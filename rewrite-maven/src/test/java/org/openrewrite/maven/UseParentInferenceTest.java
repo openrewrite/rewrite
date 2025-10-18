@@ -61,9 +61,7 @@ class UseParentInferenceTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                      <relativePath/>
-                  </parent>
+                  <parent/>
                   <artifactId>child</artifactId>
               </project>
               """,
@@ -102,9 +100,7 @@ class UseParentInferenceTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                      <relativePath/>
-                  </parent>
+                  <parent/>
                   <artifactId>child</artifactId>
               </project>
               """,
@@ -214,9 +210,7 @@ class UseParentInferenceTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                      <relativePath/>
-                  </parent>
+                  <parent/>
                   <artifactId>child</artifactId>
                   <version>2.0.0</version>
               </project>
@@ -264,9 +258,7 @@ class UseParentInferenceTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                      <relativePath/>
-                  </parent>
+                  <parent/>
                   <artifactId>child</artifactId>
                   <dependencies>
                       <dependency>
@@ -316,9 +308,7 @@ class UseParentInferenceTest implements RewriteTest {
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <!-- Parent POM -->
-                  <parent>
-                      <relativePath/>
-                  </parent>
+                  <parent/>
                   <artifactId>child</artifactId>
               </project>
               """,

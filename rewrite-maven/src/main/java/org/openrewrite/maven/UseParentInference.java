@@ -18,14 +18,11 @@ package org.openrewrite.maven;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
 public class UseParentInference extends Recipe {
-
-    private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
 
     @Override
     public String getDisplayName() {
@@ -48,32 +45,12 @@ public class UseParentInference extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (isParentTag()) {
+                if (isParentTag() && tag.getContent() != null && !tag.getContent().isEmpty()) {
                     // Only process if relativePath is explicitly ".." or not present (which defaults to "..")
                     Optional<Xml.Tag> relativePathTag = t.getChild("relativePath");
                     String relativePath = relativePathTag.map(rp -> rp.getValue().orElse("")).orElse(null);
-
-                    // Check if relativePath is explicitly ".." or not present
-                    // Empty string ("") means <relativePath/> which explicitly disables filesystem lookup - skip this
-                    if (relativePath != null &&
-                            !relativePath.isEmpty() &&
-                            !"..".equals(relativePath) &&
-                            !"../".equals(relativePath)) {
-                        // Non-default relativePath (like "../../parent"), don't change
-                        return t;
-                    }
-
                     if (relativePath == null || "..".equals(relativePath) || "../".equals(relativePath)) {
-                        // Check if the parent has groupId, artifactId, and version
-                        boolean hasGroupId = t.getChild("groupId").isPresent();
-                        boolean hasArtifactId = t.getChild("artifactId").isPresent();
-                        boolean hasVersion = t.getChild("version").isPresent();
-
-                        // Only apply if all coordinates are present (otherwise it's already using inference)
-                        if (hasGroupId && hasArtifactId && hasVersion) {
-                            // Replace with parent tag containing only relativePath
-                            return Xml.Tag.build("<parent/>");
-                        }
+                        return Xml.Tag.build("<parent/>").withPrefix(tag.getPrefix());
                     }
                 }
 
