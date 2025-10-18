@@ -131,7 +131,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, P p) {
-            if (fieldAccess.getType() instanceof JavaType.Parameterized &&
+            if ("class".equals(fieldAccess.getName().getSimpleName()) &&
+                    fieldAccess.getType() instanceof JavaType.Parameterized &&
                     ((JavaType.Parameterized) fieldAccess.getType()).getType() instanceof JavaType.Class) {
                 return fieldAccess; // Avoid renaming `Foo` in `Foo.class`
             }
