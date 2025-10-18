@@ -53,3 +53,91 @@ recipeList:
   - org.openrewrite.maven.RenamePropertyKey:
       oldKey: pom.version
       newKey: project.version
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.MigrateToMaven4
+displayName: Migrate to Maven 4
+description: Migrates Maven POMs from Maven 3 to Maven 4, addressing breaking changes and deprecations. This recipe updates property expressions, lifecycle phases, removes duplicate plugin declarations, and replaces removed properties to ensure compatibility with Maven 4.
+recipeList:
+  - org.openrewrite.maven.cleanup.PrefixlessExpressions
+  - org.openrewrite.maven.ReplaceRemovedRootDirectoryProperties
+  - org.openrewrite.maven.ReplaceDeprecatedLifecyclePhases
+  - org.openrewrite.maven.RemoveDuplicatePluginDeclarations
+  - org.openrewrite.maven.UpgradeToModelVersion410
+  - org.openrewrite.maven.ReplaceModulesWithSubprojects
+  - org.openrewrite.maven.UseParentInference
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.ReplaceRemovedRootDirectoryProperties
+displayName: Replace removed root directory properties
+description: Maven 4 removed support for deprecated root directory properties. This recipe replaces `${executionRootDirectory}` with `${session.rootDirectory}` and `${multiModuleProjectDirectory}` with `${project.rootDirectory}`.
+recipeList:
+  - org.openrewrite.maven.RenamePropertyKey:
+      oldKey: executionRootDirectory
+      newKey: session.rootDirectory
+  - org.openrewrite.maven.RenamePropertyKey:
+      oldKey: multiModuleProjectDirectory
+      newKey: project.rootDirectory
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.ReplaceDeprecatedLifecyclePhases
+displayName: Replace deprecated lifecycle phases
+description: Maven 4 deprecated all `pre-*` and `post-*` lifecycle phases in favor of the `before:` and `after:` syntax. This recipe updates plugin phase declarations to use the new syntax, including `pre-clean` → `before:clean`, `pre-site` → `before:site`, `pre-integration-test` → `before:integration-test`, and their `post-*` equivalents.
+recipeList:
+  - org.openrewrite.xml.ChangeTagValue:
+      elementName: //plugins/plugin/executions/execution/phase
+      oldValue: pre-clean
+      newValue: before:clean
+  - org.openrewrite.xml.ChangeTagValue:
+      elementName: //plugins/plugin/executions/execution/phase
+      oldValue: post-clean
+      newValue: after:clean
+  - org.openrewrite.xml.ChangeTagValue:
+      elementName: //plugins/plugin/executions/execution/phase
+      oldValue: pre-site
+      newValue: before:site
+  - org.openrewrite.xml.ChangeTagValue:
+      elementName: //plugins/plugin/executions/execution/phase
+      oldValue: post-site
+      newValue: after:site
+  - org.openrewrite.xml.ChangeTagValue:
+      elementName: //plugins/plugin/executions/execution/phase
+      oldValue: pre-integration-test
+      newValue: before:integration-test
+  - org.openrewrite.xml.ChangeTagValue:
+      elementName: //plugins/plugin/executions/execution/phase
+      oldValue: post-integration-test
+      newValue: after:integration-test
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.UpgradeToModelVersion410
+displayName: Upgrade to Maven model version 4.1.0
+description: Upgrades Maven POMs from model version 4.0.0 to 4.1.0, enabling new Maven 4 features like `<subprojects>`, `bom` packaging, and automatic version inference. This recipe updates the `<modelVersion>` element, `xmlns` namespace, and `xsi:schemaLocation` from 4.0.0 to 4.1.0.
+recipeList:
+  - org.openrewrite.xml.ChangeTagValue:
+      elementName: /project/modelVersion
+      oldValue: 4.0.0
+      newValue: 4.1.0
+  - org.openrewrite.xml.ChangeTagAttribute:
+      elementName: /project
+      attributeName: xmlns
+      oldValue: http://maven.apache.org/POM/4.0.0
+      newValue: http://maven.apache.org/POM/4.1.0
+  - org.openrewrite.xml.ChangeTagAttribute:
+      elementName: /project
+      attributeName: xsi:schemaLocation
+      oldValue: (http://maven\.apache\.org/POM/)4\.0\.0(\s+http://maven\.apache\.org/xsd/maven-)4\.0\.0(\.xsd)
+      newValue: $14.1.0$24.1.0$3
+      regex: true
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.ReplaceModulesWithSubprojects
+displayName: Replace modules with subprojects
+description: Maven 4 model version 4.1.0 deprecates the `<modules>` element in favor of `<subprojects>` to eliminate confusion with Java's Platform Module System (JPMS). This recipe renames `<modules>` to `<subprojects>` and `<module>` children to `<subproject>`.
+recipeList:
+  - org.openrewrite.xml.ChangeTagName:
+      elementName: /project/modules/module
+      newName: subproject
+  - org.openrewrite.xml.ChangeTagName:
+      elementName: /project/modules
+      newName: subprojects
