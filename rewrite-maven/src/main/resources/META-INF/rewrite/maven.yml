@@ -110,21 +110,6 @@ recipeList:
       newValue: after:integration-test
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.maven.UpgradeToModelVersion410
-displayName: Upgrade to Maven model version 4.1.0
-description: Upgrades Maven POMs from model version 4.0.0 to 4.1.0, enabling new Maven 4 features like `<subprojects>`, `bom` packaging, and automatic version inference. This recipe updates the `<modelVersion>` element and `xmlns` namespace from 4.0.0 to 4.1.0.
-recipeList:
-  - org.openrewrite.xml.ChangeTagValue:
-      elementName: /project/modelVersion
-      oldValue: "4.0.0"
-      newValue: "4.1.0"
-  - org.openrewrite.xml.ChangeTagAttribute:
-      elementName: /project
-      attributeName: xmlns
-      oldValue: http://maven.apache.org/POM/4.0.0
-      newValue: http://maven.apache.org/POM/4.1.0
----
-type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.ReplaceModulesWithSubprojects
 displayName: Replace modules with subprojects
 description: Maven 4 model version 4.1.0 deprecates the `<modules>` element in favor of `<subprojects>` to eliminate confusion with Java's Platform Module System (JPMS). This recipe renames `<modules>` to `<subprojects>` and `<module>` children to `<subproject>`.

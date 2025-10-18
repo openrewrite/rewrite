@@ -55,12 +55,15 @@ public class UseParentInference extends Recipe {
 
                     // Check if relativePath is explicitly ".." or not present
                     // Empty string ("") means <relativePath/> which explicitly disables filesystem lookup - skip this
-                    if (relativePath != null && !relativePath.isEmpty() && !"..".equals(relativePath) && !"../".equals(relativePath)) {
+                    if (relativePath != null &&
+                            !relativePath.isEmpty() &&
+                            !"..".equals(relativePath) &&
+                            !"../".equals(relativePath)) {
                         // Non-default relativePath (like "../../parent"), don't change
                         return t;
                     }
 
-                    if (relativePath == null || "..".equals(relativePath)) {
+                    if (relativePath == null || "..".equals(relativePath) || "../".equals(relativePath)) {
                         // Check if the parent has groupId, artifactId, and version
                         boolean hasGroupId = t.getChild("groupId").isPresent();
                         boolean hasArtifactId = t.getChild("artifactId").isPresent();
@@ -69,7 +72,7 @@ public class UseParentInference extends Recipe {
                         // Only apply if all coordinates are present (otherwise it's already using inference)
                         if (hasGroupId && hasArtifactId && hasVersion) {
                             // Replace with parent tag containing only relativePath
-                            t = autoFormat(Xml.Tag.build("<parent><relativePath/></parent>"), ctx, getCursor().getParentOrThrow());
+                            return Xml.Tag.build("<parent/>");
                         }
                     }
                 }
