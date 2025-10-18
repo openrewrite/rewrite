@@ -15,10 +15,8 @@
  */
 package org.openrewrite.maven;
 
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 public class ReplaceModulesWithSubprojects extends Recipe {
@@ -34,25 +32,26 @@ public class ReplaceModulesWithSubprojects extends Recipe {
     @Override
     public String getDescription() {
         return "Maven 4 model version 4.1.0 deprecates the `<modules>` element in favor of `<subprojects>` " +
-               "to eliminate confusion with Java's Platform Module System (JPMS). " +
-               "This recipe renames `<modules>` to `<subprojects>` and `<module>` children to `<subproject>`.";
+                "to eliminate confusion with Java's Platform Module System (JPMS). " +
+                "This recipe renames `<modules>` to `<subprojects>` and `<module>` children to `<subproject>`.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new FindSourceFiles("**/pom.xml"), new XmlIsoVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
                 if (MODULES_MATCHER.matches(getCursor())) {
-                    t = t.withName("subprojects");
-                } else if (MODULE_MATCHER.matches(getCursor())) {
-                    t = t.withName("subproject");
+                    return t.withName("subprojects");
+                }
+                if (MODULE_MATCHER.matches(getCursor())) {
+                    return t.withName("subproject");
                 }
 
                 return t;
             }
-        });
+        };
     }
 }

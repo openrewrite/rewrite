@@ -15,7 +15,9 @@
  */
 package org.openrewrite.maven;
 
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -41,7 +43,7 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new FindSourceFiles("**/pom.xml"), new MavenIsoVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
@@ -65,6 +67,6 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
 
                 return t;
             }
-        });
+        };
     }
 }

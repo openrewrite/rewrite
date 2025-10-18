@@ -15,10 +15,10 @@
  */
 package org.openrewrite.maven;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashMap;
@@ -27,6 +27,7 @@ import java.util.Map;
 public class ReplaceDeprecatedLifecyclePhases extends Recipe {
 
     private static final Map<String, String> PHASE_REPLACEMENTS = new HashMap<>();
+
     static {
         PHASE_REPLACEMENTS.put("pre-clean", "before:clean");
         PHASE_REPLACEMENTS.put("post-clean", "after:clean");
@@ -46,21 +47,19 @@ public class ReplaceDeprecatedLifecyclePhases extends Recipe {
     @Override
     public String getDescription() {
         return "Maven 4 deprecated all `pre-*` and `post-*` lifecycle phases in favor of the `before:` and `after:` syntax. " +
-               "This recipe updates plugin phase declarations to use the new syntax, including `pre-clean` → `before:clean`, " +
-               "`pre-site` → `before:site`, `pre-integration-test` → `before:integration-test`, and their `post-*` equivalents.";
+                "This recipe updates plugin phase declarations to use the new syntax, including `pre-clean` → `before:clean`, " +
+                "`pre-site` → `before:site`, `pre-integration-test` → `before:integration-test`, and their `post-*` equivalents.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new FindSourceFiles("**/pom.xml"), new XmlIsoVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if ((PLUGIN_PHASE_MATCHER.matches(getCursor())) &&
-                    t.getValue().isPresent()) {
-                    String currentPhase = t.getValue().get();
-                    String newPhase = PHASE_REPLACEMENTS.get(currentPhase);
+                if ((PLUGIN_PHASE_MATCHER.matches(getCursor())) && t.getValue().isPresent()) {
+                    String newPhase = PHASE_REPLACEMENTS.get(t.getValue().get());
                     if (newPhase != null) {
                         return t.withValue(newPhase);
                     }
@@ -68,6 +67,6 @@ public class ReplaceDeprecatedLifecyclePhases extends Recipe {
 
                 return t;
             }
-        });
+        };
     }
 }
