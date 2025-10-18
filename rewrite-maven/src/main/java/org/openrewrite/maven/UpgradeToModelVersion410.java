@@ -15,17 +15,24 @@
  */
 package org.openrewrite.maven;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.regex.Pattern;
 
 public class UpgradeToModelVersion410 extends Recipe {
 
     private static final XPathMatcher MODEL_VERSION_MATCHER = new XPathMatcher("/project/modelVersion");
+    private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
     private static final String MODEL_VERSION_410 = "4.1.0";
+    private static final String NAMESPACE_400 = "http://maven.apache.org/POM/4.0.0";
     private static final String NAMESPACE_410 = "http://maven.apache.org/POM/4.1.0";
+    private static final String SCHEMA_LOCATION_400 = "http://maven.apache.org/xsd/maven-4.0.0.xsd";
+    private static final String SCHEMA_LOCATION_410 = "http://maven.apache.org/xsd/maven-4.1.0.xsd";
 
     @Override
     public String getDisplayName() {
@@ -35,15 +42,15 @@ public class UpgradeToModelVersion410 extends Recipe {
     @Override
     public String getDescription() {
         return "Upgrades Maven POMs from model version 4.0.0 to 4.1.0, enabling new Maven 4 features " +
-               "like `<subprojects>`, `bom` packaging, and automatic version inference. " +
-               "This recipe only updates the `<modelVersion>` element. Namespace updates should be done separately if needed.";
+                "like `<subprojects>`, `bom` packaging, and automatic version inference. " +
+                "This recipe updates the `<modelVersion>` element and namespace URLs from 4.0.0 to 4.1.0.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new FindSourceFiles("**/pom.xml"), new XmlIsoVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
                 // Update modelVersion from 4.0.0 to 4.1.0
@@ -53,8 +60,50 @@ public class UpgradeToModelVersion410 extends Recipe {
                     }
                 }
 
+                // Update namespace URLs on project element
+                if (PROJECT_MATCHER.matches(getCursor())) {
+                    t = t.withAttributes(ListUtils.map(t.getAttributes(), attr -> {
+                        // Update xmlns namespace from 4.0.0 to 4.1.0
+                        if (attr.getKeyAsString().equals("xmlns") &&
+                            attr.getValueAsString().equals(NAMESPACE_400)) {
+                            return attr.withValue(
+                                new Xml.Attribute.Value(
+                                    attr.getValue().getId(),
+                                    attr.getValue().getPrefix(),
+                                    attr.getValue().getMarkers(),
+                                    attr.getValue().getQuote(),
+                                    NAMESPACE_410
+                                )
+                            );
+                        }
+
+                        // Update xsi:schemaLocation to replace 4.0.0 URLs with 4.1.0
+                        if (attr.getKeyAsString().equals("xsi:schemaLocation")) {
+                            String schemaLocation = attr.getValueAsString();
+                            // Replace both namespace and XSD URLs
+                            String updatedSchemaLocation = schemaLocation
+                                .replaceAll(Pattern.quote(NAMESPACE_400), NAMESPACE_410)
+                                .replaceAll(Pattern.quote(SCHEMA_LOCATION_400), SCHEMA_LOCATION_410);
+
+                            if (!updatedSchemaLocation.equals(schemaLocation)) {
+                                return attr.withValue(
+                                    new Xml.Attribute.Value(
+                                        attr.getValue().getId(),
+                                        attr.getValue().getPrefix(),
+                                        attr.getValue().getMarkers(),
+                                        attr.getValue().getQuote(),
+                                        updatedSchemaLocation
+                                    )
+                                );
+                            }
+                        }
+
+                        return attr;
+                    }));
+                }
+
                 return t;
             }
-        });
+        };
     }
 }

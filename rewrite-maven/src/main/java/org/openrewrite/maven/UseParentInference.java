@@ -15,10 +15,10 @@
  */
 package org.openrewrite.maven;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 public class UseParentInference extends Recipe {
@@ -33,17 +33,17 @@ public class UseParentInference extends Recipe {
     @Override
     public String getDescription() {
         return "Maven 4.1.0 supports automatic parent version inference when using a relative path. " +
-               "This recipe simplifies parent declarations by using the shorthand `<parent/>` form " +
-               "when the parent is in the default location (`..`), removing the explicit `<relativePath>`, " +
-               "`<groupId>`, `<artifactId>`, and `<version>` elements. Maven automatically infers these " +
-               "values from the parent POM.";
+                "This recipe simplifies parent declarations by using the shorthand `<parent/>` form " +
+                "when the parent is in the default location (`..`), removing the explicit `<relativePath>`, " +
+                "`<groupId>`, `<artifactId>`, and `<version>` elements. Maven automatically infers these " +
+                "values from the parent POM.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new FindSourceFiles("**/pom.xml"), new XmlIsoVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
                 if (PARENT_MATCHER.matches(getCursor())) {
@@ -74,6 +74,6 @@ public class UseParentInference extends Recipe {
 
                 return t;
             }
-        });
+        };
     }
 }
