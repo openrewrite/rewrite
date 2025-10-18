@@ -53,3 +53,21 @@ recipeList:
   - org.openrewrite.maven.RenamePropertyKey:
       oldKey: pom.version
       newKey: project.version
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.MigrateToMaven4
+displayName: Migrate to Maven 4
+description: Migrates Maven POMs from Maven 3 to Maven 4, addressing breaking changes and deprecations. This recipe updates property expressions, lifecycle phases, removes duplicate plugin declarations, and replaces removed properties to ensure compatibility with Maven 4.
+recipeList:
+  - org.openrewrite.maven.cleanup.PrefixlessExpressions
+  - org.openrewrite.maven.ReplaceRemovedRootDirectoryProperties
+  - org.openrewrite.maven.ReplaceDeprecatedLifecyclePhases
+  - org.openrewrite.maven.RemoveDuplicatePluginDeclarations
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.AdoptMaven410Features
+displayName: Adopt Maven 4.1.0 model features
+description: Upgrades Maven POMs to use Maven 4.1.0 model version and adopts new features including subprojects (replacing modules) and the new namespace. This recipe should be applied after successfully migrating to Maven 4 with the base compatibility recipe.
+recipeList:
+  - org.openrewrite.maven.UpgradeToModelVersion410
+  - org.openrewrite.maven.ReplaceModulesWithSubprojects
