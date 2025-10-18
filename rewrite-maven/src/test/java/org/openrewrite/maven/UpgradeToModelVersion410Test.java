@@ -26,7 +26,7 @@ class UpgradeToModelVersion410Test implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UpgradeToModelVersion410());
+        spec.recipe(new UpgradeToModelVersion410(null));
     }
 
     @DocumentExample
@@ -188,6 +188,35 @@ class UpgradeToModelVersion410Test implements RewriteTest {
                           <scope>test</scope>
                       </dependency>
                   </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeToCustomVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeToModelVersion410("4.2.0")),
+          pomXml(
+            """
+              <project xmlns="http://maven.apache.org/POM/4.0.0"
+                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+              </project>
+              """,
+            """
+              <project xmlns="http://maven.apache.org/POM/4.2.0"
+                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xsi:schemaLocation="http://maven.apache.org/POM/4.2.0 http://maven.apache.org/xsd/maven-4.2.0.xsd">
+                  <modelVersion>4.2.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
               </project>
               """
           )
