@@ -55,6 +55,18 @@ recipeList:
       newKey: project.version
 ---
 type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.ReplaceRemovedRootDirectoryProperties
+displayName: Replace removed root directory properties
+description: Maven 4 removed support for deprecated root directory properties. This recipe replaces `${executionRootDirectory}` with `${session.rootDirectory}` and `${multiModuleProjectDirectory}` with `${project.rootDirectory}`.
+recipeList:
+  - org.openrewrite.maven.RenamePropertyKey:
+      oldKey: executionRootDirectory
+      newKey: session.rootDirectory
+  - org.openrewrite.maven.RenamePropertyKey:
+      oldKey: multiModuleProjectDirectory
+      newKey: project.rootDirectory
+---
+type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.ReplaceDeprecatedLifecyclePhases
 displayName: Replace deprecated lifecycle phases
 description: Maven 4 deprecated all `pre-*` and `post-*` lifecycle phases in favor of the `before:` and `after:` syntax. This recipe updates plugin phase declarations to use the new syntax, including `pre-clean` → `before:clean`, `pre-site` → `before:site`, `pre-integration-test` → `before:integration-test`, and their `post-*` equivalents.
