@@ -21,6 +21,8 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Optional;
+
 public class UseParentInference extends Recipe {
 
     private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
@@ -46,14 +48,14 @@ public class UseParentInference extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (PARENT_MATCHER.matches(getCursor())) {
+                if (isParentTag()) {
                     // Only process if relativePath is explicitly ".." or not present (which defaults to "..")
-                    java.util.Optional<Xml.Tag> relativePathTag = t.getChild("relativePath");
+                    Optional<Xml.Tag> relativePathTag = t.getChild("relativePath");
                     String relativePath = relativePathTag.map(rp -> rp.getValue().orElse("")).orElse(null);
 
                     // Check if relativePath is explicitly ".." or not present
                     // Empty string ("") means <relativePath/> which explicitly disables filesystem lookup - skip this
-                    if (relativePath != null && !relativePath.isEmpty() && !"..".equals(relativePath)) {
+                    if (relativePath != null && !relativePath.isEmpty() && !"..".equals(relativePath) && !"../".equals(relativePath)) {
                         // Non-default relativePath (like "../../parent"), don't change
                         return t;
                     }
