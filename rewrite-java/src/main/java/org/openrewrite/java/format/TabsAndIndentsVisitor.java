@@ -399,7 +399,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
             int declPrefixLength = getLengthOfWhitespace(method.getPrefix().getLastWhitespace());
             int argPrefixLength = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
-            //noinspection ConstantConditions to be backwards compatible with older style versions
             if (declPrefixLength >= argPrefixLength) {
                 return declPrefixLength + style.getContinuationIndent();
             }

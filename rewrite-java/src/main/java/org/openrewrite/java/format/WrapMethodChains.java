@@ -43,7 +43,8 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
 
         try {
             // styles are parent loaded, so the getters may or may not be present and they may or may not return null
-            if (style != null && style.getChainedMethodCalls() != null && style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways) {
+            if (style != null && style.getChainedMethodCalls() != null &&
+                    (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways || style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong)) {
                 List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
                         .map(name -> String.format("*..* %s(..)", name))
                         .map(MethodMatcher::new)
@@ -57,6 +58,11 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                 Space after = m.getPadding().getSelect().getAfter();
                 //Already on a new line
                 if (after.getLastWhitespace().contains("\n")) {
+                    return m;
+                }
+
+                // Not long enough to wrap
+                if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong && LengthCalculator.computeTreeLineLength(method, getCursor()) <= style.getHardWrapAt()) {
                     return m;
                 }
 
