@@ -67,7 +67,8 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.AdoptMaven410Features
 displayName: Adopt Maven 4.1.0 model features
-description: Upgrades Maven POMs to use Maven 4.1.0 model version and adopts new features including subprojects (replacing modules) and the new namespace. This recipe should be applied after successfully migrating to Maven 4 with the base compatibility recipe.
+description: Upgrades Maven POMs to use Maven 4.1.0 model version and adopts new features including subprojects (replacing modules), parent inference, and the new namespace. This recipe should be applied after successfully migrating to Maven 4 with the base compatibility recipe.
 recipeList:
   - org.openrewrite.maven.UpgradeToModelVersion410
   - org.openrewrite.maven.ReplaceModulesWithSubprojects
+  - org.openrewrite.maven.UseParentInference
