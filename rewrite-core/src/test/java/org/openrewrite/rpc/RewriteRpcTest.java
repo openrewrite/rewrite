@@ -169,7 +169,7 @@ class RewriteRpcTest implements RewriteTest {
         Cursor c1 = new Cursor(parent, 0);
         Cursor c2 = new Cursor(c1, 1);
 
-        Cursor clientC2 = server.getCursor(client.getCursorIds(c2));
+        Cursor clientC2 = server.getCursor(client.getCursorIds(c2), null);
         assertThat(clientC2.<Integer>getValue()).isEqualTo(1);
         assertThat(clientC2.getParentOrThrow().<Integer>getValue()).isEqualTo(0);
         assertThat(clientC2.getParentOrThrow(2).<String>getValue()).isEqualTo(Cursor.ROOT_VALUE);

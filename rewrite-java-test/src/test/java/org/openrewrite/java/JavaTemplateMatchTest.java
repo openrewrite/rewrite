@@ -1001,6 +1001,40 @@ class JavaTemplateMatchTest implements RewriteTest {
     }
 
     @Test
+    void matchBigDecimalPrecision() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate template = JavaTemplate.builder("java.math.BigDecimal.valueOf(0)").build();
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.math.BigDecimal;
+              class Foo {
+                  void test() {
+                      BigDecimal.valueOf(0); // matched
+                      BigDecimal.valueOf(0.0); // different precision
+                  }
+              }
+              """,
+            """
+              import java.math.BigDecimal;
+              class Foo {
+                  void test() {
+                      /*~~>*/BigDecimal.valueOf(0); // matched
+                      BigDecimal.valueOf(0.0); // different precision
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void matchMemberReferenceContainingParameter() {
         rewriteRun(
           spec -> spec

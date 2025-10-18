@@ -48,6 +48,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
+@EqualsAndHashCode(callSuper = false)
 @AllArgsConstructor(access = AccessLevel.PACKAGE) // required for @With and tests
 @With
 public class GitProvenance extends Reference implements Marker {

@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-hcl/src/main/antlr/JsonPathLexer.g4 by ANTLR 4.13.2
+// Generated from /Users/kbrockhoff/git/kbrockhoff/rewrite/rewrite-hcl/src/main/antlr/JsonPathLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
-
+import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.LexerATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class JsonPathLexer extends Lexer {
@@ -31,12 +32,12 @@ public class JsonPathLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6,
-		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14,
-		COLON=15, QUESTION=16, CONTAINS=17, TRUE=18, FALSE=19, NULL=20, Identifier=21,
-		StringLiteral=22, PositiveNumber=23, NegativeNumber=24, NumericLiteral=25,
-		COMMA=26, TICK=27, QUOTE=28, MATCHES=29, LOGICAL_OPERATOR=30, AND=31,
-		OR=32, EQUALITY_OPERATOR=33, EQ=34, NE=35, MATCHES_REGEX_CLOSE=36, S=37,
+		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6, 
+		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14, 
+		COLON=15, QUESTION=16, CONTAINS=17, TRUE=18, FALSE=19, NULL=20, Identifier=21, 
+		StringLiteral=22, PositiveNumber=23, NegativeNumber=24, NumericLiteral=25, 
+		COMMA=26, TICK=27, QUOTE=28, MATCHES=29, LOGICAL_OPERATOR=30, AND=31, 
+		OR=32, EQUALITY_OPERATOR=33, EQ=34, NE=35, MATCHES_REGEX_CLOSE=36, S=37, 
 		REGEX=38;
 	public static final int
 		MATCHES_REGEX=1;
@@ -50,13 +51,13 @@ public class JsonPathLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK",
-			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD",
-			"COLON", "QUESTION", "CONTAINS", "TRUE", "FALSE", "NULL", "Identifier",
-			"StringLiteral", "PositiveNumber", "NegativeNumber", "NumericLiteral",
-			"COMMA", "TICK", "QUOTE", "MATCHES", "LOGICAL_OPERATOR", "AND", "OR",
-			"EQUALITY_OPERATOR", "EQ", "NE", "ESCAPE_SEQUENCE", "UNICODE", "HEX_DIGIT",
-			"SAFE_CODE_POINT", "EXPONENT_PART", "MINUS", "MATCHES_REGEX_CLOSE", "S",
+			"WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK", 
+			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD", 
+			"COLON", "QUESTION", "CONTAINS", "TRUE", "FALSE", "NULL", "Identifier", 
+			"StringLiteral", "PositiveNumber", "NegativeNumber", "NumericLiteral", 
+			"COMMA", "TICK", "QUOTE", "MATCHES", "LOGICAL_OPERATOR", "AND", "OR", 
+			"EQUALITY_OPERATOR", "EQ", "NE", "ESCAPE_SEQUENCE", "UNICODE", "HEX_DIGIT", 
+			"SAFE_CODE_POINT", "EXPONENT_PART", "MINUS", "MATCHES_REGEX_CLOSE", "S", 
 			"REGEX"
 		};
 	}
@@ -64,20 +65,20 @@ public class JsonPathLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'\\uFEFF'", null, "'{'", "'}'", "'['", "']'", "'('", "')'",
-			"'@'", "'.'", "'..'", "'$'", "'*'", "':'", "'?'", "'contains'", "'true'",
-			"'false'", "'null'", null, null, null, null, null, "','", "'''", "'\"'",
+			null, null, "'\\uFEFF'", null, "'{'", "'}'", "'['", "']'", "'('", "')'", 
+			"'@'", "'.'", "'..'", "'$'", "'*'", "':'", "'?'", "'contains'", "'true'", 
+			"'false'", "'null'", null, null, null, null, null, "','", "'''", "'\"'", 
 			"'=~'", null, "'&&'", "'||'", null, "'=='", "'!='"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK",
-			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD",
-			"COLON", "QUESTION", "CONTAINS", "TRUE", "FALSE", "NULL", "Identifier",
-			"StringLiteral", "PositiveNumber", "NegativeNumber", "NumericLiteral",
-			"COMMA", "TICK", "QUOTE", "MATCHES", "LOGICAL_OPERATOR", "AND", "OR",
+			null, "WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK", 
+			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD", 
+			"COLON", "QUESTION", "CONTAINS", "TRUE", "FALSE", "NULL", "Identifier", 
+			"StringLiteral", "PositiveNumber", "NegativeNumber", "NumericLiteral", 
+			"COMMA", "TICK", "QUOTE", "MATCHES", "LOGICAL_OPERATOR", "AND", "OR", 
 			"EQUALITY_OPERATOR", "EQ", "NE", "MATCHES_REGEX_CLOSE", "S", "REGEX"
 		};
 	}

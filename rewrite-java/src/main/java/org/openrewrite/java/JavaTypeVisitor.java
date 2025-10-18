@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
@@ -22,26 +24,24 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.util.List;
 
+import static org.openrewrite.internal.ListUtils.arrayOrNullIfEmpty;
+
+@Getter
+@Setter
 public class JavaTypeVisitor<P> {
     private Cursor cursor = new Cursor(null, "root");
-
-    public Cursor getCursor() {
-        return cursor;
-    }
-
-    public void setCursor(Cursor cursor) {
-        this.cursor = cursor;
-    }
 
     public @Nullable <JT extends JavaType> List<JT> visit(@Nullable List<JT> javaTypes, P p) {
         //noinspection unchecked
         return ListUtils.map(javaTypes, jt -> (JT) visit(jt, p));
     }
 
+    @SuppressWarnings("unused")
     public @Nullable JavaType preVisit(JavaType javaType, P p) {
         return javaType;
     }
 
+    @SuppressWarnings("unused")
     public @Nullable JavaType postVisit(JavaType javaType, P p) {
         return javaType;
     }
@@ -62,7 +62,7 @@ public class JavaTypeVisitor<P> {
         return t;
     }
 
-    public @Nullable JavaType visit(@Nullable JavaType javaType, P p) {
+    public JavaType visit(@Nullable JavaType javaType, P p) {
         if (javaType != null) {
             cursor = new Cursor(cursor, javaType);
             javaType = preVisit(javaType, p);
@@ -87,6 +87,8 @@ public class JavaTypeVisitor<P> {
                 javaType = visitMethod((JavaType.Method) javaType, p);
             } else if (javaType instanceof JavaType.Variable) {
                 javaType = visitVariable((JavaType.Variable) javaType, p);
+            } else if (javaType instanceof JavaType.Unknown) {
+                javaType = visitUnknown((JavaType.Unknown) javaType, p);
             }
 
             if (javaType != null) {
@@ -104,39 +106,55 @@ public class JavaTypeVisitor<P> {
     }
 
     public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, P p) {
-        return multiCatch.withThrowableTypes(ListUtils.map(multiCatch.getThrowableTypes(), tt -> visit(tt, p)));
+        multiCatch.unsafeSet(
+                visit(multiCatch.getThrowableTypes(), p)
+        );
+        return multiCatch;
     }
 
     public JavaType visitAnnotation(JavaType.Annotation annotation, P p) {
-        JavaType.Annotation a = annotation;
-        return a.withType((JavaType.FullyQualified) visit(a.getType(), p));
+        annotation.unsafeSet(
+                (JavaType.FullyQualified) visit(annotation.getType(), p),
+                arrayOrNullIfEmpty(annotation.getValues(), JavaType.EMPTY_ANNOTATION_VALUE_ARRAY)
+        );
+        return annotation;
     }
 
     public JavaType visitArray(JavaType.Array array, P p) {
-        JavaType.Array a = array;
-        a = a.withElemType(visit(a.getElemType(), p));
-        return a.withAnnotations(visit(a.getAnnotations(), p));
+        array.unsafeSet(
+                visit(array.getElemType(), p),
+                arrayOrNullIfEmpty(visit(array.getAnnotations(), p), JavaType.EMPTY_FULLY_QUALIFIED_ARRAY)
+        );
+        return array;
     }
 
     public JavaType visitClass(JavaType.Class aClass, P p) {
-        JavaType.Class c = aClass;
-        c = c.withSupertype((JavaType.FullyQualified) visit(c.getSupertype(), p));
-        c = c.withOwningClass((JavaType.FullyQualified) visit(c.getOwningClass(), p));
-        c = c.withAnnotations(ListUtils.map(c.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
-        c = c.withInterfaces(ListUtils.map(c.getInterfaces(), i -> (JavaType.FullyQualified) visit(i, p)));
-        c = c.withMembers(ListUtils.map(c.getMembers(), m -> (JavaType.Variable) visit(m, p)));
-        c = c.withMethods(ListUtils.map(c.getMethods(), m -> (JavaType.Method) visit(m, p)));
-        return c.withTypeParameters(ListUtils.map(c.getTypeParameters(), t -> visit(t, p)));
+        aClass.unsafeSet(
+                visit(aClass.getTypeParameters(), p),
+                (JavaType.FullyQualified) visit(aClass.getSupertype(), p),
+                (JavaType.FullyQualified) visit(aClass.getOwningClass(), p),
+                ListUtils.map(aClass.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)),
+                ListUtils.map(aClass.getInterfaces(), i -> (JavaType.FullyQualified) visit(i, p)),
+                ListUtils.map(aClass.getMembers(), m -> (JavaType.Variable) visit(m, p)),
+                ListUtils.map(aClass.getMethods(), m -> (JavaType.Method) visit(m, p))
+        );
+        return aClass;
     }
 
     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, P p) {
-        JavaType.GenericTypeVariable g = generic;
-        return g.withBounds(ListUtils.map(g.getBounds(), bound -> visit(bound, p)));
+        generic.unsafeSet(
+                generic.getName(),
+                generic.getVariance(),
+                visit(generic.getBounds(), p)
+        );
+        return generic;
     }
 
     public JavaType visitIntersection(JavaType.Intersection intersection, P p) {
-        JavaType.Intersection i = intersection;
-        return i.withBounds(ListUtils.map(i.getBounds(), bound -> visit(bound, p)));
+        intersection.unsafeSet(
+                visit(intersection.getBounds(), p)
+        );
+        return intersection;
     }
 
     /**
@@ -147,22 +165,30 @@ public class JavaTypeVisitor<P> {
      * @return A method
      */
     public JavaType visitMethod(JavaType.Method method, P p) {
-        JavaType.Method m = method;
-        m = m.withDeclaringType((JavaType.FullyQualified) visit(m.getDeclaringType(), p));
-        m = m.withReturnType(visit(m.getReturnType(), p));
-        m = m.withParameterTypes(ListUtils.map(m.getParameterTypes(), pt -> visit(pt, p)));
-        m = m.withThrownExceptions(ListUtils.map(m.getThrownExceptions(), t -> visit(t, p)));
-        return m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
+        method.unsafeSet(
+                (JavaType.FullyQualified) visit(method.getDeclaringType(), p),
+                visit(method.getReturnType(), p),
+                visit(method.getParameterTypes(), p),
+                visit(method.getThrownExceptions(), p),
+                ListUtils.map(method.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p))
+        );
+        return method;
     }
 
     public JavaType visitParameterized(JavaType.Parameterized parameterized, P p) {
-        JavaType.Parameterized pa = parameterized;
-        pa = pa.withType((JavaType.FullyQualified) visit(pa.getType(), p));
-        return pa.withTypeParameters(ListUtils.map(pa.getTypeParameters(), t -> visit(t, p)));
+        parameterized.unsafeSet(
+                (JavaType.FullyQualified) visit(parameterized.getType(), p),
+                visit(parameterized.getTypeParameters(), p)
+        );
+        return parameterized;
     }
 
     public JavaType visitPrimitive(JavaType.Primitive primitive, P p) {
         return primitive;
+    }
+
+    public JavaType visitUnknown(JavaType.Unknown unknown, P p) {
+        return unknown;
     }
 
     /**
@@ -173,9 +199,11 @@ public class JavaTypeVisitor<P> {
      * @return A variable
      */
     public JavaType visitVariable(JavaType.Variable variable, P p) {
-        JavaType.Variable v = variable;
-        v = v.withOwner(visit(v.getOwner(), p));
-        v = v.withType(visit(variable.getType(), p));
-        return v.withAnnotations(ListUtils.map(v.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
+        variable.unsafeSet(
+                visit(variable.getOwner(), p),
+                visit(variable.getType(), p),
+                ListUtils.map(variable.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p))
+        );
+        return variable;
     }
 }

@@ -17,12 +17,12 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -76,9 +76,7 @@ public class RemoveRepository extends Recipe {
     }
 
     private boolean isSameUrlAndID(Xml.Tag repo) {
-        boolean sameURL = StringUtils.isBlank(this.url) || StringUtils.equals(this.url, repo.getChildValue("url").orElse(null));
-        boolean sameID = StringUtils.isBlank(this.id) || StringUtils.equals(this.id, repo.getChildValue("id").orElse(null));
-
-        return sameURL && sameID;
+        return (StringUtils.isBlank(this.url) || this.url.equals(repo.getChildValue("url").orElse(null))) &&
+                (StringUtils.isBlank(this.id) || this.id.equals(repo.getChildValue("id").orElse(null)));
     }
 }

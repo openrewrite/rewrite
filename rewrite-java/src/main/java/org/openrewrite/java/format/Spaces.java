@@ -50,12 +50,11 @@ public class Spaces extends Recipe {
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
-                    SpacesStyle style = cu.getStyle(SpacesStyle.class);
-                    if (style == null) {
-                        style = IntelliJ.spaces();
-                    }
-                    return new SpacesVisitor<>(style, cu.getStyle(EmptyForInitializerPadStyle.class),
-                            cu.getStyle(EmptyForIteratorPadStyle.class)).visit(cu, ctx);
+                    return new SpacesVisitor<>(
+                            Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
+                            Style.from(EmptyForInitializerPadStyle.class, cu),
+                            Style.from(EmptyForIteratorPadStyle.class, cu))
+                            .visit(cu, ctx);
                 }
                 return super.visit(tree, ctx);
             }
@@ -64,7 +63,7 @@ public class Spaces extends Recipe {
 
     public static <J2 extends J> J2 formatSpaces(J j, Cursor cursor) {
         SourceFile cu = cursor.firstEnclosingOrThrow(SourceFile.class);
-        SpacesStyle style = cu.getStyle(SpacesStyle.class);
+        SpacesStyle style = Style.from(SpacesStyle.class, cu);
         //noinspection unchecked
         return (J2) new SpacesVisitor<>(style == null ? IntelliJ.spaces() : style,
                 Style.from(EmptyForInitializerPadStyle.class, cu),

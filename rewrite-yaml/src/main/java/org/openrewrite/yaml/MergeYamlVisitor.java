@@ -219,7 +219,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
                 String comment = null;
                 if (c.getValue() instanceof Yaml.Document) {
-                    comment = c.<Yaml.Document>getValue().getEnd().getPrefix();
+                    Yaml.Document doc = c.getValue();
+                    // Don't treat document end prefix as comment if it contains a document separator
+                    if (!preserveDocumentSeparator(doc)) {
+                        comment = doc.getEnd().getPrefix();
+                    }
                 } else if (c.getValue() instanceof Yaml.Mapping) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
@@ -384,5 +388,20 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         int keyIndent = (lines.length > 1 ? lines[lines.length - 1] : "").length();
         int indent = minCommonIndentLevel(substringOfAfterFirstLineBreak(((Yaml.Scalar) entry.getValue()).getValue()));
         return Math.max(indent - keyIndent, 0);
+    }
+
+    private boolean preserveDocumentSeparator(Yaml.Document document) {
+        // Check if this document is part of a multi-document YAML with a following explicit document
+        Yaml.Documents documents = getCursor().firstEnclosing(Yaml.Documents.class);
+        if (documents != null) {
+            int currentIndex = documents.getDocuments().indexOf(document);
+            // Preserve a newline before the next document separator
+            if (0 <= currentIndex && currentIndex < documents.getDocuments().size() - 1) {
+                return documents.getDocuments().get(currentIndex + 1).isExplicit();
+            }
+            // Or if this is the last document and it has an explicit end
+            return currentIndex == documents.getDocuments().size() - 1 && document.getEnd().isExplicit();
+        }
+        return false;
     }
 }

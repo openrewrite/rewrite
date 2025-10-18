@@ -16,9 +16,11 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../../reference";
+import {extractSourcePath, withMetrics} from "./metrics";
 
 export class GetObject {
-    constructor(private readonly id: string, private readonly lastKnownId?: string) {
+    constructor(private readonly id: string,
+                private readonly sourceFileType?: string) {
     }
 
     static handle(
@@ -27,52 +29,57 @@ export class GetObject {
         localObjects: Map<string, any | ((input: string) => any)>,
         localRefs: ReferenceMap,
         batchSize: number,
-        trace: boolean
+        trace: () => boolean,
+        metricsCsv?: string,
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
 
-        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
-            let objId = request.id;
-            if (!localObjects.has(objId)) {
-                return [
-                    {state: RpcObjectState.DELETE},
-                    {state: RpcObjectState.END_OF_OBJECT}
-                ];
-            }
-
-            let objectOrGenerator = localObjects.get(objId)!;
-            if (typeof objectOrGenerator === 'function') {
-                let obj = await objectOrGenerator(objId);
-                localObjects.set(objId, obj);
-            }
-
-            let allData = pendingData.get(objId);
-            if (!allData) {
-                const after = localObjects.get(objId);
-                
-                // Determine what the remote has cached
-                let before = undefined;
-                if (request.lastKnownId) {
-                    before = remoteObjects.get(request.lastKnownId);
-                    if (before === undefined) {
-                        // Remote had something cached, but we've evicted it - must send full object
-                        remoteObjects.delete(request.lastKnownId);
+        connection.onRequest(
+            new rpc.RequestType<GetObject, any, Error>("GetObject"),
+            withMetrics<GetObject, any>(
+                "GetObject",
+                metricsCsv,
+                (context) => async request => {
+                    const objId = request.id;
+                    if (!localObjects.has(objId)) {
+                        context.target = '';
+                        return [
+                            {state: RpcObjectState.DELETE},
+                            {state: RpcObjectState.END_OF_OBJECT}
+                        ];
                     }
+
+                    const objectOrGenerator = localObjects.get(objId)!;
+                    if (typeof objectOrGenerator === 'function') {
+                        const obj = await objectOrGenerator(objId);
+                        localObjects.set(objId, obj);
+                    }
+
+                    const obj = localObjects.get(objId);
+                    context.target = extractSourcePath(obj);
+
+                    let allData = pendingData.get(objId);
+                    if (!allData) {
+                        const after = obj;
+                        const before = remoteObjects.get(objId);
+
+                        allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                            .generate(after, before);
+                        pendingData.set(objId, allData);
+
+                        remoteObjects.set(objId, after);
+                    }
+
+                    const batch = allData.splice(0, batchSize);
+
+                    // If we've sent all data, remove from pending
+                    if (allData.length === 0) {
+                        pendingData.delete(objId);
+                    }
+
+                    return batch;
                 }
-
-                allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
-                pendingData.set(objId, allData);
-
-                remoteObjects.set(objId, after);
-            }
-
-            const batch = allData.splice(0, batchSize);
-
-            // If we've sent all data, remove from pending
-            if (allData.length === 0) {
-                pendingData.delete(objId);
-            }
-
-            return batch;
-        });
-    }}
+            )
+        );
+    }
+}

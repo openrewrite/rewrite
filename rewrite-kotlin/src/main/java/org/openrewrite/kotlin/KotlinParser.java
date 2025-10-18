@@ -170,6 +170,7 @@ public class KotlinParser implements Parser {
         try {
             compilerCus = parse(acceptedInputs, disposable, pctx);
         } catch (Exception e) {
+            disposable.dispose();
             return acceptedInputs.stream().map(input -> ParseError.build(this, input, relativeTo, ctx, e));
         }
 

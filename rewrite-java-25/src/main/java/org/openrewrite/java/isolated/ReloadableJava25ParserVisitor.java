@@ -26,6 +26,8 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Position;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -60,6 +62,7 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOf;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
@@ -422,21 +425,53 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
         JContainer<Statement> primaryConstructor = null;
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
-            List<Tree> stateVector = new ArrayList<>();
+            Map<String, List<J.Annotation>> recordParams = new HashMap<>();
+            Space prefix = sourceBefore("(");
+            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
+            List<JRightPadded<J.VariableDeclarations>> varDecls = new ArrayList<>();
             for (Tree member : node.getMembers()) {
+                if (member instanceof JCMethodDecl md) {
+                    if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
+                        for (JCVariableDecl var : md.getParameters()) {
+                            recordAnnotationPosTable.put(var.getName(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
+                        }
+                    }
+                }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
-                        stateVector.add(vt);
+                        Space varDeclPrefix = whitespace();
+                        List<J.Annotation> recordAnnotations = collectAnnotations(
+                                mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.getOrDefault(vt.getName(), new HashMap<>()))
+                        );
+                        Space typeExpressionPrefix = whitespace();
+                        JRightPadded<J.VariableDeclarations> varDecl = this.<J.VariableDeclarations>convert(vt, commaDelim)
+                                .map(elem -> elem.withPrefix(varDeclPrefix)
+                                        .withTypeExpression(elem.getTypeExpression()
+                                                .withPrefix(typeExpressionPrefix)));
+                        recordParams.put(vt.getName().toString(), recordAnnotations);
+                        varDecls.add(varDecl);
                     }
                 }
             }
-            primaryConstructor = JContainer.build(
-                    sourceBefore("("),
-                    stateVector.isEmpty() ?
-                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                            convertAll(stateVector, commaDelim, t -> sourceBefore(")")),
-                    Markers.EMPTY
-            );
+
+            if (varDecls.isEmpty()) {
+                primaryConstructor = JContainer.build(
+                        prefix,
+                        singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)),
+                        Markers.EMPTY
+                );
+            } else {
+                skip(")");
+                //noinspection unchecked
+                primaryConstructor = JContainer.build(
+                        prefix,
+                        (List<JRightPadded<Statement>>) (List<?>) ListUtils.map(varDecls, varDecl ->
+                                varDecl.withElement(varDecl.getElement()
+                                        .withLeadingAnnotations(recordParams.get(varDecl.getElement().getVariables().getFirst().getSimpleName())))
+                        ),
+                        Markers.EMPTY
+                );
+            }
         }
 
         JLeftPadded<TypeTree> extendings = node.getExtendsClause() == null ? null :
@@ -533,12 +568,12 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             // since it will never be subject to refactoring
             if (m instanceof JCMethodDecl md && (
                     hasFlag(md.getModifiers(), Flags.GENERATEDCONSTR) ||
-                            hasFlag(md.getModifiers(), Flags.RECORD))) {
+                    hasFlag(md.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             if (m instanceof JCVariableDecl vt &&
-                    (hasFlag(vt.getModifiers(), Flags.ENUM) ||
-                            hasFlag(vt.getModifiers(), Flags.RECORD))) {
+                (hasFlag(vt.getModifiers(), Flags.ENUM) ||
+                 hasFlag(vt.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -811,10 +846,28 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 type);
     }
 
+    @Override
+    public J visitAnyPattern(AnyPatternTree node, Space space) {
+        JavaType type = typeMapping.type(node);
+        if (type instanceof JavaType.Variable var) {
+            type = var.withName("_");
+        }
+        skip("_");
+        return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), "_",
+                type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
+                type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
+    }
+
     private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
         if (pattern instanceof JCBindingPattern b) {
-            return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                    type, typeMapping.variableType(b.var.sym));
+            String name = b.getVariable().getName().isEmpty() ? "_" : b.getVariable().getName().toString();
+            Space space = sourceBefore(name);
+            JavaType.Variable vartype = typeMapping.variableType(b.var.sym);
+            if ("_".equals(name) && vartype != null) {
+                vartype = vartype.withName("_");
+            }
+            return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), name,
+                    type, vartype);
         } else if (pattern instanceof DeconstructionPatternTree r) {
             return visitDeconstructionPattern(r, whitespace());
         } else {
@@ -875,9 +928,23 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitLiteral(LiteralTree node, Space fmt) {
-        cursor(endPos(node));
+        int endPos = endPos(node);
         Object value = node.getValue();
-        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
+
+        if (endPos == Position.NOPOS) {
+            if (typeMapping.primitive(((JCLiteral) node).typetag) == JavaType.Primitive.String) {
+                int quote = source.startsWith("\"\"\"", cursor) ? 3 : 1;
+                int elementLength = quote == 3 ? source.indexOf("\"\"\"", cursor + quote) - cursor - quote  : value.toString().length();
+                endPos = cursor + quote + elementLength + quote;
+            } else {
+                endPos = indexOf(source, cursor,
+                        ch -> Character.isWhitespace(ch) || ",;)]}+-*/%=!<>&|^?:.".indexOf(ch) != -1
+                );
+            }
+        }
+
+        cursor(endPos);
+        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos);
         JavaType.Primitive type = typeMapping.primitive(((JCLiteral) node).typetag);
 
         if (value instanceof Character) {
@@ -1700,21 +1767,24 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
-            Space namedVarPrefix = sourceBefore(n.getName().toString());
+            String varName = n.getName().isEmpty() ? "_" : n.getName().toString();
+            Space namedVarPrefix = sourceBefore(varName);
 
-            JavaType type = typeMapping.type(n);
-            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), n.getName().toString(),
-                    type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
-                    type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
+            JavaType.Variable type = typeMapping.variableType(n.sym);
+            if ("_".equals(varName) && type != null) {
+                type = type.withName("_");
+            }
             List<JLeftPadded<Space>> dimensionsAfterName = arrayDimensions();
 
             vars.add(
                     padRight(
                             new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
-                                    name,
+                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), varName,
+                                            type != null ? type.getType() : null,
+                                            type),
                                     dimensionsAfterName,
                                     n.init != null ? padLeft(sourceBefore("="), convert(n.init)) : null,
-                                    (JavaType.Variable) typeMapping.type(n)
+                                    type
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
@@ -1778,6 +1848,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
      * Conversion utilities
      * --------------
      */
+    @Contract("null -> null; !null -> !null")
     private <J2 extends J> @Nullable J2 convert(@Nullable Tree t) {
         if (t == null) {
             return null;
@@ -1825,10 +1896,12 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
     }
 
+    @Contract("null, _ -> null; !null, _ -> !null")
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
         return convert(t, suffix, j -> Markers.EMPTY);
     }
 
+    @Contract("null, _, _ -> null; !null, _, _ -> !null")
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix, Function<Tree, Markers> markers) {
         if (t == null) {
             return null;
@@ -2159,9 +2232,17 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
     }
 
-    private final Function<Tree, Space> semiDelim = ignored -> sourceBefore(";");
-    private final Function<Tree, Space> commaDelim = ignored -> sourceBefore(",");
-    private final Function<Tree, Space> noDelim = ignored -> EMPTY;
+    private final Function<Tree, Space> semiDelim = t -> {
+        Space prefix = whitespace();
+        skip(";");
+        return prefix;
+    };
+    private final Function<Tree, Space> commaDelim = t -> {
+        Space prefix = whitespace();
+        skip(",");
+        return prefix;
+    };
+    private final Function<Tree, Space> noDelim = t -> EMPTY;
 
     private Space whitespace() {
         int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
@@ -2207,7 +2288,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                     try {
                         // FIXME instanceof probably not right here...
                         return field.get(null) instanceof Long &&
-                                field.getName().matches("[A-Z_]+");
+                               field.getName().matches("[A-Z_]+");
                     } catch (IllegalAccessException e) {
                         throw new RuntimeException(e);
                     }

@@ -15,12 +15,10 @@
  */
 package org.openrewrite.java.internal.rpc;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import static org.openrewrite.rpc.Reference.asRef;
@@ -642,13 +640,14 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(space, Space::getWhitespace);
     }
 
+    private final JavaTypeSender javaTypeSender = new JavaTypeSender();
+
     @Override
     public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcSendQueue q) {
-        if (javaType instanceof RpcCodec) {
-            //noinspection unchecked
-            ((RpcCodec<@NonNull JavaType>) javaType).rpcSend(javaType, q);
-            return javaType;
+        if (javaType == null || javaType instanceof JavaType.Unknown) {
+            return null;
         }
-        return super.visitType(javaType, q);
+        return javaTypeSender.visit(javaType, q);
     }
 }
+

@@ -35,6 +35,7 @@ import static java.util.Collections.emptyList;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 public class JRightPadded<T> {
+
     T element;
     Space after;
     Markers markers;
@@ -88,8 +89,7 @@ public class JRightPadded<T> {
         TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
         TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
         WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX),
-        ANY(Space.Location.ANY)
-        ;
+        ANY(Space.Location.ANY);
 
         private final Space.Location afterLocation;
 

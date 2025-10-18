@@ -18,6 +18,7 @@ package org.openrewrite.javascript;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
@@ -26,10 +27,10 @@ import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.tree.ParseError;
 
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static java.util.Collections.unmodifiableList;
 
@@ -39,7 +40,7 @@ public class JavaScriptParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        // Split inputs based on file size (2MB threshold)
+        // Split inputs based on file size (2MB threshold) and minification detection
         List<Input> smallFiles = new ArrayList<>();
         List<Input> largeFiles = new ArrayList<>();
 
@@ -47,8 +48,11 @@ public class JavaScriptParser implements Parser {
             if (input.getFileAttributes() != null && input.getFileAttributes().getSize() > maxSizeBytes) {
                 // File is larger than 2MB, parse with PlainTextParser
                 largeFiles.add(input);
+            } else if (isMinified(input)) {
+                // File appears to be minified, parse with PlainTextParser
+                largeFiles.add(input);
             } else {
-                // File is 2MB or smaller, parse normally
+                // File is 2MB or smaller and not minified, parse normally
                 smallFiles.add(input);
             }
         }
@@ -64,12 +68,13 @@ public class JavaScriptParser implements Parser {
         Stream<SourceFile> smallFileStream = Stream.empty();
         if (!smallFiles.isEmpty()) {
             JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
-            smallFileStream = JavaScriptRewriteRpc.getOrStart().parse(smallFiles, relativeTo, this, ctx).map(source -> {
+            smallFileStream = JavaScriptRewriteRpc.getOrStart().parse(smallFiles, relativeTo, this,
+                    JS.CompilationUnit.class.getName(), ctx).map(source -> {
                 try {
                     validator.visit(source, 0);
                     return source;
                 } catch (Exception e) {
-                    Optional<Input> input = StreamSupport.stream(smallFiles.spliterator(), false)
+                    Optional<Input> input = smallFiles.stream()
                             .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
                             .findFirst();
                     return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
@@ -90,6 +95,68 @@ public class JavaScriptParser implements Parser {
     private final static List<String> EXCLUSIONS = unmodifiableList(Arrays.asList(
             ".pnp.cjs", ".pnp.loader.mjs"
     ));
+
+    /**
+     * Detects if a JavaScript/TypeScript file is minified.
+     * Minified files are typically compressed into a single very long line.
+     *
+     * @param input The input file to check
+     * @return true if the file appears to be minified, false otherwise
+     */
+    private boolean isMinified(Input input) {
+        try {
+            // Check if filename contains common minification patterns first (no file reading needed)
+            String filename = input.getPath().getFileName().toString().toLowerCase();
+            if (filename.contains(".min.") || filename.endsWith(".min.js") ||
+                filename.endsWith(".min.mjs") || filename.endsWith(".min.cjs")) {
+                return true;
+            }
+
+            // Read a sample of the file to detect minified code patterns
+            // Many minified/bundled files have license headers followed by very long minified lines
+            try (InputStream is = input.getSource(new InMemoryExecutionContext())) {
+                final int sampleSize = 10 * 1024; // Read up to 10KB sample
+                final int longLineThreshold = 1000; // Lines > 1000 chars indicate minification
+                int currentLineLength = 0;
+                int totalCharsRead = 0;
+                int ch;
+
+                while ((ch = is.read()) != -1 && totalCharsRead < sampleSize) {
+                    totalCharsRead++;
+
+                    if (ch == '\n' || ch == '\r') {
+                        // Found end of line - reset line counter
+                        currentLineLength = 0;
+
+                        // Skip the \n in \r\n sequences
+                        if (ch == '\r') {
+                            int next = is.read();
+                            if (next != -1) {
+                                totalCharsRead++;
+                                if (next != '\n') {
+                                    // It wasn't \r\n, so count this as start of new line
+                                    currentLineLength = 1;
+                                }
+                            }
+                        }
+                    } else {
+                        currentLineLength++;
+                        // If current line exceeds threshold, it's minified
+                        if (currentLineLength > longLineThreshold) {
+                            return true;
+                        }
+                    }
+                }
+
+                // We've read the sample without finding a line > threshold
+                // This means it's normal code (not minified)
+                return false;
+            }
+        } catch (Throwable ignored) {
+            // If we can't read the file, assume it's not minified and let normal parsing handle it
+            return false;
+        }
+    }
 
     @Override
     public boolean accept(Path path) {

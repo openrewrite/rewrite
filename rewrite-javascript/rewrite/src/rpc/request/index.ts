@@ -20,3 +20,4 @@ export * from "./parse";
 export * from "./prepare-recipe";
 export * from "./print";
 export * from "./visit";
+export * from "./trace-get-object";

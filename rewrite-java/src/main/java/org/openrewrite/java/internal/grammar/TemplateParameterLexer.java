@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterLexer.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/TemplateParameterLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
+import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.LexerATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class TemplateParameterLexer extends Lexer {
@@ -30,8 +32,8 @@ public class TemplateParameterLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8,
-		LSBRACK=9, RSBRACK=10, AND=11, Extends=12, Super=13, FullyQualifiedName=14,
+		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8, 
+		LSBRACK=9, RSBRACK=10, AND=11, Extends=12, Super=13, FullyQualifiedName=14, 
 		Number=15, Identifier=16, S=17;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -43,8 +45,8 @@ public class TemplateParameterLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", "WILDCARD",
-			"LSBRACK", "RSBRACK", "AND", "Extends", "Super", "FullyQualifiedName",
+			"LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", "WILDCARD", 
+			"LSBRACK", "RSBRACK", "AND", "Extends", "Super", "FullyQualifiedName", 
 			"Number", "Identifier", "JavaLetter", "JavaLetterOrDigit", "S"
 		};
 	}
@@ -52,15 +54,15 @@ public class TemplateParameterLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "'('", "')'", "'.'", "':'", "','", "'<'", "'>'", "'?'", "'['",
+			null, "'('", "')'", "'.'", "':'", "','", "'<'", "'>'", "'?'", "'['", 
 			"']'", "'&'", "'extends'", "'super'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK",
-			"WILDCARD", "LSBRACK", "RSBRACK", "AND", "Extends", "Super", "FullyQualifiedName",
+			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", 
+			"WILDCARD", "LSBRACK", "RSBRACK", "AND", "Extends", "Super", "FullyQualifiedName", 
 			"Number", "Identifier", "S"
 		};
 	}

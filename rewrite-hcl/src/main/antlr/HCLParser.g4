@@ -87,7 +87,11 @@ object
     ;
 
 objectelem
-    : (Identifier | NULL | LPAREN Identifier RPAREN | QUOTE quotedTemplatePart* QUOTE | expression) (ASSIGN | COLON) expression COMMA?
+    : (qualifiedIdentifier | NULL | LPAREN qualifiedIdentifier RPAREN | QUOTE quotedTemplatePart* QUOTE | expression) (ASSIGN | COLON) expression COMMA?
+    ;
+
+qualifiedIdentifier
+    : Identifier (DOT Identifier)*
     ;
 
 // For Expressions
