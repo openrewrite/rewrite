@@ -15,16 +15,13 @@
  */
 package org.openrewrite.maven;
 
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
-
-import static java.util.stream.Collectors.toList;
 
 public class RemoveDuplicatePluginDeclarations extends Recipe {
 
@@ -39,66 +36,31 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     @Override
     public String getDescription() {
         return "Maven 4 rejects duplicate plugin declarations (same groupId and artifactId) with an error. " +
-               "This recipe removes duplicate plugin declarations, keeping only the first occurrence.";
+                "This recipe removes duplicate plugin declarations, keeping only the first occurrence.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new FindSourceFiles("**/pom.xml"), new XmlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindSourceFiles("**/pom.xml"), new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
                 if (PLUGINS_MATCHER.matches(getCursor()) || PLUGIN_MANAGEMENT_PLUGINS_MATCHER.matches(getCursor())) {
                     Set<String> seenPlugins = new HashSet<>();
-                    boolean hasDuplicates = false;
-
-                    // First pass: check if there are any duplicates
-                    for (Object content : t.getContent()) {
+                    return t.withContent(ListUtils.filter(t.getContent(), content -> {
                         if (content instanceof Xml.Tag) {
                             Xml.Tag pluginTag = (Xml.Tag) content;
                             if ("plugin".equals(pluginTag.getName())) {
-                                String groupId = pluginTag.getChildValue("groupId")
-                                        .orElse("org.apache.maven.plugins");
+                                String groupId = pluginTag.getChildValue("groupId").orElse("org.apache.maven.plugins");
                                 String artifactId = pluginTag.getChildValue("artifactId").orElse(null);
-
                                 if (artifactId != null) {
-                                    String pluginKey = groupId + ":" + artifactId;
-                                    if (seenPlugins.contains(pluginKey)) {
-                                        hasDuplicates = true;
-                                        break;
-                                    }
-                                    seenPlugins.add(pluginKey);
+                                    return seenPlugins.add(groupId + ":" + artifactId); // Keep only the first occurrence
                                 }
                             }
                         }
-                    }
-
-                    // Second pass: remove duplicates if found
-                    if (hasDuplicates) {
-                        seenPlugins.clear();
-                        t = t.withContent(t.getContent().stream()
-                                .filter(content -> {
-                                    if (content instanceof Xml.Tag) {
-                                        Xml.Tag pluginTag = (Xml.Tag) content;
-                                        if ("plugin".equals(pluginTag.getName())) {
-                                            String groupId = pluginTag.getChildValue("groupId")
-                                                    .orElse("org.apache.maven.plugins");
-                                            String artifactId = pluginTag.getChildValue("artifactId").orElse(null);
-
-                                            if (artifactId != null) {
-                                                String pluginKey = groupId + ":" + artifactId;
-                                                if (seenPlugins.contains(pluginKey)) {
-                                                    return false;  // Filter out duplicate
-                                                }
-                                                seenPlugins.add(pluginKey);
-                                            }
-                                        }
-                                    }
-                                    return true;
-                                })
-                                .collect(toList()));
-                    }
+                        return true; // Keep non-plugin tags
+                    }));
                 }
 
                 return t;
