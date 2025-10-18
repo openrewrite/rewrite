@@ -473,7 +473,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
-                getExamples(), source);
+                getExamples(), null);
     }
 
     @Override

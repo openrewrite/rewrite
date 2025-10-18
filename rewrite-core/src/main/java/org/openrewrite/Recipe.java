@@ -224,16 +224,10 @@ public abstract class Recipe implements Cloneable {
             recipeList1.add(next.getDescriptor());
         }
         recipeList1.trimToSize();
-        URI recipeSource;
-        try {
-            recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), getExamples(), recipeSource);
+                getMaintainers(), getContributors(), getExamples(), null);
     }
 
     private List<OptionDescriptor> getOptionDescriptors() {

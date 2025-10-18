@@ -22,15 +22,17 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
 import org.openrewrite.NlsRewrite;
+import org.openrewrite.Recipe;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeListing;
 
-import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class RecipeDescriptor {
+public class RecipeDescriptor implements RecipeListing {
     @EqualsAndHashCode.Include
     String name;
 
@@ -64,5 +66,6 @@ public class RecipeDescriptor {
 
     List<RecipeExample> examples;
 
-    URI source;
+    @Nullable
+    RecipeBundle bundle;
 }
