@@ -765,4 +765,67 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         return spec -> spec.afterRecipe(cu ->
           Assertions.assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
     }
+
+    @Test
+    void forLoopWithCorrectSpacing() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+          java(
+            """
+            class Test {
+                public static void main(String[] args) {
+                    for (int i = 0; i < args.length; i++) {
+                        System.out.println(args[i]);
+                    }
+                }
+                public static void main2(String[] args) {
+                    for (final String arg : args) {
+                        System.out.println(arg);
+                    }
+                }
+                public int indexOfFirstValue(final Object[] multipleValues) {
+                    for (int i = 0; i < multipleValues.length; i++) {
+                        if (multipleValues[i] != null) {
+                            return i;
+                        }
+                    }
+                    for (int i = 0; i < multipleValues.length;  i++) { // space
+                        if (multipleValues[i] != null) {
+                            return i;
+                        }
+                    }
+                    return -1;
+                }
+            }
+            """,
+            """
+            class Test {
+                public static void main(String[] args) {
+                    for (int i = 0; i < args.length; i++) {
+                        System.out.println(args[i]);
+                    }
+                }
+                public static void main2(String[] args) {
+                    for (final String arg : args) {
+                        System.out.println(arg);
+                    }
+                }
+                public int indexOfFirstValue(final Object[] multipleValues) {
+                    for (int i = 0; i < multipleValues.length; i++) {
+                        if (multipleValues[i] != null) {
+                            return i;
+                        }
+                    }
+                    for (int i = 0; i < multipleValues.length; i++) { // space
+                        if (multipleValues[i] != null) {
+                            return i;
+                        }
+                    }
+                    return -1;
+                }
+            }
+            """
+          )
+        );
+    }
 }
