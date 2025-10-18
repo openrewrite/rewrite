@@ -20,8 +20,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class DependencyInsightTest implements RewriteTest {
@@ -30,7 +32,13 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findDependency() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null)),
+          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> assertThat(rows).singleElement().satisfies(row -> {
+                assertThat(row.getGroupId()).isEqualTo("com.google.guava");
+                assertThat(row.getArtifactId()).isEqualTo("guava");
+                assertThat(row.getVersion()).isEqualTo("29.0-jre");
+              })
+            ),
           pomXml(
             """
               <project>
@@ -149,7 +157,6 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
-
     @Test
     void versionSelector() {
         rewriteRun(
@@ -251,6 +258,50 @@ class DependencyInsightTest implements RewriteTest {
                 </project>
                 """
             )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5882")
+    @Test
+    void datatableRowsWhenPresentMoreThanOnce() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new DependencyInsight("*", "jackson-core", null, null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> assertThat(rows).singleElement().satisfies(row -> {
+                  assertThat(row.getArtifactId()).isEqualTo("jackson-core");
+                  assertThat(row.getVersion()).isEqualTo("2.13.4");
+              })
+            ),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-core</artifactId>
+                      <version>7.39.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~(com.fasterxml.jackson.core:jackson-core:2.13.4)~~>--><dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-core</artifactId>
+                      <version>7.39.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
         );
     }
 }
