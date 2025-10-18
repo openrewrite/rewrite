@@ -16,7 +16,6 @@
 package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.PathUtils;
 
 import java.io.File;
 import java.io.IOException;
