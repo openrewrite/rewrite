@@ -15,11 +15,8 @@
  */
 package org.openrewrite.gradle;
 
-import org.assertj.core.api.InstanceOfAssertFactories;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
@@ -41,7 +38,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
-import java.util.Collection;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.rpc;
 
-import io.moderne.jsonrpc.JsonRpc;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
