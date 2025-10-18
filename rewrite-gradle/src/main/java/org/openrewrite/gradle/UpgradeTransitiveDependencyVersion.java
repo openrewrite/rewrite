@@ -21,7 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
@@ -357,7 +356,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         if (depArg instanceof G.GString) {
                             List<J> strings = ((G.GString) depArg).getStrings();
                             if (strings.size() == 2 && strings.get(0) instanceof J.Literal && (((J.Literal) strings.get(0)).getValue() instanceof String) && strings.get(1) instanceof G.GString.Value) {
-                                org.openrewrite.gradle.internal.Dependency dep = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                                Dependency dep = Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
                                 if (dep != null) {
                                     G.GString.Value versionValue = (G.GString.Value) strings.get(1);
                                     acc.versionPropNameToGA.put(versionValue.getTree().toString(), new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
@@ -366,7 +365,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         } else if (depArg instanceof K.StringTemplate) {
                             List<J> strings = ((K.StringTemplate) depArg).getStrings();
                             if (strings.size() == 2 && strings.get(0) instanceof J.Literal && (((J.Literal) strings.get(0)).getValue() instanceof String) && strings.get(1) instanceof K.StringTemplate.Expression) {
-                                org.openrewrite.gradle.internal.Dependency dep = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                                Dependency dep = Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
                                 if (dep != null) {
                                     K.StringTemplate.Expression versionValue = (K.StringTemplate.Expression) strings.get(1);
                                     acc.versionPropNameToGA.put(versionValue.getTree().toString(), new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
@@ -725,7 +724,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             if (m2.getSimpleName().equals(config)) {
                                 existingConstraint = m2;
                                 if (m2.getArguments().get(0) instanceof J.Literal) {
-                                    org.openrewrite.gradle.internal.Dependency notation = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue()));
+                                    Dependency notation = Dependency.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue()));
                                     if (notation == null) {
                                         continue;
                                     }

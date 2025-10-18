@@ -21,6 +21,11 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 
+/**
+ * @deprecated Use {@link org.openrewrite.maven.tree.Dependency} instead.
+ * This class is retained for compatibility but will be removed in a future release.
+ */
+@Deprecated
 @Value
 @With
 @EqualsAndHashCode

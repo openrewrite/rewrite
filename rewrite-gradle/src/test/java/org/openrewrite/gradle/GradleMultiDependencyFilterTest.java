@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.search;
+package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
@@ -21,46 +21,49 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.buildGradleKts;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
-class FindDependencyHandlerTest implements RewriteTest {
+class GradleMultiDependencyFilterTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindDependencyHandler())
-          .beforeRecipe(withToolingApi());
+        spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-*", "2.17.0", null));
     }
 
     @DocumentExample
     @Test
-    void findDependenciesBlock() {
+    void upgradesOnlyMatchingDependenciesInVarargs() {
         rewriteRun(
           buildGradle(
             """
               plugins {
-                  id 'java-library'
+                id 'java-library'
               }
 
               repositories {
-                  mavenCentral()
+                mavenCentral()
               }
 
               dependencies {
-                  api 'com.google.guava:guava:23.0'
+                implementation(
+                  'com.fasterxml.jackson.core:jackson-databind:2.11.0',
+                  'com.google.guava:guava:29.0-jre',
+                  'com.fasterxml.jackson.core:jackson-core:2.11.0')
               }
               """,
             """
               plugins {
-                  id 'java-library'
+                id 'java-library'
               }
 
               repositories {
-                  mavenCentral()
+                mavenCentral()
               }
 
-              /*~~>*/dependencies {
-                  api 'com.google.guava:guava:23.0'
+              dependencies {
+                implementation(
+                  'com.fasterxml.jackson.core:jackson-databind:2.17.0',
+                  'com.google.guava:guava:29.0-jre',
+                  'com.fasterxml.jackson.core:jackson-core:2.17.0')
               }
               """
           )
@@ -68,33 +71,15 @@ class FindDependencyHandlerTest implements RewriteTest {
     }
 
     @Test
-    void findDependenciesBlockKotlin() {
+    void doesNotChangeNonMatchingVarargs() {
         rewriteRun(
-          buildGradleKts(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework", "*", "6.0.0", null)),
+          buildGradle(
             """
-              plugins {
-                  `java-library`
-              }
-
-              repositories {
-                  mavenCentral()
-              }
-
               dependencies {
-                  api("com.google.guava:guava:23.0")
-              }
-              """,
-            """
-              plugins {
-                  `java-library`
-              }
-
-              repositories {
-                  mavenCentral()
-              }
-
-              /*~~>*/dependencies {
-                  api("com.google.guava:guava:23.0")
+                implementation(
+                  'com.fasterxml.jackson.core:jackson-databind:2.11.0',
+                  'com.google.guava:guava:29.0-jre')
               }
               """
           )

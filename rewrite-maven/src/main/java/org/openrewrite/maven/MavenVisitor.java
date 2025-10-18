@@ -247,7 +247,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (tag.getChildValue("groupId").isPresent() && tag.getChildValue("groupId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("groupId").get().trim();
                 String value = getResolutionResult().getPom().getValue(propertyKey);
-                isGroupIdFound = value != null && matchesGlob(value, groupId);
+                isGroupIdFound = matchesGlob(value, groupId);
             }
         }
         return isGroupIdFound;
@@ -262,7 +262,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (tag.getChildValue("artifactId").isPresent() && tag.getChildValue("artifactId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("artifactId").get().trim();
                 String value = getResolutionResult().getPom().getValue(propertyKey);
-                isArtifactIdFound = value != null && matchesGlob(value, artifactId);
+                isArtifactIdFound = matchesGlob(value, artifactId);
             }
         }
         return isArtifactIdFound;
