@@ -54,8 +54,8 @@ public class ReplaceDeprecatedLifecyclePhases extends Recipe {
             public Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if ((PLUGIN_PHASE_MATCHER.matches(getCursor()) || PLUGIN_MANAGEMENT_PHASE_MATCHER.matches(getCursor()))
-                    && t.getValue().isPresent()) {
+                if ((PLUGIN_PHASE_MATCHER.matches(getCursor()) || PLUGIN_MANAGEMENT_PHASE_MATCHER.matches(getCursor())) &&
+                    t.getValue().isPresent()) {
                     String currentPhase = t.getValue().get();
                     String newPhase = PHASE_REPLACEMENTS.get(currentPhase);
                     if (newPhase != null) {

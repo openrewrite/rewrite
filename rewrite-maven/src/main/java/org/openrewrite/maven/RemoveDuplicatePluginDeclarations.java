@@ -24,6 +24,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.HashSet;
 import java.util.Set;
 
+import static java.util.stream.Collectors.toList;
+
 public class RemoveDuplicatePluginDeclarations extends Recipe {
 
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("//project/build/plugins");
@@ -95,7 +97,7 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                                     }
                                     return true;
                                 })
-                                .collect(java.util.stream.Collectors.toList()));
+                                .collect(toList()));
                     }
                 }
 
