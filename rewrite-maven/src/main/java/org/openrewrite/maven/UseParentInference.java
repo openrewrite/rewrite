@@ -49,7 +49,7 @@ public class UseParentInference extends Recipe {
                     // Only process if relativePath is explicitly ".." or not present (which defaults to "..")
                     Optional<Xml.Tag> relativePathTag = t.getChild("relativePath");
                     String relativePath = relativePathTag.map(rp -> rp.getValue().orElse("")).orElse(null);
-                    if (relativePath == null || "..".equals(relativePath) || "../".equals(relativePath)) {
+                    if ("..".equals(relativePath) || "../".equals(relativePath)) {
                         return Xml.Tag.build("<parent/>").withPrefix(tag.getPrefix());
                     }
                 }

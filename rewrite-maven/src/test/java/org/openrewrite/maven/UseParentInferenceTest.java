@@ -71,7 +71,7 @@ class UseParentInferenceTest implements RewriteTest {
     }
 
     @Test
-    void useParentInferenceWithImplicitRelativePath() {
+    void noChangeWithImplicitRelativePath() {
         rewriteRun(
           pomXml(
             """
@@ -94,13 +94,6 @@ class UseParentInferenceTest implements RewriteTest {
                       <artifactId>parent</artifactId>
                       <version>1.0.0</version>
                   </parent>
-                  <artifactId>child</artifactId>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <parent/>
                   <artifactId>child</artifactId>
               </project>
               """,
@@ -213,61 +206,6 @@ class UseParentInferenceTest implements RewriteTest {
                   <parent/>
                   <artifactId>child</artifactId>
                   <version>2.0.0</version>
-              </project>
-              """,
-            spec -> spec.path("child/pom.xml")
-          )
-        );
-    }
-
-    @Test
-    void useParentInferencePreservesOtherElements() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>parent</artifactId>
-                  <version>1.0.0</version>
-                  <packaging>pom</packaging>
-              </project>
-              """,
-            spec -> spec.path("pom.xml")
-          ),
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                      <groupId>com.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0.0</version>
-                  </parent>
-                  <artifactId>child</artifactId>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.junit.jupiter</groupId>
-                          <artifactId>junit-jupiter</artifactId>
-                          <version>5.9.0</version>
-                          <scope>test</scope>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <parent/>
-                  <artifactId>child</artifactId>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.junit.jupiter</groupId>
-                          <artifactId>junit-jupiter</artifactId>
-                          <version>5.9.0</version>
-                          <scope>test</scope>
-                      </dependency>
-                  </dependencies>
               </project>
               """,
             spec -> spec.path("child/pom.xml")
