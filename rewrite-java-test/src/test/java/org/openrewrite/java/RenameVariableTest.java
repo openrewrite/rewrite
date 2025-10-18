@@ -1462,24 +1462,74 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
                package com.helloworld;
-              
+
                public class A {
                  private final String foo = "";
-              
+
                  public String foo() {
                   return this.foo;
                  }
               }""",
             """
                package com.helloworld;
-              
+
                public class A {
                  private final String baz = "";
-              
+
                  public String foo() {
                   return this.baz;
                  }
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6153")
+    @Test
+    void renameVariableWithLambdaAssignedToField() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations.NamedVariable visitVariable(
+                J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
+                  if ("foo".equals(variable.getSimpleName())) {
+                      doAfterVisit(new RenameVariable<>(variable, "FOO"));
+                  }
+                  return super.visitVariable(variable, executionContext);
+              }
+          })),
+          java(
+            """
+              import java.util.function.BiFunction;
+
+              public class Foo {
+                public BiFunction<String, String, Boolean> baz;
+                public String baz2;
+              }
+
+              """
+          ),
+          java(
+            """
+                public class Bar {
+                  private static final Foo foo = new Foo();
+
+                  public void bar() {
+                    foo.baz = (a, b) -> true;
+                    foo.baz2 = "hello";
+                  }
+                }
+              """,
+            """
+                public class Bar {
+                  private static final Foo FOO = new Foo();
+
+                  public void bar() {
+                    FOO.baz = (a, b) -> true;
+                    FOO.baz2 = "hello";
+                  }
+                }
               """
           )
         );
