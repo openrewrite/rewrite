@@ -3085,6 +3085,7 @@ public interface J extends Tree, RpcCodec<J> {
                 return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.module, t.qualid, t.alias);
             }
 
+            @Nullable
             public JLeftPadded<Boolean> getModule() {
                 return t.module;
             }
