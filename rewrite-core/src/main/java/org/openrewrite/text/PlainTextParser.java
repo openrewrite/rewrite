@@ -16,11 +16,12 @@
 package org.openrewrite.text;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.jgit.diff.RawText;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -32,7 +33,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -52,13 +55,14 @@ public class PlainTextParser implements Parser {
             return (PlainText) sourceFile;
         }
         PlainText text = PlainTextParser.builder().build()
-                .parse(sourceFile.printAll())
+                .parse(sourceFile.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Failed to parse as plain text"))
                 .withSourcePath(sourceFile.getSourcePath())
                 .withFileAttributes(sourceFile.getFileAttributes())
                 .withCharsetBomMarked(sourceFile.isCharsetBomMarked())
-                .withId(sourceFile.getId());
+                .withId(sourceFile.getId())
+                .withMarkers(sourceFile.getMarkers().withMarkers(gatherMarkers(sourceFile)));
         if (sourceFile.getCharset() != null) {
             text = (PlainText) text.withCharset(sourceFile.getCharset());
         }
@@ -155,5 +159,21 @@ public class PlainTextParser implements Parser {
         public String getDslName() {
             return "text";
         }
+    }
+
+    private static List<Marker> gatherMarkers(SourceFile sourceFile) {
+        return new TreeVisitor<Tree, List<Marker>>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, List<Marker> markers) {
+                if (tree != null && tree != sourceFile) {
+                    tree.getMarkers().getMarkers().forEach(marker -> {
+                        if (marker instanceof SearchResult || marker instanceof Markup) {
+                            markers.add(marker);
+                        }
+                    });
+                }
+                return super.visit(tree, markers);
+            }
+        }.reduce(sourceFile, new ArrayList<>(sourceFile.getMarkers().getMarkers()));
     }
 }
