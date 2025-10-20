@@ -77,7 +77,8 @@ class RecipeRunTest implements RewriteTest {
               """,
             """
               ~~>hello
-              """
+              """,
+            spec -> spec.path("file1.txt")
           ),
           text(
             """
@@ -85,7 +86,8 @@ class RecipeRunTest implements RewriteTest {
               """,
             """
               ~~>world
-              """
+              """,
+            spec -> spec.path("file2.txt")
           )
         );
     }
