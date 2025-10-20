@@ -178,7 +178,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        m = m.withParameters(ListUtils.map(m.getParameters(), (ix, param) -> {
+        return m.withParameters(ListUtils.map(m.getParameters(), (ix, param) -> {
             if (param.getPrefix().getLastWhitespace().contains("\n")) {
                 return param;
             }
