@@ -55,7 +55,7 @@ public class RecipeRun {
         for (Map.Entry<DataTable<?>, List<?>> dataTableAndRows : dataTables.entrySet()) {
             if (dataTableAndRows.getKey().getName().equals(name)) {
                 //noinspection unchecked
-                results.addAll ((List<E>) dataTableAndRows.getValue());
+                results.addAll((List<E>) dataTableAndRows.getValue());
             }
         }
         return results;
@@ -73,15 +73,14 @@ public class RecipeRun {
             List<?> rows = entry.getValue();
             File csv = filePath.resolve(dataTable.getName() + ".csv").toFile();
             try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(csv, false))) {
-                exportCsv(ctx, dataTable, printWriter::println, rows);
+                exportCsv(dataTable, rows, printWriter::println, ctx);
             } catch (FileNotFoundException e) {
                 ctx.getOnError().accept(e);
             }
         }
     }
 
-    public static void exportCsv(final ExecutionContext ctx, final DataTable<?> dataTable, final Consumer<String> output,
-            final List<?> rows) {
+    static void exportCsv(DataTable<?> dataTable, List<?> rows, Consumer<String> output, ExecutionContext ctx) {
         DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
         List<String> fieldNames = new ArrayList<>();
         List<String> fieldTitles = new ArrayList<>();
@@ -95,11 +94,7 @@ public class RecipeRun {
 
         output.accept(String.join(",", fieldTitles));
         output.accept(String.join(",", fieldDescriptions));
-        exportRowData(output, rows, fieldNames, ctx);
-    }
 
-    private static void exportRowData(Consumer<String> output, List<?> rows, List<String> fieldNames,
-            ExecutionContext ctx) {
         for (Object row : rows) {
             List<String> rowValues = new ArrayList<>();
             for (String fieldName : fieldNames) {

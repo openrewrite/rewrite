@@ -20,8 +20,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class DependencyInsightTest implements RewriteTest {
@@ -251,6 +253,59 @@ class DependencyInsightTest implements RewriteTest {
                 </project>
                 """
             )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6151")
+    @Test
+    void findTwoDependenciesAndTheirDataTableRows() {
+        rewriteRun(
+          spec -> spec
+            .dataTable(DependenciesInUse.Row.class, rows -> assertThat(rows).hasSize(2))
+            .recipes(
+            new DependencyInsight("*", "guava", "compile", null, null),
+            new DependencyInsight("*", "lombok", "compile", null, null)
+          ),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                  </dependency>
+                  <dependency>
+                      <groupId>org.projectlombok</groupId>
+                      <artifactId>lombok</artifactId>
+                      <version>1.18.42</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~>--><dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                  </dependency>
+                  <!--~~>--><dependency>
+                      <groupId>org.projectlombok</groupId>
+                      <artifactId>lombok</artifactId>
+                      <version>1.18.42</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
         );
     }
 }

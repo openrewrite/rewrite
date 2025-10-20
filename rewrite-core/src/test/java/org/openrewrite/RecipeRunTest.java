@@ -16,10 +16,13 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.table.SourcesFileResults;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
-import org.openrewrite.text.FindAndReplace;
+import org.openrewrite.text.Find;
+
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -29,22 +32,63 @@ class RecipeRunTest implements RewriteTest {
     @Test
     void printDatatable() {
         rewriteRun(
-          recipeSpec -> recipeSpec.recipe(new FindAndReplace("replace_me", "replacement", null, null, null, null, null, null))
+          recipeSpec -> recipeSpec.recipe(new Find("test", null, null, null, null, null, null, null))
             .afterRecipe(recipeRun -> {
                 StringBuilder output = new StringBuilder();
-                final String dataTableName = SourcesFileResults.class.getName();
-                RecipeRun.exportCsv(new InMemoryExecutionContext(), recipeRun.getDataTable(dataTableName),
-                  s -> output.append(s).append("\n"), recipeRun.getDataTableRows(dataTableName));
-                assertThat(output.toString()).contains("org.openrewrite.text.FindAndReplace");
-            }), text(
-                """
-            replace_me
-            """,
-                """
-            replacement
-            """ ));
+                String dataTableName = TextMatches.class.getName();
+                RecipeRun.exportCsv(recipeRun.getDataTable(dataTableName), recipeRun.getDataTableRows(dataTableName),
+                  s -> output.append(s).append("\n"), new InMemoryExecutionContext());
+                assertThat(output.toString()).contains("~~>test");
+            }),
+          text(
+            """
+              This is a test
+              """,
+            """
+              This is a ~~>test
+              """
+          )
+        );
     }
 
+    @Test
+    void exportDatatablesToCsvWithMultipleRecipeInstances(@TempDir Path tempDir) {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipes(
+              new Find("hello", null, null, null, null, null, null, null),
+              new Find("world", null, null, null, null, null, null, null)
+            )
+            .afterRecipe(recipeRun -> {
+                recipeRun.exportDatatablesToCsv(tempDir, new InMemoryExecutionContext());
+
+                // Verify that CSV file was created
+                Path csvFile = tempDir.resolve(TextMatches.class.getName() + ".csv");
+                assertThat(csvFile)
+                  .exists()
+                  .content()
+                  .contains(
+                    "hello",
+                    "world"
+                  );
+            }),
+          text(
+            """
+              hello
+              """,
+            """
+              ~~>hello
+              """
+          ),
+          text(
+            """
+              world
+              """,
+            """
+              ~~>world
+              """
+          )
+        );
+    }
 
     @Test
     void delegateRecipeWithOnComplete() {
@@ -53,7 +97,7 @@ class RecipeRunTest implements RewriteTest {
         assertThat(ctx.<String>getMessage("org.openrewrite.recipe.oncomplete")).isEqualTo("with delegate recipe.");
     }
 
-    public static class DelegatingRecipe extends Recipe implements Recipe.DelegatingRecipe{
+    public static class DelegatingRecipe extends Recipe implements Recipe.DelegatingRecipe {
 
         @Override
         public String getDisplayName() {
