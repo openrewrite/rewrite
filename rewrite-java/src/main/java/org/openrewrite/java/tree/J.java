@@ -3070,9 +3070,7 @@ public interface J extends Tree {
                 return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.module, t.qualid, t.alias);
             }
 
-            @Nullable
-            public JLeftPadded<Boolean> getModule() {
-                return t.module;
+            public @Nullable JLeftPadded<Boolean> getModule() {
             }
 
             public Import withModule(JLeftPadded<Boolean> module) {
