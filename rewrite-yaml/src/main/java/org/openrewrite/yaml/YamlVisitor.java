@@ -72,6 +72,7 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
 
     public Yaml visitDocument(Yaml.Document document, P p) {
         return document.withBlock((Yaml.Block) visit(document.getBlock(), p))
+                .withEnd((Yaml.Document.End) visit(document.getEnd(), p))
                 .withMarkers(visitMarkers(document.getMarkers(), p));
     }
 
@@ -128,7 +129,7 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     @Deprecated
     public void maybeCoalesceProperties() {
         if (getAfterVisit().stream().noneMatch(CoalescePropertiesVisitor.class::isInstance)) {
-            doAfterVisit(new CoalescePropertiesVisitor<>());
+            doAfterVisit(new CoalescePropertiesVisitor<>(null, null));
         }
     }
 

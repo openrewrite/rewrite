@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
+// Generated from /Users/kbrockhoff/git/kbrockhoff/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -195,6 +195,12 @@ public interface HCLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitObjectelem(HCLParser.ObjectelemContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link HCLParser#qualifiedIdentifier}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitQualifiedIdentifier(HCLParser.QualifiedIdentifierContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link HCLParser#forExpr}.
 	 * @param ctx the parse tree

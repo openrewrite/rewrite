@@ -52,7 +52,6 @@ class CommentOutPropertyTest implements RewriteTest {
         );
     }
 
-    @DocumentExample("comment out entire sequence")
     @Test
     void commentSequence() {
         rewriteRun(
@@ -81,7 +80,6 @@ class CommentOutPropertyTest implements RewriteTest {
         );
     }
 
-    @DocumentExample("comment out a map entry")
     @Test
     void sequenceKeepProperty() {
         rewriteRun(
@@ -111,7 +109,6 @@ class CommentOutPropertyTest implements RewriteTest {
         );
     }
 
-    @DocumentExample("comment out a map entry")
     @Test
     void sequenceFirstKeepProperty() {
         rewriteRun(
@@ -140,7 +137,6 @@ class CommentOutPropertyTest implements RewriteTest {
         );
     }
 
-    @DocumentExample("comment out entire sequence")
     @Test
     void commentSequenceKeepProperty() {
         rewriteRun(

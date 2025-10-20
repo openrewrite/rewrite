@@ -17,7 +17,12 @@ import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor} from "../../tree";
 import {ExecutionContext} from "../../execution";
-import {UUID} from "node:crypto";
+import {withMetrics} from "./metrics";
+
+export interface GenerateResponse {
+    ids: string[]
+    sourceFileTypes: string[]
+}
 
 export class Generate {
     constructor(private readonly id: string, private readonly p: string) {
@@ -27,24 +32,41 @@ export class Generate {
                   localObjects: Map<string, any>,
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
-                  getObject: (id: string) => any): void {
-        connection.onRequest(new rpc.RequestType<Generate, UUID[], Error>("Generate"), async (request) => {
-            const recipe = preparedRecipes.get(request.id);
-            if (recipe && recipe instanceof ScanningRecipe) {
-                let cursor = recipeCursors.get(recipe);
-                if (!cursor) {
-                    cursor = rootCursor();
-                    recipeCursors.set(recipe, cursor);
+                  getObject: (id: string) => any,
+                  metricsCsv?: string): void {
+        connection.onRequest(
+            new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"),
+            withMetrics<Generate, GenerateResponse>(
+                "Generate",
+                metricsCsv,
+                (context) => async (request) => {
+                    context.target = request.id;
+                    const recipe = preparedRecipes.get(request.id);
+                    const response = {
+                        ids: [],
+                        sourceFileTypes: []
+                    } as GenerateResponse;
+
+                    if (recipe && recipe instanceof ScanningRecipe) {
+                        let cursor = recipeCursors.get(recipe);
+                        if (!cursor) {
+                            cursor = rootCursor();
+                            recipeCursors.set(recipe, cursor);
+                        }
+                        const ctx = getObject(request.p) as ExecutionContext;
+                        const acc = recipe.accumulator(cursor, ctx);
+                        const generated = await recipe.generate(acc, ctx)
+
+                        for (const g of generated) {
+                            localObjects.set(g.id.toString(), g);
+                            response.ids.push(g.id.toString());
+                            response.sourceFileTypes.push(g.kind);
+                        }
+
+                    }
+                    return response;
                 }
-                const ctx = getObject(request.p) as ExecutionContext;
-                const acc = recipe.accumulator(cursor, ctx);
-                const generated = await recipe.generate(acc, ctx)
-                return generated.map(g => {
-                    localObjects.set(g.id.toString(), g);
-                    return g.id;
-                })
-            }
-            return []
-        });
+            )
+        );
     }
 }

@@ -15,23 +15,24 @@
  */
 import {RecipeSpec} from "../../../src/test";
 import {JS, typescript} from "../../../src/javascript";
-import {J, JavaType} from "../../../src/java";
+import {J, Type} from "../../../src/java";
 import Literal = J.Literal;
 
 const spec = new RecipeSpec();
 
 describe.each([
-    ['1', JavaType.Primitive.Double],
-    ['1.0', JavaType.Primitive.Double],
-    ['"1"', JavaType.Primitive.String],
-    ['true', JavaType.Primitive.Boolean],
-    ['null', JavaType.Primitive.Null],
+    ['1', Type.Primitive.Double],
+    ['1.0', Type.Primitive.Double],
+    ['123n', Type.Primitive.BigInt],
+    ['"1"', Type.Primitive.String],
+    ['true', Type.Primitive.Boolean],
+    ['null', Type.Primitive.Null],
     //skipped since undefined is a valid identifier in some scenarios.
     // see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/undefined#description
     // ['undefined', JavaType.Primitive.None],
-    ['/hello/gi', JavaType.Primitive.String],
-    ['`hello!`', JavaType.Primitive.String]
-])(`primitive types`, (expectedValueSource: string, expectedType: JavaType.Primitive) => {
+    ['/hello/gi', Type.Primitive.String],
+    ['`hello!`', Type.Primitive.String]
+])(`primitive types`, (expectedValueSource: string, expectedType: Type.Primitive) => {
     test(`${expectedValueSource} should have primitive type ${expectedType.keyword}`, () => spec.rewriteRun({
         ...typescript(` ${expectedValueSource}`),
         afterRecipe: (cu: JS.CompilationUnit) => {

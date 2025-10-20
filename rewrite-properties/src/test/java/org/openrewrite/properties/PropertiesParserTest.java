@@ -84,10 +84,10 @@ class PropertiesParserTest implements RewriteTest {
             spec -> spec.beforeRecipe(p -> {
                 assertThat(p.getContent().getFirst())
                   .isInstanceOf(Properties.Comment.class)
-                  .matches(comment -> ((Properties.Comment) comment).getMessage().equals(" this is a comment"));
+                  .matches(comment -> " this is a comment".equals(((Properties.Comment) comment).getMessage()));
                 assertThat(p.getContent().get(1))
                   .isInstanceOf(Properties.Entry.class)
-                  .matches(e -> e.getPrefix().equals("\n"));
+                  .matches(e -> "\n".equals(e.getPrefix()));
             })
           )
         );
@@ -109,7 +109,7 @@ class PropertiesParserTest implements RewriteTest {
                   .isEqualTo("value");
                 assertThat(p.getContent().get(1))
                   .isInstanceOf(Properties.Comment.class)
-                  .matches(comment -> ((Properties.Comment) comment).getMessage().equals(" this is a comment"));
+                  .matches(comment -> " this is a comment".equals(((Properties.Comment) comment).getMessage()));
             })
           )
         );
@@ -128,8 +128,8 @@ class PropertiesParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings({"WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty"})
     @Issue("https://github.com/openrewrite/rewrite/issues/2471")
+    @SuppressWarnings({"WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty"})
     @Test
     void escapedEndOfLine() {
         rewriteRun(
@@ -154,13 +154,13 @@ class PropertiesParserTest implements RewriteTest {
               ########################
               #
               ########################
-              
+
               key1=value1
-              
+
               !!!!!!!!!!!!!!!!!!!!!!!
               !
               !!!!!!!!!!!!!!!!!!!!!!!
-              
+
               key2=value2
               """,
             containsValues("value1", "value2")
@@ -168,8 +168,8 @@ class PropertiesParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("WrongPropertyKeyValueDelimiter")
     @Issue("https://github.com/openrewrite/rewrite/issues/2501")
+    @SuppressWarnings("WrongPropertyKeyValueDelimiter")
     @Test
     void delimitedByWhitespace() {
         rewriteRun(
@@ -247,7 +247,7 @@ class PropertiesParserTest implements RewriteTest {
           properties(
             """
               foo=C:\\
-              
+
               """,
             spec -> spec.afterRecipe(file -> {
                 assertThat(file).isInstanceOf(Properties.File.class);

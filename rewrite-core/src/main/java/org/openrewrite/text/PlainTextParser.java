@@ -20,18 +20,23 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.jgit.diff.RawText;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static java.util.stream.Collectors.toList;
 
 public class PlainTextParser implements Parser {
 
@@ -88,7 +93,11 @@ public class PlainTextParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return true;
+        try (InputStream is = Files.newInputStream(path)) {
+            return !RawText.isBinary(is);
+        } catch (IOException ignored) {
+            return false;
+        }
     }
 
     @Override
@@ -116,7 +125,7 @@ public class PlainTextParser implements Parser {
         public Builder plainTextMasks(Path basePath, Iterable<String> plainTextMaskGlobs) {
             return plainTextMasks(StreamSupport.stream(plainTextMaskGlobs.spliterator(), false)
                     .map((o) -> basePath.getFileSystem().getPathMatcher("glob:" + o))
-                    .collect(Collectors.toList()));
+                    .collect(toList()));
         }
 
         @Override
@@ -132,10 +141,10 @@ public class PlainTextParser implements Parser {
                         }
                         // PathMather will not evaluate the path "README.md" to be matched by the pattern "**/README.md"
                         // This is counter-intuitive for most users and would otherwise require separate exclusions for files at the root and files in subdirectories
-                        if(!path.isAbsolute() && !path.startsWith(File.separator)) {
+                        if (!path.isAbsolute() && !path.startsWith(File.separator)) {
                             return accept(Paths.get("/" + path));
                         }
-                        return false;
+                        return super.accept(path);
                     }
                 };
             }

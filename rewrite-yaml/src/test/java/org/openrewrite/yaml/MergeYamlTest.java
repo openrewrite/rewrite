@@ -338,6 +338,155 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5972")
+    @Test
+    void insertAtRootMultiDocumentYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "spec: 0",
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              ---
+              configuration: prod
+              """,
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              spec: 0
+              ---
+              configuration: prod
+              spec: 0
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5972")
+    @Test
+    void insertAtRootMultiDocumentYamlWithExplicitEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "spec: 0",
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              configuration: prod
+              ...
+              """,
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              configuration: prod
+              spec: 0
+              ...
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5972")
+    @Test
+    void insertAtRootMultiDocumentYamlWithExplicitStartAndEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "spec: 0",
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              ---
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              configuration: prod
+              ...
+              """,
+            """
+              ---
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              configuration: prod
+              spec: 0
+              ...
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5972")
+    @Test
+    void insertAtRootMultipleDocumentsYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "newKey: newValue",
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              ---
+              doc1: first
+              ...
+              ---
+              doc2: second
+              ...
+              
+              ---
+              doc3: third
+              ...
+              """,
+            """
+              ---
+              doc1: first
+              newKey: newValue
+              ...
+              ---
+              doc2: second
+              newKey: newValue
+              ...
+              
+              ---
+              doc3: third
+              newKey: newValue
+              ...
+              """
+          )
+        );
+    }
+
     @Test
     void insertInSequenceEntries() {
         rewriteRun(
@@ -1539,7 +1688,7 @@ class MergeYamlTest implements RewriteTest {
               "$",
               //language=yaml
               """
-                
+
                   # new stuff
                 new-property: value
                 """,
@@ -1575,10 +1724,10 @@ class MergeYamlTest implements RewriteTest {
               "$.groups",
               //language=yaml
               """
-                
+
                 # comment
                 - id: 3
-                
+
                   # foo bar
                   foo: bar
                 """,
@@ -1601,7 +1750,7 @@ class MergeYamlTest implements RewriteTest {
                 - id: 2
                 # comment
                 - id: 3
-              
+
                   # foo bar
                   foo: bar
               """
@@ -1736,7 +1885,7 @@ class MergeYamlTest implements RewriteTest {
               """
                 deep:
                   object:
-                
+
                     script: | # yaml comment
                        #!/bin/bash
                         echo "hello"
@@ -1763,7 +1912,7 @@ class MergeYamlTest implements RewriteTest {
                   deep:
                     object:
                       with: An existing value
-              
+
                       script: | # yaml comment
                          #!/bin/bash
                           echo "hello"
@@ -2822,8 +2971,8 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5031")
+    @Test
     void preventKeysToBeAppendedToPreviousComment() {
         rewriteRun(spec -> spec
             .recipe(new MergeYaml(//language=jsonpath
@@ -2862,8 +3011,8 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5031")
+    @Test
     void preventKeysToBeAppendedToPreviousCommentIfManyLineBreaks() {
         rewriteRun(spec -> spec
             .recipe(new MergeYaml(//language=jsonpath
@@ -2887,9 +3036,9 @@ class MergeYamlTest implements RewriteTest {
               foo:
                 existing-key: existing-value
               # A simple comment with trailing line breaks
-              
-              
-              
+
+
+
               bar: bar-value
               """,
             // language=yaml
@@ -2899,9 +3048,9 @@ class MergeYamlTest implements RewriteTest {
                 existing-key: existing-value
                 new-key: new-value
               # A simple comment with trailing line breaks
-              
-              
-              
+
+
+
               bar: bar-value
               """
           )

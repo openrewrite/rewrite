@@ -143,7 +143,7 @@ public class ChangePluginVersion extends Recipe {
                 }
 
                 String selectedNewVersion = newVersion;
-                if (currentVersion.equals("0") && "latest.patch".equals(newVersion)) {
+                if ("0".equals(currentVersion) && "latest.patch".equals(newVersion)) {
                     selectedNewVersion = "latest.release";
                 }
 

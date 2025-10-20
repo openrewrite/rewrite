@@ -238,8 +238,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         a = a.withAnnotations(ListUtils.map(a.getAnnotations(), e -> visitAndCast(e, p)));
         a = a.withTypeExpression(visitAndCast(a.getTypeExpression(), p));
-        a = a.withTypeExpression(visitTypeName(a.getTypeExpression(), p));
-        return a;
+        return a.withTypeExpression(visitTypeName(a.getTypeExpression(), p));
     }
 
     public J visitAnnotation(J.Annotation annotation, P p) {
@@ -256,8 +255,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             a = a.getPadding().withArguments(visitContainer(a.getPadding().getArguments(), JContainer.Location.ANNOTATION_ARGUMENTS, p));
         }
         a = a.withAnnotationType(visitAndCast(a.getAnnotationType(), p));
-        a = a.withAnnotationType(visitTypeName(a.getAnnotationType(), p));
-        return a;
+        return a.withAnnotationType(visitTypeName(a.getAnnotationType(), p));
     }
 
     public J visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
@@ -272,16 +270,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         a = a.withIndexed(visitAndCast(a.getIndexed(), p));
         a = a.withDimension(visitAndCast(a.getDimension(), p));
-        a = a.withType(visitType(a.getType(), p));
-        return a;
+        return a.withType(visitType(a.getType(), p));
     }
 
     public J visitArrayDimension(J.ArrayDimension arrayDimension, P p) {
         J.ArrayDimension a = arrayDimension;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.DIMENSION_PREFIX, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.getPadding().withIndex(visitRightPadded(a.getPadding().getIndex(), JRightPadded.Location.ARRAY_INDEX, p));
-        return a;
+        return a.getPadding().withIndex(visitRightPadded(a.getPadding().getIndex(), JRightPadded.Location.ARRAY_INDEX, p));
     }
 
     public J visitArrayType(J.ArrayType arrayType, P p) {
@@ -302,8 +298,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                     .withBefore(visitSpace(a.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p))
                     .withElement(visitSpace(a.getDimension().getElement(), Space.Location.DIMENSION, p)));
         }
-        a = a.withType(visitType(a.getType(), p));
-        return a;
+        return a.withType(visitType(a.getType(), p));
     }
 
     public J visitAssert(J.Assert assert_, P p) {
@@ -341,8 +336,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         a = a.withVariable(visitAndCast(a.getVariable(), p));
         a = a.getPadding().withAssignment(visitLeftPadded(a.getPadding().getAssignment(), JLeftPadded.Location.ASSIGNMENT, p));
-        a = a.withType(visitType(a.getType(), p));
-        return a;
+        return a.withType(visitType(a.getType(), p));
     }
 
     public J visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
@@ -364,8 +358,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         a = a.withVariable(visitAndCast(a.getVariable(), p));
         a = a.getPadding().withOperator(visitLeftPadded(a.getPadding().getOperator(), JLeftPadded.Location.ASSIGNMENT_OPERATION_OPERATOR, p));
         a = a.withAssignment(visitAndCast(a.getAssignment(), p));
-        a = a.withType(visitType(a.getType(), p));
-        return a;
+        return a.withType(visitType(a.getType(), p));
     }
 
     public J visitBinary(J.Binary binary, P p) {
@@ -381,8 +374,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         b = b.withLeft(visitAndCast(b.getLeft(), p));
         b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), JLeftPadded.Location.BINARY_OPERATOR, p));
         b = b.withRight(visitAndCast(b.getRight(), p));
-        b = b.withType(visitType(b.getType(), p));
-        return b;
+        return b.withType(visitType(b.getType(), p));
     }
 
     public J visitBlock(J.Block block, P p) {
@@ -398,8 +390,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         b = b.getPadding().withStatic(visitRightPadded(b.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p));
         b = b.getPadding().withStatements(ListUtils.map(b.getPadding().getStatements(), t ->
                 visitRightPadded(t, JRightPadded.Location.BLOCK_STATEMENT, p)));
-        b = b.withEnd(visitSpace(b.getEnd(), Space.Location.BLOCK_END, p));
-        return b;
+        return b.withEnd(visitSpace(b.getEnd(), Space.Location.BLOCK_END, p));
     }
 
     public J visitBreak(J.Break breakStatement, P p) {
@@ -412,8 +403,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             b = (J.Break) temp;
         }
-        b = b.withLabel(visitAndCast(b.getLabel(), p));
-        return b;
+        return b.withLabel(visitAndCast(b.getLabel(), p));
     }
 
     public J visitCase(J.Case case_, P p) {
@@ -429,8 +419,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         c = c.getPadding().withCaseLabels(visitContainer(c.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, p));
         c = c.withGuard(visitAndCast(c.getGuard(), p));
         c = c.getPadding().withBody(visitRightPadded(c.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
-        c = c.getPadding().withStatements(visitContainer(c.getPadding().getStatements(), JContainer.Location.CASE, p));
-        return c;
+        return c.getPadding().withStatements(visitContainer(c.getPadding().getStatements(), JContainer.Location.CASE, p));
     }
 
     public J visitCatch(J.Try.Catch catch_, P p) {
@@ -438,8 +427,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CATCH_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.withParameter(visitAndCast(c.getParameter(), p));
-        c = c.withBody(visitAndCast(c.getBody(), p));
-        return c;
+        return c.withBody(visitAndCast(c.getBody(), p));
     }
 
     public J visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
@@ -484,8 +472,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         c = c.getPadding().withImplements(visitTypeNames(c.getPadding().getImplements(), p));
         c = c.withBody(visitAndCast(c.getBody(), p));
-        c = c.withType(visitType(c.getType(), p));
-        return c;
+        return c.withType(visitType(c.getType(), p));
     }
 
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
@@ -497,8 +484,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         c = c.getPadding().withImports(ListUtils.map(c.getPadding().getImports(), t -> visitRightPadded(t, JRightPadded.Location.IMPORT, p)));
         c = c.withClasses(ListUtils.map(c.getClasses(), e -> visitAndCast(e, p)));
-        c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
-        return c;
+        return c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
     }
 
     public J visitContinue(J.Continue continueStatement, P p) {
@@ -511,8 +497,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             c = (J.Continue) temp;
         }
-        c = c.withLabel(visitAndCast(c.getLabel(), p));
-        return c;
+        return c.withLabel(visitAndCast(c.getLabel(), p));
     }
 
     public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, P p) {
@@ -526,8 +511,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             cp = (J.ControlParentheses<T>) temp;
         }
         cp = cp.getPadding().withTree(visitRightPadded(cp.getPadding().getTree(), JRightPadded.Location.PARENTHESES, p));
-        cp = cp.withMarkers(visitMarkers(cp.getMarkers(), p));
-        return cp;
+        return cp.withMarkers(visitMarkers(cp.getMarkers(), p));
     }
 
     public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
@@ -541,8 +525,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             d = (J.DoWhileLoop) temp;
         }
         d = d.getPadding().withWhileCondition(visitLeftPadded(d.getPadding().getWhileCondition(), JLeftPadded.Location.WHILE_CONDITION, p));
-        d = d.getPadding().withBody(visitRightPadded(d.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, p));
-        return d;
+        return d.getPadding().withBody(visitRightPadded(d.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, p));
     }
 
     public J visitEmpty(J.Empty empty, P p) {
@@ -570,8 +553,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         e = e.withAnnotations(ListUtils.map(e.getAnnotations(), a -> visitAndCast(a, p)));
         e = e.withName(visitAndCast(e.getName(), p));
-        e = e.withInitializer(visitAndCast(e.getInitializer(), p));
-        return e;
+        return e.withInitializer(visitAndCast(e.getInitializer(), p));
     }
 
     public J visitEnumValueSet(J.EnumValueSet enums, P p) {
@@ -584,8 +566,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             e = (J.EnumValueSet) temp;
         }
-        e = e.getPadding().withEnums(ListUtils.map(e.getPadding().getEnums(), t -> visitRightPadded(t, JRightPadded.Location.ENUM_VALUE, p)));
-        return e;
+        return e.getPadding().withEnums(ListUtils.map(e.getPadding().getEnums(), t -> visitRightPadded(t, JRightPadded.Location.ENUM_VALUE, p)));
     }
 
     public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
@@ -607,8 +588,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         f = f.withTarget(visitAndCast(f.getTarget(), p));
         f = f.getPadding().withName(visitLeftPadded(f.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p));
-        f = f.withType(visitType(f.getType(), p));
-        return f;
+        return f.withType(visitType(f.getType(), p));
     }
 
     public J visitForEachLoop(J.ForEachLoop forLoop, P p) {
@@ -622,8 +602,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             f = (J.ForEachLoop) temp;
         }
         f = f.withControl(visitAndCast(f.getControl(), p));
-        f = f.getPadding().withBody(visitRightPadded(f.getPadding().getBody(), JRightPadded.Location.FOR_BODY, p));
-        return f;
+        return f.getPadding().withBody(visitRightPadded(f.getPadding().getBody(), JRightPadded.Location.FOR_BODY, p));
     }
 
     public J visitForEachControl(J.ForEachLoop.Control control, P p) {
@@ -631,8 +610,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.FOR_EACH_CONTROL_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.getPadding().withVariable(visitRightPadded(c.getPadding().getVariable(), JRightPadded.Location.FOREACH_VARIABLE, p));
-        c = c.getPadding().withIterable(visitRightPadded(c.getPadding().getIterable(), JRightPadded.Location.FOREACH_ITERABLE, p));
-        return c;
+        return c.getPadding().withIterable(visitRightPadded(c.getPadding().getIterable(), JRightPadded.Location.FOREACH_ITERABLE, p));
     }
 
     public J visitForLoop(J.ForLoop forLoop, P p) {
@@ -646,8 +624,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             f = (J.ForLoop) temp;
         }
         f = f.withControl(visitAndCast(f.getControl(), p));
-        f = f.getPadding().withBody(visitRightPadded(f.getPadding().getBody(), JRightPadded.Location.FOR_BODY, p));
-        return f;
+        return f.getPadding().withBody(visitRightPadded(f.getPadding().getBody(), JRightPadded.Location.FOR_BODY, p));
     }
 
     public J visitForControl(J.ForLoop.Control control, P p) {
@@ -656,8 +633,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.getPadding().withInit(ListUtils.map(c.getPadding().getInit(), t -> visitRightPadded(t, JRightPadded.Location.FOR_INIT, p)));
         c = c.getPadding().withCondition(visitRightPadded(c.getPadding().getCondition(), JRightPadded.Location.FOR_CONDITION, p));
-        c = c.getPadding().withUpdate(ListUtils.map(c.getPadding().getUpdate(), t -> visitRightPadded(t, JRightPadded.Location.FOR_UPDATE, p)));
-        return c;
+        return c.getPadding().withUpdate(ListUtils.map(c.getPadding().getUpdate(), t -> visitRightPadded(t, JRightPadded.Location.FOR_UPDATE, p)));
     }
 
     public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, P p) {
@@ -693,16 +669,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             i = (J.Identifier) temp;
         }
         i = i.withType(visitType(i.getType(), p));
-        i = i.withFieldType((JavaType.Variable) visitType(i.getFieldType(), p));
-        return i;
+        return i.withFieldType((JavaType.Variable) visitType(i.getFieldType(), p));
     }
 
     public J visitElse(J.If.Else else_, P p) {
         J.If.Else e = else_;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.ELSE_PREFIX, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        e = e.getPadding().withBody(visitRightPadded(e.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p));
-        return e;
+        return e.getPadding().withBody(visitRightPadded(e.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p));
     }
 
     public J visitIf(J.If iff, P p) {
@@ -717,8 +691,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         i = i.withIfCondition(visitAndCast(i.getIfCondition(), p));
         i = i.getPadding().withThenPart(visitRightPadded(i.getPadding().getThenPart(), JRightPadded.Location.IF_THEN, p));
-        i = i.withElsePart(visitAndCast(i.getElsePart(), p));
-        return i;
+        return i.withElsePart(visitAndCast(i.getElsePart(), p));
     }
 
     public J visitImport(J.Import import_, P p) {
@@ -727,8 +700,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.getPadding().withStatic(visitLeftPadded(i.getPadding().getStatic(), JLeftPadded.Location.STATIC_IMPORT, p));
         i = i.withQualid(visitAndCast(i.getQualid(), p));
-        i = i.getPadding().withAlias(visitLeftPadded(i.getPadding().getAlias(), JLeftPadded.Location.IMPORT_ALIAS_PREFIX, p));
-        return i;
+        return i.getPadding().withAlias(visitLeftPadded(i.getPadding().getAlias(), JLeftPadded.Location.IMPORT_ALIAS_PREFIX, p));
     }
 
     public J visitInstanceOf(J.InstanceOf instanceOf, P p) {
@@ -744,8 +716,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         i = i.getPadding().withExpression(visitRightPadded(i.getPadding().getExpression(), JRightPadded.Location.INSTANCEOF, p));
         i = i.withClazz(visitAndCast(i.getClazz(), p));
         i = i.withPattern(visitAndCast(i.getPattern(), p));
-        i = i.withType(visitType(i.getType(), p));
-        return i;
+        return i.withType(visitType(i.getType(), p));
     }
 
     public J visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
@@ -754,8 +725,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withDeconstructor(visitAndCast(d.getDeconstructor(), p));
         d = d.getPadding().withNested(visitContainer(d.getPadding().getNested(), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED, p));
-        d = d.withType(visitType(d.getType(), p));
-        return d;
+        return d.withType(visitType(d.getType(), p));
 
     }
 
@@ -764,8 +734,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.INTERSECTION_TYPE_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.getPadding().withBounds(visitContainer(i.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, p));
-        i = i.withType(visitType(i.getType(), p));
-        return i;
+        return i.withType(visitType(i.getType(), p));
     }
 
     public J visitLabel(J.Label label, P p) {
@@ -779,8 +748,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             l = (J.Label) temp;
         }
         l = l.getPadding().withLabel(visitRightPadded(l.getPadding().getLabel(), JRightPadded.Location.LABEL, p));
-        l = l.withStatement(visitAndCast(l.getStatement(), p));
-        return l;
+        return l.withStatement(visitAndCast(l.getStatement(), p));
     }
 
     public J visitLambda(J.Lambda lambda, P p) {
@@ -796,20 +764,18 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         l = l.withParameters(visitAndCast(l.getParameters(), p));
         l = l.withArrow(visitSpace(l.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p));
         l = l.withBody(visitAndCast(l.getBody(), p));
-        l = l.withType(visitType(l.getType(), p));
-        return l;
+        return l.withType(visitType(l.getType(), p));
     }
 
     public J visitLambdaParameters(J.Lambda.Parameters parameters, P p) {
         J.Lambda.Parameters params = parameters;
         params = params.withPrefix(visitSpace(params.getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p));
         params = params.withMarkers(visitMarkers(params.getMarkers(), p));
-        params = params.getPadding().withParameters(
+        return params.getPadding().withParameters(
                 ListUtils.map(params.getPadding().getParameters(),
                         param -> visitRightPadded(param, JRightPadded.Location.LAMBDA_PARAM, p)
                 )
         );
-        return params;
     }
 
     public J visitLiteral(J.Literal literal, P p) {
@@ -822,8 +788,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             l = (J.Literal) temp;
         }
-        l = l.withType(visitType(l.getType(), p));
-        return l;
+        return l.withType(visitType(l.getType(), p));
     }
 
     public J visitMemberReference(J.MemberReference memberRef, P p) {
@@ -843,8 +808,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.getPadding().withReference(visitLeftPadded(m.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p));
         m = m.withType(visitType(m.getType(), p));
         m = m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
-        m = m.withVariableType((JavaType.Variable) visitType(m.getVariableType(), p));
-        return m;
+        return m.withVariableType((JavaType.Variable) visitType(m.getVariableType(), p));
     }
 
     public J visitMethodDeclaration(J.MethodDeclaration method, P p) {
@@ -876,8 +840,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (m.getPadding().getDefaultValue() != null) {
             m = m.getPadding().withDefaultValue(visitLeftPadded(m.getPadding().getDefaultValue(), JLeftPadded.Location.METHOD_DECLARATION_DEFAULT_VALUE, p));
         }
-        m = m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
-        return m;
+        return m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
     }
 
     public J visitMethodInvocation(J.MethodInvocation method, P p) {
@@ -912,25 +875,22 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.getPadding().withTypeParameters(visitTypeNames(m.getPadding().getTypeParameters(), p));
         m = m.withName((J.Identifier) visitNonNull(m.getName(), p));
         m = m.getPadding().withArguments(visitContainer(m.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p));
-        m = m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
-        return m;
+        return m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
     }
 
     public J visitModifier(J.Modifier modifer, P p) {
         J.Modifier m = modifer;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.MODIFIER_PREFIX, p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
-        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> visitAndCast(a, p)));
-        return m;
+        return m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> visitAndCast(a, p)));
     }
 
     public J visitMultiCatch(J.MultiCatch multiCatch, P p) {
         J.MultiCatch m = multiCatch;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.MULTI_CATCH_PREFIX, p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
-        m = m.getPadding().withAlternatives(ListUtils.map(m.getPadding().getAlternatives(), t ->
+        return m.getPadding().withAlternatives(ListUtils.map(m.getPadding().getAlternatives(), t ->
                 visitTypeName(visitRightPadded(t, JRightPadded.Location.CATCH_ALTERNATIVE, p), p)));
-        return m;
     }
 
     public J visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
@@ -952,8 +912,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.withVarargs(m.getVarargs() == null ?
                 null :
                 visitSpace(m.getVarargs(), Space.Location.VARARGS, p));
-        m = m.getPadding().withVariables(ListUtils.map(m.getPadding().getVariables(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, p)));
-        return m;
+        return m.getPadding().withVariables(ListUtils.map(m.getPadding().getVariables(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, p)));
     }
 
     public J visitNewArray(J.NewArray newArray, P p) {
@@ -974,8 +933,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (n.getPadding().getInitializer() != null) {
             n = n.getPadding().withInitializer(visitContainer(n.getPadding().getInitializer(), JContainer.Location.NEW_ARRAY_INITIALIZER, p));
         }
-        n = n.withType(visitType(n.getType(), p));
-        return n;
+        return n.withType(visitType(n.getType(), p));
     }
 
     public J visitNewClass(J.NewClass newClass, P p) {
@@ -1002,8 +960,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         n = n.withClazz(n.getClazz() == null ? null : visitTypeName(n.getClazz(), p));
         n = n.getPadding().withArguments(visitContainer(n.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, p));
         n = n.withBody(visitAndCast(n.getBody(), p));
-        n = n.withConstructorType((JavaType.Method) visitType(n.getConstructorType(), p));
-        return n;
+        return n.withConstructorType((JavaType.Method) visitType(n.getConstructorType(), p));
     }
 
     public J visitNullableType(J.NullableType nullableType, P p) {
@@ -1020,8 +977,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
 
         nt = nt.getPadding().withTypeTree(visitRightPadded(nt.getPadding().getTypeTree(), JRightPadded.Location.NULLABLE, p));
-        nt = nt.withType(visitType(nt.getType(), p));
-        return nt;
+        return nt.withType(visitType(nt.getType(), p));
     }
 
     public J visitPackage(J.Package pkg, P p) {
@@ -1029,8 +985,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), Space.Location.PACKAGE_PREFIX, p));
         pa = pa.withMarkers(visitMarkers(pa.getMarkers(), p));
         pa = pa.withExpression(visitAndCast(pa.getExpression(), p));
-        pa = pa.withAnnotations(ListUtils.map(pa.getAnnotations(), a -> visitAndCast(a, p)));
-        return pa;
+        return pa.withAnnotations(ListUtils.map(pa.getAnnotations(), a -> visitAndCast(a, p)));
     }
 
     public J visitParameterizedType(J.ParameterizedType type, P p) {
@@ -1048,8 +1003,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             pt = pt.getPadding().withTypeParameters(visitContainer(pt.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
         pt = pt.getPadding().withTypeParameters(visitTypeNames(pt.getPadding().getTypeParameters(), p));
-        pt = pt.withType(visitType(pt.getType(), p));
-        return pt;
+        return pt.withType(visitType(pt.getType(), p));
     }
 
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
@@ -1063,8 +1017,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             //noinspection unchecked
             pa = (J.Parentheses<T>) temp;
         }
-        pa = pa.getPadding().withTree(visitRightPadded(pa.getPadding().getTree(), JRightPadded.Location.PARENTHESES, p));
-        return pa;
+        return pa.getPadding().withTree(visitRightPadded(pa.getPadding().getTree(), JRightPadded.Location.PARENTHESES, p));
     }
 
     public J visitPrimitive(J.Primitive primitive, P p) {
@@ -1077,8 +1030,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             pr = (J.Primitive) temp;
         }
-        pr = pr.withType(visitType(pr.getType(), p));
-        return pr;
+        return pr.withType(visitType(pr.getType(), p));
     }
 
     public J visitReturn(J.Return return_, P p) {
@@ -1091,8 +1043,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             r = (J.Return) temp;
         }
-        r = r.withExpression(visitAndCast(r.getExpression(), p));
-        return r;
+        return r.withExpression(visitAndCast(r.getExpression(), p));
     }
 
     public J visitSwitch(J.Switch switch_, P p) {
@@ -1106,8 +1057,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             s = (J.Switch) temp;
         }
         s = s.withSelector(visitAndCast(s.getSelector(), p));
-        s = s.withCases(visitAndCast(s.getCases(), p));
-        return s;
+        return s.withCases(visitAndCast(s.getCases(), p));
     }
 
     public J visitSwitchExpression(J.SwitchExpression switch_, P p) {
@@ -1121,8 +1071,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             s = (J.SwitchExpression) temp;
         }
         s = s.withSelector(visitAndCast(s.getSelector(), p));
-        s = s.withCases(visitAndCast(s.getCases(), p));
-        return s;
+        return s.withCases(visitAndCast(s.getCases(), p));
     }
 
     public J visitSynchronized(J.Synchronized synch, P p) {
@@ -1136,8 +1085,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             s = (J.Synchronized) temp;
         }
         s = s.withLock(visitAndCast(s.getLock(), p));
-        s = s.withBody(visitAndCast(s.getBody(), p));
-        return s;
+        return s.withBody(visitAndCast(s.getBody(), p));
     }
 
     public J visitTernary(J.Ternary ternary, P p) {
@@ -1159,8 +1107,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         t = t.withCondition(visitAndCast(t.getCondition(), p));
         t = t.getPadding().withTruePart(visitLeftPadded(t.getPadding().getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p));
         t = t.getPadding().withFalsePart(visitLeftPadded(t.getPadding().getFalsePart(), JLeftPadded.Location.TERNARY_FALSE, p));
-        t = t.withType(visitType(t.getType(), p));
-        return t;
+        return t.withType(visitType(t.getType(), p));
     }
 
     public J visitThrow(J.Throw thrown, P p) {
@@ -1173,8 +1120,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             t = (J.Throw) temp;
         }
-        t = t.withException(visitAndCast(t.getException(), p));
-        return t;
+        return t.withException(visitAndCast(t.getException(), p));
     }
 
     public J visitTry(J.Try tryable, P p) {
@@ -1202,8 +1148,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.Try.Resource r = tryResource;
         r = tryResource.withPrefix(visitSpace(r.getPrefix(), Space.Location.TRY_RESOURCE, p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
-        r = tryResource.withVariableDeclarations(visitAndCast(r.getVariableDeclarations(), p));
-        return r;
+        return tryResource.withVariableDeclarations(visitAndCast(r.getVariableDeclarations(), p));
     }
 
     public J visitTypeCast(J.TypeCast typeCast, P p) {
@@ -1218,8 +1163,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         t = t.withClazz(visitAndCast(t.getClazz(), p));
         t = t.withClazz(t.getClazz().withTree(visitTypeName(t.getClazz().getTree(), p)));
-        t = t.withExpression(visitAndCast(t.getExpression(), p));
-        return t;
+        return t.withExpression(visitAndCast(t.getExpression(), p));
     }
 
     public J visitTypeParameter(J.TypeParameter typeParam, P p) {
@@ -1239,8 +1183,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (t.getPadding().getBounds() != null) {
             t = t.getPadding().withBounds(visitContainer(t.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, p));
         }
-        t = t.getPadding().withBounds(visitTypeNames(t.getPadding().getBounds(), p));
-        return t;
+        return t.getPadding().withBounds(visitTypeNames(t.getPadding().getBounds(), p));
     }
 
     public J visitTypeParameters(J.TypeParameters typeParameters, P p) {
@@ -1248,12 +1191,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
         t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
-        t = t.getPadding().withTypeParameters(
+        return t.getPadding().withTypeParameters(
                 ListUtils.map(t.getPadding().getTypeParameters(),
                         tp -> visitRightPadded(tp, JRightPadded.Location.TYPE_PARAMETER, p)
                 )
         );
-        return t;
     }
 
     public J visitUnary(J.Unary unary, P p) {
@@ -1274,23 +1216,20 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.UNARY_OPERATOR, p));
         u = u.withExpression(visitAndCast(u.getExpression(), p));
-        u = u.withType(visitType(u.getType(), p));
-        return u;
+        return u.withType(visitType(u.getType(), p));
     }
 
     public J visitUnknown(J.Unknown unknown, P p) {
         J.Unknown u = unknown;
         u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.UNKNOWN_PREFIX, p));
         u = u.withMarkers(visitMarkers(u.getMarkers(), p));
-        u = u.withSource(visitAndCast(u.getSource(), p));
-        return u;
+        return u.withSource(visitAndCast(u.getSource(), p));
     }
 
     public J visitUnknownSource(J.Unknown.Source source, P p) {
         J.Unknown.Source s = source;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.UNKNOWN_SOURCE_PREFIX, p));
-        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        return s;
+        return s.withMarkers(visitMarkers(s.getMarkers(), p));
     }
 
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
@@ -1308,8 +1247,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             v = v.getPadding().withInitializer(visitLeftPadded(v.getPadding().getInitializer(),
                     JLeftPadded.Location.VARIABLE_INITIALIZER, p));
         }
-        v = v.withVariableType((JavaType.Variable) visitType(v.getVariableType(), p));
-        return v;
+        return v.withVariableType((JavaType.Variable) visitType(v.getVariableType(), p));
     }
 
     public J visitWhileLoop(J.WhileLoop whileLoop, P p) {
@@ -1323,8 +1261,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             w = (J.WhileLoop) temp;
         }
         w = w.withCondition(visitAndCast(w.getCondition(), p));
-        w = w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, p));
-        return w;
+        return w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, p));
     }
 
     public J visitWildcard(J.Wildcard wildcard, P p) {
@@ -1356,8 +1293,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             y = (J.Yield) temp;
         }
-        y = y.withValue(visitAndCast(y.getValue(), p));
-        return y;
+        return y.withValue(visitAndCast(y.getValue(), p));
     }
 
     public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
@@ -1433,8 +1369,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     public J visitErroneous(J.Erroneous erroneous, P p) {
         J.Erroneous u = erroneous;
         u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, p));
-        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
-        return u;
+        return u.withMarkers(visitMarkers(u.getMarkers(), p));
     }
 
     /**

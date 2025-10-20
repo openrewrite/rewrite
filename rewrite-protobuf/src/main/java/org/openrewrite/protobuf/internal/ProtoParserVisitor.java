@@ -44,7 +44,14 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     private final Charset charset;
     private final boolean charsetBomMarked;
 
+    /**
+     * Track position within the file by character (UTF-16 code units)
+     */
     private int cursor = 0;
+    /**
+     * Track parsing position within the file by Unicode code point
+     */
+    private int codePointCursor = 0;
 
     public ProtoParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
@@ -429,12 +436,12 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     private Space prefix(Token token) {
         int start = token.getStartIndex();
-        if (start < cursor) {
+        if (start < codePointCursor) {
             return Space.EMPTY;
         }
-        String prefix = source.substring(cursor, start);
-        cursor = start;
-        return Space.format(prefix);
+        int oldCursor = cursor;
+        advanceCursor(start);
+        return Space.format(source.substring(oldCursor, cursor));
     }
 
     private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, Space, T> conversion) {
@@ -445,7 +452,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
         T t = conversion.apply(ctx, prefix(ctx));
         if (ctx.getStop() != null) {
-            cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);
+            advanceCursor(ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1));
         }
 
         return t;
@@ -453,7 +460,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     private <T> T convert(TerminalNode node, BiFunction<TerminalNode, Space, T> conversion) {
         T t = conversion.apply(node, prefix(node));
-        cursor = node.getSymbol().getStopIndex() + 1;
+        advanceCursor(node.getSymbol().getStopIndex() + 1);
         return t;
     }
 
@@ -469,7 +476,9 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         }
 
         String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
+        int codePointsInPrefix = prefix.codePointCount(0, prefix.length());
+        // All Protobuf delimiters are ASCII, so length == code point count
+        advanceCursor(codePointCursor + codePointsInPrefix + untilDelim.length());
         return Space.format(prefix);
     }
 
@@ -514,5 +523,18 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         }
 
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
+    }
+
+    /**
+     * Advance both the cursor and the code point cursor
+     */
+    @SuppressWarnings("UnusedReturnValue")
+    private int advanceCursor(int newCodePointIndex) {
+        if (newCodePointIndex <= codePointCursor) {
+            return cursor;
+        }
+        cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
+        codePointCursor = newCodePointIndex;
+        return cursor;
     }
 }

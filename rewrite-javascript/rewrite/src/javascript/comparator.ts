@@ -27,7 +27,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     /**
      * Flag indicating whether the trees match so far
      */
-    private match: boolean = true;
+    protected match: boolean = true;
 
     /**
      * Creates a new comparator visitor.
@@ -63,7 +63,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     /**
      * Aborts the visit operation by setting the match flag to false.
      */
-    private abort(): void {
+    protected abort(): void {
         this.match = false;
     }
 
@@ -1529,27 +1529,6 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         await this.visit(span.tail, otherSpan.tail);
 
         return span;
-    }
-
-    /**
-     * Overrides the visitTrailingTokenStatement method to compare trailing token statements.
-     * 
-     * @param trailingTokenStatement The trailing token statement to visit
-     * @param other The other trailing token statement to compare with
-     * @returns The visited trailing token statement, or undefined if the visit was aborted
-     */
-    override async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TrailingTokenStatement) {
-            this.abort();
-            return trailingTokenStatement;
-        }
-
-        const otherTrailingTokenStatement = other as JS.TrailingTokenStatement;
-
-        // Visit expression
-        await this.visit(trailingTokenStatement.expression.element, otherTrailingTokenStatement.expression.element);
-
-        return trailingTokenStatement;
     }
 
     /**

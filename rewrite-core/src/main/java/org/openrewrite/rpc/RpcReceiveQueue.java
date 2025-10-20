@@ -15,11 +15,8 @@
  */
 package org.openrewrite.rpc;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
-import org.openrewrite.marker.Markers;
 
 import java.io.PrintStream;
 import java.util.*;
@@ -31,30 +28,20 @@ import static java.util.Objects.requireNonNull;
 
 public class RpcReceiveQueue {
     private static final ObjenesisStd objenesis = new ObjenesisStd();
-    private static final LoadingCache<String, Object> instanceCache = Caffeine.newBuilder()
-            .maximumSize(1_000)
-            .build((String key) -> {
-                try {
-                    Class<?> clazz = Class.forName(key);
-                    return objenesis.newInstance(clazz);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException(e);
-                }
-            });
 
     private final Deque<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
-    private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
-    private final Function<Integer, Object> getRef;
+    private final @Nullable String sourceFileType;
+    private final @Nullable PrintStream log;
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
-                           Supplier<List<RpcObjectData>> pull, Function<Integer, Object> getRef) {
+    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
+                           @Nullable String sourceFileType, @Nullable PrintStream log) {
         this.refs = refs;
+        this.sourceFileType = sourceFileType;
+        this.log = log;
         this.batch = new ArrayDeque<>();
-        this.logFile = logFile;
         this.pull = pull;
-        this.getRef = getRef;
     }
 
     public RpcObjectData take() {
@@ -80,13 +67,8 @@ public class RpcReceiveQueue {
     @SuppressWarnings({"DataFlowIssue", "unchecked"})
     public <T, U> T receiveAndGet(@Nullable T before, Function<U, @Nullable T> mapping) {
         T after = receive(before, null);
+        //noinspection ConstantValue
         return after != null && after != before ? mapping.apply((U) after) : after;
-    }
-
-    public Markers receiveMarkers(Markers markers) {
-        return receive(markers, m -> m
-                .withId(receiveAndGet(m.getId(), UUID::fromString))
-                .withMarkers(receiveList(m.getMarkers(), null)));
     }
 
     /**
@@ -112,15 +94,9 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     @SuppressWarnings("DataFlowIssue")
-    public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
+    public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
-        
-        if (logFile != null && message.getTrace() != null) {
-            logFile.println(message.withTrace(null));
-            logFile.println("  " + message.getTrace());
-            logFile.println("  " + Trace.traceReceiver());
-            logFile.flush();
-        }
+        Trace.traceReceiver(message, log);
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:
@@ -135,17 +111,19 @@ public class RpcReceiveQueue {
                         //noinspection unchecked
                         return (T) refs.get(ref);
                     } else {
-                        // Ref was evicted from cache, fetch it
-                        Object refObject = getRef.apply(ref);
-                        refs.put(ref, refObject);
-                        //noinspection unchecked
-                        return (T) refObject;
+                        throw new IllegalStateException("Received a reference to an object that was not previously sent: " + ref);
                     }
                 } else {
                     // This is either a new object or a forward declaration with ref
                     before = message.getValueType() == null ?
                             message.getValue() :
                             newObj(message.getValueType());
+                    if (ref != null) {
+                        // For an object like JavaType that we will mutate in place rather than using
+                        // immutable updates because of its cyclic nature, the before instance will ultimately
+                        // be the same as the after instance below.
+                        refs.put(ref, before);
+                    }
                 }
                 // Intentional fall-through...
             case CHANGE:
@@ -153,11 +131,11 @@ public class RpcReceiveQueue {
 
                 // TODO handle enums here
 
+                RpcCodec<T> codec;
                 if (onChange != null) {
                     after = onChange.apply(before);
-                } else if (before instanceof RpcCodec) {
-                    //noinspection unchecked
-                    after = (T) ((RpcCodec<Object>) before).rpcReceive(before, this);
+                } else if (before != null && (codec = RpcCodec.forInstance(before, sourceFileType)) != null) {
+                    after = codec.rpcReceive(before, this);
                 } else if (message.getValueType() == null) {
                     after = message.getValue();
                 } else {
@@ -172,8 +150,10 @@ public class RpcReceiveQueue {
         }
     }
 
-    public <T> @Nullable List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
+    @SuppressWarnings("DataFlowIssue")
+    public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData msg = take();
+        Trace.traceReceiver(msg, log);
         switch (msg.getState()) {
             case NO_CHANGE:
                 return before;
@@ -197,8 +177,13 @@ public class RpcReceiveQueue {
     }
 
     private <T> T newObj(String type) {
-        //noinspection unchecked
-        return (T) requireNonNull(instanceCache.get(type));
+        try {
+            Class<?> clazz = Class.forName(type);
+            //noinspection unchecked
+            return (T) objenesis.newInstance(clazz);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

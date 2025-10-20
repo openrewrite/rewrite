@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.RecipeDescriptor;
@@ -28,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RecipeBasicsTest {
 
     @Test
-    void cloneRecipe() throws JsonMappingException {
+    void cloneRecipe() throws Exception {
         ChangeText ct = new ChangeText("hi");
         ChangeText ct2 = (ChangeText) ct.clone();
         ObjectMapper mapper = new ObjectMapper();

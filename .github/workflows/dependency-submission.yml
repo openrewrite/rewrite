@@ -14,13 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+        uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 21
+          java-version: |
+            25
+            21
       - name: Generate and submit dependency graph
-        uses: gradle/actions/dependency-submission@v4
+        uses: gradle/actions/dependency-submission@v5
         env:
           # Exclude all dependencies that originate solely in the 'buildSrc' project
           DEPENDENCY_GRAPH_EXCLUDE_PROJECTS: ':buildSrc'

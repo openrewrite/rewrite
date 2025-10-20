@@ -15,12 +15,10 @@
  */
 package org.openrewrite.java.internal.rpc;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import static org.openrewrite.rpc.Reference.asRef;
@@ -32,7 +30,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(getValueNonNull(space), q));
-        q.sendMarkers(j, Tree::getMarkers);
+        q.getAndSend(j, Tree::getMarkers);
         return j;
     }
 
@@ -596,7 +594,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         } else {
             q.getAndSend(left, JLeftPadded::getElement);
         }
-        q.sendMarkers(left, JLeftPadded::getMarkers);
+        q.getAndSend(left, JLeftPadded::getMarkers);
     }
 
     public <T> void visitRightPadded(JRightPadded<T> right, RpcSendQueue q) {
@@ -609,13 +607,13 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
             q.getAndSend(right, JRightPadded::getElement);
         }
         q.getAndSend(right, JRightPadded::getAfter, space -> visitSpace(getValueNonNull(space), q));
-        q.sendMarkers(right, JRightPadded::getMarkers);
+        q.getAndSend(right, JRightPadded::getMarkers);
     }
 
     public <J2 extends J> void visitContainer(JContainer<J2> container, RpcSendQueue q) {
         q.getAndSend(container, JContainer::getBefore, space -> visitSpace(getValueNonNull(space), q));
         q.getAndSendList(container, c -> c.getPadding().getElements(), e -> e.getElement().getId(), e -> visitRightPadded(e, q));
-        q.sendMarkers(container, JContainer::getMarkers);
+        q.getAndSend(container, JContainer::getMarkers);
     }
 
     public void visitSpace(Space space, RpcSendQueue q) {
@@ -637,18 +635,19 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
                         throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
                     }
                     q.getAndSend(c, Comment::getSuffix);
-                    q.sendMarkers(c, Comment::getMarkers);
+                    q.getAndSend(c, Comment::getMarkers);
                 });
         q.getAndSend(space, Space::getWhitespace);
     }
 
+    private final JavaTypeSender javaTypeSender = new JavaTypeSender();
+
     @Override
     public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcSendQueue q) {
-        if (javaType instanceof RpcCodec) {
-            //noinspection unchecked
-            ((RpcCodec<@NonNull JavaType>) javaType).rpcSend(javaType, q);
-            return javaType;
+        if (javaType == null || javaType instanceof JavaType.Unknown) {
+            return null;
         }
-        return super.visitType(javaType, q);
+        return javaTypeSender.visit(javaType, q);
     }
 }
+

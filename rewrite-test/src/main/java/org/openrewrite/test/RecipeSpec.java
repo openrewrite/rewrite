@@ -37,8 +37,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -149,7 +150,7 @@ public class RecipeSpec {
 
     private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
         return Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, Collections.emptyList(),
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, emptyList(),
                         mapper -> mapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)))
                 .build()
                 .activateRecipes(activeRecipes);
@@ -210,8 +211,7 @@ public class RecipeSpec {
         return afterRecipe(run -> {
             for (Map.Entry<DataTable<?>, List<?>> dataTableListEntry : run.getDataTables().entrySet()) {
                 if (dataTableListEntry.getKey().getType().equals(rowType)) {
-                    //noinspection unchecked
-                    List<E> rows = (List<E>) dataTableListEntry.getValue();
+                    List<E> rows = run.getDataTableRows(dataTableListEntry.getKey().getName());
                     assertThat(rows).isNotNull();
                     assertThat(rows).isNotEmpty();
                     extract.accept(rows);
@@ -223,8 +223,9 @@ public class RecipeSpec {
             if (!tables.isEmpty()) {
                 message += "\nFound data tables row type(s): " + tables.stream()
                         .map(it -> it.getType().getName().replace("$", "."))
-                        .collect(Collectors.joining(","));
+                        .collect(joining(","));
             }
+            //noinspection ResultOfMethodCallIgnored
             fail(message);
         });
     }

@@ -62,7 +62,7 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
 
         t = new SpacesVisitor<>(
                 spacesStyle,
-                cu.getStyle(EmptyForInitializerPadStyle.class),
+                Style.from(EmptyForInitializerPadStyle.class, cu),
                 Style.from(EmptyForIteratorPadStyle.class, cu),
                 stopAfter
         ).visit(t, p, cursor.fork());
@@ -81,8 +81,6 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
 
         t = new OmitParenthesesForLastArgumentLambdaVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
 
-        t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
-
-        return t;
+        return new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
     }
 }

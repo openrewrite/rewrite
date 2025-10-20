@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
@@ -30,7 +31,6 @@ import java.util.*;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 
@@ -44,6 +44,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
+    static final XPathMatcher ANNOTATION_PROCESSORS_PATH_MATCHER = new XPathMatcher("//annotationProcessorPaths/path");
     static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
     static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
@@ -72,7 +73,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return super.isAcceptable(sourceFile, p) &&
-               sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
+                sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
     }
 
     protected MavenResolutionResult getResolutionResult() {
@@ -83,7 +84,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (document != null && document != newDocument) {
                 throw new IllegalStateException(
                         "The same MavenVisitor instance has been used on two different XML documents. " +
-                        "This violates the Recipe contract that they will return a unique visitor instance every time getVisitor() is called.");
+                                "This violates the Recipe contract that they will return a unique visitor instance every time getVisitor() is called.");
             }
             document = newDocument;
         }
@@ -116,7 +117,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (isTag("dependency") && PROFILE_DEPENDENCY_MATCHER.matches(getCursor())) {
                 Xml.Tag tag = getCursor().getValue();
                 return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
-                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+                        matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
             }
             return false;
         }
@@ -142,8 +143,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                         Dependency req = resolvedDependency.getRequested();
                         String reqGroup = req.getGroupId();
                         if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                            req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                            scope == tagScope) {
+                                req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                                scope == tagScope) {
                             return true;
                         }
                     }
@@ -155,13 +156,13 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public boolean isPluginDependencyTag(String groupId, String artifactId) {
         if (!isTag("dependency") ||
-            !PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) &&
-            !PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
+                !PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) &&
+                        !PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
         return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
-               matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+                matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
     }
 
     public boolean isManagedDependencyTag() {
@@ -180,7 +181,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (isTag("dependency") && PROFILE_MANAGED_DEPENDENCY_MATCHER.matches(getCursor())) {
                 Xml.Tag tag = getCursor().getValue();
                 return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
-                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+                        matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
             }
             return false;
         }
@@ -190,8 +191,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 ManagedDependency req = dm.getRequested();
                 String reqGroup = req.getGroupId();
                 if (reqGroup.equals(tag.getChildValue("groupId").orElse(null)) &&
-                    req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                    dm.getScope() == tag.getChildValue("scope").map(Scope::fromName).orElse(null)) {
+                        req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                        dm.getScope() == tag.getChildValue("scope").map(Scope::fromName).orElse(null)) {
                     return true;
                 }
             }
@@ -200,7 +201,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                     ManagedDependency requestedBom = dm.getRequestedBom();
                     //noinspection ConstantConditions
                     if (requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
-                        requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))) {
+                            requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))) {
                         return true;
                     }
                 }
@@ -215,7 +216,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         }
         Xml.Tag tag = getCursor().getValue();
         return tag.getChildValue("type").map("pom"::equalsIgnoreCase).orElse(false) &&
-               tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
+                tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
     }
 
     public void maybeUpdateModel() {
@@ -276,7 +277,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return isTag("project") && PROJECT_MATCHER.matches(getCursor());
     }
 
-    private boolean isTag(String name) {
+    protected boolean isTag(String name) {
         // `XPathMatcher` is still a bit expensive
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }
@@ -291,9 +292,29 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             String oldValue = childTag.get().getValue().orElse(null);
             if (newValue != null && !newValue.equals(oldValue)) {
                 if (isProperty(oldValue)) {
+                    MavenResolutionResult resolutionResult = getResolutionResult();
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
-                    if (getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
+                    ResolvedPom pom = resolutionResult.getPom();
+                    if (pom.getRequested().getProperties().containsKey(propertyName)) {
+                        // The current REQUESTED pom already has a property, let's change the value of the property in the current file
                         doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, addPropertyIfMissing, false).getVisitor());
+                    } else if (pom.getProperties().containsKey(propertyName)) {
+                        // The combined pom knows about the property, but it is not originating from the current requested pom
+                        boolean inheritsPropertyFromExternalParent = true;
+                        while (resolutionResult.getParent() != null) {
+                            resolutionResult = resolutionResult.getParent();
+                            if (resolutionResult.getPom().getRequested().getProperties().containsKey(propertyName)) {
+                                // We found an in-repo parent pom that creates this property, so we do not have to adapt this file as the other file will be adapted.
+                                inheritsPropertyFromExternalParent = false;
+                                break;
+                            }
+                        }
+                        if (inheritsPropertyFromExternalParent) {
+                            // We did not find a parent POM (external parents are not mapped on the resolution result's POM) in the repo,
+                            // but the property exists so it must be a property that comes from an external parent pom,
+                            // so we create the property in the current pom file in order to override its value
+                            doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, true, false).getVisitor());
+                        }
                     }
                 } else {
                     tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);
@@ -303,6 +324,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return tag;
     }
 
+    @Contract("null -> false")
     protected boolean isProperty(@Nullable String value) {
         return value != null && value.startsWith("${") && !IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value);
     }
@@ -316,9 +338,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 String reqGroup = req.getGroupId();
                 String reqVersion = req.getVersion();
                 if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                    req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                    (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null))) &&
-                    (req.getClassifier() == null || req.getClassifier().equals(tag.getChildValue("classifier").orElse(null)))) {
+                        req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                        (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null))) &&
+                        (req.getClassifier() == null || req.getClassifier().equals(tag.getChildValue("classifier").orElse(null)))) {
                     return resolvedDependency;
                 }
             }
@@ -345,9 +367,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
         for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (groupId.equals(d.getGroupId()) &&
-                artifactId.equals(d.getArtifactId()) &&
-                (classifier == null || classifier.equals(d.getClassifier())) &&
-                (type == null || type.equals(d.getType()))) {
+                    artifactId.equals(d.getArtifactId()) &&
+                    (classifier == null || classifier.equals(d.getClassifier())) &&
+                    (type == null || type.equals(d.getType()))) {
                 return d;
             }
         }
@@ -371,7 +393,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (inClasspathOf == null || scope.getKey() == inClasspathOf || scope.getKey().isInClasspathOf(inClasspathOf)) {
                 for (ResolvedDependency d : scope.getValue()) {
                     if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
-                        tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
+                            tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
                         return d;
                     }
                 }
@@ -419,7 +441,12 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
-        return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
+        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+        Optional<MavenSettings> maybeSettings = Optional.ofNullable(mctx.effectiveSettings(getResolutionResult()));
+        List<String> activeProfiles = maybeSettings.map(MavenSettings::getActiveProfiles)
+                .map(MavenSettings.ActiveProfiles::getActiveProfiles)
+                .orElse(null);
+        return new MavenPomDownloader(getResolutionResult().getProjectPoms(), ctx, maybeSettings.orElse(null), activeProfiles)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
     }
 
@@ -428,7 +455,12 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public MavenMetadata downloadPluginMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
-        return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
+        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+        Optional<MavenSettings> maybeSettings = Optional.ofNullable(mctx.effectiveSettings(getResolutionResult()));
+        List<String> activeProfiles = maybeSettings.map(MavenSettings::getActiveProfiles)
+                .map(MavenSettings.ActiveProfiles::getActiveProfiles)
+                .orElse(null);
+        return new MavenPomDownloader(getResolutionResult().getProjectPoms(), ctx, maybeSettings.orElse(null), activeProfiles)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getPluginRepositories());
     }
 
@@ -457,8 +489,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             String resArtifactId = resolvedPlugin.getArtifactId();
             String resVersion = resolvedPlugin.getVersion();
             if (resGroup.equals(tagGroupId) &&
-                resArtifactId.equals(tagArtifactId) &&
-                (resVersion == null || tagVersion == null || resVersion.equals(tagVersion))) {
+                    resArtifactId.equals(tagArtifactId) &&
+                    (resVersion == null || tagVersion == null || resVersion.equals(tagVersion))) {
                 return resolvedPlugin;
             }
         }

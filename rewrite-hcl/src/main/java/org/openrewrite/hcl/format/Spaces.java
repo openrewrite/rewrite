@@ -21,6 +21,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.Hcl;
+import org.openrewrite.style.Style;
 
 public class Spaces extends Recipe {
 
@@ -42,10 +43,7 @@ public class Spaces extends Recipe {
     private static class SpacesFromCompilationUnitStyle extends HclIsoVisitor<ExecutionContext> {
         @Override
         public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile cf, ExecutionContext ctx) {
-            SpacesStyle style = cf.getStyle(SpacesStyle.class);
-            if (style == null) {
-                style = SpacesStyle.DEFAULT;
-            }
+            SpacesStyle style = Style.from(SpacesStyle.class, cf, () -> SpacesStyle.DEFAULT);
             return (Hcl.ConfigFile) new SpacesVisitor<>(style).visitNonNull(cf, ctx);
         }
     }

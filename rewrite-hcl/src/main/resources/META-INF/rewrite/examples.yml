@@ -73,6 +73,17 @@ examples:
 - description: ''
   sources:
   - before: |
+      resource "aws_ebs_volume"    {    size      = 1
+      encrypted = true   }
+    after: |
+      resource "aws_ebs_volume" {
+        size      = 1
+        encrypted = true
+      }
+    language: hcl
+- description: ''
+  sources:
+  - before: |
       locals {
         object = {
                string_attr = "value1"
@@ -85,17 +96,6 @@ examples:
           string_attr = "value1"
           int_attr    = 2
         }
-      }
-    language: hcl
-- description: ''
-  sources:
-  - before: |
-      resource "aws_ebs_volume"    {    size      = 1
-      encrypted = true   }
-    after: |
-      resource "aws_ebs_volume" {
-        size      = 1
-        encrypted = true
       }
     language: hcl
 ---

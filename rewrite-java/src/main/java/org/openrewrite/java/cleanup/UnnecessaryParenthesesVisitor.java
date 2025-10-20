@@ -137,7 +137,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P ctx) {
         J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
-        if (getStyle().getAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
+        if (getStyle().getAssign() && v.getInitializer() instanceof J.Parentheses) {
             v = (J.VariableDeclarations.NamedVariable) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visitNonNull(v, ctx, getCursor().getParentOrThrow());
         }
         return v;
@@ -225,7 +225,8 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
             if (parentheses.getTree() instanceof J.Assignment ||
                     parentheses.getTree() instanceof J.Binary ||
                     parentheses.getTree() instanceof J.Ternary ||
-                    parentheses.getTree() instanceof J.TypeCast) {
+                    parentheses.getTree() instanceof J.TypeCast ||
+                    parentheses.getTree() instanceof J.SwitchExpression) {
                 return mi;
             }
             Expression tree = (Expression) parentheses.getTree();

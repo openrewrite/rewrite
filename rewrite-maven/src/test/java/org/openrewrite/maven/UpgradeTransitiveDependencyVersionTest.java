@@ -159,4 +159,43 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * This test verifies that the recipe correctly prevents downgrading transitive dependencies.
+     * <ul>
+     * <li>jackson-dataformat-xml:2.18.0 brings in jackson-databind:2.18.0 transitively.</li>
+     * <li>jackson-datatype-jsr310:2.15.3 brings in jackson-databind:2.15.3 transitively.</li>
+     * </ul>
+     *  When trying to "upgrade" to 2.15.0 (which would be a downgrade), the recipe should
+     *  make no changes to avoid downgrading the transitive dependency.
+     */
+    @Test
+    void doesNotDowngradeTransitiveDependencyWithExplicitVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
+            "com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null, null, null, null, null, null, null)),
+          pomXml(
+            """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>core</artifactId>
+                <version>0.1.0-SNAPSHOT</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.fasterxml.jackson.dataformat</groupId>
+                        <artifactId>jackson-dataformat-xml</artifactId>
+                        <version>2.18.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>com.fasterxml.jackson.datatype</groupId>
+                        <artifactId>jackson-datatype-jsr310</artifactId>
+                        <version>2.15.3</version>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
+          )
+        );
+    }
 }

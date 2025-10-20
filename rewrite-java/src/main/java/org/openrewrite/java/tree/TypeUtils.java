@@ -109,8 +109,24 @@ public class TypeUtils {
 
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
-            return fqn1.equals(fqn2) || fqn1.length() == fqn2.length() &&
-                                        toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
+            if (fqn1.equals(fqn2)) {
+                return true;
+            }
+            int patternLen = fqn1.length();
+            if (patternLen != fqn2.length()) {
+                return false;
+            }
+            for (int i = 0; i < patternLen; i++) {
+                char p = fqn1.charAt(i);
+                char t = fqn2.charAt(i);
+                if (p != t) {
+                    if ((p == '$' && t == '.') || (p == '.' && t == '$')) {
+                        continue;
+                    }
+                    return false;
+                }
+            }
+            return true;
         }
         return fqn1 == null && fqn2 == null;
     }
@@ -779,7 +795,7 @@ public class TypeUtils {
     }
 
     private static boolean isWildcard(JavaType type) {
-        return type instanceof JavaType.GenericTypeVariable && ((JavaType.GenericTypeVariable) type).getName().equals("?");
+        return type instanceof JavaType.GenericTypeVariable && "?".equals(((JavaType.GenericTypeVariable) type).getName());
     }
 
     private static boolean isPseudoType(@Nullable JavaType type) {
@@ -836,7 +852,7 @@ public class TypeUtils {
         } catch (Exception e) {
             return false;
         }
-        return to.equals("java.lang.Object");
+        return "java.lang.Object".equals(to);
     }
 
     public static boolean isAssignableTo(Pattern to, @Nullable JavaType from) {
@@ -1120,7 +1136,7 @@ public class TypeUtils {
             return base + joiner;
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
-            if (!genericType.getName().equals("?")) {
+            if (!"?".equals(genericType.getName())) {
                 return genericType.getName();
             } else if (genericType.getVariance() == JavaType.GenericTypeVariable.Variance.INVARIANT ||
                     genericType.getBounds().size() != 1) { // Safe check, wildcards don't allow additional bounds

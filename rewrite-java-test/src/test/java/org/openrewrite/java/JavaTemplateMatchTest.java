@@ -64,8 +64,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-templating/pull/91")
+    @Test
     void shouldMatchAbstractStringAssertIsEqualToEmptyString() {
         rewriteRun(
           spec -> spec
@@ -204,8 +204,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"ObviousNullCheck"})
+    @Test
     void matchAgainstQualifiedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -271,8 +271,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"ObviousNullCheck"})
+    @Test
     void matchAgainstUnqualifiedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -340,8 +340,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"ObviousNullCheck"})
+    @Test
     void matchAgainstStaticallyImportedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -409,8 +409,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"UnnecessaryCallToStringValueOf", "RedundantCast"})
+    @Test
     void matchCompatibleTypes() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -457,8 +457,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("DataFlowIssue")
+    @Test
     void matchMethodInvocationParameter() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -538,8 +538,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("ConstantValue")
+    @Test
     void matchExpressionInThrow() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -798,8 +798,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("RedundantCast")
+    @Test
     void matchSpecialPrimitives() {
         rewriteRun(
           spec -> spec
@@ -841,8 +841,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessaryBoxing")
+    @Test
     void matchBoxedTypes() {
         rewriteRun(
           spec -> {
@@ -1001,6 +1001,40 @@ class JavaTemplateMatchTest implements RewriteTest {
     }
 
     @Test
+    void matchBigDecimalPrecision() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate template = JavaTemplate.builder("java.math.BigDecimal.valueOf(0)").build();
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.math.BigDecimal;
+              class Foo {
+                  void test() {
+                      BigDecimal.valueOf(0); // matched
+                      BigDecimal.valueOf(0.0); // different precision
+                  }
+              }
+              """,
+            """
+              import java.math.BigDecimal;
+              class Foo {
+                  void test() {
+                      /*~~>*/BigDecimal.valueOf(0); // matched
+                      BigDecimal.valueOf(0.0); // different precision
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void matchMemberReferenceContainingParameter() {
         rewriteRun(
           spec -> spec
@@ -1085,7 +1119,7 @@ class JavaTemplateMatchTest implements RewriteTest {
           java(
             """
               import java.util.function.Function;
-              
+
               class Foo {
                   void test() {
                       test(String::valueOf);
@@ -1099,7 +1133,7 @@ class JavaTemplateMatchTest implements RewriteTest {
               """,
             """
               import java.util.function.Function;
-              
+
               class Foo {
                   void test() {
                       test((e) -> e.toString());

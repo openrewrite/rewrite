@@ -23,8 +23,8 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class DelegationTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/145")
+    @Test
     void delegationByMap() {
         rewriteRun(
           kotlin(
@@ -38,19 +38,19 @@ class DelegationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/269")
+    @Test
     void delegationToProperty() {
         rewriteRun(
           kotlin(
             """
               var topLevelInt: Int = 0
               class ClassWithDelegate(val anotherClassInt: Int)
-              
+
               class MyClass(var memberInt: Int, val anotherClassInstance: ClassWithDelegate) {
                   var delegatedToMember: Int by this::memberInt
                   var delegatedToTopLevel: Int by ::topLevelInt
-              
+
                   val delegatedToAnotherClass: Int by anotherClassInstance::anotherClassInt
               }
               var MyClass.extDelegated: Int by ::topLevelInt
@@ -59,8 +59,8 @@ class DelegationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/269")
+    @Test
     void classWithDelegation() {
         rewriteRun(
           kotlin(
@@ -77,7 +77,7 @@ class DelegationTest implements RewriteTest {
           kotlin(
             """
               import kotlin.properties.Delegates
-              
+
               class User {
                   var name: String by Delegates.observable("<no name>") {
                       prop, old, new ->

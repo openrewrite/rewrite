@@ -50,6 +50,7 @@ import java.util.function.UnaryOperator;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 public class JLeftPadded<T> {
+
     Space before;
     T element;
     Markers markers;

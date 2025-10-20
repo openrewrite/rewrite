@@ -23,7 +23,6 @@ export interface PlainText extends SourceFile {
 
 export namespace PlainText {
     export const Kind = {
-        ...TreeKind,
         PlainText: "org.openrewrite.text.PlainText",
         Snippet: "org.openrewrite.text.PlainText$Snippet"
     } as const

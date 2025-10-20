@@ -19,8 +19,7 @@ name: org.openrewrite.gradle.GradleBestPractices
 displayName: Apply Gradle best practices
 description: Apply a set of [Gradle best practices](https://docs.gradle.org/current/userguide/best_practices_general.html) to the build files, for more efficient and ideomatic builds.
 recipeList:
-  - org.openrewrite.gradle.MigrateToGradle8
-  - org.openrewrite.gradle.DependencyUseStringNotation
+  - org.openrewrite.gradle.MigrateToGradle9
   - org.openrewrite.gradle.EnableGradleBuildCache
   - org.openrewrite.gradle.EnableGradleParallelExecution
 ---

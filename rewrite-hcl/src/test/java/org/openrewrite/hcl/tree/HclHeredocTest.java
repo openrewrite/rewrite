@@ -79,4 +79,19 @@ class HclHeredocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void heredocWithTrailingComment() {
+        rewriteRun(
+          hcl(
+            """
+              setenv = <<EOF               ## Optional parameter, default value: ""
+                      export SPRING_PROFILES_ACTIVE=prod
+                      export CONFIG_SERVER_URL=http://config-server:9010
+                      export SERVER_PORT=5000
+                      EOF
+              """
+          )
+        );
+    }
 }

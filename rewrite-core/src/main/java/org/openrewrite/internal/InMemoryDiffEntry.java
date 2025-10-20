@@ -34,7 +34,8 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
 
@@ -141,7 +142,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
                            }
                            return l;
                        })
-                       .collect(Collectors.joining("\n")) + "\n";
+                       .collect(joining("\n")) + "\n";
     }
 
     @Override

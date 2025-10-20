@@ -24,60 +24,45 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.config.Environment;
-import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaScriptParserTest {
-
-    JavaScriptRewriteRpc rewriteRpc;
     JavaScriptParser parser;
     ExecutionContext ctx;
-    ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope;
 
     @BeforeEach
     void before() {
-        this.rewriteRpc = JavaScriptRewriteRpc.builder(Environment.builder().build())
-          .nodePath(Path.of("node"))
-          .installationDirectory(Path.of("./rewrite/dist"))
-//          .inspectAndBreak()
-//          .trace(true)
-          .build();
-        this.scope = JavaScriptRewriteRpc.current().using(rewriteRpc);
-        this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
+//        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder().inspectBrk(Paths.get("rewrite")));
+        this.parser = JavaScriptParser.builder().build();
         this.ctx = new InMemoryExecutionContext();
     }
 
     @AfterEach
     void after() {
-        scope.close();
-        rewriteRpc.close();
+        JavaScriptRewriteRpc.shutdownCurrent();
     }
 
     @Test
     void helloJavaScript() {
         @Language("js")
         String helloWorld = """
-          console.info("Hello world!")
+          console.info("Hello " + 123n)
           """;
-        Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.js"), helloWorld);
+        Parser.Input input = Parser.Input.fromString(Path.of("helloworld.js"), helloWorld);
         Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(javascript.get()).satisfies(cu -> {
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(javascript.get()).satisfies(cu ->
+          assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
@@ -86,8 +71,8 @@ class JavaScriptParserTest {
         String helloWorld = """
           console.info("Hello world!")
           """;
-        Parser.Input input1 = Parser.Input.fromString(Paths.get("helloworld1.js"), helloWorld);
-        Parser.Input input2 = Parser.Input.fromString(Paths.get("helloworld2.js"), helloWorld);
+        Parser.Input input1 = Parser.Input.fromString(Path.of("helloworld1.js"), helloWorld);
+        Parser.Input input2 = Parser.Input.fromString(Path.of("helloworld2.js"), helloWorld);
 
         List<SourceFile> sourceFiles = parser.parseInputs(List.of(input1, input2), null, ctx).toList();
         assertThat(sourceFiles).hasSize(2);
@@ -103,14 +88,14 @@ class JavaScriptParserTest {
           const message: string = "Hello world!";
           console.info(message);
           """;
-        Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.ts"), helloWorld);
-        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), Paths.get("helloworld.ts").toAbsolutePath().getParent(), ctx).findFirst();
+        Parser.Input input = Parser.Input.fromString(Path.of("helloworld.ts"), helloWorld);
+        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), Path.of("helloworld.ts").toAbsolutePath().getParent(), ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu -> {
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(typescript.get()).satisfies(cu ->
+          assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
+    @SuppressWarnings({"TypeScriptUnresolvedReference", "HtmlUnknownAttribute"})
     @Test
     void tsx() {
         @Language("tsx")
@@ -168,6 +153,13 @@ class JavaScriptParserTest {
                   >
                     <p>This div uses regular attributes, spread attributes, and namespaced attributes</p>
                   </div>
+          
+                  {/* JSX elements with generics */}
+                  <DataTable<User> data={[]} />
+                  <Component<string, number> prop="value" />
+                  <Form<FormData> onSubmit={() => {}}>
+                    <Input name="username" />
+                  </Form>
                 </div>
           
                 {/* Short fragment syntax */}
@@ -181,19 +173,18 @@ class JavaScriptParserTest {
           
           export default JSXConstructsExample;
           """;
-        Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.tsx"), script);
+        Parser.Input input = Parser.Input.fromString(Path.of("helloworld.tsx"), script);
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu -> {
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(typescript.get()).satisfies(cu ->
+          assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
     @Disabled
-    void complexTypeScript() throws MalformedURLException {
+    void complexTypeScript() throws Exception {
         URL url = URI.create("https://raw.githubusercontent.com/sinclairzx81/typebox/f958156785350aa052c5f822bc2970d0945d887b/src/syntax/parser.ts").toURL();
-        Parser.Input input = new Parser.Input(Paths.get("parser.ts"), null, () -> {
+        Parser.Input input = new Parser.Input(Path.of("parser.ts"), null, () -> {
             try {
                 return url.openStream();
             } catch (IOException e) {

@@ -30,7 +30,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.Objects;
 
 import static java.util.Collections.singletonList;
@@ -44,7 +44,7 @@ public class KotlinTypeSignatureBuilderTest {
             .logCompilationWarningsAndErrors(true)
             .moduleName("test")
             .build()
-            .parse(singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), disposable,
+            .parse(singletonList(new Parser.Input(Path.of("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), disposable,
                     new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
 
     @AfterAll
@@ -165,7 +165,7 @@ public class KotlinTypeSignatureBuilderTest {
     @Test
     void fileField() {
         FirProperty firProperty = getCompiledSource().getDeclarations().stream()
-          .filter(it -> it instanceof FirProperty && "field".equals(((FirProperty) it).getName().asString()))
+          .filter(it -> it instanceof FirProperty fp && "field".equals(fp.getName().asString()))
           .map(it -> (FirProperty) it).findFirst().orElseThrow();
         assertThat(signatureBuilder().variableSignature(firProperty, getCompiledSource()))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=field,type=kotlin.Int}");
@@ -174,7 +174,7 @@ public class KotlinTypeSignatureBuilderTest {
     @Test
     void fileFunction() {
         FirSimpleFunction function = getCompiledSource().getDeclarations().stream()
-          .filter(it -> it instanceof FirSimpleFunction && "function".equals(((FirSimpleFunction) it).getName().asString()))
+          .filter(it -> it instanceof FirSimpleFunction fsf && "function".equals(fsf.getName().asString()))
           .map(it -> (FirSimpleFunction) it).findFirst().orElseThrow();
         assertThat(signatureBuilder().methodSignature(function, getCompiledSource()))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");

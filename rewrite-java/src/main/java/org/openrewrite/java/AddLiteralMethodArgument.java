@@ -17,10 +17,10 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -44,7 +44,7 @@ public class AddLiteralMethodArgument extends Recipe {
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
+            description = MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
             example = "com.yourorg.A foo(int, int)")
     String methodPattern;
 
@@ -127,7 +127,7 @@ public class AddLiteralMethodArgument extends Recipe {
                 if (StringUtils.isBlank(primitiveType) || "string".equalsIgnoreCase(primitiveType)) {
                     primitive = Primitive.String;
                     valueSource = String.format("\"%s\"", getLiteral());
-                } else if(primitiveType.equalsIgnoreCase("char")){
+                } else if("char".equalsIgnoreCase(primitiveType)){
                     primitive = Primitive.Char;
                     valueSource = String.format("'%s'", getLiteral());
                 }else {

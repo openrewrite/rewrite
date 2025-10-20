@@ -16,11 +16,12 @@
 package org.openrewrite.java;
 
 import io.github.classgraph.ClassGraph;
+import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.internal.parser.JavaParserClasspathLoader;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -28,17 +29,20 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
@@ -110,6 +114,15 @@ public interface JavaParser extends Parser {
         return artifacts;
     }
 
+    /**
+     * Load artifacts from packaged resources. This is useful for loading dependencies which are not on the recipe
+     * execution classpath, or where you need to load multiple different versions of the same artifact.
+     * Supports both {@link TypeTable} `classpath.tsv.gz` and packaged resource jars in `META-INF/rewrite/classpath/`.
+     *
+     * @param ctx                       The execution context to use for loading resources.
+     * @param artifactNamesWithVersions artifact prefix to match, e.g. "guava" or "guava-31" for a specific version.
+     * @return A list of paths to the located artifacts.
+     */
     static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
         if (artifactNamesWithVersions.length == 0) {
             return emptyList();
@@ -117,27 +130,35 @@ public interface JavaParser extends Parser {
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
         Set<String> missingArtifactNames = new LinkedHashSet<>(Arrays.asList(artifactNamesWithVersions));
 
-        try (RewriteClasspathJarClasspathLoader rewriteClasspathJarClasspathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
-            List<JavaParserClasspathLoader> loaders = new ArrayList<>(2);
-            loaders.add(rewriteClasspathJarClasspathLoader);
-            // TODO support annotations in type tables (e.g. required by meta annotations support)
-            Optional.ofNullable(TypeTable.fromClasspath(ctx, missingArtifactNames)).ifPresent(loaders::add);
+        TypeTable typeTable = TypeTable.fromClasspath(ctx, missingArtifactNames);
+        if (typeTable != null) {
+            for (Iterator<String> it = missingArtifactNames.iterator(); it.hasNext(); ) {
+                String missingArtifactName = it.next();
+                Path located = typeTable.load(missingArtifactName);
+                if (located != null) {
+                    artifacts.add(located);
+                    it.remove();
+                }
+            }
+        }
 
-            for (JavaParserClasspathLoader loader : loaders) {
+        if (!missingArtifactNames.isEmpty()) {
+            try (RewriteClasspathJarClasspathLoader classpathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
                 for (String missingArtifactName : new ArrayList<>(missingArtifactNames)) {
-                    Path located = loader.load(missingArtifactName);
+                    Path located = classpathLoader.load(missingArtifactName);
                     if (located != null) {
                         artifacts.add(located);
                         missingArtifactNames.remove(missingArtifactName);
                     }
                 }
             }
-
-            if (!missingArtifactNames.isEmpty()) {
-                String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
-                throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
-            }
         }
+
+        if (!missingArtifactNames.isEmpty()) {
+            String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
+            throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
+        }
+
         return artifacts;
     }
 
@@ -145,61 +166,7 @@ public interface JavaParser extends Parser {
      * Builds a Java parser with a language level equal to that of the JDK running this JVM process.
      */
     static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
-        JavaParser.Builder<? extends JavaParser, ?> javaParser;
-        String[] versionParts = System.getProperty("java.version").split("[.-]");
-        int version = Integer.parseInt(versionParts[0]);
-        if (version == 1) {
-            version = 8;
-        }
-
-        if (version >= 21) {
-            try {
-                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
-                        .forName("org.openrewrite.java.Java21Parser")
-                        .getDeclaredMethod("builder")
-                        .invoke(null);
-                return javaParser;
-            } catch (Exception e) {
-                //Fall through, look for a parser on an older version.
-            }
-        }
-
-        if (version >= 17) {
-            try {
-                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
-                        .forName("org.openrewrite.java.Java17Parser")
-                        .getDeclaredMethod("builder")
-                        .invoke(null);
-                return javaParser;
-            } catch (Exception e) {
-                //Fall through, look for a parser on an older version.
-            }
-        }
-
-        if (version >= 11) {
-            try {
-                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
-                        .forName("org.openrewrite.java.Java11Parser")
-                        .getDeclaredMethod("builder")
-                        .invoke(null);
-                return javaParser;
-            } catch (Exception e) {
-                //Fall through, look for a parser on an older version.
-            }
-        }
-
-        try {
-            javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
-                    .forName("org.openrewrite.java.Java8Parser")
-                    .getDeclaredMethod("builder")
-                    .invoke(null);
-            return javaParser;
-        } catch (Exception e) {
-            //Fall through to an exception without making this the "cause".
-        }
-
-        throw new IllegalStateException("Unable to create a Java parser instance. " +
-                "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
+        return JdkParserBuilderCache.getBuilder();
     }
 
     @Override
@@ -300,7 +267,7 @@ public interface JavaParser extends Parser {
         @Incubating(since = "8.18.3")
         public B addClasspathEntry(Path entry) {
             if (classpath.isEmpty()) {
-                classpath = Collections.singletonList(entry);
+                classpath = singletonList(entry);
             } else if (!classpath.contains(entry)) {
                 classpath = new ArrayList<>(classpath);
                 classpath.add(entry);
@@ -308,12 +275,31 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * Sets the classpath from runtime classpath dependencies of the process constructing the parser. Predates
+         * {@link #classpathFromResources(ExecutionContext, String...)}, with the latter preferred to limit dependencies
+         * needed on the recipe runtime classpath, as the runtime classpath may differ in say the CLI or Platform.
+         * <p>
+         * This is suitable, for example, when writing tests that may require older versions of dependencies,
+         * without needing to add them to the recipe runtime classpath through resources.
+         *
+         * @return A list of paths to jars on the runtime classpath of the process constructing the parser.
+         */
         public B classpath(String... artifactNames) {
             this.artifactNames = Arrays.asList(artifactNames);
             this.classpath = emptyList();
             return (B) this;
         }
 
+        /**
+         * Load artifacts from packaged resources. This is useful for loading dependencies which are not on the recipe
+         * execution classpath, or where you need to load multiple different versions of the same artifact.
+         * Supports both {@link TypeTable} `classpath.tsv.gz` and packaged resource jars in `META-INF/rewrite/classpath/`.
+         *
+         * @param ctx       The execution context to use for loading resources.
+         * @param classpath artifact prefix to match, e.g. "guava" or "guava-31" for a specific version.
+         * @return A list of paths to the located artifacts.
+         */
         @SuppressWarnings({"UnusedReturnValue", "unused"})
         public B classpathFromResources(ExecutionContext ctx, String... classpath) {
             this.artifactNames = emptyList();
@@ -321,6 +307,11 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * @deprecated prefer {@link #classpath} and {@link #classpathFromResources(ExecutionContext, String...)}.
+         */
+        @Deprecated
+        @ToBeRemoved(after = "2025-12-31", reason = "Use classpath or classpathFromResources instead.")
         public B classpath(byte[]... classpath) {
             this.classBytesClasspath = Arrays.asList(classpath);
             return (B) this;
@@ -387,22 +378,100 @@ public interface JavaParser extends Parser {
     }
 }
 
+@UtilityClass
 class RuntimeClasspathCache {
-    private RuntimeClasspathCache() {
-    }
-
     @Nullable
-    private static List<Path> runtimeClasspath = null;
+    private static volatile List<Path> runtimeClasspath = null;
 
     static List<Path> getRuntimeClasspath() {
-        if (runtimeClasspath == null) {
-            runtimeClasspath = new ClassGraph()
-                    .disableNestedJarScanning()
-                    .getClasspathURIs().stream()
-                    .filter(uri -> "file".equals(uri.getScheme()))
-                    .map(Paths::get)
-                    .collect(toList());
+        List<Path> paths = runtimeClasspath;
+        if (paths == null) {
+            synchronized (RuntimeClasspathCache.class) {
+                paths = runtimeClasspath;
+                if (paths == null) {
+                    runtimeClasspath = paths = new ClassGraph()
+                            .disableNestedJarScanning()
+                            .getClasspathURIs().stream()
+                            .filter(uri -> "file".equals(uri.getScheme()))
+                            .map(Paths::get)
+                            .collect(toList());
+                }
+            }
         }
-        return runtimeClasspath;
+        return paths;
+    }
+}
+
+@UtilityClass
+class JdkParserBuilderCache {
+    // Cached supplier for the parser builder - initialized on first access
+    private static volatile @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> cachedBuilderSupplier = null;
+
+    static JavaParser.Builder<? extends JavaParser, ?> getBuilder() {
+        Supplier<JavaParser.Builder<? extends JavaParser, ?>> supplier = cachedBuilderSupplier;
+        if (supplier != null) {
+            return supplier.get();
+        }
+
+        synchronized (JdkParserBuilderCache.class) {
+            // Double-check after acquiring lock
+            supplier = cachedBuilderSupplier;
+            if (supplier != null) {
+                return supplier.get();
+            }
+
+            // Determine Java version once
+            String[] versionParts = System.getProperty("java.version").split("[.-]");
+            int version = Integer.parseInt(versionParts[0]);
+            if (version == 1) {
+                version = 8;
+            }
+
+            // Try to find and cache appropriate parser
+            if (version > 21) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java25Parser");
+            }
+
+            if (version > 17 && supplier == null) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java21Parser");
+            }
+
+            if (version > 11 && supplier == null) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java17Parser");
+            }
+
+            if (version > 8 && supplier == null) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java11Parser");
+            }
+
+            if (supplier == null) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java8Parser");
+            }
+
+            if (supplier != null) {
+                cachedBuilderSupplier = supplier;
+                return supplier.get();
+            }
+
+            throw new IllegalStateException("Unable to create a Java parser instance. " +
+                    "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, `rewrite-java-21`, or `rewrite-java-25` must be on the classpath.");
+        }
+    }
+
+    private static @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> tryCreateBuilderSupplier(String className) {
+        try {
+            Class<?> clazz = Class.forName(className);
+            Method builderMethod = clazz.getDeclaredMethod("builder");
+            return () -> {
+                try {
+                    //noinspection rawtypes,unchecked
+                    return (JavaParser.Builder) builderMethod.invoke(null);
+                } catch (Throwable e) {
+                    throw new RuntimeException("Failed to invoke builder() on " + className, e);
+                }
+            };
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            return null; // This parser version isn't available
+        }
     }
 }

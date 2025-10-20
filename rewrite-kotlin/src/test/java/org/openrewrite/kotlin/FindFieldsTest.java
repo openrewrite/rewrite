@@ -33,7 +33,7 @@ class FindFieldsTest implements RewriteTest {
             """
               import java.lang.Integer
               import java.lang.Integer.MAX_VALUE
-              
+
               val i1 = java.lang.Integer.MAX_VALUE
               val i2 = Integer.MAX_VALUE
               val i3 = MAX_VALUE
@@ -42,7 +42,7 @@ class FindFieldsTest implements RewriteTest {
             """
               import java.lang.Integer
               import java.lang.Integer.MAX_VALUE
-              
+
               val i1 = /*~~>*/java.lang.Integer.MAX_VALUE
               val i2 = /*~~>*/Integer.MAX_VALUE
               val i3 = /*~~>*/MAX_VALUE

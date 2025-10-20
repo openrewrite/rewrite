@@ -366,8 +366,8 @@ class ResolvedPomTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/4687")
+    @Nested
     class TolerateMissingPom {
 
         @Language("xml")
@@ -393,7 +393,7 @@ class ResolvedPomTest implements RewriteTest {
         Path localRepository2;
 
         @Test
-        void singleRepositoryContainingJar() throws IOException {
+        void singleRepositoryContainingJar() throws Exception {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             createJarFile(localRepository);
 
@@ -418,7 +418,7 @@ class ResolvedPomTest implements RewriteTest {
         }
 
         @Test
-        void twoRepositoriesSecondContainingJar() throws IOException {
+        void twoRepositoriesSecondContainingJar() throws Exception {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             MavenRepository mavenLocal2 = createMavenRepository(localRepository2, "local2");
             createJarFile(localRepository2);
@@ -450,7 +450,7 @@ class ResolvedPomTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
         @Test
-        void resolveVersionFromParentDependencyManagement(@TempDir Path localRepository) throws IOException {
+        void resolveVersionFromParentDependencyManagement(@TempDir Path localRepository) throws Exception {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             createJarFile(localRepository);
             createJarFile(localRepository, "org.openrewrite.test", "lib", "1.0");
@@ -556,7 +556,7 @@ class ResolvedPomTest implements RewriteTest {
     }
 
     @Test
-    void ignoreScopeInDependencyManagement(@TempDir Path localRepository) throws IOException {
+    void ignoreScopeInDependencyManagement(@TempDir Path localRepository) throws Exception {
         MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
         createJarFile(localRepository, "com.some", "some-artifact", "1");
 
@@ -715,7 +715,7 @@ class ResolvedPomTest implements RewriteTest {
           )
         );
     }
-    
+
     @Test
     void circularProjectVersionInDependency() {
         // Test case where a property shadows project.version and is used in a dependency
@@ -792,7 +792,7 @@ class ResolvedPomTest implements RewriteTest {
                   <artifactId>api-parent</artifactId>
                   <version>1.0.0-SNAPSHOT</version>
                   <packaging>pom</packaging>
-              
+
                   <modules>
                       <module>api-definitions</module>
                       <module>api-codegen</module>
@@ -806,7 +806,7 @@ class ResolvedPomTest implements RewriteTest {
                 <project>
                     <artifactId>api-definitions</artifactId>
                     <packaging>tgz</packaging>
-                
+
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
@@ -823,14 +823,14 @@ class ResolvedPomTest implements RewriteTest {
             pomXml("""
                 <project>
                     <artifactId>api-codegen</artifactId>
-                
+
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
                         <version>1.0.0-SNAPSHOT</version>
                         <relativePath>../pom.xml</relativePath>
                     </parent>
-                
+
                     <dependencies>
                         <dependency>
                             <groupId>org.example</groupId>

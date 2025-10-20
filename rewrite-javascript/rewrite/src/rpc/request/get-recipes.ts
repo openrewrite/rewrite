@@ -15,15 +15,24 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {RecipeDescriptor, RecipeRegistry} from "../../recipe";
+import {withMetrics0} from "./metrics";
 
 export class GetRecipes {
-    static handle(connection: rpc.MessageConnection, registry: RecipeRegistry): void {
-        connection.onRequest(new rpc.RequestType0<({ name: string } & RecipeDescriptor)[], Error>("GetRecipes"), async () => {
-            const recipes = [];
-            for (const [_name, recipe] of registry.all.entries()) {
-                recipes.push(await new recipe().descriptor());
-            }
-            return recipes;
-        });
+    static handle(connection: rpc.MessageConnection, registry: RecipeRegistry, metricsCsv?: string): void {
+        connection.onRequest(
+            new rpc.RequestType0<({ name: string } & RecipeDescriptor)[], Error>("GetRecipes"),
+            withMetrics0<({ name: string } & RecipeDescriptor)[]>(
+                "GetRecipes",
+                metricsCsv,
+                (context) => async () => {
+                    const recipes = [];
+                    for (const [_name, recipe] of registry.all.entries()) {
+                        recipes.push(await new recipe().descriptor());
+                    }
+                    context.target = '';
+                    return recipes;
+                }
+            )
+        );
     }
 }

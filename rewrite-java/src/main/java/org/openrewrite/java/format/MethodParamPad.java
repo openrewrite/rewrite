@@ -26,8 +26,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.Style;
 
-import java.util.Optional;
-
 import static java.util.Objects.requireNonNull;
 
 public class MethodParamPad extends Recipe {
@@ -48,6 +46,7 @@ public class MethodParamPad extends Recipe {
         return new MethodParamPadVisitor();
     }
 
+    @SuppressWarnings("NotNullFieldNotInitialized")
     private static class MethodParamPadVisitor extends JavaIsoVisitor<ExecutionContext> {
         SpacesStyle spacesStyle;
         MethodParamPadStyle methodParamPadStyle;
@@ -59,11 +58,11 @@ public class MethodParamPad extends Recipe {
         }
 
         @Override
-        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                spacesStyle = Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces());
-                methodParamPadStyle = Optional.ofNullable(Style.from(MethodParamPadStyle.class, cu)).orElse(Checkstyle.methodParamPadStyle());
+                spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
+                methodParamPadStyle = Style.from(MethodParamPadStyle.class, cu, Checkstyle::methodParamPadStyle);
 
                 spacesStyle = spacesStyle.withBeforeParentheses(
                         spacesStyle.getBeforeParentheses()
@@ -102,9 +101,8 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            mi = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, null, null, mi)
+            return (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, null, null, mi)
                     .visitNonNull(mi, ctx, getCursor().getParentTreeCursor().fork());
-            return mi;
         }
 
         @Override
@@ -120,9 +118,8 @@ public class MethodParamPad extends Recipe {
                     );
                 }
             }
-            nc = (J.NewClass) new SpacesVisitor<>(spacesStyle, null, null, nc)
+            return (J.NewClass) new SpacesVisitor<>(spacesStyle, null, null, nc)
                     .visitNonNull(nc, ctx, getCursor().getParentTreeCursor().fork());
-            return nc;
         }
     }
 }

@@ -54,14 +54,14 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
     public void putMessage(String key, @Nullable Object value) {
         boolean mutationAllowed =
                 !getMessage(VALIDATE_CTX_MUTATION, false) ||
-                key.equals(VALIDATE_CURSOR_ACYCLIC) ||
-                key.equals(VALIDATE_CTX_MUTATION) ||
-                key.equals(PANIC) ||
-                key.equals(ExecutionContext.CURRENT_CYCLE) ||
-                key.equals(ExecutionContext.CURRENT_RECIPE) ||
-                key.equals(ExecutionContext.DATA_TABLES) ||
-                key.equals(WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT) ||
-                key.equals(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT) ||
+                VALIDATE_CURSOR_ACYCLIC.equals(key) ||
+                VALIDATE_CTX_MUTATION.equals(key) ||
+                PANIC.equals(key) ||
+                ExecutionContext.CURRENT_CYCLE.equals(key) ||
+                ExecutionContext.CURRENT_RECIPE.equals(key) ||
+                ExecutionContext.DATA_TABLES.equals(key) ||
+                WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT.equals(key) ||
+                ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.equals(key) ||
                 key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
                 || key.startsWith("io.moderne"); // We ought to know what we're doing
         assert mutationAllowed : "Recipe mutated execution context key \"" + key + "\". " +

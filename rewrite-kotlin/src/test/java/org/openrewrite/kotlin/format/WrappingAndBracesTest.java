@@ -270,7 +270,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               class Test {
-                  @Suppress("ALL") 
+                  @Suppress("ALL")
                @Deprecated("", ReplaceWith("Any()"))
                  fun method(): Any {
                       return Any()
@@ -591,12 +591,12 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               val o = object {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               class T {
                   @Suppress val i = 1
                   @Suppress val j = 1
@@ -607,14 +607,14 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               val o = object {
                   @Suppress
                val i = 1
                   @Suppress
                val j = 1
               }
-              
+
               class T {
                   @Suppress
                val i = 1

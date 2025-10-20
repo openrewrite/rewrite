@@ -62,10 +62,7 @@ public class WrappingAndBraces extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                WrappingAndBracesStyle style = ((SourceFile) cu).getStyle(WrappingAndBracesStyle.class);
-                if (style == null) {
-                    style = IntelliJ.wrappingAndBraces();
-                }
+                WrappingAndBracesStyle style = Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces);
                 return new WrappingAndBracesVisitor<>(style).visit(cu, ctx);
             }
             return (J) tree;

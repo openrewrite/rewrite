@@ -29,11 +29,13 @@ import org.openrewrite.kotlin.style.IntelliJ;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.unmodifiableSet;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
@@ -56,7 +58,7 @@ import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport<P> extends KotlinIsoVisitor<P> {
 
-    private static final Set<String> IMPLICITLY_IMPORTED_PACKAGES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+    private static final Set<String> IMPLICITLY_IMPORTED_PACKAGES = unmodifiableSet(new HashSet<>(Arrays.asList(
             "kotlin",
             "kotlin.annotation",
             "kotlin.collections",
@@ -181,8 +183,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                 }
             }
 
-            ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
-                    .orElse(IntelliJ.importLayout());
+            ImportLayoutStyle layoutStyle = Style.from(ImportLayoutStyle.class, cu, IntelliJ::importLayout);
 
             List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
                     .map(JavaSourceSet::getClasspath)
@@ -191,8 +192,8 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
             List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
 
             // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
-            GeneralFormatStyle generalFormatStyle = Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
-              .orElse(autodetectGeneralFormatStyle(cu));
+            K.CompilationUnit finalCu = cu;
+            GeneralFormatStyle generalFormatStyle = Style.from(GeneralFormatStyle.class, cu, ()-> autodetectGeneralFormatStyle(finalCu));
             newImports = checkCRLF(newImports, generalFormatStyle);
 
             cu = cu.getPadding().withImports(newImports);

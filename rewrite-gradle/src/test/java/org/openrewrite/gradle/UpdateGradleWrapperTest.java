@@ -30,10 +30,12 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.Objects;
@@ -56,8 +58,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
     };
 
     // Gradle wrapper script text for 7.4.2
-    private static final String GRADLEW_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2"));
-    private static final String GRADLEW_BAT_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2.bat"));
+    private static final String GRADLEW_TEXT_7_4_2 = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2"));
+    private static final String GRADLEW_BAT_TEXT_7_4_2 = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2.bat"));
+    private static final String GRADLEW_TEXT_8_14 = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-8.14"));
+    private static final String GRADLEW_BAT_TEXT_8_14 = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-8.14.bat"));
 
     private final SourceSpecs gradlew = text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty));
     private final SourceSpecs gradlewBat = text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty));
@@ -70,15 +74,15 @@ class UpdateGradleWrapperTest implements RewriteTest {
           .beforeRecipe(withToolingApi());
     }
 
-    @Test
     @DocumentExample("Update existing Gradle wrapper")
+    @Test
     void updateWrapper() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
             .afterRecipe(run -> {
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
-                assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+                assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT_7_4_2);
                 //noinspection DataFlowIssue
                 assertThat(gradleSh.getFileAttributes()).isNotNull();
                 assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
@@ -86,7 +90,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
                 var gradleBat = result(run, PlainText.class, "gradlew.bat");
                 assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
-                assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
+                assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT_7_4_2);
 
                 var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
                 assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
@@ -130,7 +134,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
               var gradleSh = result(run, PlainText.class, "gradlew");
               assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
-              assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+              assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT_7_4_2);
               //noinspection DataFlowIssue
               assertThat(gradleSh.getFileAttributes()).isNotNull();
               assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
@@ -138,7 +142,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
               var gradleBat = result(run, PlainText.class, "gradlew.bat");
               assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
-              assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
+              assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT_7_4_2);
 
               var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
               assertThat(gradleWrapperProperties.getSourcePath()).isEqualTo(WRAPPER_PROPERTIES_LOCATION);
@@ -345,8 +349,18 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
     @Test
     void doNotDowngrade() {
+        HttpSender unhelpfulSender = request -> {
+            if (request.getUrl().toString().contains("services.gradle.org")) {
+                throw new RuntimeException("I'm sorry Dave, I'm afraid I can't do that.");
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(unhelpfulSender)
+          .setLargeFileHttpSender(unhelpfulSender);
         rewriteRun(
-          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.5"))),
+          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.5")))
+            .executionContext(ctx),
           properties(
             """
               distributionBase=GRADLE_USER_HOME
@@ -774,8 +788,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2651")
+    @Test
     void updateWithCustomDistributionUri() {
         HttpSender customDistributionHost = request -> {
             if (request.getUrl().toString().contains("company.com")) {
@@ -861,10 +875,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
             .afterRecipe(run -> {
-                Path subdir = Paths.get("subdir");
+                Path subdir = Path.of("subdir");
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_SCRIPT_LOCATION));
-                assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+                assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT_7_4_2);
                 //noinspection DataFlowIssue
                 assertThat(gradleSh.getFileAttributes()).isNotNull();
                 assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
@@ -872,7 +886,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
                 var gradleBat = result(run, PlainText.class, "gradlew.bat");
                 assertThat(gradleBat.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_BATCH_LOCATION));
-                assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
+                assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT_7_4_2);
 
                 var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
                 assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_JAR_LOCATION));
@@ -913,6 +927,171 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void failRecipeIfBothVersionAndDistributionUriAreProvided() {
         assertThat(new UpdateGradleWrapper("7.4.2", "bin", false, "https://company.com/repo/gradle-7.4.2-bin.zip", null).validate().isInvalid()).isTrue();
+    }
+
+    @Test
+    void supportsSemverAgainstJFrogArtifactory() {
+        HttpSender customDistributionHost = request -> {
+            String url = request.getUrl().toString();
+            if ("https://artifactory.company.com/artifactory/api/storage/gradle-distributions".equals(url)) {
+                return new HttpSender.Response(200, new ByteArrayInputStream("""
+                  {
+                    "repo" : "gradle-distributions",
+                    "path" : "/",
+                    "created" : "2025-08-25T07:12:28.801Z",
+                    "createdBy" : "admin",
+                    "lastModified" : "2025-08-25T07:12:28.801Z",
+                    "modifiedBy" : "admin",
+                    "lastUpdated" : "2025-08-25T07:12:28.801Z",
+                    "children" : [ {
+                      "uri" : "/gradle-8.10-bin.zip",
+                      "folder" : false
+                    }, {
+                      "uri" : "/gradle-8.8-all.zip",
+                      "folder" : false
+                    }, {
+                      "uri" : "/gradle-8.8-bin.zip",
+                      "folder" : false
+                    } ],
+                    "uri" : "https://company.com/artifactory/api/storage/gradle-distributions"
+                  }
+                  """.getBytes(StandardCharsets.UTF_8)), () -> {
+                });
+            } else if ("https://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip".equals(url)) {
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.8-all.zip"), () -> {
+                });
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.x", "all", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "8.2")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://artifactory.company.com/artifactory/gradle-distributions/gradle-8.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void supportsSemverAgainstJFrogArtifactoryWithPath() {
+        HttpSender customDistributionHost = request -> {
+            String url = request.getUrl().toString();
+            if ("https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions".equals(url)) {
+                return new HttpSender.Response(200, new ByteArrayInputStream("""
+                  {
+                    "repo" : "gradle-distributions",
+                    "path" : "/gradle/distributions",
+                    "created" : "2025-08-25T07:12:28.801Z",
+                    "createdBy" : "admin",
+                    "lastModified" : "2025-08-25T07:12:28.801Z",
+                    "modifiedBy" : "admin",
+                    "lastUpdated" : "2025-08-25T07:12:28.801Z",
+                    "children" : [ {
+                      "uri" : "/gradle-8.10-bin.zip",
+                      "folder" : false
+                    }, {
+                      "uri" : "/gradle-8.8-all.zip",
+                      "folder" : false
+                    }, {
+                      "uri" : "/gradle-8.8-bin.zip",
+                      "folder" : false
+                    } ],
+                    "uri" : "https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions"
+                  }
+                  """.getBytes(StandardCharsets.UTF_8)), () -> {
+                });
+            } else if ("https://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip".equals(url)) {
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.x", null, null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "8.2")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void usesExecutableJarFrom8_14() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.14", null, null, null, null))
+            .expectedCyclesThatMakeChanges(1).afterRecipe(run -> {
+                assertThat(run.getChangeset().getAllResults()).hasSize(4);
+
+                var gradleSh = result(run, PlainText.class, "gradlew");
+                assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+                assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT_8_14);
+                //noinspection DataFlowIssue
+                assertThat(gradleSh.getFileAttributes()).isNotNull();
+                assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
+                assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
+
+                var gradleBat = result(run, PlainText.class, "gradlew.bat");
+                assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
+                assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT_8_14);
+
+                var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
+                assertThat(gradleWrapperProperties.getSourcePath()).isEqualTo(WRAPPER_PROPERTIES_LOCATION);
+
+                var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
+                assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-8.14-bin.zip"));
+                assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              """
+          )
+        );
     }
 
     private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {

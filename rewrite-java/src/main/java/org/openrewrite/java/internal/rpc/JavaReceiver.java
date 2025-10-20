@@ -16,9 +16,9 @@
 package org.openrewrite.java.internal.rpc;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -30,14 +30,14 @@ import java.util.function.Function;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
-@SuppressWarnings("DataFlowIssue")
+@SuppressWarnings({"DataFlowIssue", "ConstantValue"})
 public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
-        return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
-                .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
-                .withMarkers(q.receiveMarkers(j.getMarkers()));
+        J j2 = j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
+        j2 = j2.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
+        return j2.withMarkers(q.receive(j.getMarkers()));
     }
 
     @Override
@@ -151,9 +151,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     private J.ClassDeclaration.Kind visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcReceiveQueue q) {
         J.ClassDeclaration.Kind k = (J.ClassDeclaration.Kind) preVisit(kind, q);
-        k = k.withAnnotations(q.receiveList(kind.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
+        return k.withAnnotations(q.receiveList(kind.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withType(q.receiveAndGet(kind.getType(), toEnum(J.ClassDeclaration.Kind.Type.class)));
-        return k;
     }
 
     @Override
@@ -279,9 +278,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitElse(J.If.Else elze, RpcReceiveQueue q) {
-        return elze
-                .getPadding().withBody(q.receive(elze.getPadding().getBody(), b -> visitRightPadded(b, q)));
+    public J visitElse(J.If.Else anElse, RpcReceiveQueue q) {
+        return anElse
+                .getPadding().withBody(q.receive(anElse.getPadding().getBody(), b -> visitRightPadded(b, q)));
     }
 
     @Override
@@ -609,7 +608,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                         return ((TextComment) c).withMultiline(q.receive(c.isMultiline()))
                                 .withText(q.receive(((TextComment) c).getText()))
                                 .withSuffix(q.receive(c.getSuffix()))
-                                .withMarkers(q.receiveMarkers(c.getMarkers()));
+                                .withMarkers(q.receive(c.getMarkers()));
                     }
                     return c;
                 }))
@@ -621,7 +620,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withBefore(q.receive(container.getBefore(), space -> visitSpace(space, q)))
                 .getPadding().withElements(q.receiveList(container.getPadding().getElements(),
                         e -> visitRightPadded(e, q)))
-                .withMarkers(q.receiveMarkers(container.getMarkers()));
+                .withMarkers(q.receive(container.getMarkers()));
     }
 
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
@@ -637,14 +636,14 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                     }
                     return t;
                 }))
-                .withMarkers(q.receiveMarkers(left.getMarkers()));
+                .withMarkers(q.receive(left.getMarkers()));
     }
 
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q, Function<Object, T> elementMapping) {
         return left
                 .withBefore(q.receive(left.getBefore(), s -> visitSpace(s, q)))
                 .withElement(requireNonNull(q.receiveAndGet(left.getElement(), elementMapping)))
-                .withMarkers(q.receiveMarkers(left.getMarkers()));
+                .withMarkers(q.receive(left.getMarkers()));
     }
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
@@ -660,15 +659,19 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                     return t;
                 }))
                 .withAfter(q.receive(right.getAfter(), s -> visitSpace(s, q)))
-                .withMarkers(q.receiveMarkers(right.getMarkers()));
+                .withMarkers(q.receive(right.getMarkers()));
     }
 
+    private final JavaTypeReceiver javaTypeReceiver = new JavaTypeReceiver();
+
     @Override
-    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType, RpcReceiveQueue q) {
-        if (javaType instanceof RpcCodec) {
-            //noinspection unchecked
-            return ((RpcCodec<@NonNull JavaType>) javaType).rpcReceive(javaType, q);
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcReceiveQueue q) {
+        if (javaType == null) {
+            return null;
+        } else if (javaType instanceof JavaType.Unknown) {
+            return JavaType.Unknown.getInstance();
         }
-        return requireNonNull(super.visitType(javaType, q));
+        return javaTypeReceiver.visit(javaType, q);
     }
 }
+
