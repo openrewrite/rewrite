@@ -19,8 +19,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.jgit.diff.RawText;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -32,7 +33,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -59,7 +62,7 @@ public class PlainTextParser implements Parser {
                 .withFileAttributes(sourceFile.getFileAttributes())
                 .withCharsetBomMarked(sourceFile.isCharsetBomMarked())
                 .withId(sourceFile.getId())
-                .withMarkers(gatherMarkers(sourceFile));
+                .withMarkers(sourceFile.getMarkers().withMarkers(gatherMarkers(sourceFile)));
         if (sourceFile.getCharset() != null) {
             text = (PlainText) text.withCharset(sourceFile.getCharset());
         }
@@ -158,13 +161,13 @@ public class PlainTextParser implements Parser {
         }
     }
 
-    private static Markers gatherMarkers(SourceFile sourceFile) {
-        return new TreeVisitor<Tree, Markers>() {
+    private static List<Marker> gatherMarkers(SourceFile sourceFile) {
+        return new TreeVisitor<Tree, ArrayList<Marker>>() {
             @Override
-            public Tree visit(Tree tree, Markers markers) {
+            public Tree visit(Tree tree, ArrayList<Marker> markers) {
                 if (tree != sourceFile) {
                     tree.getMarkers().getMarkers().forEach(marker -> {
-                        if (marker instanceof Markup) {
+                        if (marker instanceof SearchResult || marker instanceof Markup) {
                             markers.add(marker);
                         }
                     });
@@ -172,6 +175,6 @@ public class PlainTextParser implements Parser {
 
                 return super.visit(tree, markers);
             }
-        }.reduce(sourceFile, sourceFile.getMarkers());
+        }.reduce(sourceFile, new ArrayList<>(sourceFile.getMarkers().getMarkers()));
     }
 }
