@@ -162,17 +162,16 @@ public class PlainTextParser implements Parser {
     }
 
     private static List<Marker> gatherMarkers(SourceFile sourceFile) {
-        return new TreeVisitor<Tree, ArrayList<Marker>>() {
+        return new TreeVisitor<Tree, List<Marker>>() {
             @Override
-            public Tree visit(Tree tree, ArrayList<Marker> markers) {
-                if (tree != sourceFile) {
+            public @Nullable Tree visit(@Nullable Tree tree, List<Marker> markers) {
+                if (tree != null && tree != sourceFile) {
                     tree.getMarkers().getMarkers().forEach(marker -> {
                         if (marker instanceof SearchResult || marker instanceof Markup) {
                             markers.add(marker);
                         }
                     });
                 }
-
                 return super.visit(tree, markers);
             }
         }.reduce(sourceFile, new ArrayList<>(sourceFile.getMarkers().getMarkers()));

@@ -47,7 +47,7 @@ class PlainTextParserConversionTest implements RewriteTest {
         rewriteRun(
           spec -> {
               spec.afterRecipe(run -> {
-                  SourceFile result = run.getChangeset().getAllResults().get(0).getAfter();
+                  SourceFile result = run.getChangeset().getAllResults().getFirst().getAfter();
                   assertThat(result).isInstanceOf(PlainText.class);
                   assertThat(result.getMarkers().getMarkers()).hasSize(3);
                   assertThat(result.getMarkers().findAll(AlreadyReplaced.class)).isNotEmpty();
@@ -77,7 +77,7 @@ class PlainTextParserConversionTest implements RewriteTest {
     void markersAreKeptWhenNoConversionToTextLst() {
         rewriteRun(
           spec ->
-              spec.recipes(markClassDeclaration, new FindAndReplace("doesNotExist", "willNotAppear", null, null, null, null, null, null)),
+            spec.recipes(markClassDeclaration, new FindAndReplace("doesNotExist", "willNotAppear", null, null, null, null, null, null)),
           java(
             """
               package com.example;
