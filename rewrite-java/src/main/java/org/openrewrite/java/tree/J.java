@@ -3071,6 +3071,7 @@ public interface J extends Tree {
             }
 
             public @Nullable JLeftPadded<Boolean> getModule() {
+                return t.module;
             }
 
             public Import withModule(JLeftPadded<Boolean> module) {
