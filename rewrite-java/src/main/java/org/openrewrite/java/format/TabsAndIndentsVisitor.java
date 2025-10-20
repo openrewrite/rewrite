@@ -426,7 +426,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             JContainer<Statement> primaryConstructorArgs = ((J.ClassDeclaration) tree).getPadding().getPrimaryConstructor();
             arguments = primaryConstructorArgs == null ? emptyList() : primaryConstructorArgs.getPadding().getElements();
         } else {
-            throw new IllegalStateException("Unexpected tree type: " + tree.getClass().getSimpleName());
+            return -1;
         }
         J firstArg = arguments.isEmpty() ? null : arguments.get(0).getElement();
         if (firstArg == null || firstArg instanceof J.Empty) {
