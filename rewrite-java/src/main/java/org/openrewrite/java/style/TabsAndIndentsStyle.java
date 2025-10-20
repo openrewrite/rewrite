@@ -34,10 +34,17 @@ public class TabsAndIndentsStyle implements JavaStyle {
     Boolean indentsRelativeToExpressionStart;
 
     MethodDeclarationParameters methodDeclarationParameters;
+    RecordComponents recordComponents;
 
     @Value
     @With
     public static class MethodDeclarationParameters {
+        Boolean alignWhenMultiple;
+    }
+
+    @Value
+    @With
+    public static class RecordComponents {
         Boolean alignWhenMultiple;
     }
 
