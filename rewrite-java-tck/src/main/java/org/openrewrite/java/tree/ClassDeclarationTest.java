@@ -368,42 +368,6 @@ class ClassDeclarationTest implements RewriteTest {
         }
 
         @Test
-        void implicitClassWithPackageStatement() {
-            rewriteRun(
-              java(
-                """
-                  package com.example;
-
-                  void main() {
-                      System.out.println("Hello from package!");
-                  }
-                  """,
-                spec -> spec.path("com/example/Main.java")
-              )
-            );
-        }
-
-        @Test
-        void implicitClassWithPackageStatementWithAbundantSpacing() {
-            rewriteRun(
-              java(
-                """
-
-                  package com.example;
-
-                  void main() {
-
-                      System.out.println("Hello from package!");
-
-                  }
-
-                  """,
-                spec -> spec.path("com/example/Main.java")
-              )
-            );
-        }
-
-        @Test
         void implicitClassWithConstructor() {
             rewriteRun(
               java(

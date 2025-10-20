@@ -646,14 +646,6 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                    cu.modle.equals(Symtab.instance(context).unnamedModule) &&
                    cu.packge.equals(Symtab.instance(context).unnamedModule.unnamedPackage)) {
             int saveCursor = cursor;
-            Space prefix = whitespace();
-            if (source.startsWith("package", cursor)) {
-                skip("package");
-                markers.add(new PackageOnCompactSourceFile(randomId(),
-                        prefix, sourceBefore(";").getWhitespace()));
-            } else {
-                cursor = saveCursor;
-            }
         }
         return new J.CompilationUnit(
                 randomId(),

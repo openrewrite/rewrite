@@ -574,14 +574,6 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, PrintOutputCapture<P> p) {
         beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
-        Optional<PackageOnCompactSourceFile> packageOnCompactSourceFile = cu.getMarkers().findFirst(PackageOnCompactSourceFile.class);
-        if (packageOnCompactSourceFile.isPresent()) {
-            PackageOnCompactSourceFile pkg  = packageOnCompactSourceFile.get();
-            visitSpace(pkg.getPrefix(), Space.Location.PACKAGE_PREFIX, p);
-            p.append("package");
-            p.append(pkg.getPackageDefinition());
-            p.append(";");
-        }
         visitRightPadded(cu.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, ";", p);
         visitRightPadded(cu.getPadding().getImports(), JRightPadded.Location.IMPORT, ";", p);
         if (!cu.getImports().isEmpty()) {
