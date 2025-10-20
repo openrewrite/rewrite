@@ -238,7 +238,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         J tree = null;
                         if (loc == JRightPadded.Location.METHOD_DECLARATION_PARAMETER) {
                             tree = getCursor().firstEnclosing(J.MethodDeclaration.class);
-                        } else if (loc == JRightPadded.Location.RECORD_STATE_VECTOR) {
+                        } else {
                             tree = getCursor().firstEnclosing(J.ClassDeclaration.class);
                             getCursor().getParentOrThrow().putMessage("indentType", IndentType.CONTINUATION_INDENT);
                         }
