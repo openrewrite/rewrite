@@ -1141,4 +1141,22 @@ class UnnecessaryParenthesesTest implements RewriteTest {
             );
         }
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/534")
+    @Test
+    void doNotUnwrapSwitchWithMethodCall() {
+        rewriteRun(
+          java(
+            """
+            class Foo {
+                int foo(int i) {
+                    return (switch(i) {
+                        default -> "foo";
+                    }).length();
+               }
+            }
+            """
+          )
+        );
+    }
 }

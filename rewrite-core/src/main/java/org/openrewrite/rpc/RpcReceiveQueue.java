@@ -131,11 +131,11 @@ public class RpcReceiveQueue {
 
                 // TODO handle enums here
 
-                RpcCodec<T> rpcCodec;
+                RpcCodec<T> codec;
                 if (onChange != null) {
                     after = onChange.apply(before);
-                } else if (before != null && (rpcCodec = RpcCodec.forInstance(before, sourceFileType)) != null) {
-                    after = rpcCodec.rpcReceive(before, this);
+                } else if (before != null && (codec = RpcCodec.forInstance(before, sourceFileType)) != null) {
+                    after = codec.rpcReceive(before, this);
                 } else if (message.getValueType() == null) {
                     after = message.getValue();
                 } else {
