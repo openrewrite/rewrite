@@ -16,9 +16,9 @@
 package org.openrewrite.java.internal.rpc;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -30,7 +30,7 @@ import java.util.function.Function;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
-@SuppressWarnings("DataFlowIssue")
+@SuppressWarnings({"DataFlowIssue", "ConstantValue"})
 public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
@@ -278,9 +278,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitElse(J.If.Else elze, RpcReceiveQueue q) {
-        return elze
-                .getPadding().withBody(q.receive(elze.getPadding().getBody(), b -> visitRightPadded(b, q)));
+    public J visitElse(J.If.Else anElse, RpcReceiveQueue q) {
+        return anElse
+                .getPadding().withBody(q.receive(anElse.getPadding().getBody(), b -> visitRightPadded(b, q)));
     }
 
     @Override
@@ -662,12 +662,16 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withMarkers(q.receive(right.getMarkers()));
     }
 
+    private final JavaTypeReceiver javaTypeReceiver = new JavaTypeReceiver();
+
     @Override
-    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType, RpcReceiveQueue q) {
-        if (javaType instanceof RpcCodec) {
-            //noinspection unchecked
-            return ((RpcCodec<@NonNull JavaType>) javaType).rpcReceive(javaType, q);
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcReceiveQueue q) {
+        if (javaType == null) {
+            return null;
+        } else if (javaType instanceof JavaType.Unknown) {
+            return JavaType.Unknown.getInstance();
         }
-        return requireNonNull(super.visitType(javaType, q));
+        return javaTypeReceiver.visit(javaType, q);
     }
 }
+

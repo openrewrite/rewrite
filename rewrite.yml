@@ -111,5 +111,5 @@ recipeList:
   - org.openrewrite.java.RemoveAnnotation:
       annotationPattern: '@jakarta.annotation.Nonnull'
 #  - org.openrewrite.java.jspecify.MigrateToJspecify
-  - org.openrewrite.staticanalysis.AnnotateNullableMethods
+#  - org.openrewrite.staticanalysis.AnnotateNullableMethods
   - org.openrewrite.staticanalysis.NullableOnMethodReturnType

@@ -32,7 +32,7 @@ export class FindIdentifier extends Recipe {
         super(options);
     }
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const identifier = this.identifier;
         return new class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitIdentifier(ident: J.Identifier, ctx: ExecutionContext): Promise<J | undefined> {

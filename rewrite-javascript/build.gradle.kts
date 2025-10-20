@@ -17,6 +17,7 @@ plugins {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    api(project(":rewrite-json"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
@@ -52,15 +53,13 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-val datedSnapshotVersion by extra {
-    if (System.getenv("CI") != null) {
-        project.version.toString().replace(
-            "SNAPSHOT",
-            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-        )
-    } else {
-        project.version.toString()
-    }
+val datedSnapshotVersion = if (System.getenv("CI") != null) {
+    project.version.toString().replace(
+        "SNAPSHOT",
+        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+    )
+} else {
+    project.version.toString()
 }
 
 val npmVersion = tasks.register<NpmTask>("npmVersion") {

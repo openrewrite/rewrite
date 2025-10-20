@@ -19,29 +19,51 @@ import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.internal.RecipeLoader;
+import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static java.util.Collections.emptyList;
 
 @Value
 public class PrepareRecipe implements RpcRequest {
     String id;
     Map<String, Object> options;
 
+    public interface Loader {
+        Recipe load(String id, Map<String, Object> options) throws Exception;
+    }
+
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<PrepareRecipe> {
-        private final Map<String, Recipe> preparedRecipes;
+        private final PreparedRecipeCache preparedRecipes;
+        private final AtomicReference<@Nullable Loader> recipeLoader;
 
         @Override
         protected Object handle(PrepareRecipe request) throws Exception {
-            Recipe recipe = new RecipeLoader(null).load(request.getId(), request.getOptions());
+            Loader loader = recipeLoader.get();
+            if (loader == null) {
+                loader = (recipeId, options) -> new RecipeLoader(null).load(recipeId, options);
+            }
+            Recipe recipe = loader.load(request.id, request.getOptions());
             String instanceId = SnowflakeId.generateId();
-            preparedRecipes.put(instanceId, recipe);
-            return new PrepareRecipeResponse(instanceId, recipe.getDescriptor(),
+            preparedRecipes.getInstantiated().put(instanceId, recipe);
+            return new PrepareRecipeResponse(
+                    instanceId,
+                    recipe.getDescriptor(),
                     "edit:" + instanceId,
-                    recipe instanceof ScanningRecipe ? "scan:" + instanceId : null);
+                    // Making this non-empty would only be valuable if a non-Java process was controlling
+                    // recipe execution and there would then be some benefit to it preempting the execution
+                    // of the edit visitor in this Java RPC process. Same for the scan precondition visitor below.
+                    emptyList(),
+                    recipe instanceof ScanningRecipe ? "scan:" + instanceId : null,
+                    emptyList()
+            );
         }
     }
 }

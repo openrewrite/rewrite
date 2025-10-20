@@ -15,6 +15,8 @@
  */
 package org.openrewrite.rpc;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A codec decomposes a value into multiple RPC {@link RpcObjectData} events, and
  * on the receiving side reconstitutes the value from those events.
@@ -42,4 +44,12 @@ public interface RpcCodec<T> {
      * @param q      The queue that is receiving {@link RpcObjectData} from a remote.
      */
     T rpcReceive(T before, RpcReceiveQueue q);
+
+    static <T> @Nullable RpcCodec<T> forInstance(T t, @Nullable String sourceFileType) {
+        if (t instanceof RpcCodec) {
+            //noinspection unchecked
+            return (RpcCodec<T>) t;
+        }
+        return DynamicDispatchRpcCodec.getCodec(t, sourceFileType);
+    }
 }

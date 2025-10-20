@@ -126,7 +126,7 @@ public class PsiTreePrinter {
         int depth;
     }
 
-    public static @Nullable String printFirFile(FirFile file) {
+    public static String printFirFile(FirFile file) {
         StringBuilder sb = new StringBuilder();
         List<StringBuilder> lines = new ArrayList<>();
         sb.append("------------").append("\n");
@@ -161,12 +161,11 @@ public class PsiTreePrinter {
         return sb.toString();
     }
 
-    public static @Nullable String printFirTree(FirElement firElement) {
+    public static String printFirTree(FirElement firElement) {
         StringBuilder sb = new StringBuilder();
         List<StringBuilder> lines = new ArrayList<>();
         TreePrinterContext context = new TreePrinterContext(lines, 1);
         new FirDefaultVisitor<Void, TreePrinterContext>() {
-
             @Override
             public @Nullable Void visitElement(FirElement fir, TreePrinterContext ctx) {
                 StringBuilder line = new StringBuilder();

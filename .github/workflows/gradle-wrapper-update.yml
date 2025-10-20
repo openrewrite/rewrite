@@ -1,0 +1,37 @@
+---
+name: Update Gradle wrapper scripts
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: 0 10 * * TUE
+
+jobs:
+  update-versions:
+    if: github.event_name != 'schedule' || github.repository_owner == 'openrewrite'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Update versions
+        run: ./gradlew :rewrite-gradle:syncWrapperScripts
+
+      # Commit and push
+      - name: configure-git-user
+        run: |
+          git config user.email "team@moderne.io"
+          git config user.name "team-moderne[bot]"
+      - name: Create timestamp
+        run: echo "NOW=$(date +'%Y-%m-%dT%H%M')" >> $GITHUB_ENV
+      - name: Commit and push
+        run: |
+          git add rewrite-gradle/src/main/resources/META-INF/rewrite/gradle-wrapper/
+          git diff --quiet HEAD || (git commit -m "[Auto] Gradle wrapper scripts as of ${{ env.NOW }}" && git push origin main)

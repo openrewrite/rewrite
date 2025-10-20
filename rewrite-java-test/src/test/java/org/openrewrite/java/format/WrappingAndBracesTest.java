@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,12 +28,12 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.emptySet;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
 import static org.openrewrite.style.LineWrapSetting.WrapAlways;
@@ -45,6 +45,7 @@ class WrappingAndBracesTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
           new WrappingAndBracesStyle.IfStatement(false),
+          new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder")),
           new WrappingAndBracesStyle.Annotations(WrapAlways),
           new WrappingAndBracesStyle.Annotations(WrapAlways),
           new WrappingAndBracesStyle.Annotations(WrapAlways),
@@ -69,7 +70,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   {
-                      int n = 0;
+              int n = 0;
                       n++;
                   }
               }
@@ -925,6 +926,7 @@ class WrappingAndBracesTest implements RewriteTest {
         rewriteRun(spec ->
             spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
               new WrappingAndBracesStyle.IfStatement(false),
+              new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList()),
               null,
               null,
               null,

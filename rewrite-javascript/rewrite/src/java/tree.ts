@@ -16,16 +16,31 @@
  * limitations under the License.
  */
 
-import {emptyMarkers, Markers, SourceFile, Tree, TreeKind} from "../";
-import {JavaType} from "./type";
-import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {JavaReceiver, JavaSender} from "./rpc";
+import {emptyMarkers, Markers} from "../markers";
+import {SourceFile, Tree} from "../tree";
+import {Type} from "./type";
 
 export interface J extends Tree {
     readonly prefix: J.Space;
 }
 
+export namespace J {
+    export function isMethodCall(e?: Expression): e is MethodCall {
+        return e?.kind === J.Kind.NewClass ||
+            e?.kind === J.Kind.MethodInvocation ||
+            e?.kind === J.Kind.MemberReference;
+    }
+
+    export function hasType<T extends J>(tree: T): tree is T & { type: Type } {
+        return tree && 'type' in tree && tree.type != null;
+    }
+}
+
 export interface Expression extends J {
+}
+
+export interface MethodCall extends Expression {
+    readonly methodType?: Type.Method;
 }
 
 export interface TypedTree extends J {
@@ -54,7 +69,6 @@ export interface NameTree extends J {
 
 export namespace J {
     export const Kind = {
-        ...TreeKind,
         AnnotatedType: "org.openrewrite.java.tree.J$AnnotatedType",
         Annotation: "org.openrewrite.java.tree.J$Annotation",
         ArrayAccess: "org.openrewrite.java.tree.J$ArrayAccess",
@@ -149,7 +163,7 @@ export namespace J {
         readonly kind: typeof Kind.ArrayAccess;
         readonly indexed: Expression;
         readonly dimension: ArrayDimension;
-        readonly type?: JavaType
+        readonly type?: Type
     }
 
     export interface ArrayDimension extends J {
@@ -162,7 +176,7 @@ export namespace J {
         readonly elementType: TypeTree;
         readonly annotations?: Annotation[];
         readonly dimension: LeftPadded<Space>;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export interface Assert extends J, Statement {
@@ -175,7 +189,7 @@ export namespace J {
         readonly kind: typeof Kind.Assignment;
         readonly variable: Expression;
         readonly assignment: LeftPadded<Expression>;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export interface AssignmentOperation extends J, Statement, Expression, TypedTree {
@@ -183,7 +197,7 @@ export namespace J {
         readonly variable: Expression;
         readonly operator: LeftPadded<AssignmentOperation.Type>;
         readonly assignment: Expression;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export namespace AssignmentOperation {
@@ -210,7 +224,7 @@ export namespace J {
         readonly left: Expression;
         readonly operator: LeftPadded<Binary.Type>;
         readonly right: Expression;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export namespace Binary {
@@ -277,7 +291,7 @@ export namespace J {
         readonly implements?: Container<TypeTree>;
         readonly permitting?: Container<TypeTree>;
         readonly body: Block;
-        readonly type?: JavaType.FullyQualified;
+        readonly type?: Type.FullyQualified;
     }
 
     export namespace ClassDeclaration {
@@ -336,7 +350,7 @@ export namespace J {
         readonly kind: typeof Kind.FieldAccess;
         readonly target: Expression;
         readonly name: LeftPadded<Identifier>;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export interface ForEachLoop extends J, Statement {
@@ -378,8 +392,8 @@ export namespace J {
         readonly kind: typeof Kind.Identifier;
         readonly annotations: Annotation[];
         readonly simpleName: string;
-        readonly type?: JavaType;
-        readonly fieldType?: JavaType.Variable;
+        readonly type?: Type;
+        readonly fieldType?: Type.Variable;
     }
 
     export interface If extends J, Statement {
@@ -408,7 +422,7 @@ export namespace J {
         readonly expression: RightPadded<Expression>;
         readonly class: J;
         readonly pattern?: J;
-        readonly type?: JavaType;
+        readonly type?: Type;
         readonly modifier?: Modifier;
     }
 
@@ -416,13 +430,13 @@ export namespace J {
         readonly kind: typeof Kind.DeconstructionPattern;
         readonly deconstructor: Expression;
         readonly nested: Container<J>;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export interface IntersectionType extends J, TypeTree, Expression {
         readonly kind: typeof Kind.IntersectionType;
         readonly bounds: Container<TypeTree>;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export interface Label extends J, Statement {
@@ -436,7 +450,7 @@ export namespace J {
         readonly parameters: Lambda.Parameters;
         readonly arrow: Space;
         readonly body: Statement | Expression;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export namespace Lambda {
@@ -449,10 +463,10 @@ export namespace J {
 
     export interface Literal extends J, TypedTree, Expression, VariableDeclarator {
         readonly kind: typeof Kind.Literal;
-        readonly value?: Object;
+        readonly value?: string | number | bigint | boolean | null | undefined;
         readonly valueSource?: string;
         readonly unicodeEscapes?: LiteralUnicodeEscape[];
-        readonly type?: JavaType.Primitive;
+        readonly type?: Type.Primitive;
     }
 
     export interface LiteralUnicodeEscape {
@@ -460,14 +474,13 @@ export namespace J {
         readonly codePoint: string;
     }
 
-    export interface MemberReference extends J, Expression {
+    export interface MemberReference extends J, MethodCall {
         readonly kind: typeof Kind.MemberReference;
         readonly containing: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
         readonly reference: LeftPadded<Identifier>;
-        readonly type?: JavaType;
-        readonly methodType?: JavaType.Method;
-        readonly variableType?: JavaType.Variable;
+        readonly type?: Type;
+        readonly variableType?: Type.Variable;
     }
 
     export interface MethodDeclaration extends J, TypedTree {
@@ -482,16 +495,15 @@ export namespace J {
         readonly throws?: Container<NameTree>;
         readonly body?: Block;
         readonly defaultValue?: LeftPadded<Expression>;
-        readonly methodType?: JavaType.Method;
+        readonly methodType?: Type.Method;
     }
 
-    export interface MethodInvocation extends J, TypedTree, Expression {
+    export interface MethodInvocation extends J, TypedTree, MethodCall {
         readonly kind: typeof Kind.MethodInvocation;
         readonly select?: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
         readonly name: Identifier;
         readonly arguments: Container<Expression>;
-        readonly methodType?: JavaType.Method;
     }
 
     export interface Modifier extends J {
@@ -535,17 +547,17 @@ export namespace J {
         readonly typeExpression?: TypeTree;
         readonly dimensions: ArrayDimension[];
         readonly initializer?: Container<Expression>;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
-    export interface NewClass extends J, TypedTree, Expression {
+    export interface NewClass extends J, TypedTree, MethodCall {
         readonly kind: typeof Kind.NewClass;
         readonly enclosing?: RightPadded<Expression>;
         readonly new: Space;
         readonly class?: TypeTree;
         readonly arguments: Container<Expression>;
         readonly body?: Block;
-        readonly constructorType?: JavaType.Method;
+        readonly constructorType?: Type.Method;
     }
 
     export interface NullableType extends J, TypeTree, Expression {
@@ -564,7 +576,7 @@ export namespace J {
         readonly kind: typeof Kind.ParameterizedType;
         readonly class: NameTree;
         readonly typeParameters?: Container<Expression>;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export interface Parentheses<J2 extends J> extends J, Expression {
@@ -579,7 +591,7 @@ export namespace J {
 
     export interface Primitive extends J, TypeTree, Expression {
         readonly kind: typeof Kind.Primitive;
-        readonly type: JavaType.Primitive;
+        type: Type.Primitive;
     }
 
     export interface Return extends J, Statement {
@@ -597,7 +609,7 @@ export namespace J {
         readonly kind: typeof Kind.SwitchExpression;
         readonly selector: ControlParentheses<Expression>;
         readonly cases: Block;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export interface Synchronized extends J, Statement {
@@ -611,7 +623,7 @@ export namespace J {
         readonly condition: Expression;
         readonly truePart: LeftPadded<Expression>;
         readonly falsePart: LeftPadded<Expression>;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
     export interface Throw extends J, Statement {
@@ -665,7 +677,7 @@ export namespace J {
         readonly kind: typeof Kind.Unary;
         readonly operator: LeftPadded<Unary.Type>;
         readonly expression: Expression;
-        readonly type?: JavaType;
+        readonly type?: Type;
     }
 
 
@@ -697,7 +709,7 @@ export namespace J {
             readonly name: VariableDeclarator;
             readonly dimensionsAfterName: LeftPadded<Space>[];
             readonly initializer?: LeftPadded<Expression>;
-            readonly variableType?: JavaType.Variable;
+            readonly variableType?: Type.Variable;
         }
     }
 
@@ -816,12 +828,6 @@ export interface DocComment extends Comment {
     // TODO implement me!
 }
 
-const javaKindValues = new Set(Object.values(J.Kind));
-
-export function isJava(tree: any): tree is J {
-    return javaKindValues.has(tree["kind"]);
-}
-
 export function isLiteral(tree: any): tree is J.Literal {
     return tree["kind"] === J.Kind.Literal;
 }
@@ -836,9 +842,9 @@ export function rightPadded<T extends J | boolean>(t: T, trailing: J.Space, mark
 }
 
 export namespace TypedTree {
-    const typeGetters = new Map<TypedTree["kind"], (tree: TypedTree) => JavaType | undefined>();
+    const typeGetters = new Map<TypedTree["kind"], (tree: TypedTree) => Type | undefined>();
 
-    export function getType(typeTree?: TypedTree): JavaType | undefined {
+    export function getType(typeTree?: TypedTree): Type | undefined {
         if (!typeTree) {
             return undefined;
         }
@@ -852,7 +858,7 @@ export namespace TypedTree {
         return (typeTree as any).type;
     }
 
-    export function registerTypeGetter<T extends TypedTree>(kind: T["kind"], fn: (tree: T) => JavaType | undefined): void {
+    export function registerTypeGetter<T extends TypedTree>(kind: T["kind"], fn: (tree: T) => Type | undefined): void {
         typeGetters.set(kind, fn as any);
     }
 
@@ -864,43 +870,12 @@ export namespace TypedTree {
     // TODO ControlParentheses here isn't a TypedTree so why does this compile?
     registerTypeGetter(J.Kind.TypeCast, (tree: J.TypeCast) => getType(tree.class));
 
-    registerTypeGetter(J.Kind.Empty, () => JavaType.unknownType);
+    registerTypeGetter(J.Kind.Empty, () => Type.unknownType);
     registerTypeGetter(J.Kind.MultiCatch, (tree: J.MultiCatch) => {
         const bounds = tree.alternatives.map(a => getType(a.element));
-        return {kind: JavaType.Kind.Union, bounds: bounds};
+        return {kind: Type.Kind.Union, bounds: bounds};
     });
     registerTypeGetter(J.Kind.NullableType, (tree: J.NullableType) => getType(tree.typeTree.element));
-    registerTypeGetter(J.Kind.Wildcard, () => JavaType.unknownType);
-    registerTypeGetter(J.Kind.Unknown, () => JavaType.unknownType);
+    registerTypeGetter(J.Kind.Wildcard, () => Type.unknownType);
+    registerTypeGetter(J.Kind.Unknown, () => Type.unknownType);
 }
-
-const javaReceiver = new JavaReceiver();
-const javaSender = new JavaSender();
-
-const javaCodec: RpcCodec<J> = {
-    async rpcReceive(before: J, q: RpcReceiveQueue): Promise<J> {
-        return (await javaReceiver.visit(before, q))!;
-    },
-
-    async rpcSend(after: J, q: RpcSendQueue): Promise<void> {
-        await javaSender.visit(after, q);
-    }
-}
-
-// Register codec for all Java AST node types
-Object.values(J.Kind).forEach(kind => {
-    if (kind === J.Kind.Space) {
-        RpcCodecs.registerCodec(kind, {
-                async rpcReceive(before: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
-                    return (await javaReceiver.visitSpace(before, q))!;
-                },
-
-                async rpcSend(after: J.Space, q: RpcSendQueue): Promise<void> {
-                    await javaSender.visitSpace(after, q);
-                }
-            }
-        );
-    } else if (!Object.values(TreeKind).includes(kind as any)) {
-        RpcCodecs.registerCodec(kind, javaCodec);
-    }
-});

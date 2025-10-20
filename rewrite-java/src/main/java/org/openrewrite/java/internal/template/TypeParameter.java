@@ -15,8 +15,10 @@
  */
 package org.openrewrite.java.internal.template;
 
-import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.internal.ThrowingErrorListener;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParserBaseVisitor;
@@ -36,13 +38,13 @@ public class TypeParameter {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
 
     public static TemplateParameterParser parser(String value) {
+        ThrowingErrorListener errorListener = new ThrowingErrorListener(value);
         TemplateParameterLexer lexer = new TemplateParameterLexer(CharStreams.fromString(value));
         lexer.removeErrorListeners();
-        lexer.addErrorListener(new ThrowingErrorListener());
-
+        lexer.addErrorListener(errorListener);
         TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(lexer));
         parser.removeErrorListeners();
-        parser.addErrorListener(new ThrowingErrorListener());
+        parser.addErrorListener(errorListener);
         return parser;
     }
 
@@ -127,14 +129,5 @@ public class TypeParameter {
             }
         }
         return genericTypesMap;
-    }
-
-    private static class ThrowingErrorListener extends BaseErrorListener {
-        @Override
-        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                int line, int charPositionInLine, String msg, RecognitionException e) {
-            throw new IllegalArgumentException(
-                    String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
-        }
     }
 }

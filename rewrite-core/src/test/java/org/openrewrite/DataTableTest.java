@@ -16,10 +16,14 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
+import lombok.Value;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -59,9 +63,72 @@ class DataTableTest implements RewriteTest {
     void descriptor() {
         Recipe recipe = toRecipe();
         new WordTable(recipe);
-
         assertThat(recipe.getDataTableDescriptors()).hasSize(4);
         assertThat(recipe.getDataTableDescriptors().getFirst().getColumns()).hasSize(2);
+    }
+
+    @Test
+    void multipleRecipesWriteToSameDataTable() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(
+              toRecipe(r -> new PlainTextVisitor<>() {
+                  final WordTable wordTable = new WordTable(r);
+
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      wordTable.insertRow(ctx, new WordTable.Row(0, "first"));
+                      return text;
+                  }
+              }),
+              toRecipe(r -> new PlainTextVisitor<>() {
+                  final WordTable wordTable = new WordTable(r);
+
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      wordTable.insertRow(ctx, new WordTable.Row(1, "second"));
+                      return text;
+                  }
+              })
+            )))
+            .dataTable(WordTable.Row.class, rows -> assertThat(rows.stream().map(WordTable.Row::getText))
+              .containsExactlyInAnyOrder("first", "second")),
+          text("test")
+        );
+    }
+
+    @Test
+    void recipeUsedInPreconditionDoesNotEmitDataTableRows() {
+        Recipe preconditionRecipe = toRecipe(r -> new PlainTextVisitor<>() {
+            final WordTable wordTable = new WordTable(r);
+
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                // This row should NOT be emitted because it's in a precondition
+                wordTable.insertRow(ctx, new WordTable.Row(0, "precondition"));
+                return text.withText("modified");
+            }
+        });
+
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(r -> Preconditions.check(
+              preconditionRecipe,
+              new PlainTextVisitor<>() {
+                  final WordTable wordTable = new WordTable(r);
+
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      wordTable.insertRow(ctx, new WordTable.Row(1, "main"));
+                      return text.withText("changed");
+                  }
+              }
+            )))
+            .dataTable(WordTable.Row.class, rows -> assertThat(rows.stream().map(WordTable.Row::getText))
+              // Only "main" should be present, not "precondition"
+              .containsExactly("main")),
+          text("test", "changed")
+        );
     }
 
     @JsonIgnoreType
@@ -70,28 +137,13 @@ class DataTableTest implements RewriteTest {
             super(recipe, "Words", "Each word in the text.");
         }
 
+        @Value
         static class Row {
             @Column(displayName = "Position", description = "The index position of the word in the text.")
-            private int position;
+            int position;
 
             @Column(displayName = "Text", description = "The text of the word.")
-            private String text;
-
-            public Row() {
-            }
-
-            public Row(int position, String text) {
-                this.position = position;
-                this.text = text;
-            }
-
-            public int getPosition() {
-                return position;
-            }
-
-            public String getText() {
-                return text;
-            }
+            String text;
         }
     }
 }

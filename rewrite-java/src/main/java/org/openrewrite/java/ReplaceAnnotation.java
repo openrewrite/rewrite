@@ -18,11 +18,21 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaCoordinates;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+
+import static java.util.Collections.emptySet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -56,45 +66,87 @@ public class ReplaceAnnotation extends Recipe {
     @Override
     public String getDescription() {
         return "Replace an Annotation with another one if the annotation pattern matches. " +
-               "Only fixed parameters can be set in the replacement.";
+                "Only fixed parameters can be set in the replacement.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+        AnnotationMatcher matcher = new AnnotationMatcher(annotationPatternToReplace);
+        return new JavaIsoVisitor<ExecutionContext>() {
+
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(annotationTemplateToInsert);
-                if (classpathResourceName == null) {
-                    templateBuilder.javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
-                } else {
-                    templateBuilder.javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, classpathResourceName));
+            public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                J.Annotation a = super.visitAnnotation(annotation, ctx);
+
+                if (!matcher.matches(a)) {
+                    return a;
                 }
-                return new ReplaceAnnotationVisitor(new AnnotationMatcher(annotationPatternToReplace), templateBuilder.build())
-                        .visit(tree, ctx);
-            }
-        };
-    }
 
-    @Value
-    @EqualsAndHashCode(callSuper = false)
-    public static class ReplaceAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
-        AnnotationMatcher matcher;
-        JavaTemplate replacement;
+                // Remove imports for the annotation itself, as well as any arguments
+                maybeRemoveImport(TypeUtils.asFullyQualified(a.getType()));
+                collectTypesFromArguments(a).forEach(this::maybeRemoveImport);
 
-        @Override
-        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-            J.Annotation a = super.visitAnnotation(annotation, ctx);
-
-            if (!matcher.matches(a)) {
+                a = JavaTemplate.builder(annotationTemplateToInsert)
+                        .javaParser(classpathResourceName == null ?
+                                JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()) :
+                                JavaParser.fromJavaVersion().classpathFromResources(ctx, classpathResourceName))
+                        .build()
+                        .apply(getCursor(), a.getCoordinates().replace());
+                doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(a));
                 return a;
             }
 
-            maybeRemoveImport(TypeUtils.asFullyQualified(a.getType()));
-            JavaCoordinates replaceCoordinate = a.getCoordinates().replace();
-            a = replacement.apply(getCursor(), replaceCoordinate);
-            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(a));
-            return a;
-        }
+            private Collection<JavaType.FullyQualified> collectTypesFromArguments(J.Annotation a) {
+                if (a.getArguments() == null || a.getArguments().isEmpty() || a.getArguments().get(0) instanceof J.Empty) {
+                    return emptySet();
+                }
+
+                Set<JavaType.FullyQualified> typesToRemove = new HashSet<>();
+                for (Expression arg : a.getArguments()) {
+                    collectTypesFromExpression(arg, typesToRemove);
+                }
+                return typesToRemove;
+            }
+
+            private void collectTypesFromExpression(Expression expr, Set<JavaType.FullyQualified> types) {
+                if (expr instanceof J.FieldAccess) {
+                    J.FieldAccess fieldAccess = (J.FieldAccess) expr;
+                    // Check if this is a class literal (e.g., String.class)
+                    if ("class".equals(fieldAccess.getSimpleName())) {
+                        Expression target = fieldAccess.getTarget();
+                        JavaType targetType = target.getType();
+                        if (targetType instanceof JavaType.FullyQualified) {
+                            types.add((JavaType.FullyQualified) targetType);
+                        }
+                    }
+                    // Recursively check the target for nested field accesses
+                    collectTypesFromExpression(fieldAccess.getTarget(), types);
+                } else if (expr instanceof J.NewArray) {
+                    // Handle array initializers like {String.class, List.class}
+                    J.NewArray newArray = (J.NewArray) expr;
+                    if (newArray.getInitializer() != null) {
+                        for (Expression element : newArray.getInitializer()) {
+                            collectTypesFromExpression(element, types);
+                        }
+                    }
+                } else if (expr instanceof J.Assignment) {
+                    // Handle named arguments like value = String.class
+                    J.Assignment assignment = (J.Assignment) expr;
+                    collectTypesFromExpression(assignment.getAssignment(), types);
+                } else if (expr instanceof J.Identifier) {
+                    // Handle simple identifiers that might be class references
+                    J.Identifier identifier = (J.Identifier) expr;
+                    JavaType type = identifier.getType();
+                    if (type instanceof JavaType.Class) {
+                        JavaType.Class classType = (JavaType.Class) type;
+                        // Check if this is a reference to a Class type (e.g., in "String.class")
+                        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(classType);
+                        if (fq != null && !fq.getFullyQualifiedName().startsWith("java.lang.Class")) {
+                            types.add(fq);
+                        }
+                    }
+                }
+            }
+        };
     }
 }

@@ -29,6 +29,7 @@ import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -43,6 +44,7 @@ import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.properties.Assertions.properties;
 
 class GradleProjectTest implements RewriteTest {
 
@@ -67,6 +69,184 @@ class GradleProjectTest implements RewriteTest {
               }
               repositories {
                   mavenCentral()
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:8.56.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryWithCredentials() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.0"),
+            "implementation",
+            (original, updated) -> assertThat(updated)
+              .isSameAs(original)
+              .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .singleElement()
+                .satisfies(repo -> {
+                    assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
+                    assertThat(repo.getUsername()).isEqualTo("dummyuser");
+                    assertThat(repo.getPassword()).isEqualTo("dummypass");
+                }))
+          )),
+          properties(
+            """
+              mavenUsername=dummyuser
+              mavenPassword=dummypass
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  maven {
+                      url = "https://example.com/maven2"
+                      credentials {
+                        username = findProperty("mavenUsername")
+                        password = findProperty("mavenPassword")
+                      }
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:8.56.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryWithPreemptiveCredentials() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.0"),
+            "implementation",
+            (original, updated) -> assertThat(updated)
+              .isSameAs(original)
+              .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .singleElement()
+                .satisfies(repo -> {
+                    assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
+                    assertThat(repo.getUsername()).isEqualTo("dummyuser");
+                    assertThat(repo.getPassword()).isEqualTo("dummypass");
+                }))
+          )),
+          properties(
+            """
+              mavenUsername=dummyuser
+              mavenPassword=dummypass
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  maven {
+                      url = "https://example.com/maven2"
+                      credentials {
+                        username = findProperty("mavenUsername")
+                        password = findProperty("mavenPassword")
+                        authentication {
+                          basic(BasicAuthentication)
+                        }
+                      }
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:8.56.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryWithPasswordCredentials() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.0"),
+            "implementation",
+            (original, updated) -> assertThat(updated)
+              .isSameAs(original)
+              .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .singleElement()
+                .satisfies(repo -> {
+                    assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
+                    assertThat(repo.getUsername()).isEqualTo("dummyuser");
+                    assertThat(repo.getPassword()).isEqualTo("dummypass");
+                }))
+          )),
+          properties(
+            """
+              mySecureRepositoryUsername=dummyuser
+              mySecureRepositoryPassword=dummypass
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  maven {
+                      name = "mySecureRepository"
+                      url = "https://example.com/maven2"
+                      credentials(PasswordCredentials)
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:8.56.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryWithHttpHeaderCredentials() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.0"),
+            "implementation",
+            (original, updated) -> assertThat(updated)
+              .isSameAs(original)
+              .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .singleElement()
+                .satisfies(repo -> {
+                    assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
+                    assertThat(repo.getUsername()).isNull();
+                    assertThat(repo.getPassword()).isNull();
+                }))
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  maven {
+                      name = "mySecureRepository"
+                      url = "https://example.com/maven2"
+                      credentials(HttpHeaderCredentials) {
+                          name = "Private-Token"
+                          value = "TOKEN"
+                      }
+                      authentication {
+                          header(HttpHeaderAuthentication)
+                      }
+                  }
               }
               dependencies {
                   implementation("org.openrewrite:rewrite-java:8.56.0")
@@ -366,7 +546,7 @@ class GradleProjectTest implements RewriteTest {
 
                 GradleDependencyConstraint jacksonConstraint = constraints.stream()
                   .filter(c -> "com.fasterxml.jackson.core".equals(c.getGroupId()) &&
-                               "jackson-databind".equals(c.getArtifactId()))
+                    "jackson-databind".equals(c.getArtifactId()))
                   .findFirst()
                   .orElse(null);
 
@@ -429,6 +609,10 @@ class UpgradeDependencyInMarker extends Recipe {
             @Override
             @SneakyThrows
             public Tree visit(Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Properties.File) {
+                    // Skip gradle.properties files
+                    return tree;
+                }
                 GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
                 GradleProject updated = original.upgradeDirectDependencyVersion(configuration, newGav, ctx);
                 testAssertion.accept(original, updated);

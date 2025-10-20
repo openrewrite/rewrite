@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 @Value
@@ -51,16 +50,18 @@ public class RecipeRun {
         return null;
     }
 
-    public <E> @Nullable List<E> getDataTableRows(String name) {
+    public <E> List<E> getDataTableRows(String name) {
+        List<E> results = new ArrayList<>();
         for (Map.Entry<DataTable<?>, List<?>> dataTableAndRows : dataTables.entrySet()) {
             if (dataTableAndRows.getKey().getName().equals(name)) {
                 //noinspection unchecked
-                return (List<E>) dataTableAndRows.getValue();
+                results.addAll ((List<E>) dataTableAndRows.getValue());
             }
         }
-        return emptyList();
+        return results;
     }
 
+    @SuppressWarnings("unused")
     public void exportDatatablesToCsv(Path filePath, ExecutionContext ctx) {
         try {
             Files.createDirectories(filePath);
