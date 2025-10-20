@@ -18,6 +18,8 @@ package org.openrewrite.maven;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
@@ -46,6 +48,9 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
     @Nullable
     private final String classifier;
 
+    @Nullable
+    private final String because;
+
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
         Xml.Document doc = super.visitDocument(document, ctx);
@@ -67,7 +72,7 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
         }
 
         return (Xml.Document) new InsertDependencyInOrder(groupId, artifactId, version,
-                type, scope, classifier).visitNonNull(doc, ctx);
+                type, scope, classifier, because).visitNonNull(doc, ctx);
     }
 
     private boolean documentHasManagedDependency(Xml.Document doc, ExecutionContext ctx) {
@@ -100,6 +105,9 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
         @Nullable
         private final String classifier;
 
+        @Nullable
+        private final String because;
+
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
@@ -124,8 +132,66 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
                                 "<scope>" + scope + "</scope>\n") +
                         "</dependency>"
                 );
+
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
                         new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
+
+                // If because is provided, add a visitor to prepend the comment before the dependency
+                if (because != null) {
+                    final String becauseFinal = because;
+                    final String groupIdFinal = groupId;
+                    final String artifactIdFinal = artifactId;
+                    doAfterVisit(new MavenIsoVisitor<ExecutionContext>() {
+                        @Override
+                        public Xml.Tag visitTag(Xml.Tag t, ExecutionContext ctx) {
+                            // Find the <dependencies> tag under <dependencyManagement>
+                            if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor()) && t.getContent() != null) {
+                                List<Content> contents = new java.util.ArrayList<>(t.getContent());
+
+                                // Find the dependency we just added
+                                for (int i = 0; i < contents.size(); i++) {
+                                    Content content = contents.get(i);
+                                    if (content instanceof Xml.Tag) {
+                                        Xml.Tag depTag = (Xml.Tag) content;
+                                        if ("dependency".equals(depTag.getName()) &&
+                                            groupIdFinal.equals(depTag.getChildValue("groupId").orElse(null)) &&
+                                            artifactIdFinal.equals(depTag.getChildValue("artifactId").orElse(null))) {
+
+                                            // Check if comment already exists
+                                            boolean hasComment = i > 0 && contents.get(i - 1) instanceof Xml.Comment &&
+                                                    becauseFinal.equals(((Xml.Comment) contents.get(i - 1)).getText());
+
+                                            if (!hasComment) {
+                                                // Extract the prefix (should be like "\n            ")
+                                                String prefix = depTag.getPrefix();
+
+                                                // Create comment with the same prefix as the dependency tag
+                                                // Add spaces around the comment text for proper XML formatting
+                                                Xml.Comment comment = new Xml.Comment(
+                                                        Tree.randomId(),
+                                                        prefix,
+                                                        Markers.EMPTY,
+                                                        " " + becauseFinal + " "
+                                                );
+
+                                                // Insert comment before the dependency
+                                                contents.add(i, comment);
+
+                                                // Update the dependency to have the same prefix (newline + indentation)
+                                                // so it appears on the next line after the comment
+                                                contents.set(i + 1, depTag.withPrefix(prefix));
+
+                                                return t.withContent(contents);
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            return super.visitTag(t, ctx);
+                        }
+                    });
+                }
             }
             return super.
 
