@@ -30,28 +30,6 @@ import static org.openrewrite.test.SourceSpecs.text;
 class RecipeRunTest implements RewriteTest {
     @DocumentExample
     @Test
-    void printDatatable() {
-        rewriteRun(
-          recipeSpec -> recipeSpec.recipe(new Find("test", null, null, null, null, null, null, null))
-            .afterRecipe(recipeRun -> {
-                StringBuilder output = new StringBuilder();
-                String dataTableName = TextMatches.class.getName();
-                RecipeRun.exportCsv(recipeRun.getDataTable(dataTableName), recipeRun.getDataTableRows(dataTableName),
-                  s -> output.append(s).append("\n"), new InMemoryExecutionContext());
-                assertThat(output.toString()).contains("~~>test");
-            }),
-          text(
-            """
-              This is a test
-              """,
-            """
-              This is a ~~>test
-              """
-          )
-        );
-    }
-
-    @Test
     void exportDatatablesToCsvWithMultipleRecipeInstances(@TempDir Path tempDir) {
         rewriteRun(
           recipeSpec -> recipeSpec.recipes(

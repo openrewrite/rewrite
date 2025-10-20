@@ -25,9 +25,7 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
@@ -68,45 +66,51 @@ public class RecipeRun {
         } catch (IOException e) {
             ctx.getOnError().accept(e);
         }
+
+        Set<File> createdFiles = new HashSet<>();
         for (Map.Entry<DataTable<?>, List<?>> entry : dataTables.entrySet()) {
             DataTable<?> dataTable = entry.getKey();
             List<?> rows = entry.getValue();
             File csv = filePath.resolve(dataTable.getName() + ".csv").toFile();
-            try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(csv, false))) {
-                exportCsv(dataTable, rows, printWriter::println, ctx);
-            } catch (FileNotFoundException e) {
-                ctx.getOnError().accept(e);
-            }
+            boolean added = createdFiles.add(csv);
+            exportCsv(dataTable, csv, added, rows, ctx);
         }
     }
 
-    static void exportCsv(DataTable<?> dataTable, List<?> rows, Consumer<String> output, ExecutionContext ctx) {
-        DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
-        List<String> fieldNames = new ArrayList<>();
-        List<String> fieldTitles = new ArrayList<>();
-        List<String> fieldDescriptions = new ArrayList<>();
+    private static void exportCsv(DataTable<?> dataTable, File csv, boolean writeHeader, List<?> rows, ExecutionContext ctx) {
+        try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(csv, !writeHeader))) {
+            Consumer<String> output = printWriter::println;
+            DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
+            List<String> fieldNames = new ArrayList<>();
+            List<String> fieldTitles = new ArrayList<>();
+            List<String> fieldDescriptions = new ArrayList<>();
 
-        for (ColumnDescriptor columnDescriptor : descriptor.getColumns()) {
-            fieldNames.add(columnDescriptor.getName());
-            fieldTitles.add(formatForCsv(columnDescriptor.getDisplayName()));
-            fieldDescriptions.add(formatForCsv(columnDescriptor.getDescription()));
-        }
-
-        output.accept(String.join(",", fieldTitles));
-        output.accept(String.join(",", fieldDescriptions));
-
-        for (Object row : rows) {
-            List<String> rowValues = new ArrayList<>();
-            for (String fieldName : fieldNames) {
-                try {
-                    Field field = row.getClass().getDeclaredField(fieldName);
-                    field.setAccessible(true);
-                    rowValues.add(formatForCsv(field.get(row)));
-                } catch (NoSuchFieldException | IllegalAccessException e) {
-                    ctx.getOnError().accept(e);
-                }
+            for (ColumnDescriptor columnDescriptor : descriptor.getColumns()) {
+                fieldNames.add(columnDescriptor.getName());
+                fieldTitles.add(formatForCsv(columnDescriptor.getDisplayName()));
+                fieldDescriptions.add(formatForCsv(columnDescriptor.getDescription()));
             }
-            output.accept(String.join(",", rowValues));
+
+            if (writeHeader) {
+                output.accept(String.join(",", fieldTitles));
+                output.accept(String.join(",", fieldDescriptions));
+            }
+
+            for (Object row : rows) {
+                List<String> rowValues = new ArrayList<>();
+                for (String fieldName : fieldNames) {
+                    try {
+                        Field field = row.getClass().getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        rowValues.add(formatForCsv(field.get(row)));
+                    } catch (NoSuchFieldException | IllegalAccessException e) {
+                        ctx.getOnError().accept(e);
+                    }
+                }
+                output.accept(String.join(",", rowValues));
+            }
+        } catch (FileNotFoundException e) {
+            ctx.getOnError().accept(e);
         }
     }
 
