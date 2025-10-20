@@ -20,13 +20,13 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.toml.Assertions.toml;
 
-class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
+class MigrateDependenciesToVersionCatalogKotlinDSLTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -38,10 +38,10 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
     @DocumentExample
     void migrateStringNotationDependencies() {
         rewriteRun(
-          buildGradle(
+          buildGradleKts(
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
 
               repositories {
@@ -49,14 +49,14 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation 'org.springframework:spring-core:5.3.0'
-                  testImplementation 'junit:junit:4.13.2'
-                  runtimeOnly 'com.h2database:h2:1.4.200'
+                  implementation("org.springframework:spring-core:5.3.0")
+                  testImplementation("junit:junit:4.13.2")
+                  runtimeOnly("com.h2database:h2:1.4.200")
               }
               """,
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
 
               repositories {
@@ -64,11 +64,12 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation libs.springCore
-                  testImplementation libs.junit
-                  runtimeOnly libs.h2
+                  implementation(libs.springCore)
+                  testImplementation(libs.junit)
+                  runtimeOnly(libs.h2)
               }
-              """
+              """,
+            spec -> spec.path("build.gradle.kts")
           ),
           toml(
             doesNotExist(),
@@ -77,7 +78,7 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               spring-core = "5.3.0"
               junit = "4.13.2"
               h2 = "1.4.200"
-              
+
               [libraries]
               spring-core = { group = "org.springframework", name = "spring-core", version.ref = "spring-core" }
               junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -91,10 +92,10 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
     @Test
     void migrateMapNotationDependencies() {
         rewriteRun(
-          buildGradle(
+          buildGradleKts(
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
 
               repositories {
@@ -102,13 +103,13 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
-                  testImplementation group: 'org.mockito', name: 'mockito-core', version: '4.6.1'
+                  implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.12.0")
+                  testImplementation(group = "org.mockito", name = "mockito-core", version = "4.6.1")
               }
               """,
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
 
               repositories {
@@ -116,10 +117,11 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation libs.commonsLang3
-                  testImplementation libs.mockitoCore
+                  implementation(libs.commonsLang3)
+                  testImplementation(libs.mockitoCore)
               }
-              """
+              """,
+            spec -> spec.path("build.gradle.kts")
           ),
           toml(
             doesNotExist(),
@@ -127,7 +129,7 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               [versions]
               commons-lang3 = "3.12.0"
               mockito-core = "4.6.1"
-              
+
               [libraries]
               commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
               mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito-core" }
@@ -142,66 +144,67 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
         rewriteRun(
           settingsGradle(
             """
-              rootProject.name = 'test'
-              include 'core'
-              include 'test-utils'
-              """
+              rootProject.name = "test"
+              include("core")
+              include("test-utils")
+              """,
+            spec -> spec.path("settings.gradle.kts")
           ),
-          buildGradle(
+          buildGradleKts(
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
-                  implementation project(':core')
-                  implementation 'org.springframework:spring-core:5.3.0'
-                  testImplementation project(':test-utils')
+                  implementation(project(":core"))
+                  implementation("org.springframework:spring-core:5.3.0")
+                  testImplementation(project(":test-utils"))
               }
               """,
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
-                  implementation project(':core')
-                  implementation libs.springCore
-                  testImplementation project(':test-utils')
+                  implementation(project(":core"))
+                  implementation(libs.springCore)
+                  testImplementation(project(":test-utils"))
               }
               """,
-            spec -> spec.path("build.gradle")
+            spec -> spec.path("build.gradle.kts")
           ),
-          buildGradle(
+          buildGradleKts(
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
               """,
-            spec -> spec.path("core/build.gradle")
+            spec -> spec.path("core/build.gradle.kts")
           ),
-          buildGradle(
+          buildGradleKts(
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
               """,
-            spec -> spec.path("test-utils/build.gradle")
+            spec -> spec.path("test-utils/build.gradle.kts")
           ),
           toml(
             doesNotExist(),
             """
               [versions]
               spring-core = "5.3.0"
-              
+
               [libraries]
               spring-core = { group = "org.springframework", name = "spring-core", version.ref = "spring-core" }
               """,
@@ -213,10 +216,10 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
     @Test
     void handleMixedNotations() {
         rewriteRun(
-          buildGradle(
+          buildGradleKts(
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
 
               repositories {
@@ -224,16 +227,16 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation 'org.springframework:spring-core:5.3.0'
-                  implementation group: 'org.springframework', name: 'spring-context', version: '5.3.0'
-                  implementation('org.springframework:spring-web:5.3.0') {
-                      exclude group: 'commons-logging'
+                  implementation("org.springframework:spring-core:5.3.0")
+                  implementation(group = "org.springframework", name = "spring-context", version = "5.3.0")
+                  implementation("org.springframework:spring-web:5.3.0") {
+                      exclude(group = "commons-logging")
                   }
               }
               """,
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
 
               repositories {
@@ -241,13 +244,14 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation libs.springCore
-                  implementation libs.springContext
+                  implementation(libs.springCore)
+                  implementation(libs.springContext)
                   implementation(libs.springWeb) {
-                      exclude group: 'commons-logging'
+                      exclude(group = "commons-logging")
                   }
               }
-              """
+              """,
+            spec -> spec.path("build.gradle.kts")
           ),
           toml(
             doesNotExist(),
@@ -256,7 +260,7 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               spring-core = "5.3.0"
               spring-context = "5.3.0"
               spring-web = "5.3.0"
-              
+
               [libraries]
               spring-core = { group = "org.springframework", name = "spring-core", version.ref = "spring-core" }
               spring-context = { group = "org.springframework", name = "spring-context", version.ref = "spring-context" }
@@ -281,35 +285,41 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               """,
             spec -> spec.path("gradle.properties")
           ),
-          buildGradle(
+          buildGradleKts(
             """
+              val junitVersion: String by project
+              val mockitoVersion: String by project
+
               plugins {
-                  id 'java'
+                  id("java")
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
-                  testImplementation "junit:junit:$junitVersion"
-                  testImplementation group: 'org.mockito', name: 'mockito-core', version: mockitoVersion
+                  testImplementation("junit:junit:$junitVersion")
+                  testImplementation(group = "org.mockito", name = "mockito-core", version = mockitoVersion)
               }
               """,
             """
+
+
               plugins {
-                  id 'java'
+                  id("java")
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
-                  testImplementation libs.junit
-                  testImplementation libs.mockitoCore
+                  testImplementation(libs.junit)
+                  testImplementation(libs.mockitoCore)
               }
-              """
+              """,
+            spec -> spec.path("build.gradle.kts")
           ),
           toml(
             doesNotExist(),
@@ -317,7 +327,7 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               [versions]
               junit = "4.13.2"
               mockito-core = "4.6.1"
-              
+
               [libraries]
               junit = { group = "junit", name = "junit", version.ref = "junit" }
               mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito-core" }
@@ -344,10 +354,10 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               """,
             spec -> spec.path("gradle/libs.versions.toml")
           ),
-          buildGradle(
+          buildGradleKts(
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
 
               repositories {
@@ -355,13 +365,13 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation 'org.springframework:spring-core:5.3.0'
-                  testImplementation 'junit:junit:4.13.2'
+                  implementation("org.springframework:spring-core:5.3.0")
+                  testImplementation("junit:junit:4.13.2")
               }
               """,
             """
               plugins {
-                  id 'java'
+                  id("java")
               }
 
               repositories {
@@ -369,10 +379,11 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation libs.springCore
-                  testImplementation libs.junit
+                  implementation(libs.springCore)
+                  testImplementation(libs.junit)
               }
-              """
+              """,
+            spec -> spec.path("build.gradle.kts")
           )
         );
     }
