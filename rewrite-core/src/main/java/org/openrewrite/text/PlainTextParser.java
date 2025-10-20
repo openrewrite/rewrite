@@ -16,11 +16,11 @@
 package org.openrewrite.text;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.jgit.diff.RawText;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -52,13 +52,14 @@ public class PlainTextParser implements Parser {
             return (PlainText) sourceFile;
         }
         PlainText text = PlainTextParser.builder().build()
-                .parse(sourceFile.printAll())
+                .parse(sourceFile.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Failed to parse as plain text"))
                 .withSourcePath(sourceFile.getSourcePath())
                 .withFileAttributes(sourceFile.getFileAttributes())
                 .withCharsetBomMarked(sourceFile.isCharsetBomMarked())
-                .withId(sourceFile.getId());
+                .withId(sourceFile.getId())
+                .withMarkers(gatherMarkers(sourceFile));
         if (sourceFile.getCharset() != null) {
             text = (PlainText) text.withCharset(sourceFile.getCharset());
         }
@@ -155,5 +156,22 @@ public class PlainTextParser implements Parser {
         public String getDslName() {
             return "text";
         }
+    }
+
+    private static Markers gatherMarkers(SourceFile sourceFile) {
+        return new TreeVisitor<Tree, Markers>() {
+            @Override
+            public Tree visit(Tree tree, Markers markers) {
+                if (tree != sourceFile) {
+                    tree.getMarkers().getMarkers().forEach(marker -> {
+                        if (marker instanceof Markup) {
+                            markers.add(marker);
+                        }
+                    });
+                }
+
+                return super.visit(tree, markers);
+            }
+        }.reduce(sourceFile, sourceFile.getMarkers());
     }
 }
