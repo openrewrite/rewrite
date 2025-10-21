@@ -77,6 +77,13 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 }
             } else {
                 j = maybeReplaceCompareWithNull(asBinary, true);
+                if (j == asBinary) {
+                    // If null comparison didn't apply, try numeric comparison
+                    Boolean result = compareNumericLiterals(asBinary);
+                    if (result != null) {
+                        j = booleanLiteral(asBinary, result);
+                    }
+                }
             }
         } else if (asBinary.getOperator() == J.Binary.Type.NotEqual) {
             if (isLiteralFalse(asBinary.getLeft())) {
@@ -97,6 +104,22 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 }
             } else {
                 j = maybeReplaceCompareWithNull(asBinary, false);
+                if (j == asBinary) {
+                    // If null comparison didn't apply, try numeric comparison
+                    Boolean result = compareNumericLiterals(asBinary);
+                    if (result != null) {
+                        j = booleanLiteral(asBinary, result);
+                    }
+                }
+            }
+        } else if (asBinary.getOperator() == J.Binary.Type.LessThan ||
+                   asBinary.getOperator() == J.Binary.Type.GreaterThan ||
+                   asBinary.getOperator() == J.Binary.Type.LessThanOrEqual ||
+                   asBinary.getOperator() == J.Binary.Type.GreaterThanOrEqual) {
+            // Simplify numeric literal comparisons
+            Boolean result = compareNumericLiterals(asBinary);
+            if (result != null) {
+                j = booleanLiteral(asBinary, result);
             }
         }
         if (asBinary != j) {
@@ -279,6 +302,62 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     private boolean isNonNullLiteral(Expression expression) {
         return expression instanceof J.Literal && ((J.Literal) expression).getType() != JavaType.Primitive.Null;
+    }
+
+    private boolean isNumericLiteral(Expression expression) {
+        if (!(expression instanceof J.Literal)) {
+            return false;
+        }
+        JavaType type = expression.getType();
+        return type == JavaType.Primitive.Byte ||
+               type == JavaType.Primitive.Short ||
+               type == JavaType.Primitive.Int ||
+               type == JavaType.Primitive.Long ||
+               type == JavaType.Primitive.Float ||
+               type == JavaType.Primitive.Double;
+    }
+
+    @Nullable
+    private Double getNumericValue(Expression expression) {
+        if (!(expression instanceof J.Literal)) {
+            return null;
+        }
+        Object value = ((J.Literal) expression).getValue();
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        return null;
+    }
+
+    @Nullable
+    private Boolean compareNumericLiterals(J.Binary binary) {
+        if (!isNumericLiteral(binary.getLeft()) || !isNumericLiteral(binary.getRight())) {
+            return null;
+        }
+
+        Double leftValue = getNumericValue(binary.getLeft());
+        Double rightValue = getNumericValue(binary.getRight());
+
+        if (leftValue == null || rightValue == null) {
+            return null;
+        }
+
+        switch (binary.getOperator()) {
+            case LessThan:
+                return leftValue < rightValue;
+            case GreaterThan:
+                return leftValue > rightValue;
+            case LessThanOrEqual:
+                return leftValue <= rightValue;
+            case GreaterThanOrEqual:
+                return leftValue >= rightValue;
+            case Equal:
+                return leftValue.equals(rightValue);
+            case NotEqual:
+                return !leftValue.equals(rightValue);
+            default:
+                return null;
+        }
     }
 
     private J maybeReplaceCompareWithNull(J.Binary asBinary, boolean valueIfEqual) {

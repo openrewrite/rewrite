@@ -225,12 +225,12 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               public class A {
                   {
-                      boolean a1 = 1 != 1;
-                      boolean a2 = 1 == 1;
-                      boolean a3 = 1 >= 1;
-                      boolean a4 = 1 > 1;
-                      boolean a5 = 1 <= 1;
-                      boolean a6 = 1 < 1;
+                      boolean a1 = false;
+                      boolean a2 = true;
+                      boolean a3 = true;
+                      boolean a4 = false;
+                      boolean a5 = true;
+                      boolean a6 = false;
                   }
               }
               """
@@ -830,6 +830,48 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   void doSome(String o1, String o2) {
                       if (o1 == null ? o2 != null : !o1.equals(o2)) {
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void simplifyNumericLiteralComparisons() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      boolean a = 1 < 2;
+                      boolean b = 3 == 4;
+                      boolean c = 5 > 3;
+                      boolean d = 2 <= 2;
+                      boolean e = 10 >= 20;
+                      boolean f = 7 != 7;
+                      boolean g = 1.5 < 2.5;
+                      boolean h = 3.0 == 3.0;
+                      boolean i = 100L > 50L;
+                      boolean j = 1 < 1;
+                      boolean k = 5 == 5;
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      boolean a = true;
+                      boolean b = false;
+                      boolean c = true;
+                      boolean d = true;
+                      boolean e = false;
+                      boolean f = false;
+                      boolean g = true;
+                      boolean h = true;
+                      boolean i = true;
+                      boolean j = false;
+                      boolean k = true;
                   }
               }
               """
