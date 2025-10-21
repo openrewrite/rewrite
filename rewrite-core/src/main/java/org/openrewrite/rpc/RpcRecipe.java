@@ -15,7 +15,10 @@
  */
 package org.openrewrite.rpc;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.OptionDescriptor;
@@ -33,8 +36,11 @@ import static java.util.stream.Collectors.toMap;
 
 
 @RequiredArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class RpcRecipe extends ScanningRecipe<Integer> {
+    @With
     private final transient RewriteRpc rpc;
+
     private transient @Nullable List<Recipe> recipeList;
 
     /**
