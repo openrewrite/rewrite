@@ -27,7 +27,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UpgradeTransitiveDependencyVersion(
-          "com.fasterxml*", "jackson-core", "2.12.5", null, null, null, null, null, null, null));
+          "com.fasterxml*", "jackson-core", "2.12.5", null, null, null, null, null, null, null, null));
     }
 
     @DocumentExample
@@ -173,7 +173,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void doesNotDowngradeTransitiveDependencyWithExplicitVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
-            "com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null, null, null, null, null, null, null)),
+            "com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null, null, null, null, null, null, null, null)),
           pomXml(
             """
             <project>
@@ -191,6 +191,56 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                         <groupId>com.fasterxml.jackson.datatype</groupId>
                         <artifactId>jackson-datatype-jsr310</artifactId>
                         <version>2.15.3</version>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    void addManagedDependencyWithBecause() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
+            "com.fasterxml*", "jackson-core", "2.12.5", null, null, null, null, null, null, null, "CVE-2024-BAD")),
+          pomXml(
+            """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>core</artifactId>
+                <version>0.1.0-SNAPSHOT</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-java</artifactId>
+                        <version>7.0.0</version>
+                    </dependency>
+                </dependencies>
+            </project>
+            """,
+            """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>core</artifactId>
+                <version>0.1.0-SNAPSHOT</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <!-- CVE-2024-BAD -->
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-core</artifactId>
+                            <version>2.12.5</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-java</artifactId>
+                        <version>7.0.0</version>
                     </dependency>
                 </dependencies>
             </project>

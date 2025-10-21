@@ -250,7 +250,7 @@ public class ChangeParentPom extends Recipe {
                             for (ResolvedManagedDependency dep : dependenciesWithoutExplicitVersions) {
                                 changeParentTagVisitors.add(new AddManagedDependencyVisitor(
                                         dep.getGav().getGroupId(), dep.getGav().getArtifactId(), dep.getGav().getVersion(),
-                                        dep.getScope() == null ? null : dep.getScope().toString().toLowerCase(), dep.getType(), dep.getClassifier()));
+                                        dep.getScope() == null ? null : dep.getScope().toString().toLowerCase(), dep.getType(), dep.getClassifier(), null));
                             }
 
                             // Retain properties from the old parent that are not present in the new parent
