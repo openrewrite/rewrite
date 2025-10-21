@@ -178,6 +178,11 @@ class JavaScriptParserTest {
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(typescript.get()).satisfies(cu ->
           assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+
+        // Shutdown RPC to force sending full LST for print
+        JavaScriptRewriteRpc.shutdownCurrent();
+        assertThat(typescript.get()).satisfies(cu ->
+          assertThat(cu.printAll()).isEqualTo(script));
     }
 
     @Test
