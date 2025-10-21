@@ -142,7 +142,7 @@ class MinimumViableSpacingTest implements RewriteTest {
               }
               """,
             """
-              class A{public void foo(int paramA,final int paramB){int unassigned;int a=1;int b,c=5;final int d=10;final int e,f=20;}}
+              class A{public void foo(int paramA, final int paramB){int unassigned;int a=1;int b,c=5;final int d=10;final int e,f=20;}}
               """
           )
         );
