@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.format;
+package org.openrewrite.java.service;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
@@ -24,9 +25,10 @@ import org.openrewrite.java.tree.Statement;
 
 import static java.util.Collections.emptyList;
 
-class LengthCalculator {
+@Incubating(since = "8.63.0")
+public class SourcePositionService {
 
-    public static int computeTreeLineLength(J tree, Cursor cursor) {
+    public int computeTreeLength(J tree, Cursor cursor) {
         Object cursorValue = cursor.getValue();
         if (cursorValue instanceof J) {
             J j = (J) cursorValue;
@@ -34,7 +36,7 @@ class LengthCalculator {
             Cursor parent = cursor.getParentTreeCursor();
             boolean isCompilationUnit = parent.getValue() instanceof J.CompilationUnit;
             if (!hasNewLine && !isCompilationUnit) {
-                return computeTreeLineLength(parent.getValue(), parent);
+                return computeTreeLength(parent.getValue(), parent);
             }
         } else {
             throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + cursorValue.getClass());
@@ -48,18 +50,18 @@ class LengthCalculator {
         return capture.getOut().length() + getSuffixLength(tree);
     }
 
-    private static int getSuffixLength(J tree) {
+    private int getSuffixLength(J tree) {
         if (tree instanceof Statement && needsSemicolon((Statement) tree)) {
             return 1;
         }
         return 0;
     }
 
-    private static boolean needsSemicolon(Statement statement) {
+    private boolean needsSemicolon(Statement statement) {
         return statement instanceof J.MethodInvocation || statement instanceof J.VariableDeclarations || statement instanceof J.Assignment || statement instanceof J.Package;
     }
 
-    private static J trimPrefix(J tree) {
+    private J trimPrefix(J tree) {
         Space prefix = tree.getPrefix();
         String whitespace = prefix.getLastWhitespace().replaceFirst("^.*\\n*", "");
         prefix = prefix.withComments(emptyList()).withWhitespace(whitespace);

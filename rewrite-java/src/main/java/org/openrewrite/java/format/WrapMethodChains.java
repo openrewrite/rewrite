@@ -21,9 +21,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.LineWrapSetting;
 
@@ -62,7 +64,9 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                 }
 
                 // Not long enough to wrap
-                if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong && LengthCalculator.computeTreeLineLength(method, getCursor()) <= style.getHardWrapAt()) {
+                JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong &&
+                        (sourceFile == null || sourceFile.service(SourcePositionService.class).computeTreeLength(method, getCursor()) <= style.getHardWrapAt())) {
                     return m;
                 }
 
