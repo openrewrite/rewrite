@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaScriptVisitor} from "./visitor";
-import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {asRef, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, Statement, Type, TypedTree, TypeTree} from "../java";
 import {JavaReceiver, JavaSender, registerJLanguageCodecs} from "../java/rpc";
@@ -1011,10 +1011,11 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 afterName: await q.receive(tag.afterName, space => this.visitSpace(space, q)),
                 attributes: await q.receiveListDefined(tag.attributes, attr => this.visitRightPadded(attr, q)),
                 selfClosing: await q.receive(tag.selfClosing, space => this.visitSpace(space, q)),
-                children: await q.receiveListDefined(tag.children, child => this.visit(child, q)),
+                children: await q.receiveList(tag.children, child => this.visit(child, q)),
                 closingName: await q.receive(tag.closingName, el => this.visitLeftPadded(el, q)),
                 afterClosingName: await q.receive(tag.afterClosingName, el => this.visitSpace(el, q))
             };
+            // Type assertion is needed due to `JSX.Tag` being a union type
             return updateIfChanged(tag, updates as any);
     }
 
