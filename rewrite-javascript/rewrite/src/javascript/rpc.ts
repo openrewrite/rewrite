@@ -1005,29 +1005,17 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     override async visitJsxTag(tag: JSX.Tag, q: RpcReceiveQueue): Promise<J | undefined> {
-        if ('selfClosing' in tag) {
-            // Self-closing tag
             const updates = {
                 openName: await q.receive(tag.openName, el => this.visitLeftPadded(el, q)),
                 typeArguments: await q.receive(tag.typeArguments, el => this.visitContainer(el, q)),
                 afterName: await q.receive(tag.afterName, space => this.visitSpace(space, q)),
                 attributes: await q.receiveListDefined(tag.attributes, attr => this.visitRightPadded(attr, q)),
-                selfClosing: await q.receive(tag.selfClosing, space => this.visitSpace(space, q))
-            };
-            return updateIfChanged(tag, updates);
-        } else {
-            // Tag with children
-            const updates = {
-                openName: await q.receive(tag.openName, el => this.visitLeftPadded(el, q)),
-                typeArguments: await q.receive(tag.typeArguments, el => this.visitContainer(el, q)),
-                afterName: await q.receive(tag.afterName, space => this.visitSpace(space, q)),
-                attributes: await q.receiveListDefined(tag.attributes, attr => this.visitRightPadded(attr, q)),
+                selfClosing: await q.receive(tag.selfClosing, space => this.visitSpace(space, q)),
                 children: await q.receiveListDefined(tag.children, child => this.visit(child, q)),
                 closingName: await q.receive(tag.closingName, el => this.visitLeftPadded(el, q)),
                 afterClosingName: await q.receive(tag.afterClosingName, el => this.visitSpace(el, q))
             };
-            return updateIfChanged(tag, updates);
-        }
+            return updateIfChanged(tag, updates as any);
     }
 
     override async visitJsxAttribute(attribute: JSX.Attribute, q: RpcReceiveQueue): Promise<J | undefined> {
