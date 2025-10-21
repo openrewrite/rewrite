@@ -304,40 +304,23 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         return expression instanceof J.Literal && ((J.Literal) expression).getType() != JavaType.Primitive.Null;
     }
 
-    private boolean isNumericLiteral(Expression expression) {
-        if (!(expression instanceof J.Literal)) {
-            return false;
-        }
-        JavaType type = expression.getType();
-        return type == JavaType.Primitive.Byte ||
-               type == JavaType.Primitive.Short ||
-               type == JavaType.Primitive.Int ||
-               type == JavaType.Primitive.Long ||
-               type == JavaType.Primitive.Float ||
-               type == JavaType.Primitive.Double;
+    private static boolean isNumeric(Expression expression) {
+        return expression instanceof J.Literal &&
+                ((JavaType.Primitive) expression.getType()).isNumeric();
     }
 
-    @Nullable
-    private Double getNumericValue(Expression expression) {
-        if (!(expression instanceof J.Literal)) {
-            return null;
-        }
+    private @Nullable Double getNumericValue(Expression expression) {
         Object value = ((J.Literal) expression).getValue();
-        if (value instanceof Number) {
-            return ((Number) value).doubleValue();
-        }
-        return null;
+        return value instanceof Number ? ((Number) value).doubleValue() : null;
     }
 
-    @Nullable
-    private Boolean compareNumericLiterals(J.Binary binary) {
-        if (!isNumericLiteral(binary.getLeft()) || !isNumericLiteral(binary.getRight())) {
+    private @Nullable Boolean compareNumericLiterals(J.Binary binary) {
+        if (!isNumeric(binary.getLeft()) || !isNumeric(binary.getRight())) {
             return null;
         }
 
         Double leftValue = getNumericValue(binary.getLeft());
         Double rightValue = getNumericValue(binary.getRight());
-
         if (leftValue == null || rightValue == null) {
             return null;
         }
