@@ -2385,8 +2385,8 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               public record RenameRequest(
-                  @NotBlank
-                  @JsonProperty("name") String name) {
+                      @NotBlank
+                      @JsonProperty("name") String name) {
               }
               """
           )
