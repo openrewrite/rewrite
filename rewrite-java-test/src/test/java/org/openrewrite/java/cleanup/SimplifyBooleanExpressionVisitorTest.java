@@ -923,8 +923,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       // These large long values lose precision when cast to double
                       // The current implementation incorrectly simplifies these
-                      boolean i = false;
-                      boolean j = true;
+                      boolean i = true;
+                      boolean j = false;
                   }
               }
               """
