@@ -21,7 +21,6 @@ import lombok.Getter;
 import lombok.Value;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
-import org.openrewrite.maven.tree.Scope;
 
 import java.util.List;
 import java.util.Map;
@@ -78,43 +77,48 @@ public class DependencyGraph {
     /**
      * Builds a complete dependency graph for the given GAV based on collected paths.
      * Automatically determines whether to build a direct or inverse dependency tree.
+     *
+     * @param gav The dependency to build a graph for
+     * @param projectPaths Collected dependency paths
+     * @param minDepth Minimum depth of the dependency (0 for direct, >0 for transitive)
+     * @param scopeOrConfiguration Maven scope name or Gradle configuration name to use as fallback
      */
     public String buildDependencyGraph(ResolvedGroupArtifactVersion gav,
                                       Map<ResolvedGroupArtifactVersion, List<DependencyPath>> projectPaths,
                                       int minDepth,
-                                      Scope scope) {
+                                      String scopeOrConfiguration) {
         if (projectPaths == null || !projectPaths.containsKey(gav)) {
             // Fallback format
             return formatDependency(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()) +
-                   "\n\\--- " + scope.name().toLowerCase();
+                   "\n\\--- " + scopeOrConfiguration;
         }
 
         List<DependencyPath> paths = projectPaths.get(gav);
         if (paths.isEmpty()) {
             return formatDependency(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()) +
-                   "\n\\--- " + scope.name().toLowerCase();
+                   "\n\\--- " + scopeOrConfiguration;
         }
 
         // Determine scope/configuration from the first path
-        String scopeOrConfig = determineScopeOrConfig(paths, scope);
+        String actualScopeOrConfig = determineScopeOrConfig(paths, scopeOrConfiguration);
 
         if (minDepth == 0) {
             // Direct dependency
-            return buildDirectDependencyGraph(gav, paths, scopeOrConfig);
+            return buildDirectDependencyGraph(gav, paths, actualScopeOrConfig);
         }
 
         // Transitive dependency - build inverse tree
-        return buildInverseDependencyTree(gav, projectPaths, scopeOrConfig);
+        return buildInverseDependencyTree(gav, projectPaths, actualScopeOrConfig);
     }
 
-    private String determineScopeOrConfig(List<DependencyPath> paths, Scope defaultScope) {
+    private String determineScopeOrConfig(List<DependencyPath> paths, String defaultScopeOrConfig) {
         if (!paths.isEmpty()) {
             DependencyPath firstPath = paths.get(0);
             if (firstPath.getScope() != null && !firstPath.getScope().isEmpty()) {
                 return firstPath.getScope();
             }
         }
-        return defaultScope.name().toLowerCase();
+        return defaultScopeOrConfig;
     }
 
     private String buildDirectDependencyGraph(ResolvedGroupArtifactVersion gav,

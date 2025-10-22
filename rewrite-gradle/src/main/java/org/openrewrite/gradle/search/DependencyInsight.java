@@ -176,7 +176,7 @@ public class DependencyInsight extends Recipe {
                                     dep.getGav(),
                                     projectPaths,
                                     dep.getDepth(),
-                                    Scope.fromGradleConfigurationName(c.getName())
+                                    c.getName()
                             );
 
                             dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(

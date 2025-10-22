@@ -165,13 +165,14 @@ public class DependencyInsight extends Recipe {
                         .findFirst(JavaSourceSet.class);
 
                 Scope matchScope = Scope.fromName(match.getRequested().getScope());
+                String matchScopeName = matchScope.name().toLowerCase();
 
                 // Build the dependency graph string
                 String depGraph = dependencyGraph.buildDependencyGraph(
                         match.getGav(),
                         projectPaths,
                         match.getDepth(),
-                        matchScope
+                        matchScopeName
                 );
 
                 dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
@@ -181,7 +182,7 @@ public class DependencyInsight extends Recipe {
                         match.getArtifactId(),
                         match.getVersion(),
                         match.getDatedSnapshotVersion(),
-                        matchScope.name().toLowerCase(),
+                        matchScopeName,
                         match.getDepth(),
                         depGraph
                 ));

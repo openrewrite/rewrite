@@ -199,24 +199,4 @@ public enum Scope {
                 return null;
         }
     }
-
-    /**
-     * Converts a Gradle configuration name to an approximate Maven Scope.
-     * This is a best-effort mapping since Gradle configurations are more granular than Maven scopes.
-     * Used primarily for fallback scenarios when working with Gradle dependencies.
-     */
-    public static Scope fromGradleConfigurationName(@Nullable String configurationName) {
-        if (configurationName == null) {
-            return Compile;
-        }
-        String lowerName = configurationName.toLowerCase();
-        if (lowerName.contains("test")) {
-            return Test;
-        } else if (lowerName.contains("runtime")) {
-            return Runtime;
-        } else if (lowerName.contains("compileonly") || lowerName.contains("provided")) {
-            return Provided;
-        }
-        return Compile;
-    }
 }
