@@ -94,18 +94,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        if (c.getPrimaryConstructor() != null) {
-            c = c.withPrimaryConstructor(ListUtils.map(c.getPrimaryConstructor(), (ix, param) -> {
-                if (param.getPrefix().getLastWhitespace().contains("\n")) {
-                    return param;
-                }
-                if (ix == 0 && param.getComments().isEmpty()) {
-                    return param.withPrefix(param.getPrefix().withWhitespace(""));
-                }
-                return param.withPrefix(param.getPrefix().withWhitespace(" "));
-            }));
-        }
-
         return c;
     }
 
@@ -178,15 +166,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        return m.withParameters(ListUtils.map(m.getParameters(), (ix, param) -> {
-            if (param.getPrefix().getLastWhitespace().contains("\n")) {
-                return param;
-            }
-            if (ix == 0 && param.getComments().isEmpty()) {
-                return param.withPrefix(param.getPrefix().withWhitespace(""));
-            }
-            return param.withPrefix(param.getPrefix().withWhitespace(" "));
-        }));
+        return m;
     }
 
     @Override
