@@ -35,6 +35,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -49,6 +50,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.*;
 import static java.util.stream.Collectors.toList;
 
 @Value
@@ -460,20 +462,21 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * Helper method to extract a string value from various expression types.
+     * Helper method to extract a string v from various expression types.
      * Handles literals, identifiers, field access, method invocations, and GStrings.
      */
     private @Nullable String extractValueAsString(Expression value) {
-        if (value instanceof J.Literal) {
-            Object literalValue = ((J.Literal) value).getValue();
+        Expression v = value.withMarkers(Markers.EMPTY);
+        if (v instanceof J.Literal) {
+            Object literalValue = ((J.Literal) v).getValue();
             return literalValue instanceof String ? (String) literalValue : null;
-        } else if (value instanceof J.Identifier) {
-            return ((J.Identifier) value).getSimpleName();
-        } else if (value instanceof J.FieldAccess) {
-            return value.printTrimmed(cursor);
-        } else if (value instanceof J.MethodInvocation) {
+        } else if (v instanceof J.Identifier) {
+            return ((J.Identifier) v).getSimpleName();
+        } else if (v instanceof J.FieldAccess) {
+            return v.printTrimmed(cursor);
+        } else if (v instanceof J.MethodInvocation) {
             // Handle property('name') or findProperty('name') patterns
-            J.MethodInvocation mi = (J.MethodInvocation) value;
+            J.MethodInvocation mi = (J.MethodInvocation) v;
             String methodName = mi.getSimpleName();
             if (("property".equals(methodName) || "findProperty".equals(methodName)) &&
                     mi.getArguments().size() == 1 &&
@@ -495,12 +498,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return (String) arg;
                 }
             }
-
             // For other method invocations, return the full expression
-            return value.printTrimmed(cursor);
-        } else if (value instanceof G.Binary) {
-            G.Binary binary = (G.Binary) value;
-
+            return v.printTrimmed(cursor);
+        } else if (v instanceof G.Binary) {
+            G.Binary binary = (G.Binary) v;
             // Handle project.properties['name'] pattern (G.Binary with Access operator)
             if (binary.getOperator() == G.Binary.Type.Access && binary.getRight() instanceof J.Literal) {
                 J.Literal right = (J.Literal) binary.getRight();
@@ -508,7 +509,6 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return (String) right.getValue();
                 }
             }
-
             // Handle binary expressions like "$guavaVersion" + "-jre"
             if (binary.getLeft() instanceof G.GString) {
                 G.GString left = (G.GString) binary.getLeft();
@@ -523,11 +523,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             } else if (binary.getLeft() instanceof J.Identifier) {
                 return ((J.Identifier) binary.getLeft()).getSimpleName();
             }
-
             // For other binary expressions, return the full expression
-            return value.printTrimmed(cursor);
-        } else if (value instanceof G.GString) {
-            G.GString gString = (G.GString) value;
+            return v.printTrimmed(cursor);
+        } else if (v instanceof G.GString) {
+            G.GString gString = (G.GString) v;
             List<J> strings = gString.getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof G.GString.Value) {
                 G.GString.Value gStringValue = (G.GString.Value) strings.get(0);
@@ -544,8 +543,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return extractValueAsString((G.Binary) tree);
                 }
             }
-        } else if (value instanceof K.StringTemplate) {
-            K.StringTemplate template = (K.StringTemplate) value;
+        } else if (v instanceof K.StringTemplate) {
+            K.StringTemplate template = (K.StringTemplate) v;
             List<J> strings = template.getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof K.StringTemplate.Expression) {
                 K.StringTemplate.Expression templateExp = (K.StringTemplate.Expression) strings.get(0);
@@ -767,9 +766,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      * Extract property name from method invocation patterns like property('guavaVersion')
      * or findProperty('guavaVersion').
      */
-    @Nullable
-    private static String extractPropertyNameFromMethodInvocation(J.MethodInvocation mi) {
-        if (mi.getSimpleName().equals("property") || mi.getSimpleName().equals("findProperty")) {
+    private static @Nullable String extractPropertyNameFromMethodInvocation(J.MethodInvocation mi) {
+        if ("property".equals(mi.getSimpleName()) || "findProperty".equals(mi.getSimpleName())) {
             if (!mi.getArguments().isEmpty() && mi.getArguments().get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) mi.getArguments().get(0);
                 if (literal.getValue() instanceof String) {
@@ -784,8 +782,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      * Handle Groovy binary access like project.properties['guavaVersion']
      * where the binary operator is Access (bracket notation).
      */
-    @Nullable
-    private static String extractPropertyNameFromGBinary(G.Binary binary) {
+    private static @Nullable String extractPropertyNameFromGBinary(G.Binary binary) {
         if (binary.getOperator() == G.Binary.Type.Access && binary.getRight() instanceof J.Literal) {
             J.Literal right = (J.Literal) binary.getRight();
             if (right.getValue() instanceof String) {
@@ -936,7 +933,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     ((G.MapLiteral) firstArg).getElements() : m.getArguments().stream()
                     .filter(G.MapEntry.class::isInstance)
                     .map(G.MapEntry.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
 
             for (G.MapEntry entry : entries) {
                 if (entry.getKey() instanceof J.Literal &&
@@ -1069,7 +1066,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     ((G.MapLiteral) firstArg).getElements() : m.getArguments().stream()
                     .filter(G.MapEntry.class::isInstance)
                     .map(G.MapEntry.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
 
             for (G.MapEntry entry : entries) {
                 if (entry.getKey() instanceof J.Literal &&
@@ -1197,7 +1194,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     m.getArguments().stream()
                             .filter(G.MapEntry.class::isInstance)
                             .map(G.MapEntry.class::cast)
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
             boolean versionFound = false;
             for (G.MapEntry entry : entries) {
@@ -1326,9 +1323,6 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             J.MethodInvocation methodInvocation = cursor.getValue();
             GradleProject gradleProject = getGradleProject(cursor);
             GradleDependencyConfiguration gdc = getConfiguration(gradleProject, methodInvocation);
-            if (gdc == null && !(DEPENDENCY_DSL_MATCHER.matches(methodInvocation) && !"project".equals(methodInvocation.getSimpleName()))) {
-                return null;
-            }
 
             if (!StringUtils.isBlank(configuration) && !methodInvocation.getSimpleName().equals(configuration)) {
                 return null;
