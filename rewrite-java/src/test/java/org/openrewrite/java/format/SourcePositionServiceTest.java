@@ -46,37 +46,51 @@ class SourcePositionServiceTest implements RewriteTest {
 
               @Override
               public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(pkg, getCursor())).isEqualTo(20);
+                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(20);
                   return super.visitPackage(pkg, ctx);
               }
 
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                   if ("Test".equals(classDecl.getSimpleName())) {
-                      assertThat(service.computeTreeLength(classDecl, getCursor())).isEqualTo(381);
+                      assertThat(service.computeTreeLength(getCursor())).isEqualTo(461);
                   }
                   if ("Inner".equals(classDecl.getSimpleName())) {
-                      assertThat(service.computeTreeLength(classDecl, getCursor())).isEqualTo(72);
+                      assertThat(service.computeTreeLength(getCursor())).isEqualTo(72);
                   }
                   return super.visitClassDeclaration(classDecl, ctx);
               }
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(method, getCursor())).isEqualTo(285);
+                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(365);
                   return super.visitMethodDeclaration(method, ctx);
               }
 
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(multiVariable, getCursor())).isEqualTo(80);
+                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(80);
                   return super.visitVariableDeclarations(multiVariable, ctx);
               }
 
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(method, getCursor())).isEqualTo(80);
+                  if (method.getSimpleName().equals("valueOf")) {
+                      assertThat(service.computeTreeLength(getCursor())).isEqualTo(80);
+                  }
                   return super.visitMethodInvocation(method, ctx);
+              }
+
+              @Override
+              public J.Assert visitAssert(J.Assert _assert, ExecutionContext ctx) {
+                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(28);
+                  return super.visitAssert(_assert, ctx);
+              }
+
+              @Override
+              public J.Return visitReturn(J.Return _return, ExecutionContext ctx) {
+                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(51);
+                  return super.visitReturn(_return, ctx);
               }
           })),
           java(
@@ -85,10 +99,12 @@ class SourcePositionServiceTest implements RewriteTest {
             
             // Comments should not affect line length calculation
             public class Test {
-                public void /* multiline comments can impact though */ example() {
+                public int /* multiline comments can impact though */ example() {
                     String text = "This is a sample string to test line length calculation";
+                    assert text != null;
                     // Another comment that is not counted
                     String invocation = String.valueOf("Both lines share the same length.");
+                    return text.length() + invocation.length();
                 }
             
                 class Inner {

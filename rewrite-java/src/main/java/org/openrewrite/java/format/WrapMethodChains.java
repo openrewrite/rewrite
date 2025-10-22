@@ -66,7 +66,7 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                 // Not long enough to wrap
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong &&
-                        (sourceFile == null || sourceFile.service(SourcePositionService.class).computeTreeLength(method, getCursor()) <= style.getHardWrapAt())) {
+                        (sourceFile == null || sourceFile.service(SourcePositionService.class).computeTreeLength(getCursor()) <= style.getHardWrapAt())) {
                     return m;
                 }
 
