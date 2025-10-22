@@ -31,11 +31,13 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.graph.DependencyGraph;
 import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
@@ -100,6 +102,10 @@ public class DependencyInsight extends Recipe {
         return v;
     }
 
+    private boolean matchesConfiguration(GradleDependencyConfiguration c) {
+        return configuration == null || configuration.isEmpty() || c.getName().equals(configuration);
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
@@ -124,11 +130,24 @@ public class DependencyInsight extends Recipe {
                         .findFirst(JavaSourceSet.class)
                         .map(JavaSourceSet::getName)
                         .orElse("main");
+
+                // Initialize dependency graph
+                DependencyGraph dependencyGraph = new DependencyGraph();
+                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
+
+                // Collect dependency paths for all configurations
+                for (GradleDependencyConfiguration c : gp.getConfigurations()) {
+                    if (!matchesConfiguration(c)) {
+                        continue;
+                    }
+                    dependencyGraph.collectGradleDependencyPaths(c.getDirectResolved(), projectPaths, c.getName());
+                }
+
                 // configuration -> dependency which is or transitively depends on search target -> search target
                 Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = new HashMap<>();
                 Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency = new HashMap<>();
                 for (GradleDependencyConfiguration c : gp.getConfigurations()) {
-                    if (!(configuration == null || configuration.isEmpty() || c.getName().equals(configuration))) {
+                    if (!matchesConfiguration(c)) {
                         continue;
                     }
                     for (ResolvedDependency resolvedDependency : c.getDirectResolved()) {
@@ -151,6 +170,15 @@ public class DependencyInsight extends Recipe {
                             GroupArtifactVersion targetGav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
                             configurationToDirectDependency.computeIfAbsent(c.getName(), EMPTY).add(requestedGav);
                             directDependencyToTargetDependency.computeIfAbsent(requestedGav, EMPTY).add(targetGav);
+
+                            // Build the dependency graph string
+                            String depGraph = dependencyGraph.buildDependencyGraph(
+                                    dep.getGav(),
+                                    projectPaths,
+                                    dep.getDepth(),
+                                    Scope.fromGradleConfigurationName(c.getName())
+                            );
+
                             dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                                     projectName,
                                     sourceSetName,
@@ -159,7 +187,8 @@ public class DependencyInsight extends Recipe {
                                     dep.getVersion(),
                                     dep.getDatedSnapshotVersion(),
                                     dep.getRequested().getScope(),
-                                    dep.getDepth()
+                                    dep.getDepth(),
+                                    depGraph
                             ));
                         }
                     }

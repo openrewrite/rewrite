@@ -308,4 +308,48 @@ class DependencyInsightTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dependencyGraphIsPopulated() {
+        rewriteRun(
+          spec -> spec
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                assertThat(rows.get(0).getDependencyGraph()).isNotEmpty();
+                assertThat(rows.get(0).getDependencyGraph()).contains("com.google.guava:guava:29.0-jre");
+                assertThat(rows.get(0).getDependencyGraph()).contains("\\---");
+            })
+            .recipe(new DependencyInsight("*", "guava", "compile", null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~>--><dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
