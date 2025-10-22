@@ -35,6 +35,11 @@ public class AutoFormat extends Recipe {
 
     @Option(displayName = "Style",
             description = "See https://docs.openrewrite.org/concepts-and-explanations/styles for a description on styles.",
+            example = "type: specs.openrewrite.org/v1beta/style\n" +
+                    "name: com.yourorg.YesTabsNoStarImports\n" +
+                    "styleConfigs:\n" +
+                    "  - org.openrewrite.java.style.TabsAndIndentsStyle:\n" +
+                    "      useTabCharacter: true",
             required = false)
     @Nullable
     String style;
