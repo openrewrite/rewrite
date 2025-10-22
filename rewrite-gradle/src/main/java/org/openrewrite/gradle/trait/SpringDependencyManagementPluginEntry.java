@@ -23,8 +23,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -36,6 +34,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
@@ -129,7 +128,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                             }
                         }
                     }
-                    if (dependencies.stream().anyMatch(dependency -> (groupId != null && !matchesGlob(dependency.getGroupId(), groupId)) || (artifactId != null && !matchesGlob(dependency.getArtifactId(), artifactId)))) {
+                    if (dependencies.stream().anyMatch(dependency -> !matchesGlob(dependency.getGroupId(), groupId) || !matchesGlob(dependency.getArtifactId(), artifactId))) {
                         dependencies.clear();
                     }
                 }
@@ -140,7 +139,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                     if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment || argument instanceof K.StringTemplate) {
                         importedBom = parseDependency(methodInvocation.getArguments());
                     }
-                    if (importedBom != null && ((groupId != null && !matchesGlob(importedBom.getGroupId(), groupId)) || (artifactId != null && !matchesGlob(importedBom.getArtifactId(), artifactId)))) {
+                    if (importedBom != null && (!matchesGlob(importedBom.getGroupId(), groupId) || !matchesGlob(importedBom.getArtifactId(), artifactId))) {
                         importedBom = null;
                     }
                 }
@@ -237,7 +236,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             GavMap gavMap = null;
             if (argument instanceof J.Literal) {
                 String stringNotation = (String) ((J.Literal) argument).getValue();
-                Dependency dependency = stringNotation == null ? null : DependencyStringNotationConverter.parse(stringNotation);
+                Dependency dependency = stringNotation == null ? null : Dependency.parse(stringNotation);
                 return dependency == null ? null : dependency.getGav();
             } else if (argument instanceof G.MapLiteral) {
                 gavMap = getGAVMapEntriesForGMapEntries(((G.MapLiteral) argument).getElements());
@@ -421,7 +420,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             if (depArgs.get(0) instanceof J.Literal) {
                 String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                 if (gav != null) {
-                    Dependency original = DependencyStringNotationConverter.parse(gav);
+                    Dependency original = Dependency.parse(gav);
                     if (original != null) {
                         Dependency updated = original;
                         if (!StringUtils.isBlank(newGroup) && !updated.getGroupId().equals(newGroup)) {

@@ -391,15 +391,13 @@ public class StringUtils {
      * which properly interprets '*' and '**' wildcards for file paths.
      *
      * @param str the input string to match against the pattern, can be null
-     * @param pattern the glob pattern to evaluate, can be null
+     * @param pattern the glob pattern to evaluate. null and "*" both match everything.
      * @return true if the input string matches the glob pattern, false otherwise
      * @see org.openrewrite.PathUtils#matchesGlob(Path, String)
      */
     public static boolean matchesGlob(@Nullable String str, @Nullable String pattern) {
-        if ("*".equals(pattern)) {
+        if ("*".equals(pattern) || pattern == null) {
             return true;
-        } else if (pattern == null) {
-            return false;
         }
 
         if (str == null) {

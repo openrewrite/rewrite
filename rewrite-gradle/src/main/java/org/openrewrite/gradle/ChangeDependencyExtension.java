@@ -20,8 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -97,7 +96,7 @@ public class ChangeDependencyExtension extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
-                        Dependency dependency = DependencyStringNotationConverter.parse(gav);
+                        Dependency dependency = Dependency.parse(gav);
                         if (dependency != null && !newExtension.equals(dependency.getExt())) {
                             Dependency newDependency = dependency.withExt(newExtension);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));

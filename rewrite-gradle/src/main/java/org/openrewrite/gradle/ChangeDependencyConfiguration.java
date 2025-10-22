@@ -19,8 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -110,7 +110,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         return m;
                     }
 
-                    Dependency dependency = DependencyStringNotationConverter.parse((String) arg.getValue());
+                    Dependency dependency = Dependency.parse((String) arg.getValue());
                     if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
@@ -125,7 +125,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         return m;
                     }
 
-                    Dependency dependency = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                    Dependency dependency = Dependency.parse((String) groupArtifact.getValue());
                     if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
@@ -206,9 +206,11 @@ public class ChangeDependencyConfiguration extends Recipe {
 
                     Dependency dependency;
                     if ("project".equals(inner.getSimpleName())) {
-                        dependency = new Dependency("", ((String) value.getValue()).substring(1), null, null, null);
+                        dependency = Dependency.builder()
+                                .gav(new GroupArtifactVersion("", ((String) value.getValue()).substring(1), null))
+                                .build();
                     } else {
-                        dependency = DependencyStringNotationConverter.parse((String) value.getValue());
+                        dependency = Dependency.parse((String) value.getValue());
                     }
 
                     if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
