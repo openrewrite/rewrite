@@ -66,18 +66,6 @@ class AutoFormatTest implements RewriteTest {
                               - builder
                               - newBuilder
                               - stream
-                          classAnnotations:
-                            wrap: WrapAlways
-                          methodAnnotations:
-                            wrap: WrapAlways
-                          fieldAnnotations:
-                            wrap: WrapAlways
-                          parameterAnnotations:
-                            wrap: DoNotWrap
-                          localVariableAnnotations:
-                            wrap: DoNotWrap
-                          enumFieldAnnotations:
-                            wrap: DoNotWrap
             """,
             "org.openrewrite.java.AutoFormatWithCustomStyle"
           );

@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.Arrays;
 import java.util.List;
@@ -128,18 +129,23 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private <S extends Style> @Nullable S getStyle(Class<S> styleClass, JavaSourceFile sourceFile) {
+        S projectStyle = Style.from(styleClass, sourceFile);
         S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
+        if (projectStyle == null) {
             return style;
         }
-        return Style.from(styleClass, sourceFile);
+        if (style != null) {
+            return StyleHelper.merge(projectStyle, style);
+        }
+        return projectStyle;
     }
 
     private <S extends Style> S getStyle(Class<S> styleClass, JavaSourceFile sourceFile, Supplier<S> defaultStyle) {
+        S projectStyle = Style.from(styleClass, sourceFile, defaultStyle);
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {
-            return style;
+            return StyleHelper.merge(projectStyle, style);
         }
-        return Style.from(styleClass, sourceFile, defaultStyle);
+        return projectStyle;
     }
 }

@@ -20,6 +20,7 @@ import org.openrewrite.internal.StringUtils;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -75,7 +76,9 @@ public class StyleHelper {
                 if (rightValue != null) {
                     if (!isPrimitiveOrWrapper(rightValue) && !isEnum(rightValue)) {
                         Object leftValue = getter.invoke(left);
-                        rightValue = merge(leftValue, rightValue);
+                        if (leftValue instanceof Collection && !((Collection<?>) leftValue).isEmpty()) {
+                            rightValue = merge(leftValue, rightValue);
+                        }
                     }
                     //noinspection unchecked
                     left = (T) wither.invoke(left, rightValue);
