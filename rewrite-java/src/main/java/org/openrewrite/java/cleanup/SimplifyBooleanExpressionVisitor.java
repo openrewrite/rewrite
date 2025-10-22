@@ -309,9 +309,15 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 ((JavaType.Primitive) expression.getType()).isNumeric();
     }
 
-    private @Nullable Double getNumericValue(Expression expression) {
-        Object value = ((J.Literal) expression).getValue();
-        return value instanceof Number ? ((Number) value).doubleValue() : null;
+    private static boolean isIntegralType(Expression expression) {
+        if (!(expression instanceof J.Literal)) {
+            return false;
+        }
+        JavaType type = expression.getType();
+        return type == JavaType.Primitive.Byte ||
+               type == JavaType.Primitive.Short ||
+               type == JavaType.Primitive.Int ||
+               type == JavaType.Primitive.Long;
     }
 
     private @Nullable Boolean compareNumericLiterals(J.Binary binary) {
@@ -319,27 +325,55 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             return null;
         }
 
-        Double leftValue = getNumericValue(binary.getLeft());
-        Double rightValue = getNumericValue(binary.getRight());
-        if (leftValue == null || rightValue == null) {
+        Object leftValue = ((J.Literal) binary.getLeft()).getValue();
+        Object rightValue = ((J.Literal) binary.getRight()).getValue();
+
+        if (!(leftValue instanceof Number) || !(rightValue instanceof Number)) {
             return null;
         }
 
-        switch (binary.getOperator()) {
-            case LessThan:
-                return leftValue < rightValue;
-            case GreaterThan:
-                return leftValue > rightValue;
-            case LessThanOrEqual:
-                return leftValue <= rightValue;
-            case GreaterThanOrEqual:
-                return leftValue >= rightValue;
-            case Equal:
-                return leftValue.equals(rightValue);
-            case NotEqual:
-                return !leftValue.equals(rightValue);
-            default:
-                return null;
+        // If both operands are integral types, compare as long to avoid precision loss
+        if (isIntegralType(binary.getLeft()) && isIntegralType(binary.getRight())) {
+            long left = ((Number) leftValue).longValue();
+            long right = ((Number) rightValue).longValue();
+
+            switch (binary.getOperator()) {
+                case LessThan:
+                    return left < right;
+                case GreaterThan:
+                    return left > right;
+                case LessThanOrEqual:
+                    return left <= right;
+                case GreaterThanOrEqual:
+                    return left >= right;
+                case Equal:
+                    return left == right;
+                case NotEqual:
+                    return left != right;
+                default:
+                    return null;
+            }
+        } else {
+            // If either operand is floating-point, compare as double
+            double left = ((Number) leftValue).doubleValue();
+            double right = ((Number) rightValue).doubleValue();
+
+            switch (binary.getOperator()) {
+                case LessThan:
+                    return left < right;
+                case GreaterThan:
+                    return left > right;
+                case LessThanOrEqual:
+                    return left <= right;
+                case GreaterThanOrEqual:
+                    return left >= right;
+                case Equal:
+                    return Double.compare(left, right) == 0;
+                case NotEqual:
+                    return Double.compare(left, right) != 0;
+                default:
+                    return null;
+            }
         }
     }
 

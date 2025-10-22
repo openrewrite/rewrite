@@ -911,8 +911,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               class A {
                   {
-                      // These large long values lose precision when cast to double
-                      // The current implementation incorrectly simplifies these
+                      // Large long values that would lose precision if cast to double
+                      // Now correctly handled by comparing as long values
                       boolean i = 9007199254740992L < 9007199254740993L;
                       boolean j = 9007199254740992L == 9007199254740993L;
                   }
@@ -921,8 +921,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               class A {
                   {
-                      // These large long values lose precision when cast to double
-                      // The current implementation incorrectly simplifies these
+                      // Large long values that would lose precision if cast to double
+                      // Now correctly handled by comparing as long values
                       boolean i = true;
                       boolean j = false;
                   }
