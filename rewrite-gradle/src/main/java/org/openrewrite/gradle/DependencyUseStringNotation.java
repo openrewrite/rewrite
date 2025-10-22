@@ -21,6 +21,7 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.tree.G;
@@ -168,7 +169,7 @@ public class DependencyUseStringNotation extends Recipe {
                             .classifier(classifier)
                             .type(extension)
                             .build();
-                    String stringNotation = dependency.toStringNotation();
+                    String stringNotation = DependencyNotation.toStringNotation(dependency);
 
                     return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", emptyList(), JavaType.Primitive.String);
                 }

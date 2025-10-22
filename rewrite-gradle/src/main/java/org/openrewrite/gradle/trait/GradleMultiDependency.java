@@ -28,6 +28,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
@@ -90,7 +91,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
                         (printed.startsWith("\"") && printed.endsWith("\""))) {
                         printed = printed.substring(1, printed.length() - 1);
                     }
-                    return Dependency.parse(printed) != null;
+                    return DependencyNotation.parse(printed) != null;
                 })
                 .limit(2)
                 .count();

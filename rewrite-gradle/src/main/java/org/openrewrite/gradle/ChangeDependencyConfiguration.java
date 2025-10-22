@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
@@ -110,7 +111,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         return m;
                     }
 
-                    Dependency dependency = Dependency.parse((String) arg.getValue());
+                    Dependency dependency = DependencyNotation.parse((String) arg.getValue());
                     if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
@@ -125,7 +126,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         return m;
                     }
 
-                    Dependency dependency = Dependency.parse((String) groupArtifact.getValue());
+                    Dependency dependency = DependencyNotation.parse((String) groupArtifact.getValue());
                     if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
@@ -210,7 +211,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                                 .gav(new GroupArtifactVersion("", ((String) value.getValue()).substring(1), null))
                                 .build();
                     } else {
-                        dependency = Dependency.parse((String) value.getValue());
+                        dependency = DependencyNotation.parse((String) value.getValue());
                     }
 
                     if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {

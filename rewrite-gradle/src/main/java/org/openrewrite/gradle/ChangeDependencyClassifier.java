@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
@@ -122,10 +123,10 @@ public class ChangeDependencyClassifier extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
-                        Dependency dependency = Dependency.parse(gav);
+                        Dependency dependency = DependencyNotation.parse(gav);
                         if (dependency != null && dependency.getVersion() != null && !Objects.equals(newClassifier, dependency.getClassifier())) {
                             Dependency newDependency = dependency.withClassifier(newClassifier);
-                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
+                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(newDependency))));
                         }
                     }
                 } else if (depArgs.get(0) instanceof G.MapEntry) {

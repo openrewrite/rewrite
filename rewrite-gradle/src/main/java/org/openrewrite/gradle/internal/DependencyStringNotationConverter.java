@@ -17,9 +17,10 @@ package org.openrewrite.gradle.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 
 /**
- * @deprecated Use {@link Dependency#parse(String)} instead.
+ * @deprecated Use {@link DependencyNotation#parse(String)} instead.
  * This class is retained for backward compatibility.
  */
 @Deprecated
@@ -28,10 +29,10 @@ public class DependencyStringNotationConverter {
     /**
      * @param notation a String in the format group:artifact:version:classifier@extension
      * @return A corresponding Dependency or null if the notation could not be parsed
-     * @deprecated Use {@link Dependency#parse(String)} instead
+     * @deprecated Use {@link DependencyNotation#parse(String)} instead
      */
     @Deprecated
     public static @Nullable Dependency parse(@Nullable String notation) {
-        return Dependency.parse(notation);
+        return DependencyNotation.parse(notation);
     }
 }

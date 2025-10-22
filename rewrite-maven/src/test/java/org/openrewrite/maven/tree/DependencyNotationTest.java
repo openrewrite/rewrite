@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class DependencyTest {
+class DependencyNotationTest {
 
     @Test
     void toStringNotationWithAllFieldsPresent() {
@@ -28,7 +28,7 @@ class DependencyTest {
                 .classifier("sources")
                 .type("jar")
                 .build();
-        assertThat(dep.toStringNotation()).isEqualTo("com.example:artifact:1.0.0:sources@jar");
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo("com.example:artifact:1.0.0:sources@jar");
     }
 
     @Test
@@ -36,7 +36,7 @@ class DependencyTest {
         Dependency dep = Dependency.builder()
                 .gav(new GroupArtifactVersion("com.example", "artifact", null))
                 .build();
-        assertThat(dep.toStringNotation()).isEqualTo("com.example:artifact");
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo("com.example:artifact");
     }
 
     @Test
@@ -44,7 +44,7 @@ class DependencyTest {
         Dependency dep = Dependency.builder()
                 .gav(new GroupArtifactVersion(null, "artifact", "1.0.0"))
                 .build();
-        assertThat(dep.toStringNotation()).isEqualTo(":artifact:1.0.0");
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo(":artifact:1.0.0");
     }
 
     @Test
@@ -53,7 +53,7 @@ class DependencyTest {
                 .gav(new GroupArtifactVersion("com.example", "artifact", null))
                 .classifier("sources")
                 .build();
-        assertThat(dep.toStringNotation()).isEqualTo("com.example:artifact::sources");
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo("com.example:artifact::sources");
     }
 
     @Test
@@ -62,7 +62,7 @@ class DependencyTest {
                 .gav(new GroupArtifactVersion("com.example", "artifact", null))
                 .type("jar")
                 .build();
-        assertThat(dep.toStringNotation()).isEqualTo("com.example:artifact@jar");
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo("com.example:artifact@jar");
     }
 
     @Test
@@ -71,7 +71,7 @@ class DependencyTest {
                 .gav(new GroupArtifactVersion("com.example", "artifact", "1.0.0"))
                 .type("jar")
                 .build();
-        assertThat(dep.toStringNotation()).isEqualTo("com.example:artifact:1.0.0@jar");
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo("com.example:artifact:1.0.0@jar");
     }
 
     @Test
@@ -79,12 +79,12 @@ class DependencyTest {
         Dependency dep = Dependency.builder()
                 .gav(new GroupArtifactVersion(null, "artifact", null))
                 .build();
-        assertThat(dep.toStringNotation()).isEqualTo(":artifact");
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo(":artifact");
     }
 
     @Test
     void parseWithAllFieldsPresent() {
-        Dependency dep = Dependency.parse("com.example:artifact:1.0.0:sources@jar");
+        Dependency dep = DependencyNotation.parse("com.example:artifact:1.0.0:sources@jar");
         assertThat(dep).isNotNull();
         assertThat(dep.getGroupId()).isEqualTo("com.example");
         assertThat(dep.getArtifactId()).isEqualTo("artifact");
@@ -95,7 +95,7 @@ class DependencyTest {
 
     @Test
     void parseWithOnlyGroupAndArtifact() {
-        Dependency dep = Dependency.parse("com.example:artifact");
+        Dependency dep = DependencyNotation.parse("com.example:artifact");
         assertThat(dep).isNotNull();
         assertThat(dep.getGroupId()).isEqualTo("com.example");
         assertThat(dep.getArtifactId()).isEqualTo("artifact");
@@ -106,7 +106,7 @@ class DependencyTest {
 
     @Test
     void parseWithNullGroup() {
-        Dependency dep = Dependency.parse(":artifact:1.0.0");
+        Dependency dep = DependencyNotation.parse(":artifact:1.0.0");
         assertThat(dep).isNotNull();
         // Empty string group is preserved in parse
         assertThat(dep.getGroupId()).isEqualTo("");
@@ -118,7 +118,7 @@ class DependencyTest {
 
     @Test
     void parseWithNullVersionButClassifierPresent() {
-        Dependency dep = Dependency.parse("com.example:artifact::sources");
+        Dependency dep = DependencyNotation.parse("com.example:artifact::sources");
         assertThat(dep).isNotNull();
         assertThat(dep.getGroupId()).isEqualTo("com.example");
         assertThat(dep.getArtifactId()).isEqualTo("artifact");
@@ -129,7 +129,7 @@ class DependencyTest {
 
     @Test
     void parseWithNullVersionAndClassifierButExtensionPresent() {
-        Dependency dep = Dependency.parse("com.example:artifact@jar");
+        Dependency dep = DependencyNotation.parse("com.example:artifact@jar");
         assertThat(dep).isNotNull();
         assertThat(dep.getGroupId()).isEqualTo("com.example");
         assertThat(dep.getArtifactId()).isEqualTo("artifact");
@@ -140,7 +140,7 @@ class DependencyTest {
 
     @Test
     void parseWithNullClassifierButExtensionPresent() {
-        Dependency dep = Dependency.parse("com.example:artifact:1.0.0@jar");
+        Dependency dep = DependencyNotation.parse("com.example:artifact:1.0.0@jar");
         assertThat(dep).isNotNull();
         assertThat(dep.getGroupId()).isEqualTo("com.example");
         assertThat(dep.getArtifactId()).isEqualTo("artifact");
@@ -151,7 +151,7 @@ class DependencyTest {
 
     @Test
     void parseWithOnlyArtifact() {
-        Dependency dep = Dependency.parse(":artifact");
+        Dependency dep = DependencyNotation.parse(":artifact");
         assertThat(dep).isNotNull();
         // Empty string group is preserved in parse
         assertThat(dep.getGroupId()).isEqualTo("");
@@ -163,55 +163,55 @@ class DependencyTest {
 
     @Test
     void parseNull() {
-        assertThat(Dependency.parse(null)).isNull();
+        assertThat(DependencyNotation.parse(null)).isNull();
     }
 
     @Test
     void parseInvalidNotationTooFewComponents() {
-        assertThat(Dependency.parse("artifact")).isNull();
+        assertThat(DependencyNotation.parse("artifact")).isNull();
     }
 
     @Test
     void parseInvalidNotationTooManyComponents() {
-        assertThat(Dependency.parse("group:artifact:version:classifier:extra")).isNull();
+        assertThat(DependencyNotation.parse("group:artifact:version:classifier:extra")).isNull();
     }
 
     @Test
     void parseInvalidNotationTooManyComponentsWithExtension() {
-        assertThat(Dependency.parse("group:artifact:version:classifier:extra@jar")).isNull();
+        assertThat(DependencyNotation.parse("group:artifact:version:classifier:extra@jar")).isNull();
     }
 
     // Round-trip tests
     @Test
     void parseAndToStringNotationRoundTrip() {
         String notation = "com.example:artifact:1.0.0:sources@jar";
-        Dependency dep = Dependency.parse(notation);
+        Dependency dep = DependencyNotation.parse(notation);
         assertThat(dep).isNotNull();
-        assertThat(dep.toStringNotation()).isEqualTo(notation);
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo(notation);
     }
 
     @Test
     void parseAndToStringNotationRoundTripMinimal() {
         String notation = ":artifact";
-        Dependency dep = Dependency.parse(notation);
+        Dependency dep = DependencyNotation.parse(notation);
         assertThat(dep).isNotNull();
-        assertThat(dep.toStringNotation()).isEqualTo(notation);
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo(notation);
     }
 
     @Test
     void parseAndToStringNotationRoundTripWithEmptyVersion() {
         String notation = "com.example:artifact::sources";
-        Dependency dep = Dependency.parse(notation);
+        Dependency dep = DependencyNotation.parse(notation);
         assertThat(dep).isNotNull();
-        assertThat(dep.toStringNotation()).isEqualTo(notation);
+        assertThat(DependencyNotation.toStringNotation(dep)).isEqualTo(notation);
     }
 
-    // Tests for convenience methods
+    // Tests for convenience methods using withGav
     @Test
     void withGroupId() {
-        Dependency original = Dependency.parse("com.example:artifact:1.0.0");
+        Dependency original = DependencyNotation.parse("com.example:artifact:1.0.0");
         assertThat(original).isNotNull();
-        Dependency updated = original.withGroupId("org.example");
+        Dependency updated = original.withGav(original.getGav().withGroupId("org.example"));
         assertThat(updated.getGroupId()).isEqualTo("org.example");
         assertThat(updated.getArtifactId()).isEqualTo("artifact");
         assertThat(updated.getVersion()).isEqualTo("1.0.0");
@@ -219,9 +219,9 @@ class DependencyTest {
 
     @Test
     void withArtifactId() {
-        Dependency original = Dependency.parse("com.example:artifact:1.0.0");
+        Dependency original = DependencyNotation.parse("com.example:artifact:1.0.0");
         assertThat(original).isNotNull();
-        Dependency updated = original.withArtifactId("new-artifact");
+        Dependency updated = original.withGav(original.getGav().withArtifactId("new-artifact"));
         assertThat(updated.getGroupId()).isEqualTo("com.example");
         assertThat(updated.getArtifactId()).isEqualTo("new-artifact");
         assertThat(updated.getVersion()).isEqualTo("1.0.0");
@@ -229,9 +229,9 @@ class DependencyTest {
 
     @Test
     void withVersion() {
-        Dependency original = Dependency.parse("com.example:artifact:1.0.0");
+        Dependency original = DependencyNotation.parse("com.example:artifact:1.0.0");
         assertThat(original).isNotNull();
-        Dependency updated = original.withVersion("2.0.0");
+        Dependency updated = original.withGav(original.getGav().withVersion("2.0.0"));
         assertThat(updated.getGroupId()).isEqualTo("com.example");
         assertThat(updated.getArtifactId()).isEqualTo("artifact");
         assertThat(updated.getVersion()).isEqualTo("2.0.0");
@@ -239,27 +239,25 @@ class DependencyTest {
 
     @Test
     void withExt() {
-        Dependency original = Dependency.parse("com.example:artifact:1.0.0");
+        Dependency original = DependencyNotation.parse("com.example:artifact:1.0.0");
         assertThat(original).isNotNull();
-        Dependency updated = original.withExt("war");
+        Dependency updated = original.withType("war");
         assertThat(updated.getGroupId()).isEqualTo("com.example");
         assertThat(updated.getArtifactId()).isEqualTo("artifact");
         assertThat(updated.getVersion()).isEqualTo("1.0.0");
         assertThat(updated.getType()).isEqualTo("war");
-        assertThat(updated.getExt()).isEqualTo("war");
     }
 
     @Test
     void getExt() {
-        Dependency dep = Dependency.parse("com.example:artifact:1.0.0@war");
+        Dependency dep = DependencyNotation.parse("com.example:artifact:1.0.0@war");
         assertThat(dep).isNotNull();
-        assertThat(dep.getExt()).isEqualTo("war");
         assertThat(dep.getType()).isEqualTo("war");
     }
 
     @Test
     void parseWithAllFieldsPresentUsingFluentAssertions() {
-        Dependency dep = Dependency.parse("com.example:artifact:1.0.0:sources@jar");
+        Dependency dep = DependencyNotation.parse("com.example:artifact:1.0.0:sources@jar");
 
         assertThat(dep)
                 .isNotNull()
@@ -270,70 +268,70 @@ class DependencyTest {
                     assertThat(d.getClassifier()).isEqualTo("sources");
                     assertThat(d.getType()).isEqualTo("jar");
                 })
-                .extracting(Dependency::toStringNotation)
+                .extracting(DependencyNotation::toStringNotation)
                 .isEqualTo("com.example:artifact:1.0.0:sources@jar");
     }
 
     @Test
     void parseRejectsGroovyMapNotation() {
-        assertThat(Dependency.parse("group : \"com.google.guava\"")).isNull();
-        assertThat(Dependency.parse("name : \"guava\"")).isNull();
-        assertThat(Dependency.parse(" group: \"value\" ")).isNull();
-        assertThat(Dependency.parse("version: '29.0-jre'")).isNull();
+        assertThat(DependencyNotation.parse("group : \"com.google.guava\"")).isNull();
+        assertThat(DependencyNotation.parse("name : \"guava\"")).isNull();
+        assertThat(DependencyNotation.parse(" group: \"value\" ")).isNull();
+        assertThat(DependencyNotation.parse("version: '29.0-jre'")).isNull();
     }
 
     @Test
     void parseRejectsNotationWithQuotedValues() {
         // These look like partial Groovy notation, not valid dependency strings
-        assertThat(Dependency.parse("'com.example':'artifact'")).isNull();
+        assertThat(DependencyNotation.parse("'com.example':'artifact'")).isNull();
     }
 
     @Test
     void parseRejectsNotationWithTrailingSpaces() {
         // Valid dependency notation should not have spaces around colons
-        assertThat(Dependency.parse("com.example : artifact")).isNull();
-        assertThat(Dependency.parse("com.example: artifact")).isNull();
-        assertThat(Dependency.parse("com.example :artifact")).isNull();
+        assertThat(DependencyNotation.parse("com.example : artifact")).isNull();
+        assertThat(DependencyNotation.parse("com.example: artifact")).isNull();
+        assertThat(DependencyNotation.parse("com.example :artifact")).isNull();
     }
 
     @Test
     void parseRejectsEmptyString() {
-        assertThat(Dependency.parse("")).isNull();
+        assertThat(DependencyNotation.parse("")).isNull();
     }
 
     @Test
     void parseRejectsOnlyColons() {
-        assertThat(Dependency.parse(":")).isNull();
-        assertThat(Dependency.parse("::")).isNull();
-        assertThat(Dependency.parse(":::")).isNull();
+        assertThat(DependencyNotation.parse(":")).isNull();
+        assertThat(DependencyNotation.parse("::")).isNull();
+        assertThat(DependencyNotation.parse(":::")).isNull();
     }
 
     @Test
     void parseRejectsInvalidCharactersInGroupId() {
         // GroupIds must match [A-Za-z0-9_.-]+
-        assertThat(Dependency.parse("com/example:artifact")).isNull();
-        assertThat(Dependency.parse("com example:artifact")).isNull();
-        assertThat(Dependency.parse("com*example:artifact")).isNull();
-        assertThat(Dependency.parse("com@example:artifact")).isNull();
-        assertThat(Dependency.parse("com+example:artifact")).isNull();
-        assertThat(Dependency.parse("com[example]:artifact")).isNull();
+        assertThat(DependencyNotation.parse("com/example:artifact")).isNull();
+        assertThat(DependencyNotation.parse("com example:artifact")).isNull();
+        assertThat(DependencyNotation.parse("com*example:artifact")).isNull();
+        assertThat(DependencyNotation.parse("com@example:artifact")).isNull();
+        assertThat(DependencyNotation.parse("com+example:artifact")).isNull();
+        assertThat(DependencyNotation.parse("com[example]:artifact")).isNull();
     }
 
     @Test
     void parseRejectsInvalidCharactersInArtifactId() {
         // ArtifactIds must match [A-Za-z0-9_.-]+
-        assertThat(Dependency.parse("com.example:my/artifact")).isNull();
-        assertThat(Dependency.parse("com.example:my artifact")).isNull();
-        assertThat(Dependency.parse("com.example:my*artifact")).isNull();
-        assertThat(Dependency.parse("com.example:my+artifact")).isNull();
-        assertThat(Dependency.parse("com.example:my[artifact]")).isNull();
-        assertThat(Dependency.parse("com.example:my#artifact")).isNull();
+        assertThat(DependencyNotation.parse("com.example:my/artifact")).isNull();
+        assertThat(DependencyNotation.parse("com.example:my artifact")).isNull();
+        assertThat(DependencyNotation.parse("com.example:my*artifact")).isNull();
+        assertThat(DependencyNotation.parse("com.example:my+artifact")).isNull();
+        assertThat(DependencyNotation.parse("com.example:my[artifact]")).isNull();
+        assertThat(DependencyNotation.parse("com.example:my#artifact")).isNull();
     }
 
     @Test
     void parseAcceptsValidCharactersInGroupAndArtifact() {
         // Valid characters: A-Z, a-z, 0-9, _, ., -
-        Dependency dep = Dependency.parse("com.example-test_123:my-artifact_456.test");
+        Dependency dep = DependencyNotation.parse("com.example-test_123:my-artifact_456.test");
         assertThat(dep).isNotNull();
         assertThat(dep.getGroupId()).isEqualTo("com.example-test_123");
         assertThat(dep.getArtifactId()).isEqualTo("my-artifact_456.test");

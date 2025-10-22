@@ -37,6 +37,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
@@ -225,7 +226,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         return null;
                     }
                     String toParse = leftStr.endsWith(":") ? leftStr + "1.0" : leftStr;
-                    Dependency dep = Dependency.parse(toParse);
+                    Dependency dep = DependencyNotation.parse(toParse);
                     return dep != null ? dep.getGroupId() : null;
                 }
             }
@@ -234,7 +235,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         // String literal notation: "group:artifact:version"
         if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
             Dependency dep =
-                    Dependency.parse((String) ((J.Literal) arg).getValue());
+                    DependencyNotation.parse((String) ((J.Literal) arg).getValue());
             return dep != null ? dep.getGroupId() : null;
         }
 
@@ -243,7 +244,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = ((G.GString) arg).getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 Dependency dep =
-                        Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
+                        DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
                 return dep != null ? dep.getGroupId() : null;
             }
         }
@@ -253,7 +254,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = ((K.StringTemplate) arg).getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 Dependency dep =
-                        Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
+                        DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
                 return dep != null ? dep.getGroupId() : null;
             }
         }
@@ -325,7 +326,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         return null;
                     }
                     String toParse = leftStr.endsWith(":") ? leftStr + "1.0" : leftStr;
-                    Dependency dep = Dependency.parse(toParse);
+                    Dependency dep = DependencyNotation.parse(toParse);
                     return dep != null ? dep.getArtifactId() : null;
                 }
             }
@@ -333,7 +334,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
         // String literal notation: "group:artifact:version"
         if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
-            Dependency dep = Dependency.parse((String) ((J.Literal) arg).getValue());
+            Dependency dep = DependencyNotation.parse((String) ((J.Literal) arg).getValue());
             return dep != null ? dep.getArtifactId() : null;
         }
 
@@ -341,7 +342,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (arg instanceof G.GString) {
             List<J> strings = ((G.GString) arg).getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
-                Dependency dep = Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
+                Dependency dep = DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
                 return dep != null ? dep.getArtifactId() : null;
             }
         }
@@ -350,7 +351,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (arg instanceof K.StringTemplate) {
             List<J> strings = ((K.StringTemplate) arg).getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
-                Dependency dep = Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
+                Dependency dep = DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
                 return dep != null ? dep.getArtifactId() : null;
             }
         }
@@ -425,7 +426,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         // String literal notation: "group:artifact:version"
         if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
             Dependency dep =
-                    Dependency.parse((String) ((J.Literal) arg).getValue());
+                    DependencyNotation.parse((String) ((J.Literal) arg).getValue());
             return dep != null ? dep.getVersion() : null;
         }
 
@@ -826,13 +827,13 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (m.getArguments().get(0) instanceof J.Literal) {
             J.Literal l = (J.Literal) m.getArguments().get(0);
             if (l.getType() == JavaType.Primitive.String) {
-                Dependency dep = Dependency.parse((String) l.getValue());
+                Dependency dep = DependencyNotation.parse((String) l.getValue());
                 if (dep == null || dep.getClassifier() != null || (dep.getType() != null && !"jar".equals(dep.getType()))) {
                     return this;
                 }
                 updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
-                        ChangeStringLiteral.withStringValue(l, dep.withGav(dep.getGav().withVersion(null)).toStringNotation()))
-                );
+                        ChangeStringLiteral.withStringValue(l, DependencyNotation.toStringNotation(dep.withGav(dep.getGav().withVersion(null))))
+                ));
             }
         } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
             updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
@@ -900,11 +901,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (firstArg instanceof J.Literal) {
             String gav = (String) ((J.Literal) firstArg).getValue();
             if (gav != null) {
-                Dependency dep = Dependency.parse(gav);
+                Dependency dep = DependencyNotation.parse(gav);
                 if (dep != null && !newGroupId.equals(dep.getGroupId())) {
-                    Dependency updatedDep = dep.withGroupId(newGroupId);
+                    Dependency updatedDep = dep.withGav(dep.getGav().withGroupId(newGroupId));
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
-                            arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, updatedDep.toStringNotation())));
+                            arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
                 }
             }
         } else if (firstArg instanceof G.GString) {
@@ -913,10 +914,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
                 String originalValue = (String) literal.getValue();
-                Dependency dep = Dependency.parse(originalValue);
+                Dependency dep = DependencyNotation.parse(originalValue);
                 if (dep != null && !newGroupId.equals(dep.getGroupId())) {
-                    Dependency updatedDep = dep.withGroupId(newGroupId);
-                    String replacement = updatedDep.toStringNotation();
+                    Dependency updatedDep = dep.withGav(dep.getGav().withGroupId(newGroupId));
+                    String replacement = DependencyNotation.toStringNotation(updatedDep);
                     // Preserve trailing colon if present (for version interpolation)
                     if (originalValue.endsWith(":")) {
                         replacement = replacement + ":";
@@ -981,10 +982,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = template.getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
-                Dependency dep = Dependency.parse((String) literal.getValue());
+                Dependency dep = DependencyNotation.parse((String) literal.getValue());
                 if (dep != null && !newGroupId.equals(dep.getGroupId())) {
-                    Dependency updatedDep = dep.withGroupId(newGroupId);
-                    String replacement = updatedDep.toStringNotation();
+                    Dependency updatedDep = dep.withGav(dep.getGav().withGroupId(newGroupId));
+                    String replacement = DependencyNotation.toStringNotation(updatedDep);
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
                     updated = m.withArguments(singletonList(newLiteral));
@@ -1033,11 +1034,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (firstArg instanceof J.Literal) {
             String gav = (String) ((J.Literal) firstArg).getValue();
             if (gav != null) {
-                Dependency dep = Dependency.parse(gav);
+                Dependency dep = DependencyNotation.parse(gav);
                 if (dep != null && !newArtifactId.equals(dep.getArtifactId())) {
-                    Dependency updatedDep = dep.withArtifactId(newArtifactId);
+                    Dependency updatedDep = dep.withGav(dep.getGav().withArtifactId(newArtifactId));
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
-                            arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, updatedDep.toStringNotation())));
+                            arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
                 }
             }
         } else if (firstArg instanceof G.GString) {
@@ -1046,10 +1047,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
                 String originalValue = (String) literal.getValue();
-                Dependency dep = Dependency.parse(originalValue);
+                Dependency dep = DependencyNotation.parse(originalValue);
                 if (dep != null && !newArtifactId.equals(dep.getArtifactId())) {
-                    Dependency updatedDep = dep.withArtifactId(newArtifactId);
-                    String replacement = updatedDep.toStringNotation();
+                    Dependency updatedDep = dep.withGav(dep.getGav().withArtifactId(newArtifactId));
+                    String replacement = DependencyNotation.toStringNotation(updatedDep);
                     // Preserve trailing colon if present (for version interpolation)
                     if (originalValue.endsWith(":")) {
                         replacement = replacement + ":";
@@ -1114,10 +1115,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = template.getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
-                Dependency dep = Dependency.parse((String) literal.getValue());
+                Dependency dep = DependencyNotation.parse((String) literal.getValue());
                 if (dep != null && !newArtifactId.equals(dep.getArtifactId())) {
-                    Dependency updatedDep = dep.withArtifactId(newArtifactId);
-                    String replacement = updatedDep.toStringNotation();
+                    Dependency updatedDep = dep.withGav(dep.getGav().withArtifactId(newArtifactId));
+                    String replacement = DependencyNotation.toStringNotation(updatedDep);
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
                     updated = m.withArguments(singletonList(newLiteral));
@@ -1166,11 +1167,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (firstArg instanceof J.Literal) {
             String gav = (String) ((J.Literal) firstArg).getValue();
             if (gav != null) {
-                Dependency dep = Dependency.parse(gav);
+                Dependency dep = DependencyNotation.parse(gav);
                 if (dep != null && !newVersion.equals(dep.getVersion())) {
-                    Dependency updatedDep = dep.withVersion(newVersion);
+                    Dependency updatedDep = dep.withGav(dep.getGav().withVersion(newVersion));
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
-                            arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, updatedDep.toStringNotation())));
+                            arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
                 }
             }
         } else if (firstArg instanceof G.GString) {
@@ -1179,10 +1180,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = gstring.getStrings();
             if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
-                Dependency dep = Dependency.parse((String) literal.getValue());
+                Dependency dep = DependencyNotation.parse((String) literal.getValue());
                 if (dep != null) {
-                    Dependency updatedDep = dep.withVersion(newVersion);
-                    String replacement = updatedDep.toStringNotation();
+                    Dependency updatedDep = dep.withGav(dep.getGav().withVersion(newVersion));
+                    String replacement = DependencyNotation.toStringNotation(updatedDep);
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
                     updated = m.withArguments(singletonList(newLiteral));
@@ -1250,10 +1251,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = template.getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
-                Dependency dep = Dependency.parse((String) literal.getValue());
+                Dependency dep = DependencyNotation.parse((String) literal.getValue());
                 if (dep != null) {
-                    Dependency updatedDep = dep.withVersion(newVersion);
-                    String replacement = updatedDep.toStringNotation();
+                    Dependency updatedDep = dep.withGav(dep.getGav().withVersion(newVersion));
+                    String replacement = DependencyNotation.toStringNotation(updatedDep);
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
                     updated = m.withArguments(singletonList(newLiteral));
@@ -1408,12 +1409,12 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         private @Nullable Dependency parseDependency(List<Expression> arguments) {
             Expression argument = arguments.get(0);
             if (argument instanceof J.Literal) {
-                return Dependency.parse((String) ((J.Literal) argument).getValue());
+                return DependencyNotation.parse((String) ((J.Literal) argument).getValue());
             } else if (argument instanceof G.GString) {
                 G.GString gstring = (G.GString) argument;
                 List<J> strings = gstring.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
-                    return Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
+                    return DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
                 }
             } else if (argument instanceof G.MapLiteral) {
                 List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
@@ -1462,7 +1463,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 K.StringTemplate template = (K.StringTemplate) argument;
                 List<J> strings = template.getStrings();
                 if (!strings.isEmpty() && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
-                    return Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
+                    return DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
                 }
             }
 

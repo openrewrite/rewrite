@@ -249,7 +249,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             return m;
                                         }
                                         String value = (String) ((J.Literal) m.getArguments().get(0)).getValue();
-                                        Dependency dependency = Dependency.parse(value);
+                                        Dependency dependency = DependencyNotation.parse(value);
                                         try {
                                             getCursor().dropParentUntil(obj -> obj instanceof J.MethodInvocation && "constraints".equals(((J.MethodInvocation) obj).getSimpleName())).getValue();
                                             if (shouldRemoveRedundantConstraint(dependency, gp.getConfiguration(m.getSimpleName()))) {

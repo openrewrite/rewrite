@@ -35,6 +35,7 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
@@ -236,7 +237,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             GavMap gavMap = null;
             if (argument instanceof J.Literal) {
                 String stringNotation = (String) ((J.Literal) argument).getValue();
-                Dependency dependency = stringNotation == null ? null : Dependency.parse(stringNotation);
+                Dependency dependency = stringNotation == null ? null : DependencyNotation.parse(stringNotation);
                 return dependency == null ? null : dependency.getGav();
             } else if (argument instanceof G.MapLiteral) {
                 gavMap = getGAVMapEntriesForGMapEntries(((G.MapLiteral) argument).getElements());
@@ -420,14 +421,14 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             if (depArgs.get(0) instanceof J.Literal) {
                 String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                 if (gav != null) {
-                    Dependency original = Dependency.parse(gav);
+                    Dependency original = DependencyNotation.parse(gav);
                     if (original != null) {
                         Dependency updated = original;
                         if (!StringUtils.isBlank(newGroup) && !updated.getGroupId().equals(newGroup)) {
-                            updated = updated.withGroupId(newGroup);
+                            updated = updated.withGav(updated.getGav().withGroupId(newGroup));
                         }
                         if (!StringUtils.isBlank(newArtifact) && !updated.getArtifactId().equals(newArtifact)) {
-                            updated = updated.withArtifactId(newArtifact);
+                            updated = updated.withGav(updated.getGav().withArtifactId(newArtifact));
                         }
                         if (!StringUtils.isBlank(newVersion)) {
                             String resolvedVersion;
@@ -438,11 +439,11 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                                 return e.warn(m);
                             }
                             if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
-                                updated = updated.withVersion(resolvedVersion);
+                                updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
                             }
                         }
                         if (original != updated) {
-                            String replacement = updated.toStringNotation();
+                            String replacement = DependencyNotation.toStringNotation(updated);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> arg == null ? null : ChangeStringLiteral.withStringValue((J.Literal) arg, replacement)));
                         }
                     }
