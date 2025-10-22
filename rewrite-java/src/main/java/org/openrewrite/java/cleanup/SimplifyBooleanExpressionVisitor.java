@@ -304,7 +304,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         return expression instanceof J.Literal && ((J.Literal) expression).getType() != JavaType.Primitive.Null;
     }
 
-    private static boolean isNumeric(Expression expression) {
+    private static boolean isNumericLiteral(Expression expression) {
         return expression instanceof J.Literal &&
                 ((JavaType.Primitive) expression.getType()).isNumeric();
     }
@@ -321,7 +321,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     private @Nullable Boolean compareNumericLiterals(J.Binary binary) {
-        if (!isNumeric(binary.getLeft()) || !isNumeric(binary.getRight())) {
+        if (!isNumericLiteral(binary.getLeft()) || !isNumericLiteral(binary.getRight())) {
             return null;
         }
 
