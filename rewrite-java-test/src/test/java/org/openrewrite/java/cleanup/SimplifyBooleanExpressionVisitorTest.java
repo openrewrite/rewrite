@@ -878,4 +878,83 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void numericLiteralComparisonsWithEdgeCases() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      // Edge cases with floating point - these are not simplified
+                      // because they involve non-literal expressions (field accesses)
+                      boolean a = Double.NaN == Double.NaN;
+                      boolean b = Double.NaN != Double.NaN;
+                      boolean c = -0.0 == 0.0;
+                      boolean d = -0.0 < 0.0;
+                      boolean e = Double.POSITIVE_INFINITY > 1.0;
+                      boolean f = Double.NEGATIVE_INFINITY < 1.0;
+                      boolean g = Float.NaN == Float.NaN;
+                      boolean h = Float.POSITIVE_INFINITY > Float.NEGATIVE_INFINITY;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/6164")
+    @Test
+    void largeLongValuesLosePrecisionInDouble() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      // These large long values lose precision when cast to double
+                      // The current implementation incorrectly simplifies these
+                      boolean i = 9007199254740992L < 9007199254740993L;
+                      boolean j = 9007199254740992L == 9007199254740993L;
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      // These large long values lose precision when cast to double
+                      // The current implementation incorrectly simplifies these
+                      boolean i = false;
+                      boolean j = true;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotSimplifyNonLiteralComparisons() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      int i = 1;
+                      boolean a = i == 1;
+                      boolean b = i < 2;
+                      boolean c = 1 == i;
+
+                      int j = 2;
+                      boolean d = i == j;
+                      boolean e = i < j;
+
+                      long l = 100L;
+                      boolean f = l > 50L;
+                      boolean g = l == 100L;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
