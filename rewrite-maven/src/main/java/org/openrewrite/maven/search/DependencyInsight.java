@@ -115,21 +115,24 @@ public class DependencyInsight extends Recipe {
 
         return new MavenIsoVisitor<ExecutionContext>() {
             final DependencyGraph dependencyGraph = new DependencyGraph();
-            final Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
+            final Map<String, Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>>> pathsByScope = new HashMap<>();
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                // Collect dependency paths for scopes matching the requested scope
-                // When requestedScope is null, we collect for all scopes, but buildDependencyGraph will filter
+                // Collect dependency paths for each scope separately to avoid non-deterministic HashMap iteration
                 if (requestedScope != null) {
                     List<ResolvedDependency> dependencies = getResolutionResult().getDependencies().get(requestedScope);
                     if (dependencies != null) {
+                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
                         dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, requestedScope.name().toLowerCase());
+                        pathsByScope.put(requestedScope.name().toLowerCase(), projectPaths);
                     }
                 } else {
-                    getResolutionResult().getDependencies().forEach((scope, dependencies) ->
-                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, scope.name().toLowerCase())
-                    );
+                    getResolutionResult().getDependencies().forEach((scope, dependencies) -> {
+                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
+                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, scope.name().toLowerCase());
+                        pathsByScope.put(scope.name().toLowerCase(), projectPaths);
+                    });
                 }
                 return super.visitDocument(document, ctx);
             }
@@ -173,6 +176,10 @@ public class DependencyInsight extends Recipe {
 
                 Scope matchScope = Scope.fromName(match.getRequested().getScope());
                 String matchScopeName = matchScope.name().toLowerCase();
+
+                // Get the paths for this specific scope
+                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths =
+                        pathsByScope.getOrDefault(matchScopeName, new HashMap<>());
 
                 // Build the dependency graph string
                 String depGraph = dependencyGraph.buildDependencyGraph(
