@@ -24,6 +24,7 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Parser;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2ParserBaseVisitor;
+import org.openrewrite.protobuf.marker.ImplicitProto2Syntax;
 import org.openrewrite.protobuf.tree.*;
 
 import java.nio.charset.Charset;
@@ -317,11 +318,26 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     @Override
     public Proto.Document visitProto(Protobuf2Parser.ProtoContext ctx) {
-        Proto.Syntax syntax = visitSyntax(ctx.syntax());
+        Proto.Syntax syntax;
+        int startIndex;
+        if (ctx.syntax() != null) {
+            syntax = visitSyntax(ctx.syntax());
+            startIndex = 1;
+        } else {
+            // Default to proto2 when syntax is omitted
+            syntax = new Proto.Syntax(
+                    randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY.add(new ImplicitProto2Syntax(randomId())),
+                    Space.EMPTY,
+                    ProtoRightPadded.build(new Proto.Constant(randomId(), Space.EMPTY, Markers.EMPTY, "proto2", "\"proto2\"")));
+            startIndex = 0;
+        }
+
         List<ProtoRightPadded<Proto>> list = new ArrayList<>();
-        // The first element is the syntax, which we've already parsed
+        // The first element is the syntax (if present), which we've already parsed
         // The last element is a "TerminalNode" which we are uninterested in
-        for (int i = 1; i < ctx.children.size() - 1; i++) {
+        for (int i = startIndex; i < ctx.children.size() - 1; i++) {
             Proto s = visit(ctx.children.get(i));
             ProtoRightPadded<Proto> protoProtoRightPadded = ProtoRightPadded.build(s).withAfter(
                     (s instanceof Proto.Empty ||
