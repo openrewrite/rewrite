@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
@@ -28,6 +29,8 @@ import org.openrewrite.table.TextMatches;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -98,7 +101,7 @@ public class Find extends Recipe {
 
     @Option(displayName = "Context size for Datatable",
             description = "The number of characters to include in the datatable before and after the match. Default `0`, " +
-                    "`-1` indicates that the whole text should be used.",
+                          "`-1` indicates that the whole text should be used.",
             required = false,
             example = "50")
     @Nullable
@@ -121,6 +124,7 @@ public class Find extends Recipe {
                     return sourceFile;
                 }
                 PlainText plainText = PlainTextParser.convert(sourceFile);
+
                 String searchStr = find;
                 if (!Boolean.TRUE.equals(regex)) {
                     searchStr = Pattern.quote(searchStr);
@@ -136,60 +140,116 @@ public class Find extends Recipe {
                     patternOptions |= Pattern.DOTALL;
                 }
                 Pattern pattern = Pattern.compile(searchStr, patternOptions);
-                Matcher matcher = pattern.matcher(plainText.getText());
-                String rawText = plainText.getText();
-                if (!matcher.find()) {
+
+                List<PlainText.Snippet> inputSnippets = ListUtils.concat(snippet(plainText.getText()), plainText.getSnippets());
+                List<PlainText.Snippet> newSnippets = new ArrayList<>();
+                boolean foundAnyMatch = false;
+                StringBuilder fullTextContext = new StringBuilder();
+
+                for (PlainText.Snippet snippet : inputSnippets) {
+                    // Skip snippets that already have a SearchResult marker - they've been processed by a previous Find
+                    if (snippet.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                        newSnippets.add(snippet);
+                        fullTextContext.append(snippet.getText());
+                        continue;
+                    }
+
+                    String snippetText = snippet.getText();
+                    Matcher matcher = pattern.matcher(snippetText);
+
+                    if (!matcher.find()) {
+                        // No match in this snippet, keep it as is
+                        newSnippets.add(snippet);
+                        fullTextContext.append(snippetText);
+                        continue;
+                    }
+
+                    foundAnyMatch = true;
+                    String sourceFilePath = sourceFile.getSourcePath().toString();
+
+                    // Calculate offset of current snippet in the full text
+                    int snippetOffset = fullTextContext.length();
+                    String fullText = fullTextContext + snippetText;
+
+                    AtomicInteger lastNewLineIndex = new AtomicInteger(-1);
+                    AtomicInteger nextNewLineIndex = new AtomicInteger(-1);
+                    AtomicBoolean isFirstMatch = new AtomicBoolean(true);
+
+                    List<PlainText.Snippet> matchedSnippets = processMatches(snippetText, matcher, sourceFilePath, ctx,
+                            (text) -> {
+                                int matchStart = matcher.start() + snippetOffset;
+                                int matchEnd = matcher.end() + snippetOffset;
+
+                                // For the first match, search backwards
+                                if (isFirstMatch.get()) {
+                                    lastNewLineIndex.set(fullText.lastIndexOf('\n', matchStart));
+                                    nextNewLineIndex.set(fullText.indexOf('\n', lastNewLineIndex.get() + 1));
+                                    isFirstMatch.set(false);
+                                } else if (nextNewLineIndex.get() != -1 && nextNewLineIndex.get() < matchStart) {
+                                    // Advance lastNewLineIndex while before match start
+                                    while (nextNewLineIndex.get() != -1 && nextNewLineIndex.get() < matchStart) {
+                                        lastNewLineIndex.set(nextNewLineIndex.get());
+                                        nextNewLineIndex.set(fullText.indexOf('\n', lastNewLineIndex.get() + 1));
+                                    }
+                                }
+
+                                int startLine = lastNewLineIndex.get() + 1;
+                                int endLine = nextNewLineIndex.get() > matchEnd ? nextNewLineIndex.get() : fullText.indexOf('\n', matchEnd);
+                                if (endLine == -1) {
+                                    endLine = fullText.length();
+                                }
+
+                                return truncateContext(endLine, startLine, matchStart, matchEnd, fullText);
+                            });
+
+                    newSnippets.addAll(matchedSnippets);
+                    fullTextContext.append(snippetText);
+                }
+
+                if (!foundAnyMatch) {
                     return sourceFile;
                 }
 
-                String sourceFilePath = sourceFile.getSourcePath().toString();
-
-                List<PlainText.Snippet> snippets = new ArrayList<>();
-                int previousEnd = 0;
-
-                int lastNewLineIndex = -1;
-                int nextNewLineIndex = -1;
-                boolean isFirstMatch = true;
-
-                do {
-                    int matchStart = matcher.start();
-                    snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
-                    String text = rawText.substring(matchStart, matcher.end());
-                    snippets.add(SearchResult.found(snippet(text), Boolean.TRUE.equals(description) ? text : null));
-                    previousEnd = matcher.end();
-
-                    // For the first match, search backwards
-                    if (isFirstMatch) {
-                        lastNewLineIndex = rawText.lastIndexOf('\n', matchStart);
-                        nextNewLineIndex = rawText.indexOf('\n', lastNewLineIndex + 1);
-                        isFirstMatch = false;
-                    } else if (nextNewLineIndex != -1 && nextNewLineIndex < matchStart) {
-                        // Advance lastNewLineIndex while before match start
-                        while (nextNewLineIndex != -1 && nextNewLineIndex < matchStart) {
-                            lastNewLineIndex = nextNewLineIndex;
-                            nextNewLineIndex = rawText.indexOf('\n', lastNewLineIndex + 1);
-                        }
-                    }
-
-                    int startLine = lastNewLineIndex + 1;
-                    int endLine = nextNewLineIndex > matcher.end() ? nextNewLineIndex : rawText.indexOf('\n', matcher.end());
-                    if (endLine == -1) {
-                        endLine = rawText.length();
-                    }
-
-                    String context = truncateContext(endLine, startLine, matcher, matchStart, rawText);
-
-                    textMatches.insertRow(ctx, new TextMatches.Row(sourceFilePath, context));
-                } while (matcher.find());
-                snippets.add(snippet(rawText.substring(previousEnd)));
-                return plainText.withText("").withSnippets(snippets);
+                return plainText.withText("").withSnippets(newSnippets);
             }
 
-            private String truncateContext(int endLine, int startLine, Matcher matcher, int matchStart, String rawText) {
-                String matchText = matcher.group();
+            /**
+             * Process all matches in the given text and create snippets with SearchResult markers.
+             *
+             * @param text The text to search within
+             * @param matcher The matcher positioned at the first match (after find() has been called)
+             * @param sourceFilePath The path to the source file (for data table)
+             * @param ctx The execution context
+             * @param contextProvider Function to generate context string for data table from matched text
+             * @return A new list of snippets with matches marked
+             */
+            private List<PlainText.Snippet> processMatches(
+                    String text, Matcher matcher, String sourceFilePath, ExecutionContext ctx,
+                    java.util.function.Function<String, String> contextProvider) {
+                List<PlainText.Snippet> snippets = new ArrayList<>();
+                int previousEnd = 0;
+                do {
+                    int matchStart = matcher.start();
+                    if (matchStart > previousEnd) {
+                        snippets.add(snippet(text.substring(previousEnd, matchStart)));
+                    }
+                    String matchedText = text.substring(matchStart, matcher.end());
+                    snippets.add(SearchResult.found(snippet(matchedText), Boolean.TRUE.equals(description) ? matchedText : null));
+                    previousEnd = matcher.end();
+                    String context = contextProvider.apply(matchedText);
+                    textMatches.insertRow(ctx, new TextMatches.Row(sourceFilePath, context));
+                } while (matcher.find());
+
+                if (previousEnd < text.length()) {
+                    snippets.add(snippet(text.substring(previousEnd)));
+                }
+                return snippets;
+            }
+
+            private String truncateContext(int endLine, int startLine, int matchStart, int matchEnd, String fullText) {
                 int contextLength = contextSize == null ? 0 : contextSize;
                 int contextStart = contextLength == -1 ? startLine : matchStart - contextLength;
-                int contextEnd = contextLength == -1 ? endLine : matchStart + matchText.length() + contextLength;
+                int contextEnd = contextLength == -1 ? endLine : matchEnd + contextLength;
 
                 StringBuilder sb = new StringBuilder();
 
@@ -197,9 +257,9 @@ public class Find extends Recipe {
                     sb.append("...");
                 }
 
-                sb.append(rawText, Math.max(contextStart, startLine), matchStart)
+                sb.append(fullText, Math.max(contextStart, startLine), matchStart)
                         .append("~~>")
-                        .append(rawText, matchStart, Math.min(contextEnd, endLine));
+                        .append(fullText, matchStart, Math.min(contextEnd, endLine));
 
                 if (contextEnd < endLine) {
                     sb.append("...");
