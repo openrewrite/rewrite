@@ -119,17 +119,17 @@ public class DependencyInsight extends Recipe {
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                // Collect all dependency paths for the document before visiting tags
+                // Collect dependency paths for scopes matching the requested scope
+                // When requestedScope is null, we collect for all scopes, but buildDependencyGraph will filter
                 if (requestedScope != null) {
                     List<ResolvedDependency> dependencies = getResolutionResult().getDependencies().get(requestedScope);
                     if (dependencies != null) {
                         dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, requestedScope.name().toLowerCase());
                     }
                 } else {
-                    // Collect paths for all scopes
-                    for (Map.Entry<Scope, List<ResolvedDependency>> entry : getResolutionResult().getDependencies().entrySet()) {
-                        dependencyGraph.collectMavenDependencyPaths(entry.getValue(), projectPaths, entry.getKey().name().toLowerCase());
-                    }
+                    getResolutionResult().getDependencies().forEach((scope, dependencies) ->
+                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, scope.name().toLowerCase())
+                    );
                 }
                 return super.visitDocument(document, ctx);
             }
