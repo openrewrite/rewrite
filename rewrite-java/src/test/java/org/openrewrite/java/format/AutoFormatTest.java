@@ -94,7 +94,7 @@ class AutoFormatTest implements RewriteTest {
                       n++;
                   }
               }
-              """, spec -> spec.afterRecipe(cu -> System.out.println(cu.print()))
+              """
           )
         );
     }
