@@ -42,7 +42,7 @@ class AutoFormatTest implements RewriteTest {
         spec
           .parser(JavaParser.fromJavaVersion().dependsOn("""
             package com.example;
-            
+
             public class MyObject {
                 public static Builder builder() { return new Builder(); }
                 public static Builder newBuilder() { return new Builder(); }
@@ -53,6 +53,9 @@ class AutoFormatTest implements RewriteTest {
                     Builder nested(MyObject nested) { return this; }
                     MyObject build() { return new MyObject(); }
                 }
+
+                public static void outerMethod(String a, String b, String c) {}
+                public static String innerMethod(String x, String y, String z) { return ""; }
             }
             """))
           .recipe(toRecipe(() -> new AutoFormatVisitor<>(null,
@@ -585,7 +588,6 @@ class AutoFormatTest implements RewriteTest {
               """,
             SourceSpec::skip),
           java(
-
             """
               @Foo
               @Foo
@@ -1782,6 +1784,383 @@ class AutoFormatTest implements RewriteTest {
                                       .collect(Collectors.toList()))
                               .name("name")
                               .build();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void recordSingleVariableDeclarationsIndented() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              record someRecord1(
+              @Foo @Foo String name) {
+              }
+              """,
+            """
+              record someRecord1(
+                      @Foo @Foo String name) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord2(
+                                   @Foo @Foo String name) {
+              }
+              """,
+            """
+              record someRecord2(
+                      @Foo @Foo String name) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord3(@Foo @Foo String name) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord4(    @Foo @Foo String name) {
+              }
+              """,
+            """
+              record someRecord4(@Foo @Foo String name) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord5(    @Foo @Foo String name
+              ) {
+              }
+              """,
+            """
+              record someRecord5(@Foo @Foo String name
+              ) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void recordMultipleVariableDeclarationsIndented() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              record someRecord1(
+              @Foo @Foo String name,
+              int age) {
+              }
+              """,
+            """
+              record someRecord1(
+                      @Foo @Foo String name,
+                      int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord2(
+                                   @Foo @Foo String name,
+                                   int age) {
+              }
+              """,
+            """
+              record someRecord2(
+                      @Foo @Foo String name,
+                      int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord3(@Foo @Foo String name, int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord4(    @Foo @Foo String name,       int age) {
+              }
+              """,
+            """
+              record someRecord4(@Foo @Foo String name, int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord5(    @Foo @Foo String name,       int age
+              ) {
+              }
+              """,
+            """
+              record someRecord5(@Foo @Foo String name, int age
+              ) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodSingleParameterIndented() {
+        rewriteRun(
+          java(
+            """
+              class Test1 {
+                  void someMethod1(
+              String name) {
+                  }
+              }
+              """,
+            """
+              class Test1 {
+                  void someMethod1(
+                          String name) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test2 {
+                  void someMethod2(
+                                       String name) {
+                  }
+              }
+              """,
+            """
+              class Test2 {
+                  void someMethod2(
+                          String name) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test3 {
+                  void someMethod3(String name) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test4 {
+                  void someMethod4(    String name) {
+                  }
+              }
+              """,
+            """
+              class Test4 {
+                  void someMethod4(String name) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test5 {
+                  void someMethod5(    String name
+                  ) {
+                  }
+              }
+              """,
+            """
+              class Test5 {
+                  void someMethod5(String name
+                  ) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodMultipleParametersIndented() {
+        rewriteRun(
+          java(
+            """
+              class Test1 {
+                  void someMethod1(
+              String name,
+              int age) {
+                  }
+              }
+              """,
+            """
+              class Test1 {
+                  void someMethod1(
+                          String name,
+                          int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test2 {
+                  void someMethod2(
+                                       String name,
+                                       int age) {
+                  }
+              }
+              """,
+            """
+              class Test2 {
+                  void someMethod2(
+                          String name,
+                          int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test3 {
+                  void someMethod3(String name, int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test4 {
+                  void someMethod4(    String name,       int age) {
+                  }
+              }
+              """,
+            """
+              class Test4 {
+                  void someMethod4(String name, int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test5 {
+                  void someMethod5(    String name,       int age
+                  ) {
+                  }
+              }
+              """,
+            """
+              class Test5 {
+                  void someMethod5(String name, int age
+                  ) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedMethodInvocationWithMultipleArguments() {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+
+              class Test1 {
+                  void test() {
+                      MyObject.outerMethod("arg1",
+                          MyObject.innerMethod("nested1", "nested2", "nested3"),
+                          "arg3");
+                  }
+              }
+              """,
+            """
+              package com.example;
+
+              class Test1 {
+                  void test() {
+                      MyObject.outerMethod("arg1",
+                              MyObject.innerMethod("nested1", "nested2", "nested3"),
+                              "arg3");
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              class Test2 {
+                  void test() {
+                      MyObject.outerMethod(
+                          "arg1",
+                          MyObject.innerMethod(
+                              "nested1",
+                              "nested2",
+                              "nested3"
+                          ),
+                          "arg3"
+                      );
+                  }
+              }
+              """,
+            """
+              package com.example;
+
+              class Test2 {
+                  void test() {
+                      MyObject.outerMethod(
+                              "arg1",
+                              MyObject.innerMethod(
+                                      "nested1",
+                                      "nested2",
+                                      "nested3"
+                              ),
+                              "arg3"
+                      );
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              class Test3 {
+                  void test() {
+                      MyObject.outerMethod("arg1", MyObject.innerMethod("nested1", "nested2", "nested3"), "arg3");
                   }
               }
               """

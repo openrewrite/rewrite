@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.openrewrite.maven.tree;
+package org.openrewrite.protobuf.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.jspecify.annotations.Nullable;
+import org.openrewrite.marker.Marker;
 
-import java.io.Serializable;
+import java.util.UUID;
 
+/**
+ * Marker to indicate that the syntax declaration was implicitly defaulted to proto2
+ * when not present in the original source file. According to the protobuf spec,
+ * if the syntax statement is omitted, the protocol compiler defaults to proto2.
+ */
 @Value
 @With
-public class GroupArtifact implements Serializable {
-    String groupId;
-    String artifactId;
-
-    public GroupArtifact(@Nullable String groupId, String artifactId) {
-        this.groupId = groupId == null ? "" : groupId;
-        this.artifactId = artifactId;
-    }
+public class ImplicitProto2Syntax implements Marker {
+    UUID id;
 }

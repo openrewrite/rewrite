@@ -16,8 +16,8 @@
 package org.openrewrite.gradle;
 
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -146,7 +146,7 @@ public class DependencyUseMapNotation extends Recipe {
         if (dependencyString == null) {
             return m;
         }
-        Dependency dependency = DependencyStringNotationConverter.parse(dependencyString);
+        Dependency dependency = DependencyNotation.parse(dependencyString);
         if (dependency == null) {
             return m;
         }
@@ -163,8 +163,8 @@ public class DependencyUseMapNotation extends Recipe {
             arguments.add(mapper.apply("classifier", dependency.getClassifier())
                     .withMarkers(arg.getMarkers()));
         }
-        if (dependency.getExt() != null) {
-            arguments.add(mapper.apply("ext", dependency.getExt())
+        if (dependency.getType() != null) {
+            arguments.add(mapper.apply("ext", dependency.getType())
                     .withMarkers(arg.getMarkers()));
         }
 

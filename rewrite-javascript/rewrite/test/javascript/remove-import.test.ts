@@ -413,4 +413,123 @@ describe('RemoveImport visitor', () => {
             );
         });
     });
+
+    describe('comment preservation', () => {
+        test('should preserve comments on subsequent lines when removing import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import fs from 'fs';
+
+                        // This comment belongs to the class below
+                        class MyClass {
+                            doSomething() {
+                                return 'test';
+                            }
+                        }
+                    `,
+                    `
+                        // This comment belongs to the class below
+                        class MyClass {
+                            doSomething() {
+                                return 'test';
+                            }
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve multiple comments after removed import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        /**
+                         * Documentation for the function
+                         * @returns {string} A test value
+                         */
+                        function example() {
+                            return 'test';
+                        }
+                    `,
+                    `
+                        /**
+                         * Documentation for the function
+                         * @returns {string} A test value
+                         */
+                        function example() {
+                            return 'test';
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve inline and subsequent comments when removing import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import fs from 'fs'; // This import is unused
+
+                        // Main application code starts here
+                        function main() {
+                            console.log('application');
+                        }
+                    `,
+                    `
+                        // Main application code starts here
+                        function main() {
+                            console.log('application');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve comments after multiple removed imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util", "isNullOrUndefined"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as DiffGenerators from './diffgenerators/export';
+                        import { isNullOrUndefined } from 'util';
+
+                        // Gets the xml files and passes them into diff generators
+                        class Foo {
+                            doSomething() {
+                                return DiffGenerators;
+                            }
+                        }
+                    `,
+                    `
+                        import * as DiffGenerators from './diffgenerators/export';
+
+                        // Gets the xml files and passes them into diff generators
+                        class Foo {
+                            doSomething() {
+                                return DiffGenerators;
+                            }
+                        }
+                    `
+                )
+            );
+        });
+    });
 });

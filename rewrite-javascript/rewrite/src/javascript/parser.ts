@@ -96,6 +96,7 @@ export class JavaScriptParser extends Parser {
             allowSyntheticDefaultImports: true,
             experimentalDecorators: true,
             emitDecoratorMetadata: true,
+            forceConsistentCasingInFileNames: false,
             jsx: ts.JsxEmit.Preserve,
             baseUrl: relativeTo || process.cwd()
         };
