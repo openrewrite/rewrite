@@ -52,4 +52,9 @@ public class TabsAndIndentsStyle implements JavaStyle {
     public Style applyDefaults() {
         return StyleHelper.merge(IntelliJ.tabsAndIndents(), this);
     }
+
+    public RecordComponents getRecordComponents() {
+        //noinspection ConstantConditions
+        return recordComponents == null ? new RecordComponents(true) : recordComponents;
+    }
 }

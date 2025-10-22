@@ -245,7 +245,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         if (elements.size() > 1) {
                             try {
                                 if ((loc == JRightPadded.Location.METHOD_DECLARATION_PARAMETER && style.getMethodDeclarationParameters().getAlignWhenMultiple()) ||
-                                        ((loc == JRightPadded.Location.RECORD_STATE_VECTOR && style.getRecordComponents() != null && style.getRecordComponents().getAlignWhenMultiple()))) {
+                                        ((loc == JRightPadded.Location.RECORD_STATE_VECTOR && style.getRecordComponents().getAlignWhenMultiple()))) {
                                     if (tree != null) {
                                         int alignTo = computeFirstParameterColumn(tree);
                                         if (alignTo != -1) {
