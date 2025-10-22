@@ -15,14 +15,11 @@
  */
 package org.openrewrite.protobuf.marker;
 
-import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.Cursor;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
-import java.util.function.UnaryOperator;
 
 /**
  * Marker to indicate that the syntax declaration was implicitly defaulted to proto2
@@ -30,14 +27,7 @@ import java.util.function.UnaryOperator;
  * if the syntax statement is omitted, the protocol compiler defaults to proto2.
  */
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
 public class ImplicitProto2Syntax implements Marker {
-    @EqualsAndHashCode.Include
     UUID id;
-
-    @Override
-    public String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
-        return "";
-    }
 }

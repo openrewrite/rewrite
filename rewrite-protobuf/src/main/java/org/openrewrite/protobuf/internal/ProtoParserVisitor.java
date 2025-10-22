@@ -325,11 +325,12 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
             startIndex = 1;
         } else {
             // Default to proto2 when syntax is omitted
-            syntax = new Proto.Syntax(randomId(), Space.EMPTY,
+            syntax = new Proto.Syntax(
+                    randomId(),
+                    Space.EMPTY,
                     Markers.EMPTY.add(new ImplicitProto2Syntax(randomId())),
                     Space.EMPTY,
-                    ProtoRightPadded.build(new Proto.Constant(randomId(), Space.EMPTY, Markers.EMPTY, "proto2", "\"proto2\""))
-                            .withAfter(Space.EMPTY));
+                    ProtoRightPadded.build(new Proto.Constant(randomId(), Space.EMPTY, Markers.EMPTY, "proto2", "\"proto2\"")));
             startIndex = 0;
         }
 
