@@ -23,13 +23,16 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
@@ -90,8 +93,14 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new NormalizeLineBreaksVisitor<>(getStyle(GeneralFormatStyle.class, cu, () -> autodetectGeneralFormatStyle(cu)), stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        return new RemoveTrailingWhitespaceVisitor<>(stopAfter)
+        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter)
                 .visitNonNull(t, p, cursor.fork());
+
+        if (t instanceof J.CompilationUnit) {
+            return addStyleMarker((JavaSourceFile) t);
+        }
+
+        return t;
     }
 
     @Override
@@ -122,10 +131,32 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(tabsAndIndentsStyle, stopAfter)
                     .visitNonNull(t, p);
 
-            return new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
+            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
                     .visitNonNull(t, p);
+
+            return addStyleMarker(t);
         }
         return (J) tree;
+    }
+
+    private JavaSourceFile addStyleMarker(JavaSourceFile t) {
+        if (!styles.isEmpty()) {
+            Set<NamedStyles> newNamedStyles = new HashSet<>(styles);
+            boolean styleAlreadyPresent = false;
+            for (NamedStyles namedStyle : t.getMarkers().findAll(NamedStyles.class)) {
+                styleAlreadyPresent = !newNamedStyles.add(namedStyle) || styleAlreadyPresent;
+            }
+            // As the order or NamedStyles matters, we cannot simply use addIfAbsent.
+            if (!styleAlreadyPresent) {
+                Markers markers = t.getMarkers().removeByType(NamedStyles.class);
+                for (NamedStyles namedStyle : newNamedStyles) {
+                    markers = markers.add(namedStyle);
+                }
+
+                return t.withMarkers(markers);
+            }
+        }
+        return t;
     }
 
     private <S extends Style> @Nullable S getStyle(Class<S> styleClass, JavaSourceFile sourceFile) {
