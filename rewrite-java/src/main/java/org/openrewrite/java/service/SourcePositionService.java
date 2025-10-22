@@ -58,13 +58,13 @@ public class SourcePositionService {
     }
 
     private boolean needsSemicolon(Statement statement) {
-        return statement instanceof J.MethodInvocation
-                || statement instanceof J.VariableDeclarations
-                || statement instanceof J.Assignment
-                || statement instanceof J.Package
-                || statement instanceof J.Return
-                || statement instanceof J.Import
-                || statement instanceof J.Assert;
+        return statement instanceof J.MethodInvocation ||
+                statement instanceof J.VariableDeclarations ||
+                statement instanceof J.Assignment ||
+                statement instanceof J.Package ||
+                statement instanceof J.Return ||
+                statement instanceof J.Import ||
+                statement instanceof J.Assert;
     }
 
     private J trimPrefix(J tree) {

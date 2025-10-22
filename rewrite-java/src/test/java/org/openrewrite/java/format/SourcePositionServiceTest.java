@@ -75,7 +75,7 @@ class SourcePositionServiceTest implements RewriteTest {
 
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if (method.getSimpleName().equals("valueOf")) {
+                  if ("valueOf".equals(method.getSimpleName())) {
                       assertThat(service.computeTreeLength(getCursor())).isEqualTo(80);
                   }
                   return super.visitMethodInvocation(method, ctx);
