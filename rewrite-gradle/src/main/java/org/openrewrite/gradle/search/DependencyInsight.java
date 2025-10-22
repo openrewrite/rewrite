@@ -135,13 +135,11 @@ public class DependencyInsight extends Recipe {
                 DependencyGraph dependencyGraph = new DependencyGraph();
                 Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
 
-                // Collect dependency paths for all configurations
-                for (GradleDependencyConfiguration c : gp.getConfigurations()) {
-                    if (!matchesConfiguration(c)) {
-                        continue;
-                    }
-                    dependencyGraph.collectGradleDependencyPaths(c.getDirectResolved(), projectPaths, c.getName());
-                }
+                // Collect dependency paths for the requested configuration
+                gp.getConfigurations().stream()
+                    .filter(c -> matchesConfiguration(c))
+                    .findFirst()
+                    .ifPresent(c -> dependencyGraph.collectGradleDependencyPaths(c.getDirectResolved(), projectPaths, c.getName()));
 
                 // configuration -> dependency which is or transitively depends on search target -> search target
                 Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = new HashMap<>();
