@@ -28,7 +28,7 @@ import static java.util.Collections.emptyList;
 @Incubating(since = "8.63.0")
 public class SourcePositionService {
 
-    public int computeTreeLength(J tree, Cursor cursor) {
+    public int computeTreeLength(Cursor cursor) {
         Object cursorValue = cursor.getValue();
         if (cursorValue instanceof J) {
             J j = (J) cursorValue;
@@ -36,18 +36,18 @@ public class SourcePositionService {
             Cursor parent = cursor.getParentTreeCursor();
             boolean isCompilationUnit = parent.getValue() instanceof J.CompilationUnit;
             if (!hasNewLine && !isCompilationUnit) {
-                return computeTreeLength(parent.getValue(), parent);
+                return computeTreeLength(parent);
             }
+
+            TreeVisitor<?, PrintOutputCapture<TreeVisitor<?, ?>>> printer = j.printer(cursor);
+            PrintOutputCapture<TreeVisitor<?, ?>> capture = new PrintOutputCapture<>(printer, PrintOutputCapture.MarkerPrinter.SANITIZED);
+
+            printer.visit(trimPrefix(j), capture, cursor.getParentOrThrow());
+
+            return capture.getOut().length() + getSuffixLength(j);
         } else {
             throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + cursorValue.getClass());
         }
-
-        TreeVisitor<?, PrintOutputCapture<TreeVisitor<?, ?>>> printer = tree.printer(cursor);
-        PrintOutputCapture<TreeVisitor<?, ?>> capture = new PrintOutputCapture<>(printer, PrintOutputCapture.MarkerPrinter.SANITIZED);
-
-        printer.visit(trimPrefix(tree), capture, cursor.getParentOrThrow());
-
-        return capture.getOut().length() + getSuffixLength(tree);
     }
 
     private int getSuffixLength(J tree) {
@@ -58,7 +58,13 @@ public class SourcePositionService {
     }
 
     private boolean needsSemicolon(Statement statement) {
-        return statement instanceof J.MethodInvocation || statement instanceof J.VariableDeclarations || statement instanceof J.Assignment || statement instanceof J.Package;
+        return statement instanceof J.MethodInvocation
+                || statement instanceof J.VariableDeclarations
+                || statement instanceof J.Assignment
+                || statement instanceof J.Package
+                || statement instanceof J.Return
+                || statement instanceof J.Import
+                || statement instanceof J.Assert;
     }
 
     private J trimPrefix(J tree) {
