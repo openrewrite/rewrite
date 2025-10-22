@@ -19,21 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.List;
-import java.util.UUID;
-
-import static java.util.Arrays.asList;
-import static java.util.Collections.emptySet;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
-import static org.openrewrite.style.LineWrapSetting.WrapAlways;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class AutoFormatTest implements RewriteTest {
 
@@ -55,22 +45,42 @@ class AutoFormatTest implements RewriteTest {
                 }
             }
             """))
-          .recipe(toRecipe(() -> new AutoFormatVisitor<>(null,
-            new NamedStyles(UUID.randomUUID(), "junit", "Unit Test style", "Only used in unit tests", emptySet(),
-              List.of(
-                new WrappingAndBracesStyle(
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, asList("builder", "newBuilder", "stream")),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap)
-                )
-              )
-              )
-          )));
+          .recipeFromYaml(
+            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.java.AutoFormatWithCustomStyle
+            displayName: Autoformat java code with custom style
+            description: Formats the code with some IntelliJ settings overwritten.
+            recipeList:
+              - org.openrewrite.java.format.AutoFormat:
+                  style: |
+                    type: specs.openrewrite.org/v1beta/style
+                    name: junit
+                    displayName: Unit Test style
+                    description: Only used in unit tests
+                    styleConfigs:
+                      - org.openrewrite.java.style.WrappingAndBracesStyle:
+                          chainedMethodCalls:
+                            wrap: WrapAlways
+                            builderMethods:
+                              - builder
+                              - newBuilder
+                              - stream
+                          classAnnotations:
+                            wrap: WrapAlways
+                          methodAnnotations:
+                            wrap: WrapAlways
+                          fieldAnnotations:
+                            wrap: WrapAlways
+                          parameterAnnotations:
+                            wrap: DoNotWrap
+                          localVariableAnnotations:
+                            wrap: DoNotWrap
+                          enumFieldAnnotations:
+                            wrap: DoNotWrap
+            """,
+            "org.openrewrite.java.AutoFormatWithCustomStyle"
+          );
     }
 
     @DocumentExample

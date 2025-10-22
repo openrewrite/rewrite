@@ -2103,7 +2103,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignBlockPrefixes() {
         rewriteRun(
-          spec -> spec.recipe(new AutoFormat()),
+          spec -> spec.recipe(new AutoFormat(null)),
           java(
             """
               public class Test {
