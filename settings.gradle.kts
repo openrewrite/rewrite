@@ -17,6 +17,7 @@ val allProjects = listOf(
     "rewrite-gradle",
     "rewrite-gradle-tooling-model:model",
     "rewrite-gradle-tooling-model:plugin",
+    "rewrite-graphql",
     "rewrite-groovy",
     "rewrite-hcl",
     "rewrite-java",
