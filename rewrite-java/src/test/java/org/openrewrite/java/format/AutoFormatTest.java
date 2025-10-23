@@ -19,21 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.List;
-import java.util.UUID;
-
-import static java.util.Arrays.asList;
-import static java.util.Collections.emptySet;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
-import static org.openrewrite.style.LineWrapSetting.WrapAlways;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class AutoFormatTest implements RewriteTest {
 
@@ -58,23 +48,30 @@ class AutoFormatTest implements RewriteTest {
                 public static String innerMethod(String x, String y, String z) { return ""; }
             }
             """))
-          .recipe(toRecipe(() -> new AutoFormatVisitor<>(null,
-            new NamedStyles(UUID.randomUUID(), "junit", "Unit Test style", "Only used in unit tests", emptySet(),
-              List.of(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, asList("builder", "newBuilder", "stream")),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap)
-                )
-              )
-              )
-          )));
+          .recipeFromYaml(
+            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.java.AutoFormatWithCustomStyle
+            displayName: Autoformat java code with custom style
+            description: Formats the code with some IntelliJ settings overwritten.
+            recipeList:
+              - org.openrewrite.java.format.AutoFormat:
+                  style: |
+                    type: specs.openrewrite.org/v1beta/style
+                    name: junit
+                    displayName: Unit Test style
+                    description: Only used in unit tests
+                    styleConfigs:
+                      - org.openrewrite.java.style.WrappingAndBracesStyle:
+                          chainedMethodCalls:
+                            wrap: WrapAlways
+                            builderMethods:
+                              - builder
+                              - newBuilder
+                              - stream
+            """,
+            "org.openrewrite.java.AutoFormatWithCustomStyle"
+          );
     }
 
     @DocumentExample
@@ -282,6 +279,11 @@ class AutoFormatTest implements RewriteTest {
               @SuppressWarnings({"ALL"})
               class Test {
               }
+              """,
+            """
+              @SuppressWarnings({"ALL"})
+              class Test {
+              }
               """
           )
         );
@@ -337,6 +339,13 @@ class AutoFormatTest implements RewriteTest {
                       @SuppressWarnings("ALL") int foo;
                   }
               }
+              """,
+            """
+              public class Test {
+                  public void doSomething() {
+                      @SuppressWarnings("ALL") int foo;
+                  }
+              }
               """
           )
         );
@@ -365,6 +374,12 @@ class AutoFormatTest implements RewriteTest {
     void annotatedVariableDeclInMethodDeclaration() {
         rewriteRun(
           java(
+            """
+              public class Test {
+                  public void doSomething(@SuppressWarnings("ALL") int foo) {
+                  }
+              }
+              """,
             """
               public class Test {
                   public void doSomething(@SuppressWarnings("ALL") int foo) {
@@ -399,6 +414,12 @@ class AutoFormatTest implements RewriteTest {
     void emptyLineBeforeEnumConstants() {
         rewriteRun(
           java(
+            """
+              public enum Status {
+                  NOT_STARTED,
+                  STARTED
+              }
+              """,
             """
               public enum Status {
                   NOT_STARTED,
@@ -517,6 +538,29 @@ class AutoFormatTest implements RewriteTest {
               record someRecord(
                       @Foo @Foo String name) {
               }
+              """,
+            """
+              @Foo
+              @Foo
+              class Test {
+                  @Foo
+                  @Foo
+                  int field;
+              
+                  @Foo
+                  @Foo
+                  void method(@Foo @Foo int param) {
+                      @Foo @Foo int localVar;
+                  }
+              }
+              
+              enum MyEnum {
+                  @Foo @Foo VALUE
+              }
+              
+              record someRecord(
+                      @Foo @Foo String name) {
+              }
               """
           )
         );
@@ -588,6 +632,22 @@ class AutoFormatTest implements RewriteTest {
               """,
             SourceSpec::skip),
           java(
+            """
+              @Foo
+              @Foo
+              final class Test {
+                  @Foo
+                  @Foo
+                  private int field;
+              
+                  @Foo
+                  @Foo
+                  public void method(
+                          @Foo @Foo final int param) {
+                      @Foo @Foo final int localVar;
+                  }
+              }
+              """,
             """
               @Foo
               @Foo
@@ -708,6 +768,29 @@ class AutoFormatTest implements RewriteTest {
                       return param;
                   }
               }
+              """,
+            """
+              @Foo
+              @Foo
+              class Test<T> {
+                  @Foo
+                  @Foo
+                  private int field;
+              
+                  @Foo
+                  @Foo
+                  Test(int field) {
+                      this.field = field;
+                  }
+              
+                  @Foo
+                  @Foo
+                  T method(
+                          @Foo @Foo T param) {
+                      @Foo @Foo T localVar;
+                      return param;
+                  }
+              }
               """
           )
         );
@@ -757,6 +840,35 @@ class AutoFormatTest implements RewriteTest {
                       return "test";
                   }
               }
+              """,
+            """
+              class Test {
+                  @Foo //comment
+                  String method1() {
+                      return "test";
+                  }
+              
+                  @Foo /* comment
+                  on multiple
+                  lines */
+                  String method2() {
+                      return "test";
+                  }
+              
+                  @Foo
+                  //comment
+                  String method3() {
+                      return "test";
+                  }
+              
+                  @Foo
+                  /* comment
+                  on multiple
+                  lines */
+                  String method4() {
+                      return "test";
+                  }
+              }
               """
           )
         );
@@ -778,6 +890,35 @@ class AutoFormatTest implements RewriteTest {
               """,
             SourceSpec::skip),
           java(
+            """
+              class Test {
+                  @Foo //comment
+                  final String method1() {
+                      return "test";
+                  }
+              
+                  @Foo /* comment
+                  on multiple
+                  lines */
+                  final String method2() {
+                      return "test";
+                  }
+              
+                  @Foo
+                  //comment
+                  final String method3() {
+                      return "test";
+                  }
+              
+                  @Foo
+                  /* comment
+                  on multiple
+                  lines */
+                  final String method4() {
+                      return "test";
+                  }
+              }
+              """,
             """
               class Test {
                   @Foo //comment
@@ -873,6 +1014,18 @@ class AutoFormatTest implements RewriteTest {
     void preserveAlreadyFormattedBuilder() {
         rewriteRun(
           java(
+            """
+              package com.example;
+              
+              class Test {
+                  void test() {
+                      MyObject obj = MyObject.builder()
+                              .name("test")
+                              .age(25)
+                              .build();
+                  }
+              }
+              """,
             """
               package com.example;
               
@@ -1131,6 +1284,16 @@ class AutoFormatTest implements RewriteTest {
     void doNotFormatNonBuilderChainedCalls() {
         rewriteRun(
           java(
+            """
+              package com.example;
+              
+              class Test {
+                  void test() {
+                      String result = "hello".toUpperCase().substring(1).trim();
+                      String sb = new StringBuilder().append("a").append("b").toString();
+                  }
+              }
+              """,
             """
               package com.example;
               
@@ -1708,6 +1871,38 @@ class AutoFormatTest implements RewriteTest {
                   static class Item {
                   }
               }
+              """,
+            """
+              package com.example;
+              
+              import java.util.Collection;
+              import java.util.Optional;
+              
+              class Test {
+                  Optional<Item> findItem(Collection<Item> collection) {
+                      return collection.stream()
+                              .filter(item -> {
+                                  if (someCondition(item)) {
+                                      return true;
+                                  } else if (otherCondition(item)) {
+                                      return true;
+                                  }
+                                  return false;
+                              })
+                              .findFirst();
+                  }
+              
+                  boolean someCondition(Item item) {
+                      return true;
+                  }
+
+                  boolean otherCondition(Item item) {
+                      return false;
+                  }
+              
+                  static class Item {
+                  }
+              }
               """
           )
         );
@@ -1834,6 +2029,10 @@ class AutoFormatTest implements RewriteTest {
             """
               record someRecord3(@Foo @Foo String name) {
               }
+              """,
+            """
+              record someRecord3(@Foo @Foo String name) {
+              }
               """
           ),
           java(
@@ -1908,6 +2107,10 @@ class AutoFormatTest implements RewriteTest {
             """
               record someRecord3(@Foo @Foo String name, int age) {
               }
+              """,
+            """
+              record someRecord3(@Foo @Foo String name, int age) {
+              }
               """
           ),
           java(
@@ -1971,6 +2174,12 @@ class AutoFormatTest implements RewriteTest {
               """
           ),
           java(
+            """
+              class Test3 {
+                  void someMethod3(String name) {
+                  }
+              }
+              """,
             """
               class Test3 {
                   void someMethod3(String name) {
@@ -2051,6 +2260,12 @@ class AutoFormatTest implements RewriteTest {
               """
           ),
           java(
+            """
+              class Test3 {
+                  void someMethod3(String name, int age) {
+                  }
+              }
+              """,
             """
               class Test3 {
                   void someMethod3(String name, int age) {
@@ -2155,6 +2370,15 @@ class AutoFormatTest implements RewriteTest {
               """
           ),
           java(
+            """
+              package com.example;
+
+              class Test3 {
+                  void test() {
+                      MyObject.outerMethod("arg1", MyObject.innerMethod("nested1", "nested2", "nested3"), "arg3");
+                  }
+              }
+              """,
             """
               package com.example;
 
