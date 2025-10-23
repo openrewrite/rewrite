@@ -35,8 +35,10 @@ export * from "./run";
 
 // register all recipes in this package
 export async function activate(registry: RecipeRegistry): Promise<void> {
-    const {OrderImports} = await import("./recipe/order-imports.js");
+    const {OrderImports} = await import("./recipe/index.js");
+    const {ModernizeOctalLiterals} = await import("./javascript/migrate/es6/index.js");
     registry.register(OrderImports);
+    registry.register(ModernizeOctalLiterals);
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
