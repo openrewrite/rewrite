@@ -1302,8 +1302,7 @@ class AutoFormatTest implements RewriteTest {
                       String result = "hello".toUpperCase()
                               .substring(1)
                               .trim();
-                      String sb = new StringBuilder()
-                              .append("a")
+                      String sb = new StringBuilder().append("a")
                               .append("b")
                               .toString();
                   }

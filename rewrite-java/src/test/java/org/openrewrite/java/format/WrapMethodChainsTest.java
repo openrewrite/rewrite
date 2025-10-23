@@ -367,8 +367,7 @@ class WrapMethodChainsTest implements RewriteTest {
                      String result = "hello".toUpperCase()
              .substring(1)
              .trim();
-                     String sb = new StringBuilder()
-             .append("a")
+                     String sb = new StringBuilder().append("a")
              .append("b")
              .toString();
                  }
@@ -1175,8 +1174,7 @@ class WrapMethodChainsTest implements RewriteTest {
               
               class Test {
                   void test() {
-                      String obj = new StringBuilder()
-              .append("test")
+                      String obj = new StringBuilder().append("test")
               .append("25")
               .toString();
                   }

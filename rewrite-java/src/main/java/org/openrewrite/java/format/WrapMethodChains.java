@@ -96,9 +96,6 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
         while (true) {
             J.MethodInvocation mi = (J.MethodInvocation) current;
             Expression select = mi.getSelect();
-            if (select instanceof J.NewClass) {
-                return select;
-            }
             if (!(select instanceof J.MethodInvocation)) {
                 return mi;
             }
