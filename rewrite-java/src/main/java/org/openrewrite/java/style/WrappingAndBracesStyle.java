@@ -29,6 +29,7 @@ import static java.util.Collections.emptyList;
 @With
 public class WrappingAndBracesStyle implements JavaStyle {
 
+    int hardWrapAt;
     IfStatement ifStatement;
     ChainedMethodCalls chainedMethodCalls;
     @Nullable Annotations classAnnotations;
