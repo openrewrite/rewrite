@@ -15,3 +15,4 @@
  */
 
 export {ModernizeOctalLiterals} from "./modernize-octal-literals";
+export {RemoveDuplicateObjectKeys} from "./remove-duplicate-object-keys";

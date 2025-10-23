@@ -520,7 +520,6 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         import * as DiffGenerators from './diffgenerators/export';
-
                         // Gets the xml files and passes them into diff generators
                         class Foo {
                             doSomething() {

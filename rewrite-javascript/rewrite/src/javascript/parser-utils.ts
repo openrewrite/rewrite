@@ -355,7 +355,7 @@ export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile
     // checking Parsing and Syntax Errors
     let syntaxErrors : [errorMsg: string, errorCode: number][] = [];
     if (diagnostics.length > 0) {
-        const errors = diagnostics.filter(d =>  (d.category === ts.DiagnosticCategory.Error) && isCriticalDiagnostic(d.code));
+        const errors = diagnostics.filter(d =>  (d.category === ts.DiagnosticCategory.Error) && isCriticalDiagnostic(d.code, sourceFile));
         if (errors.length > 0) {
             syntaxErrors = errors.map(e => {
                 let errorMsg;
@@ -385,10 +385,9 @@ const additionalCriticalCodes = new Set([
 const excludedCodes = new Set([
     1039, // Initializers are not allowed in ambient contexts.
     1064, // The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<{0}>'?
-    1101, // 'with' statements are not allowed in strict mode.
     1107, // Jump target cannot cross function boundary.
     1111, // Private field '{0}' must be declared in an enclosing class.
-    1121, // Octal literals are not allowed. Use the syntax '{0}'.
+    1117, // An object literal cannot have multiple properties with the same name.
     1155, // '{0}' declarations must be initialized.
     1166, // A computed property name in a class property declaration must have a simple literal type or a 'unique symbol' type.
     1170, // A computed property name in a type literal must refer to an expression whose type is a literal type or a 'unique symbol' type.
@@ -424,7 +423,25 @@ const excludedCodes = new Set([
     1432, // Top-level 'for await' loops are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', 'nodenext', or 'preserve', and the 'target' option is set to 'es2017' or higher.
 ]);
 
-function isCriticalDiagnostic(code: number): boolean {
+// Errors to exclude only for JavaScript files (.js, .jsx, .mjs, .cjs)
+// TypeScript files (.ts, .tsx, .mts, .cts) should still report these as errors
+const jsOnlyExcludedCodes = new Set([
+    1101, // 'with' statements are not allowed in strict mode.
+    1121, // Octal literals are not allowed. Use the syntax '{0}'.
+    1125, // Hexadecimal digit expected.
+]);
+
+function isCriticalDiagnostic(code: number, sourceFile: ts.SourceFile): boolean {
+    // Check if this error should be excluded for JavaScript files
+    if (jsOnlyExcludedCodes.has(code)) {
+        const fileName = sourceFile.fileName.toLowerCase();
+        const isJavaScript = fileName.endsWith('.js') || fileName.endsWith('.jsx') ||
+                           fileName.endsWith('.mjs') || fileName.endsWith('.cjs');
+        if (isJavaScript) {
+            return false; // Not critical for JS files
+        }
+    }
+
     return (code > 1000 && code < 2000 && !excludedCodes.has(code)) || additionalCriticalCodes.has(code);
 }
 
