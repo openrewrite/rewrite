@@ -19,21 +19,26 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
-import static org.openrewrite.style.StyleHelper.addStyleMarker;
-import static org.openrewrite.style.StyleHelper.getStyle;
 
 public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -133,5 +138,49 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             return addStyleMarker(t, styles);
         }
         return (J) tree;
+    }
+
+    @ToBeRemoved(after = "30-11-2025", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
+    private static <T extends SourceFile> T addStyleMarker(T t, List<NamedStyles> styles) {
+        if (!styles.isEmpty()) {
+            Set<NamedStyles> newNamedStyles = new HashSet<>(styles);
+            boolean styleAlreadyPresent = false;
+            for (NamedStyles namedStyle : t.getMarkers().findAll(NamedStyles.class)) {
+                styleAlreadyPresent = !newNamedStyles.add(namedStyle) || styleAlreadyPresent;
+            }
+            // As the order or NamedStyles matters, we cannot simply use addIfAbsent.
+            if (!styleAlreadyPresent) {
+                Markers markers = t.getMarkers().removeByType(NamedStyles.class);
+                for (NamedStyles namedStyle : newNamedStyles) {
+                    markers = markers.add(namedStyle);
+                }
+
+                return t.withMarkers(markers);
+            }
+        }
+        return t;
+    }
+
+    @ToBeRemoved(after = "30-11-2025", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style, T extends SourceFile> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles, T sourceFile) {
+        S projectStyle = Style.from(styleClass, sourceFile);
+        S style = NamedStyles.merge(styleClass, styles);
+        if (projectStyle == null) {
+            return style;
+        }
+        if (style != null) {
+            return StyleHelper.merge(projectStyle, style);
+        }
+        return projectStyle;
+    }
+
+    @ToBeRemoved(after = "30-11-2025", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style, T extends SourceFile> S getStyle(Class<S> styleClass, List<NamedStyles> styles, T sourceFile, Supplier<S> defaultStyle) {
+        S projectStyle = Style.from(styleClass, sourceFile, defaultStyle);
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(projectStyle, style);
+        }
+        return projectStyle;
     }
 }
