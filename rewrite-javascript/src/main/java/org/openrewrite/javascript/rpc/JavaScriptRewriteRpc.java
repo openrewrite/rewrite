@@ -39,6 +39,8 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
+
 @Getter
 public class JavaScriptRewriteRpc extends RewriteRpc {
     private static final RewriteRpcProcessManager<JavaScriptRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());
@@ -82,7 +84,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     public int installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
-                new InstallRecipesByFile(recipes),
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
                 InstallRecipesResponse.class
         ).getRecipesInstalled();
     }
@@ -116,7 +118,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private boolean traceRpcMessages;
 
         private @Nullable Integer inspectBrk;
-        private Path inspectBrkRewriteSourcePath;
+        private @Nullable Path inspectBrkRewriteSourcePath;
 
         private @Nullable Integer maxHeapSize;
         private @Nullable Path workingDirectory;
@@ -234,7 +236,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             Stream<@Nullable String> cmd;
 
             if (inspectBrk != null) {
-                Path serverJs = inspectBrkRewriteSourcePath.resolve("dist/rpc/server.js");
+                Path serverJs = requireNonNull(inspectBrkRewriteSourcePath).resolve("dist/rpc/server.js");
 
                 // We have to use node directly here because npx spawns a child node process. The
                 // IDE's debug configuration would connect to the npx process rather than the spawned
