@@ -2397,9 +2397,8 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
-
-    @Test
     @Issue("https://www.jetbrains.com/help/idea/2025.1/code-style-java.html?#chained-method-calls")
+    @Test
     void alwaysWrapBuilderMethods() {
         rewriteRun(
           spec -> spec.recipeFromYaml(
