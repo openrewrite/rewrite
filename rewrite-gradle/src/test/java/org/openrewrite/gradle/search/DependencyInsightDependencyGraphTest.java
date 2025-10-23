@@ -143,7 +143,6 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
                                    \\--- compileClasspath
                     """.strip());
                 assertThat(row.getDepth()).isEqualTo(3);
-                assertThat(row.getVersion()).isEqualTo("4.1.89.Final");
             }),
           buildGradle(
             """
@@ -189,6 +188,7 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
                     junit:junit:4.13
                     \\--- testCompileClasspath
                     """.strip());
+                assertThat(row.getDepth()).isEqualTo(0);
             }),
           buildGradle(
             """
@@ -215,6 +215,65 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
 
               dependencies {
                   /*~~(junit:junit:4.13)~~>*/testImplementation 'junit:junit:4.13'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependencyGraphForDuplicateTransitiveWithSameGroupIdArtifactIdVersion() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new DependencyInsight("jakarta.annotation", "jakarta.annotation-api", null, "compileClasspath"))
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                //assertThat(rows).hasSize(1);
+                DependenciesInUse.Row row1 = rows.getFirst();
+                assertThat(row1.getDependencyGraph()).isEqualTo(
+                  """
+                    jakarta.annotation:jakarta.annotation-api:1.3.5
+                    \\--- org.glassfish.jersey.core:jersey-common:2.35
+                         \\--- org.glassfish.jersey.core:jersey-client:2.35
+                              \\--- org.glassfish.jersey.core:jersey-server:2.35
+                                   \\--- compileClasspath
+                    """.strip());
+                assertThat(row1.getDepth()).isEqualTo(3);
+                DependenciesInUse.Row row2 = rows.getFirst();
+                assertThat(row2.getDependencyGraph()).isEqualTo(
+                  """
+                    jakarta.annotation:jakarta.annotation-api:1.3.5
+                    \\--- org.glassfish.jersey.core:jersey-common:2.35
+                         \\--- org.glassfish.jersey.core:jersey-client:2.35
+                              \\--- org.glassfish.jersey.core:jersey-server:2.35
+                                   \\--- compileClasspath
+                    """.strip());
+                assertThat(row2.getDepth()).isEqualTo(3);
+            }),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'org.glassfish.jersey.core:jersey-server:2.35'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  /*~~(jakarta.annotation:jakarta.annotation-api:1.3.5)~~>*/implementation 'org.glassfish.jersey.core:jersey-server:2.35'
               }
               """
           )

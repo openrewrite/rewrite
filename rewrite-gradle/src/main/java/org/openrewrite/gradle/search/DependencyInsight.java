@@ -37,7 +37,6 @@ import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
-import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
@@ -102,10 +101,6 @@ public class DependencyInsight extends Recipe {
         return v;
     }
 
-    private boolean matchesConfiguration(GradleDependencyConfiguration c) {
-        return configuration == null || configuration.isEmpty() || c.getName().equals(configuration);
-    }
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
@@ -131,15 +126,8 @@ public class DependencyInsight extends Recipe {
                         .map(JavaSourceSet::getName)
                         .orElse("main");
 
-                // Initialize dependency graph
                 DependencyGraph dependencyGraph = new DependencyGraph();
-                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
-
-                // Collect dependency paths for the requested configuration
-                gp.getConfigurations().stream()
-                    .filter(c -> matchesConfiguration(c))
-                    .findFirst()
-                    .ifPresent(c -> dependencyGraph.collectGradleDependencyPaths(c.getDirectResolved(), projectPaths, c.getName()));
+                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> dependencyPaths = collectDependencyPaths(gp, dependencyGraph);
 
                 // configuration -> dependency which is or transitively depends on search target -> search target
                 Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = new HashMap<>();
@@ -169,13 +157,7 @@ public class DependencyInsight extends Recipe {
                             configurationToDirectDependency.computeIfAbsent(c.getName(), EMPTY).add(requestedGav);
                             directDependencyToTargetDependency.computeIfAbsent(requestedGav, EMPTY).add(targetGav);
 
-                            // Build the dependency graph string
-                            String depGraph = dependencyGraph.buildDependencyGraph(
-                                    dep.getGav(),
-                                    projectPaths,
-                                    dep.getDepth(),
-                                    c.getName()
-                            );
+                            String depGraph = buildDependencyGraph(dependencyGraph, dep, dependencyPaths, c.getName());
 
                             dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                                     projectName,
@@ -211,6 +193,28 @@ public class DependencyInsight extends Recipe {
                     }
                 }
                 return new MarkIndividualDependency(configurationToDirectDependency, directDependencyToTargetDependency).attachMarkers(sourceFile, ctx);
+            }
+
+            private boolean matchesConfiguration(GradleDependencyConfiguration c) {
+                return configuration == null || configuration.isEmpty() || c.getName().equals(configuration);
+            }
+
+            private Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> collectDependencyPaths(GradleProject gp, DependencyGraph dependencyGraph) {
+                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> dependencyPaths = new HashMap<>();
+                gp.getConfigurations().stream()
+                        .filter(this::matchesConfiguration)
+                        .findFirst()
+                        .ifPresent(c -> dependencyGraph.collectGradleDependencyPaths(c.getDirectResolved(), dependencyPaths, c.getName()));
+                return dependencyPaths;
+            }
+
+            private String buildDependencyGraph(DependencyGraph dependencyGraph, ResolvedDependency dep, Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> dependencyPaths, String configurationName) {
+                return dependencyGraph.buildDependencyGraph(
+                        dep.getGav(),
+                        dependencyPaths,
+                        dep.getDepth(),
+                        configurationName
+                );
             }
         };
     }
