@@ -205,8 +205,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         IndentType indentType = getCursor().getParent().getNearestMessage("indentType", IndentType.ALIGN);
         if (right.getElement() instanceof J) {
             J elem = (J) right.getElement();
-            if ((right.getAfter().getLastWhitespace().contains("\n") ||
-                    elem.getPrefix().getLastWhitespace().contains("\n"))) {
+            if (right.getAfter().getLastWhitespace().contains("\n") ||
+                    elem.getPrefix().getLastWhitespace().contains("\n") ||
+                    (elem.getPrefix().getWhitespace().contains("\n") && elem.getPrefix().getComments().stream().noneMatch(c -> c.getSuffix().contains("\n")))) {
                 switch (loc) {
                     case FOR_CONDITION:
                     case FOR_UPDATE: {
