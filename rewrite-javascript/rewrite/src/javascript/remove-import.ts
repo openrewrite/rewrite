@@ -2,6 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
 import {JS} from "./tree";
 import {mapAsync} from "../util";
+import {applyRemovedElementPrefix} from "../java/formatting-utils";
 
 /**
  * @param visitor The visitor to add the import removal to
@@ -110,8 +111,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
         // Now process imports with knowledge of what's used
         return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
-            let previousWasRemoved = false;
-            let hasKeptStatement = false;
+            let removedElement: J | undefined = undefined;
 
             draft.statements = await mapAsync(compilationUnit.statements, async (stmt) => {
                 const statement = stmt.element;
@@ -121,12 +121,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     const jsImport = statement as JS.Import;
                     const result = await this.processImport(jsImport, usedIdentifiers, usedTypes, p);
                     if (result === undefined) {
-                        // Mark that we removed an import
-                        previousWasRemoved = true;
+                        // Track the removed import
+                        if (!removedElement) {
+                            removedElement = statement;
+                        }
                         return undefined;
                     }
-                    previousWasRemoved = false;
-                    hasKeptStatement = true;
+                    removedElement = undefined;
                     return {...stmt, element: result};
                 }
 
@@ -136,25 +137,24 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     const varDecl = statement as J.VariableDeclarations;
                     const result = await this.processRequireFromVarDecls(varDecl, usedIdentifiers, p);
                     if (result === undefined) {
-                        // Mark that we removed a require
-                        previousWasRemoved = true;
+                        // Track the removed require
+                        if (!removedElement) {
+                            removedElement = statement;
+                        }
                         return undefined;
                     }
-                    previousWasRemoved = false;
-                    hasKeptStatement = true;
+                    removedElement = undefined;
                     return {...stmt, element: result};
                 }
 
                 // If the previous statement was removed, adjust this statement's prefix
-                if (previousWasRemoved && statement) {
-                    previousWasRemoved = false;
-                    const updatedStatement = this.adjustPrefixAfterRemoval(statement, hasKeptStatement);
-                    hasKeptStatement = true;
+                if (removedElement && statement) {
+                    const updatedStatement = applyRemovedElementPrefix(removedElement, statement);
+                    removedElement = undefined;
                     return {...stmt, element: updatedStatement};
                 }
 
-                previousWasRemoved = false;
-                hasKeptStatement = true;
+                removedElement = undefined;
                 return stmt;
             });
 
@@ -162,53 +162,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             draft.statements = draft.statements.filter(s => s !== undefined);
             draft.eof = await this.visitSpace(compilationUnit.eof, p);
         });
-    }
-
-    /**
-     * Adjusts the prefix of a statement that follows a removed import/require.
-     * Removes the import's line while preserving comments that belong to subsequent lines.
-     *
-     * If the prefix whitespace doesn't contain a newline, the first comment was inline
-     * on the removed import line - we remove that comment and one line terminator from its suffix.
-     *
-     * @param statement The statement following the removed import
-     * @param hasKeptPreviousStatement Whether there's a previous statement that wasn't removed
-     */
-    private adjustPrefixAfterRemoval(statement: J, hasKeptPreviousStatement: boolean): J {
-        const prefix = (statement as any).prefix;
-        if (!prefix) {
-            return statement;
-        }
-
-        let whitespace = prefix.whitespace || '';
-        let comments = prefix.comments || [];
-
-        // If the whitespace before the first comment doesn't contain a line terminator,
-        // the first comment was inline on the same line as the removed import
-        if (!/[\r\n]/.test(whitespace) && comments.length > 0) {
-            // Remove the first comment (which was inline with the import)
-            comments = comments.slice(1);
-            // Clear the whitespace (it was just spacing before the inline comment)
-            whitespace = '';
-        } else if (!hasKeptPreviousStatement) {
-            // At the beginning of file - remove all leading newlines
-            // (The removed import was the first statement, so we don't want leading blank lines)
-            whitespace = whitespace.replace(/^[\r\n]+/, '');
-        }
-        // else: There's a previous kept statement and no inline comment - keep whitespace as-is
-        // (This preserves intentional blank lines between statements)
-
-        // Create a new Space with adjusted whitespace and comments
-        const newPrefix = {
-            ...prefix,
-            whitespace: whitespace,
-            comments: comments
-        };
-
-        return {
-            ...statement,
-            prefix: newPrefix
-        } as J;
     }
 
     private async processImport(
