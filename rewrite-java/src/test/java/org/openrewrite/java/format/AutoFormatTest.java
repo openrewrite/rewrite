@@ -1281,7 +1281,7 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
-    void doNotFormatNonBuilderChainedCalls() {
+    void alsoFormatNonBuilderChainedCalls() {
         rewriteRun(
           java(
             """
@@ -1299,8 +1299,13 @@ class AutoFormatTest implements RewriteTest {
               
               class Test {
                   void test() {
-                      String result = "hello".toUpperCase().substring(1).trim();
-                      String sb = new StringBuilder().append("a").append("b").toString();
+                      String result = "hello".toUpperCase()
+                              .substring(1)
+                              .trim();
+                      String sb = new StringBuilder()
+                              .append("a")
+                              .append("b")
+                              .toString();
                   }
               }
               """
@@ -2386,6 +2391,57 @@ class AutoFormatTest implements RewriteTest {
                   void test() {
                       MyObject.outerMethod("arg1", MyObject.innerMethod("nested1", "nested2", "nested3"), "arg3");
                   }
+              }
+              """
+          )
+        );
+    }
+
+
+    @Test
+    @Issue("https://www.jetbrains.com/help/idea/2025.1/code-style-java.html?#chained-method-calls")
+    void alwaysWrapBuilderMethods() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.java.NonWrappingAutoFormatWithCustomStyle
+            displayName: Autoformat java code with custom style
+            description: Formats the code with some IntelliJ settings overwritten.
+            recipeList:
+              - org.openrewrite.java.format.AutoFormat:
+                  style: |
+                    type: specs.openrewrite.org/v1beta/style
+                    name: junit
+                    displayName: Unit Test style
+                    description: Only used in unit tests
+                    styleConfigs:
+                      - org.openrewrite.java.style.WrappingAndBracesStyle:
+                          chainedMethodCalls:
+                            wrap: DoNotWrap
+                            builderMethods:
+                              - builder
+            """,
+            "org.openrewrite.java.NonWrappingAutoFormatWithCustomStyle"
+          ),
+          java(
+            """
+              package com.example;
+
+              class Test1 {
+                  private static final StringBuilder sb = new StringBuilder().append("testing long methods").append(" get wrapped").append(" and receive correct indentation");              
+                  private final MyObject value = MyObject.builder().name("hello").age(30).build();
+              }
+              """,
+            """
+              package com.example;
+
+              class Test1 {
+                  private static final StringBuilder sb = new StringBuilder().append("testing long methods").append(" get wrapped").append(" and receive correct indentation");
+                  private final MyObject value = MyObject.builder()
+                          .name("hello")
+                          .age(30)
+                          .build();
               }
               """
           )

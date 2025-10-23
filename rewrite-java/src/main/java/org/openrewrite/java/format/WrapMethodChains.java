@@ -17,7 +17,6 @@ package org.openrewrite.java.format;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -45,15 +44,14 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
 
         try {
             // styles are parent loaded, so the getters may or may not be present and they may or may not return null
-            if (style != null && style.getChainedMethodCalls() != null &&
-                    (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways || style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong)) {
+            if (style != null && style.getChainedMethodCalls() != null) {
                 List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
                         .map(name -> String.format("*..* %s(..)", name))
                         .map(MethodMatcher::new)
                         .collect(toList());
-                J.MethodInvocation chainStarter = findChainStarterInChain(m, matchers);
+                J chainStarter = findChainStarterInChain(m);
                 // If there is no chain starter in the chain, or the current method is the actual chain starter call (current chain starter call does not need newline)
-                if (chainStarter == null || chainStarter == m || m.getPadding().getSelect() == null) {
+                if (chainStarter == m || m.getPadding().getSelect() == null) {
                     return m;
                 }
 
@@ -63,22 +61,27 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                     return m;
                 }
 
-                // Not long enough to wrap
-                JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong &&
-                        (sourceFile == null || sourceFile.service(SourcePositionService.class).computeTreeLength(getCursor()) <= style.getHardWrapAt())) {
-                    return m;
-                }
+                boolean isBuilderMethod = chainStarter instanceof J.MethodInvocation && matchers.stream().anyMatch(matcher -> matcher.matches((J.MethodInvocation) chainStarter));
 
-                //Only update the whitespace, preserving comments
-                if (after.getComments().isEmpty()) {
-                    after = after.withWhitespace("\n");
-                } else {
-                    after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment == null ? null : comment.withSuffix("\n")));
-                }
-                if (after != m.getPadding().getSelect().getAfter()) {
-                    m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
-                            .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
+                if (isBuilderMethod || (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways || style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong)) {
+                    // Not long enough to wrap (always wrap builder methods)
+                    JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                    if (!isBuilderMethod &&
+                            style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong &&
+                            (sourceFile == null || sourceFile.service(SourcePositionService.class).computeTreeLength(getCursor()) <= style.getHardWrapAt())) {
+                        return m;
+                    }
+
+                    //Only update the whitespace, preserving comments
+                    if (after.getComments().isEmpty()) {
+                        after = after.withWhitespace("\n");
+                    } else {
+                        after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment == null ? null : comment.withSuffix("\n")));
+                    }
+                    if (after != m.getPadding().getSelect().getAfter()) {
+                        m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
+                                .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
+                    }
                 }
             }
         } catch (NoSuchMethodError ignore) {
@@ -88,23 +91,18 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
         return m;
     }
 
-    private J.@Nullable MethodInvocation findChainStarterInChain(J.MethodInvocation method, List<MethodMatcher> matchers) {
+    private J findChainStarterInChain(J.MethodInvocation method) {
         Expression current = method;
-        while (current instanceof J.MethodInvocation) {
+        while (true) {
             J.MethodInvocation mi = (J.MethodInvocation) current;
-            for (MethodMatcher matcher : matchers) {
-                if (matcher.matches(mi)) {
-                    return mi;
-                }
-            }
             Expression select = mi.getSelect();
+            if (select instanceof J.NewClass) {
+                return select;
+            }
             if (!(select instanceof J.MethodInvocation)) {
-                if (matchers.isEmpty()) {
-                    return method;
-                }
+                return mi;
             }
             current = select;
         }
-        return null;
     }
 }
