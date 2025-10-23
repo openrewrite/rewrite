@@ -46,11 +46,10 @@ class FindTest implements RewriteTest {
     void isFullMatch() {
         rewriteRun(
           spec -> spec.recipe(new Find("This is text.", true, true, null, null, null, null, null))
-            .dataTable(TextMatches.Row.class, rows -> {
-                  assertThat(rows)
-                    .hasSize(1)
-                    .allSatisfy(r -> assertThat(r.getMatch()).isEqualTo("~~>This is text."));
-              }),
+            .dataTable(TextMatches.Row.class, rows ->
+              assertThat(rows)
+                .hasSize(1)
+                .allSatisfy(r -> assertThat(r.getMatch()).isEqualTo("~~>This is text."))),
           text(
             """
               This is text.
@@ -309,8 +308,8 @@ class FindTest implements RewriteTest {
             .dataTable(TextMatches.Row.class, rows -> {
                 assertThat(rows).hasSize(18);
                 assertThat(rows).allSatisfy(
-                    r -> assertThat(r.getMatch()).isEqualTo("...~~>very...")
-                  );
+                  r -> assertThat(r.getMatch()).isEqualTo("...~~>very...")
+                );
             }),
           text(
             """
@@ -356,6 +355,24 @@ class FindTest implements RewriteTest {
               """,
             """
               This is a ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very long line.
+              """
+          )
+        );
+    }
+
+    @Test
+    void sequentialFinds() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new Find("foo", null, null, null, null, null, null, null),
+            new Find("bar", null, null, null, null, null, null, null)
+          ),
+          text(
+            """
+              This contains foo and bar.
+              """,
+            """
+              This contains ~~>foo and ~~>bar.
               """
           )
         );
