@@ -1060,7 +1060,26 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async preVisit(tree: J, p: P): Promise<J | undefined> {
         const ret = await super.preVisit(tree, p);
-        const indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+        let indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+
+        // Increase indent for control structures with non-block bodies
+        if (tree.kind === J.Kind.If) {
+            const ifStmt = tree as J.If;
+            if (ifStmt.thenPart.element.kind !== J.Kind.Block) {
+                indentShouldIncrease = true;
+            }
+        } else if (tree.kind === J.Kind.WhileLoop) {
+            const whileLoop = tree as J.WhileLoop;
+            if (whileLoop.body.element.kind !== J.Kind.Block) {
+                indentShouldIncrease = true;
+            }
+        } else if (tree.kind === J.Kind.ForLoop) {
+            const forLoop = tree as J.ForLoop;
+            if (forLoop.body.element.kind !== J.Kind.Block) {
+                indentShouldIncrease = true;
+            }
+        }
+
         if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
         }
@@ -1072,15 +1091,13 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (ret == undefined) {
             return ret;
         }
-        // Only apply indentation when we're explicitly in an indentation context (block or case)
-        const hasExplicitIndent = this.cursor.getNearestMessage("indentToUse") !== undefined;
         const relativeIndent = this.currentIndent;
 
         return produce(ret, draft => {
             if (draft.prefix == undefined) {
                 draft.prefix = {kind: J.Kind.Space, comments: [], whitespace: ""};
             }
-            if (hasExplicitIndent && draft.prefix.whitespace.includes("\n")) {
+            if (draft.prefix.whitespace.includes("\n")) {
                 draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
             }
             if (draft.kind === J.Kind.Block) {
@@ -1095,10 +1112,8 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (ret == undefined) {
             return ret;
         }
-        // Only apply indentation when we're explicitly in an indentation context (block or case)
-        const hasExplicitIndent = this.cursor.getNearestMessage("indentToUse") !== undefined;
         return produce(ret, draft => {
-            if (hasExplicitIndent && draft.before.whitespace.includes("\n")) {
+            if (draft.before.whitespace.includes("\n")) {
                 draft.before.whitespace = this.combineIndent(draft.before.whitespace, this.currentIndent);
             }
         });
