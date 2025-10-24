@@ -439,9 +439,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // For require() statements, check the module name from the require call
             const moduleName = this.getModuleNameFromRequire(methodInv);
             if (moduleName) {
-                const matchesTarget = this.member === undefined
-                    ? moduleName === this.target
-                    : moduleName === this.target;
+                const matchesTarget = this.member === undefined ? moduleName === this.target :
+                    moduleName === this.target;
 
                 if (matchesTarget && !usedIdentifiers.has(varName)) {
                     return undefined; // Remove the entire require statement
@@ -482,12 +481,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         const firstArg = args[0].element;
-        if (!firstArg || firstArg.kind !== J.Kind.Literal) {
+        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal).value !== 'string') {
             return undefined;
         }
 
-        const literal = firstArg as J.Literal;
-        return literal.value?.toString().replace(/['"`]/g, '');
+        return (firstArg as J.Literal).value?.toString();
     }
 
     private async processObjectBindingPattern(
