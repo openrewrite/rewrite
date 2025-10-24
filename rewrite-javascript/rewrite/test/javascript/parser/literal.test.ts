@@ -63,6 +63,23 @@ describe('Old-style octal literals (error 1121)', () => {
     });
 });
 
+describe('Old-style octal escapes (error 1487)', () => {
+    test('should parse in .js files', () => spec.rewriteRun({
+        ...javascript("'\\033[2J'"),
+        afterRecipe: (cu: JS.CompilationUnit) => {
+            expect(cu).toBeDefined();
+            expect(cu.statements).toHaveLength(1);
+            const lit = (cu.statements[0].element as JS.ExpressionStatement).expression as Literal;
+            expect(lit.valueSource).toBe("'\\033[2J'");
+            expect(lit.type).toBe(Type.Primitive.String);
+        }
+    }));
+
+    test('should NOT parse in .ts files', () => {
+        return expect(spec.rewriteRun(typescript("'\\033[2J'"))).rejects.toThrow(/Octal escape sequences are not allowed/);
+    });
+});
+
 describe('Malformed hex escape sequences (error 1125)', () => {
     test('should parse in .js files', () => spec.rewriteRun({
         ...javascript('/\\x-.*/'),
