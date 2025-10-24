@@ -2219,7 +2219,7 @@ class AutoFormatTest implements RewriteTest {
               """,
             """
               record someRecord11(@Foo @Foo String name,
-                                 int age) {
+                                  int age) {
               }
               """
           ),
@@ -2231,7 +2231,7 @@ class AutoFormatTest implements RewriteTest {
               """,
             """
               record someRecord12(@Foo @Foo String name,
-                                 int age) {
+                                  int age) {
               }
               """
           )
@@ -2504,7 +2504,7 @@ class AutoFormatTest implements RewriteTest {
             """
               class Test11 {
                   void someMethod11(String name,
-                                   int age) {
+                                    int age) {
                   }
               }
               """
@@ -2520,7 +2520,7 @@ class AutoFormatTest implements RewriteTest {
             """
               class Test12 {
                   void someMethod12(String name,
-                                   int age) {
+                                    int age) {
                   }
               }
               """
