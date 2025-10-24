@@ -412,6 +412,38 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+
+        test('should remove require from multi-variable assignment', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("underscore"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        var BinarySearchTree = require('binary-search-tree').AVLTree,
+                            model = require('./model'),
+                            _ = require('underscore'),
+                            util = require('util');
+
+                        function example() {
+                            model.save();
+                            util.inspect({});
+                        }
+                    `,
+                    `
+                        var BinarySearchTree = require('binary-search-tree').AVLTree,
+                            model = require('./model'),
+                            util = require('util');
+
+                        function example() {
+                            model.save();
+                            util.inspect({});
+                        }
+                    `
+                )
+            );
+        });
     });
 
     describe('comment preservation', () => {
