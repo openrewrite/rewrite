@@ -2142,12 +2142,70 @@ class AutoFormatTest implements RewriteTest {
           java(
             """
               record someRecord6(
-                      @Foo @Foo String name,
-                      int age) {
+                                   String name,
+                                   /* some comment */ int age) {
               }
               """,
             """
               record someRecord6(
+                      String name,
+                      /* some comment */ int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord7(
+                                   String name,
+                                   // some comment
+                                   int age) {
+              }
+              """,
+            """
+              record someRecord7(
+                      String name,
+                      // some comment
+                      int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord8(
+                                   String name, // some comment
+                                   int age) {
+              }
+              """,
+            """
+              record someRecord8(
+                      String name, // some comment
+                      int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord9(
+                                     String name,       /* some comment */ int age
+              ) {
+              }
+              """,
+            """
+              record someRecord9(
+                      String name,       /* some comment */ int age
+              ) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord10(
+                      @Foo @Foo String name,
+                      int age) {
+              }
+              """,
+            """
+              record someRecord10(
                       @Foo @Foo String name,
                       int age) {
               }
@@ -2155,24 +2213,24 @@ class AutoFormatTest implements RewriteTest {
           ),
           java(
             """
-              record someRecord7(@Foo @Foo String name,
+              record someRecord11(@Foo @Foo String name,
               int age) {
               }
               """,
             """
-              record someRecord7(@Foo @Foo String name,
+              record someRecord11(@Foo @Foo String name,
                                  int age) {
               }
               """
           ),
           java(
             """
-              record someRecord8(@Foo @Foo String name,
+              record someRecord12(@Foo @Foo String name,
                                  int age) {
               }
               """,
             """
-              record someRecord8(@Foo @Foo String name,
+              record someRecord12(@Foo @Foo String name,
                                  int age) {
               }
               """
@@ -2349,8 +2407,8 @@ class AutoFormatTest implements RewriteTest {
             """
               class Test6 {
                   void someMethod6(
-                          String name,
-                          int age) {
+                                       String name,
+                                       /* some comment */ int age) {
                   }
               }
               """,
@@ -2358,6 +2416,26 @@ class AutoFormatTest implements RewriteTest {
               class Test6 {
                   void someMethod6(
                           String name,
+                          /* some comment */ int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test7 {
+                  void someMethod7(
+                                       String name,
+                                       // some comment
+                                       int age) {
+                  }
+              }
+              """,
+            """
+              class Test7 {
+                  void someMethod7(
+                          String name,
+                          // some comment
                           int age) {
                   }
               }
@@ -2365,15 +2443,67 @@ class AutoFormatTest implements RewriteTest {
           ),
           java(
             """
-              class Test7 {
-                  void someMethod7(String name,
+              class Test8 {
+                  void someMethod8(
+                                       String name, // some comment
                                        int age) {
                   }
               }
               """,
             """
-              class Test7 {
-                  void someMethod7(String name,
+              class Test8 {
+                  void someMethod8(
+                          String name, // some comment
+                          int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test9 {
+                  void someMethod9(
+                                       String name,       /* some comment */ int age) {
+                  }
+              }
+              """,
+            """
+              class Test9 {
+                  void someMethod9(
+                          String name,       /* some comment */ int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test10 {
+                  void someMethod10(
+                          String name,
+                          int age) {
+                  }
+              }
+              """,
+            """
+              class Test10 {
+                  void someMethod10(
+                          String name,
+                          int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test11 {
+                  void someMethod11(String name,
+                                       int age) {
+                  }
+              }
+              """,
+            """
+              class Test11 {
+                  void someMethod11(String name,
                                    int age) {
                   }
               }
@@ -2381,15 +2511,15 @@ class AutoFormatTest implements RewriteTest {
           ),
           java(
             """
-              class Test8 {
-                  void someMethod8(String name,
+              class Test12 {
+                  void someMethod12(String name,
                                    int age) {
                   }
               }
               """,
             """
-              class Test8 {
-                  void someMethod8(String name,
+              class Test12 {
+                  void someMethod12(String name,
                                    int age) {
                   }
               }

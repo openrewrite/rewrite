@@ -17,3 +17,4 @@ IDE.properties
 .aider*
 /worktrees
 rewrite-gradle-tooling-model/model/src/main/resources/test-manifest.txt
+.nvmrc

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {JavaScriptVisitor, npm, packageJson, typescript} from "../../../src/javascript";
+import {JavaScriptVisitor, JS, npm, packageJson, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {withDir} from "tmp-promise";
 
@@ -34,6 +34,22 @@ describe('method mapping', () => {
                 }
             `)
         ));
+
+    test('string name', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                class Handler {
+                    'foo bar'() {
+                        // hello world comment
+                    }
+                }
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                let method = (cu.statements[0].element as J.ClassDeclaration).body.statements[0].element as J.MethodDeclaration;
+                expect(method.name.kind).toBe(J.Kind.Identifier);
+            }
+        }));
 
     test('single parameter', () =>
         spec.rewriteRun(

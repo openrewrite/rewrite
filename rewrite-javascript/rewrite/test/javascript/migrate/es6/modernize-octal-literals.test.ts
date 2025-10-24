@@ -1,4 +1,4 @@
-// noinspection TypeScriptUnresolvedReference,JSOctalInteger,JSUnusedLocalSymbols
+// noinspection TypeScriptUnresolvedReference,JSUnusedLocalSymbols
 
 /*
  * Copyright 2025 the original author or authors.
@@ -18,7 +18,7 @@
 import {describe} from "@jest/globals";
 import {RecipeSpec} from "../../../../src/test";
 import {ModernizeOctalLiterals} from "../../../../src/javascript/migrate/es6/modernize-octal-literals";
-import {typescript} from "../../../../src/javascript";
+import {javascript} from "../../../../src/javascript";
 
 describe("modernize-octal-literals", () => {
     const spec = new RecipeSpec()
@@ -26,8 +26,8 @@ describe("modernize-octal-literals", () => {
 
     test("convert octal literal", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `const permissions = 0777;`,
                 `const permissions = 0o777;`
             )
@@ -36,8 +36,8 @@ describe("modernize-octal-literals", () => {
 
     test("convert multiple octal literals", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `
                 const permissions = 0777;
                 const readable = 0444;
@@ -54,8 +54,8 @@ describe("modernize-octal-literals", () => {
 
     test("convert various octal literals", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `
                 const a = 0755;
                 const b = 0644;
@@ -74,8 +74,8 @@ describe("modernize-octal-literals", () => {
 
     test("do not convert zero", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `const zero = 0;`
             )
         )
@@ -83,8 +83,8 @@ describe("modernize-octal-literals", () => {
 
     test("do not convert hexadecimal literals", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `const hex = 0xFF;`
             )
         )
@@ -92,8 +92,8 @@ describe("modernize-octal-literals", () => {
 
     test("do not convert binary literals", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `const binary = 0b1010;`
             )
         )
@@ -101,8 +101,8 @@ describe("modernize-octal-literals", () => {
 
     test("do not convert modern octal literals", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `const modernOctal = 0o777;`
             )
         )
@@ -113,8 +113,8 @@ describe("modernize-octal-literals", () => {
 
     test("convert octal in object literal", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `const config = { mode: 0755 };`,
                 `const config = { mode: 0o755 };`
             )
@@ -123,8 +123,8 @@ describe("modernize-octal-literals", () => {
 
     test("convert octal in array", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `const modes = [0644, 0755, 0777];`,
                 `const modes = [0o644, 0o755, 0o777];`
             )
@@ -133,8 +133,8 @@ describe("modernize-octal-literals", () => {
 
     test("convert octal in function call", () => {
         return spec.rewriteRun(
-            //language=typescript
-            typescript(
+            //language=javascript
+            javascript(
                 `chmod(file, 0755);`,
                 `chmod(file, 0o755);`
             )
