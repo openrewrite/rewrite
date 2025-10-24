@@ -139,4 +139,80 @@ describe("hoist-function-declarations-from-blocks", () => {
             )
         );
     });
+
+    test("nestedBlocksUsedOutsideBoth", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                if (condition1) {
+                    if (condition2) {
+                        function helper() {
+                            return 42;
+                        }
+                    }
+                }
+                const result = helper();
+                `,
+                `
+                let helper;
+                if (condition1) {
+                    if (condition2) {
+                        helper = function() {
+                            return 42;
+                        };
+                    }
+                }
+                const result = helper();
+                `
+            )
+        );
+    });
+
+    test("nestedBlocksUsedInOuterBlock", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                if (condition1) {
+                    if (condition2) {
+                        function helper() {
+                            return 42;
+                        }
+                    }
+                    const result = helper();
+                }
+                `,
+                `
+                let helper;
+                if (condition1) {
+                    if (condition2) {
+                        helper = function() {
+                            return 42;
+                        };
+                    }
+                    const result = helper();
+                }
+                `
+            )
+        );
+    });
+
+    test("nestedBlocksUsedOnlyInInnerBlock", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                if (condition1) {
+                    if (condition2) {
+                        function helper() {
+                            return 42;
+                        }
+                        const result = helper();
+                    }
+                }
+                `
+            )
+        );
+    });
 });
