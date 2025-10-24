@@ -28,6 +28,17 @@ import {
 } from "./style";
 import {produceAsync} from "../visitor";
 
+export async function maybeAutoFormat<J2 extends J, P>(before: J2, after: J2, p: P, stopAfter?: J): Promise<J2> {
+    if (before !== after) {
+        return autoFormat(after, p, stopAfter);
+    }
+    return after;
+}
+
+export async function autoFormat<J2 extends J, P>(j: J2, p: P, stopAfter?: J): Promise<J2> {
+    return await new AutoformatVisitor().visit(j, p) as J2;
+}
+
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
         const visitors = [
