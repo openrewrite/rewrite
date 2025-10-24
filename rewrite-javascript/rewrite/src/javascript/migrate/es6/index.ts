@@ -14,5 +14,6 @@
  * limitations under the License.
  */
 
+export {HoistFunctionDeclarationsFromBlocks} from "./hoist-function-declarations-from-blocks";
 export {ModernizeOctalLiterals} from "./modernize-octal-literals";
 export {RemoveDuplicateObjectKeys} from "./remove-duplicate-object-keys";
