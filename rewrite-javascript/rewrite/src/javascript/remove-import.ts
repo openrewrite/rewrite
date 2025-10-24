@@ -108,7 +108,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         // Traverse the AST to collect used identifiers
         await this.collectUsedIdentifiers(compilationUnit, usedIdentifiers, usedTypes);
 
-
         // Now process imports with knowledge of what's used
         return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
             let removedElement: J | undefined = undefined;
@@ -154,16 +153,29 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     // Scoped variable declarations contain a variables array where each element is a single-variable J.VariableDeclarations
                     const filteredVariables: any[] = [];
                     let hasChanges = false;
+                    let removedFirstVar: J.VariableDeclarations | undefined;
 
-                    for (const v of scopedVarDecl.variables) {
+                    for (let i = 0; i < scopedVarDecl.variables.length; i++) {
+                        const v = scopedVarDecl.variables[i];
                         const varDecl = v.element;
                         if (varDecl?.kind === J.Kind.VariableDeclarations) {
                             const result = await this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, usedIdentifiers, p);
                             if (result === undefined) {
                                 // This require should be removed
                                 hasChanges = true;
+                                // If this is the first variable, save it for prefix transfer
+                                if (i === 0) {
+                                    removedFirstVar = varDecl;
+                                }
                             } else {
-                                filteredVariables.push(result === varDecl ? v : {...v, element: result});
+                                // If this is the first kept variable and we removed the original first variable,
+                                // apply proper whitespace and comment handling from the removed first variable
+                                if (filteredVariables.length === 0 && removedFirstVar) {
+                                    const formattedVarDecl = applyRemovedElementPrefix(removedFirstVar, result as J.VariableDeclarations);
+                                    filteredVariables.push({...v, element: formattedVarDecl});
+                                } else {
+                                    filteredVariables.push(result === varDecl ? v : {...v, element: result});
+                                }
                             }
                         } else {
                             filteredVariables.push(v);
@@ -692,6 +704,16 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         if (node.kind === J.Kind.Identifier) {
             const identifier = node as J.Identifier;
             usedIdentifiers.add(identifier.simpleName);
+        } else if (node.kind === J.Kind.VariableDeclarations) {
+            const varDecls = node as J.VariableDeclarations;
+            // Check the type expression on the VariableDeclarations itself
+            await this.checkTypeExpression(varDecls, usedTypes);
+            for (const v of varDecls.variables) {
+                // Check the initializer
+                if (v.element.initializer?.element) {
+                    await this.collectUsedIdentifiers(v.element.initializer.element, usedIdentifiers, usedTypes);
+                }
+            }
         } else if (node.kind === J.Kind.MethodInvocation) {
             const methodInv = node as J.MethodInvocation;
 
@@ -831,25 +853,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             }
             if (lambda.body) {
                 await this.collectUsedIdentifiers(lambda.body, usedIdentifiers, usedTypes);
-            }
-        } else if (node.kind === J.Kind.VariableDeclarations) {
-            const varDecls = node as J.VariableDeclarations;
-            // Check the type expression on the VariableDeclarations itself
-            await this.checkTypeExpression(varDecls, usedTypes);
-            for (const v of varDecls.variables) {
-                const namedVar = v.element;
-                if (namedVar) {
-                    // Check type annotation on the variable
-                    await this.checkTypeExpression(namedVar, usedTypes);
-                    // Check the variable name
-                    if (namedVar.name) {
-                        await this.collectUsedIdentifiers(namedVar.name, usedIdentifiers, usedTypes);
-                    }
-                    // Check the initializer
-                    if (namedVar.initializer && namedVar.initializer.element) {
-                        await this.collectUsedIdentifiers(namedVar.initializer.element, usedIdentifiers, usedTypes);
-                    }
-                }
             }
         } else if ((node as any).statements) {
             // Generic handler for nodes with statements

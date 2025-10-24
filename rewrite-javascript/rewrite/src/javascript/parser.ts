@@ -3018,15 +3018,15 @@ export class JavaScriptParserVisitor {
             return this.rightPadded({
                 kind: J.Kind.VariableDeclarations,
                 id: randomId(),
-                prefix: emptySpace,
+                prefix: isMulti ? this.prefix(declaration) : emptySpace,
                 markers: emptyMarkers,
                 leadingAnnotations: [],
-                modifiers: modifiers,
+                modifiers: isMulti ? [] : modifiers,
                 typeExpression: this.mapTypeInfo(declaration),
                 variables: [this.rightPadded({
                     kind: J.Kind.NamedVariable,
                     id: randomId(),
-                    prefix: this.prefix(declaration),
+                    prefix: isMulti ? emptySpace : this.prefix(declaration),
                     markers: produce(emptyMarkers, draft => {
                         if (declaration.exclamationToken) {
                             draft.markers.push({
@@ -3060,14 +3060,8 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
-                modifiers: [],
-                variables: varDecls.map((v, idx) => {
-                    return produce(v, draft => {
-                        if (idx > 0) {
-                            draft.element.modifiers = [];
-                        }
-                    });
-                })
+                modifiers: modifiers,
+                variables: varDecls
             };
         }
     }
