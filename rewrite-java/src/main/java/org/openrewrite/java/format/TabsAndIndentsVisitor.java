@@ -380,7 +380,12 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         elem = visitAndCast(elem, p);
                         if (right.getAfter().getLastWhitespace().contains("\n") && alignWhenMultiple(loc)) {
                             JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                            int alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                            int alignTo;
+                            try {
+                                alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                            } catch (UnsupportedOperationException e) {
+                                alignTo = -1;
+                            }
                             if (alignTo != -1) {
                                 after = indentTo(right.getAfter(), alignTo, loc.getAfterLocation());
                             } else {

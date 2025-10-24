@@ -92,14 +92,12 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
     }
 
     private J findChainStarterInChain(J.MethodInvocation method) {
-        Expression current = method;
-        while (true) {
-            J.MethodInvocation mi = (J.MethodInvocation) current;
-            Expression select = mi.getSelect();
-            if (!(select instanceof J.MethodInvocation)) {
-                return mi;
-            }
-            current = select;
+        J.MethodInvocation chainStarter = method;
+        Expression select = method.getSelect();
+        while (select instanceof J.MethodInvocation) {
+            chainStarter = (J.MethodInvocation) select;
+            select = chainStarter.getSelect();
         }
+        return chainStarter;
     }
 }

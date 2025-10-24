@@ -67,9 +67,8 @@ public class SourcePositionService {
                         visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
                         indentation.set(p.getOut().length());
                         return method;
-                    } else {
-                        return super.visitMethodInvocation(method, p);
                     }
+                    return super.visitMethodInvocation(method, p);
                 }
             };
             PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<TreeVisitor<?, ?>>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED) {
@@ -85,9 +84,8 @@ public class SourcePositionService {
             javaPrinter.visit(j, printLine, cursor.getParentOrThrow());
 
             return indentation.get();
-        } else {
-            throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
         }
+        throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
     }
 
     public int computeTreeLength(Cursor cursor) {
@@ -99,9 +97,8 @@ public class SourcePositionService {
             printer.visit(trimPrefix(j), capture, cursor.getParentOrThrow());
 
             return capture.getOut().length() + getSuffixLength(j);
-        } else {
-            throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
         }
+        throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
     }
 
     private int getSuffixLength(J tree) {
@@ -142,9 +139,12 @@ public class SourcePositionService {
     private @Nullable Cursor alignsWith(Cursor cursor) {
         J cursorValue = cursor.getValue();
         SourceFile sourceFile = cursor.firstEnclosing(SourceFile.class);
-        return new JavaIsoVisitor<AtomicReference<Cursor>>() {
+        if (sourceFile == null) {
+            return null;
+        }
+        return new JavaIsoVisitor<AtomicReference<@Nullable Cursor>>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicReference<Cursor> ctx) {
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicReference<@Nullable Cursor> ctx) {
                 if (ctx.get() == null) {
                     method = super.visitMethodInvocation(method, ctx);
                     if (!(method.getSelect() instanceof J.MethodInvocation) && getCursor().getPathAsStream(o -> o instanceof J.MethodInvocation).anyMatch(value -> SemanticallyEqual.areEqual((J) value, cursorValue))) {
@@ -155,14 +155,14 @@ public class SourcePositionService {
             }
 
             @Override
-            public @Nullable <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, AtomicReference<Cursor> ctx) {
+            public @Nullable <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, AtomicReference<@Nullable Cursor> ctx) {
                 if (ctx.get() == null) {
-                    if (container.getElements().stream().anyMatch(e -> e == cursorValue)) {
+                    if (container != null && container.getElements().stream().anyMatch(e -> e == cursorValue)) {
                         ctx.set(new Cursor(getCursor(), container.getElements().get(0)));
                     }
                 }
                 return super.visitContainer(container, loc, ctx);
             }
-        }.reduce(sourceFile, new AtomicReference<>(), new Cursor(cursor.getRoot(), sourceFile)).get();
+        }.reduce(sourceFile, new AtomicReference<@Nullable Cursor>(), new Cursor(cursor.getRoot(), sourceFile)).get();
     }
 }
