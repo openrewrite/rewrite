@@ -14,5 +14,6 @@
  * limitations under the License.
  */
 
+export {ModernizeOctalEscapeSequences} from "./modernize-octal-escape-sequences";
 export {ModernizeOctalLiterals} from "./modernize-octal-literals";
 export {RemoveDuplicateObjectKeys} from "./remove-duplicate-object-keys";
