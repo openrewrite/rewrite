@@ -284,4 +284,20 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     })
+
+    test("collapsed if", () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {})));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                if (504 == 436)
+                console.log("That's practically true!");
+                if (407 == 501)
+                    console.log("Also true!");
+                `)
+            // @formatter:on
+        )
+    })
 });
