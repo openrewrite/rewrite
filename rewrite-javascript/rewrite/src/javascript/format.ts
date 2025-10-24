@@ -1072,13 +1072,15 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (ret == undefined) {
             return ret;
         }
+        // Only apply indentation when we're explicitly in an indentation context (block or case)
+        const hasExplicitIndent = this.cursor.getNearestMessage("indentToUse") !== undefined;
         const relativeIndent = this.currentIndent;
 
         return produce(ret, draft => {
             if (draft.prefix == undefined) {
                 draft.prefix = {kind: J.Kind.Space, comments: [], whitespace: ""};
             }
-            if (draft.prefix.whitespace.includes("\n")) {
+            if (hasExplicitIndent && draft.prefix.whitespace.includes("\n")) {
                 draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
             }
             if (draft.kind === J.Kind.Block) {
@@ -1093,8 +1095,10 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (ret == undefined) {
             return ret;
         }
+        // Only apply indentation when we're explicitly in an indentation context (block or case)
+        const hasExplicitIndent = this.cursor.getNearestMessage("indentToUse") !== undefined;
         return produce(ret, draft => {
-            if (draft.before.whitespace.includes("\n")) {
+            if (hasExplicitIndent && draft.before.whitespace.includes("\n")) {
                 draft.before.whitespace = this.combineIndent(draft.before.whitespace, this.currentIndent);
             }
         });
