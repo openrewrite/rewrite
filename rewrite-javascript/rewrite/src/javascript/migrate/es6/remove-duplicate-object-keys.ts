@@ -86,7 +86,7 @@ export class RemoveDuplicateObjectKeys extends Recipe {
 
                     for (let i = 0; i < statements.length; i++) {
                         if (indicesToRemove.has(i)) {
-                            // Track the first removed element
+                            // Track the first removed element and its index
                             if (!removedElement && statements[i].element) {
                                 removedElement = statements[i].element;
                             }
@@ -96,8 +96,9 @@ export class RemoveDuplicateObjectKeys extends Recipe {
                         const stmt = statements[i];
 
                         // If we removed previous elements, apply the removed element's prefix to this one
+                        // Note: We never preserve comments from removed duplicate keys (unlike imports)
                         if (removedElement) {
-                            const adjustedElement = applyRemovedElementPrefix(removedElement, stmt.element);
+                            const adjustedElement = applyRemovedElementPrefix(removedElement, stmt.element, false);
                             filteredStatements.push({
                                 ...stmt,
                                 element: adjustedElement

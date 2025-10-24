@@ -111,6 +111,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         // Now process imports with knowledge of what's used
         return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
             let removedElement: J | undefined = undefined;
+            let hasKeptAnyStatement = false;
 
             draft.statements = await mapAsync(compilationUnit.statements, async (stmt) => {
                 const statement = stmt.element;
@@ -126,8 +127,17 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         }
                         return undefined;
                     }
-                    removedElement = undefined;
-                    return {...stmt, element: result};
+
+                    // If we removed previous elements, apply the removed element's prefix to this one
+                    let finalResult = result;
+                    if (removedElement) {
+                        const preserveComments = !hasKeptAnyStatement;
+                        finalResult = applyRemovedElementPrefix(removedElement, result, preserveComments) as JS.Import;
+                        removedElement = undefined;
+                    }
+
+                    hasKeptAnyStatement = true;
+                    return {...stmt, element: finalResult};
                 }
 
                 // Handle CommonJS require statements
@@ -143,8 +153,17 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         }
                         return undefined;
                     }
-                    removedElement = undefined;
-                    return {...stmt, element: result};
+
+                    // If we removed previous elements, apply the removed element's prefix to this one
+                    let finalResult = result;
+                    if (removedElement) {
+                        const preserveComments = !hasKeptAnyStatement;
+                        finalResult = applyRemovedElementPrefix(removedElement, result, preserveComments) as J.VariableDeclarations;
+                        removedElement = undefined;
+                    }
+
+                    hasKeptAnyStatement = true;
+                    return {...stmt, element: finalResult};
                 }
 
                 // Handle JS.ScopedVariableDeclarations (multi-variable var/let/const)
@@ -171,7 +190,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                                 // If this is the first kept variable and we removed the original first variable,
                                 // apply proper whitespace and comment handling from the removed first variable
                                 if (filteredVariables.length === 0 && removedFirstVar) {
-                                    const formattedVarDecl = applyRemovedElementPrefix(removedFirstVar, result as J.VariableDeclarations);
+                                    const formattedVarDecl = applyRemovedElementPrefix(removedFirstVar, result as J.VariableDeclarations, true);
                                     filteredVariables.push({...v, element: formattedVarDecl});
                                 } else {
                                     filteredVariables.push(result === varDecl ? v : {...v, element: result});
@@ -190,23 +209,31 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         return undefined;
                     }
 
-                    if (hasChanges) {
-                        // Update the scoped variable declaration with the modified variables
+                    // Determine the final element (with or without changes)
+                    let finalElement: any = hasChanges ? {...scopedVarDecl, variables: filteredVariables} : statement;
+
+                    // If we removed previous elements, apply the removed element's prefix to this one
+                    const hadRemovedElement = !!removedElement;
+                    if (removedElement) {
+                        const preserveComments = !hasKeptAnyStatement;
+                        finalElement = applyRemovedElementPrefix(removedElement, finalElement, preserveComments);
                         removedElement = undefined;
-                        return {...stmt, element: {...scopedVarDecl, variables: filteredVariables}};
                     }
 
-                    removedElement = undefined;
-                    return stmt;
+                    hasKeptAnyStatement = true;
+                    return hasChanges || hadRemovedElement ? {...stmt, element: finalElement} : stmt;
                 }
 
                 // If the previous statement was removed, adjust this statement's prefix
                 if (removedElement && statement) {
-                    const updatedStatement = applyRemovedElementPrefix(removedElement, statement);
+                    const preserveComments = !hasKeptAnyStatement;
+                    const updatedStatement = applyRemovedElementPrefix(removedElement, statement, preserveComments);
+                    hasKeptAnyStatement = true;
                     removedElement = undefined;
                     return {...stmt, element: updatedStatement};
                 }
 
+                hasKeptAnyStatement = true;
                 removedElement = undefined;
                 return stmt;
             });

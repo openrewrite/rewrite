@@ -480,6 +480,30 @@ describe('RemoveImport visitor', () => {
             );
         });
 
+        test('should preserve blank line when removing middle require statement', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const http = require('http');
+                        const util = require('util');
+
+                        describe("nographql", () => {
+                        })
+                    `,
+                    `
+                        const http = require('http');
+
+                        describe("nographql", () => {
+                        })
+                    `
+                )
+            );
+        });
+
         test('should preserve var keyword when removing first variable from multi-variable assignment', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("underscore"));
@@ -637,6 +661,7 @@ describe('RemoveImport visitor', () => {
                     `
                         import {readFile} from "fs";
                         import util = require("util");
+                        
                         console.log(util.isArray([]));
                         readFile("test.txt", () => {});
                     `
@@ -675,6 +700,7 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         import util = require("util");
+
                         console.log(util.isArray([]));
                     `
                 )
@@ -683,6 +709,78 @@ describe('RemoveImport visitor', () => {
     });
 
     describe('comment preservation', () => {
+        test('should remove trailing line comment when removing first import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import fs from 'fs'; // unused import
+                        import path from 'path';
+
+                        console.log(path.join('a', 'b'));
+                    `,
+                    `
+                        import path from 'path';
+
+                        console.log(path.join('a', 'b'));
+                    `
+                )
+            );
+        });
+
+        test('should preserve leading comment on second element when removing first import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import fs from 'fs';
+                        // This is about path
+                        import path from 'path';
+
+                        console.log(path.join('a', 'b'));
+                    `,
+                    `
+                        // This is about path
+                        import path from 'path';
+
+                        console.log(path.join('a', 'b'));
+                    `
+                )
+            );
+        });
+
+        test('should preserve file header comment when removing first import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        // Copyright 2025
+                        // File header comment
+                        import fs from 'fs';
+                        import path from 'path';
+
+                        console.log(path.join('a', 'b'));
+                    `,
+                    `
+                        // Copyright 2025
+                        // File header comment
+                        import path from 'path';
+
+                        console.log(path.join('a', 'b'));
+                    `
+                )
+            );
+        });
+
         test('should preserve comments on subsequent lines when removing import', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("fs"));
