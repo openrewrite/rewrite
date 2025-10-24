@@ -21,9 +21,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.LineWrapSetting;
 
@@ -43,7 +45,8 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
 
         try {
             // styles are parent loaded, so the getters may or may not be present and they may or may not return null
-            if (style != null && style.getChainedMethodCalls() != null && style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways) {
+            if (style != null && style.getChainedMethodCalls() != null &&
+                    (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways || style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong)) {
                 List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
                         .map(name -> String.format("*..* %s(..)", name))
                         .map(MethodMatcher::new)
@@ -57,6 +60,13 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                 Space after = m.getPadding().getSelect().getAfter();
                 //Already on a new line
                 if (after.getLastWhitespace().contains("\n")) {
+                    return m;
+                }
+
+                // Not long enough to wrap
+                JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong &&
+                        (sourceFile == null || sourceFile.service(SourcePositionService.class).computeTreeLength(getCursor()) <= style.getHardWrapAt())) {
                     return m;
                 }
 

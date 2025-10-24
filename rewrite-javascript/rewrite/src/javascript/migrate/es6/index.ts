@@ -13,14 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.rpc;
 
-import lombok.Value;
-import org.openrewrite.rpc.request.RpcRequest;
-
-import java.nio.file.Path;
-
-@Value
-class InstallRecipesByFile implements RpcRequest {
-    Path recipes;
-}
+export {ModernizeOctalEscapeSequences} from "./modernize-octal-escape-sequences";
+export {ModernizeOctalLiterals} from "./modernize-octal-literals";
+export {RemoveDuplicateObjectKeys} from "./remove-duplicate-object-keys";

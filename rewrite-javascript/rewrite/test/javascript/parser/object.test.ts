@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {javascript, typescript} from "../../../src/javascript";
 
 describe('object literal mapping', () => {
     const spec = new RecipeSpec();
@@ -29,6 +29,12 @@ describe('object literal mapping', () => {
         spec.rewriteRun(
             //language=typescript
             typescript('const c = { foo: 1 }')
+        ));
+
+    test('duplicate', () =>
+        spec.rewriteRun(
+            //language=javascript
+            javascript('const c = { foo: 1, foo: 2 }')
         ));
 
     test('multiple', () =>
