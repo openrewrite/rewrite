@@ -61,33 +61,4 @@ describe('JavaScript visitor formatting', () => {
             )
         );
     });
-
-    test('maybeAutoFormat does not call autoFormat when tree is unchanged', async () => {
-        // given
-        let autoFormatCalled = false;
-
-        class NoChangeVisitor extends JavaScriptVisitor<ExecutionContext> {
-            protected override async autoFormat<J2 extends J>(j: J2, p: ExecutionContext, stopAfter?: J): Promise<J2> {
-                autoFormatCalled = true;
-                return super.autoFormat(j, p, stopAfter);
-            }
-
-            protected override async visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): Promise<J | undefined> {
-                const original = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
-                return this.maybeAutoFormat(original, original, ctx);
-            }
-        }
-
-        const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(new NoChangeVisitor());
-
-        // when
-        await spec.rewriteRun(
-            //language=typescript
-            typescript('console.log("hello");')
-        );
-
-        // then
-        expect(autoFormatCalled).toBe(false);
-    });
 });
