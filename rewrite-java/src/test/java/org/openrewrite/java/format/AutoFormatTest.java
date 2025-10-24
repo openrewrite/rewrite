@@ -2134,6 +2134,64 @@ class AutoFormatTest implements RewriteTest {
               ) {
               }
               """
+          ),
+          java(
+            """
+              record someRecord6(
+                                   String name,
+                                   /* some comment */ int age) {
+              }
+              """,
+            """
+              record someRecord6(
+                      String name,
+                      /* some comment */ int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord7(
+                                   String name,
+                                   // some comment
+                                   int age) {
+              }
+              """,
+            """
+              record someRecord7(
+                      String name,
+                      // some comment
+                      int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord8(
+                                   String name, // some comment
+                                   int age) {
+              }
+              """,
+            """
+              record someRecord8(
+                      String name, // some comment
+                      int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord9(
+                                     String name,       /* some comment */ int age
+              ) {
+              }
+              """,
+            """
+              record someRecord9(
+                      String name,       /* some comment */ int age
+              ) {
+              }
+              """
           )
         );
     }
@@ -2299,6 +2357,78 @@ class AutoFormatTest implements RewriteTest {
               class Test5 {
                   void someMethod5(String name, int age
                   ) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test6 {
+                  void someMethod6(
+                                       String name,
+                                       /* some comment */ int age) {
+                  }
+              }
+              """,
+            """
+              class Test6 {
+                  void someMethod6(
+                          String name,
+                          /* some comment */ int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test7 {
+                  void someMethod7(
+                                       String name,
+                                       // some comment
+                                       int age) {
+                  }
+              }
+              """,
+            """
+              class Test7 {
+                  void someMethod7(
+                          String name,
+                          // some comment
+                          int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test8 {
+                  void someMethod8(
+                                       String name, // some comment
+                                       int age) {
+                  }
+              }
+              """,
+            """
+              class Test8 {
+                  void someMethod8(
+                          String name, // some comment
+                          int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test9 {
+                  void someMethod9(
+                                       String name,       /* some comment */ int age) {
+                  }
+              }
+              """,
+            """
+              class Test9 {
+                  void someMethod9(
+                          String name,       /* some comment */ int age) {
                   }
               }
               """
