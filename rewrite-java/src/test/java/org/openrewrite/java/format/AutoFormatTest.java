@@ -2138,6 +2138,44 @@ class AutoFormatTest implements RewriteTest {
               ) {
               }
               """
+          ),
+          java(
+            """
+              record someRecord6(
+                      @Foo @Foo String name,
+                      int age) {
+              }
+              """,
+            """
+              record someRecord6(
+                      @Foo @Foo String name,
+                      int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord7(@Foo @Foo String name,
+              int age) {
+              }
+              """,
+            """
+              record someRecord7(@Foo @Foo String name,
+                                 int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord8(@Foo @Foo String name,
+                                 int age) {
+              }
+              """,
+            """
+              record someRecord8(@Foo @Foo String name,
+                                 int age) {
+              }
+              """
           )
         );
     }
@@ -2306,6 +2344,56 @@ class AutoFormatTest implements RewriteTest {
                   }
               }
               """
+          ),
+          java(
+            """
+              class Test6 {
+                  void someMethod6(
+                          String name,
+                          int age) {
+                  }
+              }
+              """,
+            """
+              class Test6 {
+                  void someMethod6(
+                          String name,
+                          int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test7 {
+                  void someMethod7(String name,
+                                       int age) {
+                  }
+              }
+              """,
+            """
+              class Test7 {
+                  void someMethod7(String name,
+                                   int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test8 {
+                  void someMethod8(String name,
+                                   int age) {
+                  }
+              }
+              """,
+            """
+              class Test8 {
+                  void someMethod8(String name,
+                                   int age) {
+                  }
+              }
+              """
           )
         );
     }
@@ -2440,6 +2528,56 @@ class AutoFormatTest implements RewriteTest {
                           .name("hello")
                           .age(30)
                           .build();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alignMethodChainsWhenMultiline() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.java.AutoFormatWithCustomStyle
+            displayName: Autoformat java code with custom style
+            description: Formats the code with some IntelliJ settings overwritten.
+            recipeList:
+              - org.openrewrite.java.format.AutoFormat:
+                  style: |
+                    type: specs.openrewrite.org/v1beta/style
+                    name: junit
+                    displayName: Unit Test style
+                    description: Only used in unit tests
+                    styleConfigs:
+                      - org.openrewrite.java.style.WrappingAndBracesStyle:
+                          chainedMethodCalls:
+                            wrap: WrapAlways
+                            alignWhenMultiline: true
+            """,
+            "org.openrewrite.java.AutoFormatWithCustomStyle"
+          ),
+          java(
+            """
+              package com.example;
+
+              class Test1 {
+                  private static final StringBuilder sb = new StringBuilder().append("testing long methods").append(" get wrapped").append(" and receive correct indentation");
+                  private final MyObject value = MyObject.builder().name("hello").age(30).build();
+              }
+              """,
+            """
+              package com.example;
+
+              class Test1 {
+                  private static final StringBuilder sb = new StringBuilder().append("testing long methods")
+                                                                             .append(" get wrapped")
+                                                                             .append(" and receive correct indentation");
+                  private final MyObject value = MyObject.builder()
+                                                         .name("hello")
+                                                         .age(30)
+                                                         .build();
               }
               """
           )

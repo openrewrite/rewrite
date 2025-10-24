@@ -53,7 +53,7 @@ class WrapMethodChainsTest implements RewriteTest {
             new WrappingAndBracesStyle(
               120,
               new WrappingAndBracesStyle.IfStatement(false),
-              new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder")),
+              new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
               new WrappingAndBracesStyle.Annotations(WrapAlways),
               new WrappingAndBracesStyle.Annotations(WrapAlways),
               new WrappingAndBracesStyle.Annotations(WrapAlways),
@@ -481,7 +481,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -578,7 +578,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -651,7 +651,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -726,7 +726,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -785,7 +785,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -861,7 +861,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -923,7 +923,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -979,7 +979,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -1054,7 +1054,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -1104,7 +1104,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "stream"), false),
             null,
             null,
             null,
@@ -1152,7 +1152,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             79,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(ChopIfTooLong, Arrays.asList("builder", "stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(ChopIfTooLong, Arrays.asList("builder", "stream"), false),
             null,
             null,
             null,
@@ -1191,7 +1191,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
             length,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(ChopIfTooLong, Arrays.asList("builder", "stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(ChopIfTooLong, Arrays.asList("builder", "stream"), false),
             null,
             null,
             null,
