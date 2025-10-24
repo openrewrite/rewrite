@@ -31,6 +31,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.function.Supplier;
 
+import static java.util.Collections.emptyList;
+import static org.openrewrite.java.format.ColumnPositionCalculator.computeColumnPosition;
+
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
@@ -250,7 +253,12 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                         (loc == JRightPadded.Location.RECORD_STATE_VECTOR && style.getRecordComponents().getAlignWhenMultiple())) {
                                     if (tree != null) {
                                         JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                                        int alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                                        int alignTo;
+                                        try {
+                                            alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                                        } catch (UnsupportedOperationException e) {
+                                            alignTo = computeFirstParameterColumn(tree);
+                                        }
                                         if (alignTo != -1) {
                                             getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                             elem = visitAndCast(elem, p);
@@ -274,7 +282,12 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         } else {
                             if (elem.getPrefix().getLastWhitespace().contains("\n") && tree != null) {
                                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                                int alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                                int alignTo;
+                                try {
+                                    alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                                } catch (UnsupportedOperationException error) {
+                                    alignTo = computeFirstParameterColumn(tree);
+                                }
                                 if (alignTo != -1) {
                                     getCursor().getParentTreeCursor().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                     elem = visitAndCast(elem, p);
@@ -430,6 +443,30 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         setCursor(getCursor().getParent());
         return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
+    }
+
+    private int computeFirstParameterColumn(J tree) {
+        List<JRightPadded<Statement>> arguments;
+        if (tree instanceof J.MethodDeclaration) {
+            arguments = ((J.MethodDeclaration) tree).getPadding().getParameters().getPadding().getElements();
+        } else if (tree instanceof J.ClassDeclaration) {
+            JContainer<Statement> primaryConstructorArgs = ((J.ClassDeclaration) tree).getPadding().getPrimaryConstructor();
+            arguments = primaryConstructorArgs == null ? emptyList() : primaryConstructorArgs.getPadding().getElements();
+        } else {
+            return -1;
+        }
+        J firstArg = arguments.isEmpty() ? null : arguments.get(0).getElement();
+        if (firstArg == null || firstArg instanceof J.Empty) {
+            return -1;
+        }
+
+        if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
+            int declPrefixLength = getLengthOfWhitespace(tree.getPrefix().getLastWhitespace());
+
+            return declPrefixLength + style.getContinuationIndent();
+        } else {
+            return computeColumnPosition(tree, firstArg, getCursor());
+        }
     }
 
     @Override

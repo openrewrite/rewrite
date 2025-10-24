@@ -84,7 +84,7 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                     }
                 }
             }
-        } catch (NoSuchMethodError ignore) {
+        } catch (NoSuchMethodError | NoSuchFieldError ignore) {
             // Styles are parent-first loaded and this can happen if the style is from a older version of the runtime. Can be removed in future releases.
         }
 
