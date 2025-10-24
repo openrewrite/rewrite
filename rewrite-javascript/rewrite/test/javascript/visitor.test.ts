@@ -17,7 +17,6 @@
 import {ExecutionContext, produceAsync} from "../../src";
 import {emptySpace, Expression, J, rightPadded} from "../../src/java";
 import {JavaScriptVisitor, template, typescript} from "../../src/javascript";
-import {autoFormat, maybeAutoFormat} from "../../src/javascript/format";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 
 describe('JavaScript visitor', () => {
@@ -42,9 +41,9 @@ describe('JavaScript visitor', () => {
                 });
 
                 if (formatMethod == 'maybeAutoFormat') {
-                    return maybeAutoFormat(original, altered, ctx);
+                    return this.maybeAutoFormat(original, altered, ctx);
                 } else {
-                    return autoFormat(altered, ctx);
+                    return this.autoFormat(altered, ctx);
                 }
             }
         }
