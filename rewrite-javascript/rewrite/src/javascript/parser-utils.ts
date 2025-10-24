@@ -429,6 +429,7 @@ const jsOnlyExcludedCodes = new Set([
     1101, // 'with' statements are not allowed in strict mode.
     1121, // Octal literals are not allowed. Use the syntax '{0}'.
     1125, // Hexadecimal digit expected.
+    1487, // Octal escape sequences are not allowed. Use the syntax '{0}'.
 ]);
 
 function isCriticalDiagnostic(code: number, sourceFile: ts.SourceFile): boolean {
