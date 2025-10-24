@@ -2,7 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
 import {JS} from "./tree";
 import {mapAsync} from "../util";
-import {applyRemovedElementPrefix} from "../java/formatting-utils";
+import {ElementRemovalFormatter} from "../java/formatting-utils";
 
 /**
  * @param visitor The visitor to add the import removal to
@@ -110,8 +110,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
         // Now process imports with knowledge of what's used
         return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
-            let removedElement: J | undefined = undefined;
-            let hasKeptAnyStatement = false;
+            const formatter = new ElementRemovalFormatter<J>(true); // Preserve file headers from first import
 
             draft.statements = await mapAsync(compilationUnit.statements, async (stmt) => {
                 const statement = stmt.element;
@@ -121,22 +120,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     const jsImport = statement as JS.Import;
                     const result = await this.processImport(jsImport, usedIdentifiers, usedTypes, p);
                     if (result === undefined) {
-                        // Track the removed import
-                        if (!removedElement) {
-                            removedElement = statement;
-                        }
+                        formatter.markRemoved(statement);
                         return undefined;
                     }
 
-                    // If we removed previous elements, apply the removed element's prefix to this one
-                    let finalResult = result;
-                    if (removedElement) {
-                        const preserveComments = !hasKeptAnyStatement;
-                        finalResult = applyRemovedElementPrefix(removedElement, result, preserveComments) as JS.Import;
-                        removedElement = undefined;
-                    }
-
-                    hasKeptAnyStatement = true;
+                    const finalResult = formatter.processKept(result) as JS.Import;
                     return {...stmt, element: finalResult};
                 }
 
@@ -147,22 +135,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     const varDecl = statement as J.VariableDeclarations;
                     const result = await this.processRequireFromVarDecls(varDecl, usedIdentifiers, p);
                     if (result === undefined) {
-                        // Track the removed require
-                        if (!removedElement) {
-                            removedElement = statement;
-                        }
+                        formatter.markRemoved(statement);
                         return undefined;
                     }
 
-                    // If we removed previous elements, apply the removed element's prefix to this one
-                    let finalResult = result;
-                    if (removedElement) {
-                        const preserveComments = !hasKeptAnyStatement;
-                        finalResult = applyRemovedElementPrefix(removedElement, result, preserveComments) as J.VariableDeclarations;
-                        removedElement = undefined;
-                    }
-
-                    hasKeptAnyStatement = true;
+                    const finalResult = formatter.processKept(result) as J.VariableDeclarations;
                     return {...stmt, element: finalResult};
                 }
 
@@ -172,29 +149,18 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     // Scoped variable declarations contain a variables array where each element is a single-variable J.VariableDeclarations
                     const filteredVariables: any[] = [];
                     let hasChanges = false;
-                    let removedFirstVar: J.VariableDeclarations | undefined;
+                    const varFormatter = new ElementRemovalFormatter<J.VariableDeclarations>(true); // Preserve file headers
 
-                    for (let i = 0; i < scopedVarDecl.variables.length; i++) {
-                        const v = scopedVarDecl.variables[i];
+                    for (const v of scopedVarDecl.variables) {
                         const varDecl = v.element;
                         if (varDecl?.kind === J.Kind.VariableDeclarations) {
                             const result = await this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, usedIdentifiers, p);
                             if (result === undefined) {
-                                // This require should be removed
                                 hasChanges = true;
-                                // If this is the first variable, save it for prefix transfer
-                                if (i === 0) {
-                                    removedFirstVar = varDecl;
-                                }
+                                varFormatter.markRemoved(varDecl);
                             } else {
-                                // If this is the first kept variable and we removed the original first variable,
-                                // apply proper whitespace and comment handling from the removed first variable
-                                if (filteredVariables.length === 0 && removedFirstVar) {
-                                    const formattedVarDecl = applyRemovedElementPrefix(removedFirstVar, result as J.VariableDeclarations, true);
-                                    filteredVariables.push({...v, element: formattedVarDecl});
-                                } else {
-                                    filteredVariables.push(result === varDecl ? v : {...v, element: result});
-                                }
+                                const formattedVarDecl = varFormatter.processKept(result as J.VariableDeclarations);
+                                filteredVariables.push({...v, element: formattedVarDecl});
                             }
                         } else {
                             filteredVariables.push(v);
@@ -202,39 +168,23 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     }
 
                     if (filteredVariables.length === 0) {
-                        // Remove the entire scoped variable declaration
-                        if (!removedElement) {
-                            removedElement = statement;
-                        }
+                        formatter.markRemoved(statement);
                         return undefined;
                     }
 
-                    // Determine the final element (with or without changes)
-                    let finalElement: any = hasChanges ? {...scopedVarDecl, variables: filteredVariables} : statement;
+                    const finalElement: any = hasChanges
+                        ? formatter.processKept({...scopedVarDecl, variables: filteredVariables})
+                        : formatter.processKept(statement);
 
-                    // If we removed previous elements, apply the removed element's prefix to this one
-                    const hadRemovedElement = !!removedElement;
-                    if (removedElement) {
-                        const preserveComments = !hasKeptAnyStatement;
-                        finalElement = applyRemovedElementPrefix(removedElement, finalElement, preserveComments);
-                        removedElement = undefined;
-                    }
-
-                    hasKeptAnyStatement = true;
-                    return hasChanges || hadRemovedElement ? {...stmt, element: finalElement} : stmt;
+                    return {...stmt, element: finalElement};
                 }
 
-                // If the previous statement was removed, adjust this statement's prefix
-                if (removedElement && statement) {
-                    const preserveComments = !hasKeptAnyStatement;
-                    const updatedStatement = applyRemovedElementPrefix(removedElement, statement, preserveComments);
-                    hasKeptAnyStatement = true;
-                    removedElement = undefined;
-                    return {...stmt, element: updatedStatement};
+                // For any other statement type, apply prefix from removed elements
+                if (statement) {
+                    const finalStatement = formatter.processKept(statement);
+                    return {...stmt, element: finalStatement};
                 }
 
-                hasKeptAnyStatement = true;
-                removedElement = undefined;
                 return stmt;
             });
 

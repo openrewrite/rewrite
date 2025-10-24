@@ -18,6 +18,70 @@ import {J} from "../java";
 import {produce} from "immer";
 
 /**
+ * Handles element removal from lists while preserving LST formatting.
+ * Automatically applies prefixes from removed elements to the next kept element,
+ * handling whitespace and comment preservation.
+ *
+ * @example
+ * const formatter = new ElementRemovalFormatter<J>();
+ *
+ * for (const stmt of statements) {
+ *     if (shouldRemove(stmt)) {
+ *         formatter.markRemoved(stmt.element);
+ *         continue;
+ *     }
+ *     const adjusted = formatter.processKept(stmt.element);
+ *     filteredList.push({...stmt, element: adjusted});
+ * }
+ *
+ * if (formatter.hasRemovals) {
+ *     // Apply the filtered list
+ * }
+ */
+export class ElementRemovalFormatter<T extends J> {
+    private lastRemoved?: T;
+    private keptCount = 0;
+    private removedCount = 0;
+
+    /**
+     * @param preserveFirstElementComments Whether to preserve comments from the first removed element.
+     *        Set to true for imports (to preserve file headers). Defaults to false.
+     */
+    constructor(private readonly preserveFirstElementComments: boolean = false) {}
+
+    /**
+     * Returns true if any elements have been marked as removed.
+     */
+    get hasRemovals(): boolean {
+        return this.removedCount > 0;
+    }
+
+    /**
+     * Mark an element as removed. Only the first consecutive removed element is tracked.
+     */
+    markRemoved(elem: T): void {
+        this.lastRemoved ??= elem;
+        this.removedCount++;
+    }
+
+    /**
+     * Process a kept element, applying prefix from any previously removed element if needed.
+     */
+    processKept(elem: T): T {
+        if (!this.lastRemoved) {
+            this.keptCount++;
+            return elem;
+        }
+
+        const preserveComments = this.preserveFirstElementComments && this.keptCount === 0;
+        const adjusted = applyRemovedElementPrefix(this.lastRemoved, elem, preserveComments);
+        this.lastRemoved = undefined;
+        this.keptCount++;
+        return adjusted;
+    }
+}
+
+/**
  * Applies the prefix from a removed element to the next element.
  *
  * This is used when removing elements from a list to preserve formatting:
@@ -31,7 +95,7 @@ import {produce} from "immer";
  * @param preserveRemovedComments Whether to preserve leading comments from removed element (default: false)
  * @returns The next element with adjusted prefix, or the original if no changes needed
  */
-export function applyRemovedElementPrefix<T extends J>(removedElement: J, nextElement: T, preserveRemovedComments: boolean = false): T {
+function applyRemovedElementPrefix<T extends J>(removedElement: J, nextElement: T, preserveRemovedComments: boolean = false): T {
     if (!removedElement.prefix || !nextElement.prefix) {
         return nextElement;
     }
