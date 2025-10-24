@@ -223,6 +223,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         usedTypes: Set<string>,
         p: P
     ): Promise<JS.Import | undefined> {
+        // Handle import-equals-require syntax: import util = require("util");
+        if (jsImport.initializer) {
+            return this.processImportEqualsRequire(jsImport, usedIdentifiers, usedTypes, p);
+        }
+
         // Check if this import is from the target module
         if (!this.isTargetModule(jsImport)) {
             return jsImport;
@@ -350,6 +355,79 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         return jsImport;
     }
 
+    /**
+     * Process TypeScript import-equals-require syntax: import util = require("util");
+     * This is represented as a JS.Import with an initializer containing the require() call.
+     */
+    private async processImportEqualsRequire(
+        jsImport: JS.Import,
+        usedIdentifiers: Set<string>,
+        usedTypes: Set<string>,
+        p: P
+    ): Promise<JS.Import | undefined> {
+        const initializer = jsImport.initializer?.element;
+        if (!initializer || !this.isRequireCall(initializer)) {
+            return jsImport;
+        }
+
+        const methodInv = initializer as J.MethodInvocation;
+        const moduleName = this.getModuleNameFromRequire(methodInv);
+        if (!moduleName || !this.matchesTargetModule(moduleName)) {
+            return jsImport;
+        }
+
+        // Get the import name from the importClause
+        const importClause = jsImport.importClause;
+        if (!importClause || !importClause.name) {
+            // No name, this is unusual for import-equals-require
+            return jsImport;
+        }
+
+        const importedName = (importClause.name.element as J.Identifier).simpleName;
+
+        // For import-equals-require, we can only remove the entire import since
+        // it imports the whole module as a single identifier
+        if (this.shouldRemoveIdentifier(importedName, usedIdentifiers, usedTypes)) {
+            return undefined;
+        }
+
+        return jsImport;
+    }
+
+    /**
+     * Check if a node is a require() method invocation
+     */
+    private isRequireCall(node: J): boolean {
+        if (node.kind !== J.Kind.MethodInvocation) {
+            return false;
+        }
+        const methodInv = node as J.MethodInvocation;
+        return methodInv.name?.kind === J.Kind.Identifier &&
+               (methodInv.name as J.Identifier).simpleName === 'require';
+    }
+
+    /**
+     * Check if the module name matches the target module
+     */
+    private matchesTargetModule(moduleName: string): boolean {
+        return this.member === undefined ? moduleName === this.target : moduleName === this.target;
+    }
+
+    /**
+     * Check if an identifier should be removed based on usage
+     */
+    private shouldRemoveIdentifier(name: string, usedIdentifiers: Set<string>, usedTypes: Set<string>): boolean {
+        // If member is specified, we're removing a specific member
+        if (this.member !== undefined) {
+            // Only remove if the identifier is not used
+            return !usedIdentifiers.has(name) && !usedTypes.has(name);
+        } else {
+            // We're removing based on the target name
+            // Check if the name matches and is not used
+            return this.target === name && !usedIdentifiers.has(name) && !usedTypes.has(name);
+        }
+    }
+
     private async processNamedImports(
         namedImports: JS.NamedImports,
         usedIdentifiers: Set<string>,
@@ -429,14 +507,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         const initializer = namedVar.initializer?.element;
-        if (!initializer || initializer.kind !== J.Kind.MethodInvocation) {
+        if (!initializer || !this.isRequireCall(initializer)) {
             return varDecls;
         }
 
         const methodInv = initializer as J.MethodInvocation;
-        if (methodInv.name?.kind !== J.Kind.Identifier || (methodInv.name as J.Identifier).simpleName !== 'require') {
-            return varDecls;
-        }
 
         // This is a require() statement
         const pattern = namedVar.name;
@@ -450,13 +525,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
             // For require() statements, check the module name from the require call
             const moduleName = this.getModuleNameFromRequire(methodInv);
-            if (moduleName) {
-                const matchesTarget = this.member === undefined ? moduleName === this.target :
-                    moduleName === this.target;
-
-                if (matchesTarget && !usedIdentifiers.has(varName)) {
-                    return undefined; // Remove the entire require statement
-                }
+            if (moduleName && this.matchesTargetModule(moduleName) && !usedIdentifiers.has(varName)) {
+                return undefined; // Remove the entire require statement
             }
         }
 
@@ -820,6 +890,18 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             if (method.body) {
                 await this.collectUsedIdentifiers(method.body, usedIdentifiers, usedTypes);
             }
+        } else if (node.kind === JS.Kind.TypeOf) {
+            // Handle typeof expressions like: typeof util
+            const typeOf = node as JS.TypeOf;
+            if (typeOf.expression) {
+                await this.collectUsedIdentifiers(typeOf.expression, usedIdentifiers, usedTypes);
+            }
+        } else if (node.kind === JS.Kind.TypeQuery) {
+            // Handle typeof type queries like: const x: typeof util
+            const typeQuery = node as JS.TypeQuery;
+            if (typeQuery.typeExpression) {
+                await this.collectUsedIdentifiers(typeQuery.typeExpression, usedIdentifiers, usedTypes);
+            }
         } else if ((node as any).typeExpression) {
             // Handle nodes with type expressions (parameters, variables, etc.)
             await this.checkTypeExpression(node, usedTypes);
@@ -882,6 +964,24 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     if (typeParam.element) {
                         await this.collectTypeUsage(typeParam.element, usedTypes);
                     }
+                }
+            }
+        } else if (typeExpr.kind === JS.Kind.TypeQuery) {
+            // Handle typeof type queries like: const x: typeof util
+            const typeQuery = typeExpr as JS.TypeQuery;
+            if (typeQuery.typeExpression) {
+                await this.collectTypeUsage(typeQuery.typeExpression, usedTypes);
+            }
+        } else if (typeExpr.kind === JS.Kind.TypeOf) {
+            // Handle typeof expressions in types
+            const typeOf = typeExpr as JS.TypeOf;
+            if (typeOf.expression) {
+                // For typeof expressions, the expression contains the identifier
+                // Add it to usedTypes since it's used in a type context
+                if (typeOf.expression.kind === J.Kind.Identifier) {
+                    usedTypes.add((typeOf.expression as J.Identifier).simpleName);
+                } else {
+                    await this.collectTypeUsage(typeOf.expression, usedTypes);
                 }
             }
         } else if (typeExpr.kind === JS.Kind.TypeTreeExpression) {

@@ -511,6 +511,177 @@ describe('RemoveImport visitor', () => {
         });
     });
 
+    describe('import-equals-require syntax', () => {
+        test('should remove unused import-equals-require', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import util = require("util");
+
+                        console.log("no util usage");
+                    `,
+                    `
+                        console.log("no util usage");
+                    `
+                )
+            );
+        });
+
+        test('should not remove used import-equals-require', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import util = require("util");
+
+                        console.log(util.isArray([]));
+                    `
+                )
+            );
+        });
+
+        test('should remove unused import-equals-require with member specified', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import util = require("util");
+
+                        console.log("no util usage");
+                    `,
+                    `
+                        console.log("no util usage");
+                    `
+                )
+            );
+        });
+
+        test('should remove unused import-equals-require from multiple imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import util = require("util");
+                        import fs = require("fs");
+                        import path = require("path");
+
+                        console.log(util.isArray([]));
+                        console.log(path.join("a", "b"));
+                    `,
+                    `
+                        import util = require("util");
+                        import path = require("path");
+
+                        console.log(util.isArray([]));
+                        console.log(path.join("a", "b"));
+                    `
+                )
+            );
+        });
+
+        test('should preserve comments when removing import-equals-require', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import util = require("util");
+                        // This is a comment about fs
+                        import fs = require("fs");
+                        import path = require("path");
+
+                        console.log(util.isArray([]));
+                        console.log(path.join("a", "b"));
+                    `,
+                    `
+                        import util = require("util");
+                        import path = require("path");
+
+                        console.log(util.isArray([]));
+                        console.log(path.join("a", "b"));
+                    `
+                )
+            );
+        });
+
+        test('should remove import-equals-require while keeping ES6 imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from "fs";
+                        import util = require("util");
+                        import fs = require("fs");
+
+                        console.log(util.isArray([]));
+                        readFile("test.txt", () => {});
+                    `,
+                    `
+                        import {readFile} from "fs";
+                        import util = require("util");
+                        console.log(util.isArray([]));
+                        readFile("test.txt", () => {});
+                    `
+                )
+            );
+        });
+
+        test('should not remove import-equals-require used as type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import util = require("util");
+
+                        const x: typeof util = {} as any;
+                    `
+                )
+            );
+        });
+
+        test('should remove import-equals-require used in member access', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("path"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import util = require("util");
+                        import path = require("path");
+
+                        console.log(util.isArray([]));
+                    `,
+                    `
+                        import util = require("util");
+                        console.log(util.isArray([]));
+                    `
+                )
+            );
+        });
+    });
+
     describe('comment preservation', () => {
         test('should preserve comments on subsequent lines when removing import', async () => {
             const spec = new RecipeSpec();
