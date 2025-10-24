@@ -444,6 +444,71 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+
+        test('should not remove require from multi-variable assignment if it is used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        var util = require('util'),
+                            _ = require('underscore');
+
+                        function example() {
+                            return util.promisify(fs.readFile);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not remove import when used in initializer of typed variable', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as util from 'util';
+
+                        const eachLine: any = util.promisify(LineReader.eachLine);
+                    `
+                )
+            );
+        });
+
+        test('should preserve var keyword when removing first variable from multi-variable assignment', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("underscore"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        var _ = require('underscore'),
+                            model = require('./model'),
+                            util = require('util');
+
+                        function example() {
+                            model.save();
+                            util.inspect({});
+                        }
+                    `,
+                    `
+                        var model = require('./model'),
+                            util = require('util');
+
+                        function example() {
+                            model.save();
+                            util.inspect({});
+                        }
+                    `
+                )
+            );
+        });
     });
 
     describe('comment preservation', () => {

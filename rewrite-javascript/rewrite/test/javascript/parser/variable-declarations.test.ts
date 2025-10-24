@@ -64,6 +64,54 @@ describe('variable declaration mapping', () => {
             typescript('let a=2, b=2 ')
         ));
 
+    test('multi variable declaration AST structure', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                var a = 1,
+                    b = 2,
+                    c = 3;
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                expect(cu).toBeDefined();
+                expect(cu.statements).toHaveLength(1);
+
+                const stmt = cu.statements[0];
+                expect(stmt.element.kind).toBe(JS.Kind.ScopedVariableDeclarations);
+
+                const scopedVarDecl = stmt.element as JS.ScopedVariableDeclarations;
+
+                // Modifiers (var/let/const) should be on the ScopedVariableDeclarations
+                expect(scopedVarDecl.modifiers).toHaveLength(1);
+                expect(scopedVarDecl.modifiers[0].keyword).toBe('var');
+
+                // Should have 3 variable declarations
+                expect(scopedVarDecl.variables).toHaveLength(3);
+
+                // First variable: prefix should have whitespace (space after 'var'), no modifiers
+                const firstVar = scopedVarDecl.variables[0].element as J.VariableDeclarations;
+                expect(firstVar.kind).toBe(J.Kind.VariableDeclarations);
+                expect(firstVar.modifiers).toHaveLength(0); // No modifiers on individual variables
+                expect(firstVar.prefix.whitespace).toBe(' '); // Space after 'var'
+                expect(firstVar.variables).toHaveLength(1);
+                expect(firstVar.variables[0].element.prefix.whitespace).toBe(''); // NamedVariable has empty prefix
+
+                // Second variable: prefix should have newline + indentation, no modifiers
+                const secondVar = scopedVarDecl.variables[1].element as J.VariableDeclarations;
+                expect(secondVar.kind).toBe(J.Kind.VariableDeclarations);
+                expect(secondVar.modifiers).toHaveLength(0);
+                expect(secondVar.prefix.whitespace).toMatch(/\n\s+/); // Newline + spaces
+                expect(secondVar.variables[0].element.prefix.whitespace).toBe(''); // NamedVariable has empty prefix
+
+                // Third variable: similar to second
+                const thirdVar = scopedVarDecl.variables[2].element as J.VariableDeclarations;
+                expect(thirdVar.kind).toBe(J.Kind.VariableDeclarations);
+                expect(thirdVar.modifiers).toHaveLength(0);
+                expect(thirdVar.prefix.whitespace).toMatch(/\n\s+/);
+                expect(thirdVar.variables[0].element.prefix.whitespace).toBe('');
+            }
+        }));
+
     test('multi typed', () =>
         spec.rewriteRun(
             //language=typescript
