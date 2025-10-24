@@ -72,7 +72,17 @@ public class SourcePositionService {
                     }
                 }
             };
-            javaPrinter.visit(trimPrefix(j), new PrintOutputCapture<>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED), cursor.getParentOrThrow());
+            PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<TreeVisitor<?, ?>>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED) {
+                @Override
+                public PrintOutputCapture<TreeVisitor<?, ?>> append(@Nullable String text) {
+                    if (text != null && text.contains("\n")) {
+                        out.setLength(0);
+                        text = text.substring(text.lastIndexOf("\n") + 1);
+                    }
+                    return super.append(text);
+                }
+            };
+            javaPrinter.visit(j, printLine, cursor.getParentOrThrow());
 
             return indentation.get();
         } else {
