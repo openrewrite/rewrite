@@ -132,7 +132,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 }
 
                 // Handle CommonJS require statements
-                // Note: const fs = require() comes as J.VariableDeclarations, not ScopedVariableDeclarations
+                // Note: const fs = require() comes as J.VariableDeclarations
+                // Multi-variable declarations might come as JS.ScopedVariableDeclarations
                 if (statement?.kind === J.Kind.VariableDeclarations) {
                     const varDecl = statement as J.VariableDeclarations;
                     const result = await this.processRequireFromVarDecls(varDecl, usedIdentifiers, p);
@@ -145,6 +146,46 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     }
                     removedElement = undefined;
                     return {...stmt, element: result};
+                }
+
+                // Handle JS.ScopedVariableDeclarations (multi-variable var/let/const)
+                if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
+                    const scopedVarDecl = statement as any;
+                    // Scoped variable declarations contain a variables array where each element is a single-variable J.VariableDeclarations
+                    const filteredVariables: any[] = [];
+                    let hasChanges = false;
+
+                    for (const v of scopedVarDecl.variables) {
+                        const varDecl = v.element;
+                        if (varDecl?.kind === J.Kind.VariableDeclarations) {
+                            const result = await this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, usedIdentifiers, p);
+                            if (result === undefined) {
+                                // This require should be removed
+                                hasChanges = true;
+                            } else {
+                                filteredVariables.push(result === varDecl ? v : {...v, element: result});
+                            }
+                        } else {
+                            filteredVariables.push(v);
+                        }
+                    }
+
+                    if (filteredVariables.length === 0) {
+                        // Remove the entire scoped variable declaration
+                        if (!removedElement) {
+                            removedElement = statement;
+                        }
+                        return undefined;
+                    }
+
+                    if (hasChanges) {
+                        // Update the scoped variable declaration with the modified variables
+                        removedElement = undefined;
+                        return {...stmt, element: {...scopedVarDecl, variables: filteredVariables}};
+                    }
+
+                    removedElement = undefined;
+                    return stmt;
                 }
 
                 // If the previous statement was removed, adjust this statement's prefix
@@ -394,8 +435,16 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         // Handle: const fs = require('fs')
         if (pattern.kind === J.Kind.Identifier) {
             const varName = (pattern as J.Identifier).simpleName;
-            if (this.shouldRemoveImport(varName, usedIdentifiers, new Set())) {
-                return undefined; // Remove the entire require statement
+
+            // For require() statements, check the module name from the require call
+            const moduleName = this.getModuleNameFromRequire(methodInv);
+            if (moduleName) {
+                const matchesTarget = this.member === undefined ? moduleName === this.target :
+                    moduleName === this.target;
+
+                if (matchesTarget && !usedIdentifiers.has(varName)) {
+                    return undefined; // Remove the entire require statement
+                }
             }
         }
 
@@ -420,6 +469,23 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         return varDecls;
+    }
+
+    /**
+     * Get the module name from a require() call
+     */
+    private getModuleNameFromRequire(methodInv: J.MethodInvocation): string | undefined {
+        const args = methodInv.arguments?.elements;
+        if (!args || args.length === 0) {
+            return undefined;
+        }
+
+        const firstArg = args[0].element;
+        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal).value !== 'string') {
+            return undefined;
+        }
+
+        return (firstArg as J.Literal).value?.toString();
     }
 
     private async processObjectBindingPattern(
