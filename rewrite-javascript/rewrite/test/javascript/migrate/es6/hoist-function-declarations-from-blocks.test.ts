@@ -1,3 +1,5 @@
+// noinspection TypeScriptUnresolvedReference,TypeScriptValidateTypes,JSUnusedLocalSymbols,PointlessBooleanExpressionJS
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -15,7 +17,9 @@
  */
 import {describe} from "@jest/globals";
 import {RecipeSpec} from "../../../../src/test";
-import {HoistFunctionDeclarationsFromBlocks} from "../../../../src/javascript/migrate/es6/hoist-function-declarations-from-blocks";
+import {
+    HoistFunctionDeclarationsFromBlocks
+} from "../../../../src/javascript/migrate/es6/hoist-function-declarations-from-blocks";
 import {typescript} from "../../../../src/javascript";
 
 describe("hoist-function-declarations-from-blocks", () => {
@@ -198,18 +202,116 @@ describe("hoist-function-declarations-from-blocks", () => {
         );
     });
 
-    test("nestedBlocksUsedOnlyInInnerBlock", () => {
+    test("functionInElseBlock", () => {
         return spec.rewriteRun(
             //language=typescript
             typescript(
                 `
-                if (condition1) {
-                    if (condition2) {
+                if (condition) {
+                    console.log('then');
+                } else {
+                    function helper() {
+                        return 42;
+                    }
+                }
+                const result = helper();
+                `,
+                `
+                let helper;
+                if (condition) {
+                    console.log('then');
+                } else {
+                    helper = function() {
+                        return 42;
+                    };
+                }
+                const result = helper();
+                `
+            )
+        );
+    });
+
+    test("functionWithoutBlockUsedOutside", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                if (true)
+                    function helper() {
+                        return 42;
+                    }
+                const result = helper();
+                `,
+                `
+                let helper;
+                if (true)
+                    helper = function() {
+                        return 42;
+                    };
+                const result = helper();
+                `
+            )
+        );
+    });
+
+    test("hoistingInsideFunction", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                function outer() {
+                    if (condition) {
                         function helper() {
                             return 42;
                         }
-                        const result = helper();
                     }
+                    return helper();
+                }
+                `,
+                `
+                function outer() {
+                    let helper;
+                    if (condition) {
+                        helper = function() {
+                            return 42;
+                        };
+                    }
+                    return helper();
+                }
+                `
+            )
+        );
+    });
+
+    test("hoistingInsideNestedFunctions", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                function outer() {
+                    function inner() {
+                        if (condition) {
+                            function helper() {
+                                return 42;
+                            }
+                        }
+                        return helper();
+                    }
+                    return inner();
+                }
+                `,
+                `
+                function outer() {
+                    function inner() {
+                        let helper;
+                        if (condition) {
+                            helper = function() {
+                                return 42;
+                            };
+                        }
+                        return helper();
+                    }
+                    return inner();
                 }
                 `
             )
