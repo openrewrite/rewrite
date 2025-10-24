@@ -1224,17 +1224,4 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         return super.accept(j, p);
     }
-
-    protected async maybeAutoFormat<J2 extends J>(before: J2, after: J2, p: P, stopAfter?: J): Promise<J2> {
-        if (before !== after) {
-            return this.autoFormat(after, p, stopAfter);
-        }
-        return after;
-    }
-
-    protected async autoFormat<J2 extends J>(j: J2, p: P, stopAfter?: J): Promise<J2> {
-        // Lazy require to avoid circular dependency at module load time
-        const {autoFormat: autoFormatFn} = require("./format");
-        return autoFormatFn(j, p, stopAfter);
-    }
 }
