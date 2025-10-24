@@ -49,20 +49,20 @@ public class AddLiteralMethodArgument extends Recipe {
     String methodPattern;
 
     /**
-     * A zero-based index that indicates which argument will be added as null to the method invocation.
+     * A zero-based index indicating where to insert the new argument.
      */
     @Option(displayName = "Argument index",
-            description = "A zero-based index that indicates which argument will be added as null to the method invocation.",
+            description = "A zero-based index indicating where to insert the new argument.",
             example = "0")
     int argumentIndex;
 
     @Option(displayName = "Literal",
-            description = "The literal value that we add the argument for.",
+            description = "The literal value to add as an argument.",
             example = "abc")
     Object literal;
 
     @Option(displayName = "Parameter type",
-            description = "The type of the parameter that we add the argument for. Defaults to `String`.",
+            description = "The parameter type for the added argument. Defaults to `String`.",
             required = false,
             example = "String",
             valid = {"String", "int", "short", "long", "float", "double", "boolean", "char"})
@@ -81,7 +81,7 @@ public class AddLiteralMethodArgument extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add a literal `String` or `int` argument to method invocations.";
+        return "Add a literal `String` or primitive argument to method invocations.";
     }
 
     @Override
