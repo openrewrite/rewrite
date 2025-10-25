@@ -76,11 +76,12 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new BlankLinesVisitor<>(getStyle(BlankLinesStyle.class, styles, cu, IntelliJ::blankLines), stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        t = new WrappingAndBracesVisitor<>(getStyle(WrappingAndBracesStyle.class, styles, cu, IntelliJ::wrappingAndBraces), stopAfter)
-                .visitNonNull(t, p, cursor.fork());
-
+        WrappingAndBracesStyle wrappingAndBracesStyle = getStyle(WrappingAndBracesStyle.class, styles, cu, IntelliJ::wrappingAndBraces);
         SpacesStyle spacesStyle = getStyle(SpacesStyle.class, styles, cu, IntelliJ::spaces);
         TabsAndIndentsStyle tabsAndIndentsStyle = getStyle(TabsAndIndentsStyle.class, styles, cu, IntelliJ::tabsAndIndents);
+
+        t = new WrappingAndBracesVisitor<>(wrappingAndBracesStyle, stopAfter)
+                .visitNonNull(t, p, cursor.fork());
 
         t = new SpacesVisitor<>(spacesStyle, getStyle(EmptyForInitializerPadStyle.class, styles, cu), getStyle(EmptyForIteratorPadStyle.class, styles, cu), stopAfter)
                 .visitNonNull(t, p, cursor.fork());
@@ -88,7 +89,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new NormalizeTabsOrSpacesVisitor<>(tabsAndIndentsStyle, stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        t = new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
+        t = new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, wrappingAndBracesStyle, stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
         t = new NormalizeLineBreaksVisitor<>(getStyle(GeneralFormatStyle.class, styles, cu, () -> autodetectGeneralFormatStyle(cu)), stopAfter)
@@ -120,19 +121,20 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             t = (JavaSourceFile) new BlankLinesVisitor<>(getStyle(BlankLinesStyle.class, styles, cu, IntelliJ::blankLines), stopAfter)
                     .visitNonNull(t, p);
 
+            WrappingAndBracesStyle wrappingAndBracesStyle = getStyle(WrappingAndBracesStyle.class, styles, cu, IntelliJ::wrappingAndBraces);
             SpacesStyle spacesStyle = getStyle(SpacesStyle.class, styles, cu, IntelliJ::spaces);
             TabsAndIndentsStyle tabsAndIndentsStyle = getStyle(TabsAndIndentsStyle.class, styles, cu, IntelliJ::tabsAndIndents);
 
             t = (JavaSourceFile) new SpacesVisitor<P>(spacesStyle, getStyle(EmptyForInitializerPadStyle.class, styles, cu), getStyle(EmptyForIteratorPadStyle.class, styles, cu), stopAfter)
                     .visitNonNull(t, p);
 
-            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(getStyle(WrappingAndBracesStyle.class, styles, cu, IntelliJ::wrappingAndBraces), stopAfter)
+            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(wrappingAndBracesStyle, stopAfter)
                     .visitNonNull(t, p);
 
             t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(tabsAndIndentsStyle, stopAfter)
                     .visitNonNull(t, p);
 
-            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
+            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, wrappingAndBracesStyle, stopAfter)
                     .visitNonNull(t, p);
 
             return addStyleMarker(t, styles);

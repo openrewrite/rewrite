@@ -1281,7 +1281,7 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
-    void doNotFormatNonBuilderChainedCalls() {
+    void alsoFormatNonBuilderChainedCalls() {
         rewriteRun(
           java(
             """
@@ -1299,8 +1299,12 @@ class AutoFormatTest implements RewriteTest {
               
               class Test {
                   void test() {
-                      String result = "hello".toUpperCase().substring(1).trim();
-                      String sb = new StringBuilder().append("a").append("b").toString();
+                      String result = "hello".toUpperCase()
+                              .substring(1)
+                              .trim();
+                      String sb = new StringBuilder().append("a")
+                              .append("b")
+                              .toString();
                   }
               }
               """
@@ -2192,6 +2196,44 @@ class AutoFormatTest implements RewriteTest {
               ) {
               }
               """
+          ),
+          java(
+            """
+              record someRecord10(
+                      @Foo @Foo String name,
+                      int age) {
+              }
+              """,
+            """
+              record someRecord10(
+                      @Foo @Foo String name,
+                      int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord11(@Foo @Foo String name,
+              int age) {
+              }
+              """,
+            """
+              record someRecord11(@Foo @Foo String name,
+                                  int age) {
+              }
+              """
+          ),
+          java(
+            """
+              record someRecord12(@Foo @Foo String name,
+                                 int age) {
+              }
+              """,
+            """
+              record someRecord12(@Foo @Foo String name,
+                                  int age) {
+              }
+              """
           )
         );
     }
@@ -2432,6 +2474,56 @@ class AutoFormatTest implements RewriteTest {
                   }
               }
               """
+          ),
+          java(
+            """
+              class Test10 {
+                  void someMethod10(
+                          String name,
+                          int age) {
+                  }
+              }
+              """,
+            """
+              class Test10 {
+                  void someMethod10(
+                          String name,
+                          int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test11 {
+                  void someMethod11(String name,
+                                       int age) {
+                  }
+              }
+              """,
+            """
+              class Test11 {
+                  void someMethod11(String name,
+                                    int age) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class Test12 {
+                  void someMethod12(String name,
+                                   int age) {
+                  }
+              }
+              """,
+            """
+              class Test12 {
+                  void someMethod12(String name,
+                                    int age) {
+                  }
+              }
+              """
           )
         );
     }
@@ -2516,6 +2608,106 @@ class AutoFormatTest implements RewriteTest {
                   void test() {
                       MyObject.outerMethod("arg1", MyObject.innerMethod("nested1", "nested2", "nested3"), "arg3");
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://www.jetbrains.com/help/idea/2025.1/code-style-java.html?#chained-method-calls")
+    @Test
+    void alwaysWrapBuilderMethods() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.java.NonWrappingAutoFormatWithCustomStyle
+            displayName: Autoformat java code with custom style
+            description: Formats the code with some IntelliJ settings overwritten.
+            recipeList:
+              - org.openrewrite.java.format.AutoFormat:
+                  style: |
+                    type: specs.openrewrite.org/v1beta/style
+                    name: junit
+                    displayName: Unit Test style
+                    description: Only used in unit tests
+                    styleConfigs:
+                      - org.openrewrite.java.style.WrappingAndBracesStyle:
+                          chainedMethodCalls:
+                            wrap: DoNotWrap
+                            builderMethods:
+                              - builder
+            """,
+            "org.openrewrite.java.NonWrappingAutoFormatWithCustomStyle"
+          ),
+          java(
+            """
+              package com.example;
+
+              class Test1 {
+                  private static final StringBuilder sb = new StringBuilder().append("testing long methods").append(" get wrapped").append(" and receive correct indentation");              
+                  private final MyObject value = MyObject.builder().name("hello").age(30).build();
+              }
+              """,
+            """
+              package com.example;
+
+              class Test1 {
+                  private static final StringBuilder sb = new StringBuilder().append("testing long methods").append(" get wrapped").append(" and receive correct indentation");
+                  private final MyObject value = MyObject.builder()
+                          .name("hello")
+                          .age(30)
+                          .build();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alignMethodChainsWhenMultiline() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.java.AutoFormatWithCustomStyle
+            displayName: Autoformat java code with custom style
+            description: Formats the code with some IntelliJ settings overwritten.
+            recipeList:
+              - org.openrewrite.java.format.AutoFormat:
+                  style: |
+                    type: specs.openrewrite.org/v1beta/style
+                    name: junit
+                    displayName: Unit Test style
+                    description: Only used in unit tests
+                    styleConfigs:
+                      - org.openrewrite.java.style.WrappingAndBracesStyle:
+                          chainedMethodCalls:
+                            wrap: WrapAlways
+                            alignWhenMultiline: true
+            """,
+            "org.openrewrite.java.AutoFormatWithCustomStyle"
+          ),
+          java(
+            """
+              package com.example;
+
+              class Test1 {
+                  private static final StringBuilder sb = new StringBuilder().append("testing long methods").append(" get wrapped").append(" and receive correct indentation");
+                  private final MyObject value = MyObject.builder().name("hello").age(30).build();
+              }
+              """,
+            """
+              package com.example;
+
+              class Test1 {
+                  private static final StringBuilder sb = new StringBuilder().append("testing long methods")
+                                                                             .append(" get wrapped")
+                                                                             .append(" and receive correct indentation");
+                  private final MyObject value = MyObject.builder()
+                                                         .name("hello")
+                                                         .age(30)
+                                                         .build();
               }
               """
           )

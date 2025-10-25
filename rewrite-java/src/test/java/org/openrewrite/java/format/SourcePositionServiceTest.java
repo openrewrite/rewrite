@@ -115,4 +115,91 @@ class SourcePositionServiceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void correctlyCalculatesIndentationToAlign() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              SourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(SourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("valueOf".equals(method.getSimpleName())) {
+                      assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(34);
+                  }
+                  if ("reverse".equals(method.getSimpleName()) || "toString".equals(method.getSimpleName())) {
+                      assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(41);
+                  }
+                  if ("repeat".equals(method.getSimpleName())) {
+                      assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(31);
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "stub".contains(v.getSimpleName().substring(0, 1)))) {
+                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("1"))) {
+                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(22);
+                      }
+                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("2"))) {
+                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(26);
+                      }
+                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("3"))) {
+                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(12);
+                      }
+                  }
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "param".contains(v.getSimpleName().substring(0, 1)))) {
+                      assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(67);
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+            package com.example;
+
+            public class Test {
+                public void /* multiline comments can impact though */ example(int p, String a, double r, Integer a, Float m) {
+                    // comments should not be counted
+                    String invocation = String.valueOf("Both lines share the same length.");
+                    String text = new StringBuilder().append("text").reverse().toString();
+                    StringBuilder builder = 
+                        new StringBuilder().append("text").repeat("text", 2);
+                }
+            }
+            """
+          ),
+          java (
+            """
+            public record Record1(String s1, Integer t1, Double u1, Float b1) {
+                public record Record2(String s2, Integer t2, Double u2, Float b2) {}
+                public record Record3(
+                        String s3, Integer t3, Double u3, Float b3) {}
+            }
+            """
+          ),
+          java (
+            """
+            public record Record4(String s1, Integer t1, Double u1, Float b1) {
+                public record Record5(String s2,
+            Integer t2,
+                                                       Double u2,
+            
+            Float b2) {}
+                public record Record6(
+            String s3, Integer t3, Double u3, Float b3) {}
+            }
+            """
+          )
+        );
+    }
 }

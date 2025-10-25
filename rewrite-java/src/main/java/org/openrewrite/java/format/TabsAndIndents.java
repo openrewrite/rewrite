@@ -21,6 +21,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
+import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.Style;
@@ -52,7 +53,8 @@ public class TabsAndIndents extends Recipe {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
                 TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
                 SpacesStyle spacesStyle = Optional.ofNullable(Style.from(SpacesStyle.class, cu)).orElse(IntelliJ.spaces());
-                return new TabsAndIndentsVisitor<>(style, spacesStyle).visit(tree, ctx);
+                WrappingAndBracesStyle wrappingAndBracesStyle = Optional.ofNullable(Style.from(WrappingAndBracesStyle.class, cu)).orElse(IntelliJ.wrappingAndBraces());
+                return new TabsAndIndentsVisitor<>(style, spacesStyle, wrappingAndBracesStyle).visit(tree, ctx);
             }
             return (J) tree;
         }
@@ -62,8 +64,9 @@ public class TabsAndIndents extends Recipe {
         SourceFile cu = cursor.firstEnclosingOrThrow(SourceFile.class);
         TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
         SpacesStyle spacesStyle = Optional.ofNullable(Style.from(SpacesStyle.class, cu)).orElse(IntelliJ.spaces());
+        WrappingAndBracesStyle wrappingAndBracesStyle = Optional.ofNullable(Style.from(WrappingAndBracesStyle.class, cu)).orElse(IntelliJ.wrappingAndBraces());
         //noinspection unchecked
-        return (J2) new TabsAndIndentsVisitor<>(style, spacesStyle)
+        return (J2) new TabsAndIndentsVisitor<>(style, spacesStyle, wrappingAndBracesStyle)
                 .visitNonNull(j, 0, cursor);
     }
 }
