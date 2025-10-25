@@ -64,5 +64,9 @@ public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
         @Column(displayName = "Depth",
                 description = "How many levels removed from a direct dependency. This will be 0 for direct dependencies.")
         Integer depth;
+
+        @Column(displayName = "Dependency graph",
+                description = "The dependency path that requested the dependency.")
+        String dependencyGraph;
     }
 }

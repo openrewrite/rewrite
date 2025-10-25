@@ -1,0 +1,36 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.maven.graph;
+
+import org.openrewrite.maven.tree.ResolvedDependency;
+
+/**
+ * Gradle-specific implementation of DependencyGraphBuilder that creates GradleDependencyNode instances
+ * which preserve the full ResolvedDependency object.
+ */
+public class GradleDependencyGraphBuilder extends AbstractDependencyGraphBuilder<DependencyGraph.GradleDependencyNode> {
+
+    @Override
+    public DependencyGraph.GradleDependencyNode createNode(ResolvedDependency dependency, String scope) {
+        return new DependencyGraph.GradleDependencyNode(
+                dependency.getGroupId(),
+                dependency.getArtifactId(),
+                dependency.getVersion(),
+                scope,
+                dependency
+        );
+    }
+}
