@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/kbrockhoff/git/kbrockhoff/rewrite/rewrite-hcl/src/main/antlr/JsonPathParser.g4 by ANTLR 4.13.2
+// Generated from ~/git/rewrite/rewrite-hcl/src/main/antlr/JsonPathParser.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;

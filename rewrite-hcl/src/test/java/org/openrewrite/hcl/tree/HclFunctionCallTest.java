@@ -33,4 +33,39 @@ class HclFunctionCallTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void providerScopedFunctionCall() {
+        rewriteRun(
+          hcl(
+            """
+              terraform {
+                  required_providers {
+                      test = {
+                          source = "hashicorp/test"
+                      }
+                  }
+              }
+              locals {
+                  result = provider::test::count_e("cheese")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleProviderScopedFunctions() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                  a = provider::aws::ec2_instance_type_info("t2.micro")
+                  b = provider::google::compute_zone("us-central1-a")
+                  c = normalFunction("arg")
+              }
+              """
+          )
+        );
+    }
 }
