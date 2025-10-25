@@ -78,11 +78,13 @@ public interface RewriteTest extends SourceSpecs {
     default void assertRecipesConfigure(String packageName) {
         // soft assertions allow the entire stack trace to be displayed for each
         // recipe that fails to configure
-        SoftAssertions softly = new SoftAssertions();
-        for (Recipe recipe : Environment.builder()
+        List<Recipe> recipes = Environment.builder()
                 .scanRuntimeClasspath(packageName)
                 .build()
-                .listRecipes()) {
+                .listRecipes();
+        assertThat(recipes).as("No recipes found in %s", packageName).isNotEmpty();
+        SoftAssertions softly = new SoftAssertions();
+        for (Recipe recipe : recipes) {
             // scanRuntimeClasspath picks up all recipes in META-INF/rewrite regardless of whether their
             // names start with the package we intend to filter on here
             if (recipe.getName().startsWith(packageName)) {
