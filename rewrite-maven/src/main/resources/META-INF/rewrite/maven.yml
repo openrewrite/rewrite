@@ -126,7 +126,7 @@ recipeList:
   - org.openrewrite.xml.ChangeTagAttribute:
       elementName: /project
       attributeName: xsi:schemaLocation
-      oldValue: (http://maven\.apache\.org/POM/)4\.0\.0(\s+http://maven\.apache\.org/xsd/maven-)4\.0\.0(\.xsd)
+      oldValue: (http://maven\.apache\.org/POM/)4\.0\.0(\s+http[s]?://maven\.apache\.org/xsd/maven-)4\.0\.0(\.xsd)
       newValue: $14.1.0$24.1.0$3
       regex: true
 ---
