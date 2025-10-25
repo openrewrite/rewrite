@@ -215,7 +215,7 @@ class AnnotationServiceTest implements RewriteTest {
                         // Direct getAllAnnotations should not find inherited annotations
                         assertThat(service.getAllAnnotations(getCursor())).isEmpty();
 
-                        // But hasAnnotation should find it through the type hierarchy
+                        // But isAnnotatedWith should find it through the type hierarchy
                         assertThat(service.isAnnotatedWith(classDecl, "BaseAnnotation")).isTrue();
                         assertThat(service.annotatedWith(classDecl, "BaseAnnotation")).hasSize(1);
                     }
@@ -292,7 +292,7 @@ class AnnotationServiceTest implements RewriteTest {
                             assertThat(directAnnotations).hasSize(1);
                             assertThat(directAnnotations.get(0).getSimpleName()).isEqualTo("Override");
 
-                            // But hasAnnotation should find @MethodAnnotation from parent
+                            // But isAnnotatedWith should find @MethodAnnotation from parent
                             assertThat(service.isAnnotatedWith(method, "MethodAnnotation")).isTrue();
                             assertThat(service.annotatedWith(method, "MethodAnnotation")).hasSize(1);
                         }
