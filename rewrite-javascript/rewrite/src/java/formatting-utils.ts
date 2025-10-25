@@ -102,107 +102,52 @@ function applyRemovedElementPrefix<T extends J>(removedElement: J, nextElement: 
 
     const removedPrefix = removedElement.prefix;
     const currentPrefix = nextElement.prefix;
-    const currentComments = currentPrefix.comments || [];
 
-    // If the next element has no comments, apply appropriate formatting
-    if (currentComments.length === 0) {
-        if (currentPrefix === removedPrefix) {
-            return nextElement;
-        }
-
-        // If preserving comments, transfer file header comments and use removed element's whitespace
-        if (preserveRemovedComments) {
-            const removedComments = removedPrefix.comments || [];
-
-            // Check if removed element has leading comments (not inline trailing comments)
-            // These are likely file headers and should be preserved
-            const removedWhitespace = removedPrefix.whitespace || '';
-            const hasLeadingNewlineBeforeComments = removedComments.length === 0 || /[\r\n]/.test(removedWhitespace);
-
-            // Transfer file header comments from removed element (non-inline comments only)
-            const commentsToTransfer = hasLeadingNewlineBeforeComments ? removedComments : [];
-
-            return produce(nextElement, draft => {
-                draft.prefix = {
-                    ...removedPrefix,
-                    comments: commentsToTransfer.length > 0 ? commentsToTransfer : []
-                };
-            });
-        }
-
-        // When not preserving comments, preserve blank lines from the current prefix
-        const removedWhitespace = removedPrefix.whitespace || '';
-        const currentWhitespace = currentPrefix.whitespace || '';
-        const removedNewlines = (removedWhitespace.match(/\r?\n/g) || []).length;
-        const currentNewlines = (currentWhitespace.match(/\r?\n/g) || []).length;
-
-        // If the current element has more newlines (i.e., blank lines), preserve them
-        if (currentNewlines > removedNewlines) {
-            return nextElement;
-        }
-
-        // Use removed element's whitespace but don't transfer comments from removed middle elements
-        return produce(nextElement, draft => {
-            draft.prefix = {
-                kind: removedPrefix.kind,
-                whitespace: removedWhitespace,
-                comments: []
-            };
-        });
+    if (currentPrefix === removedPrefix) {
+        return nextElement;
     }
 
-    // The next element has comments - check if we need to remove inline/trailing line comments
-    const currentWhitespace = currentPrefix.whitespace || '';
-    const hasLeadingNewline = /[\r\n]/.test(currentWhitespace);
+    // Helper to count newlines in whitespace
+    const countNewlines = (ws: string | undefined) => (ws?.match(/\r?\n/g) || []).length;
 
+    // Helper to check if whitespace has leading newline (comments are on their own line, not inline)
+    const hasLeadingNewline = (ws: string | undefined) => /[\r\n]/.test(ws || '');
+
+    const removedWs = removedPrefix.whitespace || '';
+    const currentWs = currentPrefix.whitespace || '';
+    const removedComments = removedPrefix.comments || [];
+    const currentComments = currentPrefix.comments || [];
+
+    // Filter out inline trailing line comments from current element
     let commentsToKeep = currentComments;
-
-    // Check for truly inline trailing line comments that should be removed
-    if (currentComments.length > 0) {
+    if (currentComments.length > 0 && !hasLeadingNewline(currentWs)) {
         const firstComment: any = currentComments[0];
         const commentText = firstComment.text || firstComment.message || '';
         const isLineComment = commentText.includes('//') || firstComment.multiline === false;
-
-        if (isLineComment && !hasLeadingNewline) {
-            // Only remove comments that are truly inline (no newline before them)
-            // Comments on their own line (with leading newline) are preserved as they're
-            // likely leading comments for the next element, not trailing comments from removed element
+        if (isLineComment) {
             commentsToKeep = currentComments.slice(1);
         }
     }
 
-    // If preserving comments, preserve leading comments from removed element
-    if (preserveRemovedComments) {
-        const removedComments = removedPrefix.comments || [];
-
-        // Only transfer leading comments (not inline trailing comments)
-        const removedWhitespace = removedPrefix.whitespace || '';
-        const hasLeadingComments = removedComments.length === 0 || /[\r\n]/.test(removedWhitespace);
-
-        // Combine leading comments from removed element with filtered comments from current element
-        const allComments = hasLeadingComments ? [...removedComments, ...commentsToKeep] : commentsToKeep;
-
-        // When preserving comments, always use the removed element's whitespace
-        return produce(nextElement, draft => {
-            draft.prefix = {
-                ...removedPrefix,
-                comments: allComments.length > 0 ? allComments : []
-            };
-        });
+    // Determine which comments to include in final prefix
+    let finalComments: any[];
+    if (preserveRemovedComments && hasLeadingNewline(removedWs)) {
+        // Transfer leading comments from removed element
+        finalComments = [...removedComments, ...commentsToKeep];
+    } else {
+        finalComments = commentsToKeep;
     }
 
-    // If we still have comments after filtering, use removed element's whitespace with filtered comments
-    if (commentsToKeep.length > 0) {
-        return produce(nextElement, draft => {
-            draft.prefix = {
-                ...removedPrefix,
-                comments: commentsToKeep
-            };
-        });
-    }
+    // Determine which whitespace to use: preserve current if it has more blank lines
+    const shouldPreserveCurrentWhitespace =
+        !preserveRemovedComments &&
+        countNewlines(currentWs) > countNewlines(removedWs);
 
-    // No comments left after filtering, use removed element's prefix entirely
     return produce(nextElement, draft => {
-        draft.prefix = removedPrefix;
+        draft.prefix = {
+            kind: shouldPreserveCurrentWhitespace ? currentPrefix.kind : removedPrefix.kind,
+            whitespace: shouldPreserveCurrentWhitespace ? currentWs : removedWs,
+            comments: finalComments.length > 0 ? finalComments : []
+        };
     });
 }
