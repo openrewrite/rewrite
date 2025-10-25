@@ -240,10 +240,10 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
 
         /**
-         * Common TSV parsing logic used by both read() and readWithVisitors().
+         * Common TSV parsing logic used by both read() methods.
          * Parses the TSV and calls the processor for each GAV's classes.
          */
-        private void parseTsvAndProcess(InputStream is, Options options,
+        public void parseTsvAndProcess(InputStream is, Options options,
                                         ClassesProcessor processor) throws IOException {
             AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
             Map<String, ClassDefinition> classesByName = new HashMap<>();
@@ -303,7 +303,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[13].isEmpty() ? null : fields[13].split("\\|"),
                                     fields.length > 14 && !fields[14].isEmpty() ? fields[14] : null,  // elementAnnotations - raw string
                                     fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null,
-                                    fields.length > 16 && !fields[16].isEmpty() ? fields[16].split("\\|") : null,  // typeAnnotations - keep | delimiter between different type contexts
+                                    fields.length > 16 && !fields[16].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[16], '|') : null,  // typeAnnotations - keep `|` delimiter between different type contexts
                                     fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null
                             ));
                         }
@@ -318,7 +318,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
 
         @FunctionalInterface
-        private interface ClassesProcessor {
+        interface ClassesProcessor {
             void accept(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes,
                         Map<String, List<ClassDefinition>> nestedTypes);
         }
@@ -962,7 +962,7 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     @Value
-    private static class GroupArtifactVersion {
+    static class GroupArtifactVersion {
         String groupId;
         String artifactId;
         String version;
@@ -970,7 +970,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     @Value
     @RequiredArgsConstructor
-    private static class ClassDefinition {
+    static class ClassDefinition {
         int access;
         String name;
 
@@ -1006,7 +1006,7 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     @Value
-    private static class Member {
+    static class Member {
         ClassDefinition classDefinition;
         int access;
         String name;

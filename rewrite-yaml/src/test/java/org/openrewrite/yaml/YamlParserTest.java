@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -460,6 +461,70 @@ class YamlParserTest implements RewriteTest {
               - item1
               - item2
               other_anchor: *anchor
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1471")
+    @Test
+    void yamlWithDocumentEndMarker() {
+        rewriteRun(
+          yaml(
+            """
+              ---
+              applications:
+                - name: modified-app-name
+                  memory: 1G
+              ...
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
+    void helmTemplateMatchingDocumentEndParsesCorrectly() {
+        rewriteRun(
+          yaml(
+            """
+              # ${{ looks.like.helm.before }}
+              jobs:
+                # ${{ looks.like.helm.middle }}
+                steps:
+                  # ${{ looks.like.helm.sequence }}
+                  - items1: []
+                  # ${{ looks.like.helm.in-sequence }}
+                  - items2: []
+                  # ${{ looks.like.helm.end-sequence }}
+              # ${{ looks.like.helm.end }}
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  - items1: []
+                  # ${{ looks.like.helm.sequence }}
+                  - items2: []
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  # ${{ looks.like.helm.sequence }}
+                  - items1: []
+                  - items2: []
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  - items1: []
+                  - items2: []
+              # ${{ looks.like.helm.end }}
               """
           )
         );

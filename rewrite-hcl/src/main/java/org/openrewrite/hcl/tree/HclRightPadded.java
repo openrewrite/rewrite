@@ -55,6 +55,7 @@ public class HclRightPadded<T> {
         OBJECT_VALUE_ARGUMENT(Space.Location.OBJECT_VALUE_ATTRIBUTE_SUFFIX),
         PARENTHESES(Space.Location.PARENTHESES_SUFFIX),
         SPLAT_OPERATOR(Space.Location.SPLAT_OPERATOR_SUFFIX),
+        TEMPLATE_INTERPOLATION(Space.Location.TEMPLATE_INTERPOLATION_SUFFIX),
         TUPLE_VALUE(Space.Location.TUPLE_VALUE_SUFFIX);
 
         private final Space.Location afterLocation;

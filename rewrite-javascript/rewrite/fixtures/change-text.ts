@@ -39,7 +39,7 @@ export class ChangeText extends Recipe {
         return `Change text to '${this.text}'`;
     }
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const toText = this.text;
         const replacedText = this.replacedText;
         return new class extends PlainTextVisitor<ExecutionContext> {

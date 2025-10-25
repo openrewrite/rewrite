@@ -1,11 +1,59 @@
-// noinspection JSUnusedLocalSymbols
+// noinspection JSUnusedLocalSymbols,TypeScriptUnresolvedReference,TypeScriptMissingConfigOption,NpmUsedModulesInstalled,TypeScriptJSXUnresolvedComponent
 
 import {describe} from "@jest/globals";
-import {tsx} from "../../../src/javascript";
+import {JavaScriptVisitor, JSX, npm, packageJson, tsx} from "../../../src/javascript";
 import {RecipeSpec} from "../../../src/test";
+import {J, Type} from "../../../src/java";
+import {withDir} from "tmp-promise";
 
 describe("jsx mapping", () => {
     const spec = new RecipeSpec();
+
+    test("react component supertype", async () => {
+        await withDir(async repo => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    {
+                        ...tsx(
+                            `
+                                import Select from 'react-select';
+                                
+                                const App = () => {
+                                  return <Select options={[]} />;
+                                };
+                            `
+                        ),
+                        afterRecipe: async cu => {
+                            await (new class extends JavaScriptVisitor<any> {
+                                protected async visitJsxTag(tag: JSX.Tag, _: any): Promise<J | undefined> {
+                                    const ident = tag.openName.element as J.Identifier;
+                                    expect(Type.isClass(ident.type)).toBeTruthy();
+                                    expect((ident.type as Type.Class).supertype?.fullyQualifiedName).toContain('Component');
+                                    return tag;
+                                }
+                            }).visit(cu, 0);
+                        }
+                    },
+                    //language=json
+                    packageJson(
+                        `
+                          {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                              "react-select": "^2.4.4"
+                            },
+                            "devDependencies": {
+                              "@types/react-select": "^2.0.0"
+                            }
+                          }
+                        `
+                    )
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
 
     // noinspection TypeScriptMissingConfigOption
     test("jsx with comments", () =>
@@ -107,7 +155,7 @@ describe("jsx mapping", () => {
     test("jsx element with multiple generic type arguments", () =>
         spec.rewriteRun(
             //language=tsx
-            tsx(`<Component<string, number> prop="value" />`)
+            tsx(`<Component<string, number> prop="value"/>`)
         )
     );
 
@@ -116,7 +164,7 @@ describe("jsx mapping", () => {
             //language=tsx
             tsx(`
                 <Container<ItemType>>
-                    <Item />
+                    <Item/>
                 </Container>
             `)
         )
@@ -125,28 +173,28 @@ describe("jsx mapping", () => {
     test("jsx self-closing element with complex generic types", () =>
         spec.rewriteRun(
             //language=tsx
-            tsx(`<DataTable<{ id: number; name: string }> data={items} />`)
+            tsx(`<DataTable<{ id: number; name: string }> data={items}/>`)
         )
     );
 
     test("jsx element with nested generics", () =>
         spec.rewriteRun(
             //language=tsx
-            tsx(`<List<Array<Record<string, any>>> items={data} />`)
+            tsx(`<List<Array<Record<string, any>>> items={data}/>`)
         )
     );
 
     test("jsx element with union type generic", () =>
         spec.rewriteRun(
             //language=tsx
-            tsx(`<Component<string | number> props={data} />`)
+            tsx(`<Component<string | number> props={data}/>`)
         )
     );
 
     test("jsx element with member expression and generics", () =>
         spec.rewriteRun(
             //language=tsx
-            tsx(`<Components.Table<UserData> columns={columns} />`)
+            tsx(`<Components.Table<UserData> columns={columns}/>`)
         )
     );
 
@@ -154,20 +202,20 @@ describe("jsx mapping", () => {
         spec.rewriteRun(
             //language=tsx
             tsx(
-         `
-                <Ruud>
-                    <MenuItemWithOverlay<DrawerProps>
-                    >
-                        <span>You didn't expect it, did you?</span>
-                    </MenuItemWithOverlay>
-                    <AnotherTag<Param>
-                        slots={{
-                            container: Drawer
-                        }}
-                    >
-                    </AnotherTag>
-                </Ruud>
                 `
-        )
-    ));
+                    <Ruud>
+                        <MenuItemWithOverlay<DrawerProps>
+                        >
+                            <span>You didn't expect it, did you?</span>
+                        </MenuItemWithOverlay>
+                        <AnotherTag<Param>
+                            slots={{
+                                container: Drawer
+                            }}
+                        >
+                        </AnotherTag>
+                    </Ruud>
+                `
+            )
+        ));
 });

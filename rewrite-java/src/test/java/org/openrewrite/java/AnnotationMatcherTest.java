@@ -21,6 +21,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 
 class AnnotationMatcherTest implements RewriteTest {
@@ -72,5 +73,11 @@ class AnnotationMatcherTest implements RewriteTest {
               )
             );
         }
+    }
+
+    @Test
+    void failsToParse() {
+        assertThatThrownBy(() -> new AnnotationMatcher("@foo|bar"))
+          .isInstanceOf(IllegalArgumentException.class);
     }
 }

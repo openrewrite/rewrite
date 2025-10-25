@@ -62,6 +62,14 @@ public class AddProperty extends Recipe {
     @Nullable
     String delimiter;
 
+    @Option(displayName = "Ordered property insertion",
+            description = "Whether to attempt adding the property in an order following alphabetic sorting. The default value is `true`.",
+            required = false,
+            example = "false"
+    )
+    @Nullable
+    Boolean orderedInsertion;
+
     @Override
     public String getDisplayName() {
         return "Add a new property";
@@ -99,7 +107,7 @@ public class AddProperty extends Recipe {
                 Properties.Entry.Delimiter delimitedBy = StringUtils.isNotEmpty(delimiter) ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
                 String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
                 Properties.Entry entry = new Properties.Entry(randomId(), "\n", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
-                int insertionIndex = sortedInsertionIndex(entry, p.getContent());
+
 
                 List<Properties.Content> newContents;
                 if(StringUtils.isBlank(comment)) {
@@ -116,9 +124,17 @@ public class AddProperty extends Recipe {
                 }
 
                 List<Properties.Content> contentList = new ArrayList<>(p.getContent().size() + 1);
-                contentList.addAll(p.getContent().subList(0, insertionIndex));
-                contentList.addAll(newContents);
-                contentList.addAll(p.getContent().subList(insertionIndex, p.getContent().size()));
+                if (orderedInsertion == null || orderedInsertion) {
+                    int insertionIndex = sortedInsertionIndex(entry, p.getContent());
+                    contentList.addAll(p.getContent().subList(0, insertionIndex));
+                    contentList.addAll(newContents);
+                    contentList.addAll(p.getContent().subList(insertionIndex, p.getContent().size()));
+                }
+                else {
+                    contentList.addAll(p.getContent());
+                    contentList.addAll(newContents);
+                }
+
 
                 // First entry in the file does not need a newline, but every other entry does
                 contentList = ListUtils.map(contentList, (i, c) -> {

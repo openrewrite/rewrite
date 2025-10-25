@@ -21,6 +21,9 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPracticesSubset
 displayName: OpenRewrite best practices
 description: Best practices for OpenRewrite recipe development.
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "!(**/internal/grammar/*.*)"
 recipeList:
   - org.openrewrite.recipes.JavaRecipeBestPracticesSubset
   - org.openrewrite.recipes.RecipeTestingBestPracticesSubset
@@ -111,5 +114,5 @@ recipeList:
   - org.openrewrite.java.RemoveAnnotation:
       annotationPattern: '@jakarta.annotation.Nonnull'
 #  - org.openrewrite.java.jspecify.MigrateToJspecify
-  - org.openrewrite.staticanalysis.AnnotateNullableMethods
+#  - org.openrewrite.staticanalysis.AnnotateNullableMethods
   - org.openrewrite.staticanalysis.NullableOnMethodReturnType

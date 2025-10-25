@@ -463,7 +463,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             try {
                 // Ugly reflection solution, because AttrRecover$RecoveryErrorType is private inner class
                 for (Class<?> targetClass : Class.forName(AttrRecover.class.getCanonicalName()).getDeclaredClasses()) {
-                    if ("RecoveryErrorType".equals(targetClass.getSimpleName())) {
+                    if ("RecoveryErrorType".equals(targetClass.getSimpleName()) && targetClass.isInstance(selectType)) {
                         Field field = targetClass.getDeclaredField("candidateSymbol");
                         field.setAccessible(true);
                         Symbol originalSymbol = (Symbol) field.get(selectType);

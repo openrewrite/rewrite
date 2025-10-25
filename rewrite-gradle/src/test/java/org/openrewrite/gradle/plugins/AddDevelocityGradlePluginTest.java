@@ -18,7 +18,8 @@ package org.openrewrite.gradle.plugins;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.groovy.tree.G.CompilationUnit;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -33,8 +34,7 @@ import java.util.regex.Pattern;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.test.SourceSpecs.dir;
 
@@ -46,7 +46,16 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
           .recipe(new AddDevelocityGradlePlugin("3.x", null, null, null, null, null));
     }
 
-    private static Consumer<SourceSpec<CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
+    private static Consumer<SourceSpec<G.CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
+        return spec -> spec.after(actual -> {
+            assertThat(actual).isNotNull();
+            Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
+            assertThat(version.find()).isTrue();
+            return after.formatted(version.group(0));
+        });
+    }
+
+    private static Consumer<SourceSpec<K.CompilationUnit>> interpolateResolvedVersionKts(@Language("kotlin") String after) {
         return spec -> spec.after(actual -> {
             assertThat(actual).isNotNull();
             Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
@@ -314,6 +323,201 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
               }
 
               rootProject.name = 'my-project'
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addNewSettingsPluginsBlockKts() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
+          buildGradleKts(
+            ""
+          ),
+          settingsGradleKts(
+            """
+              rootProject.name = "my-project"
+              """,
+            interpolateResolvedVersionKts("""
+              plugins {
+                  id("com.gradle.develocity") version "%s"
+              }
+
+              rootProject.name = "my-project"
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addExistingSettingsPluginsBlockKts() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
+          buildGradleKts(
+            ""
+          ),
+          settingsGradleKts(
+            """
+              plugins {
+              }
+
+              rootProject.name = "my-project"
+              """,
+            interpolateResolvedVersionKts("""
+              plugins {
+                  id("com.gradle.develocity") version "%s"
+              }
+
+              rootProject.name = "my-project"
+              """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2697")
+    @Test
+    void withGradleEnterpriseConfigurationInSettingsKts() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+            .recipe(new AddDevelocityGradlePlugin("3.16.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
+          buildGradleKts(
+            ""
+          ),
+          settingsGradleKts(
+            "",
+            interpolateResolvedVersionKts("""
+              plugins {
+                  id("com.gradle.enterprise") version "%s"
+              }
+              gradleEnterprise {
+                  server.set("https://ge.sam.com/")
+                  allowUntrustedServer.set(true)
+                  buildScan {
+                      publishAlways()
+                      uploadInBackground.set(true)
+                      capture {
+                          taskInputFiles.set(true)
+                      }
+                  }
+              }
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void withDevelocityConfigurationInSettingsKts() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+            .recipe(new AddDevelocityGradlePlugin("3.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
+          buildGradleKts(
+            ""
+          ),
+          settingsGradleKts(
+            "",
+            interpolateResolvedVersionKts("""
+              plugins {
+                  id("com.gradle.develocity") version "%s"
+              }
+              develocity {
+                  server.set("https://ge.sam.com/")
+                  allowUntrustedServer.set(true)
+                  buildScan {
+                      publishing.onlyIf { true }
+                      uploadInBackground.set(true)
+                      capture {
+                          fileFingerprints.set(true)
+                      }
+                  }
+              }
+              """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2697")
+    @Test
+    void withConfigurationOldInputCaptureKts() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+            .recipe(new AddDevelocityGradlePlugin("3.6", null, null, true, null, null)),
+          buildGradleKts(
+            ""
+          ),
+          settingsGradleKts(
+            "",
+            """
+              plugins {
+                  id("com.gradle.enterprise") version "3.6"
+              }
+              gradleEnterprise {
+                  buildScan {
+                      captureTaskInputFiles.set(true)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void defaultsToLatestReleaseKts() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+            .recipe(new AddDevelocityGradlePlugin(null, null, null, null, null, null)),
+          buildGradleKts(
+            ""
+          ),
+          settingsGradleKts(
+            "",
+            spec -> spec.after(after -> {
+                Matcher versionMatcher = Pattern.compile("id\\(\"com\\.gradle\\.develocity\"\\) version \"(.*?)\"").matcher(after);
+                assertThat(versionMatcher.find()).isTrue();
+                String version = versionMatcher.group(1);
+                VersionComparator versionComparator = requireNonNull(Semver.validate("[3.14,)", null).getValue());
+                assertThat(versionComparator.compare(null, "3.14", version)).isLessThanOrEqualTo(0);
+
+                return """
+                  plugins {
+                      id("com.gradle.develocity") version "%s"
+                  }
+                  """.formatted(version);
+            })
+          )
+        );
+    }
+
+    @Test
+    void addNewSettingsPluginsBlockWithLicenseHeaderKts() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
+          buildGradleKts(
+            ""
+          ),
+          settingsGradleKts(
+            """
+              /*
+               * Licensed to...
+               */
+
+              rootProject.name = "my-project"
+              """,
+            interpolateResolvedVersionKts("""
+              /*
+               * Licensed to...
+               */
+
+              plugins {
+                  id("com.gradle.develocity") version "%s"
+              }
+
+              rootProject.name = "my-project"
               """
             )
           )

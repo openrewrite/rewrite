@@ -17,9 +17,106 @@ import {JS} from '.';
 import {JavaScriptParser} from './parser';
 import {JavaScriptVisitor} from './visitor';
 import {Cursor, isTree, Tree} from '..';
-import {J} from '../java';
+import {J, Type} from '../java';
 import {produce} from "immer";
 import {JavaScriptComparatorVisitor} from "./comparator";
+import {DependencyWorkspace} from './dependency-workspace';
+import {Marker} from '../markers';
+import {randomId} from '../uuid';
+
+/**
+ * Cache for compiled templates and patterns.
+ * Stores parsed ASTs to avoid expensive re-parsing and dependency resolution.
+ */
+class TemplateCache {
+    private cache = new Map<string, JS.CompilationUnit>();
+
+    /**
+     * Generates a cache key from template string, captures, and options.
+     */
+    private generateKey(
+        templateString: string,
+        captures: Capture[],
+        imports: string[],
+        dependencies: Record<string, string>
+    ): string {
+        // Use the actual template string (with placeholders) as the primary key
+        const templateKey = templateString;
+
+        // Capture names
+        const capturesKey = captures.map(c => c.name).join(',');
+
+        // Imports
+        const importsKey = imports.join(';');
+
+        // Dependencies
+        const depsKey = JSON.stringify(dependencies || {});
+
+        return `${templateKey}::${capturesKey}::${importsKey}::${depsKey}`;
+    }
+
+    /**
+     * Gets a cached compilation unit or creates and caches a new one.
+     */
+    async getOrParse(
+        templateString: string,
+        captures: Capture[],
+        imports: string[],
+        dependencies: Record<string, string>
+    ): Promise<JS.CompilationUnit> {
+        const key = this.generateKey(templateString, captures, imports, dependencies);
+
+        let cu = this.cache.get(key);
+        if (cu) {
+            return cu;
+        }
+
+        // Create workspace if dependencies are provided
+        // DependencyWorkspace has its own cache, so multiple templates with
+        // the same dependencies will automatically share the same workspace
+        let workspaceDir: string | undefined;
+        if (dependencies && Object.keys(dependencies).length > 0) {
+            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+        }
+
+        // Prepend imports for type attribution context
+        const fullTemplateString = imports.length > 0
+            ? imports.join('\n') + '\n' + templateString
+            : templateString;
+
+        // Parse and cache (workspace only needed during parsing)
+        const parser = new JavaScriptParser({relativeTo: workspaceDir});
+        const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.ts'});
+        cu = (await parseGenerator.next()).value as JS.CompilationUnit;
+
+        this.cache.set(key, cu);
+        return cu;
+    }
+
+    /**
+     * Clears the cache.
+     */
+    clear(): void {
+        this.cache.clear();
+    }
+}
+
+// Global cache instance
+const templateCache = new TemplateCache();
+
+/**
+ * Marker that stores capture metadata on pattern AST nodes.
+ * This avoids the need to parse capture names from identifiers during matching.
+ */
+class CaptureMarker implements Marker {
+    readonly kind = 'org.openrewrite.javascript.CaptureMarker';
+    readonly id = randomId();
+
+    constructor(
+        public readonly captureName: string
+    ) {
+    }
+}
 
 /**
  * Capture specification for pattern matching.
@@ -42,18 +139,25 @@ class CaptureImpl implements Capture {
 /**
  * Creates a capture specification for use in template patterns.
  *
+ * @param name Optional name for the capture. If not provided, an auto-generated name is used.
  * @returns A Capture object
  *
  * @example
- * // Multiple captures
+ * // Named inline captures
+ * const pattern = pattern`${capture('left')} + ${capture('right')}`;
+ *
+ * // Unnamed captures
  * const {left, right} = {left: capture(), right: capture()};
  * const pattern = pattern`${left} + ${right}`;
  *
  * // Repeated patterns using the same capture
- * const expr = capture();
+ * const expr = capture('expr');
  * const redundantOr = pattern`${expr} || ${expr}`;
  */
-export function capture(): Capture {
+export function capture(name?: string): Capture {
+    if (name) {
+        return new CaptureImpl(name);
+    }
     return new CaptureImpl(`unnamed_${capture.nextUnnamedId++}`);
 }
 
@@ -61,9 +165,50 @@ export function capture(): Capture {
 capture.nextUnnamedId = 1;
 
 /**
+ * Concise alias for `capture`. Works well for inline captures in patterns and templates.
+ *
+ * @param name Optional name for the capture. If not provided, an auto-generated name is used.
+ * @returns A Capture object
+ *
+ * @example
+ * // Inline captures with _ alias
+ * pattern`isDate(${_('dateArg')})`
+ * template`${_('dateArg')} instanceof Date`
+ */
+export const _ = capture;
+
+/**
+ * Configuration options for patterns.
+ */
+export interface PatternOptions {
+    /**
+     * Import statements to provide type attribution context.
+     * These are prepended to the pattern when parsing to ensure proper type information.
+     */
+    imports?: string[];
+
+    /**
+     * NPM dependencies required for import resolution and type attribution.
+     * Maps package names to version specifiers (e.g., { 'util': '^1.0.0' }).
+     * The template engine will create a package.json with these dependencies.
+     */
+    dependencies?: Record<string, string>;
+}
+
+/**
  * Represents a pattern that can be matched against AST nodes.
  */
 export class Pattern {
+    private _options: PatternOptions = {};
+
+    /**
+     * Gets the configuration options for this pattern.
+     * @readonly
+     */
+    get options(): Readonly<PatternOptions> {
+        return this._options;
+    }
+
     /**
      * Creates a new pattern from template parts and captures.
      *
@@ -74,6 +219,24 @@ export class Pattern {
         public readonly templateParts: TemplateStringsArray,
         public readonly captures: Capture[]
     ) {
+    }
+
+    /**
+     * Configures this pattern with additional options.
+     *
+     * @param options Configuration options
+     * @returns This pattern for method chaining
+     *
+     * @example
+     * pattern`isDate(${capture('date')})`
+     *     .configure({
+     *         imports: ['import { isDate } from "util"'],
+     *         dependencies: { 'util': '^1.0.0' }
+     *     })
+     */
+    configure(options: PatternOptions): Pattern {
+        this._options = { ...this._options, ...options };
+        return this;
     }
 
     /**
@@ -92,11 +255,156 @@ export class Pattern {
 export class MatchResult implements Pick<Map<string, J>, "get"> {
     constructor(
         private readonly bindings: Map<string, J> = new Map()
-    ) {}
+    ) {
+    }
 
     get(capture: Capture | string): J | undefined {
         const name = typeof capture === "string" ? capture : capture.name;
         return this.bindings.get(name);
+    }
+}
+
+/**
+ * A comparator visitor that checks semantic equality including type attribution.
+ * This ensures that patterns only match code with compatible types, not just
+ * structurally similar code.
+ */
+class JavaScriptTemplateSemanticallyEqualVisitor extends JavaScriptComparatorVisitor {
+    /**
+     * Checks if two types are semantically equal.
+     * For method types, this checks that the declaring type and method name match.
+     */
+    private isOfType(target?: Type, source?: Type): boolean {
+        if (!target || !source) {
+            return target === source;
+        }
+
+        if (target.kind !== source.kind) {
+            return false;
+        }
+
+        // For method types, check declaring type
+        // Note: We don't check the name field because it might not be fully resolved in patterns
+        // The method invocation visitor already checks that simple names match
+        if (target.kind === Type.Kind.Method && source.kind === Type.Kind.Method) {
+            const targetMethod = target as Type.Method;
+            const sourceMethod = source as Type.Method;
+
+            // Only check that declaring types match
+            return this.isOfType(targetMethod.declaringType, sourceMethod.declaringType);
+        }
+
+        // For fully qualified types, check the fully qualified name
+        if (Type.isFullyQualified(target) && Type.isFullyQualified(source)) {
+            return Type.FullyQualified.getFullyQualifiedName(target) ===
+                   Type.FullyQualified.getFullyQualifiedName(source);
+        }
+
+        // Default: types are equal if they're the same kind
+        return true;
+    }
+
+    /**
+     * Override method invocation comparison to include type attribution checking.
+     * When types match semantically, we allow matching even if one has a receiver
+     * and the other doesn't (e.g., `isDate(x)` vs `util.isDate(x)`).
+     */
+    override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.MethodInvocation) {
+            return method;
+        }
+
+        const otherMethod = other as J.MethodInvocation;
+
+        // Check basic structural equality first
+        if (method.name.simpleName !== otherMethod.name.simpleName ||
+            method.arguments.elements.length !== otherMethod.arguments.elements.length) {
+            this.abort();
+            return method;
+        }
+
+        // Check type attribution
+        // Both must have method types for semantic equality
+        if (!method.methodType || !otherMethod.methodType) {
+            // If template has type but target doesn't, they don't match
+            if (method.methodType || otherMethod.methodType) {
+                this.abort();
+                return method;
+            }
+            // If neither has type, fall through to structural comparison
+            return super.visitMethodInvocation(method, other);
+        }
+
+        // Both have types - check they match semantically
+        const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
+        if (!typesMatch) {
+            // Types don't match - abort comparison
+            this.abort();
+            return method;
+        }
+
+        // Types match! Now we can ignore receiver differences and just compare arguments.
+        // This allows pattern `isDate(x)` to match both `isDate(x)` and `util.isDate(x)`
+        // when they have the same type attribution.
+
+        // Compare type parameters
+        if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
+            this.abort();
+            return method;
+        }
+
+        if (method.typeParameters && otherMethod.typeParameters) {
+            if (method.typeParameters.elements.length !== otherMethod.typeParameters.elements.length) {
+                this.abort();
+                return method;
+            }
+            for (let i = 0; i < method.typeParameters.elements.length; i++) {
+                await this.visit(method.typeParameters.elements[i].element, otherMethod.typeParameters.elements[i].element);
+                if (!this.match) return method;
+            }
+        }
+
+        // Compare name (already checked simpleName above, but visit for markers/prefix)
+        await this.visit(method.name, otherMethod.name);
+        if (!this.match) return method;
+
+        // Compare arguments
+        for (let i = 0; i < method.arguments.elements.length; i++) {
+            await this.visit(method.arguments.elements[i].element, otherMethod.arguments.elements[i].element);
+            if (!this.match) return method;
+        }
+
+        return method;
+    }
+
+    /**
+     * Override identifier comparison to include type checking for field access.
+     */
+    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.Identifier) {
+            return identifier;
+        }
+
+        const otherIdentifier = other as J.Identifier;
+
+        // Check name matches
+        if (identifier.simpleName !== otherIdentifier.simpleName) {
+            return identifier;
+        }
+
+        // For identifiers with field types, check type attribution
+        if (identifier.fieldType && otherIdentifier.fieldType) {
+            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType)) {
+                this.abort();
+                return identifier;
+            }
+        } else if (identifier.fieldType || otherIdentifier.fieldType) {
+            // If only one has a type, they don't match
+            this.abort();
+            return identifier;
+        }
+
+        return super.visitIdentifier(identifier, other);
     }
 }
 
@@ -106,7 +414,6 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
 class Matcher {
     private readonly bindings = new Map<string, J>();
     private patternAst?: J;
-    private templateProcessor?: TemplateProcessor;
 
     /**
      * Creates a new matcher for a pattern against an AST node.
@@ -127,8 +434,13 @@ class Matcher {
      */
     async matches(): Promise<boolean> {
         if (!this.patternAst) {
-            this.templateProcessor = new TemplateProcessor(this.pattern.templateParts, this.pattern.captures);
-            this.patternAst = await this.templateProcessor.toAstPattern();
+            const templateProcessor = new TemplateProcessor(
+                this.pattern.templateParts,
+                this.pattern.captures,
+                this.pattern.options.imports || [],
+                this.pattern.options.dependencies || {}
+            );
+            this.patternAst = await templateProcessor.toAstPattern();
         }
 
         return this.matchNode(this.patternAst, this.ast);
@@ -162,7 +474,7 @@ class Matcher {
         }
 
         const matcher = this;
-        return await ((new class extends JavaScriptComparatorVisitor {
+        return await ((new class extends JavaScriptTemplateSemanticallyEqualVisitor {
             protected hasSameKind(j: J, other: J): boolean {
                 return super.hasSameKind(j, other) || j.kind == J.Kind.Identifier && this.matchesParameter(j as J.Identifier, other);
             }
@@ -172,8 +484,7 @@ class Matcher {
             }
 
             private matchesParameter(identifier: J.Identifier, other: J): boolean {
-                return PlaceholderUtils.isCapture(identifier) &&
-                    matcher.handleCapture(identifier, other);
+                return PlaceholderUtils.isCapture(identifier) && matcher.handleCapture(identifier, other);
             }
         }).compare(pattern, target));
     }
@@ -186,15 +497,14 @@ class Matcher {
      * @returns true if the capture is successful, false otherwise
      */
     private handleCapture(pattern: J, target: J): boolean {
-        const id = pattern as J.Identifier;
-        const captureInfo = PlaceholderUtils.parseCapture(id.simpleName);
+        const captureName = PlaceholderUtils.getCaptureName(pattern);
 
-        if (!captureInfo) {
+        if (!captureName) {
             return false;
         }
 
         // Store the binding
-        this.bindings.set(captureInfo.name, target);
+        this.bindings.set(captureName, target);
         return true;
     }
 }
@@ -245,6 +555,24 @@ namespace JavaCoordinates {
 export type TemplateParameter = Capture | Tree | string | number | boolean;
 
 /**
+ * Configuration options for templates.
+ */
+export interface TemplateOptions {
+    /**
+     * Import statements to provide type attribution context.
+     * These are prepended to the template when parsing to ensure proper type information.
+     */
+    imports?: string[];
+
+    /**
+     * NPM dependencies required for import resolution and type attribution.
+     * Maps package names to version specifiers (e.g., { 'util': '^1.0.0' }).
+     * The template engine will create a package.json with these dependencies.
+     */
+    dependencies?: Record<string, string>;
+}
+
+/**
  * Template for creating AST nodes.
  *
  * This class provides the public API for template generation.
@@ -259,6 +587,8 @@ export type TemplateParameter = Capture | Tree | string | number | boolean;
  * const result = template`${capture()}`.apply(cursor, coordinates);
  */
 export class Template {
+    private options: TemplateOptions = {};
+
     /**
      * Creates a new template.
      *
@@ -272,6 +602,24 @@ export class Template {
     }
 
     /**
+     * Configures this template with additional options.
+     *
+     * @param options Configuration options
+     * @returns This template for method chaining
+     *
+     * @example
+     * template`isDate(${capture('date')})`
+     *     .configure({
+     *         imports: ['import { isDate } from "util"'],
+     *         dependencies: { 'util': '^1.0.0' }
+     *     })
+     */
+    configure(options: TemplateOptions): Template {
+        this.options = { ...this.options, ...options };
+        return this;
+    }
+
+    /**
      * Applies this template and returns the resulting tree.
      *
      * @param cursor The cursor pointing to the current location in the AST
@@ -280,10 +628,18 @@ export class Template {
      * @returns A Promise resolving to the generated AST node
      */
     async apply(cursor: Cursor, tree: J, values?: Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
-        return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, {
-            tree,
-            mode: JavaCoordinates.Mode.Replace
-        }, values);
+        return TemplateEngine.applyTemplate(
+            this.templateParts,
+            this.parameters,
+            cursor,
+            {
+                tree,
+                mode: JavaCoordinates.Mode.Replace
+            },
+            values,
+            this.options.imports || [],
+            this.options.dependencies || {}
+        );
     }
 }
 
@@ -321,6 +677,8 @@ class TemplateEngine {
      * @param cursor The cursor pointing to the current location in the AST
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @param values Map of capture names to values to replace the parameters with
+     * @param imports Import statements to prepend for type attribution
+     * @param dependencies NPM dependencies for type attribution
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplate(
@@ -328,7 +686,9 @@ class TemplateEngine {
         parameters: Parameter[],
         cursor: Cursor,
         coordinates: JavaCoordinates,
-        values: Pick<Map<string, J>, 'get'> = new Map()
+        values: Pick<Map<string, J>, 'get'> = new Map(),
+        imports: string[] = [],
+        dependencies: Record<string, string> = {}
     ): Promise<J | undefined> {
         // Build the template string with parameter placeholders
         const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
@@ -338,27 +698,40 @@ class TemplateEngine {
             return undefined;
         }
 
-        // Parse the template string into an AST
-        const parser = new JavaScriptParser();
-        const parseGenerator = parser.parse({text: templateString, sourcePath: 'template.ts'});
-        const cu: JS.CompilationUnit = (await parseGenerator.next()).value as JS.CompilationUnit;
+        // Use cache to get or parse the compilation unit
+        // For templates, we don't have captures, so use empty array
+        const cu = await templateCache.getOrParse(
+            templateString,
+            [], // templates don't have captures in the cache key
+            imports,
+            dependencies
+        );
 
         // Check if there are any statements
         if (!cu.statements || cu.statements.length === 0) {
             return undefined;
         }
 
+        // Skip import statements to get to the actual template code
+        const templateStatementIndex = imports.length;
+        if (templateStatementIndex >= cu.statements.length) {
+            return undefined;
+        }
+
         // Extract the relevant part of the AST
-        const firstStatement = cu.statements[0].element;
-        const ast = firstStatement.kind === JS.Kind.ExpressionStatement ?
+        const firstStatement = cu.statements[templateStatementIndex].element;
+        let extracted = firstStatement.kind === JS.Kind.ExpressionStatement ?
             (firstStatement as JS.ExpressionStatement).expression :
             firstStatement;
+
+        // Create a copy to avoid sharing cached AST instances
+        const ast = produce(extracted, draft => {});
 
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
         for (let i = 0; i < parameters.length; i++) {
             const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-            substitutions.set(placeholder, typeof parameters[i].value === 'string' ? {value: values.get(parameters[i].value) || parameters[i].value} : parameters[i]);
+            substitutions.set(placeholder, parameters[i]);
         }
 
         // Unsubstitute placeholders with actual parameter values and match results
@@ -376,16 +749,22 @@ class TemplateEngine {
      * @param parameters The parameters between the string parts
      * @returns The template string
      */
-    private static buildTemplateString(templateParts: TemplateStringsArray, parameters: Parameter[]): string {
+    private static buildTemplateString(
+        templateParts: TemplateStringsArray,
+        parameters: Parameter[]
+    ): string {
         let result = '';
         for (let i = 0; i < templateParts.length; i++) {
             result += templateParts[i];
             if (i < parameters.length) {
-                if (parameters[i].value instanceof CaptureImpl || typeof parameters[i].value === 'string' || isTree(parameters[i].value)) {
+                const param = parameters[i].value;
+                // Use a placeholder for Captures and Tree nodes
+                // Inline everything else (strings, numbers, booleans) directly
+                if (param instanceof CaptureImpl || isTree(param)) {
                     const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
                     result += placeholder;
                 } else {
-                    result += parameters[i].value;
+                    result += param;
                 }
             }
         }
@@ -408,11 +787,30 @@ class PlaceholderUtils {
      * @returns true if the node is a capture placeholder, false otherwise
      */
     static isCapture(node: J): boolean {
-        if (node.kind === J.Kind.Identifier) {
-            const id = node as J.Identifier;
-            return id.simpleName.startsWith(this.CAPTURE_PREFIX);
+        // Check for CaptureMarker first (efficient)
+        for (const marker of node.markers.markers) {
+            if (marker instanceof CaptureMarker) {
+                return true;
+            }
         }
         return false;
+    }
+
+    /**
+     * Gets the capture name from a node with a CaptureMarker.
+     *
+     * @param node The node to extract capture name from
+     * @returns The capture name, or null if not a capture
+     */
+    static getCaptureName(node: J): string | undefined {
+        // Check for CaptureMarker
+        for (const marker of node.markers.markers) {
+            if (marker instanceof CaptureMarker) {
+                return marker.captureName;
+            }
+        }
+
+        return undefined;
     }
 
     /**
@@ -577,7 +975,7 @@ class TemplateApplier {
      * @returns A Promise resolving to the modified AST
      */
     async apply(): Promise<J | undefined> {
-        const {tree, loc, mode} = this.coordinates;
+        const {loc} = this.coordinates;
 
         // Apply the template based on the location and mode
         switch (loc || 'EXPRESSION_PREFIX') {
@@ -645,10 +1043,14 @@ class TemplateProcessor {
      *
      * @param templateParts The string parts of the template
      * @param captures The captures between the string parts
+     * @param imports Import statements to prepend for type attribution
+     * @param dependencies NPM dependencies for type attribution
      */
     constructor(
         private readonly templateParts: TemplateStringsArray,
-        private readonly captures: Capture[]
+        private readonly captures: Capture[],
+        private readonly imports: string[] = [],
+        private readonly dependencies: Record<string, string> = {}
     ) {
     }
 
@@ -661,10 +1063,14 @@ class TemplateProcessor {
         // Combine template parts and placeholders
         const templateString = this.buildTemplateString();
 
-        // Parse template string to AST
-        const parser = new JavaScriptParser();
-        const parseGenerator = parser.parse({text: templateString, sourcePath: 'template.ts'});
-        const cu: JS.CompilationUnit = (await parseGenerator.next()).value as JS.CompilationUnit;
+        // Use cache to get or parse the compilation unit
+        const cu = await templateCache.getOrParse(
+            templateString,
+            this.captures,
+            this.imports,
+            this.dependencies
+        );
+
         // Extract the relevant part of the AST
         return this.extractPatternFromAst(cu);
     }
@@ -693,16 +1099,81 @@ class TemplateProcessor {
      * @returns The extracted pattern
      */
     private extractPatternFromAst(cu: JS.CompilationUnit): J {
-        // Extract the relevant part of the AST based on the template content
-        const firstStatement = cu.statements[0].element;
+        // Skip import statements to get to the actual pattern code
+        const patternStatementIndex = this.imports.length;
 
+        // Extract the relevant part of the AST based on the template content
+        const firstStatement = cu.statements[patternStatementIndex].element;
+
+        let extracted: J;
         // If the first statement is an expression statement, extract the expression
         if (firstStatement.kind === JS.Kind.ExpressionStatement) {
-            return (firstStatement as JS.ExpressionStatement).expression;
+            extracted = (firstStatement as JS.ExpressionStatement).expression;
+        } else {
+            // Otherwise, return the statement itself
+            extracted = firstStatement;
         }
 
-        // Otherwise, return the statement itself
-        return firstStatement;
+        // Attach CaptureMarkers to capture identifiers
+        return this.attachCaptureMarkers(extracted);
+    }
+
+    /**
+     * Attaches CaptureMarkers to capture identifiers in the AST.
+     * This allows efficient capture detection without string parsing.
+     *
+     * @param ast The AST to process
+     * @returns The AST with CaptureMarkers attached
+     */
+    private attachCaptureMarkers(ast: J): J {
+        const visited = new Set<any>();
+        return produce(ast, draft => {
+            this.visitAndAttachMarkers(draft, visited);
+        });
+    }
+
+    /**
+     * Recursively visits AST nodes and attaches CaptureMarkers to capture identifiers.
+     *
+     * @param node The node to visit
+     * @param visited Set of already visited nodes to avoid cycles
+     */
+    private visitAndAttachMarkers(node: any, visited: Set<any>): void {
+        if (!node || typeof node !== 'object' || visited.has(node)) {
+            return;
+        }
+
+        // Mark as visited to avoid cycles
+        visited.add(node);
+
+        // If this is an identifier that looks like a capture, attach a marker
+        if (node.kind === J.Kind.Identifier && node.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
+            const captureInfo = PlaceholderUtils.parseCapture(node.simpleName);
+            if (captureInfo) {
+                // Initialize markers if needed
+                if (!node.markers) {
+                    node.markers = { kind: 'org.openrewrite.marker.Markers', id: randomId(), markers: [] };
+                }
+                if (!node.markers.markers) {
+                    node.markers.markers = [];
+                }
+
+                // Add CaptureMarker
+                node.markers.markers.push(new CaptureMarker(captureInfo.name));
+            }
+        }
+
+        // Recursively visit all properties
+        for (const key in node) {
+            if (node.hasOwnProperty(key)) {
+                const value = node[key];
+                if (Array.isArray(value)) {
+                    value.forEach(item => this.visitAndAttachMarkers(item, visited));
+                } else if (typeof value === 'object' && value !== null) {
+                    this.visitAndAttachMarkers(value, visited);
+                }
+            }
+        }
     }
 }
 
@@ -710,6 +1181,15 @@ class TemplateProcessor {
  * Represents a replacement rule that can match a pattern and apply a template.
  */
 export interface RewriteRule {
+    /**
+     * Attempts to apply this rewrite rule to the given AST node.
+     *
+     * @param cursor The cursor context at the current position in the AST
+     * @param node The AST node to try matching and transforming
+     * @returns The transformed node if a pattern matched, or `undefined` if no pattern matched.
+     *          When using in a visitor, always use the `|| node` pattern to return the original
+     *          node when there's no match: `return await rule.tryOn(this.cursor, node) || node;`
+     */
     tryOn(cursor: Cursor, node: J): Promise<J | undefined>;
 }
 
@@ -734,7 +1214,6 @@ class RewriteRuleImpl implements RewriteRule {
     async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
         for (const pattern of this.before) {
             const match = await pattern.match(node);
-
             if (match) {
                 const result = await this.after.apply(cursor, node, match);
                 if (result) {
@@ -756,22 +1235,35 @@ class RewriteRuleImpl implements RewriteRule {
  *
  * @example
  * // Single pattern
- * const swapOperands = replace<J.Binary>(() => ({
+ * const swapOperands = rewrite(() => ({
  *     before: pattern`${"left"} + ${"right"}`,
  *     after: template`${"right"} + ${"left"}`
  * }));
  *
  * @example
  * // Multiple patterns
- * const normalizeComparisons = replace<J.Binary>(() => ({
+ * const normalizeComparisons = rewrite(() => ({
  *     before: [
  *         pattern`${"left"} == ${"right"}`,
  *         pattern`${"left"} === ${"right"}`
  *     ],
  *     after: template`${"left"} === ${"right"}`
  * }));
+ *
+ * @example
+ * // Using in a visitor - IMPORTANT: use `|| node` to handle undefined when no match
+ * class MyVisitor extends JavaScriptVisitor<any> {
+ *     override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+ *         const rule = rewrite(() => ({
+ *             before: pattern`${capture('a')} + ${capture('b')}`,
+ *             after: template`${capture('b')} + ${capture('a')}`
+ *         }));
+ *         // tryOn() returns undefined if no pattern matches, so always use || node
+ *         return await rule.tryOn(this.cursor, binary) || binary;
+ *     }
+ * }
  */
-export function rewrite<T extends J>(
+export function rewrite(
     builderFn: () => RewriteConfig
 ): RewriteRule {
     const config = builderFn();

@@ -16,7 +16,7 @@
 package org.openrewrite.ipc.http;
 
 import io.micrometer.core.instrument.util.StringUtils;
-import io.micrometer.core.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.*;
 import java.net.MalformedURLException;

@@ -17,8 +17,52 @@ import {AfterRecipeText, dedentAfter, SourceSpec} from "../test";
 import {JavaScriptParser} from "./parser";
 import {JS} from "./tree";
 import ts from 'typescript';
+import {json, Json} from "../json";
+import * as fs from "fs";
+import * as path from "path";
+import {DependencyWorkspace} from "./dependency-workspace";
 
 const sourceFileCache: Map<string, ts.SourceFile> = new Map();
+
+export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): AsyncGenerator<SourceSpec<any>, void, unknown> {
+    for (const spec of sourceSpecs) {
+        if (spec.path === 'package.json') {
+            // Parse package.json to extract dependencies
+            const packageJsonContent = JSON.parse(spec.before!);
+            const dependencies = {
+                ...packageJsonContent.dependencies,
+                ...packageJsonContent.devDependencies
+            };
+
+            // Use DependencyWorkspace to create workspace in relativeTo directory
+            // This will check if it's already valid and skip npm install if so
+            if (Object.keys(dependencies).length > 0) {
+                await DependencyWorkspace.getOrCreateWorkspace(dependencies, relativeTo);
+            }
+
+            yield spec;
+        }
+    }
+    for (const spec of sourceSpecs) {
+        if (spec.path !== 'package.json') {
+            if (spec.kind === JS.Kind.CompilationUnit) {
+                yield {
+                    ...spec,
+                    parser: () => new JavaScriptParser({sourceFileCache, relativeTo})
+                }
+            } else {
+                yield spec;
+            }
+        }
+    }
+}
+
+export function packageJson(before: string, after?: AfterRecipeText): SourceSpec<Json.Document> {
+    return {
+        ...json(before, after),
+        path: 'package.json'
+    };
+}
 
 export function javascript(before: string | null, after?: AfterRecipeText): SourceSpec<JS.CompilationUnit> {
     return {
@@ -26,7 +70,7 @@ export function javascript(before: string | null, after?: AfterRecipeText): Sour
         before: before,
         after: dedentAfter(after),
         ext: 'js',
-        parser: () => new JavaScriptParser({sourceFileCache})
+        parser: ctx => new JavaScriptParser({sourceFileCache})
     };
 }
 

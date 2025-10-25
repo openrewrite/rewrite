@@ -15,11 +15,13 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.InlineMe;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
@@ -103,6 +105,53 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
             required = false)
     @Nullable
     Boolean addToRootPom;
+
+    @Option(displayName = "Because",
+            description = "The reason for adding the managed dependency. This will be added as an XML comment preceding the managed dependency.",
+            required = false,
+            example = "CVE-2021-1234")
+    @Nullable
+    String because;
+
+    @Deprecated
+    @InlineMe(replacement = "this(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, null)")
+    public AddManagedDependency(String groupId,
+                                String artifactId,
+                                String version,
+                                @Nullable String scope,
+                                @Nullable String type,
+                                @Nullable String classifier,
+                                @Nullable String versionPattern,
+                                @Nullable Boolean releasesOnly,
+                                @Nullable String onlyIfUsing,
+                                @Nullable Boolean addToRootPom) {
+        this(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, null);
+    }
+
+    @JsonCreator
+    public AddManagedDependency(String groupId,
+                                String artifactId,
+                                String version,
+                                @Nullable String scope,
+                                @Nullable String type,
+                                @Nullable String classifier,
+                                @Nullable String versionPattern,
+                                @Nullable Boolean releasesOnly,
+                                @Nullable String onlyIfUsing,
+                                @Nullable Boolean addToRootPom,
+                                @Nullable String because) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.scope = scope;
+        this.type = type;
+        this.classifier = classifier;
+        this.versionPattern = versionPattern;
+        this.releasesOnly = releasesOnly;
+        this.onlyIfUsing = onlyIfUsing;
+        this.addToRootPom = addToRootPom;
+        this.because = because;
+    }
 
     @Override
     public Validated<Object> validate() {
@@ -226,7 +275,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                                     versionToUse = version;
                                 }
                                 doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
-                                        versionToUse, scope, type, classifier));
+                                        versionToUse, scope, type, classifier, because));
                                 maybeUpdateModel();
                             }
                         } catch (MavenDownloadingException e) {
