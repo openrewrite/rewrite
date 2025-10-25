@@ -212,7 +212,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
           groovy(
                 """
               package org.gradle.api
-              
+
               interface Action<T> {
                   void execute(T t);
               }

@@ -39,10 +39,11 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
@@ -98,15 +99,15 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                     charsetBomMarked,
                     null,
                     fileAttributes,
-                    Collections.emptyList(),
+                    emptyList(),
                     Space.EMPTY
             );
         }
 
         List<TomlValue> elements = new ArrayList<>();
-        // The last element is a "TerminalNode" which we are uninterested in
-        for (int i = 0; i < ctx.children.size() - 1; i++) {
-            TomlValue element = (TomlValue) visit(ctx.children.get(i));
+        for (TomlParser.ExpressionContext expr: ctx.expression()) {
+            TomlValue element = (TomlValue) visit(expr);
+            //noinspection ConstantValue
             if (element != null) {
                 elements.add(element);
             }
@@ -370,7 +371,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             return new Toml.Table(
                     randomId(),
                     prefix,
-                    Markers.build(Collections.singletonList(new InlineTable(randomId()))),
+                    Markers.build(singletonList(new InlineTable(randomId()))),
                     null,
                     elements
             );
@@ -386,8 +387,8 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
 
             List<TomlParser.KeyValueContext> values = c.keyValue();
             List<TomlRightPadded<Toml>> elements = new ArrayList<>();
-            for (int i = 0; i < values.size(); i++) {
-                elements.add(TomlRightPadded.build(visit(values.get(i))));
+            for (TomlParser.KeyValueContext value : values) {
+                elements.add(TomlRightPadded.build(visit(value)));
             }
 
             return new Toml.Table(
@@ -409,14 +410,14 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
 
             List<TomlParser.KeyValueContext> values = c.keyValue();
             List<TomlRightPadded<Toml>> elements = new ArrayList<>();
-            for (int i = 0; i < values.size(); i++) {
-                elements.add(TomlRightPadded.build(visit(values.get(i))));
+            for (TomlParser.KeyValueContext value : values) {
+                elements.add(TomlRightPadded.build(visit(value)));
             }
 
             return new Toml.Table(
                     randomId(),
                     prefix,
-                    Markers.build(Collections.singletonList(new ArrayTable(randomId()))),
+                    Markers.build(singletonList(new ArrayTable(randomId()))),
                     nameRightPadded,
                     elements
             );
@@ -425,10 +426,6 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
 
     private Space prefix(ParserRuleContext ctx) {
         return prefix(ctx.getStart());
-    }
-
-    private Space prefix(@Nullable TerminalNode terminalNode) {
-        return terminalNode == null ? Space.EMPTY : prefix(terminalNode.getSymbol());
     }
 
     private Space prefix(Token token) {
@@ -440,28 +437,20 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     }
 
     public int advanceCursor(int newCodePointIndex) {
-        for (; codePointCursor < newCodePointIndex; codePointCursor++) {
-            cursor = source.offsetByCodePoints(cursor, 1);
+        if (newCodePointIndex <= codePointCursor) {
+            return cursor;
         }
+        cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
+        codePointCursor = newCodePointIndex;
         return cursor;
     }
 
-    private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, Space, T> conversion) {
-        if (ctx == null) {
-            return null;
-        }
-
+    private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, Space, T> conversion) {
         T t = conversion.apply(ctx, prefix(ctx));
         if (ctx.getStop() != null) {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return t;
-    }
-
-    private <T> T convert(TerminalNode node, BiFunction<TerminalNode, Space, T> conversion) {
-        T t = conversion.apply(node, prefix(node));
-        advanceCursor(node.getSymbol().getStopIndex() + 1);
         return t;
     }
 

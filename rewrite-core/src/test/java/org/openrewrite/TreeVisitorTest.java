@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +30,7 @@ class TreeVisitorTest {
 
     @Test
     void scheduleAfterOnVisitWithCursor() {
-        Quark quark = new Quark(Tree.randomId(), Paths.get("quark"), Markers.EMPTY, null, null);
+        Quark quark = new Quark(Tree.randomId(), Path.of("quark"), Markers.EMPTY, null, null);
         AtomicInteger visited = new AtomicInteger(0);
         TreeVisitor<Tree, Integer> scheduled = new TreeVisitor<>() {
             @Override

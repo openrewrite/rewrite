@@ -310,7 +310,7 @@ class FindMethodsTest implements RewriteTest {
             """
               public @interface Example {
                   String name() default "";
-              
+
                   String description() default "";
               }
               """

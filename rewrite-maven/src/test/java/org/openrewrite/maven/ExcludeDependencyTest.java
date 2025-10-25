@@ -42,7 +42,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>2.3.6.RELEASE</version>
                 </parent>
-              
+
                 <groupId>com.example</groupId>
                 <artifactId>demo</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
@@ -67,7 +67,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>2.3.6.RELEASE</version>
                 </parent>
-              
+
                 <groupId>com.example</groupId>
                 <artifactId>demo</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
@@ -105,7 +105,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>2.4.0</version>
                 </parent>
-              
+
                 <groupId>com.example</groupId>
                 <artifactId>demo</artifactId>
                 <dependencies>
@@ -246,6 +246,120 @@ class ExcludeDependencyTest implements RewriteTest {
                       <exclusion>
                         <groupId>org.apache.logging.log4j</groupId>
                         <artifactId>log4j-api</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void excludeFromEjbTypeDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeDependency("org.projectlombok", "lombok", null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <version>1.0.1.0</version>
+                    <type>ejb</type>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <version>1.0.1.0</version>
+                    <type>ejb</type>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void excludeFromManagedEjbTypeDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeDependency("org.projectlombok", "lombok", null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>ru.send-to.ejb</groupId>
+                      <artifactId>EjbContext</artifactId>
+                      <version>1.0.1.0</version>
+                      <type>ejb</type>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <type>ejb</type>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>ru.send-to.ejb</groupId>
+                      <artifactId>EjbContext</artifactId>
+                      <version>1.0.1.0</version>
+                      <type>ejb</type>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <type>ejb</type>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
                       </exclusion>
                     </exclusions>
                   </dependency>

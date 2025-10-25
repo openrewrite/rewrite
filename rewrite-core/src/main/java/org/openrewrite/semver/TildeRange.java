@@ -22,6 +22,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.lang.Integer.parseInt;
+import static java.util.Objects.requireNonNull;
+import static org.openrewrite.semver.Semver.isVersion;
 
 /**
  * Allows patch-level changes if a minor version is specified on the comparator. Allows minor-level changes if not.
@@ -80,5 +82,53 @@ public class TildeRange extends LatestRelease {
         }
 
         return Validated.valid("tildeRange", new TildeRange(lower, upper, metadataPattern, requireRelease));
+    }
+
+    @Override
+    public int compare(@Nullable String currentVersion, String v1, String v2) {
+        Validated<TildeRange> maybeTildeRangeV1 = build(v1, null);
+        Validated<TildeRange> maybeTildeRangeV2 = build(v2, null);
+        if (maybeTildeRangeV1.isValid() && maybeTildeRangeV2.isValid()) {
+            TildeRange tildeRangeV1 = requireNonNull(maybeTildeRangeV1.getValue());
+            TildeRange tildeRangeV2 = requireNonNull(maybeTildeRangeV2.getValue());
+            int compare = super.compare(currentVersion, tildeRangeV1.upperExclusive, tildeRangeV2.upperExclusive);
+            if (compare != 0) {
+                return compare;
+            }
+
+            return super.compare(currentVersion, tildeRangeV1.lower, tildeRangeV2.lower);
+        } else if (maybeTildeRangeV1.isValid()) {
+            if (!isVersion(v2)) {
+                return 1;
+            }
+
+            TildeRange tildeRangeV1 = requireNonNull(maybeTildeRangeV1.getValue());
+            int compare = super.compare(currentVersion, tildeRangeV1.upperExclusive, v2);
+            if (compare < 0) {
+                return compare;
+            } else if (compare == 0) {
+                return -1;
+            }
+
+            compare = super.compare(currentVersion, tildeRangeV1.lower, v2);
+            return Math.max(compare, 0);
+        } else if (maybeTildeRangeV2.isValid()) {
+            if (!isVersion(v1)) {
+                return -1;
+            }
+
+            TildeRange tildeRangeV2 = requireNonNull(maybeTildeRangeV2.getValue());
+            int compare = super.compare(currentVersion, v1, tildeRangeV2.upperExclusive);
+            if (compare > 0) {
+                return compare;
+            } else if (compare == 0) {
+                return 1;
+            }
+
+            compare = super.compare(currentVersion, v1, tildeRangeV2.lower);
+            return Math.min(compare, 0);
+        }
+
+        return super.compare(currentVersion, v1, v2);
     }
 }

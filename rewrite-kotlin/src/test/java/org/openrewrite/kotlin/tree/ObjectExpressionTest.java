@@ -62,7 +62,7 @@ class ObjectExpressionTest implements RewriteTest {
             """
               open class A
               interface B
-              
+
               val foo: Any = object: A ( ), B { }
               """
           )

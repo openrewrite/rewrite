@@ -16,22 +16,30 @@
 package org.openrewrite.text;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.jgit.diff.RawText;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.stream.Collectors;
+import java.util.List;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static java.util.stream.Collectors.toList;
 
 public class PlainTextParser implements Parser {
 
@@ -47,13 +55,14 @@ public class PlainTextParser implements Parser {
             return (PlainText) sourceFile;
         }
         PlainText text = PlainTextParser.builder().build()
-                .parse(sourceFile.printAll())
+                .parse(sourceFile.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Failed to parse as plain text"))
                 .withSourcePath(sourceFile.getSourcePath())
                 .withFileAttributes(sourceFile.getFileAttributes())
                 .withCharsetBomMarked(sourceFile.isCharsetBomMarked())
-                .withId(sourceFile.getId());
+                .withId(sourceFile.getId())
+                .withMarkers(sourceFile.getMarkers().withMarkers(gatherMarkers(sourceFile)));
         if (sourceFile.getCharset() != null) {
             text = (PlainText) text.withCharset(sourceFile.getCharset());
         }
@@ -88,7 +97,11 @@ public class PlainTextParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return true;
+        try (InputStream is = Files.newInputStream(path)) {
+            return !RawText.isBinary(is);
+        } catch (IOException ignored) {
+            return false;
+        }
     }
 
     @Override
@@ -116,7 +129,7 @@ public class PlainTextParser implements Parser {
         public Builder plainTextMasks(Path basePath, Iterable<String> plainTextMaskGlobs) {
             return plainTextMasks(StreamSupport.stream(plainTextMaskGlobs.spliterator(), false)
                     .map((o) -> basePath.getFileSystem().getPathMatcher("glob:" + o))
-                    .collect(Collectors.toList()));
+                    .collect(toList()));
         }
 
         @Override
@@ -132,10 +145,10 @@ public class PlainTextParser implements Parser {
                         }
                         // PathMather will not evaluate the path "README.md" to be matched by the pattern "**/README.md"
                         // This is counter-intuitive for most users and would otherwise require separate exclusions for files at the root and files in subdirectories
-                        if(!path.isAbsolute() && !path.startsWith(File.separator)) {
+                        if (!path.isAbsolute() && !path.startsWith(File.separator)) {
                             return accept(Paths.get("/" + path));
                         }
-                        return false;
+                        return super.accept(path);
                     }
                 };
             }
@@ -146,5 +159,21 @@ public class PlainTextParser implements Parser {
         public String getDslName() {
             return "text";
         }
+    }
+
+    private static List<Marker> gatherMarkers(SourceFile sourceFile) {
+        return new TreeVisitor<Tree, List<Marker>>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, List<Marker> markers) {
+                if (tree != null && tree != sourceFile) {
+                    tree.getMarkers().getMarkers().forEach(marker -> {
+                        if (marker instanceof SearchResult || marker instanceof Markup) {
+                            markers.add(marker);
+                        }
+                    });
+                }
+                return super.visit(tree, markers);
+            }
+        }.reduce(sourceFile, new ArrayList<>(sourceFile.getMarkers().getMarkers()));
     }
 }

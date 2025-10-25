@@ -29,10 +29,10 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -146,7 +146,7 @@ class ArrayTypeTest implements RewriteTest {
           Tree.randomId(),
           Space.EMPTY,
           Markers.EMPTY,
-          Collections.emptyList(),
+          emptyList(),
           "String",
           JavaType.ShallowClass.build("java.lang.String"),
           null
@@ -157,7 +157,7 @@ class ArrayTypeTest implements RewriteTest {
           Space.EMPTY,
           Markers.EMPTY,
           elementType,
-          Collections.emptyList(),
+          emptyList(),
           null,
           null,
           null

@@ -21,6 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.protobuf.ProtoVisitor;
+import org.openrewrite.protobuf.marker.ImplicitProto2Syntax;
 import org.openrewrite.protobuf.tree.*;
 
 import java.util.List;
@@ -302,6 +303,10 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Proto visitSyntax(Proto.Syntax syntax, PrintOutputCapture<P> p) {
+        // Skip printing implicit proto2 syntax that was not present in the original source
+        if (syntax.getMarkers().findFirst(ImplicitProto2Syntax.class).isPresent()) {
+            return syntax;
+        }
         beforeSyntax(syntax, p);
         p.append("syntax");
         visitSpace(syntax.getKeywordSuffix(), p);

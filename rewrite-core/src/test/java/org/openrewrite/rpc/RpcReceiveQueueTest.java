@@ -17,11 +17,12 @@ package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Checksum;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.Tree;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,20 +37,14 @@ public class RpcReceiveQueueTest {
     void setUp() {
         batches = new ArrayDeque<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), localRefs, false);
-        rq = new RpcReceiveQueue(new HashMap<>(), null, batches::removeFirst, refId ->
-            // Find the object with this ref ID in the send queue's local refs
-            localRefs.entrySet().stream()
-                    .filter(entry -> entry.getValue().equals(refId))
-                    .map(Map.Entry::getKey)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Reference " + refId + " not found in test")));
+        sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), localRefs, PlainText.class.getName(), false);
+        rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, PlainText.class.getName(), null);
     }
 
     @Test
     void add() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
 
@@ -66,7 +61,7 @@ public class RpcReceiveQueueTest {
     @SuppressWarnings("UnnecessaryLocalVariable")
     void noChange() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
         PlainText noChange = before;
@@ -82,7 +77,7 @@ public class RpcReceiveQueueTest {
     @Test
     void changeId() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
         PlainText newId = before.withId(Tree.randomId());
@@ -95,11 +90,27 @@ public class RpcReceiveQueueTest {
         assertThat(after.getId()).isEqualTo(newId.getId());
     }
 
+    @Test
+    void changePropertyType() {
+        // Test changing a property from FileAttributes to Checksum
+        // This simulates a recipe that changes the type of an object assigned to a property
+        FileAttributes beforeAttr = new FileAttributes(null, null, null, true, true, false, 100);
+        Checksum afterChecksum = new Checksum("SHA-256", new byte[]{1, 2, 3});
+
+        sq.send(afterChecksum, beforeAttr, null);
+        assertThat(batches).isNotEmpty();
+
+        Object received = rq.receive(beforeAttr);
+
+        assertThat(received).isInstanceOf(Checksum.class);
+        assertThat(((Checksum) received).getAlgorithm()).isEqualTo("SHA-256");
+    }
+
     private List<RpcObjectData> encode(List<RpcObjectData> batch) {
         List<RpcObjectData> encoded = new ArrayList<>();
         for (RpcObjectData data : batch) {
             if (data.getValue() instanceof UUID || data.getValue() instanceof Path) {
-                encoded.add(new RpcObjectData(data.getState(), data.getValueType(), data.getValue().toString(), data.getRef(), data.getTrace()));
+                encoded.add(new RpcObjectData(data.getState(), data.getValueType(), data.getValue().toString(), data.getRef(), false));
             } else {
                 encoded.add(data);
             }

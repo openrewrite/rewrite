@@ -16,13 +16,11 @@
 package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.semver.Semver;
 
-@Getter
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpgradeParentVersion extends Recipe {
@@ -84,11 +82,17 @@ public class UpgradeParentVersion extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return changeParentPom().getVisitor();
-    }
-
-    private ChangeParentPom changeParentPom() {
-        return new ChangeParentPom(groupId, null, artifactId, null, newVersion, Boolean.TRUE.equals(onlyExternal) ? "" : null, null,
-                versionPattern, false);
+        return new ChangeParentPom(
+                groupId,
+                null,
+                artifactId,
+                null,
+                newVersion,
+                Boolean.TRUE.equals(onlyExternal) ? "" : null,
+                null,
+                versionPattern,
+                false,
+                null)
+                .getVisitor();
     }
 }

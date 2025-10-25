@@ -174,7 +174,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
           java(
             """
             package com.helloworld;
-            
+
             import java.util.Objects;
 
             class Hello {
@@ -204,7 +204,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
           java(
             """
             package com.helloworld;
-            
+
             import java.util.Objects;
 
             class Hello {
@@ -224,6 +224,31 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                 if (!(abc == null)) {
                   return;
                 }
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4031")
+    @Test
+    void unwrapReturnedBinary() {
+        rewriteRun(
+          java(
+            """            
+            import java.util.Objects;
+
+            class Foo {
+              boolean foo(Object o) {
+                return Objects.isNull(o);
+              }
+            }
+            """,
+            """            
+            class Foo {
+              boolean foo(Object o) {
+                return o == null;
               }
             }
             """

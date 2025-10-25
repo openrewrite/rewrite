@@ -21,19 +21,13 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.config.Environment;
-import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
-import org.openrewrite.javascript.internal.rpc.JavaScriptReceiver;
-import org.openrewrite.javascript.internal.rpc.JavaScriptSender;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.RpcReceiveQueue;
-import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
@@ -47,10 +41,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
 public interface JS extends J {
@@ -76,16 +70,6 @@ public interface JS extends J {
     @Override
     default List<Comment> getComments() {
         return getPrefix().getComments();
-    }
-
-    @Override
-    default void rpcSend(J after, RpcSendQueue q) {
-        new JavaScriptSender().visit(after, q);
-    }
-
-    @Override
-    default J rpcReceive(J before, RpcReceiveQueue q) {
-        return new JavaScriptReceiver().visitNonNull(before, q);
     }
 
     @ToString
@@ -181,7 +165,7 @@ public interface JS extends J {
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override
@@ -199,15 +183,12 @@ public interface JS extends J {
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
                 @Override
-                public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
-                    try (ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope = JavaScriptRewriteRpc.current()
-                            .requireOrCreate(JavaScriptRewriteRpc.bundledInstallation(Environment.builder().build())::build)) {
-                        return scope.map(rpc -> {
-                            Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                            p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                            return tree;
-                        });
-                    }
+                public Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
+                    JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.getOrStart();
+                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                    stopAfterPreVisit();
+                    return tree;
                 }
             };
         }
@@ -3869,8 +3850,8 @@ public interface JS extends J {
         @Override
         public String toString() {
             return "ComputedPropertyMethodDeclaration{" +
-                    (getMethodType() == null ? "unknown" : getMethodType()) +
-                    "}";
+                   (getMethodType() == null ? "unknown" : getMethodType()) +
+                   "}";
         }
 
         public ComputedPropertyMethodDeclaration.Padding getPadding() {

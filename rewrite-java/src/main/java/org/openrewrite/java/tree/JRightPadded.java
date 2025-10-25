@@ -24,6 +24,8 @@ import org.openrewrite.marker.Markers;
 import java.util.*;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
+
 /**
  * A Java element that could have trailing space.
  *
@@ -33,6 +35,7 @@ import java.util.function.UnaryOperator;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 public class JRightPadded<T> {
+
     T element;
     Space after;
     Markers markers;
@@ -86,8 +89,7 @@ public class JRightPadded<T> {
         TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
         TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
         WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX),
-        ANY(Space.Location.ANY)
-        ;
+        ANY(Space.Location.ANY);
 
         private final Space.Location afterLocation;
 
@@ -102,7 +104,7 @@ public class JRightPadded<T> {
 
     public static <T> List<T> getElements(@Nullable List<JRightPadded<T>> ls) {
         if (ls == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         List<T> list = new ArrayList<>(ls.size());
         for (JRightPadded<T> l : ls) {
@@ -139,7 +141,7 @@ public class JRightPadded<T> {
                 return before;
             }
         } else if (elements.isEmpty()) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         List<JRightPadded<J2>> after = new ArrayList<>(elements.size());

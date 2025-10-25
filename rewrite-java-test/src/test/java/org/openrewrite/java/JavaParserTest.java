@@ -208,7 +208,7 @@ class JavaParserTest implements RewriteTest {
               public class User implements InterfaceA, InterfaceB {
                 @Override
                 public void methodA() {}
-              
+
                 @Override
                public void methodB() {}
               }
@@ -334,7 +334,7 @@ class JavaParserTest implements RewriteTest {
               .extracting("text")
               .containsExactly(
                 """
-                  
+
                        * public Some getOther() { return other; }
                        *
                        \
@@ -348,7 +348,7 @@ class JavaParserTest implements RewriteTest {
                        \
                   """,
                 """
-                  
+
                        * public void setOther(Some value) { this.other =
                        * value; }
                        \
@@ -391,7 +391,29 @@ class JavaParserTest implements RewriteTest {
               }
             }
             """
-          ));
+          )
+        );
+    }
+
+    @Test
+    void multiLinePackageComment() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+              package com.abc;
+              public class Server {
+                /**
+                 * @see com.abc.Server#load(
+                 * java.lang.
+                 * String)
+                 */
+                public void load(String str) {
+                }
+              }
+              """
+          )
+        );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/5445")
@@ -435,5 +457,4 @@ class JavaParserTest implements RewriteTest {
           )
         );
     }
-
 }

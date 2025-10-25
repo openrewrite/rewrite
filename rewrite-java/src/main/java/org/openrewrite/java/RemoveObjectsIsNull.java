@@ -47,14 +47,14 @@ public class RemoveObjectsIsNull extends Recipe {
             public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (IS_NULL.matches(m)) {
-                    return replace(ctx, m, "(#{any(boolean)}) == null");
+                    return replace(m, "(#{any()}) == null", ctx);
                 } else if (NON_NULL.matches(m)) {
-                    return replace(ctx, m, "(#{any(boolean)}) != null");
+                    return replace(m, "(#{any()}) != null", ctx);
                 }
                 return m;
             }
 
-            private Expression replace(ExecutionContext ctx, J.MethodInvocation m, String pattern) {
+            private Expression replace(J.MethodInvocation m, String pattern, ExecutionContext ctx) {
                 maybeRemoveImport("java.util.Objects");
                 maybeRemoveImport("java.util.Objects." + m.getSimpleName());
 
@@ -72,15 +72,18 @@ public class RemoveObjectsIsNull extends Recipe {
                     pattern = '(' + pattern + ')';
                 }
                 parentTreeCursor.putMessage("SIMPLIFY_BOOLEAN_EXPRESSION", true);
-                Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), m.getArguments().get(0));
-                return (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx);
+                parentTreeCursor.putMessage("REMOVE_UNNECESSARY_PARENTHESES", true);
+                return JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), m.getArguments().get(0));
             }
 
             @Override
             public J postVisit(J tree, ExecutionContext ctx) {
                 J j = super.postVisit(tree, ctx);
                 if (Boolean.TRUE.equals(getCursor().pollMessage("SIMPLIFY_BOOLEAN_EXPRESSION"))) {
-                    return new SimplifyBooleanExpressionVisitor().visit(j, ctx, getCursor().getParentOrThrow());
+                    j = new SimplifyBooleanExpressionVisitor().visit(j, ctx, getCursor().getParentOrThrow());
+                }
+                if (Boolean.TRUE.equals(getCursor().pollMessage("REMOVE_UNNECESSARY_PARENTHESES"))) {
+                    j = new UnnecessaryParenthesesVisitor<>().visit(j, ctx, getCursor().getParentOrThrow());
                 }
                 return j;
             }

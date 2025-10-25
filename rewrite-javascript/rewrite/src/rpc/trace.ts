@@ -18,8 +18,8 @@ import {AsyncLocalStorage} from "node:async_hooks";
 
 const stackStorage = new AsyncLocalStorage<string>();
 
-export function saveTrace<T>(condition: any | undefined, action: () => Promise<T>): Promise<T> {
-    if (condition) {
+export function saveTrace<T>(enabled: boolean, action: () => Promise<T>): Promise<T> {
+    if (enabled) {
         const entryStack = new Error().stack ?? '';
         return stackStorage.run(entryStack, action);
     }
@@ -42,7 +42,7 @@ export function trace(type: "Receiver" | "Sender"): string | undefined {
                     const codeLine = readFileSync(file, 'utf-8')
                         .split('\n')[parseInt(line, 10) - 1]
                         .trim();
-                    return `${className}:${line} => ${codeLine}`;
+                    return `${className}:${line}:depth(${stack.length}) => ${codeLine}`;
                 } catch {
                     // ignore if reading the source file fails
                 }

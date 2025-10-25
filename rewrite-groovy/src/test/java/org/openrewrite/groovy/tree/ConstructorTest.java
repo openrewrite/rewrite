@@ -38,7 +38,7 @@ class ConstructorTest implements RewriteTest {
     void withGenerics() {
         rewriteRun(
           groovy(
-            """              
+            """
               new ArrayList<String>()
               """
           )

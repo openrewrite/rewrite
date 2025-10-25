@@ -41,11 +41,11 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               gradleEnterprise {
                   server = 'https://enterprise-samples.gradle.com'
                   buildScan {
@@ -63,15 +63,15 @@ class GradleParserTest implements RewriteTest {
           buildGradle(
             """
               import org.gradle.api.Project
-              
+
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "org.openrewrite:rewrite-java:latest.release"
               }
@@ -98,11 +98,11 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "org.openrewrite:rewrite-java:latest.release"
               }
@@ -134,15 +134,15 @@ class GradleParserTest implements RewriteTest {
                * LICENSE
                */
               import org.gradle.api.Project
-              
+
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation "junit:junit:4.13"
               }
@@ -159,11 +159,11 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               // Some comment
               dependencies {
                   testImplementation "junit:junit:4.13"
@@ -181,14 +181,14 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               // Deliberately not first, as per test
               import org.gradle.api.Project
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation "junit:junit:4.13"
               }
@@ -205,13 +205,13 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
-              
+
                   // String notation
                   implementation "org.openrewrite:rewrite-java:latest.release"
                   implementation ("org.openrewrite:rewrite-java:latest.release")
@@ -224,7 +224,7 @@ class GradleParserTest implements RewriteTest {
                   implementation ( "org.openrewrite:rewrite-java:latest.release" ) {
                       transitive = false
                   }
-              
+
                   // Map notation
                   implementation group: "org.openrewrite", name: "rewrite-java", version: "latest.release"
                   implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release")
@@ -237,7 +237,7 @@ class GradleParserTest implements RewriteTest {
                   implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" ) {
                       transitive = false
                   }
-                  
+
                   // Map literal notation
                   implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"])
                   implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"]) { transitive = false }
@@ -263,7 +263,7 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
@@ -279,7 +279,7 @@ class GradleParserTest implements RewriteTest {
           plugins {
             id 'java-library'
           }
-          
+
           task executeShellCommands {
               doLast {
                   exec {
@@ -301,7 +301,7 @@ class GradleParserTest implements RewriteTest {
           plugins {
             id 'java-library'
           }
-          
+
           task executeShellCommands {
               doLast {
                   exec {
@@ -323,7 +323,7 @@ class GradleParserTest implements RewriteTest {
           plugins {
             id 'java-library'
           }
-          
+
           task executeShellCommands {
               doLast {
                   exec {
@@ -348,7 +348,7 @@ class GradleParserTest implements RewriteTest {
           plugins {
             id 'java-library'
           }
-          
+
           task executeShellCommands {
               doLast {
                   exec {

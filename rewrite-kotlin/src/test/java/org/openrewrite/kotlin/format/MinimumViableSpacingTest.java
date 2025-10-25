@@ -393,7 +393,7 @@ class MinimumViableSpacingTest implements RewriteTest {
             """
               val one = 1
               val two = 2
-              
+
               class Test
               """
           )

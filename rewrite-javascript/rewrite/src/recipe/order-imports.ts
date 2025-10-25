@@ -28,7 +28,7 @@ export class OrderImports extends Recipe {
     description = "Sort top-level imports alphabetically within groups: no qualifier, asterisk, multiple, single.";
 
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
             protected async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {

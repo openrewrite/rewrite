@@ -178,7 +178,7 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-               def a = '1'    ,  
+               def a = '1'    ,
                   b = '2'
               """
           )
@@ -190,7 +190,7 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-               String a = '1'    ,  
+               String a = '1'    ,
                   b = '2'
               """
           )

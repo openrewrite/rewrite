@@ -42,7 +42,7 @@ class FindClassHierarchyTest implements RewriteTest {
             //language=java
             """
               import java.io.Serializable;
-              
+
               class A implements Serializable {
               }
               """,

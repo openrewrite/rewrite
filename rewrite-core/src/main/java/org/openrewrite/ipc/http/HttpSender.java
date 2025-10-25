@@ -16,7 +16,7 @@
 package org.openrewrite.ipc.http;
 
 import io.micrometer.core.instrument.util.StringUtils;
-import io.micrometer.core.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.*;
 import java.net.MalformedURLException;
@@ -30,6 +30,8 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.zip.GZIPOutputStream;
+
+import static java.util.Collections.emptyMap;
 
 /**
  * A general-purpose interface for controlling how components perform HTTP calls for various purposes.
@@ -418,7 +420,7 @@ public interface HttpSender {
         private final Runnable onClose;
 
         public Response(int code, @Nullable InputStream body, Runnable onClose) {
-            this(code, body, Collections.emptyMap(), onClose);
+            this(code, body, emptyMap(), onClose);
         }
 
         public Response(int code, @Nullable InputStream body, Map<String, List<String>> headers, Runnable onClose) {

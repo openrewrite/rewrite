@@ -20,6 +20,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
@@ -83,7 +85,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import a.b.method
-              
+
               class A
               """
           )
@@ -111,7 +113,7 @@ class ImportTest implements RewriteTest {
             """
               import kotlin.collections.List as L
               import kotlin.collections.Set as S
-              
+
               class T
               """
           )
@@ -137,7 +139,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import kotlin . collections . List ;
-              
+
               class T
               """
           )
@@ -152,7 +154,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import Foo as Bar
-              
+
               class Test
               """
           )
@@ -179,6 +181,47 @@ class ImportTest implements RewriteTest {
             """
               import my.org.`$x`
               """
+          )
+        );
+    }
+
+    @Test
+    void interfaceInformation() {
+        rewriteRun(
+          kotlin(
+            """
+              package org.example
+              interface SuperShared {
+                  fun one() = "one"
+              }
+              interface Shared : SuperShared
+              class A {
+                  companion object : Shared
+              }
+              """
+          ),
+          kotlin(
+            """
+              import org.example.A.Companion.one
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType firstImportType = cu.getImports().getFirst().getQualid().getType();
+                JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(firstImportType);
+
+                //noinspection DataFlowIssue
+                assertThat(fullyQualified.getOwningClass().getInterfaces())
+                  .singleElement()
+                  .satisfies(sharedInterface -> {
+                      assertThat(sharedInterface.getFullyQualifiedName()).isEqualTo("org.example.Shared");
+                      assertThat(sharedInterface.getInterfaces())
+                        .singleElement()
+                        .satisfies(it -> {
+                            assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.SuperShared");
+                            assertThat(it.getMethods()).singleElement().extracting(JavaType.Method::getName).isEqualTo("one");
+                        });
+                  });
+              }
+            )
           )
         );
     }

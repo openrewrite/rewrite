@@ -117,7 +117,7 @@ public class WriteModel extends Recipe {
                         public #{} get#{}() {
                             return #{}.getElement();
                         }
-                                                
+
                         public #{} with#{}(#{} #{}) {
                             //noinspection ConstantConditions
                             return getPadding().with#{}(Toml#{}Padded.withElement(this.#{}, #{}));
@@ -131,7 +131,7 @@ public class WriteModel extends Recipe {
                         public #{} get#{}() {
                             return #{} == null ? null : #{}.getElement();
                         }
-                                                
+
                         public #{} with#{}(@Nullable #{} #{}) {
                             if (#{} == null) {
                                 return this.#{} == null ? this : new #{}(#{});
@@ -149,7 +149,7 @@ public class WriteModel extends Recipe {
                         public List<#{}> get#{}() {
                             return #{}.getElements();
                         }
-                                                
+
                         public #{} with#{}(List<#{}> #{}) {
                             return getPadding().with#{}(this.#{}.getPadding().withElements(TomlRightPadded.withElements(
                                 this.#{}.getPadding().getElements(), #{}));

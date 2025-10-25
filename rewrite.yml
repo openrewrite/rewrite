@@ -21,6 +21,9 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPracticesSubset
 displayName: OpenRewrite best practices
 description: Best practices for OpenRewrite recipe development.
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "!(**/internal/grammar/*.*)"
 recipeList:
   - org.openrewrite.recipes.JavaRecipeBestPracticesSubset
   - org.openrewrite.recipes.RecipeTestingBestPracticesSubset
@@ -32,6 +35,7 @@ recipeList:
   - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
   - org.openrewrite.java.format.RemoveTrailingWhitespace
   - org.openrewrite.staticanalysis.CompareEnumsWithEqualityOperator
+  - org.openrewrite.staticanalysis.EqualsAvoidsNull
   - org.openrewrite.staticanalysis.InlineVariable
   - org.openrewrite.staticanalysis.LambdaBlockToExpression
   - org.openrewrite.staticanalysis.MissingOverrideAnnotation
@@ -43,6 +47,10 @@ recipeList:
 #  - org.openrewrite.staticanalysis.RemoveUnusedPrivateMethods
 #  - org.openrewrite.staticanalysis.UnwrapElseAfterReturn
   - org.openrewrite.staticanalysis.UseDiamondOperator
+  - org.openrewrite.java.UseStaticImport:
+      methodPattern: java.util.stream.Collectors *(..)
+  - org.openrewrite.java.UseStaticImport:
+      methodPattern: java.util.Collections *(..)
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.recipes.JavaRecipeBestPracticesSubset
@@ -63,7 +71,7 @@ recipeList:
   - org.openrewrite.java.recipes.UseTreeRandomId
   - org.openrewrite.java.recipes.migrate.RemoveTraitsUsageRecipes
   - org.openrewrite.staticanalysis.NeedBraces
-  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+#  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
 #  - org.openrewrite.java.RemoveAnnotation:
 #      annotationPattern: '@org.openrewrite.NlsRewrite.DisplayName'
 #  - org.openrewrite.java.RemoveAnnotation:
@@ -106,5 +114,5 @@ recipeList:
   - org.openrewrite.java.RemoveAnnotation:
       annotationPattern: '@jakarta.annotation.Nonnull'
 #  - org.openrewrite.java.jspecify.MigrateToJspecify
-  - org.openrewrite.staticanalysis.AnnotateNullableMethods
+#  - org.openrewrite.staticanalysis.AnnotateNullableMethods
   - org.openrewrite.staticanalysis.NullableOnMethodReturnType

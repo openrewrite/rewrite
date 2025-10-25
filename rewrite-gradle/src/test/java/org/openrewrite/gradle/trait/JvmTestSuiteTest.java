@@ -47,17 +47,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
                           }
-                  
+
                           integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -71,17 +71,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           /*~~>*/test {
                               useJUnitJupiter()
                           }
-                  
+
                           /*~~>*/integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -105,17 +105,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
                           }
-                  
+
                           integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -129,17 +129,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
                           }
-                  
+
                           /*~~>*/integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -163,17 +163,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
                           }
-                  
+
                           integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -187,21 +187,21 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
-                  
+
                               dependencies {
                                   implementation "com.google.guava:guava:29.0-jre"
                               }
                           }
-                  
+
                           integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -228,23 +228,23 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
                               }
                           }
-                  
+
                           val functionalTest by registering(JvmTestSuite::class) {
                               dependencies {
                                   implementation(project())
@@ -258,23 +258,23 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           /*~~>*/val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           /*~~>*/register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
                               }
                           }
-                  
+
                           /*~~>*/val functionalTest by registering(JvmTestSuite::class) {
                               dependencies {
                                   implementation(project())
@@ -298,17 +298,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
@@ -322,17 +322,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           /*~~>*/register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
@@ -356,17 +356,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
@@ -380,21 +380,21 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
-                  
+
                               dependencies {
                                   implementation("com.google.guava:guava:29.0-jre")
                               }
                           }
-                  
+
                           register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())

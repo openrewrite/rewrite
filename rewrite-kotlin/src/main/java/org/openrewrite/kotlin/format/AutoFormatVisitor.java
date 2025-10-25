@@ -18,15 +18,13 @@ package org.openrewrite.kotlin.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.style.*;
 import org.openrewrite.style.GeneralFormatStyle;
-
-import java.util.Optional;
+import org.openrewrite.style.Style;
 
 import static java.util.Objects.requireNonNull;
 
@@ -50,39 +48,24 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
                 cursor.firstEnclosingOrThrow(JavaSourceFile.class);
 
         J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
-
         t = new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p, cursor.fork());
-
-        t = new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()), stopAfter)
+        t = new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter)
                 .visit(t, p, cursor.fork());
-
-        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
+        t = new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter)
                 .visit(t, p, cursor.fork());
-
-        t = new SpacesVisitor<>(
-                Optional.ofNullable(((SourceFile) cu).getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
-                stopAfter
-        ).visit(t, p, cursor.fork());
-
-        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+        t = new SpacesVisitor<>(Style.from(SpacesStyle.class, cu, IntelliJ::spaces), stopAfter)
                 .visit(t, p, cursor.fork());
-
+        t = new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
+                .visit(t, p, cursor.fork());
         t = new TabsAndIndentsVisitor<>(
-                Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class)).orElse(IntelliJ.tabsAndIndents()),
-                Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class)).orElse(IntelliJ.wrappingAndBraces()),
-                stopAfter
-        ).visit(t, p, cursor.fork());
-
-        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
-                .orElse(new GeneralFormatStyle(false)), stopAfter)
+                Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents),
+                Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces),
+                stopAfter)
                 .visit(t, p, cursor.fork());
-
+        t = new NormalizeLineBreaksVisitor<>(Style.from(GeneralFormatStyle.class, cu, () -> new GeneralFormatStyle(false)), stopAfter)
+                .visit(t, p, cursor.fork());
         t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
-
-        return new ImportReorderingVisitor<>().visit(t, p, cursor.fork());
+        return new ImportReorderingVisitor<>().visitNonNull(t, p, cursor.fork());
     }
 
     @Override
@@ -97,34 +80,22 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
             }
 
             JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
-
-            t = (JavaSourceFile) new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
-                    .orElse(IntelliJ.blankLines()), stopAfter)
+            t = (JavaSourceFile) new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter)
                     .visit(t, p);
-
-            t = (JavaSourceFile) new SpacesVisitor<P>(Optional.ofNullable(
-                    ((SourceFile) cu).getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+            t = (JavaSourceFile) new SpacesVisitor<P>(Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
                     stopAfter)
                     .visit(t, p);
-
-            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
-                    .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
+            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter)
                     .visit(t, p);
-
-            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
-                    .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
                     .visit(t, p);
-
             t = (JavaSourceFile) new TabsAndIndentsVisitor<>(
-                    Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class)).orElse(IntelliJ.tabsAndIndents()),
-                    Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class)).orElse(IntelliJ.wrappingAndBraces()),
+                    Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents),
+                    Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces),
                     stopAfter
             ).visit(t, p);
 
-            t = (JavaSourceFile) new TrailingCommaVisitor<>(IntelliJ.other().getUseTrailingComma()).visit(t, p);
-
-            assert t != null;
-            return t;
+            return new TrailingCommaVisitor<>(IntelliJ.other().getUseTrailingComma()).visitNonNull(t, p);
         }
         return (J) tree;
     }

@@ -265,7 +265,7 @@ public final class ListUtils {
      * For backwards compatibility; prefer {@link #map(List, Function)}.
      */
     @Contract("null, _ -> null; !null, _ -> !null")
-    public static <T> @Nullable List<T> map(@Nullable List<T> ls, UnaryOperator<@Nullable T> map) {
+    public static <T> @Nullable List<T> map(@Nullable List<T> ls, UnaryOperator<T> map) {
         return map(ls, (Function<T, T>) map);
     }
 
@@ -502,8 +502,8 @@ public final class ListUtils {
      * @param <T>   The type of elements in the list.
      * @return The array representation of the list, or null if the list is empty.
      */
-    public static <T> T @Nullable [] arrayOrNullIfEmpty(@Nullable List<T> list, T[] array) {
-        if (list == null || list.isEmpty()) {
+    public static <T> T @Nullable [] arrayOrNullIfEmpty(@Nullable List<T> list, T @Nullable [] array) {
+        if (list == null || array == null || list.isEmpty()) {
             return null;
         }
         return list.toArray(array);

@@ -28,10 +28,10 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -79,99 +79,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
-    void doNotOverrideImplicitProperty() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("io.dropwizard.metrics", "metrics-annotation", "4.2.9", null,
-            true, null)),
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>explicit-deps-app</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <name>explicit-deps-app</name>
-                  <description>explicit-deps-app</description>
-                  <properties>
-                      <java.version>17</java.version>
-                      <maven.compiler.source>17</maven.compiler.source>
-                      <maven.compiler.target>17</maven.compiler.target>
-                  </properties>
-                  <repositories>
-                      <repository>
-                          <id>spring-milestone</id>
-                          <url>https://repo.spring.io/milestone</url>
-                          <snapshots>
-                              <enabled>false</enabled>
-                          </snapshots>
-                      </repository>
-                  </repositories>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.springframework.boot</groupId>
-                              <artifactId>spring-boot-dependencies</artifactId>
-                              <version>2.4.0</version>
-                              <type>pom</type>
-                              <scope>import</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.dropwizard.metrics</groupId>
-                          <artifactId>metrics-annotation</artifactId>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>explicit-deps-app</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <name>explicit-deps-app</name>
-                  <description>explicit-deps-app</description>
-                  <properties>
-                      <java.version>17</java.version>
-                      <maven.compiler.source>17</maven.compiler.source>
-                      <maven.compiler.target>17</maven.compiler.target>
-                  </properties>
-                  <repositories>
-                      <repository>
-                          <id>spring-milestone</id>
-                          <url>https://repo.spring.io/milestone</url>
-                          <snapshots>
-                              <enabled>false</enabled>
-                          </snapshots>
-                      </repository>
-                  </repositories>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.springframework.boot</groupId>
-                              <artifactId>spring-boot-dependencies</artifactId>
-                              <version>2.4.0</version>
-                              <type>pom</type>
-                              <scope>import</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.dropwizard.metrics</groupId>
-                          <artifactId>metrics-annotation</artifactId>
-                          <version>4.2.9</version>
-                      </dependency>
-                  </dependencies>
               </project>
               """
           )
@@ -631,6 +538,94 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradeAnnotationProcessors() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.mapstruct</groupId>
+                        <artifactId>mapstruct</artifactId>
+                        <version>1.4.1.Final</version>
+                    </dependency>
+                </dependencies>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <configuration>
+                        <annotationProcessorPaths>
+                          <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>1.4.1.Final</version>
+                          </path>
+                        </annotationProcessorPaths>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("1.4.1.Final")
+                .containsPattern("<version>1.6.\\d+(.\\d+)?</version>")
+                .actual())
+          )
+        );
+    }
+
+    @Test
+    void upgradeAnnotationProcessorsVersionProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                    <org.mapstruct.version>1.4.1.Final</org.mapstruct.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <configuration>
+                        <annotationProcessorPaths>
+                          <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${org.mapstruct.version}</version>
+                          </path>
+                        </annotationProcessorPaths>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("1.4.1.Final")
+                .containsPattern("<org.mapstruct.version>1.6.\\d+(.\\d+)?</org.mapstruct.version>")
+                .actual())
+          )
+        );
+    }
+
+    @Test
     void upgradePluginDependenciesOnProperty() {
         rewriteRun(
           // Using latest.patch to validate the version property resolution, since it's needed for matching the valid patch.
@@ -1085,12 +1080,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Disabled("Anti-pattern not yet supported")
     @Issue("https://github.com/openrewrite/rewrite/issues/4193")
     @Test
     void upgradeVersionDefinedViaExplicitPropertyInRemoteParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.x", "", true, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
           pomXml(
             """
               <project>
@@ -1133,6 +1127,73 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4193")
+    @Test
+    void upgradeVersionDefinedViaNestedExplicitPropertyInRemoteParent() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+          pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>3.3.0</version>
+                  </parent>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+              </project>
+              """
+          ),
+          mavenProject("my-child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>my-child</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.flywaydb</groupId>
+                            <artifactId>flyway-core</artifactId>
+                            <version>${flyway.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>my-child</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <flyway.version>10.15.0</flyway.version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.flywaydb</groupId>
+                            <artifactId>flyway-core</artifactId>
+                            <version>${flyway.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
           )
         );
     }
@@ -1427,7 +1488,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """            
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -1722,7 +1783,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         @DocumentExample
         @Test
         void dependencyWithExplicitVersionRemovedFromDepMgmt() {
-            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch"))),
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, singletonList("com.jcraft:jsch"))),
               pomXml(
                 """
                   <project>
@@ -1782,7 +1843,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
         @Test
         void dependencyWithoutExplicitVersionRemovedFromDepMgmt() {
-            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch"))),
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, singletonList("com.jcraft:jsch"))),
               pomXml(
                 """
                   <project>
@@ -1841,7 +1902,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
         @Test
         void dependencyWithoutExplicitVersionRemovedFromDepMgmtRetainSpecificVersion() {
-            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch:0.1.50"))),
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, singletonList("com.jcraft:jsch:0.1.50"))),
               pomXml(
                 """
                   <project>
@@ -2008,6 +2069,53 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mavenUsesLatestMentionedArtifactForResolution() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0", "-jre", null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>25.0-jre</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>23.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>25.0-jre</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Disabled("Service Unavailable")
     @Test
     void exactVersionMissingInMavenMetadata() {
@@ -2150,6 +2258,228 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void upgradeBomInsteadOfOverridingDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-core", "2.15.0", null,
+            true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.14.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.15.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void upgradeVersionForEjbTypeDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencies>
+                <dependency>
+              	  <groupId>org.codeartisans.asadmin</groupId>
+              	  <artifactId>ejb-example</artifactId>
+              	  <version>0.11</version>
+              	  <type>ejb</type>
+                </dependency>
+               </dependencies>
+              </project>
+              """,
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencies>
+                <dependency>
+              	  <groupId>org.codeartisans.asadmin</groupId>
+              	  <artifactId>ejb-example</artifactId>
+              	  <version>0.12</version>
+              	  <type>ejb</type>
+                </dependency>
+               </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void upgradeVersionForEjbTypeManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.codeartisans.asadmin</groupId>
+              		  <artifactId>ejb-example</artifactId>
+              		  <version>0.11</version>
+              		  <type>ejb</type>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.codeartisans.asadmin</groupId>
+              		  <artifactId>ejb-example</artifactId>
+              		  <version>0.12</version>
+              		  <type>ejb</type>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotAddVersionToChildWhenParentDefinesInDependencyManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.security", "spring-security-core", "4.2.16.RELEASE", null,
+            true, null)),
+          pomXml(
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>parent</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.springframework.security</groupId>
+              		  <artifactId>spring-security-core</artifactId>
+              		  <version>4.2.13.RELEASE</version>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>parent</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.springframework.security</groupId>
+              		  <artifactId>spring-security-core</artifactId>
+              		  <version>4.2.16.RELEASE</version>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                	<parent>
+                		<groupId>com.mycompany.app</groupId>
+                		<artifactId>parent</artifactId>
+                		<version>1</version>
+                	</parent>
+                	<groupId>com.mycompany.app</groupId>
+                	<artifactId>child</artifactId>
+                	<version>1</version>
+                	<dependencies>
+                		<dependency>
+                			<groupId>org.springframework.security</groupId>
+                			<artifactId>spring-security-core</artifactId>
+                		</dependency>
+                		<dependency>
+                			<groupId>org.apache.logging.log4j</groupId>
+                			<artifactId>log4j</artifactId>
+                			<version>2.13.1</version>
+                		</dependency>
+                	</dependencies>
+                </project>
+                """
+            )
           )
         );
     }

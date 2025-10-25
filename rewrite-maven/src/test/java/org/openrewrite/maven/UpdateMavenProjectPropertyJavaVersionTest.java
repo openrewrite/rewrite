@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.Assertions.withLocalRepository;
 
 class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
 
@@ -253,6 +254,82 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
+    void updateLocalParentWithMavenCompilerPlugin() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>example-parent</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.8.0</version>
+                              <configuration>
+                                  <source>${java.version}</source>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <properties>
+                      <java.version>11</java.version>
+                  </properties>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>example-parent</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.8.0</version>
+                              <configuration>
+                                  <source>${java.version}</source>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <properties>
+                      <java.version>17</java.version>
+                  </properties>
+              </project>
+              """
+          ),
+          mavenProject("example-child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>example-parent</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-child</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                    <properties>
+                        <other.property>value</other.property>
+                    </properties>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void doNotCrashOnImplicitVersion() {
         rewriteRun(
           mavenProject("spring-cloud-kubernetes",
@@ -260,21 +337,21 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
               """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
-                
+
                     <parent>
                         <groupId>org.springframework.cloud</groupId>
                         <artifactId>spring-cloud-build</artifactId>
                         <version>4.1.5</version>
                         <relativePath/>
                     </parent>
-                
+
                     <artifactId>spring-cloud-kubernetes</artifactId>
                     <version>3.1.5</version>
                     <packaging>pom</packaging>
                     <modules>
                         <module>spring-cloud-kubernetes-integration-tests</module>
                     </modules>
-                
+
                     <build>
                         <plugins>
                             <plugin>
@@ -300,13 +377,13 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                         <artifactId>spring-cloud-kubernetes</artifactId>
                         <version>3.1.5</version>
                     </parent>
-                
+
                     <artifactId>spring-cloud-kubernetes-integration-tests</artifactId>
                     <packaging>pom</packaging>
-                
+
                     <name>Spring Cloud Kubernetes :: Integration Tests</name>
                     <description>Integration tests where SCK applications are run inside a Kubernetes cluster</description>
-                
+
                     <modules>
                         <module>spring-cloud-kubernetes-k8s-client-discovery-server</module>
                     </modules>
@@ -323,9 +400,9 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                         <version>3.1.5</version>
                     </parent>
                     <modelVersion>4.0.0</modelVersion>
-                
+
                     <artifactId>spring-cloud-kubernetes-k8s-client-discovery-server</artifactId>
-                
+
                 </project>"""
             )
           )
@@ -513,6 +590,299 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                 """
             )
           )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6113")
+    @Test
+    void shouldUpdatePropertyWhenParentIsExternalPomButIncludedInProjectPoms() {
+        withLocalRepository(
+            //language=xml
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example.test</groupId>
+                <artifactId>test-parent</artifactId>
+                <version>2.7.18</version>
+                <packaging>pom</packaging>
+                <properties>
+                  <java.version>1.8</java.version>
+                  <maven.compiler.source>${java.version}</maven.compiler.source>
+                  <maven.compiler.target>${java.version}</maven.compiler.target>
+                </properties>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.8.1</version>
+                        <configuration>
+                          <source>${java.version}</source>
+                          <target>${java.version}</target>
+                        </configuration>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
+              """,
+            () -> rewriteRun(
+                spec -> spec.recipe(new UpdateMavenProjectPropertyJavaVersion(11)),
+                pomXml(
+                    //language=xml
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.example.test</groupId>
+                          <artifactId>test-parent</artifactId>
+                          <version>2.7.18</version>
+                          <relativePath/> <!-- lookup parent from repository -->
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>demo</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
+                        <properties>
+                          <java.version>1.8</java.version>
+                        </properties>
+                      </project>
+                      """,
+                    //language=xml
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.example.test</groupId>
+                          <artifactId>test-parent</artifactId>
+                          <version>2.7.18</version>
+                          <relativePath/> <!-- lookup parent from repository -->
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>demo</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
+                        <properties>
+                          <java.version>11</java.version>
+                        </properties>
+                      </project>
+                      """
+                )
+            )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6113")
+    @Test
+    void verifyExternalParentPomHandling() {
+        withLocalRepository(
+            //language=xml
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example.test</groupId>
+                <artifactId>test-parent</artifactId>
+                <version>2.7.18</version>
+                <packaging>pom</packaging>
+                <properties>
+                  <java.version>1.8</java.version>
+                  <maven.compiler.source>1.8</maven.compiler.source>
+                  <maven.compiler.target>1.8</maven.compiler.target>
+                </properties>
+              </project>
+              """,
+            () -> rewriteRun(
+                spec -> spec.recipe(new UpdateMavenProjectPropertyJavaVersion(11)),
+                pomXml(
+                    //language=xml
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.example.test</groupId>
+                          <artifactId>test-parent</artifactId>
+                          <version>2.7.18</version>
+                          <relativePath/> <!-- lookup parent from repository -->
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>demo</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
+                        <properties>
+                          <java.version>1.8</java.version>
+                        </properties>
+                      </project>
+                      """,
+                    //language=xml
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.example.test</groupId>
+                          <artifactId>test-parent</artifactId>
+                          <version>2.7.18</version>
+                          <relativePath/> <!-- lookup parent from repository -->
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>demo</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
+                        <properties>
+                          <java.version>11</java.version>
+                          <maven.compiler.source>11</maven.compiler.source>
+                          <maven.compiler.target>11</maven.compiler.target>
+                        </properties>
+                      </project>
+                      """
+                )
+            )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6113")
+    @Test
+    void externalSpringBootParentWithChildProperties() {
+        withLocalRepository(
+            //language=xml
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example.test</groupId>
+                <artifactId>test-boot-parent</artifactId>
+                <version>3.0.0</version>
+                <packaging>pom</packaging>
+                <properties>
+                  <java.version>17</java.version>
+                  <maven.compiler.source>${java.version}</maven.compiler.source>
+                  <maven.compiler.target>${java.version}</maven.compiler.target>
+                </properties>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.10.1</version>
+                        <configuration>
+                          <source>${java.version}</source>
+                          <target>${java.version}</target>
+                        </configuration>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
+              """,
+            () -> rewriteRun(
+                spec -> spec.recipe(new UpdateMavenProjectPropertyJavaVersion(21)),
+                pomXml(
+                    //language=xml
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.example.test</groupId>
+                          <artifactId>test-boot-parent</artifactId>
+                          <version>3.0.0</version>
+                          <relativePath/>
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>demo-app</artifactId>
+                        <version>1.0.0</version>
+                      </project>
+                      """,
+                    //language=xml
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.example.test</groupId>
+                          <artifactId>test-boot-parent</artifactId>
+                          <version>3.0.0</version>
+                          <relativePath/>
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>demo-app</artifactId>
+                        <version>1.0.0</version>
+                        <properties>
+                          <java.version>21</java.version>
+                        </properties>
+                      </project>
+                      """
+                )
+            )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6113")
+    @Test
+    void externalCustomParentWithCompilerPlugin() {
+        // Test that child POM correctly updates the property when parent is external
+        withLocalRepository(
+            //language=xml
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.company</groupId>
+                <artifactId>company-parent</artifactId>
+                <version>2.0.0</version>
+                <packaging>pom</packaging>
+                <properties>
+                  <jdk.version>11</jdk.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.11.0</version>
+                      <configuration>
+                        <source>${jdk.version}</source>
+                        <target>${jdk.version}</target>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            () -> rewriteRun(
+                spec -> spec.recipe(new UpdateMavenProjectPropertyJavaVersion(17)),
+                pomXml(
+                    //language=xml
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.company</groupId>
+                          <artifactId>company-parent</artifactId>
+                          <version>2.0.0</version>
+                          <relativePath/>
+                        </parent>
+                        <groupId>com.company.app</groupId>
+                        <artifactId>my-service</artifactId>
+                        <version>1.0.0</version>
+                        <properties>
+                          <jdk.version>8</jdk.version>
+                        </properties>
+                      </project>
+                      """,
+                    //language=xml
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.company</groupId>
+                          <artifactId>company-parent</artifactId>
+                          <version>2.0.0</version>
+                          <relativePath/>
+                        </parent>
+                        <groupId>com.company.app</groupId>
+                        <artifactId>my-service</artifactId>
+                        <version>1.0.0</version>
+                        <properties>
+                          <jdk.version>17</jdk.version>
+                        </properties>
+                      </project>
+                      """
+                )
+            )
         );
     }
 }

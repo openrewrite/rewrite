@@ -17,10 +17,10 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -44,25 +44,25 @@ public class AddLiteralMethodArgument extends Recipe {
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
+            description = MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
             example = "com.yourorg.A foo(int, int)")
     String methodPattern;
 
     /**
-     * A zero-based index that indicates which argument will be added as null to the method invocation.
+     * A zero-based index indicating where to insert the new argument.
      */
     @Option(displayName = "Argument index",
-            description = "A zero-based index that indicates which argument will be added as null to the method invocation.",
+            description = "A zero-based index indicating where to insert the new argument.",
             example = "0")
     int argumentIndex;
 
     @Option(displayName = "Literal",
-            description = "The literal value that we add the argument for.",
+            description = "The literal value to add as an argument.",
             example = "abc")
     Object literal;
 
     @Option(displayName = "Parameter type",
-            description = "The type of the parameter that we add the argument for. Defaults to `String`.",
+            description = "The parameter type for the added argument. Defaults to `String`.",
             required = false,
             example = "String",
             valid = {"String", "int", "short", "long", "float", "double", "boolean", "char"})
@@ -81,7 +81,7 @@ public class AddLiteralMethodArgument extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add a literal `String` or `int` argument to method invocations.";
+        return "Add a literal `String` or primitive argument to method invocations.";
     }
 
     @Override
@@ -127,7 +127,7 @@ public class AddLiteralMethodArgument extends Recipe {
                 if (StringUtils.isBlank(primitiveType) || "string".equalsIgnoreCase(primitiveType)) {
                     primitive = Primitive.String;
                     valueSource = String.format("\"%s\"", getLiteral());
-                } else if(primitiveType.equalsIgnoreCase("char")){
+                } else if("char".equalsIgnoreCase(primitiveType)){
                     primitive = Primitive.Char;
                     valueSource = String.format("'%s'", getLiteral());
                 }else {

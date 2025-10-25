@@ -42,11 +42,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.integration@jar'
               }
@@ -55,11 +55,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.integration@war'
               }
@@ -78,11 +78,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release@jar'
                   api "org.openrewrite:rewrite-core:latest.release@jar"
@@ -92,11 +92,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release@war'
                   api "org.openrewrite:rewrite-core:latest.release@war"
@@ -116,11 +116,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', ext: 'jar'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", ext: "jar"
@@ -130,11 +130,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', ext: 'war'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", ext: "war"
@@ -154,11 +154,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', ext: 'jar'
@@ -169,11 +169,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', ext: 'war'
@@ -194,11 +194,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.eclipse.jetty:jetty-servlet:9.4.50.v20221201:tests@jar'
                   api "org.eclipse.jetty:jetty-servlet:9.4.50.v20221201:tests@jar"
@@ -210,11 +210,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.eclipse.jetty:jetty-servlet:9.4.50.v20221201:tests@war'
                   api "org.eclipse.jetty:jetty-servlet:9.4.50.v20221201:tests@war"
@@ -236,11 +236,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+
               repositories {
                   mavenCentral()
               }
-                  
+
               testing {
                   suites {
                       test {
@@ -256,11 +256,11 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+
               repositories {
                   mavenCentral()
               }
-                  
+
               testing {
                   suites {
                       test {

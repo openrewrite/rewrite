@@ -72,7 +72,7 @@ class MinimumViableSpacingTest implements RewriteTest {
           java(
             """
               import java.lang.Exception;
-              
+
               class A {
                   void foo() throws Exception {
                   }
@@ -219,7 +219,7 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void annotatedReturnTypeExpression() {
         rewriteRun(
-          spec -> spec.recipe(new AutoFormat()),
+          spec -> spec.recipe(new AutoFormat(null)),
           java(
             """
               class A {
@@ -267,7 +267,7 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void yieldReformatted() {
         rewriteRun(
-          spec -> spec.recipe(new AutoFormat()),
+          spec -> spec.recipe(new AutoFormat(null)),
           java(
             """
               class Test {
@@ -298,7 +298,7 @@ class MinimumViableSpacingTest implements RewriteTest {
           java(
             """
               import java.io.Serial;
-              
+
               class Clazz {}
               """,
             """

@@ -18,7 +18,6 @@ package org.openrewrite;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.PathUtils.matchesGlob;
@@ -139,7 +138,27 @@ class PathUtilsTest {
         assertThat(matchesGlob(path("d/xml"), "!(a|b|c)/{java,txt}")).isFalse();
     }
 
+    @Test
+    void stringGlobMatching() {
+        // Test the string version directly to avoid Path creation issues on Windows
+        assertThat(matchesGlob("a", "a")).isTrue();
+        assertThat(matchesGlob("a/b/c", "a/b/c")).isTrue();
+        assertThat(matchesGlob("a\\b\\c", "a\\b\\c")).isTrue();
+        assertThat(matchesGlob("a/b/c", "a\\b\\c")).isTrue();
+        assertThat(matchesGlob("a\\b\\c", "a/b/c")).isTrue();
+        assertThat(matchesGlob("*.tmp", "*.tmp")).isTrue();
+        assertThat(matchesGlob("file.tmp", "*.tmp")).isTrue();
+        assertThat(matchesGlob("dir/file.tmp", "**/file.tmp")).isTrue();
+        assertThat(matchesGlob("build/", "build/**")).isTrue();
+        assertThat(matchesGlob("build/output", "build/**")).isTrue();
+
+        // Test null handling
+        assertThat(matchesGlob((String) null, "a")).isFalse();
+        assertThat(matchesGlob("a", null)).isFalse();
+        assertThat(matchesGlob((String) null, null)).isFalse();
+    }
+
     private static Path path(String path) {
-        return Paths.get(path);
+        return Path.of(path);
     }
 }

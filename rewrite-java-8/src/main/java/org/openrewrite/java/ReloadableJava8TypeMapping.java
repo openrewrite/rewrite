@@ -28,12 +28,11 @@ import org.openrewrite.java.tree.TypeUtils;
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -573,10 +572,10 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 if(methodSymbol.getDefaultValue() instanceof Attribute.Array) {
                     defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
                             .map(attr -> attr.getValue().toString())
-                            .collect(Collectors.toList());
+                            .collect(toList());
                 } else {
                     try {
-                        defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                        defaultValues = singletonList(methodSymbol.getDefaultValue().getValue().toString());
                     } catch(UnsupportedOperationException e) {
                         // not all Attribute implementations define `getValue()`
                     }

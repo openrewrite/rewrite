@@ -27,7 +27,7 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new AddManagedDependencyVisitor("org.apache.logging.log4j", "log4j-bom", "2.17.2",
-          "import","pom",null)));
+          "import","pom",null, null)));
     }
 
     @DocumentExample

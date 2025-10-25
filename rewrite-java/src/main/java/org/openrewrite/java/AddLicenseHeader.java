@@ -26,8 +26,8 @@ import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.marker.Markers;
 
 import java.util.Calendar;
-import java.util.Collections;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -69,7 +69,7 @@ public class AddLicenseHeader extends Recipe {
                                     return System.getProperty(k);
                                 }).replace("\n", "\n * ") + "\n ";
 
-                        cu = cu.withComments(Collections.singletonList(
+                        cu = cu.withComments(singletonList(
                                 new TextComment(true, formattedLicenseText, "\n", Markers.EMPTY)
                         ));
                     }

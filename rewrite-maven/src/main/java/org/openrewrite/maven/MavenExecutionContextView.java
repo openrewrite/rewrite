@@ -25,10 +25,11 @@ import org.openrewrite.maven.tree.*;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @SuppressWarnings({"unused", "UnusedReturnValue"})
@@ -217,6 +218,23 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_ACTIVE_PROFILES, emptyList());
     }
 
+    /**
+     * Replaces the current Maven execution settings with the provided {@link MavenSettings}.
+     * <p>
+     * This method does <strong>not</strong> merge with or preserve any existing configuration.
+     * All previously configured repositories, mirrors, credentials, active profiles,
+     * and local repository settings will be discarded and replaced entirely with those
+     * derived from the given {@code settings}.
+     * </p>
+     *
+     * <p>If {@code settings} is {@code null}, this call is a no-op and the current
+     * configuration remains unchanged.</p>
+     *
+     * @param settings        the Maven settings to apply; if {@code null}, no changes are made
+     * @param activeProfiles  additional active profiles to consider; these are resolved
+     *                        against the provided settings to determine the effective profiles
+     * @return this execution context view with the updated Maven settings applied
+     */
     public MavenExecutionContextView setMavenSettings(@Nullable MavenSettings settings, String... activeProfiles) {
         if (settings == null) {
             return this;
@@ -260,14 +278,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                         settings.getActiveProfiles().getActiveProfiles().stream(),
                         Arrays.stream(activeProfiles))
                 .distinct()
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     private static List<MavenRepositoryCredentials> mapCredentials(MavenSettings settings) {
         if (settings.getServers() != null) {
             return settings.getServers().getServers().stream()
                     .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
@@ -276,14 +294,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         if (settings.getMirrors() != null) {
             return settings.getMirrors().getMirrors().stream()
                     .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots(), settings.getServers()))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
 
     private List<MavenRepository> mapRepositories(MavenSettings settings, List<String> activeProfiles) {
         Map<String, MavenRepository> repositories = this.getRepositories().stream()
-                .collect(Collectors.toMap(MavenRepository::getId, r -> r, (a, b) -> a));
+                .collect(toMap(MavenRepository::getId, r -> r, (a, b) -> a));
         return settings.getActiveRepositories(activeProfiles).stream()
                 .map(repo -> {
                     try {
@@ -321,6 +339,6 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                     }
                 })
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 }

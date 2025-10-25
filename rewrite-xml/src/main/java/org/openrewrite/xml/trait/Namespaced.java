@@ -25,7 +25,9 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 
 @Value
 public class Namespaced implements Trait<Xml> {
@@ -76,7 +78,7 @@ public class Namespaced implements Trait<Xml> {
     }
 
     public Map<String, String> getNamespaces() {
-        Map<String, String> namespaces = Collections.emptyMap();
+        Map<String, String> namespaces = emptyMap();
         if (cursor.getValue() instanceof Xml.Tag) {
             Xml.Tag tag = cursor.getValue();
             if (!tag.getAttributes().isEmpty()) {
@@ -91,7 +93,7 @@ public class Namespaced implements Trait<Xml> {
             }
         } else if (cursor.getValue() instanceof Xml.Attribute) {
             Xml.Attribute attribute = cursor.getValue();
-            namespaces = Collections.singletonMap(
+            namespaces = singletonMap(
                     extractPrefixFromNamespaceDefinition(attribute.getKeyAsString()),
                     attribute.getValueAsString());
         }
@@ -102,7 +104,7 @@ public class Namespaced implements Trait<Xml> {
         if (cursor.getValue() instanceof Xml.Tag) {
             Xml.Tag tag = cursor.getValue();
             if (tag.getAttributes().isEmpty()) {
-                return Collections.emptyList();
+                return emptyList();
             }
             List<Xml.Attribute> schemaLocations = new ArrayList<>();
             Map<String, String> namespaces = getAllNamespaces();
@@ -113,7 +115,7 @@ public class Namespaced implements Trait<Xml> {
             }
             return schemaLocations;
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 
     public List<Xml.Attribute> getAttributes() {
@@ -121,9 +123,9 @@ public class Namespaced implements Trait<Xml> {
             Xml.Tag tag = cursor.getValue();
             return tag.getAttributes();
         } else if (cursor.getValue() instanceof Xml.Attribute) {
-            return Collections.singletonList(cursor.getValue());
+            return singletonList(cursor.getValue());
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 
     public List<String> attributePrefixes() {
@@ -132,7 +134,7 @@ public class Namespaced implements Trait<Xml> {
                 .map(Namespaced::extractNamespacePrefix)
                 .filter(StringUtils::isNotEmpty)
                 .distinct()
-                .collect(Collectors.toList());
+                .collect(toList());
 
     }
 

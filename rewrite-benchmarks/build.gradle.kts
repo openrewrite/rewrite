@@ -9,9 +9,11 @@ dependencies {
     jmh("org.projectlombok:lombok:latest.release")
 
     jmh(project(":rewrite-core"))
+    jmh(project(":rewrite-java"))
     jmh(project(":rewrite-java-21"))
     jmh(project(":rewrite-maven"))
-    jmh("org.rocksdb:rocksdbjni:latest.release")
+    jmh("org.antlr:antlr4-runtime:4.13.2")
+    jmh("org.rocksdb:rocksdbjni:10.2.1")
     jmh("org.openjdk.jmh:jmh-core:latest.release")
     jmh("org.openjdk.jol:jol-core:latest.release")
     jmh("io.github.fastfilter:fastfilter:latest.release")

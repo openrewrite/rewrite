@@ -75,7 +75,7 @@ class IfTest implements RewriteTest {
             """
               if (true) {
               }
-              else{ 
+              else{
               }
               """
           )

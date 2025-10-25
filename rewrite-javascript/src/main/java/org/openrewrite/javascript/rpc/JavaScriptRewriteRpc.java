@@ -15,68 +15,76 @@
  */
 package org.openrewrite.javascript.rpc;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import io.moderne.jsonrpc.JsonRpc;
-import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
-import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
-import io.moderne.jsonrpc.handler.MessageHandler;
-import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.Environment;
-import org.openrewrite.internal.ManagedThreadLocal;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.rpc.RewriteRpcProcess;
+import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.request.PrepareRecipe;
 
-import java.io.*;
-import java.net.Socket;
-import java.nio.charset.StandardCharsets;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 import static java.util.Objects.requireNonNull;
 
+@Getter
 public class JavaScriptRewriteRpc extends RewriteRpc {
+    private static final RewriteRpcProcessManager<JavaScriptRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());
 
-    private final CloseableSupplier<JsonRpc> supplier;
+    /**
+     * The command used to start the RPC process. Useful for logging and diagnostics.
+     */
+    private final String command;
+    private final Map<String, String> commandEnv;
+    private final RewriteRpcProcess process;
 
-    private JavaScriptRewriteRpc(CloseableSupplier<JsonRpc> supplier, Environment marketplace, Duration timeout) {
-        super(supplier.get(), marketplace, timeout);
-        this.supplier = supplier;
+    JavaScriptRewriteRpc(RewriteRpcProcess process, Environment marketplace, String command, Map<String, String> commandEnv) {
+        super(process.getRpcClient(), marketplace);
+        this.command = command;
+        this.commandEnv = commandEnv;
+        this.process = process;
     }
 
-    private static final ManagedThreadLocal<JavaScriptRewriteRpc> THREAD_LOCAL = new ManagedThreadLocal<>();
+    public static @Nullable JavaScriptRewriteRpc get() {
+        return MANAGER.get();
+    }
 
-    public static ManagedThreadLocal<JavaScriptRewriteRpc> current() {
-        return THREAD_LOCAL;
+    public static JavaScriptRewriteRpc getOrStart() {
+        return MANAGER.getOrStart();
+    }
+
+    public static void setFactory(Builder builder) {
+        MANAGER.setFactory(builder);
     }
 
     @Override
-    public void close() {
-        super.close();
-        supplier.close();
+    public void shutdown() {
+        super.shutdown();
+        process.shutdown();
+    }
+
+    public static void shutdownCurrent() {
+        MANAGER.shutdown();
     }
 
     public int installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
-                new InstallRecipesByFile(recipes),
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
                 InstallRecipesResponse.class
         ).getRecipesInstalled();
     }
@@ -94,336 +102,205 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         ).getRecipesInstalled();
     }
 
-    public static Builder bundledInstallation(Environment marketplace) {
-        return builder(marketplace);
+
+    public static Builder builder() {
+        return new Builder();
     }
 
-    public static Builder bundledInstallation(Environment marketplace, Path installationDirectory) {
-        return builder(marketplace).installationDirectory(extractBundledInstallation(installationDirectory));
-    }
+    @RequiredArgsConstructor
+    public static class Builder implements Supplier<JavaScriptRewriteRpc> {
+        private Environment marketplace = Environment.builder().build();
+        private Path npxPath = Paths.get("npx");
+        private @Nullable Path log;
+        private @Nullable Path metricsCsv;
+        private @Nullable Path recipeInstallDir;
+        private Duration timeout = Duration.ofSeconds(30);
+        private boolean traceRpcMessages;
 
-    public static Builder builder(Environment marketplace) {
-        return new Builder(marketplace);
-    }
+        private @Nullable Integer inspectBrk;
+        private @Nullable Path inspectBrkRewriteSourcePath;
 
-    public static class Builder extends RewriteRpc.Builder<Builder> {
-        private static volatile @Nullable Path bundledInstallationDirectory;
+        private @Nullable Integer maxHeapSize;
+        private @Nullable Path workingDirectory;
+        private PrepareRecipe.@Nullable Loader recipeLoader;
 
-        private Path nodePath = Paths.get("node");
-        private @Nullable Path installationDirectory;
-        private int inspectPort;
-        private int port;
-        private boolean trace;
-        private @Nullable Path logFile;
-
-        private Builder(Environment marketplace) {
-            super(marketplace);
+        public Builder marketplace(Environment marketplace) {
+            this.marketplace = marketplace;
+            return this;
         }
 
-        private static Path getBundledInstallationDirectory() {
-            if (bundledInstallationDirectory == null) {
-                synchronized (Builder.class) {
-                    if (bundledInstallationDirectory == null) {
-                        bundledInstallationDirectory = initializeBundledInstallationDirectory();
-                    }
-                }
+        public Builder recipeInstallDir(@Nullable Path recipeInstallDir) {
+            this.recipeInstallDir = recipeInstallDir;
+            return this;
+        }
+
+        /**
+         * Path to the `npx` executable, not just the directory it is installed in.
+         *
+         * @param npxPath The path to the `npx` executable.
+         * @return This builder
+         */
+        public Builder npxPath(Path npxPath) {
+            if (Files.notExists(npxPath) || Files.isDirectory(npxPath)) {
+                throw new IllegalArgumentException("Invalid npx executable " + npxPath.toAbsolutePath().normalize());
             }
-            return requireNonNull(bundledInstallationDirectory);
-        }
-
-        private static Path initializeBundledInstallationDirectory() {
-            try {
-                Path tempDir = Files.createTempDirectory("javascript-rewrite-rpc");
-                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                    try (Stream<Path> stream = Files.walk(tempDir)) {
-                        stream.sorted(Comparator.reverseOrder())
-                                .map(Path::toFile)
-                                .forEach(File::delete);
-                    } catch (IOException ignore) {
-                    }
-                }));
-
-                return extractBundledInstallation(tempDir);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        public Builder nodePath(Path nodePath) {
-            this.nodePath = nodePath;
+            this.npxPath = npxPath;
             return this;
         }
 
-        public Builder installationDirectory(Path installationDirectory) {
-            this.installationDirectory = installationDirectory;
+        public Builder timeout(Duration timeout) {
+            this.timeout = timeout;
             return this;
         }
 
-        public Builder inspectAndBreak() {
-            return inspectAndBreak(9229);
-        }
-
-        public Builder inspectAndBreak(int port) {
-            this.inspectPort = port;
+        public Builder log(@Nullable Path log) {
+            this.log = log;
             return this;
         }
 
-        public Builder socket(int port) {
-            this.port = port;
+        public Builder metricsCsv(@Nullable Path metricsCsv) {
+            this.metricsCsv = metricsCsv;
             return this;
         }
 
-        public Builder trace(boolean trace) {
-            this.trace = trace;
+        /**
+         * Enables info and debug level logging.
+         *
+         * @return This builder.
+         */
+        public Builder traceRpcMessages(boolean verboseLogging) {
+            this.traceRpcMessages = verboseLogging;
             return this;
         }
 
-        public Builder logFile(Path logFile) {
-            this.logFile = logFile;
+        public Builder traceRpcMessages() {
+            return traceRpcMessages(true);
+        }
+
+        /**
+         * Set the port for the Node.js inspector to listen on. When this is set, you can use
+         * an "Attach to Node.js/Chrome" run configuration in IDEA to debug the JavaScript Rewrite RPC process.
+         * The Rewrite RPC process will block waiting for this connection.
+         *
+         * @param rewriteSourcePath The path to either OpenRewrite TypeScript source code, or inside a
+         *                          node_modules folder e.g., @openrewrite/rewrite. When
+         *                          running a test from within this project, the value should be
+         *                          "rewrite" (since "rewrite-javascript/rewrite" contains the TypeScript
+         *                          source code).
+         * @param inspectBrk        The port for the Node.js inspector to listen on.
+         * @return This builder
+         */
+        public Builder inspectBrk(Path rewriteSourcePath, int inspectBrk) {
+            this.inspectBrk = inspectBrk;
+            this.inspectBrkRewriteSourcePath = rewriteSourcePath;
+            return this;
+        }
+
+        public Builder inspectBrk(Path rewriteDistPath) {
+            return inspectBrk(rewriteDistPath, 9229);
+        }
+
+        /**
+         * Set the maximum heap size for the Node.js process in megabytes.
+         * Default V8 heap size is approximately 1.5-2 GB on 64-bit systems.
+         * For large repositories with many source files, you may need to increase this.
+         *
+         * @param maxHeapSize Maximum heap size in megabytes (e.g., 4096 for 4GB)
+         * @return This builder
+         */
+        public Builder maxHeapSize(@Nullable Integer maxHeapSize) {
+            this.maxHeapSize = maxHeapSize;
+            return this;
+        }
+
+        /**
+         * Set the working directory for the Node.js process.
+         * This affects where profile logs and other output files are generated.
+         * If not set, the process inherits the current working directory.
+         *
+         * @param workingDirectory The working directory for the Node.js process
+         * @return This builder
+         */
+        public Builder workingDirectory(@Nullable Path workingDirectory) {
+            this.workingDirectory = workingDirectory;
+            return this;
+        }
+
+        public Builder recipeLoader(PrepareRecipe.Loader recipeLoader) {
+            this.recipeLoader = recipeLoader;
             return this;
         }
 
         @Override
-        public JavaScriptRewriteRpc build() {
-            JavaScriptRewriteRpc rewriteRpc;
-            if (port != 0) {
-                rewriteRpc = new JavaScriptRewriteRpc(new CloseableSupplier<JsonRpc>() {
-                    @SuppressWarnings("NotNullFieldNotInitialized")
-                    private Socket socket;
+        public JavaScriptRewriteRpc get() {
+            Stream<@Nullable String> cmd;
 
-                    @Override
-                    public JsonRpc get() {
-                        try {
-                            socket = new Socket("127.0.0.1", port);
-                            return createRpcClient(socket.getInputStream(), socket.getOutputStream(), trace);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    }
+            if (inspectBrk != null) {
+                Path serverJs = requireNonNull(inspectBrkRewriteSourcePath).resolve("dist/rpc/server.js");
 
-                    @Override
-                    public void close() {
-                        try {
-                            socket.close();
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    }
-                }, marketplace, timeout);
+                // We have to use node directly here because npx spawns a child node process. The
+                // IDE's debug configuration would connect to the npx process rather than the spawned
+                // node process and breakpoints don't get hit.
+                cmd = Stream.of(
+                        "node",
+                        "--enable-source-maps",
+                        "--inspect-brk=" + inspectBrk,
+                        maxHeapSize != null ? "--max-old-space-size=" + maxHeapSize : null,
+                        serverJs.toAbsolutePath().normalize().toString(),
+                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                        traceRpcMessages ? "--trace-rpc-messages" : null,
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
+                );
             } else {
-                // Use default installation directory if none provided (lazy-loaded)
-                Path effectiveInstallationDirectory = installationDirectory != null ?
-                        installationDirectory :
-                        getBundledInstallationDirectory();
-
-                List<String> command = new ArrayList<>(Arrays.asList(
-                        nodePath.toString(),
-                        "--stack-size=4000",
-                        "--enable-source-maps"
-                ));
-                if (inspectPort != 0) {
-                    command.add("--inspect-brk=" + inspectPort);
-                }
-                command.add(effectiveInstallationDirectory.resolve("src/rpc/server.js").toString());
-
-                if (logFile != null) {
-                    command.add("--log-file=" + logFile);
-                }
-
-                rewriteRpc = new JavaScriptRewriteRpc(new CloseableSupplier<JsonRpc>() {
-                    private @Nullable JavaScriptRewriteRpcProcess process;
-
-                    @Override
-                    public JsonRpc get() {
-                        process = new JavaScriptRewriteRpcProcess(logFile, trace, command.toArray(new String[0]));
-                        process.start();
-                        return requireNonNull(process.rpcClient);
-                    }
-
-                    @Override
-                    public void close() {
-                        if (process != null) {
-                            process.interrupt();
-                            try {
-                                process.join();
-                            } catch (InterruptedException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }
-                    }
-                }, marketplace, timeout);
+                String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
+                cmd = Stream.of(
+                        npxPath.toString(),
+                        // For SNAPSHOT versions, assume npm link has been run and don't use --package
+                        version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
+                        "rewrite-rpc",
+                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                        metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
+                        traceRpcMessages ? "--trace-rpc-messages" : null,
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
+                );
             }
 
-            return rewriteRpc;
-        }
-    }
+            String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
+            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
 
-    /**
-     * Extracts the bundled JavaScript installation to the specified directory.
-     * This method can be used to extract the bundled installation independently
-     * of creating a JavaScriptRewriteRpc instance.
-     * <p>
-     * If a package.json file already exists in the extraction directory, it will
-     * be compared with the bundled package.json. If they differ, the entire
-     * extraction directory will be cleaned before extracting the bundled installation.
-     *
-     * @param extractionDirectory The directory where the bundled installation should be extracted
-     * @return The path to the extracted installation directory (specifically the dist folder)
-     * @throws UncheckedIOException if extraction fails
-     */
-    private static Path extractBundledInstallation(Path extractionDirectory) {
-        try {
-            Files.createDirectories(extractionDirectory);
+            // Set working directory if specified
+            if (workingDirectory != null) {
+                process.setWorkingDirectory(workingDirectory);
+            }
 
-            // Check if we need to clean the directory by comparing package.json files
-            boolean needsCleanup = shouldCleanExtractionDirectory(extractionDirectory);
-
-            if (needsCleanup) {
-                // Delete everything in the extraction directory
-                if (Files.exists(extractionDirectory)) {
-                    try (Stream<Path> stream = Files.walk(extractionDirectory)) {
-                        stream.sorted(Comparator.reverseOrder())
-                                .filter(path -> !path.equals(extractionDirectory)) // Don't delete the directory itself
-                                .map(Path::toFile)
-                                .forEach(File::delete);
-                    }
+            // Build NODE_OPTIONS with all necessary flags
+            StringBuilder nodeOptions = new StringBuilder("--enable-source-maps");
+            if (inspectBrk == null) {
+                // When not using inspect-brk, we need to pass Node.js flags via NODE_OPTIONS
+                // since npx spawns a child process
+                // Note: --prof is not allowed in NODE_OPTIONS for security reasons
+                if (maxHeapSize != null) {
+                    nodeOptions.append(" --max-old-space-size=").append(maxHeapSize);
                 }
             }
-
-            InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
-            if (packageStream == null) {
-                throw new IllegalStateException("production-package.zip not found in resources");
+            process.environment().put("NODE_OPTIONS", nodeOptions.toString());
+            if (npxPath.getParent() != null) {
+                // `npx` is typically a shebang script alongside the `node` executable
+                process.environment().put("PATH", npxPath.getParent() + File.pathSeparator +
+                        System.getenv("PATH"));
             }
+            process.start();
 
-            try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
-                ZipEntry entry;
-                while ((entry = zipIn.getNextEntry()) != null) {
-                    if (!entry.isDirectory()) {
-                        Path outputPath = extractionDirectory.resolve(entry.getName());
-                        Files.createDirectories(outputPath.getParent());
-                        Files.copy(zipIn, outputPath, StandardCopyOption.REPLACE_EXISTING);
-                    }
-                    zipIn.closeEntry();
-                }
-            }
-
-            return extractionDirectory.resolve("node_modules/@openrewrite/rewrite/dist");
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    private static boolean shouldCleanExtractionDirectory(Path extractionDirectory) throws IOException {
-        Path existingPackageJson = extractionDirectory.resolve("package.json");
-        if (!Files.exists(existingPackageJson)) {
-            return false; // No existing package.json, no need to clean
-        }
-
-        String bundledPackageJsonContent = getBundledPackageJsonContent();
-        String existingPackageJsonContent = new String(Files.readAllBytes(existingPackageJson), StandardCharsets.UTF_8);
-        return !bundledPackageJsonContent.equals(existingPackageJsonContent);
-    }
-
-    private static String getBundledPackageJsonContent() throws IOException {
-        InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
-        if (packageStream == null) {
-            throw new IllegalStateException("package.json not found in resources");
-        }
-
-        try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
-            ZipEntry entry;
-            while ((entry = zipIn.getNextEntry()) != null) {
-                if ("package.json".equals(entry.getName())) {
-                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                    int byteCount;
-                    byte[] data = new byte[4096];
-                    while ((byteCount = zipIn.read(data, 0, data.length)) != -1) {
-                        buffer.write(data, 0, byteCount);
-                    }
-                    return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
-                }
-                zipIn.closeEntry();
-            }
-        }
-
-        throw new IllegalStateException("package.json not found in resources");
-    }
-
-    private interface CloseableSupplier<T> extends Supplier<T>, AutoCloseable {
-        @Override
-        void close();
-    }
-
-    private static class JavaScriptRewriteRpcProcess extends Thread {
-        private final @Nullable Path logFile;
-        private final boolean trace;
-        private final String[] command;
-
-        @Nullable
-        private Process process;
-
-        @Getter
-        private @Nullable JsonRpc rpcClient;
-
-        public JavaScriptRewriteRpcProcess(@Nullable Path logFile, boolean trace, String... command) {
-            this.logFile = logFile;
-            this.trace = trace;
-            this.command = command;
-            this.setDaemon(false);
-        }
-
-        @Override
-        public void run() {
             try {
-                ProcessBuilder pb = new ProcessBuilder(command);
-                pb.redirectError(logFile != null ? ProcessBuilder.Redirect.appendTo(logFile.toFile()) :
-                        ProcessBuilder.Redirect.INHERIT);
-                process = pb.start();
+                return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process, marketplace,
+                        String.join(" ", cmdArr), process.environment())
+                        .livenessCheck(process::getLivenessCheck)
+                        .timeout(timeout)
+                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)))
+                        .recipeLoader(recipeLoader);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
-        }
-
-        @Override
-        public synchronized void start() {
-            super.start();
-            while (this.process == null) {
-                try {
-                    //noinspection BusyWait
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-
-            this.rpcClient = createRpcClient(this.process.getInputStream(), this.process.getOutputStream(), trace);
-        }
-    }
-
-    private static JsonRpc createRpcClient(InputStream inputStream, OutputStream outputStream, boolean trace) {
-        SimpleModule module = new SimpleModule();
-        module.addSerializer(Path.class, new PathSerializer());
-        module.addDeserializer(Path.class, new PathDeserializer());
-        JsonMessageFormatter formatter = new JsonMessageFormatter(module);
-        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter, inputStream, outputStream);
-
-        if (trace)
-            handler = new TraceMessageHandler("client", handler);
-        return new JsonRpc(handler);
-    }
-
-    private static class PathSerializer extends JsonSerializer<Path> {
-        @Override
-        public void serialize(Path path, JsonGenerator g, SerializerProvider serializerProvider) throws IOException {
-            g.writeString(path.toString());
-        }
-    }
-
-    private static class PathDeserializer extends JsonDeserializer<Path> {
-        @Override
-        public Path deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-            String pathString = p.getValueAsString();
-            return Paths.get(pathString);
         }
     }
 }

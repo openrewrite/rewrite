@@ -26,10 +26,12 @@ import org.openrewrite.style.Style;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
+import static java.util.stream.Collectors.toSet;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
@@ -57,7 +59,7 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-S1128");
+        return singleton("RSPEC-S1128");
     }
 
     @Override
@@ -93,7 +95,7 @@ public class RemoveUnusedImports extends Recipe {
 
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                if (fq != null) {
+                if (fq != null && !"class".equals(variable.getName())) {
                     methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new TreeSet<>())
                             .add(variable.getName());
                 }
@@ -186,6 +188,7 @@ public class RemoveUnusedImports extends Recipe {
                             if (methodsAndFields != null) {
                                 for (String method : methodsAndFields) {
                                     anImport.imports.add(new JRightPadded<>(elem
+                                            .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(method)))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
                                 }
@@ -194,6 +197,7 @@ public class RemoveUnusedImports extends Recipe {
                             if (staticClasses != null) {
                                 for (JavaType.FullyQualified fqn : staticClasses) {
                                     anImport.imports.add(new JRightPadded<>(elem
+                                            .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
                                 }
@@ -222,10 +226,10 @@ public class RemoveUnusedImports extends Recipe {
                     Set<String> topLevelTypeNames = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
                             .filter(fq -> fq.getOwningClass() == null)
                             .map(JavaType.FullyQualified::getFullyQualifiedName)
-                            .collect(Collectors.toSet());
+                            .collect(toSet());
                     Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
                             .filter(fq -> fq.getOwningClass() == null || !topLevelTypeNames.contains(fq.getOwningClass().getFullyQualifiedName()))
-                            .collect(Collectors.toSet());
+                            .collect(toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
                     if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                         anImport.used = false;
@@ -245,6 +249,7 @@ public class RemoveUnusedImports extends Recipe {
                                     .sorted()
                                     .distinct()
                                     .forEach(type -> anImport.imports.add(new JRightPadded<>(elem
+                                            .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(type.substring(type.lastIndexOf('.') + 1))))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                                     );

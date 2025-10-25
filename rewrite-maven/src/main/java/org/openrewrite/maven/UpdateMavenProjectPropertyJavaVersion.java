@@ -21,14 +21,19 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Plugin;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Optional;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -47,7 +52,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
     private static final List<XPathMatcher> JAVA_VERSION_XPATH_MATCHERS =
             JAVA_VERSION_PROPERTIES.stream()
                     .map(property -> "/project/properties/" + property)
-                    .map(XPathMatcher::new).collect(Collectors.toList());
+                    .map(XPathMatcher::new).collect(toList());
 
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build//plugins");
 
@@ -86,19 +91,22 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 // Update properties already defined in the current pom
                 Xml.Document d = super.visitDocument(document, ctx);
 
-                // Return early if the parent appears to be within the current repository, as properties defined there will be updated
-                if (getResolutionResult().getParent() != null && getResolutionResult().parentPomIsProjectPom()) {
+                // Return early if the parent is within the current repository, as properties defined there will be updated
+                if (getResolutionResult().parentPomIsProjectPom()) {
                     // Unless the plugin config in the parent defines source/target/release with a property
-                    for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
-                        if (plugin.getGroupId().equals("org.apache.maven.plugins") && plugin.getArtifactId().equals("maven-compiler-plugin") && plugin.getConfiguration() != null) {
+                    for (Plugin plugin : Optional.ofNullable(getResolutionResult().getParent())
+                            .map(MavenResolutionResult::getPom)
+                            .map(ResolvedPom::getPlugins)
+                            .orElse(emptyList())) {
+                        if ("org.apache.maven.plugins".equals(plugin.getGroupId()) && "maven-compiler-plugin".equals(plugin.getArtifactId()) && plugin.getConfiguration() != null) {
                             for (String property : JAVA_VERSION_PROPERTIES) {
-                                if (getResolutionResult().getPom().getProperties().get(property) != null) {
+                                if (getResolutionResult().getPom().getRequested().getProperties().get(property) != null) {
                                     try {
                                         float parsed = Float.parseFloat(getResolutionResult().getPom().getProperties().get(property));
                                         if (parsed < version &&
-                                            ((plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
-                                            (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
-                                            (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property)))) {
+                                                ((plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
+                                                (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
+                                                (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property)))) {
                                             d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
                                                     .visitNonNull(d, ctx);
                                             maybeUpdateModel();

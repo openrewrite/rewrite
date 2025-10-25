@@ -63,7 +63,7 @@ class ImplementInterfaceTest implements RewriteTest {
               """,
             """
               import b.B;
-                            
+
               class A implements B {
               }
               """
@@ -79,14 +79,14 @@ class ImplementInterfaceTest implements RewriteTest {
           java(
             """
               import c.C;
-                            
+
               class A implements C {
               }
               """,
             """
               import b.B;
               import c.C;
-                            
+
               class A implements C, B {
               }
               """
@@ -132,16 +132,16 @@ class ImplementInterfaceTest implements RewriteTest {
           java(
             """
               import c.C;
-                              
+
               class A implements C {
               }
               """,
             """
               import b.B;
               import c.C;
-                              
+
               import java.time.LocalDate;
-                              
+
               class A implements C, B<String, LocalDate> {
               }
               """

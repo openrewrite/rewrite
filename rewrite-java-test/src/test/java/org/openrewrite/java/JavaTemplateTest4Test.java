@@ -40,7 +40,7 @@ class JavaTemplateTest4Test implements RewriteTest {
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
+                  if ("test".equals(method.getSimpleName()) && method.getParameters().size() == 1) {
                       // insert in outer method
                       J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
                       J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().getFirst();
@@ -63,9 +63,9 @@ class JavaTemplateTest4Test implements RewriteTest {
                 .isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(1))
                 .matches(jt -> jt instanceof JavaType.Parameterized &&
-                               ((JavaType.Parameterized) jt).getType().getFullyQualifiedName().equals("java.util.List") &&
+                               "java.util.List".equals(((JavaType.Parameterized) jt).getType().getFullyQualifiedName()) &&
                                ((JavaType.Parameterized) jt).getTypeParameters().size() == 1 &&
-                               TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().getFirst()).getFullyQualifiedName().equals("java.lang.String"),
+                               "java.lang.String".equals(TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().getFirst()).getFullyQualifiedName()),
                   "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
                 );
               assertThat(m.getName().getType()).isEqualTo(type);
@@ -107,7 +107,7 @@ class JavaTemplateTest4Test implements RewriteTest {
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("test") && method.getParameters().getFirst() instanceof J.Empty) {
+                  if ("test".equals(method.getSimpleName()) && method.getParameters().getFirst() instanceof J.Empty) {
                       // insert in outer method
                       J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
                       J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().getFirst();
@@ -130,8 +130,8 @@ class JavaTemplateTest4Test implements RewriteTest {
               var param = TypeUtils.asArray(type.getParameterTypes().getFirst());
               assertThat(param.getElemType())
                 .as("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
-                .matches(at -> TypeUtils.asFullyQualified(TypeUtils.asArray(at).getElemType()).getFullyQualifiedName()
-                  .equals("java.lang.Object"));
+                .matches(at -> "java.lang.Object"
+                  .equals(TypeUtils.asFullyQualified(TypeUtils.asArray(at).getElemType()).getFullyQualifiedName()));
           }),
           java(
             """
@@ -165,7 +165,7 @@ class JavaTemplateTest4Test implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   {
-                      if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
+                      if ("test".equals(method.getSimpleName()) && method.getParameters().size() == 1) {
                           return JavaTemplate.builder("int n, #{}")
                             .build()
                             .apply(getCursor(), method.getCoordinates().replaceParameters(), method.getParameters().getFirst());
@@ -185,7 +185,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                 .isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(1))
                 .as("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
-                .matches(jt -> TypeUtils.asFullyQualified(jt).getFullyQualifiedName().equals("java.lang.String"));
+                .matches(jt -> "java.lang.String".equals(TypeUtils.asFullyQualified(jt).getFullyQualifiedName()));
           }),
           java(
             """

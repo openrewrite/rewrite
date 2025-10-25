@@ -47,7 +47,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.sendMarkers(j, Tree::getMarkers);
+        q.getAndSend(j, Tree::getMarkers);
 
         return j;
     }
@@ -116,7 +116,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(expressionWithTypeArguments, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return expressionWithTypeArguments;
     }
-
 
     @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcSendQueue q) {
@@ -433,6 +432,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitJsxTag(JSX.Tag tag, RpcSendQueue q) {
         q.getAndSend(tag, el -> el.getPadding().getOpenName(), el -> visitLeftPadded(el, q));
+        q.getAndSend(tag, JSX.Tag::getTypeArguments, el -> visitContainer(el, q));
         q.getAndSend(tag, JSX.Tag::getAfterName, space -> visitSpace(space, q));
         q.getAndSendList(tag, el -> el.getPadding().getAttributes(), attr -> attr.getElement().getId(), attr -> visitRightPadded(attr, q));
 
@@ -580,19 +580,19 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return functionCall;
     }
 
-    private <T> void visitLeftPadded(JLeftPadded<T> left, RpcSendQueue q) {
+    public <T> void visitLeftPadded(JLeftPadded<T> left, RpcSendQueue q) {
         delegate.visitLeftPadded(left, q);
     }
 
-    private <T> void visitRightPadded(JRightPadded<T> right, RpcSendQueue q) {
+    public <T> void visitRightPadded(JRightPadded<T> right, RpcSendQueue q) {
         delegate.visitRightPadded(right, q);
     }
 
-    private <J2 extends J> void visitContainer(JContainer<J2> container, RpcSendQueue q) {
+    public <J2 extends J> void visitContainer(JContainer<J2> container, RpcSendQueue q) {
         delegate.visitContainer(container, q);
     }
 
-    private void visitSpace(Space space, RpcSendQueue q) {
+    public void visitSpace(Space space, RpcSendQueue q) {
         delegate.visitSpace(space, q);
     }
 

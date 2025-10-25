@@ -27,7 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -73,6 +73,125 @@ class XmlParserTest implements RewriteTest {
               </html>
               """,
             spec -> spec.path("index.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspScriptlet() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                <body>
+                  <%
+                    String name = request.getParameter("name");
+                    if (name == null) {
+                        name = "Guest";
+                    }
+                  %>
+                  <h1>Welcome!</h1>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("scriptlet.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspExpression() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                <body>
+                  <h1>Current time: <%= new java.util.Date() %></h1>
+                  <p>Your name: <%= request.getParameter("name") %></p>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("expression.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspDeclaration() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <%!
+                private int counter = 0;
+
+                public int incrementCounter() {
+                    return ++counter;
+                }
+              %>
+              <html>
+                <body>
+                  <h1>Page visits: <%= incrementCounter() %></h1>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("declaration.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspComment() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                <body>
+                  <%-- This is a JSP comment that won't appear in the HTML output --%>
+                  <h1>Hello World</h1>
+                  <%--
+                    Multi-line JSP comment
+                    for documenting JSP code
+                  --%>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("comment.jsp")
+          )
+        );
+    }
+
+    @Test
+    void mixedJspElements() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <%@ page language="java" contentType="text/html; charset=UTF-8" %>
+              <html>
+                <body>
+                  <%!
+                    private String greeting = "Hello";
+                  %>
+                  <%-- Display greeting --%>
+                  <h1><%= greeting %> from JSP!</h1>
+                  <%
+                    for(int i = 1; i <= 3; i++) {
+                  %>
+                    <p>Line <%= i %></p>
+                  <% } %>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("mixed.jsp")
           )
         );
     }
@@ -145,7 +264,7 @@ class XmlParserTest implements RewriteTest {
               </beans>
               """,
             spec -> spec.afterRecipe(doc -> {
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getValue().equals("java.lang.String"))).isTrue();
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> "java.lang.String".equals(typeRef.getValue()))).isTrue();
                 assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind() == Reference.Kind.TYPE)).isTrue();
                 assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind() == Reference.Kind.PACKAGE)).isTrue();
             })
@@ -287,7 +406,7 @@ class XmlParserTest implements RewriteTest {
             """
               <?xml version="1.0" encoding="UTF-8"?>
               <!DOCTYPE configuration >
-              
+
               <configuration scan="true">
                   <root>
                       <level>WARN</level>
@@ -440,7 +559,7 @@ class XmlParserTest implements RewriteTest {
       "packages.config"
     })
     void acceptWithValidPaths(String path) {
-        assertThat(new XmlParser().accept(Paths.get(path))).isTrue();
+        assertThat(new XmlParser().accept(Path.of(path))).isTrue();
     }
 
     @DisabledOnOs(OS.WINDOWS)
@@ -452,7 +571,7 @@ class XmlParserTest implements RewriteTest {
       "/foo/bar/baz.xml.txt"
     })
     void acceptWithInvalidPaths(String path) {
-        assertThat(new XmlParser().accept(Paths.get(path))).isFalse();
+        assertThat(new XmlParser().accept(Path.of(path))).isFalse();
     }
 
     @Test
@@ -460,6 +579,38 @@ class XmlParserTest implements RewriteTest {
         rewriteRun(
           xml(
             "<?xml version=\"1.0\"?>CR<a>CR</a>".replace("CR", "\r")
+          )
+        );
+    }
+
+    @Test
+    void utf8SurrogatePairsInComments() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                  <!-- 👇 Problem below -->
+                  <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>example</artifactId>
+                  </dependency>
+                  <!-- 👆 Problem above -->
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void utf8SurrogatePairsSimple() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!-- 👇 -->
+              <a></a>
+              """
           )
         );
     }

@@ -37,7 +37,9 @@ dependencies {
     api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")
 
-    antlrGeneration("org.antlr:antlr4:4.13.2")
+    antlrGeneration("org.antlr:antlr4:4.13.2") {
+        exclude(group = "com.ibm.icu", module = "icu4j")
+    }
     implementation("org.antlr:antlr4-runtime:4.13.2")
     // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
     checkstyle("com.puppycrawl.tools:checkstyle:9.+") {
@@ -46,7 +48,6 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     compileOnly("org.junit.jupiter:junit-jupiter-api")
     compileOnly("org.assertj:assertj-core:latest.release")
-    implementation("org.apache.commons:commons-lang3:latest.release")
     implementation("org.apache.commons:commons-text:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 

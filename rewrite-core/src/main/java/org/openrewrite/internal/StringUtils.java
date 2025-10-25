@@ -292,7 +292,18 @@ public class StringUtils {
      * or <code>-1</code> if no character in the string matches the predicate.
      */
     public static int indexOf(String text, Predicate<Character> test) {
-        for (int i = 0; i < text.length(); i++) {
+        return indexOf(text, 0, test);
+    }
+
+    /**
+     * @param text Text to scan
+     * @param fromIndex Start offset to scan from
+     * @param test The predicate to match
+     * @return The index of the first character for which the predicate returns <code>true</code>,
+     * or <code>-1</code> if no character in the string matches the predicate.
+     */
+    public static int indexOf(String text, int fromIndex, Predicate<Character> test) {
+        for (int i = fromIndex; i < text.length(); i++) {
             if (test.test(text.charAt(i))) {
                 return i;
             }
@@ -380,15 +391,13 @@ public class StringUtils {
      * which properly interprets '*' and '**' wildcards for file paths.
      *
      * @param str the input string to match against the pattern, can be null
-     * @param pattern the glob pattern to evaluate, can be null
+     * @param pattern the glob pattern to evaluate. null and "*" both match everything.
      * @return true if the input string matches the glob pattern, false otherwise
      * @see org.openrewrite.PathUtils#matchesGlob(Path, String)
      */
     public static boolean matchesGlob(@Nullable String str, @Nullable String pattern) {
-        if ("*".equals(pattern)) {
+        if ("*".equals(pattern) || pattern == null) {
             return true;
-        } else if (pattern == null) {
-            return false;
         }
 
         if (str == null) {
@@ -595,6 +604,11 @@ public class StringUtils {
      * the code is in any declaration of a type whose name begins with "com.xerox.".
      */
     public static String aspectjNameToPattern(String name) {
+        // Special case: a single * matches any type
+        if ("*".equals(name)) {
+            return ".*";
+        }
+
         int length = name.length();
         StringBuilder sb = new StringBuilder(length);
         char prev = 0;
