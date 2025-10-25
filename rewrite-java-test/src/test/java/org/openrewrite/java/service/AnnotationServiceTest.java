@@ -190,4 +190,117 @@ class AnnotationServiceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void classAnnotationInheritance() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE)
+              @interface BaseAnnotation {}
+
+              @BaseAnnotation
+              class BaseClass {}
+
+              class ChildClass extends BaseClass {}
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                    AnnotationService service = service(AnnotationService.class);
+                    if ("ChildClass".equals(classDecl.getSimpleName())) {
+                        // Direct getAllAnnotations should not find inherited annotations
+                        assertThat(service.getAllAnnotations(getCursor())).isEmpty();
+
+                        // But isAnnotatedWith should find it through the type hierarchy
+                        assertThat(service.isAnnotatedWith(classDecl, "BaseAnnotation")).isTrue();
+                        assertThat(service.annotatedWith(classDecl, "BaseAnnotation")).hasSize(1);
+                    }
+                    return classDecl;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void classAnnotationFromInterface() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE)
+              @interface InterfaceAnnotation {}
+
+              @InterfaceAnnotation
+              interface MyInterface {}
+
+              class ImplementingClass implements MyInterface {}
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                    AnnotationService service = service(AnnotationService.class);
+                    if ("ImplementingClass".equals(classDecl.getSimpleName())) {
+                        assertThat(service.isAnnotatedWith(classDecl, "InterfaceAnnotation")).isTrue();
+                        assertThat(service.annotatedWith(classDecl, "InterfaceAnnotation")).hasSize(1);
+                    }
+                    return classDecl;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void methodAnnotationInheritance() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.METHOD)
+              @interface MethodAnnotation {}
+
+              class BaseClass {
+                  @MethodAnnotation
+                  public void doSomething() {}
+              }
+
+              class ChildClass extends BaseClass {
+                  @Override
+                  public void doSomething() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                    AnnotationService service = service(AnnotationService.class);
+                    Cursor parentCursor = getCursor().getParentTreeCursor();
+                    if (parentCursor.getValue() instanceof J.ClassDeclaration) {
+                        J.ClassDeclaration classDecl = parentCursor.getValue();
+                        if ("ChildClass".equals(classDecl.getSimpleName()) &&
+                            "doSomething".equals(method.getSimpleName())) {
+                            // Direct getAllAnnotations should only show @Override
+                            List<J.Annotation> directAnnotations = service.getAllAnnotations(getCursor());
+                            assertThat(directAnnotations).hasSize(1);
+                            assertThat(directAnnotations.get(0).getSimpleName()).isEqualTo("Override");
+
+                            // But isAnnotatedWith should find @MethodAnnotation from parent
+                            assertThat(service.isAnnotatedWith(method, "MethodAnnotation")).isTrue();
+                            assertThat(service.annotatedWith(method, "MethodAnnotation")).hasSize(1);
+                        }
+                    }
+                    return method;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
 }
