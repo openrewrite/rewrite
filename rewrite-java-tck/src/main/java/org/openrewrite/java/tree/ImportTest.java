@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -235,6 +236,132 @@ class ImportTest implements RewriteTest {
             """
               import java.util.List;
               ;class BetweenImport { }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
+    @Test
+    void moduleImportBasic() {
+        rewriteRun(
+          java(
+            """
+              import module java.base;
+              
+              public class A {
+                  String s = "test";
+                  List<String> list;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
+    @Test
+    void moduleImportMultiple() {
+        rewriteRun(
+          java(
+            """
+              import module java.base;
+              import module java.sql;
+              
+              public class A {
+                  Set<String> s;
+                  Connection conn;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream()
+              .filter(J.Import::isModule)
+              .map(J.Import::getQualid)
+              .map(J.FieldAccess::toString))
+              .containsExactly(
+                "java.base",
+                "java.sql"
+              ))
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
+    @Test
+    void moduleImportWithRegularImports() {
+        rewriteRun(
+          java(
+            """
+              import module java.base;
+              import java.util.HashMap;
+              import static java.util.Collections.emptyList;
+              
+              public class A {
+                  String s;
+                  HashMap<String, Integer> map;
+                  List<String> list = emptyList();
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
+    @Test
+    void moduleImportShadowing() {
+        rewriteRun(
+          java(
+            """
+              import module java.base;
+              // List is ambiguous here because java.awt.List is also in java.base
+              import java.util.List;
+              import java.awt.*;
+              
+              public class A {
+                  List<Date> list;
+                  Color color;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
+    @Test
+    void moduleImportAggregator() {
+        rewriteRun(
+          java(
+            """
+              import module java.se;
+              
+              public class A {
+                  String s;
+                  List<String> list;
+                  Connection conn;
+                  Path path;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
+    @Test
+    void moduleImportOrdering() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import module java.base;
+              import static java.util.Collections.emptyList;
+              import module java.sql;
+              import java.util.*;
+              
+              public class A {}
               """
           )
         );
