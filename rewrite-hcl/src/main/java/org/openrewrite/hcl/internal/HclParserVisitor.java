@@ -360,7 +360,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     }
 
     @Override
-    public Hcl.@NonNull Identifier visitFunctionName(HCLParser.FunctionNameContext ctx) {
+    public Hcl.Identifier visitFunctionName(HCLParser.FunctionNameContext ctx) {
         List<TerminalNode> identifiers = ctx.Identifier();
         if (identifiers.size() == 1) {
             return visitIdentifier(identifiers.get(0));
