@@ -76,13 +76,20 @@ When a CSV contains multiple top-level categories, a synthetic "epsilon root" (`
 
 - **Reader**: `RecipeMarketplaceReader` (using univocity-parsers)
   - Parses CSV into `RecipeMarketplace` hierarchies
-  - Creates `RecipeOffering` instances with null bundles when bundle columns are absent
+  - Accepts optional `RecipeBundleLoader` instances via constructor
+  - Creates bundle instances via loaders when ecosystem, packageName, and version are present
+  - Creates `RecipeOffering` instances with null bundles when bundle columns are absent or no loader is configured
   - Returns epsilon root when multiple top-level categories exist
 
 - **Writer**: `RecipeMarketplaceWriter` (using univocity-parsers)
   - Dynamically determines required category and option columns
   - Filters epsilon root from output
   - Only includes bundle columns if at least one recipe has bundle information
+
+- **Bundle Loaders**: Configurable implementations passed to the reader
+  - `MavenRecipeBundleLoader` in `rewrite-maven`: Creates `MavenRecipeBundle` instances, requires `MavenExecutionContextView` and `MavenArtifactDownloader`
+  - `NpmRecipeBundleLoader` in `rewrite-javascript`: Creates `NpmRecipeBundle` instances
+  - `RecipeBundleLoader` interface allows additional ecosystems to be added without modifying core
 
 ## Consequences
 
@@ -94,6 +101,7 @@ When a CSV contains multiple top-level categories, a synthetic "epsilon root" (`
 4. **Composable**: Multiple marketplace CSVs can be combined by merging rows
 5. **Round-trip compatible**: Reader and writer preserve all information
 6. **Familiar pattern**: Mirrors `moderne-organizations-format` conventions, reducing learning curve
+7. **Extensible bundle loading**: RecipeBundleLoader interface allows new package ecosystems to be added without modifying core modules
 
 ### Negative
 
@@ -107,6 +115,7 @@ When a CSV contains multiple top-level categories, a synthetic "epsilon root" (`
 - **Left-to-right category ordering** (left = deepest): This matches the `moderne-organizations-format` convention but may be counterintuitive to some users who expect left-to-right to represent root-to-leaf
 - **Null bundles for minimal marketplaces**: Simplifies the model but means `RecipeOffering.describe()` and `prepare()` throw exceptions until bundles are associated
 - **Dynamic columns**: Provides flexibility but means schema varies between files, making generic CSV processing tools less effective
+- **Bundle loader configuration**: Bundle loaders require runtime dependencies (e.g., MavenExecutionContextView) that must be provided when constructing the loader and passed to RecipeMarketplaceReader constructor
 
 ## Examples
 

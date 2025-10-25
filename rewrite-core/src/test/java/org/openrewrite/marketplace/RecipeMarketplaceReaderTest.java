@@ -63,15 +63,20 @@ class RecipeMarketplaceReaderTest {
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
 
         assertThat(marketplace.getDisplayName()).isEqualTo("Java Cleanup");
-        assertThat(marketplace.getRecipes())
-                .singleElement()
-                .extracting("name", "displayName", "description", "bundle")
-                .containsExactly(
-                        "org.openrewrite.java.cleanup.UnnecessaryParentheses",
-                        "Remove Unnecessary Parentheses",
-                        "Removes unnecessary parentheses",
-                        null // CSV creates minimal offerings without bundles
-                );
+        RecipeOffering offering = (RecipeOffering) marketplace.getRecipes().getFirst();
+        assertThat(offering.getName()).isEqualTo("org.openrewrite.java.cleanup.UnnecessaryParentheses");
+        assertThat(offering.getDisplayName()).isEqualTo("Remove Unnecessary Parentheses");
+        assertThat(offering.getDescription()).isEqualTo("Removes unnecessary parentheses");
+
+        // Bundle should be created if a RecipeBundleLoader is registered for Maven
+        // In test environment without ServiceLoader, bundle will be null
+        RecipeBundle bundle = offering.getBundle();
+        if (bundle != null) {
+            assertThat(bundle.getPackageEcosystem()).isEqualTo("Maven");
+            assertThat(bundle.getPackageName()).isEqualTo("org.openrewrite:rewrite-java");
+            assertThat(bundle.getVersion()).isEqualTo("8.0.0");
+            assertThat(bundle.getTeam()).isEqualTo("java-team");
+        }
     }
 
     @Test

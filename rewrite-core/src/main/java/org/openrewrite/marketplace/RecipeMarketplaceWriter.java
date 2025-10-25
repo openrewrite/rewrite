@@ -56,6 +56,19 @@ public class RecipeMarketplaceWriter {
 
             // Write headers
             List<String> headers = new ArrayList<>();
+
+            // Add optional bundle columns first if any recipe has bundle info
+            Set<String> optionalColumns = findUsedOptionalColumns(marketplace);
+            if (optionalColumns.contains("ecosystem")) {
+                headers.add("ecosystem");
+            }
+            if (optionalColumns.contains("packageName")) {
+                headers.add("packageName");
+            }
+            if (optionalColumns.contains("version")) {
+                headers.add("version");
+            }
+
             headers.add("name");
             headers.add("displayName");
             headers.add("description");
@@ -72,9 +85,10 @@ public class RecipeMarketplaceWriter {
                 headers.add("option" + i + "Description");
             }
 
-            // Add optional bundle columns if any recipe has bundle info
-            Set<String> optionalColumns = findUsedOptionalColumns(marketplace);
-            headers.addAll(optionalColumns);
+            // Add team column at the end if present
+            if (optionalColumns.contains("team")) {
+                headers.add("team");
+            }
 
             csv.writeHeaders(headers);
 
@@ -91,11 +105,23 @@ public class RecipeMarketplaceWriter {
     }
 
     private void writeCsvRecursive(CsvWriter csv, RecipeMarketplace marketplace,
-                                    List<String> categoryPath, int maxCategoryDepth,
-                                    int maxOptions, Set<String> optionalColumns) {
+                                   List<String> categoryPath, int maxCategoryDepth,
+                                   int maxOptions, Set<String> optionalColumns) {
         // Write all recipes in this category
         for (RecipeListing recipe : marketplace.getRecipes()) {
             List<String> row = new ArrayList<>();
+
+            // Optional bundle columns first (ecosystem, packageName, version)
+            RecipeBundle bundle = recipe.getBundle();
+            if (optionalColumns.contains("ecosystem")) {
+                row.add(bundle != null ? bundle.getPackageEcosystem() : "");
+            }
+            if (optionalColumns.contains("packageName")) {
+                row.add(bundle != null ? bundle.getPackageName() : "");
+            }
+            if (optionalColumns.contains("version")) {
+                row.add(bundle != null ? bundle.getVersion() : "");
+            }
 
             // Required columns
             row.add(recipe.getName());
@@ -130,19 +156,10 @@ public class RecipeMarketplaceWriter {
                 }
             }
 
-            // Optional bundle columns
-            RecipeBundle bundle = recipe.getBundle();
-            if (optionalColumns.contains("ecosystem")) {
-                row.add(bundle != null ? bundle.getPackageEcosystem() : "");
-            }
-            if (optionalColumns.contains("packageName")) {
-                row.add(bundle != null ? bundle.getPackageName() : "");
-            }
-            if (optionalColumns.contains("version")) {
-                row.add(bundle != null ? bundle.getVersion() : "");
-            }
+            // Team column at the end if present
             if (optionalColumns.contains("team")) {
-                row.add(bundle != null && bundle.getTeam() != null ? bundle.getTeam() : "");
+                String team = bundle != null ? bundle.getTeam() : null;
+                row.add(team != null ? team : "");
             }
 
             csv.writeRow(row.toArray(new String[0]));

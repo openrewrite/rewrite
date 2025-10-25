@@ -143,6 +143,32 @@ class RecipeMarketplaceWriterTest {
         assertThat(csv).contains("Cleanup,Java,Best practices");
     }
 
+    @Test
+    void roundTripWithBundleInfo() {
+        RecipeMarketplace marketplace = new RecipeMarketplace("Java", "");
+        marketplace.getRecipes().add(new RecipeOffering(
+                "org.openrewrite.java.cleanup.UnnecessaryParentheses",
+                "Remove unnecessary parentheses",
+                "Remove unnecessary parentheses",
+                "Removes unnecessary parentheses around things",
+                Collections.emptySet(),
+                null,
+                Collections.emptyList(),
+                new FakeMavenBundle("Maven", "org.openrewrite:rewrite-java", "8.0.0", "java-team")
+        ));
+
+        @Language("csv") String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        // Verify CSV contains bundle columns in the right order
+        // ecosystem, packageName, version should be first 3 columns
+        assertThat(csv).contains("ecosystem,packageName,version,name");
+        // team should be at the end
+        assertThat(csv).contains(",team\n");
+        // Verify data row has correct values
+        assertThat(csv).contains("Maven,org.openrewrite:rewrite-java,8.0.0,");
+        assertThat(csv).contains(",java-team\n");
+    }
+
     private static RecipeMarketplace createCategory(String name, RecipeOffering... recipes) {
         RecipeMarketplace category = new RecipeMarketplace(name, "");
         for (RecipeOffering recipe : recipes) {
@@ -170,4 +196,23 @@ class RecipeMarketplaceWriterTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Category not found: " + name));
     }
+
+    private record FakeMavenBundle(String ecosystem, String getPackageName, String getVersion,
+                                   String getTeam) implements RecipeBundle {
+
+        @Override
+            public String getPackageEcosystem() {
+                return ecosystem;
+            }
+
+            @Override
+            public org.openrewrite.config.RecipeDescriptor describe(RecipeListing listing) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public org.openrewrite.Recipe prepare(RecipeListing listing, java.util.Map<String, Object> options) {
+                throw new UnsupportedOperationException();
+            }
+        }
 }

@@ -15,10 +15,12 @@
  */
 package org.openrewrite.marketplace;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Checksum;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.YamlResourceLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,23 +31,30 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.Properties;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
+
 public class YamlRecipeBundle implements RecipeBundle {
-    URI uri;
-    Properties properties;
+    private final URI uri;
+    private final Properties properties;
+
+    @Getter
+    private final @Nullable String team;
+
+    public YamlRecipeBundle(URI uri, Properties properties, @Nullable String team) {
+        this.uri = uri;
+        this.properties = properties;
+        this.team = team;
+    }
 
     @Override
     public String getPackageEcosystem() {
-        return "YAML";
+        return "yaml";
     }
 
     @Override
     public String getPackageName() {
         return uri.toString();
-    }
-
-    @Override
-    public @Nullable String getTeam() {
-        return null;
     }
 
     /**
@@ -74,11 +83,16 @@ public class YamlRecipeBundle implements RecipeBundle {
 
     @Override
     public RecipeDescriptor describe(RecipeListing listing) {
-        return null;
+        return prepare(listing, emptyMap()).getDescriptor();
     }
 
     @Override
     public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
-        return null;
+        try (InputStream inputStream = uri.toURL().openStream()) {
+            YamlResourceLoader loader = new YamlResourceLoader(inputStream, uri, properties);
+            return requireNonNull(loader.loadRecipe(listing.getName()));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to open stream from " + uri, e);
+        }
     }
 }

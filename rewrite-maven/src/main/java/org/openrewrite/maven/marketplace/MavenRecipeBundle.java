@@ -18,54 +18,47 @@ package org.openrewrite.maven.marketplace;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.internal.RecipeLoader;
-import org.openrewrite.marketplace.RecipeBundle;
-import org.openrewrite.marketplace.RecipeListing;
-import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.marketplace.*;
 import org.openrewrite.maven.MavenParser;
+import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
-import java.io.UncheckedIOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
+import java.io.File;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import static java.util.Collections.emptyMap;
 
 @RequiredArgsConstructor
 public class MavenRecipeBundle implements RecipeBundle {
     private static final Map<ResolvedGroupArtifactVersion, Lock> DEPENDENCY_LOCKS = new ConcurrentHashMap<>();
 
     private final ResolvedGroupArtifactVersion gav;
-    private final MavenExecutionContextView ctx;
-    private final MavenArtifactDownloader downloader;
+    private final ExecutionContext ctx;
+    private final @Nullable MavenArtifactDownloader downloader;
 
     @Getter
     private final @Nullable String team;
 
-    /**
-     * A loader, initialized with the fully resolved runtime classpath of the dependency
-     * represented by {@link #gav}.
-     */
-    private transient @Nullable RecipeLoader recipeLoader;
+    private transient @Nullable ResolvedMavenRecipeBundle resolvedBundle;
+    private transient @Nullable List<Path> classpath;
 
     @Override
     public String getPackageEcosystem() {
-        return "Maven";
+        return "maven";
     }
 
     @Override
@@ -75,62 +68,45 @@ public class MavenRecipeBundle implements RecipeBundle {
 
     @Override
     public String getVersion() {
-        return gav.getVersion();
+        return gav.getDatedSnapshotVersion() == null ? gav.getVersion() : gav.getDatedSnapshotVersion();
     }
 
     @Override
     public RecipeDescriptor describe(RecipeListing listing) {
-        if (listing instanceof RecipeDescriptor) {
-            // Already fully described in the marketplace, so we can return that as-is
-            return (RecipeDescriptor) listing;
-        }
-        return prepare(listing, emptyMap()).getDescriptor();
+        return resolvedBundle().describe(listing);
     }
 
     @Override
     public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
-        return getRecipeLoader().load(listing.getName(), options);
+        return resolvedBundle().prepare(listing, options);
     }
 
-    protected ClassLoader buildClassLoader(Collection<Path> classpath) {
-        return new URLClassLoader(
-                classpath.stream()
-                        .map(Path::toUri)
-                        .map(uri -> {
-                            try {
-                                return uri.toURL();
-                            } catch (MalformedURLException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                        })
-                        .toArray(URL[]::new),
-                getClass().getClassLoader()
-        );
+    private ResolvedMavenRecipeBundle resolvedBundle() {
+        if (resolvedBundle == null) {
+            Path recipeJar = classpath().stream()
+                    .filter(a -> a.toAbsolutePath().toString().contains(gav.getGroupId().replaceAll("\\.", File.separator))
+                                 && a.toAbsolutePath().toString().contains(File.separator + gav.getArtifactId() + File.separator)
+                    )
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Failed to install recipe. No download error occurred."));
+
+            resolvedBundle = new ResolvedMavenRecipeBundle(
+                    gav,
+                    recipeJar,
+                    classpath(),
+                    team
+            );
+        }
+        return resolvedBundle;
     }
 
-    private RecipeLoader getRecipeLoader() {
-        if (recipeLoader == null) {
-            MavenResolutionResult mavenModel = MavenParser.builder().build().parse(ctx,
-                            //language=xml
-                            "<project>" +
-                            "    <groupId>io.moderne</groupId>" +
-                            "    <artifactId>recipe-downloader</artifactId>" +
-                            "    <version>1</version>" +
-                            "    <dependencies>" +
-                            "        <dependency>" +
-                            "            <groupId>" + gav.getGroupId() + "</groupId>" +
-                            "            <artifactId>" + gav.getArtifactId() + "</artifactId>" +
-                            "            <version>" + gav.getVersion() + "</version>" +
-                            "        </dependency>" +
-                            "    </dependencies>" +
-                            "</project>"
-                    ).findFirst()
-                    .flatMap(sf -> sf.getMarkers().findFirst(MavenResolutionResult.class))
-                    .filter(mrr -> !mrr.getDependencies().isEmpty())
-                    .orElseThrow(() -> new IllegalStateException("Unable to download recipe"));
-
-            List<Path> classpath = new ArrayList<>();
-            for (ResolvedDependency resolvedDependency : mavenModel.getDependencies().get(Scope.Runtime)) {
+    List<Path> classpath() {
+        if (classpath == null) {
+            if (downloader == null) {
+                throw new IllegalStateException("No downloader configured");
+            }
+            classpath = new ArrayList<>();
+            for (ResolvedDependency resolvedDependency : resolve().getDependencies().get(Scope.Runtime)) {
                 Lock lock = DEPENDENCY_LOCKS.computeIfAbsent(resolvedDependency.getGav(), g -> new ReentrantLock());
                 lock.lock();
                 try {
@@ -143,9 +119,47 @@ public class MavenRecipeBundle implements RecipeBundle {
                     lock.unlock();
                 }
             }
-            recipeLoader = new RecipeLoader(buildClassLoader(classpath));
         }
+        return classpath;
+    }
 
-        return recipeLoader;
+    MavenResolutionResult resolve() {
+        //language=xml
+        return MavenParser.builder().build().parse(ctx,
+                        //language=xml
+                        "<project>" +
+                        "    <groupId>io.moderne</groupId>" +
+                        "    <artifactId>recipe-downloader</artifactId>" +
+                        "    <version>1</version>" +
+                        "    <dependencies>" +
+                        "        <dependency>" +
+                        "            <groupId>" + gav.getGroupId() + "</groupId>" +
+                        "            <artifactId>" + gav.getArtifactId() + "</artifactId>" +
+                        "            <version>" + gav.getVersion() + "</version>" +
+                        "        </dependency>" +
+                        "    </dependencies>" +
+                        "</project>"
+                ).findFirst()
+                .flatMap(sf -> sf.getMarkers().findFirst(MavenResolutionResult.class))
+                .filter(mrr -> !mrr.getDependencies().isEmpty())
+                .orElseThrow(() -> new IllegalStateException("Unable to download recipe"));
+    }
+
+    public static void main(String[] args) {
+        RecipeMarketplaceReader reader = new RecipeMarketplaceReader(
+                new MavenRecipeBundleLoader(
+                        new InMemoryExecutionContext(),
+                        new MavenArtifactDownloader(
+                                new LocalMavenArtifactCache(Paths.get(".rewrite")),
+                                null,
+                                Throwable::printStackTrace
+                        )
+                ),
+                new YamlRecipeBundleLoader(new Properties())
+        );
+
+        RecipeMarketplace recipeMarketplace = reader.fromCsv(Paths.get("recipes.csv"));
+        System.out.println(new RecipeMarketplacePrinter(opt -> opt.nameStyle(
+                RecipeMarketplacePrinter.NameStyle.DISPLAY_NAME)).print(recipeMarketplace));
     }
 }

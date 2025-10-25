@@ -66,6 +66,7 @@ public class RecipeDescriptor implements RecipeListing {
 
     List<RecipeExample> examples;
 
+    @With
     @Nullable
     RecipeBundle bundle;
 }

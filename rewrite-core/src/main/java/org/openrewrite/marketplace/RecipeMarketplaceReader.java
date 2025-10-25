@@ -34,6 +34,20 @@ import java.util.regex.Pattern;
 
 public class RecipeMarketplaceReader {
 
+    private final Map<String, RecipeBundleLoader> bundleLoaders;
+
+    /**
+     * Create a reader with specific bundle loaders.
+     *
+     * @param bundleLoaders The bundle loaders to use for creating bundles from CSV ecosystem data
+     */
+    public RecipeMarketplaceReader(RecipeBundleLoader... bundleLoaders) {
+        this.bundleLoaders = new HashMap<>();
+        for (RecipeBundleLoader loader : bundleLoaders) {
+            this.bundleLoaders.put(loader.getEcosystem().toLowerCase(), loader);
+        }
+    }
+
     /**
      * Returns the recipe marketplace from CSV.
      *
@@ -85,7 +99,7 @@ public class RecipeMarketplaceReader {
         parser.beginParsing(csv);
 
         try {
-            RecipeMarketplace root = new RecipeMarketplace(RecipeMarketplace.ROOT, "");
+            RecipeMarketplace root = RecipeMarketplace.newEmpty();
             List<NamedColumn> headers = null;
             int line = 0;
 
@@ -101,7 +115,7 @@ public class RecipeMarketplaceReader {
                 if (headers == null) {
                     headers = parseHeaders(row);
                 } else {
-                    readRecipeOffering(row, root, headers, line);
+                    readRecipeOffering(row, root, headers);
                 }
             }
 
@@ -126,8 +140,7 @@ public class RecipeMarketplaceReader {
         return headers;
     }
 
-    private void readRecipeOffering(@Nullable String[] row, RecipeMarketplace root,
-                                    List<NamedColumn> headers, int line) {
+    private void readRecipeOffering(@Nullable String[] row, RecipeMarketplace root, List<NamedColumn> headers) {
         String name = null;
         String displayName = null;
         String description = null;
@@ -202,8 +215,14 @@ public class RecipeMarketplaceReader {
             throw new IllegalArgumentException("CSV file must contain a column named 'name' and each row must have a value for it");
         }
 
-        // CSV reading creates minimal offerings without bundles
-        // Bundles will be associated later when recipes are installed
+        // Create bundle if ecosystem information is present
+        RecipeBundle bundle = null;
+        if (ecosystem != null && packageName != null && version != null) {
+            RecipeBundleLoader loader = bundleLoaders.get(ecosystem.toLowerCase());
+            if (loader != null) {
+                bundle = loader.createBundle(packageName, version, team);
+            }
+        }
 
         // Convert options map to list of RecipeOffering.Option
         List<RecipeOffering.Option> offeringOptions = new ArrayList<>();
@@ -225,7 +244,7 @@ public class RecipeMarketplaceReader {
                 Collections.emptySet(), // tags
                 null, // estimatedEffortPerOccurrence
                 offeringOptions,
-                null // bundle - CSV creates minimal offerings without bundles
+                bundle
         );
 
         // Navigate to the correct category and add the offering
