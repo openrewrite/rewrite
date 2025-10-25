@@ -22,11 +22,13 @@ import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
 import org.openrewrite.*;
 
+import java.nio.file.Path;
 import java.util.function.BiFunction;
 
 @Value
 public class Print implements RpcRequest {
     String treeId;
+    Path sourcePath;
     String sourceFileType;
 
     @Nullable

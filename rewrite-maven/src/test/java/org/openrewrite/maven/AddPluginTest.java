@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.Assertions.withLocalRepository;
 
 class AddPluginTest implements RewriteTest {
 
@@ -480,6 +481,94 @@ class AddPluginTest implements RewriteTest {
                   </build>
                 </project>
                 """))
+        );
+    }
+
+    @Test
+    void addPluginWithExternalParent() {
+        // This test demonstrates that when the parent POM is external (not part of the current repository),
+        // the plugin is correctly added to the local POM rather than being skipped.
+        withLocalRepository(
+            //language=xml
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example.test</groupId>
+                <artifactId>test-boot-parent</artifactId>
+                <version>3.2.0</version>
+                <packaging>pom</packaging>
+                <properties>
+                  <java.version>17</java.version>
+                  <maven.compiler.source>${java.version}</maven.compiler.source>
+                  <maven.compiler.target>${java.version}</maven.compiler.target>
+                </properties>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.10.1</version>
+                        <configuration>
+                          <source>${java.version}</source>
+                          <target>${java.version}</target>
+                        </configuration>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
+              """,
+            () -> rewriteRun(
+                spec -> spec.recipe(new AddPlugin("org.apache.maven.plugins", "maven-compiler-plugin", "3.11.0",
+                    """
+                      <configuration>
+                        <release>17</release>
+                      </configuration>
+                      """, null, null, null)),
+                pomXml(
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.example.test</groupId>
+                          <artifactId>test-boot-parent</artifactId>
+                          <version>3.2.0</version>
+                          <relativePath/>
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>my-service</artifactId>
+                        <version>1.0.0</version>
+                      </project>
+                      """,
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.example.test</groupId>
+                          <artifactId>test-boot-parent</artifactId>
+                          <version>3.2.0</version>
+                          <relativePath/>
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>my-service</artifactId>
+                        <version>1.0.0</version>
+                        <build>
+                          <plugins>
+                            <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.11.0</version>
+                              <configuration>
+                                <release>17</release>
+                              </configuration>
+                            </plugin>
+                          </plugins>
+                        </build>
+                      </project>
+                      """
+                )
+            )
         );
     }
 }

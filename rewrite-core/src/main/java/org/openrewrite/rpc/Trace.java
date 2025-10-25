@@ -32,21 +32,17 @@ import java.util.stream.Stream;
 public class Trace {
     private static final Trace.StackElementSourceLookup sourceLookup = new Trace.StackElementSourceLookup();
 
-    public static boolean TRACE_SENDER = false;
-    public static @Nullable PrintStream TRACE_RECEIVER = null;
-
-    public static void traceReceiver(RpcObjectData message) {
-        PrintStream logFile = TRACE_RECEIVER;
+    public static void traceReceiver(RpcObjectData message, @Nullable PrintStream logFile) {
         if (logFile != null && message.getTrace() != null) {
-            logFile.println(message.withTrace());
+            logFile.println(message.withoutTrace());
             logFile.println("  " + message.getTrace());
             logFile.println("  " + trace("Receiver"));
             logFile.flush();
         }
     }
 
-    public static @Nullable String traceSender() {
-        return TRACE_SENDER ? trace("Sender") : null;
+    public static String traceSender() {
+        return trace("Sender");
     }
 
     private static String trace(String type) {

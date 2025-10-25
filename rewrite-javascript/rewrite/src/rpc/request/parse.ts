@@ -15,11 +15,11 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {ExecutionContext} from "../../execution";
-import {UUID} from "node:crypto";
 import {ParserInput, Parsers} from "../../parser";
-import {randomId} from "../../uuid";
+import {randomId, UUID} from "../../uuid";
 import {produce} from "immer";
 import {SourceFile} from "../../tree";
+import {withMetrics} from "./metrics";
 
 export class Parse {
     constructor(private readonly inputs: ParserInput[],
@@ -27,29 +27,41 @@ export class Parse {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  localObjects: Map<string, ((input: string) => any) | any>): void {
-        connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), async (request) => {
-            let parser = Parsers.createParser("javascript", {
-                ctx: new ExecutionContext(),
-                relativeTo: request.relativeTo
-            });
+                  localObjects: Map<string, ((input: string) => any) | any>,
+                  metricsCsv?: string): void {
+        connection.onRequest(
+            new rpc.RequestType<Parse, UUID[], Error>("Parse"),
+            withMetrics<Parse, UUID[]>(
+                "Parse",
+                metricsCsv,
+                (context) => async (request) => {
+                    // Set target to comma-separated list of file paths
+                    context.target = request.inputs.map(input =>
+                        typeof input === 'string' ? input : input.sourcePath
+                    ).join(',');
 
-            if (!parser) {
-                return [];
-            }
-            const generator = parser.parse(...request.inputs);
-            const result: string[] = [];
+                    const parser = Parsers.createParser("javascript", {
+                        ctx: new ExecutionContext(),
+                        relativeTo: request.relativeTo
+                    })!;
 
-            for (let i = 0; i < request.inputs.length; i++) {
-                const id = randomId();
-                localObjects.set(id, async (id: string) => {
-                    let sourceFile: SourceFile = (await generator.next()).value;
-                    return produce(sourceFile, (draft) => {draft.id = id;});
-                });
-                result.push(id);
-            }
+                    const generator = parser.parse(...request.inputs);
+                    const resultIds: UUID[] = [];
 
-            return result;
-        });
+                    for (let i = 0; i < request.inputs.length; i++) {
+                        const id = randomId();
+                        localObjects.set(id, async (id: string) => {
+                            const sourceFile: SourceFile = (await generator.next()).value;
+                            return produce(sourceFile, (draft) => {
+                                draft.id = id;
+                            });
+                        });
+                        resultIds.push(id);
+                    }
+
+                    return resultIds;
+                }
+            )
+        );
     }
 }

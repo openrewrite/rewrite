@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.rpc;
 
-import io.moderne.jsonrpc.JsonRpc;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -24,16 +23,23 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.request.PrepareRecipe;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+
+import static java.util.Objects.requireNonNull;
 
 @Getter
 public class JavaScriptRewriteRpc extends RewriteRpc {
@@ -44,11 +50,13 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      */
     private final String command;
     private final Map<String, String> commandEnv;
+    private final RewriteRpcProcess process;
 
-    JavaScriptRewriteRpc(JsonRpc jsonRpc, Environment marketplace, String command, Map<String, String> commandEnv) {
-        super(jsonRpc, marketplace);
+    JavaScriptRewriteRpc(RewriteRpcProcess process, Environment marketplace, String command, Map<String, String> commandEnv) {
+        super(process.getRpcClient(), marketplace);
         this.command = command;
         this.commandEnv = commandEnv;
+        this.process = process;
     }
 
     public static @Nullable JavaScriptRewriteRpc get() {
@@ -63,6 +71,12 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.setFactory(builder);
     }
 
+    @Override
+    public void shutdown() {
+        super.shutdown();
+        process.shutdown();
+    }
+
     public static void shutdownCurrent() {
         MANAGER.shutdown();
     }
@@ -70,7 +84,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     public int installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
-                new InstallRecipesByFile(recipes),
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
                 InstallRecipesResponse.class
         ).getRecipesInstalled();
     }
@@ -98,13 +112,17 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private Environment marketplace = Environment.builder().build();
         private Path npxPath = Paths.get("npx");
         private @Nullable Path log;
+        private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
         private Duration timeout = Duration.ofSeconds(30);
-        private boolean verboseLogging;
+        private boolean traceRpcMessages;
+
         private @Nullable Integer inspectBrk;
-        private boolean profiler;
+        private @Nullable Path inspectBrkRewriteSourcePath;
+
         private @Nullable Integer maxHeapSize;
         private @Nullable Path workingDirectory;
+        private PrepareRecipe.@Nullable Loader recipeLoader;
 
         public Builder marketplace(Environment marketplace) {
             this.marketplace = marketplace;
@@ -140,18 +158,23 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        public Builder metricsCsv(@Nullable Path metricsCsv) {
+            this.metricsCsv = metricsCsv;
+            return this;
+        }
+
         /**
          * Enables info and debug level logging.
          *
          * @return This builder.
          */
-        public Builder verboseLogging(boolean verboseLogging) {
-            this.verboseLogging = verboseLogging;
+        public Builder traceRpcMessages(boolean verboseLogging) {
+            this.traceRpcMessages = verboseLogging;
             return this;
         }
 
-        public Builder verboseLogging() {
-            return verboseLogging(true);
+        public Builder traceRpcMessages() {
+            return traceRpcMessages(true);
         }
 
         /**
@@ -159,36 +182,22 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
          * an "Attach to Node.js/Chrome" run configuration in IDEA to debug the JavaScript Rewrite RPC process.
          * The Rewrite RPC process will block waiting for this connection.
          *
-         * @param inspectBrk The port for the Node.js inspector to listen on.
+         * @param rewriteSourcePath The path to either OpenRewrite TypeScript source code, or inside a
+         *                          node_modules folder e.g., @openrewrite/rewrite. When
+         *                          running a test from within this project, the value should be
+         *                          "rewrite" (since "rewrite-javascript/rewrite" contains the TypeScript
+         *                          source code).
+         * @param inspectBrk        The port for the Node.js inspector to listen on.
          * @return This builder
          */
-        public Builder inspectBrk(@Nullable Integer inspectBrk) {
+        public Builder inspectBrk(Path rewriteSourcePath, int inspectBrk) {
             this.inspectBrk = inspectBrk;
+            this.inspectBrkRewriteSourcePath = rewriteSourcePath;
             return this;
         }
 
-        public Builder inspectBrk() {
-            return inspectBrk(9229);
-        }
-
-        /**
-         * Enable V8 CPU profiling for performance analysis. When enabled, the process will
-         * generate a CPU profile that can be analyzed to identify performance bottlenecks.
-         * The profile is saved in Chrome DevTools format (.cpuprofile) on shutdown.
-         * <p>
-         * Profiling uses the V8 Inspector API and works with both npx and direct node execution modes.
-         * The profile file can be loaded in Chrome DevTools for analysis.
-         *
-         * @param profiler Whether to enable profiling
-         * @return This builder
-         */
-        public Builder profiler(boolean profiler) {
-            this.profiler = profiler;
-            return this;
-        }
-
-        public Builder profiler() {
-            return profiler(true);
+        public Builder inspectBrk(Path rewriteDistPath) {
+            return inspectBrk(rewriteDistPath, 9229);
         }
 
         /**
@@ -217,16 +226,17 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        public Builder recipeLoader(PrepareRecipe.Loader recipeLoader) {
+            this.recipeLoader = recipeLoader;
+            return this;
+        }
+
         @Override
         public JavaScriptRewriteRpc get() {
             Stream<@Nullable String> cmd;
 
             if (inspectBrk != null) {
-                // Find the server.js file - check local development path first, then installed package
-                Path serverJs = Paths.get("rewrite/dist/rpc/server.js");
-                if (!Files.exists(serverJs)) {
-                    serverJs = Paths.get("node_modules/@openrewrite/rewrite/dist/rpc/server.js");
-                }
+                Path serverJs = requireNonNull(inspectBrkRewriteSourcePath).resolve("dist/rpc/server.js");
 
                 // We have to use node directly here because npx spawns a child node process. The
                 // IDE's debug configuration would connect to the npx process rather than the spawned
@@ -235,12 +245,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "node",
                         "--enable-source-maps",
                         "--inspect-brk=" + inspectBrk,
-                        profiler ? "--prof" : null,
                         maxHeapSize != null ? "--max-old-space-size=" + maxHeapSize : null,
                         serverJs.toAbsolutePath().normalize().toString(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        verboseLogging ? "--verbose" : null,
-                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
+                        traceRpcMessages ? "--trace-rpc-messages" : null,
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                 );
             } else {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
@@ -250,9 +259,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        verboseLogging ? "--verbose" : null,
-                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString(),
-                        profiler ? "--profile" : null
+                        metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
+                        traceRpcMessages ? "--trace-rpc-messages" : null,
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                 );
             }
 
@@ -275,12 +284,23 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }
             }
             process.environment().put("NODE_OPTIONS", nodeOptions.toString());
+            if (npxPath.getParent() != null) {
+                // `npx` is typically a shebang script alongside the `node` executable
+                process.environment().put("PATH", npxPath.getParent() + File.pathSeparator +
+                        System.getenv("PATH"));
+            }
             process.start();
 
-            return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace,
-                    String.join(" ", cmdArr), process.environment())
-                    .livenessCheck(process::getLivenessCheck)
-                    .timeout(timeout);
+            try {
+                return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process, marketplace,
+                        String.join(" ", cmdArr), process.environment())
+                        .livenessCheck(process::getLivenessCheck)
+                        .timeout(timeout)
+                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)))
+                        .recipeLoader(recipeLoader);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 }

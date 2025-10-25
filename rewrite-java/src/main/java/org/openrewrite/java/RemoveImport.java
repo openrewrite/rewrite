@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
@@ -113,10 +112,10 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             JavaSourceFile c = cu;
 
             boolean keepImport = !force && (typeUsed || !otherTypesInPackageUsed.isEmpty() && type.endsWith(".*"));
-            AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
+            AtomicReference<@Nullable Space> spaceForNextImport = new AtomicReference<>();
             c = c.withImports(ListUtils.flatMap(c.getImports(), import_ -> {
-                if (spaceForNextImport.get() != null) {
-                    Space removedPrefix = spaceForNextImport.get();
+                Space removedPrefix = spaceForNextImport.get();
+                if (removedPrefix != null) {
                     Space currentPrefix = import_.getPrefix();
                     if (removedPrefix.getLastWhitespace().isEmpty() ||
                         (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix))) {

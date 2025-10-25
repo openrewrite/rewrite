@@ -18,6 +18,7 @@ import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
+import {withMetrics, extractSourcePath} from "./metrics";
 
 export interface VisitResponse {
     modified: boolean
@@ -37,22 +38,32 @@ export class Visit {
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string, sourceFileType?: string) => any,
-                  getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>): void {
-        connection.onRequest(new rpc.RequestType<Visit, VisitResponse, Error>("Visit"), async (request) => {
-            const p = await getObject(request.p, undefined);
-            const before: Tree = await getObject(request.treeId, request.sourceFileType);
-            localObjects.set(before.id.toString(), before);
+                  getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>,
+                  metricsCsv?: string): void {
+        connection.onRequest(
+            new rpc.RequestType<Visit, VisitResponse, Error>("Visit"),
+            withMetrics<Visit, VisitResponse>(
+                "Visit",
+                metricsCsv,
+                (context) => async (request) => {
+                    const p = await getObject(request.p, undefined);
+                    const before: Tree = await getObject(request.treeId, request.sourceFileType);
+                    const cursor = await getCursor(request.cursor, request.sourceFileType);
+                    context.target = extractSourcePath(before, cursor);
+                    localObjects.set(before.id.toString(), before);
 
-            const visitor = await Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
-            const after = await visitor.visit(before, p, await getCursor(request.cursor, request.sourceFileType));
-            if (!after) {
-                localObjects.delete(before.id.toString());
-            } else if (after !== before) {
-                localObjects.set(after.id.toString(), after);
-            }
+                    const visitor = await Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
+                    const after = await visitor.visit(before, p, cursor);
+                    if (!after) {
+                        localObjects.delete(before.id.toString());
+                    } else if (after !== before) {
+                        localObjects.set(after.id.toString(), after);
+                    }
 
-            return {modified: before !== after};
-        });
+                    return {modified: before !== after};
+                }
+            )
+        );
     }
 
     private static async instantiateVisitor(request: Visit,

@@ -177,6 +177,7 @@ export class JavaScriptTypeMapping {
         // Create the Type.Method object
         return Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Method,
+            flags: 0, // FIXME - determine flags
             declaringType: declaringType,
             name: name,
             returnType: this.getType(returnType),
@@ -195,7 +196,7 @@ export class JavaScriptTypeMapping {
     private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
         if (declaringType == Type.Primitive.String && this.stringWrapperType) {
             return this.getType(this.stringWrapperType) as Type.FullyQualified;
-        } else if ((declaringType == Type.Primitive.Double || declaringType == Type.Primitive.Long) && this.numberWrapperType) {
+        } else if ((declaringType == Type.Primitive.Double || declaringType == Type.Primitive.BigInt) && this.numberWrapperType) {
             return this.getType(this.numberWrapperType) as Type.FullyQualified;
         } else if (declaringType == Type.Primitive.Boolean && this.booleanWrapperType) {
             return this.getType(this.booleanWrapperType) as Type.FullyQualified;
@@ -265,6 +266,7 @@ export class JavaScriptTypeMapping {
 
                                             inferredDeclaringType = {
                                                 kind: Type.Kind.Class,
+                                                flags: 0, // TODO - determine flags
                                                 fullyQualifiedName: moduleName
                                             } as Type.FullyQualified;
                                         }
@@ -315,6 +317,7 @@ export class JavaScriptTypeMapping {
                             const typeName = origFqn.substring(lastDot + 1);
                             declaringType = {
                                 kind: Type.Kind.Class,
+                                flags: 0, // TODO - determine flags
                                 fullyQualifiedName: `${importName}.${typeName}`
                             } as Type.FullyQualified;
                         } else {
@@ -389,6 +392,7 @@ export class JavaScriptTypeMapping {
                         // Node.js built-in module
                         declaringType = {
                             kind: Type.Kind.Class,
+                            flags: 0, // TODO - determine flags
                             fullyQualifiedName: 'node'
                         } as Type.FullyQualified;
                         methodName = moduleSpecifier.substring(5); // Remove 'node:' prefix
@@ -396,6 +400,7 @@ export class JavaScriptTypeMapping {
                         // Regular module import
                         declaringType = {
                             kind: Type.Kind.Class,
+                            flags: 0, // TODO - determine flags
                             fullyQualifiedName: moduleSpecifier
                         } as Type.FullyQualified;
                         // For aliased imports, use the original function name from the aliased symbol
@@ -418,6 +423,7 @@ export class JavaScriptTypeMapping {
                             // For functions from modules, use the module part as declaring type
                             declaringType = {
                                 kind: Type.Kind.Class,
+                                flags: 0, // TODO - determine flags
                                 fullyQualifiedName: fqn.substring(0, lastDot)
                             } as Type.FullyQualified;
                         } else {
@@ -625,6 +631,7 @@ export class JavaScriptTypeMapping {
         // Create empty class type shell (no members yet to avoid recursion)
         return Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Class,
+            flags: 0, // TODO - determine flags
             classKind: classKind,
             fullyQualifiedName: fullyQualifiedName,
             typeParameters: [],
@@ -801,7 +808,7 @@ export class JavaScriptTypeMapping {
             type.flags === ts.TypeFlags.BigIntLiteral ||
             type.flags === ts.TypeFlags.BigIntLike
         ) {
-            return Type.Primitive.Long;
+            return Type.Primitive.BigInt;
         } else if (
             (type.symbol !== undefined && type.symbol === this.regExpSymbol) ||
             this.checker.typeToString(type) === "RegExp"

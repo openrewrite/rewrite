@@ -22,10 +22,7 @@ import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.internal.JavaWhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
-import org.openrewrite.java.service.AnnotationService;
-import org.openrewrite.java.service.AutoFormatService;
-import org.openrewrite.java.service.ImportService;
-import org.openrewrite.java.service.JavaNamingService;
+import org.openrewrite.java.service.*;
 
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
@@ -79,6 +76,8 @@ public interface JavaSourceFile extends J, SourceFile {
                 return (T) new JavaWhitespaceValidationService();
             } else if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new JavaNamingService();
+            } else if (SourcePositionService.class.getName().equals(service.getName())) {
+                return (T) new SourcePositionService();
             } else {
                 throw new UnsupportedOperationException("Service " + service + " not supported");
             }

@@ -61,13 +61,21 @@ export class RecipeSpec {
         this.dataTableAssertions[name] = allRows;
     }
 
-    async rewriteRun(...sourceSpecs: (SourceSpec<any> | Generator<SourceSpec<any>, void, unknown>)[]): Promise<void> {
+    async rewriteRun(...sourceSpecs: (SourceSpec<any> | Generator<SourceSpec<any>, void, unknown> | AsyncGenerator<SourceSpec<any>, void, unknown>)[]): Promise<void> {
         // Flatten generators into a list of sourceSpecs
         const flattenedSpecs: SourceSpec<any>[] = [];
         for (const specOrGenerator of sourceSpecs) {
             if (specOrGenerator && typeof (specOrGenerator as any).next === 'function') {
-                for (const spec of specOrGenerator as Generator<SourceSpec<any>, void, unknown>) {
-                    flattenedSpecs.push(spec);
+                // Check if it's an async generator
+                if (typeof (specOrGenerator as any)[Symbol.asyncIterator] === 'function') {
+                    for await (const spec of specOrGenerator as AsyncGenerator<SourceSpec<any>, void, unknown>) {
+                        flattenedSpecs.push(spec);
+                    }
+                } else {
+                    // Sync generator
+                    for (const spec of specOrGenerator as Generator<SourceSpec<any>, void, unknown>) {
+                        flattenedSpecs.push(spec);
+                    }
                 }
             } else {
                 flattenedSpecs.push(specOrGenerator as SourceSpec<any>);

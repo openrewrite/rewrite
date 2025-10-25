@@ -117,7 +117,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return expressionWithTypeArguments;
     }
 
-
     @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcSendQueue q) {
         q.getAndSendList(functionType, JS.FunctionType::getModifiers, J.Modifier::getId, el -> visit(el, q));

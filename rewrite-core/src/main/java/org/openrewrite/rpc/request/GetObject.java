@@ -22,12 +22,15 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
@@ -35,7 +38,9 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @Value
 public class GetObject implements RpcRequest {
     String id;
-    @Nullable String sourceFileType;
+
+    @Nullable
+    String sourceFileType;
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<GetObject> {
@@ -51,6 +56,9 @@ public class GetObject implements RpcRequest {
          */
         private final IdentityHashMap<Object, Integer> localRefs;
 
+        private final AtomicReference<PrintStream> log;
+        private final Supplier<Boolean> traceGetObject;
+
         private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 
         @Override
@@ -59,8 +67,8 @@ public class GetObject implements RpcRequest {
 
             if (after == null) {
                 List<RpcObjectData> deleted = new ArrayList<>(2);
-                deleted.add(new RpcObjectData(DELETE, null, null, null));
-                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null));
+                deleted.add(new RpcObjectData(DELETE, null, null, null, traceGetObject.get()));
+                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null, traceGetObject.get()));
                 return deleted;
             }
 
@@ -68,7 +76,7 @@ public class GetObject implements RpcRequest {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
                 Object before = remoteObjects.get(id);
 
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, request.getSourceFileType());
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, request.getSourceFileType(), traceGetObject.get());
                 forkJoin.submit(() -> {
                     try {
                         sendQueue.send(after, before, null);
@@ -77,10 +85,14 @@ public class GetObject implements RpcRequest {
                         // the full tree, so update our understanding of the remote state
                         // of this tree.
                         remoteObjects.put(id, after);
-                    } catch (Throwable ignored) {
-                        // TODO do something with this exception
+                    } catch (Throwable t) {
+                        PrintStream logFile = log.get();
+                        //noinspection ConstantValue
+                        if (logFile != null) {
+                            t.printStackTrace(logFile);
+                        }
                     } finally {
-                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null));
+                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, traceGetObject.get()));
                         sendQueue.flush();
                     }
                     return 0;

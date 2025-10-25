@@ -16,63 +16,23 @@
 package org.openrewrite.gradle.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 
+/**
+ * @deprecated Use {@link DependencyNotation#parse(String)} instead.
+ * This class is retained for backward compatibility.
+ */
+@Deprecated
 public class DependencyStringNotationConverter {
 
     /**
-     * @param notation a String in the format group:artifact:version
+     * @param notation a String in the format group:artifact:version:classifier@extension
      * @return A corresponding Dependency or null if the notation could not be parsed
+     * @deprecated Use {@link DependencyNotation#parse(String)} instead
      */
-    public static @Nullable Dependency parse(String notation) {
-        int idx = notation.lastIndexOf('@');
-        if (idx == -1) {
-            return parse(notation, null);
-        }
-
-        int versionIdx = notation.lastIndexOf(':');
-        if (versionIdx < idx) {
-            return parse(notation.substring(0, idx), notation.substring(idx + 1));
-        }
-
-        return parse(notation, null);
-    }
-
-    private static @Nullable Dependency parse(String notation, @Nullable String ext) {
-        Dependency dependency = new Dependency(null, null, null, null, ext);
-
-        int count = 0;
-        int idx = 0;
-        int cur = 0;
-        while (++cur < notation.length()) {
-            if (':' == notation.charAt(cur)) {
-                String fragment = notation.substring(idx, cur);
-                dependency = assignValue(dependency, count, fragment);
-                idx = cur + 1;
-                count++;
-            }
-        }
-        dependency = assignValue(dependency, count, notation.substring(idx, cur));
-        count++;
-
-        if (count < 2 || count > 4) {
-            return null;
-        }
-
-        return dependency;
-    }
-
-    private static Dependency assignValue(Dependency dependency, int count, String fragment) {
-        switch (count) {
-            case 0:
-                return dependency.withGroupId(fragment);
-            case 1:
-                return dependency.withArtifactId(fragment);
-            case 2:
-                return dependency.withVersion(fragment);
-            case 3:
-                return dependency.withClassifier(fragment);
-            default:
-                throw new IllegalArgumentException("Invalid count parameter: " + count);
-        }
+    @Deprecated
+    public static @Nullable Dependency parse(@Nullable String notation) {
+        return DependencyNotation.parse(notation);
     }
 }

@@ -19,15 +19,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindTypes;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
-import org.openrewrite.javascript.tree.JSX;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})

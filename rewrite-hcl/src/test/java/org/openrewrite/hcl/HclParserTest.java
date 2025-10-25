@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
 
-public class HclParserTest implements RewriteTest {
+class HclParserTest implements RewriteTest {
 
     @Test
     void unicode() {
@@ -30,6 +30,21 @@ public class HclParserTest implements RewriteTest {
               tags = /*👇*/{
                 git_file =/*👇*/ "terraform/aws/👇.tf"
                 git_repo /*👇*/= "terragoat"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapes() {
+        rewriteRun(
+          hcl(
+            """
+              variable "password_mask" {
+                description = "Characters not allowed in generated passwords."
+                type        = string
+                default     = "'()*+,./:;=?[]`{|}~\\"\\\\"  # fails only because escaped backslash is last character
               }
               """
           )

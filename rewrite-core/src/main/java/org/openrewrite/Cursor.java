@@ -15,7 +15,9 @@
  */
 package org.openrewrite;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -30,12 +32,14 @@ import static java.util.stream.StreamSupport.stream;
  * A cursor is linked path of LST elements that can be used to traverse down the tree towards the root.
  */
 @EqualsAndHashCode(exclude = "messages")
+@AllArgsConstructor
 public class Cursor {
     public static final String ROOT_VALUE = "root";
 
     @Nullable
     private final Cursor parent;
 
+    @With
     private final Object value;
 
     @Nullable
