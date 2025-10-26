@@ -87,9 +87,10 @@ class RecipeMarketplaceContentValidatorTest {
     @Test
     void displayNameMustStartWithUppercase() {
         RecipeMarketplace marketplace = RecipeMarketplace.newEmpty();
+        //noinspection DialogTitleCapitalization
         marketplace.getRecipes().add(new RecipeOffering(
           "org.example.TestRecipe",
-          "Test recipe",
+          "test recipe",
           "Test recipe",
           "Valid description.",
           emptySet(),
@@ -135,11 +136,12 @@ class RecipeMarketplaceContentValidatorTest {
           emptyList(),
           null
         ));
+        //noinspection DialogTitleCapitalization
         marketplace.getRecipes().add(new RecipeOffering(
           "org.example.TestRecipe2",
-          "Another recipe.",
-          "Another recipe.",
-          "Valid description.",
+          "another recipe.",
+          "Another recipe",
+          "Valid description",
           emptySet(),
           null,
           emptyList(),
@@ -148,7 +150,9 @@ class RecipeMarketplaceContentValidatorTest {
 
         Validated<RecipeMarketplace> result = validator.validate(marketplace);
         assertThat(result.isInvalid()).isTrue();
-        assertThat(result.failures()).hasSize(3); // lowercase displayName, missing period in description, period in displayName
+        // TestRecipe1: missing period in description
+        // TestRecipe2: lowercase displayName, period in displayName, missing period in description
+        assertThat(result.failures()).hasSize(4);
     }
 
     @Test
@@ -157,9 +161,10 @@ class RecipeMarketplaceContentValidatorTest {
         RecipeMarketplace category = new RecipeMarketplace("Java", "Java recipes.");
         root.getCategories().add(category);
 
+        //noinspection DialogTitleCapitalization
         category.getRecipes().add(new RecipeOffering(
           "org.example.JavaRecipe",
-          "Java recipe",
+          "java recipe",
           "Java recipe",
           "Missing period",
           emptySet(),
