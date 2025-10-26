@@ -84,8 +84,8 @@ public class MavenRecipeBundle implements RecipeBundle {
     private ResolvedMavenRecipeBundle resolvedBundle() {
         if (resolvedBundle == null) {
             Path recipeJar = classpath().stream()
-                    .filter(a -> a.toAbsolutePath().toString().contains(gav.getGroupId().replaceAll("\\.", File.separator))
-                                 && a.toAbsolutePath().toString().contains(File.separator + gav.getArtifactId() + File.separator)
+                    .filter(a -> a.toAbsolutePath().toString().contains(gav.getGroupId().replaceAll("\\.", File.separator)) &&
+                                 a.toAbsolutePath().toString().contains(File.separator + gav.getArtifactId() + File.separator)
                     )
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Failed to install recipe. No download error occurred."));

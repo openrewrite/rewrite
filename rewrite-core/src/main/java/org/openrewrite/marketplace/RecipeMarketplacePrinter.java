@@ -22,7 +22,8 @@ import java.util.BitSet;
 import java.util.Collection;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
 public class RecipeMarketplacePrinter {
@@ -75,7 +76,7 @@ public class RecipeMarketplacePrinter {
         if (options.isOmitEmptyCategories()) {
             categories = categories.stream()
                     .filter(cat -> !cat.getRecipes().isEmpty() || !cat.getCategories().isEmpty())
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         int i = 0;

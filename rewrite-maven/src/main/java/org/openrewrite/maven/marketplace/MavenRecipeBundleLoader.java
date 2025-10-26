@@ -67,7 +67,7 @@ public class MavenRecipeBundleLoader implements RecipeBundleLoader, URLStreamHan
      */
     @Override
     public @Nullable URLStreamHandler createURLStreamHandler(String protocol) {
-        return protocol.equals("maven-rewrite-yaml") ? new URLStreamHandler() {
+        return "maven-rewrite-yaml".equals(protocol) ? new URLStreamHandler() {
             @Override
             protected URLConnection openConnection(URL u) throws IOException {
                 String[] gavAndPath = u.getPath().split("!/", 2);

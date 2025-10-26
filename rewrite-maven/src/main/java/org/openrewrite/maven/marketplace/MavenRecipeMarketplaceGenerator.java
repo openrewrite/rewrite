@@ -23,7 +23,10 @@ import org.openrewrite.config.CategoryDescriptor;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.marketplace.*;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.marketplace.RecipeMarketplaceWriter;
+import org.openrewrite.marketplace.YamlRecipeBundle;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.io.File;

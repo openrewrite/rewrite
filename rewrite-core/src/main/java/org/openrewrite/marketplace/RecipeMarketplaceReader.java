@@ -32,6 +32,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptySet;
+
 public class RecipeMarketplaceReader {
 
     private final Map<String, RecipeBundleLoader> bundleLoaders;
@@ -241,7 +243,7 @@ public class RecipeMarketplaceReader {
                 displayName != null ? displayName : name,
                 name, // instanceName
                 description != null ? description : "",
-                Collections.emptySet(), // tags
+                emptySet(), // tags
                 null, // estimatedEffortPerOccurrence
                 offeringOptions,
                 bundle

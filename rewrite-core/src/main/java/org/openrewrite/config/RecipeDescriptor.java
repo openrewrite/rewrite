@@ -22,7 +22,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
 import org.openrewrite.NlsRewrite;
-import org.openrewrite.Recipe;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeListing;
 

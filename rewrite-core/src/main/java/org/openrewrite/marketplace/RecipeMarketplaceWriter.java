@@ -23,7 +23,12 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import static java.util.Collections.reverse;
 
 public class RecipeMarketplaceWriter {
 
@@ -136,7 +141,7 @@ public class RecipeMarketplaceWriter {
                     filteredPath.add(category);
                 }
             }
-            Collections.reverse(filteredPath);
+            reverse(filteredPath);
             for (int i = 0; i < maxCategoryDepth; i++) {
                 row.add(i < filteredPath.size() ? filteredPath.get(i) : "");
             }
