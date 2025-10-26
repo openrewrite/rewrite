@@ -28,15 +28,17 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.*;
-import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.toList;
+
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
+import static java.util.Optional.ofNullable;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 /**
@@ -256,8 +258,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 maybeUpdateModel();
                             }
                         }
-                    } else if (isPluginDependencyTag(groupId, artifactId)) {
-                        t = upgradePluginDependency(ctx, t);
+                    } else if (isPluginDependencyTag(groupId, artifactId) || isAnnotationProcessorPathTag(groupId, artifactId)) {
+                        t = upgradeTag(ctx, t);
                     }
                 } catch (MavenDownloadingException e) {
                     return e.warn(t);
@@ -392,7 +394,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return null;
             }
 
-            private Xml.Tag upgradePluginDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
+            private Xml.Tag upgradeTag(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
                 String groupId = t.getChildValue("groupId").orElse(null);
                 String artifactId = t.getChildValue("artifactId").orElse(null);
                 String version = t.getChildValue("version").orElse(null);
@@ -435,6 +437,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     throws MavenDownloadingException {
                 return MavenDependency.findNewerVersion(groupId, artifactId, version, getResolutionResult(), metadataFailures,
                         versionComparator, ctx);
+            }
+
+            private boolean isAnnotationProcessorPathTag(String groupId, String artifactId) {
+                // Runtime might still have a private version of this class parent-loaded -> remove this once we have had a few releases.
+//                if (!isTag("path") || !ANNOTATION_PROCESSORS_PATH_MATCHER.matches(getCursor())) {
+                if (!(getCursor().getValue() instanceof Xml.Tag && "path".equals(getCursor().<Xml.Tag>getValue().getName())) || !new XPathMatcher("//annotationProcessorPaths/path").matches(getCursor())) {
+                    return false;
+                }
+                Xml.Tag tag = getCursor().getValue();
+                return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                        matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
             }
 
             private Xml.Document attemptBomUpgrade(Xml.Document document, ResolvedManagedDependency managedDep,

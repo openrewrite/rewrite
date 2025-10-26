@@ -17,7 +17,7 @@ import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {Comment, emptySpace, J, Statement} from "../java";
 import {Draft, produce} from "immer";
-import {Cursor, Tree} from "../tree";
+import {Cursor, isScope, Tree} from "../tree";
 import {
     BlankLinesStyle,
     SpacesStyle,
@@ -28,15 +28,30 @@ import {
 } from "./style";
 import {produceAsync} from "../visitor";
 
+export async function maybeAutoFormat<J2 extends J, P>(before: J2, after: J2, p: P, stopAfter?: J, parent?: Cursor): Promise<J2> {
+    if (before !== after) {
+        return autoFormat(after, p, stopAfter, parent);
+    }
+    return after;
+}
+
+export async function autoFormat<J2 extends J, P>(j: J2, p: P, stopAfter?: J, parent?: Cursor): Promise<J2> {
+    return await new AutoformatVisitor(stopAfter).visit(j, p, parent) as J2;
+}
+
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
+    constructor(private stopAfter?: Tree) {
+        super();
+    }
+
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
         const visitors = [
-            new NormalizeWhitespaceVisitor(),
-            new MinimumViableSpacingVisitor(),
-            new BlankLinesVisitor(styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle),
-            new WrappingAndBracesVisitor(styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle),
-            new SpacesVisitor(styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle),
-            new TabsAndIndentsVisitor(styleFromSourceFile(StyleKind.TabsAndIndentsStyle, tree) as TabsAndIndentsStyle),
+            new NormalizeWhitespaceVisitor(this.stopAfter),
+            new MinimumViableSpacingVisitor(this.stopAfter),
+            new BlankLinesVisitor(styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle, this.stopAfter),
+            new WrappingAndBracesVisitor(styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle, this.stopAfter),
+            new SpacesVisitor(styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle, this.stopAfter),
+            new TabsAndIndentsVisitor(styleFromSourceFile(StyleKind.TabsAndIndentsStyle, tree) as TabsAndIndentsStyle, this.stopAfter),
         ]
 
         let t: R | undefined = tree as R;
@@ -53,6 +68,24 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
 export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
     // called NormalizeFormat in Java
 
+    constructor(private stopAfter?: Tree) {
+        super();
+    }
+
+    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+        if (this.cursor?.getNearestMessage("stop") != null) {
+            return tree as R;
+        }
+        return super.visit(tree, p, parent);
+    }
+
+    override async postVisit(tree: J, p: P): Promise<J | undefined> {
+        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
+            this.cursor?.root.messages.set("stop", true);
+        }
+        return super.postVisit(tree, p);
+    }
+
     private concatenatePrefix(node: Draft<J>, right: J.Space) {
         // TODO look at https://github.com/openrewrite/rewrite/commit/990a366fab9e5656812d81d0eb15ecb6bfd2fde0#diff-ec2e977fe8f1e189735e71b817f8f1ebaf79c1490c0210652e8a559f7f7877de
         // and possibly incorporate it here - some special logic needed to merge comments better (?)
@@ -62,8 +95,22 @@ export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
 }
 
 export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
-    constructor(private style: SpacesStyle) {
+    constructor(private style: SpacesStyle, private stopAfter?: Tree) {
         super();
+    }
+
+    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+        if (this.cursor?.getNearestMessage("stop") != null) {
+            return tree as R;
+        }
+        return super.visit(tree, p, parent);
+    }
+
+    override async postVisit(tree: J, p: P): Promise<J | undefined> {
+        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
+            this.cursor?.root.messages.set("stop", true);
+        }
+        return super.postVisit(tree, p);
     }
 
     protected async visitAlias(alias: JS.Alias, p: P): Promise<J | undefined> {
@@ -517,8 +564,22 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 }
 
 export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
-    constructor(private readonly style: WrappingAndBracesStyle) {
+    constructor(private readonly style: WrappingAndBracesStyle, private stopAfter?: Tree) {
         super();
+    }
+
+    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+        if (this.cursor?.getNearestMessage("stop") != null) {
+            return tree as R;
+        }
+        return super.visit(tree, p, parent);
+    }
+
+    override async postVisit(tree: J, p: P): Promise<J | undefined> {
+        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
+            this.cursor?.root.messages.set("stop", true);
+        }
+        return super.postVisit(tree, p);
     }
 
     public async visitStatement(statement: Statement, p: P): Promise<Statement> {
@@ -662,8 +723,22 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
 
 
 export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
-    constructor() {
+    constructor(private stopAfter?: Tree) {
         super();
+    }
+
+    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+        if (this.cursor?.getNearestMessage("stop") != null) {
+            return tree as R;
+        }
+        return super.visit(tree, p, parent);
+    }
+
+    override async postVisit(tree: J, p: P): Promise<J | undefined> {
+        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
+            this.cursor?.root.messages.set("stop", true);
+        }
+        return super.postVisit(tree, p);
     }
 
     protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
@@ -877,11 +952,14 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
 }
 
 export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
-    constructor(private readonly style: BlankLinesStyle) {
+    constructor(private readonly style: BlankLinesStyle, private stopAfter?: Tree) {
         super();
     }
 
     override async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
+        if (this.cursor?.getNearestMessage("stop") != null) {
+            return tree as R;
+        }
         if (tree.kind === JS.Kind.CompilationUnit) {
             const cu = produce(tree as JS.CompilationUnit, draft => {
                 if (draft.prefix.comments.length == 0) {
@@ -1041,13 +1119,20 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
     private static countNewlines(s: string): number {
         return [...s].filter(c => c === "\n").length;
     }
+
+    override async postVisit(tree: J, p: P): Promise<J | undefined> {
+        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
+            this.cursor?.root.messages.set("stop", true);
+        }
+        return super.postVisit(tree, p);
+    }
 }
 
 export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     private readonly newline: string;
     private readonly singleIndent: string;
 
-    constructor(private readonly tabsAndIndentsStyle: TabsAndIndentsStyle) {
+    constructor(private readonly tabsAndIndentsStyle: TabsAndIndentsStyle, private stopAfter?: Tree) {
         super();
         this.newline = "\n"; // TODO this should be configurable and come from some style too
 
@@ -1060,7 +1145,26 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async preVisit(tree: J, p: P): Promise<J | undefined> {
         const ret = await super.preVisit(tree, p);
-        const indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+        let indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+
+        // Increase indent for control structures with non-block bodies
+        if (tree.kind === J.Kind.If) {
+            const ifStmt = tree as J.If;
+            if (ifStmt.thenPart.element.kind !== J.Kind.Block) {
+                indentShouldIncrease = true;
+            }
+        } else if (tree.kind === J.Kind.WhileLoop) {
+            const whileLoop = tree as J.WhileLoop;
+            if (whileLoop.body.element.kind !== J.Kind.Block) {
+                indentShouldIncrease = true;
+            }
+        } else if (tree.kind === J.Kind.ForLoop) {
+            const forLoop = tree as J.ForLoop;
+            if (forLoop.body.element.kind !== J.Kind.Block) {
+                indentShouldIncrease = true;
+            }
+        }
+
         if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
         }
@@ -1068,6 +1172,9 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+        if (this.cursor?.getNearestMessage("stop") != null) {
+            return tree as R;
+        }
         let ret = await super.visit(tree, p, parent) as R;
         if (ret == undefined) {
             return ret;
@@ -1115,5 +1222,12 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
     private combineIndent(oldWs: string, relativeIndent: string): string {
         return oldWs.substring(0, oldWs.lastIndexOf("\n") + 1) + relativeIndent;
+    }
+
+    override async postVisit(tree: J, p: P): Promise<J | undefined> {
+        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
+            this.cursor?.root.messages.set("stop", true);
+        }
+        return super.postVisit(tree, p);
     }
 }

@@ -112,10 +112,10 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             JavaSourceFile c = cu;
 
             boolean keepImport = !force && (typeUsed || !otherTypesInPackageUsed.isEmpty() && type.endsWith(".*"));
-            AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
+            AtomicReference<@Nullable Space> spaceForNextImport = new AtomicReference<>();
             c = c.withImports(ListUtils.flatMap(c.getImports(), import_ -> {
-                if (spaceForNextImport.get() != null) {
-                    Space removedPrefix = spaceForNextImport.get();
+                Space removedPrefix = spaceForNextImport.get();
+                if (removedPrefix != null) {
                     Space currentPrefix = import_.getPrefix();
                     if (removedPrefix.getLastWhitespace().isEmpty() ||
                         (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix))) {

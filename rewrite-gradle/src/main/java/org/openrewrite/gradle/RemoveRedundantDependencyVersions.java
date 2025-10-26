@@ -19,17 +19,13 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleDependencyConstraint;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependencies;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -39,10 +35,7 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.semver.ExactVersion;
-import org.openrewrite.semver.LatestIntegration;
-import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.semver.*;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
@@ -120,11 +113,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+                    @SuppressWarnings("NotNullFieldNotInitialized")
                     GradleProject gp;
                     final Map<String, List<ResolvedPom>> platforms = new HashMap<>();
                     final Map<String, List<ResolvedDependency>> directDependencies = new HashMap<>();
                     final Map<GroupArtifact, String> springPluginManagedDependencies = new HashMap<>();
-
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -179,73 +172,32 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 }.visit(tree, ctx);
                             }
 
-                            new JavaIsoVisitor<ExecutionContext>() {
-                                @Override
-                                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                                    J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
-                                    new GradleDependency.Matcher()
-                                            .groupId(groupPattern)
-                                            .artifactId(artifactPattern)
-                                            .get(getCursor())
-                                            .ifPresent(it ->
-                                                    directDependencies.computeIfAbsent(m.getSimpleName(), k -> new ArrayList<>()).add(it.getResolvedDependency()));
-
-                                    if (!"platform".equals(m.getSimpleName()) && !"enforcedPlatform".equals(m.getSimpleName())) {
-                                        return m;
-                                    }
-
-                                    GroupArtifactVersion gav = null;
-                                    if (m.getArguments().get(0) instanceof J.Literal) {
-                                        J.Literal l = (J.Literal) m.getArguments().get(0);
-                                        if (l.getType() == JavaType.Primitive.String) {
-                                            Dependency dependency = DependencyStringNotationConverter.parse((String) l.getValue());
-                                            gav = new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
+                            MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                            GradleMultiDependency.matcher()
+                                    .groupId(groupPattern)
+                                    .artifactId(artifactPattern)
+                                    .asVisitor(gmd -> gmd.map(gradleDependency -> {
+                                        directDependencies.computeIfAbsent(gradleDependency.getConfigurationName(), k -> new ArrayList<>()).add(gradleDependency.getResolvedDependency());
+                                        if(!gradleDependency.isPlatform()) {
+                                            return gradleDependency.getTree();
                                         }
-                                    } else if (m.getArguments().get(0) instanceof G.MapEntry) {
-                                        String groupId = null;
-                                        String artifactId = null;
-                                        String version = null;
-
-                                        for (Expression arg : m.getArguments()) {
-                                            if (!(arg instanceof G.MapEntry &&
-                                                  ((G.MapEntry) arg).getKey().getType() == JavaType.Primitive.String &&
-                                                  ((G.MapEntry) arg).getValue().getType() == JavaType.Primitive.String)) {
-                                                continue;
-                                            }
-
-                                            Object key = ((J.Literal) ((G.MapEntry) arg).getKey()).getValue();
-                                            if ("group".equals(key)) {
-                                                groupId = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
-                                            } else if ("name".equals(key)) {
-                                                artifactId = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
-                                            } else if ("version".equals(key)) {
-                                                version = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
-                                            }
-                                        }
-
-                                        if (groupId != null && artifactId != null && version != null) {
-                                            gav = new GroupArtifactVersion(groupId, artifactId, version);
-                                        }
-                                    }
-                                    if (gav != null) {
-                                        MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                                        GroupArtifactVersion gav = gradleDependency.getGav();
                                         try {
                                             ResolvedPom platformPom = mpd.download(gav, null, null, gp.getMavenRepositories())
                                                     .resolve(emptyList(), mpd, ctx);
-                                            platforms.computeIfAbsent(getCursor().getParentOrThrow(1).firstEnclosingOrThrow(J.MethodInvocation.class).getSimpleName(), k -> new ArrayList<>()).add(platformPom);
-                                        } catch (MavenDownloadingException ignored) {
+                                            platforms.computeIfAbsent(gradleDependency.getConfigurationName(), k -> new ArrayList<>()).add(platformPom);
+                                        } catch (MavenDownloadingException e) {
+                                            throw new RuntimeException(e);
                                         }
-                                    }
-                                    return m;
-                                }
-                            }.visit(tree, ctx);
+                                        return gradleDependency.getTree();
+                                    }))
+                                    .visit(tree, ctx, getCursor());
 
                             Set<Statement> statementsToRemove = new HashSet<>();
                             tree = new JavaIsoVisitor<ExecutionContext>() {
 
                                 @Override
-                                public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                                     if ("dependencies".equals(m.getSimpleName())) {
                                         // Gradle tolerates multiple declarations of the same dependency, but only the one with the newest version is used
@@ -297,10 +249,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             return m;
                                         }
                                         String value = (String) ((J.Literal) m.getArguments().get(0)).getValue();
-                                        Dependency dependency = DependencyStringNotationConverter.parse(value);
+                                        Dependency dependency = DependencyNotation.parse(value);
                                         try {
                                             getCursor().dropParentUntil(obj -> obj instanceof J.MethodInvocation && "constraints".equals(((J.MethodInvocation) obj).getSimpleName())).getValue();
                                             if (shouldRemoveRedundantConstraint(dependency, gp.getConfiguration(m.getSimpleName()))) {
+                                                //noinspection DataFlowIssue
                                                 return null;
                                             }
                                             return m;
@@ -320,9 +273,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 }
 
                                 @Override
-                                public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
+                                public J.Return visitReturn(J.Return _return, ExecutionContext ctx) {
                                     J.Return r = super.visitReturn(_return, ctx);
                                     if (r.getExpression() == null) {
+                                        //noinspection DataFlowIssue
                                         return null;
                                     }
                                     return r;
@@ -333,8 +287,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 }
 
                                 private boolean shouldRemoveRedundantDependency(@Nullable Dependency dependency, String configurationName, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-                                    if (dependency == null || ((groupPattern != null && !matchesGlob(dependency.getGroupId(), groupPattern)) ||
-                                                               (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern)))) {
+                                    if (dependency == null || !matchesGlob(dependency.getGroupId(), groupPattern) || !matchesGlob(dependency.getArtifactId(), artifactPattern)) {
                                         return false;
                                     }
 
@@ -402,8 +355,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
                                         return false;
                                     }
-                                    if ((groupPattern != null && !matchesGlob(constraint.getGroupId(), groupPattern)) ||
-                                        (artifactPattern != null && !matchesGlob(constraint.getArtifactId(), artifactPattern))) {
+                                    if (!matchesGlob(constraint.getGroupId(), groupPattern) ||
+                                        !matchesGlob(constraint.getArtifactId(), artifactPattern)) {
                                         return false;
                                     }
 
@@ -411,6 +364,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                                     Stream.of(c),
                                                     gp.configurationsExtendingFrom(c, true).stream()
                                             )
+                                            .filter(Objects::nonNull)
                                             .filter(GradleDependencyConfiguration::isCanBeResolved)
                                             .distinct()
                                             .map(conf -> conf.findResolvedDependency(requireNonNull(constraint.getGroupId()), constraint.getArtifactId()))
@@ -436,83 +390,45 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
-                        Optional<GradleDependency> maybeGradleDependency = new GradleDependency.Matcher()
+                        m = GradleMultiDependency.matcher()
                                 .groupId(groupPattern)
                                 .artifactId(artifactPattern)
-                                .get(getCursor());
-                        if (!maybeGradleDependency.isPresent()) {
-                            return m;
-                        }
+                                .get(getCursor())
+                                .map(gmd -> gmd.map(gradleDependency -> {
+                                    ResolvedDependency dep = gradleDependency.getResolvedDependency();
+                                    if (StringUtils.isBlank(dep.getVersion())) {
+                                        return gradleDependency.getTree();
+                                    }
 
-                        GradleDependency gradleDependency = maybeGradleDependency.get();
-                        ResolvedDependency dep = gradleDependency.getResolvedDependency();
-                        if (StringUtils.isBlank(dep.getVersion())) {
-                            return m;
-                        }
-
-                        if (springPluginManagedDependencies.containsKey(dep.getGav().asGroupArtifact())) {
-                            if (matchesComparator(springPluginManagedDependencies.get(dep.getGav().asGroupArtifact()), dep.getVersion())) {
-                                return maybeRemoveVersion(m);
-                            }
-                        }
-
-                        if (platforms.containsKey(m.getSimpleName())) {
-                            for (ResolvedPom platform : platforms.get(m.getSimpleName())) {
-                                String managedVersion = platform.getManagedVersion(dep.getGroupId(), dep.getArtifactId(), null, dep.getRequested().getClassifier());
-                                if (matchesComparator(managedVersion, dep.getVersion())) {
-                                    return maybeRemoveVersion(m);
-                                }
-                            }
-                        }
-                        GradleDependencyConfiguration gdc = gp.getConfiguration(m.getSimpleName());
-                        if (gdc != null) {
-                            for (GradleDependencyConfiguration configuration : gdc.allExtendsFrom()) {
-                                if (platforms.containsKey(configuration.getName())) {
-                                    for (ResolvedPom platform : platforms.get(configuration.getName())) {
-                                        String managedVersion = platform.getManagedVersion(dep.getGroupId(), dep.getArtifactId(), null, dep.getRequested().getClassifier());
-                                        if (matchesComparator(managedVersion, dep.getVersion())) {
-                                            return maybeRemoveVersion(m);
+                                    if (springPluginManagedDependencies.containsKey(dep.getGav().asGroupArtifact())) {
+                                        if (matchesComparator(springPluginManagedDependencies.get(dep.getGav().asGroupArtifact()), dep.getVersion())) {
+                                            return gradleDependency.withDeclaredVersion(null).getTree();
                                         }
                                     }
-                                }
-                            }
-                        }
 
-                        return m;
-                    }
-
-                    private J.MethodInvocation maybeRemoveVersion(J.MethodInvocation m) {
-                        if (m.getArguments().get(0) instanceof J.Literal) {
-                            J.Literal l = (J.Literal) m.getArguments().get(0);
-                            if (l.getType() == JavaType.Primitive.String) {
-                                Dependency dep = DependencyStringNotationConverter.parse((String) l.getValue());
-                                if (dep == null || dep.getClassifier() != null || dep.getExt() != null) {
-                                    return m;
-                                }
-                                return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
-                                        ChangeStringLiteral.withStringValue(l, dep.withVersion(null).toStringNotation()))
-                                );
-                            }
-                        } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
-                            return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                                G.MapLiteral mapLiteral = (G.MapLiteral) arg;
-                                return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), entry -> {
-                                    if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
-                                        return null;
+                                    if (platforms.containsKey(gradleDependency.getConfigurationName())) {
+                                        for (ResolvedPom platform : platforms.get(gradleDependency.getConfigurationName())) {
+                                            String managedVersion = platform.getManagedVersion(dep.getGroupId(), dep.getArtifactId(), null, dep.getRequested().getClassifier());
+                                            if (matchesComparator(managedVersion, dep.getVersion())) {
+                                                return gradleDependency.withDeclaredVersion(null).getTree();
+                                            }
+                                        }
                                     }
-                                    return entry;
-                                }));
-                            }));
-                        } else if (m.getArguments().get(0) instanceof G.MapEntry) {
-                            return m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                                G.MapEntry entry = (G.MapEntry) arg;
-                                if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
-                                    return null;
-                                }
-                                return entry;
-                            }));
-                        }
+                                    GradleDependencyConfiguration gdc = gp.getConfiguration(gradleDependency.getConfigurationName());
+                                    if (gdc != null) {
+                                        for (GradleDependencyConfiguration configuration : gdc.allExtendsFrom()) {
+                                            if (platforms.containsKey(configuration.getName())) {
+                                                for (ResolvedPom platform : platforms.get(configuration.getName())) {
+                                                    String managedVersion = platform.getManagedVersion(dep.getGroupId(), dep.getArtifactId(), null, dep.getRequested().getClassifier());
+                                                    if (matchesComparator(managedVersion, dep.getVersion())) {
+                                                        return gradleDependency.withDeclaredVersion(null).getTree();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    return gradleDependency.getTree();
+                                })).orElse(m);
                         return m;
                     }
 

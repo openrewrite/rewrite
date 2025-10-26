@@ -175,6 +175,42 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void alignMethodDeclarationParamsWhenIndentationNeeded() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @SuppressWarnings
+                  private void firstArgNoPrefix(
+              String first,
+               int times,
+              String third) {}
+                  private void secondArgOnNewLine(
+              String first,
+                              int times,
+                     String third
+                  ) {}
+              }
+              """,
+            """
+              class Test {
+                  @SuppressWarnings
+                  private void firstArgNoPrefix(
+                          String first,
+                          int times,
+                          String third) {}
+                  private void secondArgOnNewLine(
+                          String first,
+                          int times,
+                          String third
+                  ) {}
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1913")
     @Test
     void alignMethodDeclarationParamsWhenContinuationIndent() {
@@ -2067,7 +2103,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignBlockPrefixes() {
         rewriteRun(
-          spec -> spec.recipe(new AutoFormat()),
+          spec -> spec.recipe(new AutoFormat(null)),
           java(
             """
               public class Test {
@@ -2349,8 +2385,8 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               public record RenameRequest(
-                  @NotBlank
-                  @JsonProperty("name") String name) {
+                      @NotBlank
+                      @JsonProperty("name") String name) {
               }
               """
           )

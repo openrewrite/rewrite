@@ -277,7 +277,8 @@ public class Autodetect extends NamedStyles {
                     continuationIndent,
                     false,
                     new TabsAndIndentsStyle.MethodDeclarationParameters(
-                            multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
+                            multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument),
+                    new TabsAndIndentsStyle.RecordComponents(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
             );
         }
     }
