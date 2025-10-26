@@ -18,8 +18,8 @@ package org.openrewrite.marketplace;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
-
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeMarketplaceWriterTest {
@@ -52,9 +52,9 @@ class RecipeMarketplaceWriterTest {
           "Remove unnecessary parentheses",
           "Org.openrewrite.java.cleanup.unnecessaryParentheses",
                 "Removes unnecessary parentheses from expressions",
-                Collections.emptySet(),
+                emptySet(),
                 null,
-                Collections.emptyList(),
+                emptyList(),
                 null
         ));
 
@@ -76,7 +76,7 @@ class RecipeMarketplaceWriterTest {
           "Upgrade dependency",
           "Org.openrewrite.maven.upgradeDependencyVersion",
                 "Upgrades a Maven dependency",
-                Collections.emptySet(),
+                emptySet(),
                 null,
                 java.util.List.of(
                         new RecipeOffering.Option("groupId", "Group ID", "The group ID"),
@@ -151,9 +151,9 @@ class RecipeMarketplaceWriterTest {
                 "Remove unnecessary parentheses",
                 "Remove unnecessary parentheses",
                 "Removes unnecessary parentheses around things",
-                Collections.emptySet(),
+                emptySet(),
                 null,
-                Collections.emptyList(),
+                emptyList(),
                 new FakeMavenBundle("Maven", "org.openrewrite:rewrite-java", "8.0.0", "java-team")
         ));
 
@@ -183,9 +183,9 @@ class RecipeMarketplaceWriterTest {
                 name,
                 name,
                 "",
-                Collections.emptySet(),
+                emptySet(),
                 null,
-                Collections.emptyList(),
+                emptyList(),
                 null
         );
     }

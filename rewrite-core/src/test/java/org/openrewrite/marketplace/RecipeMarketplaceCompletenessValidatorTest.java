@@ -22,9 +22,10 @@ import org.openrewrite.config.YamlResourceLoader;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
-import java.util.Collections;
 import java.util.Properties;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeMarketplaceCompletenessValidatorTest {
@@ -56,9 +57,9 @@ class RecipeMarketplaceCompletenessValidatorTest {
           "Test recipe",
           "Test recipe",
           "A test recipe.",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -78,9 +79,9 @@ class RecipeMarketplaceCompletenessValidatorTest {
           "Phantom recipe",
           "Phantom recipe",
           "This recipe doesn't exist in JAR.",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -144,9 +145,9 @@ class RecipeMarketplaceCompletenessValidatorTest {
           "CSV recipe",
           "CSV recipe",
           "A recipe only in CSV.",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -197,9 +198,9 @@ class RecipeMarketplaceCompletenessValidatorTest {
           "Shared recipe",
           "Shared recipe",
           "A recipe that appears in multiple categories.",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -208,9 +209,9 @@ class RecipeMarketplaceCompletenessValidatorTest {
           "Shared recipe",
           "Shared recipe",
           "A recipe that appears in multiple categories.",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 

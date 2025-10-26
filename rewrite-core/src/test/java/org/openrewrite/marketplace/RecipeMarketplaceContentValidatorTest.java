@@ -18,8 +18,8 @@ package org.openrewrite.marketplace;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Validated;
 
-import java.util.Collections;
-
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeMarketplaceContentValidatorTest {
@@ -34,9 +34,9 @@ class RecipeMarketplaceContentValidatorTest {
           "Test recipe",
           "Test recipe",
           "This is a valid description.",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -52,9 +52,9 @@ class RecipeMarketplaceContentValidatorTest {
           "Test recipe",
           "Test recipe",
           "This description is missing a period",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -72,9 +72,9 @@ class RecipeMarketplaceContentValidatorTest {
           "Test recipe.",
           "Test recipe.",
           "Valid description.",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -92,9 +92,9 @@ class RecipeMarketplaceContentValidatorTest {
           "Test recipe",
           "Test recipe",
           "Valid description.",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -112,9 +112,9 @@ class RecipeMarketplaceContentValidatorTest {
           "Test recipe",
           "Test recipe",
           "",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -130,9 +130,9 @@ class RecipeMarketplaceContentValidatorTest {
           "Test recipe",
           "Test recipe",
           "Missing period",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
         marketplace.getRecipes().add(new RecipeOffering(
@@ -140,9 +140,9 @@ class RecipeMarketplaceContentValidatorTest {
           "Another recipe.",
           "Another recipe.",
           "Valid description.",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
@@ -162,9 +162,9 @@ class RecipeMarketplaceContentValidatorTest {
           "Java recipe",
           "Java recipe",
           "Missing period",
-          Collections.emptySet(),
+          emptySet(),
           null,
-          Collections.emptyList(),
+          emptyList(),
           null
         ));
 
