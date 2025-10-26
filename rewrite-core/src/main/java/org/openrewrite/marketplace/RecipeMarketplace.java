@@ -131,55 +131,6 @@ public class RecipeMarketplace {
         }
     }
 
-    /**
-     * Remove recipes and categories from this marketplace that are present in the supplied marketplace.
-     * Recursively processes all recipes and subcategories. Empty categories are removed after processing.
-     *
-     * @param other The marketplace whose contents should be removed from this one.
-     */
-    public void minus(RecipeMarketplace other) {
-        for (RecipeListing recipe : other.getRecipes()) {
-            recipes.removeIf(existing -> existing.getName().equals(recipe.getName()));
-        }
-
-        for (RecipeMarketplace otherCategory : other.getCategories()) {
-            RecipeMarketplace category = findCategory(otherCategory.getDisplayName());
-            if (category != null) {
-                category.minus(otherCategory);
-            }
-        }
-
-        categories.removeIf(category ->
-                category.getRecipes().isEmpty() && category.getCategories().isEmpty());
-    }
-
-    /**
-     * Remove a recipe from this marketplace and all subcategories by name.
-     * Recursively searches through all subcategories and removes any recipe with a matching name.
-     * Empty categories are removed after processing.
-     *
-     * @param recipe The recipe to remove (matched by name).
-     */
-    public void removeRecipe(RecipeListing recipe) {
-        recipes.removeIf(existing -> existing.getName().equals(recipe.getName()));
-
-        for (RecipeMarketplace category : categories) {
-            category.removeRecipe(recipe);
-        }
-
-        categories.removeIf(category ->
-                category.getRecipes().isEmpty() && category.getCategories().isEmpty());
-    }
-
-    private @Nullable RecipeMarketplace findCategory(String categoryName) {
-        for (RecipeMarketplace category : categories) {
-            if (category.getDisplayName().equals(categoryName)) {
-                return category;
-            }
-        }
-        return null;
-    }
-
     private RecipeMarketplace findOrCreateCategory(String categoryName) {
         for (RecipeMarketplace category : categories) {
             if (category.getDisplayName().equals(categoryName)) {
