@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,43 +13,56 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite.marketplace;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.NlsRewrite;
-import org.openrewrite.marketplace.RecipeListing;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 
+/**
+ * Offered by the marketplace, but not yet installed and/or
+ * loaded for use. An offering turns into a runnable recipe
+ * through its load method.
+ */
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class OptionDescriptor implements RecipeListing.Option {
-
+public class RecipeOffering implements RecipeListing {
     @EqualsAndHashCode.Include
     String name;
 
-    @EqualsAndHashCode.Include
-    String type;
-
-    @Nullable
     @NlsRewrite.DisplayName
     String displayName;
 
-    @Nullable
+    @NlsRewrite.DisplayName
+    String instanceName;
+
     @NlsRewrite.Description
     String description;
 
-    @Nullable
-    String example;
+    Set<String> tags;
 
     @Nullable
-    List<String> valid;
+    Duration estimatedEffortPerOccurrence;
 
-    boolean required;
+    List<Option> options;
 
-    @Nullable
-    @EqualsAndHashCode.Include
-    Object value;
+    @Nullable RecipeBundle bundle;
+
+    @Value
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    public static class Option implements RecipeListing.Option {
+        @EqualsAndHashCode.Include
+        String name;
+
+        @NlsRewrite.DisplayName
+        String displayName;
+
+        @NlsRewrite.Description
+        String description;
+    }
 }
