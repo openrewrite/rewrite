@@ -168,14 +168,25 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         }
 
         /**
-         * FieldAccess targets the variable if its target type equals variable.Name.FieldType.Owner.
+         * FieldAccess targets the variable if its target type equals variable.Name.FieldType.Owner
+         * and the accessed field matches the variable being renamed.
          */
         private boolean fieldAccessTargetsVariable(J.FieldAccess fieldAccess) {
             if (renameVariable.getName().getFieldType() != null &&
                     fieldAccess.getTarget().getType() != null) {
                 JavaType targetType = resolveType(fieldAccess.getTarget().getType());
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                return TypeUtils.isOfType(resolveType(variableNameFieldType.getOwner()), targetType);
+                if (TypeUtils.isOfType(resolveType(variableNameFieldType.getOwner()), targetType)) {
+                    // Also check that the field being accessed is the same as the variable being renamed
+                    // Try field type comparison first
+                    J.Identifier fieldName = fieldAccess.getName();
+                    if (fieldName.getFieldType() != null && renameVariable.getVariableType() != null &&
+                            TypeUtils.isOfType(fieldName.getFieldType(), renameVariable.getVariableType())) {
+                        return true;
+                    }
+                    // Fallback to simple name comparison (already checked in visitIdentifier, but verify again)
+                    return fieldName.getSimpleName().equals(renameVariable.getSimpleName());
+                }
             }
             return false;
         }

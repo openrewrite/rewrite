@@ -1534,4 +1534,55 @@ class RenameVariableTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6195")
+    @Test
+    void renameVariableQualifiedField() {
+        rewriteRun(
+          spec ->
+            spec.recipe(
+              toRecipe(
+                () ->
+                  new JavaIsoVisitor<>() {
+                      @Override
+                      public J.VariableDeclarations.NamedVariable visitVariable(
+                        J.VariableDeclarations.NamedVariable variable,
+                        ExecutionContext executionContext) {
+                          if ("foo".equals(variable.getSimpleName())) {
+                              doAfterVisit(new RenameVariable<>(variable, "FOO"));
+                          }
+                          return super.visitVariable(variable, executionContext);
+                      }
+                  })),
+          // language=java
+          java(
+            """
+              public class Bar {
+                private static final String foo = "hello";
+
+                public static class AcceptanceChecks {
+                  public static final String foo = "world";
+                }
+
+                public void bar() {
+                  String a = foo;
+                  String b = AcceptanceChecks.foo;
+                }
+              }
+              """,
+            """
+              public class Bar {
+                private static final String FOO = "hello";
+
+                public static class AcceptanceChecks {
+                  public static final String FOO = "world";
+                }
+
+                public void bar() {
+                  String a = FOO;
+                  String b = AcceptanceChecks.FOO;
+                }
+              }
+              """));
+    }
 }
