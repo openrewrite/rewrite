@@ -1539,30 +1539,30 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void renameVariableQualifiedField() {
         rewriteRun(
-          spec ->
-            spec.recipe(
-              toRecipe(
-                () ->
-                  new JavaIsoVisitor<>() {
-                      @Override
-                      public J.VariableDeclarations.NamedVariable visitVariable(
-                        J.VariableDeclarations.NamedVariable variable,
-                        ExecutionContext executionContext) {
-                          if ("foo".equals(variable.getSimpleName())) {
-                              doAfterVisit(new RenameVariable<>(variable, "FOO"));
-                          }
-                          return super.visitVariable(variable, executionContext);
-                      }
-                  })),
-          // language=java
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  class AcceptanceChecks {
+                    public static final String foo = "world";
+                  }
+                  """
+              )
+            )
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(
+                  J.VariableDeclarations.NamedVariable variable,
+                  ExecutionContext executionContext) {
+                    if ("foo".equals(variable.getSimpleName())) {
+                        doAfterVisit(new RenameVariable<>(variable, "FOO"));
+                    }
+                    return super.visitVariable(variable, executionContext);
+                }
+            })),
           java(
             """
-              public class Bar {
+              class Bar {
                 private static final String foo = "hello";
-
-                public static class AcceptanceChecks {
-                  public static final String foo = "world";
-                }
 
                 public void bar() {
                   String a = foo;
@@ -1571,18 +1571,16 @@ class RenameVariableTest implements RewriteTest {
               }
               """,
             """
-              public class Bar {
+              class Bar {
                 private static final String FOO = "hello";
-
-                public static class AcceptanceChecks {
-                  public static final String FOO = "world";
-                }
 
                 public void bar() {
                   String a = FOO;
                   String b = AcceptanceChecks.FOO;
                 }
               }
-              """));
+              """
+          )
+        );
     }
 }
