@@ -1145,7 +1145,26 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async preVisit(tree: J, p: P): Promise<J | undefined> {
         const ret = await super.preVisit(tree, p);
-        const indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+        let indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+
+        // Increase indent for control structures with non-block bodies
+        if (tree.kind === J.Kind.If) {
+            const ifStmt = tree as J.If;
+            if (ifStmt.thenPart.element.kind !== J.Kind.Block) {
+                indentShouldIncrease = true;
+            }
+        } else if (tree.kind === J.Kind.WhileLoop) {
+            const whileLoop = tree as J.WhileLoop;
+            if (whileLoop.body.element.kind !== J.Kind.Block) {
+                indentShouldIncrease = true;
+            }
+        } else if (tree.kind === J.Kind.ForLoop) {
+            const forLoop = tree as J.ForLoop;
+            if (forLoop.body.element.kind !== J.Kind.Block) {
+                indentShouldIncrease = true;
+            }
+        }
+
         if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
         }
