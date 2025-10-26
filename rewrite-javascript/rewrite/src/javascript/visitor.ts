@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {mapAsync, updateIfChanged} from "../util";
-import {SourceFile} from "../tree";
+import {Cursor, SourceFile} from "../tree";
 import {ValidImmerRecipeReturnType} from "../visitor";
 import {Expression, J, Type, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
