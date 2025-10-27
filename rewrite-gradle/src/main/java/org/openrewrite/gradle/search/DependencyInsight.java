@@ -29,7 +29,6 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.graph.DependencyGraph;
 import org.openrewrite.maven.table.DependenciesInUse;
@@ -43,6 +42,7 @@ import org.openrewrite.semver.VersionComparator;
 import java.util.*;
 import java.util.function.Function;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
@@ -316,7 +316,7 @@ public class DependencyInsight extends Recipe {
                                                  DependencyGraph dependencyGraph) {
                 // Create a temporary map with only this specific path
                 Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> singlePathMap = new HashMap<>();
-                singlePathMap.put(gav, Collections.singletonList(path));
+                singlePathMap.put(gav, singletonList(path));
                 return dependencyGraph.buildDependencyGraph(gav, singlePathMap, depth, configName);
             }
 
