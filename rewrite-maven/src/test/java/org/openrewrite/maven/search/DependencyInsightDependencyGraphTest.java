@@ -224,4 +224,59 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * Maven deduplicates dependencies and shows only the direct path.
+     * <p>
+     * jakarta.annotation-api appears as a direct dependency of jersey-server (depth 1)
+     * even though jersey-common (also a dependency of jersey-server) also depends on it.
+     */
+    @Test
+    void dependencyGraphForDuplicateTransitiveWithSameGroupIdArtifactIdVersion() {
+        rewriteRun(
+          spec -> spec
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                DependenciesInUse.Row row = rows.getFirst();
+                assertThat(row.getDependencyGraph()).isEqualTo(
+                  """
+                    jakarta.annotation:jakarta.annotation-api:1.3.5
+                    \\--- org.glassfish.jersey.core:jersey-server:2.35
+                         \\--- compile
+                    """.strip());
+                assertThat(row.getDepth()).isEqualTo(1);
+            })
+            .recipe(new DependencyInsight("jakarta.annotation", "jakarta.annotation-api", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>org.glassfish.jersey.core</groupId>
+                      <artifactId>jersey-server</artifactId>
+                      <version>2.35</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~(jakarta.annotation:jakarta.annotation-api:1.3.5)~~>--><dependency>
+                      <groupId>org.glassfish.jersey.core</groupId>
+                      <artifactId>jersey-server</artifactId>
+                      <version>2.35</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
