@@ -801,6 +801,12 @@ export const emptySpace: J.Space = {
     whitespace: "",
 };
 
+export const singleSpace: J.Space = {
+    kind: J.Kind.Space,
+    comments: [],
+    whitespace: " ",
+};
+
 export function emptyContainer<T extends J>(): J.Container<T> {
     return {
         kind: J.Kind.Container,
