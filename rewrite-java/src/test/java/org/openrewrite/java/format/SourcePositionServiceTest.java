@@ -28,6 +28,18 @@ import org.openrewrite.test.TypeValidation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
+/**
+ * Tests for {@link SourcePositionService}.
+ * <p>
+ * <b>Important:</b> The indentation in these test cases is intentionally non-standard and sometimes incorrect.
+ * This is deliberate, as we want to verify that the service correctly calculates alignment positions based on
+ * the <i>actual</i> indentation of the previous newlined element plus the continuation indent, rather than
+ * assuming the code is already properly formatted.
+ * <p>
+ * The service is designed to work with code in any state of formatting, determining the correct alignment
+ * position by finding the previous element with a newline prefix and using its actual indentation as the
+ * baseline. This allows formatting recipes to progressively correct indentation issues.
+ */
 class SourcePositionServiceTest implements RewriteTest {
 
     @DocumentExample
@@ -117,6 +129,14 @@ class SourcePositionServiceTest implements RewriteTest {
         );
     }
 
+    /**
+     * Tests alignment calculations when the first element in a container is on the same line as the opening delimiter.
+     * In these cases, subsequent elements should align with the first element's position, not just use
+     * continuation indent.
+     * <p>
+     * Note: Record5 in the third java() block has intentionally bizarre indentation (e.g., "Integer t2," at column 0
+     * and "Double u2," extremely far to the right) to verify the service handles any actual indentation pattern.
+     */
     @Test
     void correctlyCalculatesIndentationToAlign() {
         rewriteRun(
@@ -274,6 +294,18 @@ class SourcePositionServiceTest implements RewriteTest {
         );
     }
 
+    /**
+     * Tests alignment calculations when the first element in a container starts on a new line after the opening delimiter.
+     * In these cases, elements should NOT align with each other, but instead use the parent's indentation plus
+     * continuation indent.
+     * <p>
+     * For example, in {@code example(\n    int p,\n    String a)}, the parameters start on a new line after the
+     * opening parenthesis, so "String a" should be calculated based on the method's indentation + continuation,
+     * not based on aligning with "int p".
+     * <p>
+     * Note: The method chains and parameters have inconsistent indentation (e.g., ".valueOf" starting at column 0)
+     * to verify the service handles improperly formatted code correctly.
+     */
     @Test
     void calculatesIndentationForNonAlignedElement() {
         rewriteRun(
