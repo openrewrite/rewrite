@@ -157,7 +157,7 @@ class SourcePositionServiceTest implements RewriteTest {
                           assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(12);
                       }
                   }
-                  if (multiVariable.getVariables().stream().anyMatch(v -> "param".contains(v.getSimpleName().substring(0, 1)))) {
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "parm".contains(v.getSimpleName().substring(0, 1)))) {
                       assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(67);
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
@@ -168,7 +168,7 @@ class SourcePositionServiceTest implements RewriteTest {
             package com.example;
 
             public class Test {
-                public void /* multiline comments can impact though */ example(int p, String a, double r, Integer a, Float m) {
+                public void /* multiline comments can impact though */ example(int p, String a, double r, Float m) {
                     // comments should not be counted
                     String invocation = String.valueOf("Both lines share the same length.");
                     String text = new StringBuilder().append("text").reverse().toString();
@@ -197,6 +197,81 @@ class SourcePositionServiceTest implements RewriteTest {
             Float b2) {}
                 public record Record6(
             String s3, Integer t3, Double u3, Float b3) {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void calculatesIndentationForNonAlignedElement() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              SourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(SourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(16);
+                  return super.visitMethodInvocation(method, ctx);
+              }
+
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "stub".contains(v.getSimpleName().substring(0, 1)))) {
+                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("1"))) {
+                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(8);
+                      }
+                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("2"))) {
+                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(12);
+                      }
+                  }
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "parm".contains(v.getSimpleName().substring(0, 1)))) {
+                      assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(12);
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+            package com.example;
+
+            public class Test {
+                public void /* multiline comments can impact though */ example(
+            int p,
+            String a,
+            double r,
+            Float m) {
+                    // comments should not be counted
+                    String invocation = String
+            .valueOf("Both lines share the same length.");
+                    String text = new StringBuilder()
+            .append("text")
+            .reverse()
+            .toString();
+                }
+            }
+            """
+          ),
+          java (
+            """
+            public record Record1(
+            String s1,
+            Integer t1,
+            Double u1,
+            Float b1) {
+                public record Record2(
+            String s2,
+            Integer t2,
+            Double u2,
+            Float b2) {}
             }
             """
           )

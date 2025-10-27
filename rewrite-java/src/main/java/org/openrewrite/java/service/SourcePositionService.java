@@ -17,13 +17,11 @@ package org.openrewrite.java.service;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 
@@ -32,20 +30,19 @@ public class SourcePositionService {
 
     public int computeColumnToAlignTo(Cursor cursor, int continuation) {
         Cursor alignWith = alignsWith(cursor);
+        Cursor newLinedElementCursor;
         if (alignWith == null) {
-            return -1;
+            // Do not align, just calculate parents indentation
+            newLinedElementCursor = computeNewLinedCursorElement(cursor.getParentTreeCursor());
+            return ((J) newLinedElementCursor.getValue()).getPrefix().getIndent().length() + continuation;
         }
-        Cursor newLinedElementCursor = computeNewLinedCursorElement(alignWith);
+        newLinedElementCursor = computeNewLinedCursorElement(alignWith);
+        if (alignWith == newLinedElementCursor) {
+            //If they are the same element, it means that the first / indentation base is already on new line -> we should just indent with the continuation based on the previous correctly indented value
+            Cursor parentCursor = computeNewLinedCursorElement(newLinedElementCursor.getParentTreeCursor());
+            return ((J) parentCursor.getValue()).getPrefix().getIndent().length() + continuation;
+        }
         if (newLinedElementCursor.getValue() instanceof J) {
-            if (alignWith == newLinedElementCursor) {
-                //If they are the same element, it means that the first / indentation base is already on new line -> we should just indent with the continuation.
-                Cursor parentCursor = newLinedElementCursor.getParentTreeCursor();
-                int parentColumn = computeColumnToAlignTo(parentCursor, continuation);
-                if (parentCursor.getValue() instanceof J && parentColumn <= 0) {
-                    parentColumn = ((J) parentCursor.getValue()).getPrefix().getIndent().length();
-                }
-                return parentColumn + continuation;
-            }
             J j = newLinedElementCursor.getValue();
             AtomicInteger indentation = new AtomicInteger(-1);
             JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
@@ -124,6 +121,9 @@ public class SourcePositionService {
 
     private Cursor computeNewLinedCursorElement(Cursor cursor) {
         Object cursorValue = cursor.getValue();
+        while (cursorValue instanceof J.MethodInvocation && ((J.MethodInvocation) cursorValue).getSelect() instanceof J.MethodInvocation) {
+            cursorValue = ((J.MethodInvocation) cursorValue).getSelect();
+        }
         if (cursorValue instanceof J) {
             J j = (J) cursorValue;
             boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
@@ -138,31 +138,39 @@ public class SourcePositionService {
 
     private @Nullable Cursor alignsWith(Cursor cursor) {
         J cursorValue = cursor.getValue();
-        SourceFile sourceFile = cursor.firstEnclosing(SourceFile.class);
-        if (sourceFile == null) {
-            return null;
-        }
-        return new JavaIsoVisitor<AtomicReference<@Nullable Cursor>>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicReference<@Nullable Cursor> ctx) {
-                if (ctx.get() == null) {
-                    method = super.visitMethodInvocation(method, ctx);
-                    if (!(method.getSelect() instanceof J.MethodInvocation) && getCursor().getPathAsStream(o -> o instanceof J.MethodInvocation).anyMatch(value -> SemanticallyEqual.areEqual((J) value, cursorValue))) {
-                        ctx.set(getCursor());
-                    }
-                }
-                return method;
-            }
+        Cursor parent = cursor;
 
-            @Override
-            public @Nullable <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, AtomicReference<@Nullable Cursor> ctx) {
-                if (ctx.get() == null) {
-                    if (container != null && container.getElements().stream().anyMatch(e -> e == cursorValue)) {
-                        ctx.set(new Cursor(getCursor(), container.getElements().get(0)));
+        while (parent != null && !(parent.getValue() instanceof  SourceFile)) {
+            Object parentValue = parent.getValue();
+            if (parentValue instanceof JContainer) {
+                JContainer<J> container = parent.getValue();
+                if (container.getElements().stream().anyMatch(e -> SemanticallyEqual.areEqual(e, cursorValue))) {
+                    J firstElement = container.getElements().get(0);
+                    if (!firstElement.getPrefix().getLastWhitespace().contains("\n")) {
+                        if (SemanticallyEqual.areEqual(firstElement, cursorValue)) {
+                            return cursor;
+                        } else {
+                            return new Cursor(parent, firstElement);
+                        }
                     }
+                    return null; //do no align when not needed
                 }
-                return super.visitContainer(container, loc, ctx);
+            } else if (parentValue instanceof J.MethodInvocation) {
+                while (((J.MethodInvocation) parentValue).getSelect() instanceof J.MethodInvocation) {
+                    parentValue = ((J.MethodInvocation) parentValue).getSelect();
+                    parent = new Cursor(parent, parentValue);
+                }
+                J.MethodInvocation method = (J.MethodInvocation) parentValue;
+                if (parent.getPathAsStream(o -> o instanceof J.MethodInvocation).anyMatch(value -> SemanticallyEqual.areEqual((J) value, cursorValue))) {
+                    if (method.getPadding().getSelect() != null && !method.getPadding().getSelect().getAfter().getLastWhitespace().contains("\n")) {
+                        return parent;
+                    }
+                    return null; //do no align when not needed
+                }
             }
-        }.reduce(sourceFile, new AtomicReference<@Nullable Cursor>(), new Cursor(cursor.getRoot(), sourceFile)).get();
+            parent = parent.getParent();
+        }
+
+        return null;
     }
 }
