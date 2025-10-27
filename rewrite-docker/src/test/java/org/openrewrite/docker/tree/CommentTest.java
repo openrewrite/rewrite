@@ -79,4 +79,16 @@ class CommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingCommentAfterImage() {
+        rewriteRun(
+          dockerfile(
+            """
+            FROM 'ubuntu:22.04' # Trailing comment
+            RUN apt-get update
+            """
+          )
+        );
+    }
 }

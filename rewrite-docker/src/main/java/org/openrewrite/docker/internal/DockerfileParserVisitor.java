@@ -137,21 +137,8 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         Dockerfile.Argument digest = imageComponents[2];
         Dockerfile.From.As as = ctx.AS() != null ? visitFromAs(ctx) : null;
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
-        // The trailing comment will be part of the next element's prefix
-        if (ctx.getStop() != null) {
-            // Only advance to the end of the last significant token, not the trailing comment
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                // Don't advance past the trailing comment; it will be part of next element's prefix
-                if (ctx.AS() != null) {
-                    stopToken = ctx.stageName().getStop();
-                } else {
-                    stopToken = ctx.imageName().getStop();
-                }
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
-        }
+        // Cursor has already been advanced by parseImageName and other parsing methods
+        // No additional advancement needed here
 
         return new Dockerfile.From(randomId(), prefix, Markers.EMPTY, fromKeyword, flags, imageName, tag, digest, as);
     }
@@ -170,69 +157,66 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
     }
 
     private Dockerfile.Argument[] parseImageName(DockerfileParser.ImageNameContext ctx) {
-        return convert(ctx, (c, prefix) -> {
-            // Parse the text and split out environment variables
-            List<Dockerfile.ArgumentContent> contents = parseText(c.text());
+        Space prefix = prefix(ctx);
 
-            // If the entire image is a single quoted string, don't split it
-            if (contents.size() == 1 && contents.get(0) instanceof Dockerfile.QuotedString) {
-                // Single quoted string - keep it as-is
-                Dockerfile.Argument imageName = new Dockerfile.Argument(randomId(), prefix, Markers.EMPTY, contents);
-                return new Dockerfile.Argument[]{imageName, null, null};
-            }
+        // Parse the text and split out environment variables
+        List<Dockerfile.ArgumentContent> contents = parseText(ctx.text());
 
-            // Split contents into imageName, tag, and digest components
-            List<Dockerfile.ArgumentContent> imageNameContents = new ArrayList<>();
-            List<Dockerfile.ArgumentContent> tagContents = new ArrayList<>();
-            List<Dockerfile.ArgumentContent> digestContents = new ArrayList<>();
+        // Advance cursor only to the last non-comment token to avoid consuming trailing comments
+        Token lastToken = findLastNonCommentToken(ctx.text());
+        if (lastToken != null) {
+            advanceCursor(lastToken.getStopIndex() + 1);
+        }
 
-            boolean foundColon = false;
-            boolean foundAt = false;
+        // If the entire image is a single quoted string, don't split it
+        if (contents.size() == 1 && contents.get(0) instanceof Dockerfile.QuotedString) {
+            // Single quoted string - keep it as-is
+            Dockerfile.Argument imageName = new Dockerfile.Argument(randomId(), prefix, Markers.EMPTY, contents);
+            return new Dockerfile.Argument[]{imageName, null, null};
+        }
 
-            for (Dockerfile.ArgumentContent content : contents) {
-                if (content instanceof Dockerfile.PlainText) {
-                    String text = ((Dockerfile.PlainText) content).getText();
+        // Split contents into imageName, tag, and digest components
+        List<Dockerfile.ArgumentContent> imageNameContents = new ArrayList<>();
+        List<Dockerfile.ArgumentContent> tagContents = new ArrayList<>();
+        List<Dockerfile.ArgumentContent> digestContents = new ArrayList<>();
 
-                    // Look for @ first (digest takes precedence over tag)
-                    int atIndex = text.indexOf('@');
-                    int colonIndex = text.indexOf(':');
+        boolean foundColon = false;
+        boolean foundAt = false;
 
-                    if (atIndex >= 0 && !foundAt) {
-                        // Split at @
-                        foundAt = true;
-                        String imagePart = text.substring(0, atIndex);
-                        String digestPart = text.substring(atIndex + 1);
+        for (Dockerfile.ArgumentContent content : contents) {
+            if (content instanceof Dockerfile.PlainText) {
+                String text = ((Dockerfile.PlainText) content).getText();
 
-                        if (!imagePart.isEmpty()) {
-                            imageNameContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, imagePart));
-                        }
-                        if (!digestPart.isEmpty()) {
-                            digestContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, digestPart));
-                        }
-                    } else if (colonIndex >= 0 && !foundColon && !foundAt) {
-                        // Split at :
-                        foundColon = true;
-                        String imagePart = text.substring(0, colonIndex);
-                        String tagPart = text.substring(colonIndex + 1);
+                // Look for @ first (digest takes precedence over tag)
+                int atIndex = text.indexOf('@');
+                int colonIndex = text.indexOf(':');
 
-                        if (!imagePart.isEmpty()) {
-                            imageNameContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, imagePart));
-                        }
-                        if (!tagPart.isEmpty()) {
-                            tagContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, tagPart));
-                        }
-                    } else {
-                        // Add to appropriate list
-                        if (foundAt) {
-                            digestContents.add(content);
-                        } else if (foundColon) {
-                            tagContents.add(content);
-                        } else {
-                            imageNameContents.add(content);
-                        }
+                if (atIndex >= 0 && !foundAt) {
+                    // Split at @
+                    foundAt = true;
+                    String imagePart = text.substring(0, atIndex);
+                    String digestPart = text.substring(atIndex + 1);
+
+                    if (!imagePart.isEmpty()) {
+                        imageNameContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, imagePart));
+                    }
+                    if (!digestPart.isEmpty()) {
+                        digestContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, digestPart));
+                    }
+                } else if (colonIndex >= 0 && !foundColon && !foundAt) {
+                    // Split at :
+                    foundColon = true;
+                    String imagePart = text.substring(0, colonIndex);
+                    String tagPart = text.substring(colonIndex + 1);
+
+                    if (!imagePart.isEmpty()) {
+                        imageNameContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, imagePart));
+                    }
+                    if (!tagPart.isEmpty()) {
+                        tagContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, tagPart));
                     }
                 } else {
-                    // Environment variables or quoted strings
+                    // Add to appropriate list
                     if (foundAt) {
                         digestContents.add(content);
                     } else if (foundColon) {
@@ -241,16 +225,25 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
                         imageNameContents.add(content);
                     }
                 }
+            } else {
+                // Environment variables or quoted strings
+                if (foundAt) {
+                    digestContents.add(content);
+                } else if (foundColon) {
+                    tagContents.add(content);
+                } else {
+                    imageNameContents.add(content);
+                }
             }
+        }
 
-            Dockerfile.Argument imageName = new Dockerfile.Argument(randomId(), prefix, Markers.EMPTY, imageNameContents);
-            Dockerfile.Argument tag = tagContents.isEmpty() ? null :
-                new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tagContents);
-            Dockerfile.Argument digest = digestContents.isEmpty() ? null :
-                new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digestContents);
+        Dockerfile.Argument imageName = new Dockerfile.Argument(randomId(), prefix, Markers.EMPTY, imageNameContents);
+        Dockerfile.Argument tag = tagContents.isEmpty() ? null :
+            new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tagContents);
+        Dockerfile.Argument digest = digestContents.isEmpty() ? null :
+            new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digestContents);
 
-            return new Dockerfile.Argument[]{imageName, tag, digest};
-        });
+        return new Dockerfile.Argument[]{imageName, tag, digest};
     }
 
     private List<Dockerfile.ArgumentContent> parseText(DockerfileParser.TextContext textCtx) {
@@ -260,12 +253,13 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             return contents;
         }
 
-        // Check if text contains quoted strings or environment variables
+        // Check if text contains quoted strings, environment variables, or comments
         String fullText = textCtx.getText();
         boolean hasQuotedString = fullText.contains("\"") || fullText.contains("'");
         boolean hasEnvironmentVariable = fullText.contains("$");
+        boolean hasComment = fullText.contains("#");
 
-        if (!hasQuotedString && !hasEnvironmentVariable) {
+        if (!hasQuotedString && !hasEnvironmentVariable && !hasComment) {
             // Simple case: just plain text
             contents.add(new Dockerfile.PlainText(
                     randomId(),
@@ -324,6 +318,8 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
                                 tokenText
                         ));
                     }
+                    // else: COMMENT tokens are ignored and left in the source to be captured
+                    // as part of the next element's prefix
                 }
             }
         }
@@ -884,56 +880,62 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
     }
 
     private Dockerfile.Argument[] parseUserSpec(DockerfileParser.UserSpecContext ctx) {
-        return convert(ctx, (c, prefix) -> {
-            // Parse the text
-            List<Dockerfile.ArgumentContent> contents = parseText(c.text());
+        Space prefix = prefix(ctx);
 
-            // Find the colon separator to split user and group
-            List<Dockerfile.ArgumentContent> userContents = new ArrayList<>();
-            List<Dockerfile.ArgumentContent> groupContents = new ArrayList<>();
-            boolean foundColon = false;
+        // Parse the text
+        List<Dockerfile.ArgumentContent> contents = parseText(ctx.text());
 
-            for (Dockerfile.ArgumentContent content : contents) {
-                if (content instanceof Dockerfile.PlainText) {
-                    String text = ((Dockerfile.PlainText) content).getText();
-                    int colonIndex = text.indexOf(':');
+        // Advance cursor only to the last non-comment token to avoid consuming trailing comments
+        Token lastToken = findLastNonCommentToken(ctx.text());
+        if (lastToken != null) {
+            advanceCursor(lastToken.getStopIndex() + 1);
+        }
 
-                    if (colonIndex >= 0 && !foundColon) {
-                        // Split at the colon
-                        foundColon = true;
-                        String userPart = text.substring(0, colonIndex);
-                        String groupPart = text.substring(colonIndex + 1);
+        // Find the colon separator to split user and group
+        List<Dockerfile.ArgumentContent> userContents = new ArrayList<>();
+        List<Dockerfile.ArgumentContent> groupContents = new ArrayList<>();
+        boolean foundColon = false;
 
-                        if (!userPart.isEmpty()) {
-                            userContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, userPart));
-                        }
-                        if (!groupPart.isEmpty()) {
-                            groupContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, groupPart));
-                        }
-                    } else {
-                        // Add to the appropriate list
-                        if (foundColon) {
-                            groupContents.add(content);
-                        } else {
-                            userContents.add(content);
-                        }
+        for (Dockerfile.ArgumentContent content : contents) {
+            if (content instanceof Dockerfile.PlainText) {
+                String text = ((Dockerfile.PlainText) content).getText();
+                int colonIndex = text.indexOf(':');
+
+                if (colonIndex >= 0 && !foundColon) {
+                    // Split at the colon
+                    foundColon = true;
+                    String userPart = text.substring(0, colonIndex);
+                    String groupPart = text.substring(colonIndex + 1);
+
+                    if (!userPart.isEmpty()) {
+                        userContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, userPart));
+                    }
+                    if (!groupPart.isEmpty()) {
+                        groupContents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, groupPart));
                     }
                 } else {
-                    // Environment variables or quoted strings
+                    // Add to the appropriate list
                     if (foundColon) {
                         groupContents.add(content);
                     } else {
                         userContents.add(content);
                     }
                 }
+            } else {
+                // Environment variables or quoted strings
+                if (foundColon) {
+                    groupContents.add(content);
+                } else {
+                    userContents.add(content);
+                }
             }
+        }
 
-            Dockerfile.Argument user = new Dockerfile.Argument(randomId(), prefix, Markers.EMPTY, userContents);
-            Dockerfile.Argument group = groupContents.isEmpty() ? null :
-                new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, groupContents);
+        Dockerfile.Argument user = new Dockerfile.Argument(randomId(), prefix, Markers.EMPTY, userContents);
+        Dockerfile.Argument group = groupContents.isEmpty() ? null :
+            new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, groupContents);
 
-            return new Dockerfile.Argument[]{user, group};
-        });
+        return new Dockerfile.Argument[]{user, group};
     }
 
     @Override
@@ -1284,6 +1286,29 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         if (token != null) {
             advanceCursor(token.getStopIndex() + 1);
         }
+    }
+
+    private Token findLastNonCommentToken(DockerfileParser.TextContext textCtx) {
+        if (textCtx == null) {
+            return null;
+        }
+
+        Token lastNonCommentToken = null;
+        for (int i = 0; i < textCtx.getChildCount(); i++) {
+            ParseTree child = textCtx.getChild(i);
+            if (child instanceof DockerfileParser.TextElementContext) {
+                DockerfileParser.TextElementContext textElement = (DockerfileParser.TextElementContext) child;
+                if (textElement.getChildCount() > 0 && textElement.getChild(0) instanceof TerminalNode) {
+                    TerminalNode terminal = (TerminalNode) textElement.getChild(0);
+                    Token token = terminal.getSymbol();
+                    if (token.getType() != DockerfileLexer.COMMENT) {
+                        lastNonCommentToken = token;
+                    }
+                }
+            }
+        }
+
+        return lastNonCommentToken != null ? lastNonCommentToken : textCtx.getStop();
     }
 
     private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, Space, T> conversion) {
