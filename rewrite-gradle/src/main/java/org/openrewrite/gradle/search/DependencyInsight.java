@@ -138,9 +138,17 @@ public class DependencyInsight extends Recipe {
                 processMatchingDependencies(matchingDependencies, dependencyPaths, dependencyGraph,
                         dependenciesInUse, configurationToDirectDependency, directDependencyToTargetDependency,
                         projectName, sourceSetName, ctx);
+
+                // Check if any dependencies were found at all (including those without paths)
+                if (matchingDependencies.isEmpty()) {
+                    return sourceFile;
+                }
+
+                // Only proceed with marking if we actually processed some dependencies with paths
                 if (directDependencyToTargetDependency.isEmpty()) {
                     return sourceFile;
                 }
+
                 // Non-resolvable configurations may contain the requested which has been found to transitively depend on the target
                 for (GradleDependencyConfiguration c : gp.getConfigurations()) {
                     if (configurationToDirectDependency.containsKey(c.getName())) {
@@ -314,10 +322,10 @@ public class DependencyInsight extends Recipe {
 
             private Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> collectDependencyPaths(GradleProject gp, DependencyGraph dependencyGraph) {
                 Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> dependencyPaths = new HashMap<>();
+                // Collect paths from all matching configurations, not just the first one
                 gp.getConfigurations().stream()
                         .filter(this::matchesConfiguration)
-                        .findFirst()
-                        .ifPresent(c -> dependencyGraph.collectGradleDependencyPaths(c.getDirectResolved(), dependencyPaths, c.getName()));
+                        .forEach(c -> dependencyGraph.collectGradleDependencyPaths(c.getDirectResolved(), dependencyPaths, c.getName()));
                 return dependencyPaths;
             }
 
