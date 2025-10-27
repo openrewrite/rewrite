@@ -1539,16 +1539,8 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void renameVariableQualifiedField() {
         rewriteRun(
-          spec -> spec
-            .parser(JavaParser.fromJavaVersion().dependsOn(
-                """
-                  class AcceptanceChecks {
-                    public static final String foo = "world";
-                  }
-                  """
-              )
-            )
-            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+          spec ->
+            spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
                 public J.VariableDeclarations.NamedVariable visitVariable(
                   J.VariableDeclarations.NamedVariable variable,
@@ -1559,24 +1551,31 @@ class RenameVariableTest implements RewriteTest {
                     return super.visitVariable(variable, executionContext);
                 }
             })),
+          // language=java
           java(
             """
-              class Bar {
-                private static final String foo = "hello";
-
+              import java.util.ArrayList;
+              import java.util.List;
+              
+              public class Bar {
+                private static final List<String> foo = new ArrayList<>();
+              
                 public void bar() {
-                  String a = foo;
-                  String b = AcceptanceChecks.foo;
+                  for (String f : foo) {}
+                  for (String f : Bar.foo) {}
                 }
               }
               """,
             """
-              class Bar {
-                private static final String FOO = "hello";
-
+              import java.util.ArrayList;
+              import java.util.List;
+              
+              public class Bar {
+                private static final List<String> FOO = new ArrayList<>();
+              
                 public void bar() {
-                  String a = FOO;
-                  String b = AcceptanceChecks.FOO;
+                  for (String f : FOO) {}
+                  for (String f : Bar.FOO) {}
                 }
               }
               """
