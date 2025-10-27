@@ -271,6 +271,21 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         }
 
         // Complex case: parse token by token
+        boolean foundComment = false;
+        for (int i = textCtx.getChildCount() - 1; i >= 0; i--) {
+            ParseTree child = textCtx.getChild(i);
+            if (child instanceof DockerfileParser.TextElementContext) {
+                DockerfileParser.TextElementContext textElement = (DockerfileParser.TextElementContext) child;
+                if (textElement.getChildCount() > 0 && textElement.getChild(0) instanceof TerminalNode) {
+                    TerminalNode terminal = (TerminalNode) textElement.getChild(0);
+                    if (terminal.getSymbol().getType() == DockerfileLexer.COMMENT) {
+                        foundComment = true;
+                        break;
+                    }
+                }
+            }
+        }
+
         for (int i = 0; i < textCtx.getChildCount(); i++) {
             ParseTree child = textCtx.getChild(i);
 
@@ -281,7 +296,10 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
                     Token token = terminal.getSymbol();
                     String tokenText = token.getText();
 
-                    if (token.getType() == DockerfileLexer.DOUBLE_QUOTED_STRING) {
+                    if (token.getType() == DockerfileLexer.COMMENT) {
+                        // COMMENT tokens are ignored - they will be part of next element's prefix
+                        break; // Stop processing tokens once we hit a comment
+                    } else if (token.getType() == DockerfileLexer.DOUBLE_QUOTED_STRING) {
                         String value = tokenText.substring(1, tokenText.length() - 1);
                         contents.add(new Dockerfile.QuotedString(
                                 randomId(),
@@ -309,7 +327,10 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
                                 varName,
                                 braced
                         ));
-                    } else if (token.getType() != DockerfileLexer.COMMENT) {
+                    } else if (token.getType() == DockerfileLexer.WS && foundComment) {
+                        // Skip whitespace before comments - it should be part of Space/prefix
+                        // But keep processing in case there's more content after
+                    } else {
                         // Plain text for other tokens
                         contents.add(new Dockerfile.PlainText(
                                 randomId(),
@@ -318,9 +339,17 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
                                 tokenText
                         ));
                     }
-                    // else: COMMENT tokens are ignored and left in the source to be captured
-                    // as part of the next element's prefix
                 }
+            }
+        }
+
+        // Remove trailing whitespace PlainText entries that were added before we knew about the comment
+        while (!contents.isEmpty() && contents.get(contents.size() - 1) instanceof Dockerfile.PlainText) {
+            Dockerfile.PlainText last = (Dockerfile.PlainText) contents.get(contents.size() - 1);
+            if (last.getText().trim().isEmpty()) {
+                contents.remove(contents.size() - 1);
+            } else {
+                break;
             }
         }
 
@@ -1301,7 +1330,8 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
                 if (textElement.getChildCount() > 0 && textElement.getChild(0) instanceof TerminalNode) {
                     TerminalNode terminal = (TerminalNode) textElement.getChild(0);
                     Token token = terminal.getSymbol();
-                    if (token.getType() != DockerfileLexer.COMMENT) {
+                    // Skip COMMENT and WS tokens - they should be part of the next element's prefix
+                    if (token.getType() != DockerfileLexer.COMMENT && token.getType() != DockerfileLexer.WS) {
                         lastNonCommentToken = token;
                     }
                 }

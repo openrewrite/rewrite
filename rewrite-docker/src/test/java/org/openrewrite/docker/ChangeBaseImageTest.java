@@ -342,7 +342,6 @@ class ChangeBaseImageTest implements RewriteTest {
         );
     }
 
-    @Disabled("Trailing comments with quoted strings not yet supported - cursor management issue")
     @Test
     void changeBaseImageWithSingleQuotedStringPreservesTrailingComment() {
         rewriteRun(
