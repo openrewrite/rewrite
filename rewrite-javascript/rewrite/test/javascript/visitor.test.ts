@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import {ExecutionContext, produceAsync} from "../../src";
+import {Cursor, ExecutionContext, produceAsync} from "../../src";
 import {emptySpace, Expression, J, rightPadded} from "../../src/java";
-import {JavaScriptVisitor, template, typescript} from "../../src/javascript";
+import {JavaScriptVisitor, JS, template, typescript} from "../../src/javascript";
 import {autoFormat, maybeAutoFormat} from "../../src/javascript/format";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 
@@ -60,5 +60,60 @@ describe('JavaScript visitor formatting', () => {
                 'console.log("hello", `extra`);'
             )
         );
+    });
+
+    describe('cursor navigation', () => {
+        test('cursor.parent', async () => {
+            // given
+            let pathToRoot: any[] = [];
+
+            class CursorInspectionVisitor extends JavaScriptVisitor<ExecutionContext> {
+                protected override async visitLiteral(literal: J.Literal, ctx: ExecutionContext): Promise<J | undefined> {
+                    if (literal.valueSource === '"b"') {
+                        let current: Cursor | undefined = this.cursor;
+                        while (current !== undefined) {
+                            pathToRoot.push(current.value.kind);
+                            current = current.parent;
+                        }
+                    }
+                    return super.visitLiteral(literal, ctx);
+                }
+            }
+
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new CursorInspectionVisitor());
+
+            // when
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(`
+                    function m(): void {
+                      if (1 > 0) {
+                      } else {
+                          console.log("b");
+                      }
+                    }
+                `)
+            );
+
+            // then
+            expect(pathToRoot).toEqual([
+                J.Kind.Literal,
+                J.Kind.RightPadded,
+                J.Kind.Container,
+                J.Kind.MethodInvocation,
+                J.Kind.RightPadded,
+                J.Kind.Block,
+                J.Kind.RightPadded,
+                J.Kind.IfElse,
+                J.Kind.If,
+                J.Kind.RightPadded,
+                J.Kind.Block,
+                J.Kind.MethodDeclaration,
+                J.Kind.RightPadded,
+                JS.Kind.CompilationUnit,
+                undefined
+            ]);
+        });
     });
 });
