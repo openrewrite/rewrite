@@ -284,4 +284,48 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     })
+
+    test("collapsed if/while", () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {})));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+               `
+                if (504 == 436)
+                console.log("That's practically true!");
+                if (407 == 501)
+                    console.log("Also true!");
+                while (!areWeThereYet())
+                 wait();
+                if (116 == 119) console.log("Close, but false. No changes");
+                function m(): void {
+                    if (condition())
+                        doSomething();
+                     else {
+                        doSomethingElse();
+                    }
+                }
+                `,
+                `
+                if (504 == 436)
+                    console.log("That's practically true!");
+                if (407 == 501)
+                    console.log("Also true!");
+                while (!areWeThereYet())
+                    wait();
+                if (116 == 119) console.log("Close, but false. No changes");
+                function m(): void {
+                    if (condition())
+                        doSomething();
+                    else {
+                        doSomethingElse();
+                    }
+                }
+                `,
+                )
+            // @formatter:on
+        )
+    })
 });

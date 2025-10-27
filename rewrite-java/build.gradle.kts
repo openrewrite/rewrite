@@ -19,6 +19,8 @@ tasks.register<JavaExec>("generateAntlrSources") {
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
     classpath = antlrGeneration
+
+    finalizedBy("licenseFormat")
 }
 
 // Only need checkstyle for the classes that we use to load its configuration files

@@ -16,6 +16,8 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.test.RecipeSpec;
@@ -24,8 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.Arrays;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
-import static org.openrewrite.style.LineWrapSetting.WrapAlways;
+import static org.openrewrite.style.LineWrapSetting.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class WrapMethodChainsTest implements RewriteTest {
@@ -50,8 +51,9 @@ class WrapMethodChainsTest implements RewriteTest {
             """))
           .recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
             new WrappingAndBracesStyle(
+              120,
               new WrappingAndBracesStyle.IfStatement(false),
-              new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder")),
+              new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
               new WrappingAndBracesStyle.Annotations(WrapAlways),
               new WrappingAndBracesStyle.Annotations(WrapAlways),
               new WrappingAndBracesStyle.Annotations(WrapAlways),
@@ -354,18 +356,22 @@ class WrapMethodChainsTest implements RewriteTest {
     }
 
     @Test
-    void doNotFormatNonBuilderChainedCalls() {
+    void alsoFormatNonBuilderChainedCalls() {
         rewriteRun(
           java(
             """
               package com.example;
-              
-              class Test {
-                  void test() {
-                      String result = "hello".toUpperCase().substring(1).trim();
-                      String sb = new StringBuilder().append("a").append("b").toString();
-                  }
-              }
+             
+             class Test {
+                 void test() {
+                     String result = "hello".toUpperCase()
+             .substring(1)
+             .trim();
+                     String sb = new StringBuilder().append("a")
+             .append("b")
+             .toString();
+                 }
+             }
               """
           )
         );
@@ -473,8 +479,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamChain() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -569,8 +576,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithMultilineFilterLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -641,8 +649,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithMultipleMultilineLambdas() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -715,8 +724,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithMixedLambdaStyles() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -773,8 +783,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithComplexNestedLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -848,8 +859,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithMethodReferencesAndLambdas() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -909,8 +921,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithPeekAndMultilineLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -964,8 +977,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void preserveAlreadyFormattedStreamWithMultilineLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -1038,8 +1052,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithReduceMultilineLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
             null,
             null,
             null,
@@ -1087,8 +1102,9 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamInBuilderArgument() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
             new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "stream")),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "stream"), false),
             null,
             null,
             null,
@@ -1123,6 +1139,72 @@ class WrapMethodChainsTest implements RewriteTest {
               .collect(Collectors.toList()))
               .name("name")
               .build();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void chopIfTooLong() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            79,
+            new WrappingAndBracesStyle.IfStatement(false),
+            new WrappingAndBracesStyle.ChainedMethodCalls(ChopIfTooLong, Arrays.asList("builder", "stream"), false),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)))),
+          java(
+            """
+              package com.example;
+              
+              class Test {
+                  void test() {
+                      String obj = new StringBuilder().append("test").append("25").toString();
+                  }
+              }
+              """,
+            """
+              package com.example;
+              
+              class Test {
+                  void test() {
+                      String obj = new StringBuilder().append("test")
+              .append("25")
+              .toString();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {80, 81})
+    void doNotChopIfNotTooLong(int length) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            length,
+            new WrappingAndBracesStyle.IfStatement(false),
+            new WrappingAndBracesStyle.ChainedMethodCalls(ChopIfTooLong, Arrays.asList("builder", "stream"), false),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)))),
+          java(
+            """
+              package com.example;
+              
+              class Test {
+                  void test() {
+                      String obj = new StringBuilder().append("test").append("25").toString();
                   }
               }
               """
