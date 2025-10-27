@@ -258,6 +258,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                         try {
                                             alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
                                         } catch (UnsupportedOperationException e) {
+                                            // Sourcefile$service(...) might give UnsupportedOperationException depending on the runtime, the lst build date... we use deprecated behavior in that case
                                             alignTo = computeFirstParameterColumn(tree);
                                         }
                                         if (alignTo != -1) {
@@ -287,6 +288,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                 try {
                                     alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
                                 } catch (UnsupportedOperationException error) {
+                                    // Sourcefile$service(...) might give UnsupportedOperationException depending on the runtime, the lst build date... we use deprecated behavior in that case
                                     alignTo = computeFirstParameterColumn(tree);
                                 }
                                 if (alignTo != -1) {
@@ -384,6 +386,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             try {
                                 alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
                             } catch (UnsupportedOperationException e) {
+                                // Sourcefile$service(...) might give UnsupportedOperationException depending on the runtime, the lst build date... we do not align in that case.
                                 alignTo = -1;
                             }
                             if (alignTo != -1) {
@@ -451,6 +454,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
+    @Deprecated
     private int computeFirstParameterColumn(J tree) {
         List<JRightPadded<Statement>> arguments;
         if (tree instanceof J.MethodDeclaration) {
