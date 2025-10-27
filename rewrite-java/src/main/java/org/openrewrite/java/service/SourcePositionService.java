@@ -48,7 +48,7 @@ public class SourcePositionService {
             JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
                 @Override
                 public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                    if (SemanticallyEqual.areEqual(multiVariable, alignWith.getValue())) {
+                    if (multiVariable == alignWith.getValue() || SemanticallyEqual.areEqual(multiVariable, alignWith.getValue())) {
                         beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
                         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
                         indentation.set(p.getOut().length());
@@ -59,7 +59,7 @@ public class SourcePositionService {
 
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                    if (SemanticallyEqual.areEqual(method, alignWith.getValue())) {
+                    if (method == alignWith.getValue() || SemanticallyEqual.areEqual(method, alignWith.getValue())) {
                         beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
                         visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
                         indentation.set(p.getOut().length());
@@ -144,10 +144,10 @@ public class SourcePositionService {
             Object parentValue = parent.getValue();
             if (parentValue instanceof JContainer) {
                 JContainer<J> container = parent.getValue();
-                if (container.getElements().stream().anyMatch(e -> SemanticallyEqual.areEqual(e, cursorValue))) {
+                if (container.getElements().stream().anyMatch(e -> e == cursorValue || SemanticallyEqual.areEqual(e, cursorValue))) {
                     J firstElement = container.getElements().get(0);
                     if (!firstElement.getPrefix().getLastWhitespace().contains("\n")) {
-                        if (SemanticallyEqual.areEqual(firstElement, cursorValue)) {
+                        if (firstElement == cursorValue || SemanticallyEqual.areEqual(firstElement, cursorValue)) {
                             return cursor;
                         } else {
                             return new Cursor(parent, firstElement);
@@ -161,7 +161,7 @@ public class SourcePositionService {
                     parent = new Cursor(parent, parentValue);
                 }
                 J.MethodInvocation method = (J.MethodInvocation) parentValue;
-                if (parent.getPathAsStream(o -> o instanceof J.MethodInvocation).anyMatch(value -> SemanticallyEqual.areEqual((J) value, cursorValue))) {
+                if (parent.getPathAsStream(o -> o instanceof J.MethodInvocation).anyMatch(value -> value == cursorValue || SemanticallyEqual.areEqual((J) value, cursorValue))) {
                     if (method.getPadding().getSelect() != null && !method.getPadding().getSelect().getAfter().getLastWhitespace().contains("\n")) {
                         return parent;
                     }

@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -197,6 +198,76 @@ class SourcePositionServiceTest implements RewriteTest {
             Float b2) {}
                 public record Record6(
             String s3, Integer t3, Double u3, Float b3) {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void correctlyCalculatesIndentationToAlignForMissingTypeInformation() {
+        rewriteRun(
+          spec ->
+            spec.typeValidationOptions(TypeValidation.none()) //Deliberately testing missing types here
+              .recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              SourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(SourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "stub".contains(v.getSimpleName().substring(0, 1)))) {
+                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("1"))) {
+                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(22);
+                      }
+                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("2"))) {
+                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(26);
+                      }
+                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("3"))) {
+                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(12);
+                      }
+                  }
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "parm".contains(v.getSimpleName().substring(0, 1)))) {
+                      assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(67);
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+            package com.example;
+
+            public class Test {
+                public void /* multiline comments can impact though */ example(File p, File a, File r, File m) {
+                }
+            }
+            """
+          ),
+          java (
+            """
+            public record Record1(File s1, File t1, File u1, File b1) {
+                public record Record2(File s2, File t2, File u2, File b2) {}
+                public record Record3(
+                        File s3, File t3, File u3, File b3) {}
+            }
+            """
+          ),
+          java (
+            """
+            public record Record4(File s1, File t1, File u1, File b1) {
+                public record Record5(File s2,
+            File t2,
+                                                       File u2,
+            
+            File b2) {}
+                public record Record6(
+            File s3, File t3, File u3, File b3) {}
             }
             """
           )
