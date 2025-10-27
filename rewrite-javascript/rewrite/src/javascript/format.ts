@@ -1152,6 +1152,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             const ifStmt = tree as J.If;
             if (ifStmt.thenPart.element.kind !== J.Kind.Block) {
                 indentShouldIncrease = true;
+                this.cursor.messages.set("else-indent", this.currentIndent);
             }
         } else if (tree.kind === J.Kind.WhileLoop) {
             const whileLoop = tree as J.WhileLoop;
@@ -1165,7 +1166,9 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        if (indentShouldIncrease) {
+        if (tree.kind === J.Kind.IfElse && this.cursor.getNearestMessage("else-indent") !== undefined) {
+            this.cursor.messages.set("indentToUse", this.cursor.getNearestMessage("else-indent"));
+        } else if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
         }
         return ret;
@@ -1179,7 +1182,12 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (ret == undefined) {
             return ret;
         }
-        const relativeIndent = this.currentIndent;
+
+        if (tree.kind === J.Kind.IfElse && this.cursor.messages.get("else-indent") !== undefined) {
+            this.cursor.messages.set("indentToUse", this.cursor.messages.get("else-indent"));
+            this.cursor.messages.delete("else-indent");
+        }
+        const relativeIndent: string = this.currentIndent;
 
         return produce(ret, draft => {
             if (draft.prefix == undefined) {

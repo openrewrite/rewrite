@@ -300,6 +300,13 @@ describe('TabsAndIndentsVisitor', () => {
                 while (!areWeThereYet())
                  wait();
                 if (116 == 119) console.log("Close, but false. No changes");
+                function m(): void {
+                    if (condition())
+                        doSomething();
+                     else {
+                        doSomethingElse();
+                    }
+                }
                 `,
                 `
                 if (504 == 436)
@@ -309,6 +316,13 @@ describe('TabsAndIndentsVisitor', () => {
                 while (!areWeThereYet())
                     wait();
                 if (116 == 119) console.log("Close, but false. No changes");
+                function m(): void {
+                    if (condition())
+                        doSomething();
+                    else {
+                        doSomethingElse();
+                    }
+                }
                 `,
                 )
             // @formatter:on
