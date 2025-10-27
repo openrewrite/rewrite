@@ -133,59 +133,11 @@ public class DependencyInsight extends Recipe {
                 Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = new HashMap<>();
                 Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency = new HashMap<>();
 
-                // Collect all matching dependencies using the original approach
-                Map<String, List<DependencyInfo>> matchingDependencies = new HashMap<>();
-
-                for (GradleDependencyConfiguration c : gp.getConfigurations()) {
-                    if (!matchesConfiguration(c)) {
-                        continue;
-                    }
-                    for (ResolvedDependency resolvedDependency : c.getDirectResolved()) {
-                        if (!resolvedDependency.isDirect()) {
-                            continue;
-                        }
-                        List<ResolvedDependency> nestedMatchingDependencies = resolvedDependency.findDependencies(groupIdPattern, artifactIdPattern);
-                        for (ResolvedDependency dep : nestedMatchingDependencies) {
-                            if (version != null) {
-                                VersionComparator versionComparator = Semver.validate(version, null).getValue();
-                                if (versionComparator == null) {
-                                    sourceFile = Markup.warn(sourceFile, new IllegalArgumentException("Could not construct a valid version comparator from " + version + "."));
-                                } else {
-                                    if (!versionComparator.isValid(null, dep.getVersion())) {
-                                        continue;
-                                    }
-                                }
-                            }
-
-                            String key = dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getVersion();
-                            matchingDependencies.computeIfAbsent(key, k -> new ArrayList<>())
-                                .add(new DependencyInfo(resolvedDependency, dep, c.getName()));
-                        }
-                    }
-                }
-
-                // Process matching dependencies using paths-based approach
-                Set<String> processedGavs = new HashSet<>();
-                for (Map.Entry<String, List<DependencyInfo>> entry : matchingDependencies.entrySet()) {
-                    List<DependencyInfo> depInfos = entry.getValue();
-                    if (depInfos.isEmpty()) {
-                        continue;
-                    }
-
-                    ResolvedDependency firstDep = depInfos.get(0).dep;
-                    String gavKey = firstDep.getGroupId() + ":" + firstDep.getArtifactId() + ":" + firstDep.getVersion();
-
-                    // Skip if already processed (since findDependencies returns same instance multiple times)
-                    if (processedGavs.contains(gavKey)) {
-                        continue;
-                    }
-                    processedGavs.add(gavKey);
-
-                    // Always use paths-based approach to correctly handle all cases
-                    processMultiplePaths(firstDep.getGav(), dependencyPaths, dependencyGraph,
-                                        dependenciesInUse, configurationToDirectDependency,
-                                        directDependencyToTargetDependency, projectName, sourceSetName, ctx);
-                }
+                // Collect and process all matching dependencies
+                Map<String, List<DependencyInfo>> matchingDependencies = collectMatchingDependencies(gp, sourceFile);
+                processMatchingDependencies(matchingDependencies, dependencyPaths, dependencyGraph,
+                        dependenciesInUse, configurationToDirectDependency, directDependencyToTargetDependency,
+                        projectName, sourceSetName, ctx);
                 if (directDependencyToTargetDependency.isEmpty()) {
                     return sourceFile;
                 }
@@ -251,31 +203,8 @@ public class DependencyInsight extends Recipe {
                     return;
                 }
 
-                // Group paths by their immediate parent (the node right after the target dependency)
-                Map<String, DependencyGraph.DependencyPath> pathsByParent = new HashMap<>();
-                for (DependencyGraph.DependencyPath path : paths) {
-                    List<DependencyGraph.DependencyNode> nodes = path.getPath();
-                    if (nodes.isEmpty()) {
-                        continue;
-                    }
-
-                    String parentKey;
-                    if (nodes.size() == 1) {
-                        // Direct dependency
-                        parentKey = "direct";
-                    } else {
-                        // nodes.get(0) is the target dependency itself
-                        // nodes.get(1) is its immediate parent
-                        DependencyGraph.DependencyNode parentNode = nodes.get(1);
-                        parentKey = parentNode.getGroupId() + ":" + parentNode.getArtifactId() + ":" + parentNode.getVersion();
-                    }
-
-                    // Keep the longest path for each parent
-                    DependencyGraph.DependencyPath existing = pathsByParent.get(parentKey);
-                    if (existing == null || path.getPath().size() > existing.getPath().size()) {
-                        pathsByParent.put(parentKey, path);
-                    }
-                }
+                // Group paths by their immediate parent and keep the longest path for each parent
+                Map<String, DependencyGraph.DependencyPath> pathsByParent = groupPathsByParent(paths);
 
                 // Sort paths by depth (deepest first) for consistent ordering
                 List<DependencyGraph.DependencyPath> uniquePaths = new ArrayList<>(pathsByParent.values());
@@ -283,43 +212,104 @@ public class DependencyInsight extends Recipe {
 
                 // Create a row for each unique path
                 for (DependencyGraph.DependencyPath path : uniquePaths) {
+                    createDataTableRow(gav, path, dependencyGraph, dependenciesInUse,
+                            configurationToDirectDependency, directDependencyToTargetDependency,
+                            projectName, sourceSetName, ctx);
+                }
+            }
+
+            private Map<String, DependencyGraph.DependencyPath> groupPathsByParent(List<DependencyGraph.DependencyPath> paths) {
+                Map<String, DependencyGraph.DependencyPath> pathsByParent = new HashMap<>();
+                for (DependencyGraph.DependencyPath path : paths) {
                     List<DependencyGraph.DependencyNode> nodes = path.getPath();
-                    String configName = path.getScope();
-                    int depth = nodes.size() - 1; // Depth is path length minus 1
-
-                    // Find the direct dependency (the last node before the configuration)
-                    DependencyGraph.DependencyNode directDepNode = nodes.isEmpty() ? null : nodes.get(nodes.size() - 1);
-
-                    if (directDepNode != null) {
-                        GroupArtifactVersion requestedGav = new GroupArtifactVersion(directDepNode.getGroupId(), directDepNode.getArtifactId(), directDepNode.getVersion());
-                        GroupArtifactVersion targetGav = new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
-                        configurationToDirectDependency.computeIfAbsent(configName, EMPTY).add(requestedGav);
-                        directDependencyToTargetDependency.computeIfAbsent(requestedGav, EMPTY).add(targetGav);
+                    if (nodes.isEmpty()) {
+                        continue;
                     }
 
-                    // Build the dependency graph string for this specific path
-                    // Create a temporary map with only this specific path
-                    Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> singlePathMap = new HashMap<>();
-                    singlePathMap.put(gav, Collections.singletonList(path));
-                    String depGraph = dependencyGraph.buildDependencyGraph(
-                            gav,
-                            singlePathMap,
-                            depth,
-                            configName
-                    );
+                    String parentKey = determineParentKey(nodes);
 
-                    dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
-                            projectName,
-                            sourceSetName,
-                            gav.getGroupId(),
-                            gav.getArtifactId(),
-                            gav.getVersion(),
-                            gav.getDatedSnapshotVersion(),
-                            configName,
-                            depth,
-                            depGraph
-                    ));
+                    // Keep the longest path for each parent
+                    DependencyGraph.DependencyPath existing = pathsByParent.get(parentKey);
+                    if (existing == null || path.getPath().size() > existing.getPath().size()) {
+                        pathsByParent.put(parentKey, path);
+                    }
                 }
+                return pathsByParent;
+            }
+
+            private String determineParentKey(List<DependencyGraph.DependencyNode> nodes) {
+                if (nodes.size() == 1) {
+                    // Direct dependency
+                    return "direct";
+                } else {
+                    // nodes.get(0) is the target dependency itself
+                    // nodes.get(1) is its immediate parent
+                    DependencyGraph.DependencyNode parentNode = nodes.get(1);
+                    return parentNode.getGroupId() + ":" + parentNode.getArtifactId() + ":" + parentNode.getVersion();
+                }
+            }
+
+            private void createDataTableRow(ResolvedGroupArtifactVersion gav,
+                                           DependencyGraph.DependencyPath path,
+                                           DependencyGraph dependencyGraph,
+                                           DependenciesInUse dependenciesInUse,
+                                           Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency,
+                                           Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency,
+                                           String projectName, String sourceSetName, ExecutionContext ctx) {
+                List<DependencyGraph.DependencyNode> nodes = path.getPath();
+                String configName = path.getScope();
+                int depth = nodes.size() - 1; // Depth is path length minus 1
+
+                // Find the direct dependency (the last node before the configuration)
+                DependencyGraph.DependencyNode directDepNode = nodes.isEmpty() ? null : nodes.get(nodes.size() - 1);
+
+                if (directDepNode != null) {
+                    updateDependencyMappings(gav, directDepNode, configName,
+                            configurationToDirectDependency, directDependencyToTargetDependency);
+                }
+
+                // Build the dependency graph string for this specific path
+                String depGraph = buildIsolatedPathGraph(gav, path, depth, configName, dependencyGraph);
+
+                dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
+                        projectName,
+                        sourceSetName,
+                        gav.getGroupId(),
+                        gav.getArtifactId(),
+                        gav.getVersion(),
+                        gav.getDatedSnapshotVersion(),
+                        configName,
+                        depth,
+                        depGraph
+                ));
+            }
+
+            private void updateDependencyMappings(ResolvedGroupArtifactVersion gav,
+                                                 DependencyGraph.DependencyNode directDepNode,
+                                                 String configName,
+                                                 Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency,
+                                                 Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency) {
+                GroupArtifactVersion requestedGav = new GroupArtifactVersion(
+                        directDepNode.getGroupId(),
+                        directDepNode.getArtifactId(),
+                        directDepNode.getVersion());
+                GroupArtifactVersion targetGav = new GroupArtifactVersion(
+                        gav.getGroupId(),
+                        gav.getArtifactId(),
+                        gav.getVersion());
+                configurationToDirectDependency.computeIfAbsent(configName, EMPTY).add(requestedGav);
+                directDependencyToTargetDependency.computeIfAbsent(requestedGav, EMPTY).add(targetGav);
+            }
+
+            private String buildIsolatedPathGraph(ResolvedGroupArtifactVersion gav,
+                                                 DependencyGraph.DependencyPath path,
+                                                 int depth,
+                                                 String configName,
+                                                 DependencyGraph dependencyGraph) {
+                // Create a temporary map with only this specific path
+                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> singlePathMap = new HashMap<>();
+                singlePathMap.put(gav, Collections.singletonList(path));
+                return dependencyGraph.buildDependencyGraph(gav, singlePathMap, depth, configName);
             }
 
             private Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> collectDependencyPaths(GradleProject gp, DependencyGraph dependencyGraph) {
@@ -329,6 +319,56 @@ public class DependencyInsight extends Recipe {
                         .findFirst()
                         .ifPresent(c -> dependencyGraph.collectGradleDependencyPaths(c.getDirectResolved(), dependencyPaths, c.getName()));
                 return dependencyPaths;
+            }
+
+            private Map<String, List<DependencyInfo>> collectMatchingDependencies(GradleProject gp, SourceFile sourceFile) {
+                Map<String, List<DependencyInfo>> matchingDependencies = new HashMap<>();
+                @Nullable VersionComparator versionComparator = version != null ? Semver.validate(version, null).getValue() : null;
+
+                for (GradleDependencyConfiguration c : gp.getConfigurations()) {
+                    if (!matchesConfiguration(c)) {
+                        continue;
+                    }
+                    for (ResolvedDependency resolvedDependency : c.getDirectResolved()) {
+                        if (!resolvedDependency.isDirect()) {
+                            continue;
+                        }
+                        List<ResolvedDependency> nestedMatchingDependencies = resolvedDependency.findDependencies(groupIdPattern, artifactIdPattern);
+                        for (ResolvedDependency dep : nestedMatchingDependencies) {
+                            if (versionComparator != null && !versionComparator.isValid(null, dep.getVersion())) {
+                                continue;
+                            }
+                            String gavKey = dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getVersion();
+                            matchingDependencies.computeIfAbsent(gavKey, k -> new ArrayList<>())
+                                    .add(new DependencyInfo(resolvedDependency, dep, c.getName()));
+                        }
+                    }
+                }
+                return matchingDependencies;
+            }
+
+            private void processMatchingDependencies(Map<String, List<DependencyInfo>> matchingDependencies,
+                                                    Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> dependencyPaths,
+                                                    DependencyGraph dependencyGraph,
+                                                    DependenciesInUse dependenciesInUse,
+                                                    Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency,
+                                                    Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency,
+                                                    String projectName, String sourceSetName, ExecutionContext ctx) {
+                for (Map.Entry<String, List<DependencyInfo>> entry : matchingDependencies.entrySet()) {
+                    List<DependencyInfo> depInfos = entry.getValue();
+                    if (depInfos.isEmpty()) {
+                        continue;
+                    }
+
+                    // Use the first dependency info to get the GAV (they all have the same GAV)
+                    DependencyInfo firstInfo = depInfos.get(0);
+                    ResolvedGroupArtifactVersion gav = firstInfo.getDep().getGav();
+
+                    // Process paths for this dependency
+                    processMultiplePaths(gav, dependencyPaths, dependencyGraph, dependenciesInUse,
+                            configurationToDirectDependency, directDependencyToTargetDependency,
+                            projectName, sourceSetName, ctx);
+                }
             }
 
             private String buildDependencyGraph(DependencyGraph dependencyGraph, ResolvedDependency dep, Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> dependencyPaths, String configurationName) {
