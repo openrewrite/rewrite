@@ -98,7 +98,8 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         );
     }
 
-	@Override public Dockerfile.Stage visitStage(DockerfileParser.StageContext ctx) {
+    @Override
+    public Dockerfile.Stage visitStage(DockerfileParser.StageContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Parse the FROM instruction that starts this stage
@@ -239,9 +240,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
 
         Dockerfile.Argument imageName = new Dockerfile.Argument(randomId(), prefix, Markers.EMPTY, imageNameContents);
         Dockerfile.Argument tag = tagContents.isEmpty() ? null :
-            new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tagContents);
+                new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tagContents);
         Dockerfile.Argument digest = digestContents.isEmpty() ? null :
-            new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digestContents);
+                new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digestContents);
 
         return new Dockerfile.Argument[]{imageName, tag, digest};
     }
@@ -962,7 +963,7 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
 
         Dockerfile.Argument user = new Dockerfile.Argument(randomId(), prefix, Markers.EMPTY, userContents);
         Dockerfile.Argument group = groupContents.isEmpty() ? null :
-            new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, groupContents);
+                new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, groupContents);
 
         return new Dockerfile.Argument[]{user, group};
     }

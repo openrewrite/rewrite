@@ -27,10 +27,10 @@ class CommentTest implements RewriteTest {
         rewriteRun(
           dockerfile(
             """
-            # This is a comment
-            # Another comment line
-            FROM ubuntu:20.04
-            """
+              # This is a comment
+              # Another comment line
+              FROM ubuntu:20.04
+              """
           )
         );
     }
@@ -40,9 +40,9 @@ class CommentTest implements RewriteTest {
         rewriteRun(
           dockerfile(
             """
-            FROM ubuntu:20.04  # Base image
-            RUN apt-get update  # Update packages
-            """
+              FROM ubuntu:20.04  # Base image
+              RUN apt-get update  # Update packages
+              """
           )
         );
     }
@@ -52,12 +52,12 @@ class CommentTest implements RewriteTest {
         rewriteRun(
           dockerfile(
             """
-            FROM ubuntu:20.04
-            # Update and install dependencies
-            RUN apt-get update
-            # Install curl
-            RUN apt-get install -y curl
-            """
+              FROM ubuntu:20.04
+              # Update and install dependencies
+              RUN apt-get update
+              # Install curl
+              RUN apt-get install -y curl
+              """
           )
         );
     }
@@ -67,15 +67,15 @@ class CommentTest implements RewriteTest {
         rewriteRun(
           dockerfile(
             """
-            # Base image
-            FROM ubuntu:20.04
-
-            # System updates
-            RUN apt-get update
-
-            # Install packages
-            RUN apt-get install -y curl wget
-            """
+              # Base image
+              FROM ubuntu:20.04
+              
+              # System updates
+              RUN apt-get update
+              
+              # Install packages
+              RUN apt-get install -y curl wget
+              """
           )
         );
     }
@@ -85,9 +85,9 @@ class CommentTest implements RewriteTest {
         rewriteRun(
           dockerfile(
             """
-            FROM 'ubuntu:22.04' # Trailing comment
-            RUN apt-get update
-            """
+              FROM 'ubuntu:22.04' # Trailing comment
+              RUN apt-get update
+              """
           )
         );
     }
