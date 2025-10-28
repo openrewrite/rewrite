@@ -55,6 +55,59 @@ describe("jsx mapping", () => {
         }, {unsafeCleanup: true});
     });
 
+    test("react functional component", async () => {
+        await withDir(async repo => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    {
+                        ...tsx(
+                            //language=tsx
+                            `
+                                const b = () => <button>Button</button>;
+                            `
+                        ),
+                        afterRecipe: async cu => {
+                            await (new class extends JavaScriptVisitor<any> {
+                                protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, _: any): Promise<J | undefined> {
+                                    const ident = variable.name as J.Identifier;
+                                    expect(Type.isFunctionType(ident.type)).toBeTruthy();
+                                    const f = ident.type as Type.Class;
+                                    expect(f.fullyQualifiedName).toBe('𝑓');
+                                    expect(f.typeParameters).toHaveLength(1);
+                                    expect((f.typeParameters[0] as Type.Class).fullyQualifiedName).toBe('React.JSX.Element');
+                                    const apply = f.methods[0];
+                                    expect(apply.name).toBe('apply');
+                                    expect(apply.parameterTypes).toHaveLength(0);
+                                    expect((apply.returnType as Type.Class).fullyQualifiedName).toBe('React.JSX.Element');
+                                    return variable;
+                                }
+                            }).visit(cu, 0);
+                        }
+                    },
+                    //language=json
+                    packageJson(
+                        `
+                          {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                              "react": "^18.3.1",
+                              "react-dom": "^18.3.1"
+                            },
+                            "devDependencies": {
+                              "@types/react": "^18.3.5",
+                              "@types/react-dom": "^18.3.0",
+                              "typescript": "^5.6.3"
+                            }
+                          }
+                        `
+                    )
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
     // noinspection TypeScriptMissingConfigOption
     test("jsx with comments", () =>
         spec.rewriteRun(
