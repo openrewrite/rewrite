@@ -402,76 +402,11 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     }
 
     private String unixScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
-        Map<String, String> binding = new HashMap<>();
-        String defaultJvmOpts = defaultJvmOpts(gradleWrapper);
-        binding.put("defaultJvmOpts", StringUtils.isNotEmpty(defaultJvmOpts) ? "'" + defaultJvmOpts + "'" : "");
-        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleWrapper.getVersion(), "8.14") >= 0) {
-            binding.put("classpath", "\"\\\\\\\\\\\"\\\\\\\\\\\"\"");
-            binding.put("entryPointArgs", "-jar \"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"");
-            binding.put("mainClassName", "");
-        } else {
-            binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
-            binding.put("entryPointArgs", "");
-            binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
-        }
-
-        String gradlewTemplate = StringUtils.readFully(gradleWrapper.gradlew().getInputStream(ctx));
-        return renderTemplate(gradlewTemplate, binding, "\n");
+        return StringUtils.readFully(gradleWrapper.gradlew().getInputStream(ctx)).replaceAll("\r\n|\r|\n", "\n");
     }
 
     private String batchScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
-        Map<String, String> binding = new HashMap<>();
-        binding.put("defaultJvmOpts", defaultJvmOpts(gradleWrapper));
-        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleWrapper.getVersion(), "8.14") >= 0) {
-            binding.put("classpath", "");
-            binding.put("mainClassName", "");
-            binding.put("entryPointArgs", "-jar \"%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar\"");
-        } else {
-            binding.put("classpath", "%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar");
-            binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
-            binding.put("entryPointArgs", "");
-        }
-
-        String gradlewBatTemplate = StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx));
-        return renderTemplate(gradlewBatTemplate, binding, "\r\n");
-    }
-
-    private String defaultJvmOpts(GradleWrapper gradleWrapper) {
-        VersionComparator gradle53VersionComparator = requireNonNull(Semver.validate("[5.3,)", null).getValue());
-        VersionComparator gradle50VersionComparator = requireNonNull(Semver.validate("[5.0,)", null).getValue());
-
-        if (gradle53VersionComparator.isValid(null, gradleWrapper.getVersion())) {
-            return "\"-Xmx64m\" \"-Xms64m\"";
-        } else if (gradle50VersionComparator.isValid(null, gradleWrapper.getVersion())) {
-            return "\"-Xmx64m\"";
-        }
-        return "";
-    }
-
-    private String renderTemplate(String source, Map<String, String> parameters, String lineSeparator) {
-        Map<String, String> binding = new HashMap<>(parameters);
-        binding.put("applicationName", "Gradle");
-        binding.put("optsEnvironmentVar", "GRADLE_OPTS");
-        binding.put("exitEnvironmentVar", "GRADLE_EXIT_CONSOLE");
-        binding.put("moduleEntryPoint", "");
-        binding.put("appNameSystemProperty", "org.gradle.appname");
-        binding.put("appHomeRelativePath", "");
-        binding.put("modulePath", "");
-
-        String script = source;
-        for (Map.Entry<String, String> variable : binding.entrySet()) {
-            script = script.replace("${" + variable.getKey() + "}", variable.getValue())
-                    .replace("$" + variable.getKey(), variable.getValue());
-        }
-        script = script.replace("${mainClassName ?: entryPointArgs}", StringUtils.isNotEmpty(binding.get("mainClassName")) ? binding.get("mainClassName") : binding.get("entryPointArgs"));
-
-        script = script.replaceAll("(?sm)<% /\\*.*?\\*/ %>", "");
-        script = script.replaceAll("(?sm)<% if \\( mainClassName\\.startsWith\\('--module '\\) \\) \\{.*?} %>", "");
-        script = script.replaceAll("(?sm)<% if \\( appNameSystemProperty \\) \\{.*?%>(.*?)<% } %>", "$1");
-        script = script.replace("\\$", "$");
-        script = script.replaceAll("DIRNAME=\\.\\\\[\r\n]", "DIRNAME=.");
-        script = script.replace("\\\\", "\\");
-        return script.replaceAll("\r\n|\r|\n", lineSeparator);
+        return StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx)).replaceAll("\r\n|\r|\n", "\r\n");
     }
 
     private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {

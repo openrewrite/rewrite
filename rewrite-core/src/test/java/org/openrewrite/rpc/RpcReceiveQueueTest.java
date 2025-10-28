@@ -17,6 +17,8 @@ package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Checksum;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.Tree;
 import org.openrewrite.text.PlainText;
 
@@ -86,6 +88,22 @@ public class RpcReceiveQueueTest {
 
         assertThat(after).isEqualTo(newId);
         assertThat(after.getId()).isEqualTo(newId.getId());
+    }
+
+    @Test
+    void changePropertyType() {
+        // Test changing a property from FileAttributes to Checksum
+        // This simulates a recipe that changes the type of an object assigned to a property
+        FileAttributes beforeAttr = new FileAttributes(null, null, null, true, true, false, 100);
+        Checksum afterChecksum = new Checksum("SHA-256", new byte[]{1, 2, 3});
+
+        sq.send(afterChecksum, beforeAttr, null);
+        assertThat(batches).isNotEmpty();
+
+        Object received = rq.receive(beforeAttr);
+
+        assertThat(received).isInstanceOf(Checksum.class);
+        assertThat(((Checksum) received).getAlgorithm()).isEqualTo("SHA-256");
     }
 
     private List<RpcObjectData> encode(List<RpcObjectData> batch) {

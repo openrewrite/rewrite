@@ -20,33 +20,26 @@ import ts from 'typescript';
 import {json, Json} from "../json";
 import * as fs from "fs";
 import * as path from "path";
-import {execSync} from "child_process";
+import {DependencyWorkspace} from "./dependency-workspace";
 
 const sourceFileCache: Map<string, ts.SourceFile> = new Map();
 
-export function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): Generator<SourceSpec<any>, void, unknown> {
+export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): AsyncGenerator<SourceSpec<any>, void, unknown> {
     for (const spec of sourceSpecs) {
         if (spec.path === 'package.json') {
-            // Write package.json to disk so npm install can be run
-            fs.mkdirSync(relativeTo, {recursive: true});
-            const packageJsonPath = path.join(relativeTo, 'package.json');
-            
-            // Check if package.json already exists with the same content
-            let needsInstall = true;
-            if (fs.existsSync(packageJsonPath)) {
-                const existingContent = fs.readFileSync(packageJsonPath, 'utf-8');
-                if (existingContent === spec.before) {
-                    needsInstall = false;
-                }
+            // Parse package.json to extract dependencies
+            const packageJsonContent = JSON.parse(spec.before!);
+            const dependencies = {
+                ...packageJsonContent.dependencies,
+                ...packageJsonContent.devDependencies
+            };
+
+            // Use DependencyWorkspace to create workspace in relativeTo directory
+            // This will check if it's already valid and skip npm install if so
+            if (Object.keys(dependencies).length > 0) {
+                await DependencyWorkspace.getOrCreateWorkspace(dependencies, relativeTo);
             }
-            
-            if (needsInstall) {
-                fs.writeFileSync(packageJsonPath, spec.before!);
-                execSync('npm install', {
-                    cwd: relativeTo,
-                    stdio: 'inherit' // Show npm output for debugging
-                });
-            }
+
             yield spec;
         }
     }

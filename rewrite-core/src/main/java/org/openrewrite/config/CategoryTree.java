@@ -327,7 +327,7 @@ public class CategoryTree<G> {
 
     void addRecipe(G group, RecipeDescriptor recipe) {
         if (recipe.getName() == null) {
-            throw new IllegalArgumentException("Expected recipe to have a name " + recipe.getSource());
+            throw new IllegalArgumentException("Expected recipe to have a name");
         }
         if (!recipe.getName().contains(".")) {
             throw new IllegalArgumentException("Expected recipe with name '" + recipe.getName() + "' to have " +

@@ -62,4 +62,19 @@ class ProtoParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void protoWithoutSyntaxDeclaration() {
+        rewriteRun(
+          proto(
+            """
+            message Point {
+              required int32 x = 1;
+              required int32 y = 2;
+              optional string label = 3;
+            }
+            """
+          )
+        );
+    }
 }

@@ -25,8 +25,6 @@ import org.openrewrite.rpc.RpcSendQueue;
 @Getter
 @SuppressWarnings("rawtypes")
 public class JavaScriptRightPaddedRpcCodec extends DynamicDispatchRpcCodec<JRightPadded> {
-    private final JavaScriptSender sender = new JavaScriptSender();
-    private final JavaScriptReceiver receiver = new JavaScriptReceiver();
 
     @Override
     public String getSourceFileType() {
@@ -41,12 +39,12 @@ public class JavaScriptRightPaddedRpcCodec extends DynamicDispatchRpcCodec<JRigh
     @Override
     public void rpcSend(JRightPadded after, RpcSendQueue q) {
         //noinspection unchecked
-        sender.visitRightPadded(after, q);
+        new JavaScriptSender().visitRightPadded(after, q);
     }
 
     @Override
     public JRightPadded rpcReceive(JRightPadded before, RpcReceiveQueue q) {
         //noinspection unchecked
-        return receiver.visitRightPadded(before, q);
+        return new JavaScriptReceiver().visitRightPadded(before, q);
     }
 }

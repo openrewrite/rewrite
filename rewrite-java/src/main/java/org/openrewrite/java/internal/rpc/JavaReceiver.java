@@ -662,7 +662,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withMarkers(q.receive(right.getMarkers()));
     }
 
-    private static final JavaTypeReceiver javaTypeReceiver = new JavaTypeReceiver();
+    private final JavaTypeReceiver javaTypeReceiver = new JavaTypeReceiver();
 
     @Override
     public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcReceiveQueue q) {

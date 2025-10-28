@@ -67,6 +67,7 @@ public class RewriteRpc {
     private final AtomicReference<PrintStream> log = new AtomicReference<>();
     private final AtomicReference<TraceGetObject> traceGetObject = new AtomicReference<>(
             new TraceGetObject(false, false));
+    private final AtomicReference<PrepareRecipe.Loader> recipeLoader = new AtomicReference<>();
 
     final PreparedRecipeCache preparedRecipes = new PreparedRecipeCache();
 
@@ -142,7 +143,7 @@ public class RewriteRpc {
                 }
             }
         });
-        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes));
+        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, recipeLoader));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
 
         jsonRpc.bind();
@@ -166,6 +167,12 @@ public class RewriteRpc {
     public RewriteRpc log(@Nullable PrintStream logFile) {
         //noinspection DataFlowIssue
         this.log.set(logFile);
+        return this;
+    }
+
+    public RewriteRpc recipeLoader(PrepareRecipe.@Nullable Loader recipeLoader) {
+        //noinspection DataFlowIssue
+        this.recipeLoader.set(recipeLoader);
         return this;
     }
 
@@ -444,8 +451,8 @@ public class RewriteRpc {
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
+        checkLiveness();
         try {
-            checkLiveness();
 
             // Send the request and get the future
             CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
@@ -468,6 +475,10 @@ public class RewriteRpc {
 
             // If we get here, we've hit the total timeout
             throw new RuntimeException("Request timed out after " + timeout.getSeconds() + " seconds");
+        } catch (RuntimeException e) {
+            // Check if process crashed during the request
+            checkLiveness();
+            throw e;
         } catch (ExecutionException | InterruptedException e) {
             // Check if process crashed during the request
             checkLiveness();

@@ -812,14 +812,14 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return container;
     }
 
-    private static typeVisitor = new TypeSender();
+    private typeVisitor = new TypeSender();
 
     public override async visitType(javaType: Type | undefined, q: RpcSendQueue): Promise<Type | undefined> {
         if (!javaType) {
             return undefined;
         }
 
-        return await JavaSender.typeVisitor.visit(javaType, q);
+        return await this.typeVisitor.visit(javaType, q);
     }
 }
 
@@ -1088,8 +1088,8 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             expression: await q.receive(instanceOf.expression, expr => this.visitRightPadded(expr, q)),
             class: await q.receive(instanceOf.class, clazz => this.visit(clazz, q)),
             pattern: await q.receive(instanceOf.pattern, pattern => this.visit(pattern, q)),
-            modifier: await q.receive(instanceOf.modifier, mod => this.visit(mod, q)),
-            type: await q.receive(instanceOf.type, type => this.visitType(type, q))
+            type: await q.receive(instanceOf.type, type => this.visitType(type, q)),
+            modifier: await q.receive(instanceOf.modifier, mod => this.visit(mod, q))
         };
         return updateIfChanged(instanceOf, updates);
     }
@@ -1561,7 +1561,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return updateIfChanged(container, updates) as J.Container<T>;
     }
 
-    private static typeVisitor = new TypeReceiver();
+    private typeVisitor = new TypeReceiver();
 
     public override async visitType(javaType: Type | undefined, q: RpcReceiveQueue): Promise<Type | undefined> {
         if (!javaType) {
@@ -1569,7 +1569,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         } else if (javaType.kind === Type.Kind.Unknown) {
             return Type.unknownType;
         }
-        return await JavaReceiver.typeVisitor.visit(javaType, q);
+        return await this.typeVisitor.visit(javaType, q);
     }
 }
 

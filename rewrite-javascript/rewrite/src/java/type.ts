@@ -154,7 +154,7 @@ export namespace Type {
         static readonly Double = new Primitive('double');
         static readonly Float = new Primitive('float');
         static readonly Int = new Primitive('int');
-        static readonly Long = new Primitive('long');
+        static readonly BigInt = new Primitive('long');
         static readonly Short = new Primitive('short');
         static readonly String = new Primitive('String');
         static readonly Void = new Primitive('void');
@@ -168,7 +168,7 @@ export namespace Type {
             Primitive.Double,
             Primitive.Float,
             Primitive.Int,
-            Primitive.Long,
+            Primitive.BigInt,
             Primitive.Short,
             Primitive.String,
             Primitive.Void,
@@ -195,7 +195,7 @@ export namespace Type {
                 case 'int':
                     return Primitive.Int;
                 case 'long':
-                    return Primitive.Long;
+                    return Primitive.BigInt;
                 case 'short':
                     return Primitive.Short;
                 case 'String':

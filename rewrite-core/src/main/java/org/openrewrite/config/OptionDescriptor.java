@@ -19,12 +19,13 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.NlsRewrite;
+import org.openrewrite.marketplace.RecipeListing;
 
 import java.util.List;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class OptionDescriptor {
+public class OptionDescriptor implements RecipeListing.Option {
 
     @EqualsAndHashCode.Include
     String name;

@@ -23,6 +23,7 @@ export * from "./preconditions";
 export * from "./templating";
 export * from "./method-matcher";
 
+export * from "./add-import";
 export * from "./remove-import";
 
 import "./print";

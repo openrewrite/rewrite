@@ -239,6 +239,30 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     )
             );
         }
+
+        if (c.getPrimaryConstructor() != null) {
+            c = c.withPrimaryConstructor(ListUtils.map(c.getPrimaryConstructor(), (ix, param) -> {
+                if (param.getPrefix().getWhitespace().contains("\n") || (!param.getPrefix().getComments().isEmpty() && param.getPrefix().getComments().stream().noneMatch(comment -> comment.getSuffix().contains("\n")))) {
+                    return param;
+                }
+                if (ix == 0 && param.getComments().isEmpty()) {
+                    if (!style.getWithin().getRecordHeader()) {
+                        return param.withPrefix(param.getPrefix().withWhitespace(""));
+                    }
+                }
+                return param.withPrefix(param.getPrefix().withWhitespace(" "));
+            }));
+            JContainer.Padding<Statement> padding = c.getPadding().getPrimaryConstructor().getPadding();
+            c = c.getPadding().withPrimaryConstructor(
+                    padding.withElements(ListUtils.mapLast(padding.getElements(), last -> {
+                        if (!last.getAfter().getLastWhitespace().contains("\n")) {
+                            return last.withAfter(last.getAfter().withWhitespace(!style.getWithin().getRecordHeader() ? "" : " "));
+                        }
+                        return last;
+                    }
+                    )));
+        }
+
         return c;
     }
 
