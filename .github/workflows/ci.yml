@@ -11,6 +11,8 @@ on:
     branches:
       - main
   workflow_dispatch: {}
+  schedule:
+    - cron: 0 16 * * *
 
 concurrency:
   group: ci-${{ github.ref }}
