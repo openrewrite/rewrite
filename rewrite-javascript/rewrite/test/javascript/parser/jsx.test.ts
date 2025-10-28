@@ -75,11 +75,11 @@ describe("jsx mapping", () => {
                                     const f = ident.type as Type.Class;
                                     expect(f.fullyQualifiedName).toBe('𝑓');
                                     expect(f.typeParameters).toHaveLength(1);
-                                    expect((f.typeParameters[0] as Type.Class).fullyQualifiedName).toBe('React.JSX.Element');
-                                    const apply = f.methods[0];
-                                    expect(apply.name).toBe('apply');
-                                    expect(apply.parameterTypes).toHaveLength(0);
-                                    expect((apply.returnType as Type.Class).fullyQualifiedName).toBe('React.JSX.Element');
+                                    // Type parameter is now a GenericTypeVariable with the actual type in bounds
+                                    const returnTypeParam = f.typeParameters[0] as Type.GenericTypeVariable;
+                                    expect(returnTypeParam.name).toBe('R');
+                                    expect(returnTypeParam.variance).toBe(Type.GenericTypeVariable.Variance.Covariant);
+                                    expect((returnTypeParam.bounds[0] as Type.Class).fullyQualifiedName).toBe('React.JSX.Element');
                                     return variable;
                                 }
                             }).visit(cu, 0);
