@@ -149,6 +149,35 @@ public class Assertions {
         return js;
     }
 
+    public static SourceSpecs jsx(@Language("jsx") @Nullable String before) {
+        //noinspection LanguageMismatch
+        return javascript(before, s -> {
+        });
+    }
+
+    public static SourceSpecs jsx(@Language("jsx") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
+        //noinspection LanguageMismatch
+        return javascript(before, spec2 -> {
+            spec2.path(System.nanoTime() + ".jsx");
+            spec.accept(spec2);
+        });
+    }
+
+    public static SourceSpecs jsx(@Language("jsx") @Nullable String before, @Language("jsx") @Nullable String after) {
+        //noinspection LanguageMismatch
+        return javascript(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs jsx(@Language("jsx") @Nullable String before, @Language("jsx") @Nullable String after,
+                                  Consumer<SourceSpec<JS.CompilationUnit>> spec) {
+        //noinspection LanguageMismatch
+        return javascript(before, after, spec2 -> {
+            spec2.path(System.nanoTime() + ".jsx");
+            spec.accept(spec2);
+        });
+    }
+
     public static SourceSpecs typescript(@Language("ts") @Nullable String before) {
         return typescript(before, s -> {
         });
