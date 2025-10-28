@@ -84,7 +84,8 @@ export class HoistFunctionDeclarationsFromBlocks extends Recipe {
 
                     async visitMethodInvocation(invocation: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
                         const funcName = invocation.name?.simpleName;
-                        if (funcName && functionsInBlocks.has(funcName)) {
+                        // Only consider invocations without a select (i.e., function calls, not method calls)
+                        if (funcName && !invocation.select && functionsInBlocks.has(funcName)) {
                             const info = functionsInBlocks.get(funcName)!;
                             if (invocation.methodType?.name === info.methodType?.name) {
                                 const inDeclaringScope = this.scopeStack.includes(info.declaredInScope);
@@ -151,6 +152,7 @@ export class HoistFunctionDeclarationsFromBlocks extends Recipe {
                                     stmtExprDraft.statement = produce(methodNode, methodDraftNode => {
                                         methodDraftNode.body = methodDecl.body;
                                         methodDraftNode.parameters = methodDecl.parameters;
+                                        methodDraftNode.returnTypeExpression = methodDecl.returnTypeExpression;
                                     });
                                 });
                             }

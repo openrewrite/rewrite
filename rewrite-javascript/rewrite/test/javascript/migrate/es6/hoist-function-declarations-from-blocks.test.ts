@@ -261,22 +261,22 @@ describe("hoist-function-declarations-from-blocks", () => {
                 `
                 function outer() {
                     if (condition) {
-                        function helper() {
-                            return 42;
+                        function helper(n) {
+                            return 42 + n;
                         }
                     }
-                    return helper();
+                    return helper(1);
                 }
                 `,
                 `
                 function outer() {
                     let helper;
                     if (condition) {
-                        helper = function() {
-                            return 42;
+                        helper = function(n) {
+                            return 42 + n;
                         };
                     }
-                    return helper();
+                    return helper(1);
                 }
                 `
             )
@@ -313,6 +313,228 @@ describe("hoist-function-declarations-from-blocks", () => {
                     }
                     return inner();
                 }
+                `
+            )
+        );
+    });
+
+    test("sameFunctionNameInDifferentScopes", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                if (condition1) {
+                    function helper() {
+                        return 1;
+                    }
+                }
+                if (condition2) {
+                    function helper() {
+                        return 2;
+                    }
+                }
+                helper();
+                `,
+                `
+                let helper;
+                if (condition1) {
+                    helper = function() {
+                        return 1;
+                    };
+                }
+                if (condition2) {
+                    helper = function() {
+                        return 2;
+                    };
+                }
+                helper();
+                `
+            )
+        );
+    });
+
+    test("functionUsedInSiblingBlock", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                function outer() {
+                    if (condition1) {
+                        function helper() {
+                            return 1;
+                        }
+                    }
+                    if (condition2) {
+                        helper();
+                    }
+                }
+                `,
+                `
+                function outer() {
+                    let helper;
+                    if (condition1) {
+                        helper = function() {
+                            return 1;
+                        };
+                    }
+                    if (condition2) {
+                        helper();
+                    }
+                }
+                `
+            )
+        );
+    });
+
+    test("functionWithParameters", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                if (true) {
+                    function helper(a, b) {
+                        return a + b;
+                    }
+                }
+                const result = helper(1, 2);
+                `,
+                `
+                let helper;
+                if (true) {
+                    helper = function(a, b) {
+                        return a + b;
+                    };
+                }
+                const result = helper(1, 2);
+                `
+            )
+        );
+    });
+
+    test("methodInvocationVsFunctionCall", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const obj = {
+                    helper: function() {
+                        return 42;
+                    }
+                };
+                if (true) {
+                    function helper() {
+                        return 99;
+                    }
+                }
+                obj.helper();
+                `
+            )
+        );
+    });
+
+    test("switchStatementCases", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                switch (value) {
+                    case 1: {
+                        function helper() {
+                            return 42;
+                        }
+                        break;
+                    }
+                }
+                helper();
+                `
+            )
+        );
+    });
+
+    test("tryCatchFinallyBlocks", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                try {
+                    function helper() {
+                        return 42;
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+                helper();
+                `
+            )
+        );
+    });
+
+    test("functionCallViaVariableReference", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const fn = function() { return 99;};
+                if (true) {
+                    function helper() {
+                        return 42;
+                    }
+                }
+                const a = fn();
+                const b = helper();
+                `,
+                `
+                let helper;
+                const fn = function() { return 99;};
+                if (true) {
+                    helper = function() {
+                        return 42;
+                    };
+                }
+                const a = fn();
+                const b = helper();
+                `
+            )
+        );
+    });
+
+    test("functionCallViaOptionalChaining", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                if (true) {
+                    function helper() {
+                        return 42;
+                    }
+                }
+                const fn = helper;
+                fn?.();
+                `
+            )
+        );
+    });
+
+    test("functionWithReturnType", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                if (true) {
+                    function helper(): number {
+                        return 42;
+                    }
+                }
+                const result = helper();
+                `,
+                `
+                let helper;
+                if (true) {
+                    helper = function(): number {
+                        return 42;
+                    };
+                }
+                const result = helper();
                 `
             )
         );
