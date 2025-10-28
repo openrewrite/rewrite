@@ -54,10 +54,9 @@ describe('BlankLinesVisitor', () => {
                 class B {
                 }
 
-                 class C {
+                class C {
                 }
                 `),
-            // TODO the space before `class C` seems excessive, not sure if it's the BlankLinkesVisitor's responsibility though
             // @formatter:on
         )
     });

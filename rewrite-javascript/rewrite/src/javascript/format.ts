@@ -1111,7 +1111,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             if (node.kind === JS.Kind.ExpressionStatement) {
                 this.ensurePrefixHasNewLine((node as JS.ExpressionStatement).expression);
             } else {
-                node.prefix.whitespace = "\n" + node.prefix.whitespace;
+                node.prefix.whitespace = "\n";
             }
         }
     }
