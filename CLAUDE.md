@@ -93,7 +93,6 @@ OpenRewrite is an automated refactoring ecosystem for source code that eliminate
 - **`rewrite-java-test`**: Java-specific testing utilities and infrastructure
 - **`rewrite-java-lombok`**: Lombok-specific Java support
 - **`rewrite-benchmarks`**: JMH performance benchmarks
-- **`tools/language-parser-builder`**: Template tool for generating new language parsers
 
 ## Architecture Decision Records (ADRs)
 

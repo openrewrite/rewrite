@@ -55,6 +55,81 @@ describe("jsx mapping", () => {
         }, {unsafeCleanup: true});
     });
 
+    test("imported react functional component", async () => {
+        await withDir(async repo => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    {
+                        ...tsx(
+                            //language=tsx
+                            `
+                                import type { JSX } from 'react';
+                                export const Button = (): JSX.Element => <button>Button</button>;
+                            `
+                        ),
+                        path: 'components/Button.tsx',
+                    },
+                    {
+                        ...tsx(
+                            //language=tsx
+                            `
+                                import {Button} from './components/Button';
+                                export {Button};
+                            `
+                        ),
+                        afterRecipe: async cu => {
+                            let foundButton = false;
+                            await (new class extends JavaScriptVisitor<any> {
+                                async visitIdentifier(identifier: J.Identifier, _: any): Promise<J | undefined> {
+                                    if (identifier.simpleName === 'Button' && identifier.type) {
+                                        foundButton = true;
+                                        // Assert that imported Button has function type
+                                        expect(Type.isFunctionType(identifier.type)).toBeTruthy();
+                                        const funcType = identifier.type as Type.Class;
+                                        expect(funcType.fullyQualifiedName).toBe('𝑓');
+
+                                        // Check it has the correct structure
+                                        expect(funcType.typeParameters.length).toBe(1); // R only (no params)
+                                        const returnTypeParam = funcType.typeParameters[0] as Type.GenericTypeVariable;
+                                        expect(returnTypeParam.name).toBe('R');
+                                        expect(returnTypeParam.variance).toBe(Type.GenericTypeVariable.Variance.Covariant);
+
+                                        // Check apply method
+                                        expect(funcType.methods.length).toBe(1);
+                                        const applyMethod = funcType.methods[0];
+                                        expect(applyMethod.name).toBe('apply');
+                                        expect(applyMethod.parameterTypes.length).toBe(0); // No parameters
+                                    }
+                                    return identifier;
+                                }
+                            }).visit(cu, 0);
+                            expect(foundButton).toBeTruthy();
+                        }
+                    },
+                    //language=json
+                    packageJson(
+                        `
+                          {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                              "react": "^18.3.1",
+                              "react-dom": "^18.3.1"
+                            },
+                            "devDependencies": {
+                              "@types/react": "^18.3.5",
+                              "@types/react-dom": "^18.3.0",
+                              "typescript": "^5.6.3"
+                            }
+                          }
+                        `
+                    )
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
     // noinspection TypeScriptMissingConfigOption
     test("jsx with comments", () =>
         spec.rewriteRun(
