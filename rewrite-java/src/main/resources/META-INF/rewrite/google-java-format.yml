@@ -25,3 +25,7 @@ styleConfigs:
         - import static all other imports
         - <blank line>
         - import all other imports
+  - org.openrewrite.java.style.SpacesStyle:
+      # see https://google.github.io/styleguide/javaguide.html#s4.6.2-horizontal-whitespace
+      beforeLeftBrace:
+        arrayInitializerLeftBrace: true
