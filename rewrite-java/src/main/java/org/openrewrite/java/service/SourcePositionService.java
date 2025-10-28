@@ -17,6 +17,7 @@ package org.openrewrite.java.service;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
@@ -34,6 +35,8 @@ import static java.util.Collections.emptyList;
 @Incubating(since = "8.63.0")
 public class SourcePositionService {
 
+    private static final String START_COUNTING = "/* START_COUNTING */";
+
     /**
      * Computes the column position where an element should be aligned to.
      * <p>
@@ -41,7 +44,7 @@ public class SourcePositionService {
      * this calculates the column position of that alignment point. For elements that don't align,
      * it returns the parent's indentation plus the continuation indent.
      *
-     * @param cursor the cursor pointing to the element whose alignment position should be computed
+     * @param cursor       the cursor pointing to the element whose alignment position should be computed
      * @param continuation the continuation indent to add when the element doesn't align with another element
      * @return the column position (0-indexed) where the element should align to
      */
@@ -125,6 +128,67 @@ public class SourcePositionService {
         throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
     }
 
+    public int computeDeclarationLength(Cursor cursor) {
+        if (cursor.getValue() instanceof J) {
+            J j = cursor.getValue();
+            if (j instanceof J.ClassDeclaration || j instanceof J.VariableDeclarations || j instanceof J.MethodDeclaration) {
+                JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
+                    @Override
+                    public J visitBlock(J.Block block, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                        if (!block.getPrefix().getWhitespace().contains("\n") && block.getPrefix().getComments().stream().noneMatch(c -> c.getSuffix().contains("\n"))) {
+                            beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
+                            p.append('{');
+                        }
+                        return block;
+                    }
+
+                    @Override
+                    public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                        return super.visitClassDeclaration(
+                                startCounting(
+                                        classDecl
+                                                .withModifiers(ListUtils.mapFirst(classDecl.getModifiers(), this::startCounting))
+                                                .withLeadingAnnotations(ListUtils.map(classDecl.getLeadingAnnotations(), this::startCounting))
+                                ), p);
+                    }
+
+                    @Override
+                    public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                        return super.visitMethodDeclaration(
+                                startCounting(
+                                        method
+                                                .withModifiers(ListUtils.mapFirst(method.getModifiers(), this::startCounting))
+                                                .withLeadingAnnotations(ListUtils.map(method.getLeadingAnnotations(), this::startCounting))
+                                ), p);
+                    }
+
+                    private <T extends J> T startCounting(T j) {
+                        return j.withPrefix(
+                                j.getPrefix()
+                                        .withWhitespace(j.getPrefix().getWhitespace().replaceAll("\\n", "\n" + START_COUNTING))
+                                        .withComments(ListUtils.map(j.getComments(), c -> {
+                                            if (c.getSuffix().contains("\n")) {
+                                                return c.withSuffix(c.getSuffix().replaceAll("\\n", "\n" + START_COUNTING));
+                                            }
+                                            return c;
+                                        }))
+                        );
+                    }
+                };
+                PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED);
+                javaPrinter.visit(j, printLine, cursor.getParentOrThrow());
+
+                String printed = printLine.getOut();
+                int i = printed.lastIndexOf(START_COUNTING);
+                if (i >= 0) {
+                    return printed.length() - i - START_COUNTING.length();
+                }
+                return printed.length();
+            }
+        }
+        throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + cursor.getValue().getClass());
+    }
+
     private int getSuffixLength(J tree) {
         if (tree instanceof Statement && needsSemicolon((Statement) tree)) {
             return 1;
@@ -190,7 +254,7 @@ public class SourcePositionService {
         J cursorValue = cursor.getValue();
         Cursor parent = cursor;
 
-        while (parent != null && !(parent.getValue() instanceof  SourceFile)) {
+        while (parent != null && !(parent.getValue() instanceof SourceFile)) {
             Object parentValue = parent.getValue();
             if (parentValue instanceof JContainer) {
                 JContainer<J> container = parent.getValue();

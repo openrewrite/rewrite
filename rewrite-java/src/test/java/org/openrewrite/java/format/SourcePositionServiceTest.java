@@ -380,4 +380,91 @@ class SourcePositionServiceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void correctlyCalculatesDeclarationLength() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              SourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(SourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  if ("Test".equals(classDecl.getSimpleName())) {
+                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(19);
+                  }
+                  if ("Inner".equals(classDecl.getSimpleName())) {
+                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(84);
+                  }
+                  if ("RecordDeclaration".equals(classDecl.getSimpleName())) {
+                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(37);
+                  }
+                  return super.visitClassDeclaration(classDecl, ctx);
+              }
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(68);
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "abc".contains(v.getSimpleName()))) {
+                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(38);
+                  }
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "d".equals(v.getSimpleName()))) {
+                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(14);
+                  }
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "e".equals(v.getSimpleName()))) {
+                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(10);
+                  }
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "f".equals(v.getSimpleName()))) {
+                    assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(5);
+                  }
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "sum".equals(v.getSimpleName()))) {
+                    assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(24);
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+            package com.example;
+            
+            // Own-line annotations do not impact declaration length
+            @Deprecated
+            public class Test {
+                private final int a = 1, b, c = 3;
+                int d = 4;
+                int e;
+
+                public int /* multiline comment can impact though */ example() {
+                    int sum = a + c;
+                    return sum;
+                }
+
+                @Deprecated // This is also not counted
+                public void someVeryLongMethodNameThatIsAsLongAsTheMethodAbove()
+                {
+                }
+            
+                @Deprecated /* same line annotations do impact declaration length */ class Inner
+                {
+                    // Inner class to test nested structures
+                }
+
+                record RecordDeclaration(int f) { /* We only count till the opening curly (incl if on same line) and not the block's end Space / closing curly. */ }
+            }
+            """
+          )
+        );
+    }
 }

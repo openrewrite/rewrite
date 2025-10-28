@@ -2695,7 +2695,7 @@ class AutoFormatTest implements RewriteTest {
               java(
                 """
                   package com.example;
-    
+
                   class Test1 {
                       private static final StringBuilder sb = new StringBuilder().append("testing long methods").append(" get wrapped").append(" and receive correct indentation");
                       private final MyObject value = MyObject.builder().name("hello").age(30).build();
@@ -2703,7 +2703,7 @@ class AutoFormatTest implements RewriteTest {
                   """,
                 """
                   package com.example;
-    
+
                   class Test1 {
                       private static final StringBuilder sb = new StringBuilder().append("testing long methods")
                                                                                  .append(" get wrapped")
@@ -2715,6 +2715,786 @@ class AutoFormatTest implements RewriteTest {
                   }
                   """
               )
+            );
+        }
+    }
+
+    @Nested
+    class MethodDeclarationParameters {
+
+        @Test
+        void formatMethodWithMultipleParameters() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name, int age, boolean active) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name,
+                                  int age,
+                                  boolean active) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatInterfaceMethodWithMultipleParameters() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  interface Test {
+                      void method(String name, int age, boolean active);
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  interface Test {
+                      void method(String name,
+                                  int age,
+                                  boolean active);
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithTwoParameters() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name, int age) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name,
+                                  int age) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotFormatMethodWithSingleParameter() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name) {
+                      }
+                  }
+                  """,
+                  """
+                  package com.example;
+
+                  class Test {
+                      void method(String name) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void preserveAlreadyFormattedMethod() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(
+                              String name,
+                              int age,
+                              boolean active) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(
+                              String name,
+                              int age,
+                              boolean active) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithGenericTypes() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.util.List;
+                  import java.util.Map;
+
+                  class Test {
+                      void method(List<String> names, Map<String, Integer> ages) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.util.List;
+                  import java.util.Map;
+
+                  class Test {
+                      void method(List<String> names,
+                                  Map<String, Integer> ages) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithArrayParameters() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String[] names, int[] ages, boolean[][] flags) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String[] names,
+                                  int[] ages,
+                                  boolean[][] flags) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithVarargs() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name, int... values) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name,
+                                  int... values) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatConstructor() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      Test(String name, int age, boolean active) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      Test(String name,
+                           int age,
+                           boolean active) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithParameterComments() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name, /* age parameter */ int age, boolean active) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name,
+                                  /* age parameter */ int age,
+                                  boolean active) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithReturnType() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      String method(String name, int age) {
+                          return name;
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      String method(String name,
+                                    int age) {
+                          return name;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithThrowsClause() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.io.IOException;
+
+                  class Test {
+                      void method(String name, int age) throws IOException {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.io.IOException;
+
+                  class Test {
+                      void method(String name,
+                                  int age) throws IOException {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatPublicMethod() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      public void method(String name, int age) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      public void method(String name,
+                                         int age) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatStaticMethod() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      static void method(String name, int age) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      static void method(String name,
+                                         int age) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatAbstractMethod() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  abstract class Test {
+                      abstract void method(String name, int age);
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  abstract class Test {
+                      abstract void method(String name,
+                                           int age);
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatInterfaceMethod() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  interface Test {
+                      void method(String name, int age);
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  interface Test {
+                      void method(String name,
+                                  int age);
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithComplexGenerics() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.util.List;
+                  import java.util.Map;
+                  import java.util.function.Function;
+
+                  class Test {
+                      <T, R> Map<T, List<R>> method(List<T> input, Function<T, List<R>> mapper) {
+                          return null;
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.util.List;
+                  import java.util.Map;
+                  import java.util.function.Function;
+
+                  class Test {
+                      <T, R> Map<T, List<R>> method(List<T> input,
+                                                    Function<T, List<R>> mapper) {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotFormatMethodWithNoParameters() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method() {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMultipleMethodsInClass() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method1(String name, int age) {
+                      }
+
+                      void method2(boolean active, double value) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method1(String name,
+                                   int age) {
+                      }
+
+                      void method2(boolean active,
+                                   double value) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInInnerClass() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      static class Inner {
+                          void method(String name, int age) {
+                          }
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      static class Inner {
+                          void method(String name,
+                                      int age) {
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithFinalParameters() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(final String name, final int age) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(final String name,
+                                  final int age) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithMixedParameterTypes() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.util.List;
+
+                  class Test {
+                      void method(String name, int age, List<String> items, boolean active, double[] values) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.util.List;
+
+                  class Test {
+                      void method(String name,
+                                  int age,
+                                  List<String> items,
+                                  boolean active,
+                                  double[] values) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatLongLinesOnly() {
+            rewriteRun(
+              spec -> withMethodParameterChopIfTooLong(spec, 80),
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void shortMethod(String n, int a) {
+                      }
+
+                      void veryLongMethodNameThatExceedsTheLimit(String name, int age, boolean active) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void shortMethod(String n, int a) {
+                      }
+
+                      void veryLongMethodNameThatExceedsTheLimit(String name,
+                                                                 int age,
+                                                                 boolean active) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void preserveMethodWithMaxLengthBelowThreshold() {
+            rewriteRun(
+              spec -> withMethodParameterChopIfTooLong(spec, 120),
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name, int age) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name, int age) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void indentArgumentsOnTheirOwnNewLineAlready() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(
+                          String name,
+                          int age) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(
+                              String name,
+                              int age) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodWithPartialNewlines() {
+            rewriteRun(
+              this::withMethodParameterWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name,
+                          int age, boolean active) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void method(String name,
+                                  int age,
+                                  boolean active) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        private void withMethodParameterWrapping(RecipeSpec spec) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodParameterWrapping
+              displayName: Autoformat java code with method parameter wrapping
+              description: Formats the code with method parameter wrapping enabled.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            methodDeclarationParameters:
+                              wrap: WrapAlways
+              """,
+              "org.openrewrite.java.AutoFormatWithMethodParameterWrapping"
+            );
+        }
+
+        private void withMethodParameterChopIfTooLong(RecipeSpec spec, int hardWrapAt) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodParameterChopIfTooLong
+              displayName: Autoformat java code with method parameter chop if too long
+              description: Formats the code with method parameter wrapping only for long lines.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            hardWrapAt: %d
+                            methodDeclarationParameters:
+                              wrap: ChopIfTooLong
+              """.formatted(hardWrapAt),
+              "org.openrewrite.java.AutoFormatWithMethodParameterChopIfTooLong"
             );
         }
     }
