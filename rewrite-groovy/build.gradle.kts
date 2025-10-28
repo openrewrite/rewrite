@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("jvm-test-suite")
@@ -37,7 +39,7 @@ testing {
 dependencies {
     api(project(":rewrite-java"))
 
-    implementation("org.codehaus.groovy:groovy:latest.release")
+    implementation("org.apache.groovy:groovy:latest.release")
 
     compileOnly(project(":rewrite-test"))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
@@ -52,10 +54,8 @@ dependencies {
     testImplementation(project(":rewrite-java-test"))
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
-    testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
-
-    // Shaded groovyjarjarasm.asm.ClassReader doesn't support Java 25
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly("org.apache.groovy:groovy-all:latest.release")
+    testRuntimeOnly(project(":rewrite-java-25"))
 }
 
 tasks.named("check") {
