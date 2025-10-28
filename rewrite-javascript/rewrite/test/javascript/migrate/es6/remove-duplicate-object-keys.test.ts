@@ -135,13 +135,17 @@ describe("remove-duplicate-object-keys", () => {
         return spec.rewriteRun(
             //language=typescript
             typescript(
-                `const c = {
-                    foo: 1, // inline comment
-                    bar: 2, foo: 3
-                };`,
-                `const c = {
-                    bar: 2, foo: 3
-                };`
+                `
+                    const c = {
+                        foo: 1, // inline comment
+                        bar: 2, foo: 3
+                    };
+                `,
+                `
+                    const c = {
+                        bar: 2, foo: 3
+                    };
+                `
             )
         )
     })
@@ -150,17 +154,21 @@ describe("remove-duplicate-object-keys", () => {
         return spec.rewriteRun(
             //language=typescript
             typescript(
-                `const c = {
-                    foo: 1,
-                    // comment about bar
-                    bar: 2,
-                    foo: 3
-                };`,
-                `const c = {
-                    // comment about bar
-                    bar: 2,
-                    foo: 3
-                };`
+                `
+                    const c = {
+                        foo: 1,
+                        // comment about bar
+                        bar: 2,
+                        foo: 3
+                    };
+                `,
+                `
+                    const c = {
+                        // comment about bar
+                        bar: 2,
+                        foo: 3
+                    };
+                `
             )
         )
     })
@@ -182,6 +190,45 @@ describe("remove-duplicate-object-keys", () => {
                         /* block comment */
                         bar: 2,
                         foo: 3
+                    };
+                `
+            )
+        )
+    })
+
+    test("remove trailing line comment from removed first element", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    const c = {
+                        foo: 1, // trailing comment
+                        bar: 2, foo: 3
+                    };
+                `,
+                `
+                    const c = {
+                        bar: 2, foo: 3
+                    };
+                `
+            )
+        )
+    })
+
+    test("remove leading comment when removing first element", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    const c = {
+                        // comment about foo
+                        foo: 1,
+                        bar: 2, foo: 3
+                    };
+                `,
+                `
+                    const c = {
+                        bar: 2, foo: 3
                     };
                 `
             )

@@ -214,7 +214,7 @@ export class JavaScriptTypeMapping {
         let declaredFormalTypeNames: string[] = [];
 
         // Handle different kinds of nodes that represent methods or method invocations
-        if (ts.isCallExpression(node)) {
+        if (ts.isCallOrNewExpression(node)) {
             // For method invocations (e.g., _.map(...))
             signature = this.checker.getResolvedSignature(node);
             if (!signature) {

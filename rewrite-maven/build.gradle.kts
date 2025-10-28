@@ -57,6 +57,8 @@ tasks.register<JavaExec>("generateAntlrSources") {
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
     classpath = sourceSets["main"].runtimeClasspath
+
+    finalizedBy("licenseFormat")
 }
 
 tasks.withType<Javadoc>().configureEach {

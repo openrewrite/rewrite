@@ -242,7 +242,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
         if (c.getPrimaryConstructor() != null) {
             c = c.withPrimaryConstructor(ListUtils.map(c.getPrimaryConstructor(), (ix, param) -> {
-                if (param.getPrefix().getLastWhitespace().contains("\n")) {
+                if (param.getPrefix().getWhitespace().contains("\n") || (!param.getPrefix().getComments().isEmpty() && param.getPrefix().getComments().stream().noneMatch(comment -> comment.getSuffix().contains("\n")))) {
                     return param;
                 }
                 if (ix == 0 && param.getComments().isEmpty()) {

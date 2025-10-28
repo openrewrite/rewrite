@@ -21,7 +21,7 @@ import {JavaScriptVisitor} from "../../visitor";
 import {J} from "../../../java";
 import {JS} from "../../tree";
 import {produce} from "immer";
-import {applyRemovedElementPrefix} from "../../../java/formatting-utils";
+import {ElementRemovalFormatter} from "../../../java/formatting-utils";
 
 export class RemoveDuplicateObjectKeys extends Recipe {
     name = "org.openrewrite.javascript.migrate.es6.remove-duplicate-object-keys";
@@ -63,49 +63,33 @@ export class RemoveDuplicateObjectKeys extends Recipe {
                     }
                 }
 
-                // Check if there are any duplicates to remove
-                const indicesToRemove = new Set<number>();
-                for (let i = 0; i < propertyNames.length; i++) {
-                    const propName = propertyNames[i];
-                    if (propName !== null) {
-                        const lastIndex = propertyNameToLastIndex.get(propName)!;
-                        if (i < lastIndex) {
-                            indicesToRemove.add(i);
-                        }
-                    }
-                }
-
-                if (indicesToRemove.size === 0) {
-                    return newClass;
-                }
-
                 // Remove duplicate properties and adjust prefixes
                 return produce(newClass, draft => {
                     const filteredStatements: typeof statements = [];
-                    let removedElement: J | undefined = undefined;
+                    const formatter = new ElementRemovalFormatter<J>();
 
                     for (let i = 0; i < statements.length; i++) {
-                        if (indicesToRemove.has(i)) {
-                            // Track the first removed element
-                            if (!removedElement && statements[i].element) {
-                                removedElement = statements[i].element;
+                        const propName = propertyNames[i];
+
+                        // Check if this is a duplicate that should be removed
+                        if (propName !== null) {
+                            const lastIndex = propertyNameToLastIndex.get(propName)!;
+                            if (i < lastIndex) {
+                                formatter.markRemoved(statements[i].element);
+                                continue;
                             }
-                            continue;
                         }
 
                         const stmt = statements[i];
+                        const adjustedElement = formatter.processKept(stmt.element);
+                        filteredStatements.push({
+                            ...stmt,
+                            element: adjustedElement
+                        });
+                    }
 
-                        // If we removed previous elements, apply the removed element's prefix to this one
-                        if (removedElement) {
-                            const adjustedElement = applyRemovedElementPrefix(removedElement, stmt.element);
-                            filteredStatements.push({
-                                ...stmt,
-                                element: adjustedElement
-                            });
-                            removedElement = undefined;
-                        } else {
-                            filteredStatements.push(stmt);
-                        }
+                    if (!formatter.hasRemovals) {
+                        return; // No changes needed
                     }
 
                     draft.body!.statements = filteredStatements;
