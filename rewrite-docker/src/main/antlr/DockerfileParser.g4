@@ -9,7 +9,7 @@ options {
 
 // Root rule
 dockerfile
-    : ( parserDirective | NEWLINE | COMMENT )* globalArgs stage+ EOF
+    : parserDirective* globalArgs stage+ EOF
     ;
 
 parserDirective
@@ -18,12 +18,12 @@ parserDirective
 
 // Global ARG instructions before first FROM
 globalArgs
-    : ( argInstruction ( NEWLINE+ | LINE_CONTINUATION | COMMENT )* )*
+    : argInstruction*
     ;
 
 // A build stage starting with FROM
 stage
-    : fromInstruction ( NEWLINE+ | LINE_CONTINUATION | COMMENT )* ( stageInstruction ( NEWLINE+ | LINE_CONTINUATION | COMMENT )* )*
+    : fromInstruction stageInstruction*
     ;
 
 // Instructions allowed within a stage (everything except FROM and global ARG)
@@ -54,80 +54,80 @@ instruction
     ;
 
 fromInstruction
-    : FROM WS+ ( flags WS+ )? imageName ( WS+ AS WS+ stageName )? trailingComment?
+    : FROM flags? imageName ( AS stageName )?
     ;
 
 runInstruction
-    : RUN WS+ ( flags WS+ )? ( execForm | shellForm | heredoc ) trailingComment?
+    : RUN flags? ( execForm | shellForm | heredoc )
     ;
 
 cmdInstruction
-    : CMD WS+ ( execForm | shellForm ) trailingComment?
+    : CMD ( execForm | shellForm )
     ;
 
 labelInstruction
-    : LABEL WS+ labelPairs trailingComment?
+    : LABEL labelPairs
     ;
 
 exposeInstruction
-    : EXPOSE WS+ portList trailingComment?
+    : EXPOSE portList
     ;
 
 envInstruction
-    : ENV WS+ envPairs trailingComment?
+    : ENV envPairs
     ;
 
 addInstruction
-    : ADD WS+ ( flags WS+ )? ( heredoc | sourceList WS+ destination ) trailingComment?
+    : ADD flags? ( heredoc | sourceList destination )
     ;
 
 copyInstruction
-    : COPY WS+ ( flags WS+ )? ( heredoc | sourceList WS+ destination ) trailingComment?
+    : COPY flags? ( heredoc | sourceList destination )
     ;
 
 entrypointInstruction
-    : ENTRYPOINT WS+ ( execForm | shellForm ) trailingComment?
+    : ENTRYPOINT ( execForm | shellForm )
     ;
 
 volumeInstruction
-    : VOLUME WS+ ( jsonArray | pathList ) trailingComment?
+    : VOLUME ( jsonArray | pathList )
     ;
 
 userInstruction
-    : USER WS+ userSpec trailingComment?
+    : USER userSpec
     ;
 
 workdirInstruction
-    : WORKDIR WS+ path trailingComment?
+    : WORKDIR path
     ;
 
 argInstruction
-    : ARG WS+ argName ( EQUALS argValue )? trailingComment?
+    : ARG argName ( EQUALS argValue )?
     ;
 
 onbuildInstruction
-    : ONBUILD WS+ instruction trailingComment?
+    : ONBUILD instruction
     ;
 
 stopsignalInstruction
-    : STOPSIGNAL WS+ signal trailingComment?
+    : STOPSIGNAL signal
     ;
 
 healthcheckInstruction
-    : HEALTHCHECK WS+ ( UNQUOTED_TEXT | ( flags WS+ )? cmdInstruction ) trailingComment?
+    : HEALTHCHECK ( UNQUOTED_TEXT | flags? cmdInstruction )
     ;
 
 shellInstruction
-    : SHELL WS+ jsonArray trailingComment?
+    : SHELL jsonArray
     ;
 
 maintainerInstruction
-    : MAINTAINER WS+ text trailingComment?
+    : MAINTAINER text
     ;
 
 // Common elements
 flags
-    : flag ( WS+ flag )*
+    : flag+
     ;
 
 flag
@@ -157,11 +157,11 @@ shellForm
     ;
 
 heredoc
-    : HEREDOC_START ( WS+ path )? NEWLINE ( heredocLine )* heredocEnd
+    : HEREDOC_START path? NEWLINE heredocContent heredocEnd
     ;
 
-heredocLine
-    : text? NEWLINE
+heredocContent
+    : ( NEWLINE | text )*
     ;
 
 heredocEnd
@@ -169,11 +169,11 @@ heredocEnd
     ;
 
 jsonArray
-    : LBRACKET JSON_WS? jsonArrayElements? JSON_WS? JSON_RBRACKET
+    : LBRACKET jsonArrayElements? JSON_RBRACKET
     ;
 
 jsonArrayElements
-    : jsonString ( JSON_WS? JSON_COMMA JSON_WS? jsonString )*
+    : jsonString ( JSON_COMMA jsonString )*
     ;
 
 jsonString
@@ -189,7 +189,7 @@ stageName
     ;
 
 labelPairs
-    : labelPair ( WS+ labelPair )*
+    : labelPair+
     ;
 
 labelPair
@@ -205,7 +205,7 @@ labelValue
     ;
 
 portList
-    : port ( WS+ port )*
+    : port+
     ;
 
 port
@@ -213,11 +213,11 @@ port
     ;
 
 envPairs
-    : envPair ( WS+ envPair )*
+    : envPair+
     ;
 
 envPair
-    : envKey ( EQUALS envValue | WS+ envValue )
+    : envKey ( EQUALS envValue | envValue )
     ;
 
 envKey
@@ -229,7 +229,7 @@ envValue
     ;
 
 sourceList
-    : source ( WS+ source )*
+    : source+
     ;
 
 source
@@ -245,7 +245,7 @@ path
     ;
 
 pathList
-    : path ( WS+ path )*
+    : path+
     ;
 
 userSpec
@@ -275,11 +275,5 @@ textElement
     | ENV_VAR
     | EQUALS  // Allow = in shell form text (e.g., ENV_VAR=value in RUN commands)
     | DASH_DASH  // Allow -- in shell form text (e.g., --option in shell commands)
-    | LINE_CONTINUATION  // Allow line continuations in shell commands
-    | WS
-    | COMMENT  // Allow comments in heredoc content
     ;
 
-trailingComment
-    : WS* COMMENT
-    ;

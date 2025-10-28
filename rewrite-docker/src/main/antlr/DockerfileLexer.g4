@@ -4,40 +4,52 @@
 
 lexer grammar DockerfileLexer;
 
-// Parser directives (must be at the beginning of file)
-PARSER_DIRECTIVE : '#' WS_CHAR* [a-zA-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
+@lexer::header
+{import java.util.Stack;}
 
-// Comments (after parser directives)
-COMMENT : '#' ~[\r\n]*;
+@lexer::members
+{
+    private Stack<String> heredocIdentifier = new Stack<String>();
+}
+
+options {
+    caseInsensitive = true;
+}
+
+// Parser directives (must be at the beginning of file)
+PARSER_DIRECTIVE : '#' WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
+
+// Comments (after parser directives) - HIDDEN in main mode
+COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
 
 // Instructions (case-insensitive)
-FROM       : [Ff][Rr][Oo][Mm];
-RUN        : [Rr][Uu][Nn];
-CMD        : [Cc][Mm][Dd];
-LABEL      : [Ll][Aa][Bb][Ee][Ll];
-EXPOSE     : [Ee][Xx][Pp][Oo][Ss][Ee];
-ENV        : [Ee][Nn][Vv];
-ADD        : [Aa][Dd][Dd];
-COPY       : [Cc][Oo][Pp][Yy];
-ENTRYPOINT : [Ee][Nn][Tt][Rr][Yy][Pp][Oo][Ii][Nn][Tt];
-VOLUME     : [Vv][Oo][Ll][Uu][Mm][Ee];
-USER       : [Uu][Ss][Ee][Rr];
-WORKDIR    : [Ww][Oo][Rr][Kk][Dd][Ii][Rr];
-ARG        : [Aa][Rr][Gg];
-ONBUILD    : [Oo][Nn][Bb][Uu][Ii][Ll][Dd];
-STOPSIGNAL : [Ss][Tt][Oo][Pp][Ss][Ii][Gg][Nn][Aa][Ll];
-HEALTHCHECK: [Hh][Ee][Aa][Ll][Tt][Hh][Cc][Hh][Ee][Cc][Kk];
-SHELL      : [Ss][Hh][Ee][Ll][Ll];
-MAINTAINER : [Mm][Aa][Ii][Nn][Tt][Aa][Ii][Nn][Ee][Rr];
+FROM       : 'FROM';
+RUN        : 'RUN';
+CMD        : 'CMD';
+LABEL      : 'LABEL';
+EXPOSE     : 'EXPOSE';
+ENV        : 'ENV';
+ADD        : 'ADD';
+COPY       : 'COPY';
+ENTRYPOINT : 'ENTRYPOINT';
+VOLUME     : 'VOLUME';
+USER       : 'USER';
+WORKDIR    : 'WORKDIR';
+ARG        : 'ARG';
+ONBUILD    : 'ONBUILD';
+STOPSIGNAL : 'STOPSIGNAL';
+HEALTHCHECK: 'HEALTHCHECK';
+SHELL      : 'SHELL';
+MAINTAINER : 'MAINTAINER';
 
 // Special keywords
-AS         : [Aa][Ss];
+AS         : 'AS';
 
-// Heredoc start - captures <<EOF or <<-EOF (no mode switch, handled by parser)
-HEREDOC_START : '<<' '-'? [A-Za-z_][A-Za-z0-9_]*;
+// Heredoc start - captures <<EOF or <<-EOF and switches to HEREDOC_PREAMBLE mode
+HEREDOC_START : '<<' '-'? -> pushMode(HEREDOC_PREAMBLE);
 
-// Line continuation
-LINE_CONTINUATION : '\\' [ \t]* NEWLINE_CHAR;
+// Line continuation - HIDDEN in main mode
+LINE_CONTINUATION : '\\' [ \t]* NEWLINE_CHAR -> channel(HIDDEN);
 
 // JSON array delimiters (for exec form)
 LBRACKET : '[' -> pushMode(JSON_MODE);
@@ -62,10 +74,10 @@ fragment ESCAPE_SEQUENCE
     | '\\' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
     ;
 
-fragment HEX_DIGIT : [0-9a-fA-F];
+fragment HEX_DIGIT : [0-9A-F];
 
 // Environment variable reference
-ENV_VAR : '$' '{' [a-zA-Z_][a-zA-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [a-zA-Z_][a-zA-Z0-9_]*;
+ENV_VAR : '$' '{' [A-Z_][A-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [A-Z_][A-Z0-9_]*;
 
 // Unquoted text (arguments, file paths, etc.)
 // This should be after more specific tokens
@@ -77,17 +89,19 @@ UNQUOTED_TEXT
     | '-'  // Just a hyphen by itself
     ;
 
-// Whitespace (preserve for LST)
-WS : WS_CHAR+ ;
+// Whitespace - HIDDEN in main mode
+WS : WS_CHAR+ -> channel(HIDDEN);
 
 fragment WS_CHAR : [ \t];
 
-// Newlines (preserve for LST)
-NEWLINE : NEWLINE_CHAR+;
+// Newlines - HIDDEN in main mode
+NEWLINE : NEWLINE_CHAR+ -> channel(HIDDEN);
 
 fragment NEWLINE_CHAR : [\r\n];
 
+// ----------------------------------------------------------------------------------------------
 // JSON mode - for parsing JSON arrays in exec form
+// ----------------------------------------------------------------------------------------------
 mode JSON_MODE;
 
 // Comma separator in JSON arrays
@@ -100,4 +114,35 @@ JSON_RBRACKET : ']' -> popMode;
 JSON_STRING : '"' ( ESCAPE_SEQUENCE | ~["\\\r\n] )* '"';
 
 // Whitespace in JSON arrays
-JSON_WS : WS_CHAR+ ;
+JSON_WS : WS_CHAR+ -> channel(HIDDEN);
+
+// ----------------------------------------------------------------------------------------------
+// HEREDOC_PREAMBLE mode - for parsing the heredoc identifier and optional flags
+// ----------------------------------------------------------------------------------------------
+mode HEREDOC_PREAMBLE;
+
+HP_NEWLINE : '\n' -> type(NEWLINE), mode(HEREDOC);
+HP_WS      : [ \t\r\u000C]+ -> channel(HIDDEN);
+HP_COMMENT : '/*' .*? '*/'  -> channel(HIDDEN);
+HP_LINE_COMMENT : ('//' | '#') ~[\r\n]* '\r'? -> channel(HIDDEN);
+
+HPIdentifier : [A-Z_][A-Z0-9_]* {
+    heredocIdentifier.push(getText());
+} -> type(UNQUOTED_TEXT);
+
+// ----------------------------------------------------------------------------------------------
+// HEREDOC mode - for parsing heredoc content
+// ----------------------------------------------------------------------------------------------
+mode HEREDOC;
+
+H_NEWLINE : '\n' -> type(NEWLINE);
+
+HTemplateLiteral : ~[\n]+
+{
+  if(!heredocIdentifier.isEmpty() && getText().equals(heredocIdentifier.peek())) {
+      setType(UNQUOTED_TEXT);
+      heredocIdentifier.pop();
+      popMode();
+  }
+};
+

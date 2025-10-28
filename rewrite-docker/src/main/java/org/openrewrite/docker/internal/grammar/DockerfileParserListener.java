@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
+// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -343,15 +343,15 @@ public interface DockerfileParserListener extends ParseTreeListener {
 	 */
 	void exitHeredoc(DockerfileParser.HeredocContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerfileParser#heredocLine}.
+	 * Enter a parse tree produced by {@link DockerfileParser#heredocContent}.
 	 * @param ctx the parse tree
 	 */
-	void enterHeredocLine(DockerfileParser.HeredocLineContext ctx);
+	void enterHeredocContent(DockerfileParser.HeredocContentContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link DockerfileParser#heredocLine}.
+	 * Exit a parse tree produced by {@link DockerfileParser#heredocContent}.
 	 * @param ctx the parse tree
 	 */
-	void exitHeredocLine(DockerfileParser.HeredocLineContext ctx);
+	void exitHeredocContent(DockerfileParser.HeredocContentContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerfileParser#heredocEnd}.
 	 * @param ctx the parse tree
@@ -622,14 +622,4 @@ public interface DockerfileParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitTextElement(DockerfileParser.TextElementContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerfileParser#trailingComment}.
-	 * @param ctx the parse tree
-	 */
-	void enterTrailingComment(DockerfileParser.TrailingCommentContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerfileParser#trailingComment}.
-	 * @param ctx the parse tree
-	 */
-	void exitTrailingComment(DockerfileParser.TrailingCommentContext ctx);
 }

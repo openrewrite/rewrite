@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
+// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -416,13 +416,13 @@ public class DockerfileParserBaseListener implements DockerfileParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterHeredocLine(DockerfileParser.HeredocLineContext ctx) { }
+	@Override public void enterHeredocContent(DockerfileParser.HeredocContentContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitHeredocLine(DockerfileParser.HeredocLineContext ctx) { }
+	@Override public void exitHeredocContent(DockerfileParser.HeredocContentContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -747,18 +747,6 @@ public class DockerfileParserBaseListener implements DockerfileParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitTextElement(DockerfileParser.TextElementContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterTrailingComment(DockerfileParser.TrailingCommentContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitTrailingComment(DockerfileParser.TrailingCommentContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

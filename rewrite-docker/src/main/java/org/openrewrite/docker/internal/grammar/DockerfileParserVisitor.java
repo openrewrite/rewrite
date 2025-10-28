@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
+// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -218,11 +218,11 @@ public interface DockerfileParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitHeredoc(DockerfileParser.HeredocContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerfileParser#heredocLine}.
+	 * Visit a parse tree produced by {@link DockerfileParser#heredocContent}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitHeredocLine(DockerfileParser.HeredocLineContext ctx);
+	T visitHeredocContent(DockerfileParser.HeredocContentContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerfileParser#heredocEnd}.
 	 * @param ctx the parse tree
@@ -385,10 +385,4 @@ public interface DockerfileParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitTextElement(DockerfileParser.TextElementContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerfileParser#trailingComment}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitTrailingComment(DockerfileParser.TrailingCommentContext ctx);
 }

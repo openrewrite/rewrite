@@ -164,11 +164,8 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         // Parse the text and split out environment variables
         List<Dockerfile.ArgumentContent> contents = parseText(ctx.text());
 
-        // Advance cursor only to the last non-comment token to avoid consuming trailing comments
-        Token lastToken = findLastNonCommentToken(ctx.text());
-        if (lastToken != null) {
-            advanceCursor(lastToken.getStopIndex() + 1);
-        }
+        // Advance cursor to end of text
+        advanceCursor(ctx.text().getStop().getStopIndex() + 1);
 
         // If the entire image is a single quoted string, don't split it
         if (contents.size() == 1 && contents.get(0) instanceof Dockerfile.QuotedString) {
@@ -255,8 +252,11 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             return contents;
         }
 
-        // Check if text contains quoted strings, environment variables, or comments
-        String fullText = textCtx.getText();
+        // Get the actual text from source (including HIDDEN channel whitespace)
+        int startIndex = textCtx.getStart().getStartIndex();
+        int stopIndex = textCtx.getStop().getStopIndex();
+        String fullText = source.substring(source.offsetByCodePoints(0, startIndex), source.offsetByCodePoints(0, stopIndex + 1));
+
         boolean hasQuotedString = fullText.contains("\"") || fullText.contains("'");
         boolean hasEnvironmentVariable = fullText.contains("$");
         boolean hasComment = fullText.contains("#");
@@ -302,56 +302,51 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
                         // COMMENT tokens are ignored - they will be part of next element's prefix
                         break; // Stop processing tokens once we hit a comment
                     } else if (token.getType() == DockerfileLexer.DOUBLE_QUOTED_STRING) {
+                        Space elementPrefix = prefix(token);
+                        skip(token);
                         String value = tokenText.substring(1, tokenText.length() - 1);
                         contents.add(new Dockerfile.QuotedString(
                                 randomId(),
-                                Space.EMPTY,
+                                elementPrefix,
                                 Markers.EMPTY,
                                 value,
                                 Dockerfile.QuotedString.QuoteStyle.DOUBLE
                         ));
                     } else if (token.getType() == DockerfileLexer.SINGLE_QUOTED_STRING) {
+                        Space elementPrefix = prefix(token);
+                        skip(token);
                         String value = tokenText.substring(1, tokenText.length() - 1);
                         contents.add(new Dockerfile.QuotedString(
                                 randomId(),
-                                Space.EMPTY,
+                                elementPrefix,
                                 Markers.EMPTY,
                                 value,
                                 Dockerfile.QuotedString.QuoteStyle.SINGLE
                         ));
                     } else if (token.getType() == DockerfileLexer.ENV_VAR) {
+                        Space elementPrefix = prefix(token);
+                        skip(token);
                         boolean braced = tokenText.startsWith("${");
                         String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
                         contents.add(new Dockerfile.EnvironmentVariable(
                                 randomId(),
-                                Space.EMPTY,
+                                elementPrefix,
                                 Markers.EMPTY,
                                 varName,
                                 braced
                         ));
-                    } else if (token.getType() == DockerfileLexer.WS && foundComment) {
-                        // Skip whitespace before comments - it should be part of Space/prefix
-                        // But keep processing in case there's more content after
                     } else {
                         // Plain text for other tokens
+                        Space elementPrefix = prefix(token);
+                        skip(token);
                         contents.add(new Dockerfile.PlainText(
                                 randomId(),
-                                Space.EMPTY,
+                                elementPrefix,
                                 Markers.EMPTY,
                                 tokenText
                         ));
                     }
                 }
-            }
-        }
-
-        // Remove trailing whitespace PlainText entries that were added before we knew about the comment
-        while (!contents.isEmpty() && contents.get(contents.size() - 1) instanceof Dockerfile.PlainText) {
-            Dockerfile.PlainText last = (Dockerfile.PlainText) contents.get(contents.size() - 1);
-            if (last.getText().trim().isEmpty()) {
-                contents.remove(contents.size() - 1);
-            } else {
-                break;
             }
         }
 
@@ -369,20 +364,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         List<Dockerfile.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
         Dockerfile.CommandLine commandLine = visitCommandLine(ctx);
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                // Don't advance past the trailing comment
-                if (ctx.execForm() != null) {
-                    stopToken = ctx.execForm().getStop();
-                } else if (ctx.shellForm() != null) {
-                    stopToken = ctx.shellForm().getStop();
-                } else if (ctx.heredoc() != null) {
-                    stopToken = ctx.heredoc().getStop();
-                }
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Run(randomId(), prefix, Markers.EMPTY, runKeyword, flags, commandLine);
@@ -416,18 +400,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             destination = visitArgument(ctx.destination().path());
         }
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                // Don't advance past the trailing comment
-                if (ctx.heredoc() != null) {
-                    stopToken = ctx.heredoc().getStop();
-                } else if (ctx.destination() != null) {
-                    stopToken = ctx.destination().getStop();
-                }
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Add(randomId(), prefix, Markers.EMPTY, addKeyword, flags, heredoc, sources, destination);
@@ -461,18 +436,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             destination = visitArgument(ctx.destination().path());
         }
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                // Don't advance past the trailing comment
-                if (ctx.heredoc() != null) {
-                    stopToken = ctx.heredoc().getStop();
-                } else if (ctx.destination() != null) {
-                    stopToken = ctx.destination().getStop();
-                }
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Copy(randomId(), prefix, Markers.EMPTY, copyKeyword, flags, heredoc, sources, destination);
@@ -494,18 +460,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             value = visitArgument(ctx.argValue());
         }
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                // Don't advance past the trailing comment
-                if (ctx.argValue() != null) {
-                    stopToken = ctx.argValue().getStop();
-                } else {
-                    stopToken = ctx.argName().getStop();
-                }
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Arg(randomId(), prefix, Markers.EMPTY, argKeyword, name, value);
@@ -535,13 +492,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             pairs.add(new Dockerfile.Env.EnvPair(randomId(), pairPrefix, Markers.EMPTY, key, hasEquals, value));
         }
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                stopToken = ctx.envPairs().getStop();
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Env(randomId(), prefix, Markers.EMPTY, envKeyword, pairs);
@@ -569,13 +522,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             pairs.add(new Dockerfile.Label.LabelPair(randomId(), pairPrefix, Markers.EMPTY, key, value));
         }
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                stopToken = ctx.labelPairs().getStop();
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Label(randomId(), prefix, Markers.EMPTY, labelKeyword, pairs);
@@ -623,17 +572,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
 
         Dockerfile.CommandLine commandLine = visitCommandLineForCmd(ctx);
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                if (ctx.execForm() != null) {
-                    stopToken = ctx.execForm().getStop();
-                } else if (ctx.shellForm() != null) {
-                    stopToken = ctx.shellForm().getStop();
-                }
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Cmd(randomId(), prefix, Markers.EMPTY, cmdKeyword, commandLine);
@@ -648,17 +589,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
 
         Dockerfile.CommandLine commandLine = visitCommandLineForEntrypoint(ctx);
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                if (ctx.execForm() != null) {
-                    stopToken = ctx.execForm().getStop();
-                } else if (ctx.shellForm() != null) {
-                    stopToken = ctx.shellForm().getStop();
-                }
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Entrypoint(randomId(), prefix, Markers.EMPTY, entrypointKeyword, commandLine);
@@ -678,13 +611,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             ports.add(convertPort(portCtx));
         }
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                stopToken = ctx.portList().getStop();
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Expose(randomId(), prefix, Markers.EMPTY, exposeKeyword, ports);
@@ -722,17 +651,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             }
         }
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                if (ctx.jsonArray() != null) {
-                    stopToken = ctx.jsonArray().getStop();
-                } else {
-                    stopToken = ctx.pathList().getStop();
-                }
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Volume(randomId(), prefix, Markers.EMPTY, volumeKeyword, jsonForm, values);
@@ -811,13 +732,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         // Parse JSON array
         List<Dockerfile.Argument> arguments = visitJsonArrayForShell(ctx.jsonArray());
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                stopToken = ctx.jsonArray().getStop();
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Shell(randomId(), prefix, Markers.EMPTY, shellKeyword, arguments);
@@ -874,13 +791,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
 
         Dockerfile.Argument path = visitArgument(ctx.path());
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                stopToken = ctx.path().getStop();
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Workdir(randomId(), prefix, Markers.EMPTY, workdirKeyword, path);
@@ -898,13 +811,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         Dockerfile.Argument user = requireNonNull(userAndGroup[0]);
         Dockerfile.Argument group = userAndGroup[1];
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                stopToken = ctx.userSpec().getStop();
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.User(randomId(), prefix, Markers.EMPTY, userKeyword, user, group);
@@ -916,11 +825,8 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         // Parse the text
         List<Dockerfile.ArgumentContent> contents = parseText(ctx.text());
 
-        // Advance cursor only to the last non-comment token to avoid consuming trailing comments
-        Token lastToken = findLastNonCommentToken(ctx.text());
-        if (lastToken != null) {
-            advanceCursor(lastToken.getStopIndex() + 1);
-        }
+        // Advance cursor to end of text
+        advanceCursor(ctx.text().getStop().getStopIndex() + 1);
 
         // Find the colon separator to split user and group
         List<Dockerfile.ArgumentContent> userContents = new ArrayList<>();
@@ -978,13 +884,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
 
         Dockerfile.Argument signal = visitArgument(ctx.signal());
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                stopToken = ctx.signal().getStop();
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Stopsignal(randomId(), prefix, Markers.EMPTY, stopsignalKeyword, signal);
@@ -1000,13 +902,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         // Visit the wrapped instruction
         Dockerfile.Instruction instruction = (Dockerfile.Instruction) visit(ctx.instruction());
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                stopToken = ctx.instruction().getStop();
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Onbuild(randomId(), prefix, Markers.EMPTY, onbuildKeyword, instruction);
@@ -1054,17 +952,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             }
         }
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                if (isNone && ctx.UNQUOTED_TEXT() != null) {
-                    stopToken = ctx.UNQUOTED_TEXT().getSymbol();
-                } else if (ctx.cmdInstruction() != null) {
-                    stopToken = ctx.cmdInstruction().getStop();
-                }
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Healthcheck(randomId(), prefix, Markers.EMPTY, healthcheckKeyword, isNone, flags, cmd);
@@ -1079,13 +969,9 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
 
         Dockerfile.Argument text = visitArgument(ctx.text());
 
-        // Advance cursor to end of instruction, but NOT past trailing comment
+        // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
-            Token stopToken = ctx.getStop();
-            if (ctx.trailingComment() != null && stopToken == ctx.trailingComment().getStop()) {
-                stopToken = ctx.text().getStop();
-            }
-            advanceCursor(stopToken.getStopIndex() + 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return new Dockerfile.Maintainer(randomId(), prefix, Markers.EMPTY, maintainerKeyword, text);
@@ -1230,37 +1116,51 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
                 destination = visitArgument(c.path());
             }
 
-            // Collect content lines (each heredocLine is text? + NEWLINE)
+            // Collect content lines
             List<String> contentLines = new ArrayList<>();
 
-            // Add the opening newline first
+            // Add the opening newline first (after HEREDOC_START and optional path)
             if (c.NEWLINE() != null) {
                 String openingNewline = c.NEWLINE().getText();
                 contentLines.add(openingNewline);
                 skip(c.NEWLINE().getSymbol());
             }
-            for (DockerfileParser.HeredocLineContext lineCtx : c.heredocLine()) {
-                StringBuilder line = new StringBuilder();
 
-                // Add text content if present
-                if (lineCtx.text() != null) {
-                    String lineText = lineCtx.text().getText();
-                    line.append(lineText);
-                    // Skip all tokens in the text
-                    for (int i = 0; i < lineCtx.text().getChildCount(); i++) {
-                        if (lineCtx.text().getChild(i) instanceof TerminalNode) {
-                            skip(((TerminalNode) lineCtx.text().getChild(i)).getSymbol());
+            // Process heredocContent which is ( NEWLINE | text )*
+            if (c.heredocContent() != null) {
+                DockerfileParser.HeredocContentContext contentCtx = c.heredocContent();
+                StringBuilder currentLine = new StringBuilder();
+
+                for (int i = 0; i < contentCtx.getChildCount(); i++) {
+                    ParseTree child = contentCtx.getChild(i);
+
+                    if (child instanceof TerminalNode) {
+                        TerminalNode tn = (TerminalNode) child;
+                        if (tn.getSymbol().getType() == DockerfileLexer.NEWLINE) {
+                            // Newline - end current line and start new one
+                            currentLine.append(tn.getText());
+                            skip(tn.getSymbol());
+                            contentLines.add(currentLine.toString());
+                            currentLine = new StringBuilder();
+                        }
+                    } else if (child instanceof DockerfileParser.TextContext) {
+                        // Text content - append to current line
+                        DockerfileParser.TextContext textCtx = (DockerfileParser.TextContext) child;
+                        String textContent = textCtx.getText();
+                        currentLine.append(textContent);
+                        // Skip all tokens in the text
+                        for (int j = 0; j < textCtx.getChildCount(); j++) {
+                            if (textCtx.getChild(j) instanceof TerminalNode) {
+                                skip(((TerminalNode) textCtx.getChild(j)).getSymbol());
+                            }
                         }
                     }
                 }
 
-                // Add newline
-                if (lineCtx.NEWLINE() != null) {
-                    line.append(lineCtx.NEWLINE().getText());
-                    skip(lineCtx.NEWLINE().getSymbol());
+                // Add any remaining content as a line
+                if (currentLine.length() > 0) {
+                    contentLines.add(currentLine.toString());
                 }
-
-                contentLines.add(line.toString());
             }
 
             // Get closing marker (UNQUOTED_TEXT)
@@ -1277,9 +1177,11 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         }
 
         return convert(ctx, (c, prefix) -> {
-            // Simple implementation - just convert the entire context to plain text
-            // This is used for stage names and other simple arguments
-            String fullText = c.getText();
+            // Read from source to include HIDDEN channel tokens (whitespace, comments)
+            int startIndex = c.getStart().getStartIndex();
+            int stopIndex = c.getStop().getStopIndex();
+            String fullText = source.substring(source.offsetByCodePoints(0, startIndex), source.offsetByCodePoints(0, stopIndex + 1));
+
             Dockerfile.PlainText plainText = new Dockerfile.PlainText(
                     randomId(),
                     Space.EMPTY,
@@ -1317,30 +1219,6 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         if (token != null) {
             advanceCursor(token.getStopIndex() + 1);
         }
-    }
-
-    private @Nullable Token findLastNonCommentToken(DockerfileParser.@Nullable TextContext textCtx) {
-        if (textCtx == null) {
-            return null;
-        }
-
-        Token lastNonCommentToken = null;
-        for (int i = 0; i < textCtx.getChildCount(); i++) {
-            ParseTree child = textCtx.getChild(i);
-            if (child instanceof DockerfileParser.TextElementContext) {
-                DockerfileParser.TextElementContext textElement = (DockerfileParser.TextElementContext) child;
-                if (textElement.getChildCount() > 0 && textElement.getChild(0) instanceof TerminalNode) {
-                    TerminalNode terminal = (TerminalNode) textElement.getChild(0);
-                    Token token = terminal.getSymbol();
-                    // Skip COMMENT and WS tokens - they should be part of the next element's prefix
-                    if (token.getType() != DockerfileLexer.COMMENT && token.getType() != DockerfileLexer.WS) {
-                        lastNonCommentToken = token;
-                    }
-                }
-            }
-        }
-
-        return lastNonCommentToken != null ? lastNonCommentToken : textCtx.getStop();
     }
 
     private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, Space, T> conversion) {
