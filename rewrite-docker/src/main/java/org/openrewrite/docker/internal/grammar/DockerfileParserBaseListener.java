@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
+// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -608,13 +608,49 @@ public class DockerfileParserBaseListener implements DockerfileParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnvValue(DockerfileParser.EnvValueContext ctx) { }
+	@Override public void enterEnvValueEquals(DockerfileParser.EnvValueEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnvValue(DockerfileParser.EnvValueContext ctx) { }
+	@Override public void exitEnvValueEquals(DockerfileParser.EnvValueEqualsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterEnvValueSpace(DockerfileParser.EnvValueSpaceContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitEnvValueSpace(DockerfileParser.EnvValueSpaceContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterEnvTextEquals(DockerfileParser.EnvTextEqualsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitEnvTextEquals(DockerfileParser.EnvTextEqualsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterEnvTextElementEquals(DockerfileParser.EnvTextElementEqualsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitEnvTextElementEquals(DockerfileParser.EnvTextElementEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -675,6 +711,18 @@ public class DockerfileParserBaseListener implements DockerfileParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitPathList(DockerfileParser.PathListContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterVolumePath(DockerfileParser.VolumePathContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitVolumePath(DockerfileParser.VolumePathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

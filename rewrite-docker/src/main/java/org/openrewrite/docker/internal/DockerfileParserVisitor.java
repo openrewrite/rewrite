@@ -487,7 +487,13 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
                 skip(pairCtx.EQUALS().getSymbol());
             }
 
-            Dockerfile.Argument value = visitArgument(pairCtx.envValue());
+            // Handle both forms: KEY=value (envValueEquals) or KEY value (envValueSpace)
+            Dockerfile.Argument value;
+            if (pairCtx.envValueEquals() != null) {
+                value = visitArgument(pairCtx.envValueEquals().envTextEquals());
+            } else {
+                value = visitArgument(pairCtx.envValueSpace());
+            }
 
             pairs.add(new Dockerfile.Env.EnvPair(randomId(), pairPrefix, Markers.EMPTY, key, hasEquals, value));
         }
@@ -645,9 +651,36 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
             // Parse JSON array
             values = visitJsonArrayForVolume(ctx.jsonArray());
         } else {
-            // Parse path list
-            for (DockerfileParser.PathContext pathCtx : ctx.pathList().path()) {
-                values.add(visitArgument(pathCtx));
+            // Parse path list (space-separated paths)
+            for (DockerfileParser.VolumePathContext pathCtx : ctx.pathList().volumePath()) {
+                Space pathPrefix = prefix(pathCtx.getStart());
+                Token token;
+                String text;
+
+                if (pathCtx.UNQUOTED_TEXT() != null) {
+                    token = pathCtx.UNQUOTED_TEXT().getSymbol();
+                    text = token.getText();
+                    skip(token);
+                    List<Dockerfile.ArgumentContent> contents = new ArrayList<>();
+                    contents.add(new Dockerfile.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, text));
+                    values.add(new Dockerfile.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
+                } else if (pathCtx.DOUBLE_QUOTED_STRING() != null) {
+                    token = pathCtx.DOUBLE_QUOTED_STRING().getSymbol();
+                    text = token.getText();
+                    skip(token);
+                    List<Dockerfile.ArgumentContent> contents = new ArrayList<>();
+                    contents.add(new Dockerfile.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY,
+                        text.substring(1, text.length() - 1), Dockerfile.QuotedString.QuoteStyle.DOUBLE));
+                    values.add(new Dockerfile.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
+                } else if (pathCtx.SINGLE_QUOTED_STRING() != null) {
+                    token = pathCtx.SINGLE_QUOTED_STRING().getSymbol();
+                    text = token.getText();
+                    skip(token);
+                    List<Dockerfile.ArgumentContent> contents = new ArrayList<>();
+                    contents.add(new Dockerfile.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY,
+                        text.substring(1, text.length() - 1), Dockerfile.QuotedString.QuoteStyle.SINGLE));
+                    values.add(new Dockerfile.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
+                }
             }
         }
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileLexer.g4 by ANTLR 4.13.2
+// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 import java.util.Stack;
 import org.antlr.v4.runtime.Lexer;

@@ -358,8 +358,11 @@ class DockerfileParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Dockerfile.Env env = (Dockerfile.Env) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(env.getPairs()).hasSize(2); // FIXME this should be two pairs!
-                assertThat(((Dockerfile.PlainText) env.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
+                assertThat(env.getPairs()).hasSize(2);
+                assertThat(((Dockerfile.PlainText) env.getPairs().get(0).getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
+                assertThat(((Dockerfile.PlainText) env.getPairs().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
+                assertThat(((Dockerfile.PlainText) env.getPairs().get(1).getKey().getContents().getFirst()).getText()).isEqualTo("NPM_VERSION");
+                assertThat(((Dockerfile.PlainText) env.getPairs().get(1).getValue().getContents().getFirst()).getText()).isEqualTo("9.0.0");
             })
           )
         );
@@ -661,8 +664,10 @@ class DockerfileParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Dockerfile.Volume volume = (Dockerfile.Volume) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(volume.getValues()).hasSize(2); // FIXME right now values is a single string `/data /logs`
+                assertThat(volume.getValues()).hasSize(2);
                 assertThat(volume.isJsonForm()).isFalse();
+                assertThat(((Dockerfile.PlainText) volume.getValues().get(0).getContents().getFirst()).getText()).isEqualTo("/data");
+                assertThat(((Dockerfile.PlainText) volume.getValues().get(1).getContents().getFirst()).getText()).isEqualTo("/logs");
             })
           )
         );

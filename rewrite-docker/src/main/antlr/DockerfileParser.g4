@@ -217,15 +217,32 @@ envPairs
     ;
 
 envPair
-    : envKey ( EQUALS envValue | envValue )
+    : envKey EQUALS envValueEquals  // New form: KEY=value (no = in value)
+    | envKey envValueSpace           // Old form: KEY value (rest of line, can have =)
     ;
 
 envKey
     : UNQUOTED_TEXT
     ;
 
-envValue
+envValueEquals
+    : envTextEquals
+    ;
+
+envValueSpace
     : text
+    ;
+
+envTextEquals
+    : envTextElementEquals+
+    ;
+
+envTextElementEquals
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    | ENV_VAR
+    // NOTE: EQUALS is explicitly NOT included to allow multiple KEY=value pairs
     ;
 
 sourceList
@@ -245,7 +262,13 @@ path
     ;
 
 pathList
-    : path+
+    : volumePath+
+    ;
+
+volumePath
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
     ;
 
 userSpec

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
+// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -503,15 +503,45 @@ public interface DockerfileParserListener extends ParseTreeListener {
 	 */
 	void exitEnvKey(DockerfileParser.EnvKeyContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerfileParser#envValue}.
+	 * Enter a parse tree produced by {@link DockerfileParser#envValueEquals}.
 	 * @param ctx the parse tree
 	 */
-	void enterEnvValue(DockerfileParser.EnvValueContext ctx);
+	void enterEnvValueEquals(DockerfileParser.EnvValueEqualsContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link DockerfileParser#envValue}.
+	 * Exit a parse tree produced by {@link DockerfileParser#envValueEquals}.
 	 * @param ctx the parse tree
 	 */
-	void exitEnvValue(DockerfileParser.EnvValueContext ctx);
+	void exitEnvValueEquals(DockerfileParser.EnvValueEqualsContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerfileParser#envValueSpace}.
+	 * @param ctx the parse tree
+	 */
+	void enterEnvValueSpace(DockerfileParser.EnvValueSpaceContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerfileParser#envValueSpace}.
+	 * @param ctx the parse tree
+	 */
+	void exitEnvValueSpace(DockerfileParser.EnvValueSpaceContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerfileParser#envTextEquals}.
+	 * @param ctx the parse tree
+	 */
+	void enterEnvTextEquals(DockerfileParser.EnvTextEqualsContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerfileParser#envTextEquals}.
+	 * @param ctx the parse tree
+	 */
+	void exitEnvTextEquals(DockerfileParser.EnvTextEqualsContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerfileParser#envTextElementEquals}.
+	 * @param ctx the parse tree
+	 */
+	void enterEnvTextElementEquals(DockerfileParser.EnvTextElementEqualsContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerfileParser#envTextElementEquals}.
+	 * @param ctx the parse tree
+	 */
+	void exitEnvTextElementEquals(DockerfileParser.EnvTextElementEqualsContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerfileParser#sourceList}.
 	 * @param ctx the parse tree
@@ -562,6 +592,16 @@ public interface DockerfileParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitPathList(DockerfileParser.PathListContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerfileParser#volumePath}.
+	 * @param ctx the parse tree
+	 */
+	void enterVolumePath(DockerfileParser.VolumePathContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerfileParser#volumePath}.
+	 * @param ctx the parse tree
+	 */
+	void exitVolumePath(DockerfileParser.VolumePathContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerfileParser#userSpec}.
 	 * @param ctx the parse tree

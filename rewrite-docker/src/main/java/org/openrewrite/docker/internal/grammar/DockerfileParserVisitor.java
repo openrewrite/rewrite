@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
+// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -314,11 +314,29 @@ public interface DockerfileParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitEnvKey(DockerfileParser.EnvKeyContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerfileParser#envValue}.
+	 * Visit a parse tree produced by {@link DockerfileParser#envValueEquals}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitEnvValue(DockerfileParser.EnvValueContext ctx);
+	T visitEnvValueEquals(DockerfileParser.EnvValueEqualsContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerfileParser#envValueSpace}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitEnvValueSpace(DockerfileParser.EnvValueSpaceContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerfileParser#envTextEquals}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitEnvTextEquals(DockerfileParser.EnvTextEqualsContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerfileParser#envTextElementEquals}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitEnvTextElementEquals(DockerfileParser.EnvTextElementEqualsContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerfileParser#sourceList}.
 	 * @param ctx the parse tree
@@ -349,6 +367,12 @@ public interface DockerfileParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitPathList(DockerfileParser.PathListContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerfileParser#volumePath}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitVolumePath(DockerfileParser.VolumePathContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerfileParser#userSpec}.
 	 * @param ctx the parse tree
