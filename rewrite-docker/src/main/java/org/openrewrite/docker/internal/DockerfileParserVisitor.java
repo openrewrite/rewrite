@@ -37,6 +37,7 @@ import java.util.function.BiFunction;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerfile> {
@@ -132,8 +133,8 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         skip(ctx.FROM().getSymbol());
 
         List<Dockerfile.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
-        Dockerfile.Argument[] imageComponents = parseImageName(ctx.imageName());
-        Dockerfile.Argument imageName = imageComponents[0];
+        Dockerfile.@Nullable Argument[] imageComponents = parseImageName(ctx.imageName());
+        Dockerfile.Argument imageName = requireNonNull(imageComponents[0]);
         Dockerfile.Argument tag = imageComponents[1];
         Dockerfile.Argument digest = imageComponents[2];
         Dockerfile.From.As as = ctx.AS() != null ? visitFromAs(ctx) : null;
@@ -157,7 +158,7 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         );
     }
 
-    private Dockerfile.Argument[] parseImageName(DockerfileParser.ImageNameContext ctx) {
+    private Dockerfile.@Nullable Argument[] parseImageName(DockerfileParser.ImageNameContext ctx) {
         Space prefix = prefix(ctx);
 
         // Parse the text and split out environment variables
@@ -173,7 +174,7 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         if (contents.size() == 1 && contents.get(0) instanceof Dockerfile.QuotedString) {
             // Single quoted string - keep it as-is
             Dockerfile.Argument imageName = new Dockerfile.Argument(randomId(), prefix, Markers.EMPTY, contents);
-            return new Dockerfile.Argument[]{imageName, null, null};
+            return new Dockerfile.@Nullable Argument[]{imageName, null, null};
         }
 
         // Split contents into imageName, tag, and digest components
@@ -244,10 +245,10 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         Dockerfile.Argument digest = digestContents.isEmpty() ? null :
                 new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digestContents);
 
-        return new Dockerfile.Argument[]{imageName, tag, digest};
+        return new Dockerfile.@Nullable Argument[]{imageName, tag, digest};
     }
 
-    private List<Dockerfile.ArgumentContent> parseText(DockerfileParser.TextContext textCtx) {
+    private List<Dockerfile.ArgumentContent> parseText(DockerfileParser.@Nullable TextContext textCtx) {
         List<Dockerfile.ArgumentContent> contents = new ArrayList<>();
 
         if (textCtx == null) {
@@ -893,8 +894,8 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         skip(ctx.USER().getSymbol());
 
         // Parse userSpec and split into user and optional group
-        Dockerfile.Argument[] userAndGroup = parseUserSpec(ctx.userSpec());
-        Dockerfile.Argument user = userAndGroup[0];
+        Dockerfile.@Nullable Argument[] userAndGroup = parseUserSpec(ctx.userSpec());
+        Dockerfile.Argument user = requireNonNull(userAndGroup[0]);
         Dockerfile.Argument group = userAndGroup[1];
 
         // Advance cursor to end of instruction, but NOT past trailing comment
@@ -909,7 +910,7 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         return new Dockerfile.User(randomId(), prefix, Markers.EMPTY, userKeyword, user, group);
     }
 
-    private Dockerfile.Argument[] parseUserSpec(DockerfileParser.UserSpecContext ctx) {
+    private Dockerfile.@Nullable Argument[] parseUserSpec(DockerfileParser.UserSpecContext ctx) {
         Space prefix = prefix(ctx);
 
         // Parse the text
@@ -965,7 +966,7 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         Dockerfile.Argument group = groupContents.isEmpty() ? null :
                 new Dockerfile.Argument(randomId(), Space.EMPTY, Markers.EMPTY, groupContents);
 
-        return new Dockerfile.Argument[]{user, group};
+        return new Dockerfile.@Nullable Argument[]{user, group};
     }
 
     @Override
@@ -1318,7 +1319,7 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Dockerf
         }
     }
 
-    private Token findLastNonCommentToken(DockerfileParser.TextContext textCtx) {
+    private @Nullable Token findLastNonCommentToken(DockerfileParser.@Nullable TextContext textCtx) {
         if (textCtx == null) {
             return null;
         }
