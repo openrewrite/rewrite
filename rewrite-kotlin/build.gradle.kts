@@ -19,7 +19,7 @@ dependencies {
 
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation(project(":rewrite-test"))
-    testRuntimeOnly(project(":rewrite-java-25"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
     testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
 
@@ -30,7 +30,7 @@ dependencies {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 

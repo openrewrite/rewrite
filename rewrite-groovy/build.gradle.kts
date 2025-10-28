@@ -35,6 +35,11 @@ testing {
     }
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
 
 dependencies {
     api(project(":rewrite-java"))
@@ -55,7 +60,7 @@ dependencies {
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
     testRuntimeOnly("org.apache.groovy:groovy-all:latest.release")
-    testRuntimeOnly(project(":rewrite-java-25"))
+    testRuntimeOnly(project(":rewrite-java-21"))
 }
 
 tasks.named("check") {
