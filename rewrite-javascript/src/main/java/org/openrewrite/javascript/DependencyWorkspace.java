@@ -88,6 +88,10 @@ class DependencyWorkspace {
 
         // Create new workspace
         try {
+            // Ensure workspace base directory exists
+            // createDirectories is idempotent and safe to call even if directory exists
+            Files.createDirectories(WORKSPACE_BASE);
+
             // Use temp directory for atomic creation
             Path tempDir = Files.createTempDirectory(WORKSPACE_BASE, hash + ".tmp-");
 

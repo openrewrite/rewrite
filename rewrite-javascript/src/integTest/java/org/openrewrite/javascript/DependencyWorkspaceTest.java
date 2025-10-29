@@ -193,6 +193,30 @@ class DependencyWorkspaceTest implements RewriteTest {
         assertThat(Files.exists(workspaceAfterClear.resolve("node_modules"))).isTrue();
     }
 
+    @Test
+    void createsWorkspaceWhenBaseDirectoryDoesNotExist() throws Exception {
+        // This test verifies the fix for the issue where WORKSPACE_BASE might not exist
+        // when createTempDirectory is called. The fix ensures the base directory is
+        // created before attempting to create temp directories within it.
+
+        String packageJson = """
+                {
+                  "name": "test-base-dir",
+                  "dependencies": {
+                    "lodash": "^4.17.21"
+                  }
+                }
+                """;
+
+        // Even if the base directory doesn't exist initially, the workspace should be created
+        Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson);
+
+        assertThat(workspace).isNotNull();
+        assertThat(Files.exists(workspace)).isTrue();
+        assertThat(Files.exists(workspace.resolve("node_modules"))).isTrue();
+        assertThat(Files.exists(workspace.resolve("package.json"))).isTrue();
+    }
+
     private static class NoOpRecipe extends Recipe {
         @Override
         public String getDisplayName() {
