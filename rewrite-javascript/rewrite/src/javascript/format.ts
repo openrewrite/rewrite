@@ -85,13 +85,6 @@ export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
         }
         return super.postVisit(tree, p);
     }
-
-    private concatenatePrefix(node: Draft<J>, right: J.Space) {
-        // TODO look at https://github.com/openrewrite/rewrite/commit/990a366fab9e5656812d81d0eb15ecb6bfd2fde0#diff-ec2e977fe8f1e189735e71b817f8f1ebaf79c1490c0210652e8a559f7f7877de
-        // and possibly incorporate it here - some special logic needed to merge comments better (?)
-        node.prefix.comments = [...node.prefix.comments, ...right.comments];
-        node.prefix.whitespace = node.prefix.whitespace + right.whitespace;
-    }
 }
 
 export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
@@ -193,11 +186,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
         const ret = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
-        // TODO
-        // if (c.leadingAnnotations.length > 1) {
-        //     c = {...c, leadingAnnotations: spaceBetweenAnnotations(c.leadingAnnotations)};
-        // }
-
         // TODO typeParameters - IntelliJ doesn't seem to provide a setting for angleBrackets spacing for Typescript (while it does for Java),
         // thus we either introduce our own setting or just enforce the natural spacing with no setting
 
@@ -326,10 +314,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
             draft.parameters = await this.spaceBeforeContainer(draft.parameters, this.style.beforeParentheses.functionDeclarationParentheses);
 
             // TODO typeParameters handling - see visitClassDeclaration
-            // TODO
-            // if (m.leadingAnnotations.length > 1) {
-            //     m = m.withLeadingAnnotations(this.spaceBetweenAnnotations(m.leadingAnnotations));
-            // }
         });
     }
 
@@ -349,11 +333,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.arguments.elements[0] = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.arguments.elements[0], this.style.within.functionCallParentheses), false);
             }
             // TODO typeParameters handling - see visitClassDeclaration
-
-            // TODO
-            // m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
-            // if (m.getArguments().isEmpty() || m.getArguments()[0] instanceof J.Empty) {
-            //   ...
         });
     }
 
@@ -584,20 +563,6 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
             this.cursor?.root.messages.set("stop", true);
         }
         return super.postVisit(tree, p);
-    }
-
-    public async visitStatement(statement: Statement, p: P): Promise<Statement> {
-        const j = await super.visitStatement(statement, p) as Statement;
-        // TODO is it needed?
-        // const parent = this.cursor.parentTree()?.value;
-        // if (parent?.kind === J.Kind.Block && j.kind !== J.Kind.EnumValueSet) {
-        //     if (!j.prefix.whitespace.includes("\n")) {
-        //         return produce(j, draft => {
-        //             draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
-        //         });
-        //     }
-        // }
-        return j;
     }
 
     protected async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: P): Promise<J.VariableDeclarations> {
@@ -1068,8 +1033,6 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             if (!draft.end.whitespace.includes("\n")) {
                 draft.end.whitespace = draft.end.whitespace + "\n";
             }
-            // TODO check if it's relevant to TS/JS
-            // draft.end = this.keepMaximumLines(draft.end, this.style.keepMaximum.beforeEndOfBlock);
         });
     }
 
@@ -1078,17 +1041,6 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         this.keepMaximumBlankLines(e, this.style.keepMaximum.inCode);
         return e;
     }
-    // TODO check if it's relevant to TS/JS
-    // protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J.NewClass> {
-    //     const j = await super.visitNewClass(newClass, p) as J.NewClass;
-    //     if (!j.body) return j;
-    //
-    //     return produce(j, draft => {
-    //         if (draft.body!.statements.length > 0) {
-    //             draft.body!.statements[0] = this.minimumLines(draft.body!.statements[0].whitespace, this.style.minimum.afterFunction ?? 0);
-    //         }
-    //     });
-    // }
 
     private keepMaximumBlankLines<T extends J>(node: Draft<T>, max: number) {
         const whitespace = node.prefix.whitespace;
@@ -1137,12 +1089,10 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
 }
 
 export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
-    private readonly newline: string;
     private readonly singleIndent: string;
 
     constructor(private readonly tabsAndIndentsStyle: TabsAndIndentsStyle, private stopAfter?: Tree) {
         super();
-        this.newline = "\n"; // TODO this should be configurable and come from some style too
 
         if (this.tabsAndIndentsStyle.useTabCharacter) {
             this.singleIndent = "\t";
