@@ -234,7 +234,7 @@ public class DependencyInsight extends Recipe {
                         continue;
                     }
 
-                    String parentKey = determineParentKey(nodes);
+                    String parentKey = determineParentKey(nodes, path.getScope());
 
                     // Keep the longest path for each parent
                     DependencyGraph.DependencyPath existing = pathsByParent.get(parentKey);
@@ -245,15 +245,15 @@ public class DependencyInsight extends Recipe {
                 return pathsByParent;
             }
 
-            private String determineParentKey(List<DependencyGraph.DependencyNode> nodes) {
+            private String determineParentKey(List<DependencyGraph.DependencyNode> nodes, String configName) {
                 if (nodes.size() == 1) {
-                    // Direct dependency
-                    return "direct";
+                    // Direct dependency - include configuration to avoid deduplicating across independent configurations
+                    return "direct:" + configName;
                 } else {
                     // nodes.get(0) is the target dependency itself
                     // nodes.get(1) is its immediate parent
                     DependencyGraph.DependencyNode parentNode = nodes.get(1);
-                    return parentNode.getGroupId() + ":" + parentNode.getArtifactId() + ":" + parentNode.getVersion();
+                    return parentNode.getGroupId() + ":" + parentNode.getArtifactId() + ":" + parentNode.getVersion() + ":" + configName;
                 }
             }
 

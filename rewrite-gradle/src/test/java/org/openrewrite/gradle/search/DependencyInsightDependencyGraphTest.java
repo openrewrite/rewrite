@@ -287,20 +287,34 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
     }
 
     @Test
-    void dependencyGraphWithNullConfigurationSearchesAllConfigurations() {
+    void dependencyGraphWithNullConfigurationCapturesInheritingConfigurations() {
         rewriteRun(
           spec -> spec
             .recipe(new DependencyInsight("com.google.guava", "guava", null, null))
             .dataTable(DependenciesInUse.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                DependenciesInUse.Row row = rows.getFirst();
-                // compileClasspath is processed before runtimeClasspath, so it will be kept by deduplication
-                assertThat(row.getDependencyGraph()).isEqualTo(
+                // When searching all configurations, each configuration shows the dependency separately
+                // guava appears in compileClasspath, runtimeClasspath, testCompileClasspath, testRuntimeClasspath
+                assertThat(rows).hasSize(4);
+                assertThat(rows).anyMatch(row -> row.getDependencyGraph().equals(
                   """
                     com.google.guava:guava:29.0-jre
                     \\--- compileClasspath
-                    """.strip());
-                assertThat(row.getDepth()).isEqualTo(0);
+                    """.strip()) && row.getDepth() == 0);
+                assertThat(rows).anyMatch(row -> row.getDependencyGraph().equals(
+                  """
+                    com.google.guava:guava:29.0-jre
+                    \\--- runtimeClasspath
+                    """.strip()) && row.getDepth() == 0);
+                assertThat(rows).anyMatch(row -> row.getDependencyGraph().equals(
+                  """
+                    com.google.guava:guava:29.0-jre
+                    \\--- testCompileClasspath
+                    """.strip()) && row.getDepth() == 0);
+                assertThat(rows).anyMatch(row -> row.getDependencyGraph().equals(
+                  """
+                    com.google.guava:guava:29.0-jre
+                    \\--- testRuntimeClasspath
+                    """.strip()) && row.getDepth() == 0);
             }),
           buildGradle(
             """
@@ -314,7 +328,6 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
 
               dependencies {
                   implementation 'com.google.guava:guava:29.0-jre'
-                  testImplementation 'com.google.guava:guava:29.0-jre'
               }
               """,
             """
@@ -328,7 +341,73 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
 
               dependencies {
                   /*~~(com.google.guava:guava:29.0-jre)~~>*/implementation 'com.google.guava:guava:29.0-jre'
-                  /*~~(com.google.guava:guava:29.0-jre)~~>*/testImplementation 'com.google.guava:guava:29.0-jre'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependencyGraphWithNullConfigurationCapturesIndependentConfigurations() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new DependencyInsight("junit", "junit", null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                // When different versions of the same dependency are in two independent configurations,
+                // show each separately for each configuration (like Gradle does)
+                assertThat(rows).hasSize(2);
+                DependenciesInUse.Row row1 = rows.get(0);
+                assertThat(row1.getDependencyGraph()).isEqualTo(
+                  """
+                    junit:junit:4.12
+                    \\--- custom1
+                    """.strip());
+                assertThat(row1.getDepth()).isEqualTo(0);
+                DependenciesInUse.Row row2 = rows.get(1);
+                assertThat(row2.getDependencyGraph()).isEqualTo(
+                  """
+                    junit:junit:4.13
+                    \\--- custom2
+                    """.strip());
+                assertThat(row2.getDepth()).isEqualTo(0);
+            }),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              configurations {
+                  custom1
+                  custom2
+              }
+
+              dependencies {
+                  custom1 'junit:junit:4.12'
+                  custom2 'junit:junit:4.13'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              configurations {
+                  custom1
+                  custom2
+              }
+
+              dependencies {
+                  /*~~(junit:junit:4.12)~~>*/custom1 'junit:junit:4.12'
+                  /*~~(junit:junit:4.13)~~>*/custom2 'junit:junit:4.13'
               }
               """
           )
