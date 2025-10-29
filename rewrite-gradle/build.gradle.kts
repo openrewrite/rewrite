@@ -79,6 +79,12 @@ dependencies {
 
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 tasks.withType<Test>().configureEach {
     dependsOn(pluginLocalTestClasspath)
     systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!.path)
