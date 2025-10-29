@@ -68,9 +68,10 @@ describe('AutoformatVisitor', () => {
                         console.log(\`Number: \` + j);
                     }
                 `,
+                // TODO the space before export type T2 is excessive
                 `
                     type T1 = string;
-                    export type T2 = string;
+                     export type T2 = string;
 
                     abstract class L {
                     }
