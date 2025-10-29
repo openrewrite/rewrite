@@ -1146,7 +1146,10 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     protected async preVisit(tree: J, p: P): Promise<J | undefined> {
         let ret = await super.preVisit(tree, p)! as J;
 
-        let indentShouldIncrease = tree.kind === J.Kind.Block || this.cursor.parent?.parent?.parent?.value.kind == J.Kind.Case;
+        let indentShouldIncrease =
+            tree.kind === J.Kind.Block
+            || this.cursor.parent?.parent?.parent?.value.kind == J.Kind.Case
+            || (tree.kind === J.Kind.MethodDeclaration && this.cursor.parent?.value.kind === JS.Kind.StatementExpression);
 
         const previousIndent = this.currentIndent;
 
