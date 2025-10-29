@@ -39,61 +39,38 @@ public class Assertions {
     }
 
     public static SourceSpecs npm(Path relativeTo, SourceSpecs... sources) {
-        // Second pass: run npm install if needed
-        boolean alreadyInstalled = false;
+        String packageJsonContent = null;
 
-        // First pass: write package.json files
+        // First pass: find package.json content and write it to relativeTo
         for (SourceSpecs multiSpec : sources) {
             if (multiSpec instanceof SourceSpec) {
                 SourceSpec<?> spec = (SourceSpec<?>) multiSpec;
                 Path sourcePath = spec.getSourcePath();
                 if (sourcePath != null && "package.json".equals(sourcePath.toFile().getName())) {
+                    packageJsonContent = spec.getBefore();
                     try {
                         Path packageJson = relativeTo.resolve(sourcePath);
-                        if (Files.exists(packageJson)) {
-                            // If relativeTo is a non-transient directory we can optimize not having
-                            // to do npm install if the package.json hasn't changed.
-                            if (new String(Files.readAllBytes(packageJson), StandardCharsets.UTF_8).equals(spec.getBefore())) {
-                                alreadyInstalled = true;
-                                continue;
-                            }
-                        }
-                        Files.write(packageJson, requireNonNull(spec.getBefore()).getBytes(StandardCharsets.UTF_8));
+                        Files.write(packageJson, requireNonNull(packageJsonContent).getBytes(StandardCharsets.UTF_8));
                     } catch (IOException e) {
                         throw new UncheckedIOException(e);
                     }
+                    break;
                 }
             }
         }
 
-        for (SourceSpecs multiSpec : sources) {
-            if (multiSpec instanceof SourceSpec) {
-                SourceSpec<?> spec = (SourceSpec<?>) multiSpec;
-                if (!alreadyInstalled && spec.getParser() instanceof JavaScriptParser.Builder) {
-                    // Execute npm install to ensure dependencies are available
-                    // First check if package.json exists
-                    Path packageJsonPath = relativeTo.resolve("package.json");
-                    if (!Files.exists(packageJsonPath)) {
-                        // Skip npm install if no package.json exists
-                        alreadyInstalled = true;
-                        continue;
-                    }
+        // Second pass: get or create cached workspace and symlink node_modules
+        if (packageJsonContent != null) {
+            Path workspaceDir = DependencyWorkspace.getOrCreateWorkspace(packageJsonContent);
+            Path nodeModulesSource = workspaceDir.resolve("node_modules");
+            Path nodeModulesTarget = relativeTo.resolve("node_modules");
 
-                    try {
-                        ProcessBuilder pb = new ProcessBuilder("npm", "install");
-                        pb.directory(relativeTo.toFile());
-                        pb.inheritIO();
-                        Process process = pb.start();
-                        int exitCode = process.waitFor();
-                        if (exitCode != 0) {
-                            throw new RuntimeException("npm install failed with exit code: " + exitCode + " in directory: " + relativeTo.toFile().getAbsolutePath());
-                        }
-                    } catch (IOException | InterruptedException e) {
-                        throw new RuntimeException("Failed to run npm install in directory: " + relativeTo.toFile().getAbsolutePath(), e);
-                    }
-
-                    alreadyInstalled = true;
+            try {
+                if (Files.exists(nodeModulesSource) && !Files.exists(nodeModulesTarget)) {
+                    Files.createSymbolicLink(nodeModulesTarget, nodeModulesSource);
                 }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to create symlink for node_modules", e);
             }
         }
 
