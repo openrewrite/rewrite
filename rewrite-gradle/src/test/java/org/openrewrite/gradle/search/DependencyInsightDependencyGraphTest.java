@@ -277,4 +277,53 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dependencyGraphWithNullConfigurationSearchesAllConfigurations() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new DependencyInsight("com.google.guava", "guava", null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                DependenciesInUse.Row row = rows.getFirst();
+                // compileClasspath is processed before runtimeClasspath, so it will be kept by deduplication
+                assertThat(row.getDependencyGraph()).isEqualTo(
+                  """
+                    com.google.guava:guava:29.0-jre
+                    \\--- compileClasspath
+                    """.strip());
+                assertThat(row.getDepth()).isEqualTo(0);
+            }),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre'
+                  testImplementation 'com.google.guava:guava:29.0-jre'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  /*~~(com.google.guava:guava:29.0-jre)~~>*/implementation 'com.google.guava:guava:29.0-jre'
+                  /*~~(com.google.guava:guava:29.0-jre)~~>*/testImplementation 'com.google.guava:guava:29.0-jre'
+              }
+              """
+          )
+        );
+    }
 }

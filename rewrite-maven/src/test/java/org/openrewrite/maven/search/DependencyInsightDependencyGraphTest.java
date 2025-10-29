@@ -279,4 +279,73 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dependencyGraphWithNullScopeSearchesAllScopes() {
+        rewriteRun(
+          spec -> spec
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                assertThat(rows).hasSize(2);
+                DependenciesInUse.Row row1 = rows.get(0);
+                // When scope is null, all scopes are searched
+                // Dependencies without an explicit scope default to compile
+                assertThat(row1.getDependencyGraph()).isEqualTo(
+                  """
+                    com.google.guava:guava:29.0-jre
+                    \\--- compile
+                    """.strip());
+                assertThat(row1.getDepth()).isEqualTo(0);
+                DependenciesInUse.Row row2 = rows.get(1);
+                assertThat(row2.getDependencyGraph()).isEqualTo(
+                  """
+                    com.google.guava:guava:29.0-jre
+                    \\--- compile
+                    """.strip());
+                assertThat(row2.getDepth()).isEqualTo(0);
+            })
+            .recipe(new DependencyInsight("com.google.guava", "guava", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                  </dependency>
+                  <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                      <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~>--><dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                  </dependency>
+                  <!--~~>--><dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                      <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
