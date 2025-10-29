@@ -328,4 +328,24 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     })
+
+    test('unify indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {})));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                const good = 136;
+                 const great = 436;
+                  const ideal = 504;
+                `,
+                `
+                const good = 136;
+                const great = 436;
+                const ideal = 504;
+                `)
+            // @formatter:on
+        )
+    });
 });

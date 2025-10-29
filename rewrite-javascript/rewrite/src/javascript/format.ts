@@ -1225,16 +1225,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     private get currentIndent(): string {
-        const indent = this.cursor.getNearestMessage("indentToUse");
-        if (indent == undefined) {
-            const enclosingWhitespace = this.cursor.firstEnclosing((x: any): x is J => x.prefix && x.prefix.whitespace.includes("\n"))?.prefix.whitespace;
-            if (enclosingWhitespace) {
-                return enclosingWhitespace.substring(enclosingWhitespace.lastIndexOf("\n") + 1);
-            } else {
-                return "";
-            }
-        }
-        return indent;
+        return this.cursor.getNearestMessage("indentToUse") ?? "";
     }
 
     private combineIndent(oldWs: string, relativeIndent: string): string {
