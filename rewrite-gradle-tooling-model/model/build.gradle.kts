@@ -40,11 +40,6 @@ dependencies {
     testImplementation("com.fasterxml.jackson.core:jackson-databind")
     testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
 
-    testImplementation("org.assertj:assertj-core:3.+")
-    testImplementation(platform("org.junit:junit-bom:5.13.3"))
-    testImplementation("org.junit.jupiter:junit-jupiter-api")
-    testImplementation("org.junit.jupiter:junit-jupiter-params")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     "pluginLocalTestClasspath"(project(":rewrite-gradle-tooling-model:plugin"))
 }
 
