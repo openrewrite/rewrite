@@ -15,7 +15,7 @@
  */
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, emptySpace, J, Statement} from "../java";
+import {Comment, J, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isScope, Tree} from "../tree";
 import {
@@ -445,6 +445,10 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     }
     protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: P): Promise<J | undefined> {
         const ret = await super.visitVariable(variable, p) as J.VariableDeclarations.NamedVariable;
+        if (variable.initializer?.element?.kind == JS.Kind.StatementExpression
+            && (variable.initializer.element as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration) {
+            return ret;
+        }
         return produceAsync(ret, async draft => {
             if (draft.initializer) {
                 draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
@@ -968,7 +972,11 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             });
             return super.visit(cu, p, cursor);
         }
-        if (tree.kind === J.Kind.MethodDeclaration) {
+        if (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration) {
+            tree = produce(tree as JS.StatementExpression, draft => {
+                this.ensurePrefixHasNewLine(draft);
+            });
+        } else if (tree.kind === J.Kind.MethodDeclaration && this.cursor.value.kind != JS.Kind.StatementExpression) {
             tree = produce(tree as J.MethodDeclaration, draft => {
                 this.ensurePrefixHasNewLine(draft);
             });
@@ -1149,7 +1157,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         let indentShouldIncrease =
             tree.kind === J.Kind.Block
             || this.cursor.parent?.parent?.parent?.value.kind == J.Kind.Case
-            || (tree.kind === J.Kind.MethodDeclaration && this.cursor.parent?.value.kind === JS.Kind.StatementExpression);
+            || (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration);
 
         const previousIndent = this.currentIndent;
 

@@ -192,9 +192,8 @@ describe('AutoformatVisitor', () => {
             //language=typescript
             typescript(
                 `const fn = function () {return 99;};`,
-                 // TODO the space after `const fn=` is excessive
                  `
-                const fn = 
+                const fn =
                     function () {
                         return 99;
                     };

@@ -252,4 +252,23 @@ describe('variable declaration mapping', () => {
                 }
             `)
         ));
+
+    test.each([
+        "const c =  function(): number { return 116; };",
+        "const c =  136;",
+        "const c =  (1 > 0) ? 116 : 119;"
+    ])('double space: %s', (code) =>
+        spec.rewriteRun({
+            //language=javascript
+            ...typescript(code),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                expect(cu.statements).toHaveLength(1);
+                cu.statements.forEach(statement => {
+                    const varDecl = statement.element as J.VariableDeclarations;
+                    const initializer = varDecl.variables[0].element.initializer!;
+                    expect(initializer.before.whitespace).toBe(" ");
+                    expect(initializer.element.prefix.whitespace).toBe("  ");
+                });
+            }
+        }));
 });
