@@ -3131,12 +3131,15 @@ export class JavaScriptParserVisitor {
     }
 
     visitFunctionExpression(node: ts.FunctionExpression): JS.StatementExpression {
+        const delegate = this.mapFunctionDeclaration(node);
         return {
             kind: JS.Kind.StatementExpression,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: delegate.prefix,
             markers: emptyMarkers,
-            statement: this.mapFunctionDeclaration(node)
+            statement: produce(delegate, draft => {
+              draft.prefix = emptySpace;
+            })
         };
     }
 
