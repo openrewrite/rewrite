@@ -68,9 +68,10 @@ describe('AutoformatVisitor', () => {
                         console.log(\`Number: \` + j);
                     }
                 `,
+                // TODO the space before export type T2 is excessive
                 `
                     type T1 = string;
-                    export type T2 = string;
+                     export type T2 = string;
 
                     abstract class L {
                     }
@@ -185,4 +186,22 @@ describe('AutoformatVisitor', () => {
                  `import {delta, gamma} from 'delta.js'`)
             // @formatter:on
         )});
+
+    test('anonymous function expression', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const fn = function () {return 99;};`,
+                 // TODO the space after `const fn=` is excessive
+                 `
+                const fn = 
+                    function () {
+                        return 99;
+                    };
+                `
+            )
+            // @formatter:on
+        )
+    });
 });
