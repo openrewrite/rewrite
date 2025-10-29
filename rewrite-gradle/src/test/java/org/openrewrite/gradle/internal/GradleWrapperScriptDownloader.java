@@ -84,13 +84,13 @@ public class GradleWrapperScriptDownloader {
 
         // Write new files once
         for (Map.Entry<String, String> entry : unixChecksums.entrySet()) {
-            if (entry.getValue() != null) {
+            if (!entry.getValue().isBlank()) {
                 Path scriptChecksumPath = WRAPPER_SCRIPTS.resolve("unix").resolve(entry.getKey() + ".txt");
                 Files.writeString(scriptChecksumPath, entry.getValue());
             }
         }
         for (Map.Entry<String, String> entry : batChecksums.entrySet()) {
-            if (entry.getValue() != null) {
+            if (!entry.getValue().isBlank()) {
                 Path scriptChecksumPath = WRAPPER_SCRIPTS.resolve("windows").resolve(entry.getKey() + ".txt");
                 Files.writeString(scriptChecksumPath, entry.getValue());
             }
@@ -110,8 +110,8 @@ public class GradleWrapperScriptDownloader {
       InMemoryExecutionContext ctx) {
         String v = version.getVersion();
         if (allVersions.containsKey(v)) {
-            unixChecksums.put(allVersions.get(v).getGradlewChecksum(), null);
-            batChecksums.put(allVersions.get(v).getGradlewBatChecksum(), null);
+            unixChecksums.computeIfAbsent(allVersions.get(v).getGradlewChecksum(), __ -> "");
+            batChecksums.computeIfAbsent(allVersions.get(v).getGradlewBatChecksum(), __ -> "");
             System.out.printf("%03d: %s already exists. Skipping.%n", i.incrementAndGet(), v);
             return;
         }
