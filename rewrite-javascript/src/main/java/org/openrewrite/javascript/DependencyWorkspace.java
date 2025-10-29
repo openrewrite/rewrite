@@ -58,6 +58,11 @@ class DependencyWorkspace {
             }
     );
 
+    static {
+        // Pre-populate cache with existing workspaces from disk
+        initializeCacheFromDisk();
+    }
+
     /**
      * Gets or creates a workspace directory for the given package.json content.
      * Workspaces are cached by content hash to avoid repeated npm installs.
@@ -187,5 +192,38 @@ class DependencyWorkspace {
      */
     static void clearCache() {
         cache.clear();
+    }
+
+    /**
+     * Initializes the cache by discovering existing valid workspaces from disk.
+     * This allows reuse of workspaces across JVM restarts and ensures proper
+     * LRU eviction even for pre-existing workspaces.
+     */
+    private static void initializeCacheFromDisk() {
+        try {
+            if (!Files.exists(WORKSPACE_BASE)) {
+                return;
+            }
+
+            Files.list(WORKSPACE_BASE)
+                    .filter(Files::isDirectory)
+                    .filter(dir -> !dir.getFileName().toString().contains(".tmp-")) // Skip temp dirs
+                    .filter(DependencyWorkspace::isWorkspaceValid)
+                    .sorted((a, b) -> {
+                        // Sort by last modified time (oldest first)
+                        // This way oldest workspaces will be evicted first when we hit the limit
+                        try {
+                            return Files.getLastModifiedTime(a).compareTo(Files.getLastModifiedTime(b));
+                        } catch (IOException e) {
+                            return 0;
+                        }
+                    })
+                    .forEach(workspaceDir -> {
+                        String hash = workspaceDir.getFileName().toString();
+                        cache.put(hash, workspaceDir);
+                    });
+        } catch (IOException e) {
+            // Ignore - cache will be empty and workspaces will be created as needed
+        }
     }
 }

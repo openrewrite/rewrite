@@ -169,6 +169,30 @@ class DependencyWorkspaceTest implements RewriteTest {
         assertThat(Files.exists(workspace2)).isTrue();
     }
 
+    @Test
+    void initializesFromDiskOnStartup() {
+        String packageJson = """
+                {
+                  "name": "test-init",
+                  "dependencies": {
+                    "lodash": "^4.17.21"
+                  }
+                }
+                """;
+
+        // Create a workspace
+        Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson);
+        assertThat(Files.exists(workspace.resolve("node_modules"))).isTrue();
+
+        // Clear the in-memory cache (simulating a JVM restart)
+        DependencyWorkspace.clearCache();
+
+        // The workspace should still be reused from disk
+        Path workspaceAfterClear = DependencyWorkspace.getOrCreateWorkspace(packageJson);
+        assertThat(workspaceAfterClear).isEqualTo(workspace);
+        assertThat(Files.exists(workspaceAfterClear.resolve("node_modules"))).isTrue();
+    }
+
     private static class NoOpRecipe extends Recipe {
         @Override
         public String getDisplayName() {
