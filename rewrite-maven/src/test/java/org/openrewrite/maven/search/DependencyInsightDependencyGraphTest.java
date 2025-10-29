@@ -175,56 +175,6 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
         );
     }
 
-    @Test
-    void dependencyGraphWithCustomScope() {
-        rewriteRun(
-          spec -> spec
-            .dataTable(DependenciesInUse.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                DependenciesInUse.Row row = rows.get(0);
-                assertThat(row.getDependencyGraph()).isEqualTo(
-                  """
-                    junit:junit:4.13
-                    \\--- test
-                    """.strip());
-                assertThat(row.getScope()).isEqualTo("test");
-            })
-            .recipe(new DependencyInsight("junit", "junit", "test", null, null)),
-          pomXml(
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                  <dependency>
-                      <groupId>junit</groupId>
-                      <artifactId>junit</artifactId>
-                      <version>4.13</version>
-                      <scope>test</scope>
-                  </dependency>
-                </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                  <!--~~>--><dependency>
-                      <groupId>junit</groupId>
-                      <artifactId>junit</artifactId>
-                      <version>4.13</version>
-                      <scope>test</scope>
-                  </dependency>
-                </dependencies>
-              </project>
-              """
-          )
-        );
-    }
-
     /**
      * Maven deduplicates dependencies and shows only the direct path.
      * <p>

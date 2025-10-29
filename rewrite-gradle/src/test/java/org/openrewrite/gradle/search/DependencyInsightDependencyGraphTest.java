@@ -179,14 +179,14 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
     void dependencyGraphWithCustomConfiguration() {
         rewriteRun(
           spec -> spec
-            .recipe(new DependencyInsight("junit", "junit", null, "testCompileClasspath"))
+            .recipe(new DependencyInsight("junit", "junit", null, "custom"))
             .dataTable(DependenciesInUse.Row.class, rows -> {
                 assertThat(rows).hasSize(1);
                 DependenciesInUse.Row row = rows.getFirst();
                 assertThat(row.getDependencyGraph()).isEqualTo(
                   """
                     junit:junit:4.13
-                    \\--- testCompileClasspath
+                    \\--- custom
                     """.strip());
                 assertThat(row.getDepth()).isEqualTo(0);
             }),
@@ -200,8 +200,12 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
                   mavenCentral()
               }
 
+              configurations {
+                  custom
+              }
+
               dependencies {
-                  testImplementation 'junit:junit:4.13'
+                  custom 'junit:junit:4.13'
               }
               """,
             """
@@ -213,8 +217,12 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
                   mavenCentral()
               }
 
+              configurations {
+                  custom
+              }
+
               dependencies {
-                  /*~~(junit:junit:4.13)~~>*/testImplementation 'junit:junit:4.13'
+                  /*~~(junit:junit:4.13)~~>*/custom 'junit:junit:4.13'
               }
               """
           )
