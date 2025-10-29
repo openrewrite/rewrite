@@ -82,7 +82,7 @@ public class OpenRewriteModelBuilder {
         } else if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
             connector.useBuildDistribution();
         } else {
-            connector.useGradleVersion("8.12");
+            connector.useGradleVersion("9.1.0");
         }
         connector
                 // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
