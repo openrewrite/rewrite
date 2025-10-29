@@ -176,7 +176,7 @@ testing {
 
             dependencies {
                 implementation(project())
-                implementation(project(":rewrite-java-25"))
+                implementation(project(":rewrite-java-21"))
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-java-tck"))
