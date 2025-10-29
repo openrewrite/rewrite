@@ -17,8 +17,10 @@ package org.openrewrite.gradle.internal;
 
 import groovy.text.SimpleTemplateEngine;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.gradle.internal.GradleWrapperScriptLoader.Version;
 import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
+import org.openrewrite.gradle.util.GradleWrapper.GradleVersion;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.LatestRelease;
@@ -51,13 +53,12 @@ public class GradleWrapperScriptDownloader {
 
     public static void main(String[] args) throws Exception {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        Map<String, GradleWrapper.GradleVersion> allGradleReleases = GradleWrapper.listAllPublicVersions(ctx)
-          .stream()
+        Map<String, GradleVersion> gradleBinVersions = GradleWrapper.listAllPublicVersions(ctx).stream()
           .filter(v -> v.getDistributionType() == GradleWrapper.DistributionType.Bin)
-          .collect(toMap(GradleWrapper.GradleVersion::getVersion, v -> v));
-        Map<String, GradleWrapperScriptLoader.Version> allDownloadedVersions =
-          new ConcurrentHashMap<>(new GradleWrapperScriptLoader().getAllVersions());
-        allDownloadedVersions.keySet().retainAll(allGradleReleases.keySet());
+          .collect(toMap(GradleVersion::getVersion, v -> v));
+        NavigableMap<String, Version> csvVersions = new GradleWrapperScriptLoader().getAllVersions();
+        Map<String, Version> allVersions = new ConcurrentHashMap<>(csvVersions);
+        allVersions.keySet().retainAll(gradleBinVersions.keySet());
 
         Map<String, String> unixChecksums = new ConcurrentHashMap<>();
         Map<String, String> batChecksums = new ConcurrentHashMap<>();
@@ -65,18 +66,18 @@ public class GradleWrapperScriptDownloader {
 
         // Use virtual threads for I/O-bound workload
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (GradleWrapper.GradleVersion version : allGradleReleases.values()) {
-                executor.submit(() -> processVersion(version, allDownloadedVersions, unixChecksums, batChecksums, i, ctx));
+            for (GradleVersion version : gradleBinVersions.values()) {
+                executor.submit(() -> processVersion(version, allVersions, unixChecksums, batChecksums, i, ctx));
             }
         }
 
         // Write versions.csv once at the end
-        List<String> sortedVersions = new ArrayList<>(allDownloadedVersions.keySet());
+        List<String> sortedVersions = new ArrayList<>(allVersions.keySet());
         sortedVersions.sort(new LatestRelease(null).reversed());
         try (BufferedWriter writer = Files.newBufferedWriter(WRAPPER_SCRIPTS.resolve("versions.csv"))) {
             writer.write("version,gradlew,gradlewBat\n");
             for (String sortedVersion : sortedVersions) {
-                GradleWrapperScriptLoader.Version version = allDownloadedVersions.get(sortedVersion);
+                Version version = allVersions.get(sortedVersion);
                 writer.write("%s,%s,%s\n".formatted(
                   sortedVersion,
                   version.getGradlewChecksum(),
@@ -104,16 +105,16 @@ public class GradleWrapperScriptDownloader {
     }
 
     private static void processVersion(
-      GradleWrapper.GradleVersion version,
-      Map<String, GradleWrapperScriptLoader.Version> allDownloadedVersions,
+      GradleVersion version,
+      Map<String, Version> allVersions,
       Map<String, String> unixChecksums,
       Map<String, String> batChecksums,
       AtomicInteger i,
       InMemoryExecutionContext ctx) {
         String v = version.getVersion();
-        if (allDownloadedVersions.containsKey(v)) {
-            unixChecksums.put(allDownloadedVersions.get(v).getGradlewChecksum(), null);
-            batChecksums.put(allDownloadedVersions.get(v).getGradlewBatChecksum(), null);
+        if (allVersions.containsKey(v)) {
+            unixChecksums.put(allVersions.get(v).getGradlewChecksum(), null);
+            batChecksums.put(allVersions.get(v).getGradlewBatChecksum(), null);
             System.out.printf("%03d: %s already exists. Skipping.%n", i.incrementAndGet(), v);
             return;
         }
@@ -139,7 +140,7 @@ public class GradleWrapperScriptDownloader {
             batChecksums.put(gradlewBatChecksum, gradlewBat);
 
             // Update map (ConcurrentHashMap is thread-safe)
-            allDownloadedVersions.put(v, new GradleWrapperScriptLoader.Version(v, gradlewChecksum, gradlewBatChecksum));
+            allVersions.put(v, new Version(v, gradlewChecksum, gradlewBatChecksum));
 
             System.out.printf("%03d: %s downloaded.%n", i.incrementAndGet(), v);
         } catch (Throwable t) {
