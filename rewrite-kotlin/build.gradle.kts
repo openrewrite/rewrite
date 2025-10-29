@@ -15,7 +15,6 @@ dependencies {
 
     implementation(project(":rewrite-java"))
 
-    implementation(platform(kotlin("bom", kotlinVersion)))
     implementation(kotlin("compiler-embeddable", kotlinVersion))
     implementation(kotlin("stdlib", kotlinVersion))
 
