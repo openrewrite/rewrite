@@ -52,6 +52,12 @@ tasks.named<JavaCompile>("compileJava").configure {
     options.release.set(8)
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 val testGradle4 = tasks.register<Test>("testGradle4") {
     systemProperty("org.openrewrite.test.gradleVersion", "4.10")
     systemProperty("jarLocationForTest", tasks.named<Jar>("jar").get().archiveFile.get().asFile.absolutePath)

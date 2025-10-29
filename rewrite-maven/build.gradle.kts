@@ -43,7 +43,7 @@ dependencies {
     testImplementation("org.mapdb:mapdb:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:10.2.1")
 }
 

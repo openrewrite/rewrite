@@ -1144,9 +1144,42 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     protected async preVisit(tree: J, p: P): Promise<J | undefined> {
-        const ret = await super.preVisit(tree, p);
-        let indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+        let ret = await super.preVisit(tree, p)! as J;
 
+        let indentShouldIncrease =
+            tree.kind === J.Kind.Block
+            || this.cursor.parent?.parent?.parent?.value.kind == J.Kind.Case
+            || (tree.kind === J.Kind.MethodDeclaration && this.cursor.parent?.value.kind === JS.Kind.StatementExpression);
+
+        const previousIndent = this.currentIndent;
+
+        if (tree.kind === J.Kind.IfElse && this.cursor.getNearestMessage("else-indent") !== undefined) {
+            this.cursor.messages.set("indentToUse", this.cursor.getNearestMessage("else-indent"));
+        } else if (indentShouldIncrease) {
+            this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
+        }
+
+        if (tree.kind === J.Kind.IfElse && this.cursor.messages.get("else-indent") !== undefined) {
+            this.cursor.messages.set("indentToUse", this.cursor.messages.get("else-indent"));
+            this.cursor.messages.delete("else-indent");
+        }
+        const relativeIndent: string = this.currentIndent;
+
+        ret = produce(ret, draft => {
+            if (draft.prefix == undefined) {
+                draft.prefix = {kind: J.Kind.Space, comments: [], whitespace: ""};
+            }
+            if (draft.prefix.whitespace.includes("\n")) {
+                draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
+            }
+            if (draft.kind === J.Kind.Block) {
+                const block = draft as Draft<J> as Draft<J.Block>;
+                const indentToUseInClosing = indentShouldIncrease ? previousIndent : relativeIndent;
+                block.end.whitespace = this.combineIndent(block.end.whitespace, indentToUseInClosing);
+            }
+        });
+
+        indentShouldIncrease = false;
         // Increase indent for control structures with non-block bodies
         if (tree.kind === J.Kind.If) {
             const ifStmt = tree as J.If;
@@ -1165,12 +1198,10 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 indentShouldIncrease = true;
             }
         }
-
-        if (tree.kind === J.Kind.IfElse && this.cursor.getNearestMessage("else-indent") !== undefined) {
-            this.cursor.messages.set("indentToUse", this.cursor.getNearestMessage("else-indent"));
-        } else if (indentShouldIncrease) {
+        if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
         }
+
         return ret;
     }
 
@@ -1178,29 +1209,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (this.cursor?.getNearestMessage("stop") != null) {
             return tree as R;
         }
-        let ret = await super.visit(tree, p, parent) as R;
-        if (ret == undefined) {
-            return ret;
-        }
-
-        if (tree.kind === J.Kind.IfElse && this.cursor.messages.get("else-indent") !== undefined) {
-            this.cursor.messages.set("indentToUse", this.cursor.messages.get("else-indent"));
-            this.cursor.messages.delete("else-indent");
-        }
-        const relativeIndent: string = this.currentIndent;
-
-        return produce(ret, draft => {
-            if (draft.prefix == undefined) {
-                draft.prefix = {kind: J.Kind.Space, comments: [], whitespace: ""};
-            }
-            if (draft.prefix.whitespace.includes("\n")) {
-                draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
-            }
-            if (draft.kind === J.Kind.Block) {
-                const block = draft as Draft<J> as Draft<J.Block>;
-                block.end.whitespace = this.combineIndent(block.end.whitespace, relativeIndent);
-            }
-        });
+        return await super.visit(tree, p, parent) as R;
     }
 
     public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
@@ -1216,16 +1225,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     private get currentIndent(): string {
-        const indent = this.cursor.getNearestMessage("indentToUse");
-        if (indent == undefined) {
-            const enclosingWhitespace = this.cursor.firstEnclosing((x: any): x is J => x.prefix && x.prefix.whitespace.includes("\n"))?.prefix.whitespace;
-            if (enclosingWhitespace) {
-                return enclosingWhitespace.substring(enclosingWhitespace.lastIndexOf("\n") + 1);
-            } else {
-                return "";
-            }
-        }
-        return indent;
+        return this.cursor.getNearestMessage("indentToUse") ?? "";
     }
 
     private combineIndent(oldWs: string, relativeIndent: string): string {

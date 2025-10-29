@@ -24,11 +24,10 @@ tasks.withType<Javadoc>().configureEach {
     exclude("org/openrewrite/java/**")
 }
 
-tasks.named<JavaCompile>("compileTestJava") {
-    sourceCompatibility = JavaVersion.VERSION_21.toString()
-    targetCompatibility = JavaVersion.VERSION_21.toString()
-
-    options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
 }
 
 tasks.withType<Test>().configureEach {
