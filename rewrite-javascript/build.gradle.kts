@@ -3,8 +3,6 @@
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 plugins {
     id("org.openrewrite.build.language-library")
@@ -53,13 +51,12 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-val datedSnapshotVersion = if (System.getenv("CI") != null) {
-    project.version.toString().replace(
-        "SNAPSHOT",
-        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-    )
-} else {
-    project.version.toString()
+// Use the version from Nebula plugin, which handles snapshot versioning consistently
+// across all artifacts (Java and NPM). The Nebula plugin uses format: 8.66.0-20251029.143716
+// For NPM compatibility, we convert dots to hyphens: 8.66.0-20251029-143716
+// This is evaluated lazily via a provider to ensure Nebula's version inference has completed
+val datedSnapshotVersion = provider {
+    project.version.toString().replace(Regex("""(\d{8})\.(\d{6})"""), "$1-$2")
 }
 
 val npmVersion = tasks.register<NpmTask>("npmVersion") {
@@ -75,7 +72,7 @@ val npmVersion = tasks.register<NpmTask>("npmVersion") {
         }
     }
 
-    args = listOf("version", "--no-git-tag-version", datedSnapshotVersion)
+    args = listOf("version", "--no-git-tag-version", datedSnapshotVersion.get())
     workingDir = versionDir
 }
 
@@ -113,7 +110,7 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
     val versionTxt = file("src/main/resources/META-INF/version.txt")
     outputs.file(versionTxt)
     doLast {
-        versionTxt.writeText(datedSnapshotVersion)
+        versionTxt.writeText(datedSnapshotVersion.get())
     }
 
     args = listOf("run", "build")
@@ -141,7 +138,7 @@ val npmPack = tasks.register<Tar>("npmPack") {
     }
 
     archiveBaseName = "openrewrite-rewrite"
-    archiveVersion = datedSnapshotVersion
+    archiveVersion = datedSnapshotVersion.get()
     compression = Compression.GZIP
     archiveExtension = "tgz"
     destinationDirectory = layout.buildDirectory.dir("distributions")
