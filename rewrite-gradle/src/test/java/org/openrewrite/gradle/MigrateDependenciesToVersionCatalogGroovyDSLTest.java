@@ -274,6 +274,7 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
             """
               junitVersion=4.13.2
               mockitoVersion=4.6.1
+              commonsLangVersion=3.12.0
               unrelatedProperty=someValue
               """,
             """
@@ -286,13 +287,14 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation "junit:junit:$junitVersion"
+                  implementation "org.apache.commons:commons-lang3:${commonsLangVersion}"
                   testImplementation group: 'org.mockito', name: 'mockito-core', version: mockitoVersion
               }
               """,
@@ -300,13 +302,14 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation libs.junit
+                  implementation libs.commonsLang3
                   testImplementation libs.mockitoCore
               }
               """
@@ -316,10 +319,12 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
             """
               [versions]
               junit = "4.13.2"
+              commons-lang3 = "3.12.0"
               mockito-core = "4.6.1"
-              
+
               [libraries]
               junit = { group = "junit", name = "junit", version.ref = "junit" }
+              commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
               mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito-core" }
               """,
             spec -> spec.path("gradle/libs.versions.toml")
