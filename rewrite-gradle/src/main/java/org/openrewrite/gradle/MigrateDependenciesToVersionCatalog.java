@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -44,7 +45,9 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static org.openrewrite.internal.ListUtils.mapFirst;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -192,97 +195,29 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                         acc.propertyNamesToRemove.add(propName);
                     }
 
-                    return new GroovyIsoVisitor<ExecutionContext>() {
+                    GradleDependency.Matcher matcher = new GradleDependency.Matcher();
+                    return matcher.asVisitor((dep, ctx2) -> {
+                        if (!PROJECT_MATCHER.matches(dep.getTree())) {
+                            String groupId = dep.getDeclaredGroupId();
+                            String artifactId = dep.getDeclaredArtifactId();
+                            String version = dep.getDeclaredVersion();
+                            String configurationName = dep.getConfigurationName();
 
-                        @Override
-                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                            if (groupId != null && artifactId != null && version != null) {
+                                acc.configurations.add(configurationName);
 
-                            // Skip project dependencies - we don't migrate those
-                            if (PROJECT_MATCHER.matches(m)) {
-                                return m;
-                            }
-
-                            // Check if this is a dependency DSL method call
-                            if (!DEPENDENCY_DSL_MATCHER.matches(m)) {
-                                return m;
-                            }
-
-                            // Check if this looks like a dependency configuration method
-                            // We check if it has arguments that could be dependencies
-                            String methodName = m.getSimpleName();
-                            if (m.getArguments() != null && !m.getArguments().isEmpty()) {
-                                // Check if the first argument is a dependency string or map notation
-                                Expression firstArg = m.getArguments().get(0);
-                                boolean looksLikeDependency = false;
-
-                                if (firstArg instanceof J.Literal) {
-                                    J.Literal literal = (J.Literal) firstArg;
-                                    if (literal.getValue() instanceof String) {
-                                        String value = (String) literal.getValue();
-                                        // Check if it matches dependency pattern
-                                        looksLikeDependency = DEPENDENCY_STRING_PATTERN.matcher(value).matches();
-                                    }
-                                } else if (firstArg instanceof G.MapEntry) {
-                                    // Map notation dependency
-                                    looksLikeDependency = true;
-                                } else if (firstArg instanceof G.GString) {
-                                    // GString dependency (will be handled in extractDependency via GradleProject resolution)
-                                    looksLikeDependency = true;
+                                String versionVariable = dep.getVersionVariable();
+                                if (versionVariable != null) {
+                                    acc.propertyNamesToRemove.add(versionVariable);
                                 }
 
-                                if (looksLikeDependency) {
-                                    acc.configurations.add(methodName);
-
-                                    // Check if all arguments together form a map notation dependency
-                                    DependencyCoordinates coords = new DependencyCoordinates();
-                                    boolean isMapNotation = false;
-
-                                    // Check for map entries (Groovy style: group: 'x', name: 'y', version: 'z')
-                                    for (Expression arg : m.getArguments()) {
-                                        if (arg instanceof G.MapEntry) {
-                                            isMapNotation = true;
-                                            G.MapEntry entry = (G.MapEntry) arg;
-                                            String key = extractStringValue(entry.getKey());
-                                            String value = extractStringValue(entry.getValue());
-                                            extractDependencyCoordinate(key, value, coords);
-                                            // Track property names from version identifiers
-                                            if ("version".equals(key) && entry.getValue() instanceof J.Identifier) {
-                                                acc.propertyNamesToRemove.add(value);
-                                            }
-                                        } else if (arg instanceof G.MapLiteral) {
-                                            // Alternative format: [group: 'x', name: 'y', version: 'z']
-                                            isMapNotation = true;
-                                            G.MapLiteral map = (G.MapLiteral) arg;
-                                            for (G.MapEntry entry : map.getElements()) {
-                                                String key = extractStringValue(entry.getKey());
-                                                String value = extractStringValue(entry.getValue());
-                                                extractDependencyCoordinate(key, value, coords);
-                                                // Track property names from version identifiers
-                                                if ("version".equals(key) && entry.getValue() instanceof J.Identifier) {
-                                                    acc.propertyNamesToRemove.add(value);
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    if (isMapNotation && coords.isComplete()) {
-                                        // Use the version as-is (property name or actual version) - will be resolved later in generate()
-                                        String depKey = coords.group + ":" + coords.artifact + ":" + coords.version;
-                                        DependencyInfo dep = new DependencyInfo(coords.group, coords.artifact, coords.version, methodName);
-                                        acc.dependencies.put(depKey, dep);
-                                    } else {
-                                        // Process regular string dependencies
-                                        for (Expression arg : m.getArguments()) {
-                                            extractDependency(arg, methodName, acc);
-                                        }
-                                    }
-                                }
+                                String depKey = groupId + ":" + artifactId + ":" + version;
+                                DependencyInfo depInfo = new DependencyInfo(groupId, artifactId, version, configurationName);
+                                acc.dependencies.put(depKey, depInfo);
                             }
-
-                            return m;
                         }
-                    }.visitNonNull(sourceFile, ctx);
+                        return dep.getTree();
+                    }).visitNonNull(sourceFile, ctx);
                 }
 
                 // Scan Kotlin Gradle files for dependencies
@@ -296,84 +231,29 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                         acc.propertyNamesToRemove.add(propName);
                     }
 
-                    return new JavaIsoVisitor<ExecutionContext>() {
+                    GradleDependency.Matcher matcher = new GradleDependency.Matcher();
+                    return matcher.asVisitor((dep, ctx2) -> {
+                        if (!PROJECT_MATCHER.matches(dep.getTree()) && !"project".equals(dep.getTree().getSimpleName())) {
+                            String groupId = dep.getDeclaredGroupId();
+                            String artifactId = dep.getDeclaredArtifactId();
+                            String version = dep.getDeclaredVersion();
+                            String configurationName = dep.getConfigurationName();
 
-                        @Override
-                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                            if (groupId != null && artifactId != null && version != null) {
+                                acc.configurations.add(configurationName);
 
-                            // Skip project dependencies - we don't migrate those
-                            // Use MethodMatcher if type attribution is available, otherwise check by name
-                            if (m.getMethodType() != null && PROJECT_MATCHER.matches(m)) {
-                                return m;
-                            } else if (m.getMethodType() == null && "project".equals(m.getSimpleName())) {
-                                // Without type attribution, check method name directly
-                                return m;
-                            }
-
-                            String methodName = m.getSimpleName();
-                            if (m.getArguments() != null && !m.getArguments().isEmpty()) {
-                                Expression firstArg = m.getArguments().get(0);
-                                boolean looksLikeDependency = false;
-
-                                if (firstArg instanceof J.Literal) {
-                                    J.Literal literal = (J.Literal) firstArg;
-                                    if (literal.getValue() instanceof String) {
-                                        String value = (String) literal.getValue();
-                                        looksLikeDependency = DEPENDENCY_STRING_PATTERN.matcher(value).matches();
-                                    }
-                                } else if (firstArg instanceof J.Assignment) {
-                                    // Kotlin named argument dependency
-                                    looksLikeDependency = true;
-                                } else if (firstArg instanceof K.StringTemplate) {
-                                    // Kotlin string template
-                                    looksLikeDependency = true;
+                                String versionVariable = dep.getVersionVariable();
+                                if (versionVariable != null) {
+                                    acc.propertyNamesToRemove.add(versionVariable);
                                 }
 
-                                // Only check DEPENDENCY_DSL_MATCHER if type attribution is available
-                                boolean matchesDependencyDSL = m.getMethodType() == null || DEPENDENCY_DSL_MATCHER.matches(m);
-
-                                if (looksLikeDependency && matchesDependencyDSL) {
-                                    acc.configurations.add(methodName);
-
-                                    // Check if all arguments together form a map notation dependency
-                                    DependencyCoordinates coords = new DependencyCoordinates();
-                                    boolean isMapNotation = false;
-
-                                    // Check for named arguments (Kotlin style: group = "x", name = "y", version = "z")
-                                    for (Expression arg : m.getArguments()) {
-                                        if (arg instanceof J.Assignment) {
-                                            isMapNotation = true;
-                                            J.Assignment assignment = (J.Assignment) arg;
-                                            if (assignment.getVariable() instanceof J.Identifier) {
-                                                String key = ((J.Identifier) assignment.getVariable()).getSimpleName();
-                                                String value = extractStringValue(assignment.getAssignment());
-                                                extractDependencyCoordinate(key, value, coords);
-                                                // Track property names from version identifiers
-                                                if ("version".equals(key) && assignment.getAssignment() instanceof J.Identifier) {
-                                                    acc.propertyNamesToRemove.add(value);
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    if (isMapNotation && coords.isComplete()) {
-                                        // Use the version as-is (property name or actual version) - will be resolved later in generate()
-                                        String depKey = coords.group + ":" + coords.artifact + ":" + coords.version;
-                                        DependencyInfo dep = new DependencyInfo(coords.group, coords.artifact, coords.version, methodName);
-                                        acc.dependencies.put(depKey, dep);
-                                    } else {
-                                        // Process regular string dependencies
-                                        for (Expression arg : m.getArguments()) {
-                                            extractDependency(arg, methodName, acc);
-                                        }
-                                    }
-                                }
+                                String depKey = groupId + ":" + artifactId + ":" + version;
+                                DependencyInfo depInfo = new DependencyInfo(groupId, artifactId, version, configurationName);
+                                acc.dependencies.put(depKey, depInfo);
                             }
-
-                            return m;
                         }
-                    }.visitNonNull(sourceFile, ctx);
+                        return dep.getTree();
+                    }).visitNonNull(sourceFile, ctx);
                 }
 
                 return tree;
@@ -381,7 +261,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
         });
     }
 
-    private String extractStringValue(Expression expr) {
+    private static String extractStringValue(Expression expr) {
         if (expr instanceof J.Literal) {
             J.Literal literal = (J.Literal) expr;
             if (literal.getValue() instanceof String) {
@@ -393,124 +273,13 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
         return null;
     }
 
-    private void extractDependencyCoordinate(String key, String value, DependencyCoordinates coords) {
+    private static void extractDependencyCoordinate(String key, String value, DependencyCoordinates coords) {
         if ("group".equals(key)) {
             coords.group = value;
         } else if ("name".equals(key)) {
             coords.artifact = value;
         } else if ("version".equals(key)) {
             coords.version = value;
-        }
-    }
-
-    private void extractDependency(Expression arg, String configuration, DependencyAccumulator acc) {
-        if (arg instanceof J.Literal) {
-            J.Literal literal = (J.Literal) arg;
-            if (literal.getValue() instanceof String) {
-                String depString = (String) literal.getValue();
-                Matcher matcher = DEPENDENCY_STRING_PATTERN.matcher(depString);
-
-                if (matcher.matches()) {
-                    String group = matcher.group(1);
-                    String artifact = matcher.group(2);
-                    String version = matcher.group(3);
-                    String classifier = matcher.group(4);
-
-                    // Skip dependencies with classifiers/extensions as they are not supported in version catalogs
-                    if (classifier != null) {
-                        return;
-                    }
-
-                    DependencyInfo dep = new DependencyInfo(group, artifact, version, configuration);
-                    acc.dependencies.put(depString, dep);
-                }
-            }
-        } else if (arg instanceof G.GString) {
-            // Handle GString dependencies - extract group:artifact:version pattern from the GString structure
-            G.GString gstring = (G.GString) arg;
-            List<J> strings = gstring.getStrings();
-            if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
-                String firstPart = (String) ((J.Literal) strings.get(0)).getValue();
-                String[] parts = firstPart.split(":", -1);
-                if (parts.length >= 2) {
-                    String group = parts[0];
-                    String artifact = parts[1];
-
-                    // Extract property name from the GString
-                    // The version part should be in strings.get(1) if it's a simple property reference
-                    String propertyName = null;
-                    if (strings.size() >= 2) {
-                        J secondPart = strings.get(1);
-                        if (secondPart instanceof G.GString.Value) {
-                            G.GString.Value value = (G.GString.Value) secondPart;
-                            if (value.getTree() instanceof J.Identifier) {
-                                propertyName = ((J.Identifier) value.getTree()).getSimpleName();
-                            }
-                        }
-                    }
-
-                    // Store the property name as the version - it will be resolved later in generate()
-                    if (propertyName != null) {
-                        // Use property name as version placeholder
-                        String depKey = group + ":" + artifact + ":" + propertyName;
-                        DependencyInfo dep = new DependencyInfo(group, artifact, propertyName, configuration);
-                        acc.dependencies.put(depKey, dep);
-                    }
-                }
-            }
-        } else if (arg instanceof K.StringTemplate) {
-            // Handle Kotlin string template dependencies - similar to GString
-            K.StringTemplate template = (K.StringTemplate) arg;
-            List<J> strings = template.getStrings();
-            if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
-                String firstPart = (String) ((J.Literal) strings.get(0)).getValue();
-                String[] parts = firstPart.split(":", -1);
-                if (parts.length >= 2) {
-                    String group = parts[0];
-                    String artifact = parts[1];
-
-                    // Extract property name from the string template
-                    // Unlike GString which uses G.GString.Value, Kotlin uses K.StringTemplate.Expression
-                    String propertyName = null;
-                    if (strings.size() >= 2) {
-                        J secondPart = strings.get(1);
-                        if (secondPart instanceof K.StringTemplate.Expression) {
-                            K.StringTemplate.Expression expr = (K.StringTemplate.Expression) secondPart;
-                            if (expr.getTree() instanceof J.Identifier) {
-                                propertyName = ((J.Identifier) expr.getTree()).getSimpleName();
-                            }
-                        }
-                    }
-
-                    // Store the property name as the version - it will be resolved later in generate()
-                    if (propertyName != null) {
-                        // Use property name as version placeholder
-                        String depKey = group + ":" + artifact + ":" + propertyName;
-                        DependencyInfo dep = new DependencyInfo(group, artifact, propertyName, configuration);
-                        acc.dependencies.put(depKey, dep);
-                    }
-                }
-            }
-        } else if (arg instanceof G.MapLiteral) {
-            G.MapLiteral map = (G.MapLiteral) arg;
-            DependencyCoordinates coords = new DependencyCoordinates();
-
-            for (G.MapEntry entry : map.getElements()) {
-                String key = extractStringValue(entry.getKey());
-                String value = extractStringValue(entry.getValue());
-                extractDependencyCoordinate(key, value, coords);
-                // Track property names from version identifiers
-                if ("version".equals(key) && entry.getValue() instanceof J.Identifier) {
-                    acc.propertyNamesToRemove.add(value);
-                }
-            }
-
-            if (coords.isComplete()) {
-                // Use the version as-is (property name or actual version) - will be resolved later in generate()
-                String key = coords.group + ":" + coords.artifact + ":" + coords.version;
-                DependencyInfo dep = new DependencyInfo(coords.group, coords.artifact, coords.version, configuration);
-                acc.dependencies.put(key, dep);
-            }
         }
     }
 
@@ -1153,7 +922,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                 return content;
             }));
             if (f != mapped) {
-                return mapped.withContent(ListUtils.mapFirst(mapped.getContent(), c -> (Properties.Content) c.withPrefix("")));
+                return mapped.withContent(mapFirst(mapped.getContent(), c -> (Properties.Content) c.withPrefix("")));
             }
             return mapped;
         }
