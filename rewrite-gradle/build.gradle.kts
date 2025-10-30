@@ -76,6 +76,7 @@ dependencies {
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
 }
 
