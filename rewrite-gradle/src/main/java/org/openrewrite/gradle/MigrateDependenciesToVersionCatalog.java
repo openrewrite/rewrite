@@ -78,10 +78,10 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
     }
 
     static class DependencyAccumulator {
-        final Map<String, DependencyInfo> dependencies = synchronizedMap(new LinkedHashMap<>());
-        final Set<String> configurations = synchronizedSet(new LinkedHashSet<>());
-        final Set<String> propertyNamesToRemove = synchronizedSet(new LinkedHashSet<>());
-        final Map<String, String> propertyValues = synchronizedMap(new LinkedHashMap<>());
+        final Map<String, DependencyInfo> dependencies = new LinkedHashMap<>();
+        final Set<String> configurations = new LinkedHashSet<>();
+        final Set<String> propertyNamesToRemove = new LinkedHashSet<>();
+        final Map<String, String> propertyValues = new LinkedHashMap<>();
         boolean catalogExists = false;
     }
 
