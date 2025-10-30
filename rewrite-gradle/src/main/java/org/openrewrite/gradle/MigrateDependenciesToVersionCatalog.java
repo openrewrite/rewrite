@@ -490,7 +490,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
     public Collection<? extends SourceFile> generate(DependencyAccumulator acc, ExecutionContext ctx) {
         // Check if we should skip generation
         if (acc.dependencies.isEmpty() || acc.catalogExists) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         String tomlContent = generateVersionCatalogContent(acc);
