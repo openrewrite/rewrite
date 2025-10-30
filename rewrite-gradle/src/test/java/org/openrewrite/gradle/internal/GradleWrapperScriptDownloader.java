@@ -53,7 +53,7 @@ public class GradleWrapperScriptDownloader {
         Map<String, GradleVersion> gradleBinVersions = GradleWrapper.listAllPublicVersions(ctx).stream()
           .filter(v -> v.getDistributionType() == GradleWrapper.DistributionType.Bin)
           .collect(toMap(GradleVersion::getVersion, v -> v));
-        NavigableMap<String, Version> csvVersions = new GradleWrapperScriptLoader().getAllVersions();
+        Map<String, Version> csvVersions = new GradleWrapperScriptLoader().getAllVersions();
         Map<String, Version> allVersions = new ConcurrentHashMap<>(csvVersions);
         allVersions.keySet().retainAll(gradleBinVersions.keySet());
 
@@ -213,9 +213,10 @@ public class GradleWrapperScriptDownloader {
         VersionComparator gradle53VersionComparator = requireNonNull(Semver.validate("[5.3,)", null).getValue());
         VersionComparator gradle50VersionComparator = requireNonNull(Semver.validate("[5.0,)", null).getValue());
 
-        if (gradle53VersionComparator.isValid(null, gradleVersion)) {
+        String strippedVersion = gradleVersion.split("-")[0];
+        if (gradle53VersionComparator.isValid(null, strippedVersion)) {
             return "\"-Xmx64m\" \"-Xms64m\"";
-        } else if (gradle50VersionComparator.isValid(null, gradleVersion)) {
+        } else if (gradle50VersionComparator.isValid(null, strippedVersion)) {
             return "\"-Xmx64m\"";
         }
         return "";
