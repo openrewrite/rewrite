@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.toml.TomlParser;
@@ -126,14 +127,31 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyAccumulator acc) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
+        return Preconditions.check(
+            Preconditions.or(
+                new IsBuildGradle<>(),
+                new TreeVisitor<Tree, ExecutionContext>() {
+                    @Override
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (tree instanceof SourceFile) {
+                            SourceFile sourceFile = (SourceFile) tree;
+                            String path = sourceFile.getSourcePath().toString();
+                            if (path.endsWith(".properties") || path.endsWith(CATALOG_PATH)) {
+                                return SearchResult.found(tree);
+                            }
+                        }
+                        return tree;
+                    }
                 }
+            ),
+            new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    if (!(tree instanceof SourceFile)) {
+                        return tree;
+                    }
 
-                SourceFile sourceFile = (SourceFile) tree;
+                    SourceFile sourceFile = (SourceFile) tree;
 
                 // Check if version catalog already exists
                 if (sourceFile.getSourcePath().toString().endsWith(CATALOG_PATH)) {
@@ -350,7 +368,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
                 return tree;
             }
-        };
+        });
     }
 
     private String extractStringValue(Expression expr) {
@@ -552,7 +570,6 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyAccumulator acc) {
-        // If accumulator is empty, don't make changes
         if (acc.dependencies.isEmpty()) {
             return TreeVisitor.noop();
         }

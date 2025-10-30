@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.toml.Assertions.toml;
 
@@ -32,6 +33,24 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
           .recipe(new MigrateDependenciesToVersionCatalog());
+    }
+
+    @Test
+    void doesNotProcessFilesExcludedByPreconditions() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(0),
+          java(
+            """
+              package com.example;
+
+              public class Example {
+                  public void method() {
+                      String dep = "org.springframework:spring-core:5.3.0";
+                  }
+              }
+              """
+          )
+        );
     }
 
     @Test
