@@ -110,10 +110,17 @@ public class GradleWrapperScriptDownloader {
       InMemoryExecutionContext ctx) {
         String v = version.getVersion();
         if (allVersions.containsKey(v)) {
-            unixChecksums.computeIfAbsent(allVersions.get(v).getGradlewChecksum(), __ -> "");
-            batChecksums.computeIfAbsent(allVersions.get(v).getGradlewBatChecksum(), __ -> "");
-            System.out.printf("%03d: %s already exists. Skipping.%n", i.incrementAndGet(), v);
-            return;
+            GradleWrapperScriptLoader.Version existingVersion = allVersions.get(v);
+            Path unixFile = WRAPPER_SCRIPTS.resolve("unix").resolve(existingVersion.getGradlewChecksum() + ".txt");
+            Path windowsFile = WRAPPER_SCRIPTS.resolve("windows").resolve(existingVersion.getGradlewBatChecksum() + ".txt");
+
+            if (Files.exists(unixFile) && Files.exists(windowsFile)) {
+                unixChecksums.computeIfAbsent(allVersions.get(v).getGradlewChecksum(), __ -> "");
+                batChecksums.computeIfAbsent(allVersions.get(v).getGradlewBatChecksum(), __ -> "");
+                System.out.printf("%03d: %s already exists. Skipping.%n", i.incrementAndGet(), v);
+                return;
+            }
+            System.out.printf("%03d: %s exists in CSV but files missing. Re-downloading.%n", i.incrementAndGet(), v);
         }
 
         try {
