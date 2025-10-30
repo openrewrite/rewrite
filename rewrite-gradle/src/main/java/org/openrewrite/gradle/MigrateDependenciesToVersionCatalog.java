@@ -41,6 +41,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.*;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateDependenciesToVersionCatalog.DependencyAccumulator> {
