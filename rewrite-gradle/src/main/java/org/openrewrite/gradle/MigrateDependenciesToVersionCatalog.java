@@ -33,6 +33,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.toml.TomlParser;
@@ -96,21 +97,17 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
     }
 
     static class DependencyInfo {
-        final String group;
-        final String artifact;
-        final String version;
+        final GroupArtifactVersion gav;
         final String configuration;
 
         DependencyInfo(String group, String artifact, String version, String configuration) {
-            this.group = group;
-            this.artifact = artifact;
-            this.version = version;
+            this.gav = new GroupArtifactVersion(group, artifact, version);
             this.configuration = configuration;
         }
 
         String getTomlAliasName() {
             // Keep hyphenated names for TOML file
-            return artifact.toLowerCase()
+            return gav.getArtifactId().toLowerCase()
                     .replaceAll("[^a-z0-9-]", "-")
                     .replaceAll("-+", "-")
                     .replaceAll("^-|-$", "");
@@ -546,16 +543,16 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
         // Collect unique dependencies preserving order
         for (Map.Entry<String, DependencyInfo> entry : acc.dependencies.entrySet()) {
             DependencyInfo dep = entry.getValue();
-            String key = dep.group + ":" + dep.artifact;
+            String key = dep.gav.getGroupId() + ":" + dep.gav.getArtifactId();
             if (!uniqueDeps.containsKey(key)) {
                 // Resolve version from properties if it's a property reference
-                String resolvedVersion = dep.version;
-                if (acc.propertyValues.containsKey(dep.version)) {
-                    resolvedVersion = acc.propertyValues.get(dep.version);
+                String resolvedVersion = dep.gav.getVersion();
+                if (acc.propertyValues.containsKey(dep.gav.getVersion())) {
+                    resolvedVersion = acc.propertyValues.get(dep.gav.getVersion());
                 }
 
                 // Create a new DependencyInfo with resolved version
-                DependencyInfo resolvedDep = new DependencyInfo(dep.group, dep.artifact, resolvedVersion, dep.configuration);
+                DependencyInfo resolvedDep = new DependencyInfo(dep.gav.getGroupId(), dep.gav.getArtifactId(), resolvedVersion, dep.configuration);
                 uniqueDeps.put(key, resolvedDep);
                 String versionKey = resolvedDep.getTomlAliasName();
                 versionRefs.put(key, versionKey);
@@ -572,8 +569,8 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
             String versionRef = versionRefs.get(entry.getKey());
 
             sb.append(alias).append(" = { ");
-            sb.append("group = \"").append(dep.group).append("\", ");
-            sb.append("name = \"").append(dep.artifact).append("\", ");
+            sb.append("group = \"").append(dep.gav.getGroupId()).append("\", ");
+            sb.append("name = \"").append(dep.gav.getArtifactId()).append("\", ");
             sb.append("version.ref = \"").append(versionRef).append("\"");
             sb.append(" }\n");
         }
@@ -653,7 +650,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                             // If not found by exact version, search by group:artifact only
                             if (dep == null) {
                                 for (DependencyInfo candidate : acc.dependencies.values()) {
-                                    if (candidate.group.equals(coords.group) && candidate.artifact.equals(coords.artifact)) {
+                                    if (candidate.gav.getGroupId().equals(coords.group) && candidate.gav.getArtifactId().equals(coords.artifact)) {
                                         dep = candidate;
                                         break;
                                     }
@@ -763,7 +760,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
                             // Look for this dependency in our accumulator by group:artifact
                             for (DependencyInfo dep : acc.dependencies.values()) {
-                                if (dep.group.equals(group) && dep.artifact.equals(artifact)) {
+                                if (dep.gav.getGroupId().equals(group) && dep.gav.getArtifactId().equals(artifact)) {
                                     boolean hasMultipleArgs = methodInvocation.getArguments().size() > 1;
 
                                     Expression catalogRef = JavaTemplate.builder("libs.#{}")
@@ -805,7 +802,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                         // If not found by exact version, search by group:artifact only
                         if (dep == null) {
                             for (DependencyInfo candidate : acc.dependencies.values()) {
-                                if (candidate.group.equals(coords.group) && candidate.artifact.equals(coords.artifact)) {
+                                if (candidate.gav.getGroupId().equals(coords.group) && candidate.gav.getArtifactId().equals(coords.artifact)) {
                                     dep = candidate;
                                     break;
                                 }
@@ -971,7 +968,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                         // If not found by exact version, search by group:artifact only
                         if (dep == null) {
                             for (DependencyInfo candidate : acc.dependencies.values()) {
-                                if (candidate.group.equals(coords.group) && candidate.artifact.equals(coords.artifact)) {
+                                if (candidate.gav.getGroupId().equals(coords.group) && candidate.gav.getArtifactId().equals(coords.artifact)) {
                                     dep = candidate;
                                     break;
                                 }
@@ -1092,7 +1089,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
                         // Look for this dependency in our accumulator by group:artifact
                         for (DependencyInfo dep : acc.dependencies.values()) {
-                            if (dep.group.equals(group) && dep.artifact.equals(artifact)) {
+                            if (dep.gav.getGroupId().equals(group) && dep.gav.getArtifactId().equals(artifact)) {
                                 J.Identifier libs = new J.Identifier(
                                         Tree.randomId(),
                                         Space.EMPTY,
