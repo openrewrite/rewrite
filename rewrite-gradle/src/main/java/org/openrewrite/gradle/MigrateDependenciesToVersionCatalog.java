@@ -502,7 +502,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                 .map(doc -> doc.withSourcePath(Paths.get(CATALOG_PATH)))
                 .orElseThrow(() -> new IllegalStateException("Failed to create version catalog file"));
 
-        return Collections.singletonList(versionCatalog);
+        return singletonList(versionCatalog);
     }
 
     private String generateVersionCatalogContent(DependencyAccumulator acc) {
