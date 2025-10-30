@@ -648,7 +648,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                 J.FieldAccess catalogRef = new J.FieldAccess(
                                         Tree.randomId(),
                                         prefixSpace,  // Preserve the space before the first argument
-                                        new Markers(Tree.randomId(), Collections.singletonList(new OmitParentheses(Tree.randomId()))),
+                                        new Markers(Tree.randomId(), singletonList(new OmitParentheses(Tree.randomId()))),
                                         libs,
                                         new JLeftPadded<>(
                                                 Space.EMPTY,
