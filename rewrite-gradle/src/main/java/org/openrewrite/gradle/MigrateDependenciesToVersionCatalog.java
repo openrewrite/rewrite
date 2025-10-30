@@ -54,6 +54,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
     private static final Pattern DEPENDENCY_STRING_PATTERN = Pattern.compile("([^:]+):([^:]+):([^:@]+)(@.+)?");
     private static final Pattern DEPENDENCY_MAP_PATTERN = Pattern.compile("group:\\s*['\"]([^'\"]+)['\"],\\s*name:\\s*['\"]([^'\"]+)['\"],\\s*version:\\s*['\"]([^'\"]+)['\"]");
     private static final String CATALOG_PATH = "gradle/libs.versions.toml";
+    private static final String GRADLE_PROPERTIES = "gradle.properties";
 
     @Override
     public String getDisplayName() {
@@ -148,7 +149,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                         if (tree instanceof SourceFile) {
                             SourceFile sourceFile = (SourceFile) tree;
                             String path = sourceFile.getSourcePath().toString();
-                            if (path.endsWith(".properties") || path.endsWith(CATALOG_PATH)) {
+                            if (path.endsWith(GRADLE_PROPERTIES) || path.endsWith(CATALOG_PATH)) {
                                 return SearchResult.found(tree);
                             }
                         }
@@ -591,7 +592,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
-                    if (sourceFile.getSourcePath().toString().endsWith(".properties")) {
+                    if (sourceFile.getSourcePath().toString().endsWith(GRADLE_PROPERTIES) && sourceFile instanceof Properties.File) {
                         return new PropertiesFileVisitor(acc).visitNonNull(sourceFile, ctx);
                     } else if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
                         return new GradleFileVisitor(acc).visitNonNull(sourceFile, ctx);
