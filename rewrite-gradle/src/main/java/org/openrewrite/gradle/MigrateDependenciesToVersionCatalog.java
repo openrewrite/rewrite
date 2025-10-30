@@ -61,7 +61,18 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
     @Override
     public String getDescription() {
-        return "Migrates Gradle project dependencies to use the version catalog feature.";
+        //language=markdown
+        return "Migrates Gradle project dependencies to use the [version catalog](https://docs.gradle.org/current/userguide/platforms.html) feature. " +
+                "Supports migrating dependency declarations of various forms:\n" +
+                " * `String` notation: `\"group:artifact:version\"`\n" +
+                " * `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
+                " * Property references: `\"group:artifact:$version\"` or `\"group:artifact:${version}\"`\n\n" +
+                "The recipe will:\n" +
+                " * Create a `gradle/libs.versions.toml` file with version declarations\n" +
+                " * Replace dependency declarations with catalog references (e.g., `libs.springCore`)\n" +
+                " * Migrate version properties from `gradle.properties` to the version catalog\n" +
+                " * Preserve project dependencies unchanged\n\n" +
+                "**Note:** If a version catalog already exists, the recipe will not modify it.";
     }
 
     static class DependencyAccumulator {
