@@ -13,7 +13,9 @@ dependencies {
         // last version which supports java 8, which testGradle4 runs on
         testImplementation("org.assertj:assertj-core:3.27.4!!")
     }
-    implementation(gradleApi())
+    // Use compileOnly instead of implementation to avoid leaking gradleApi() to consumers
+    // This prevents Gradle 9's API from polluting rewrite-gradle's test classpath
+    compileOnly(gradleApi())
 
     // NOTE: this is latest.integration because we need to be able to release
     // rewrite-gradle-tooling-model BEFORE rewrite but also need to depend on
