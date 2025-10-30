@@ -21,6 +21,8 @@ import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
@@ -29,6 +31,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.gradle.Assertions.*;
 
 class GradleParserTest implements RewriteTest {
@@ -380,6 +383,27 @@ class GradleParserTest implements RewriteTest {
                   implementation platform("commons-lang:commons-lang3:3.0",)
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-testing-frameworks/pull/836")
+    @Test
+    void typeAttributionOnTasks() {
+        rewriteRun(
+          //language=groovy
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              tasks.withType(Test) {
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                JavaType tasksType = ((J.MethodInvocation) cu.getStatements().getLast()).getSelect().getType();
+                assertTrue(TypeUtils.isAssignableTo("org.gradle.api.tasks.TaskContainer", tasksType), tasksType.toString());
+            })
           )
         );
     }
