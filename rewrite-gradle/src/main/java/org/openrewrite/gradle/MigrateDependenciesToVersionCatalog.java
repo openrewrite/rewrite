@@ -656,7 +656,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                                         Tree.randomId(),
                                                         Space.EMPTY,
                                                         Markers.EMPTY,
-                                                        Collections.emptyList(),
+                                                        emptyList(),
                                                         dep.getAliasName(),
                                                         null,
                                                         null
@@ -666,7 +666,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                         null
                                 );
 
-                                m = m.withArguments(Collections.singletonList(catalogRef));
+                                m = m.withArguments(singletonList(catalogRef));
                             }
                         } else {
                             // Handle regular string dependencies
@@ -708,7 +708,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                     Tree.randomId(),
                                     Space.EMPTY,
                                     Markers.EMPTY,
-                                    Collections.emptyList(),
+                                    emptyList(),
                                     "libs",
                                     null,
                                     null
@@ -716,7 +716,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
                             Markers markers = hasMultipleArgs ?
                                     Markers.EMPTY :
-                                    new Markers(Tree.randomId(), Collections.singletonList(new OmitParentheses(Tree.randomId())));
+                                    new Markers(Tree.randomId(), singletonList(new OmitParentheses(Tree.randomId())));
 
                             return new J.FieldAccess(
                                     Tree.randomId(),
@@ -729,7 +729,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                                     Tree.randomId(),
                                                     Space.EMPTY,
                                                     Markers.EMPTY,
-                                                    Collections.emptyList(),
+                                                    emptyList(),
                                                     dep.getAliasName(),
                                                     null,
                                                     null
@@ -761,7 +761,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                             Tree.randomId(),
                                             Space.EMPTY,
                                             Markers.EMPTY,
-                                            Collections.emptyList(),
+                                            emptyList(),
                                             "libs",
                                             null,
                                             null
@@ -769,7 +769,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
                                     Markers markers = hasMultipleArgs ?
                                             Markers.EMPTY :
-                                            new Markers(Tree.randomId(), Collections.singletonList(new OmitParentheses(Tree.randomId())));
+                                            new Markers(Tree.randomId(), singletonList(new OmitParentheses(Tree.randomId())));
 
                                     return new J.FieldAccess(
                                             Tree.randomId(),
@@ -782,7 +782,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                                             Tree.randomId(),
                                                             Space.EMPTY,
                                                             Markers.EMPTY,
-                                                            Collections.emptyList(),
+                                                            emptyList(),
                                                             dep.getAliasName(),
                                                             null,
                                                             null
@@ -830,7 +830,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                     Tree.randomId(),
                                     Space.EMPTY,
                                     Markers.EMPTY,
-                                    Collections.emptyList(),
+                                    emptyList(),
                                     "libs",
                                     null,
                                     null
@@ -838,7 +838,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
                             Markers markers = hasMultipleArgs ?
                                     Markers.EMPTY :
-                                    new Markers(Tree.randomId(), Collections.singletonList(new OmitParentheses(Tree.randomId())));
+                                    new Markers(Tree.randomId(), singletonList(new OmitParentheses(Tree.randomId())));
 
                             return new J.FieldAccess(
                                     Tree.randomId(),
@@ -851,7 +851,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                                     Tree.randomId(),
                                                     Space.EMPTY,
                                                     Markers.EMPTY,
-                                                    Collections.emptyList(),
+                                                    emptyList(),
                                                     dep.getAliasName(),
                                                     null,
                                                     null
@@ -995,7 +995,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                     Tree.randomId(),
                                     Space.EMPTY,
                                     Markers.EMPTY,
-                                    Collections.emptyList(),
+                                    emptyList(),
                                     "libs",
                                     null,
                                     null
@@ -1012,7 +1012,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                                     Tree.randomId(),
                                                     Space.EMPTY,
                                                     Markers.EMPTY,
-                                                    Collections.emptyList(),
+                                                    emptyList(),
                                                     dep.getAliasName(),
                                                     null,
                                                     null
@@ -1022,7 +1022,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                     null
                             );
 
-                            m = m.withArguments(Collections.singletonList(catalogRef));
+                            m = m.withArguments(singletonList(catalogRef));
                         }
                     } else {
                         // Handle regular string dependencies
@@ -1059,7 +1059,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                 Tree.randomId(),
                                 Space.EMPTY,
                                 Markers.EMPTY,
-                                Collections.emptyList(),
+                                emptyList(),
                                 "libs",
                                 null,
                                 null
