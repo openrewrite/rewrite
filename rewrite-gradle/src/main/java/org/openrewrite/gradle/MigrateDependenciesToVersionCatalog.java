@@ -1122,7 +1122,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                                         Tree.randomId(),
                                                         Space.EMPTY,
                                                         Markers.EMPTY,
-                                                        Collections.emptyList(),
+                                                        emptyList(),
                                                         dep.getAliasName(),
                                                         null,
                                                         null
