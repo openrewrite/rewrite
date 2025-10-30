@@ -22,7 +22,7 @@ import {SourceFile} from "../tree";
 import dedent from "dedent";
 import {Result, scheduleRun} from "../run";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
-import {mapAsync} from "../util";
+import {mapAsync, trimIndent} from "../util";
 import {ParseErrorKind} from "../parse-error";
 import {MarkersKind, ParseExceptionResult} from "../markers";
 import {JavaScriptVisitor} from "../javascript";
@@ -61,13 +61,21 @@ export class RecipeSpec {
         this.dataTableAssertions[name] = allRows;
     }
 
-    async rewriteRun(...sourceSpecs: (SourceSpec<any> | Generator<SourceSpec<any>, void, unknown>)[]): Promise<void> {
+    async rewriteRun(...sourceSpecs: (SourceSpec<any> | Generator<SourceSpec<any>, void, unknown> | AsyncGenerator<SourceSpec<any>, void, unknown>)[]): Promise<void> {
         // Flatten generators into a list of sourceSpecs
         const flattenedSpecs: SourceSpec<any>[] = [];
         for (const specOrGenerator of sourceSpecs) {
             if (specOrGenerator && typeof (specOrGenerator as any).next === 'function') {
-                for (const spec of specOrGenerator as Generator<SourceSpec<any>, void, unknown>) {
-                    flattenedSpecs.push(spec);
+                // Check if it's an async generator
+                if (typeof (specOrGenerator as any)[Symbol.asyncIterator] === 'function') {
+                    for await (const spec of specOrGenerator as AsyncGenerator<SourceSpec<any>, void, unknown>) {
+                        flattenedSpecs.push(spec);
+                    }
+                } else {
+                    // Sync generator
+                    for (const spec of specOrGenerator as Generator<SourceSpec<any>, void, unknown>) {
+                        flattenedSpecs.push(spec);
+                    }
                 }
             } else {
                 flattenedSpecs.push(specOrGenerator as SourceSpec<any>);
@@ -158,6 +166,9 @@ export class RecipeSpec {
     }
 
     private async expectAfter(spec: SourceSpec<any>, after?: SourceFile) {
+        if (!after) {
+            throw new Error('Expected for recipe to have produced a change for file:\n' + trimIndent(spec.before))
+        }
         expect(after).toBeDefined();
         await new ValidateWhitespaceVisitor().visit(after!, this.executionContext);
         const actualAfter = await TreePrinters.print(after!);
@@ -212,7 +223,7 @@ export class RecipeSpec {
 }
 
 class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
-    protected override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
+    public override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
         const ret = super.visitSpace(space, p);
         expect(space.whitespace).toMatch(/^\s*$/);
         return ret;

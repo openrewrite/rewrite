@@ -69,14 +69,21 @@ dependencies {
     testImplementation(project(":rewrite-gradle-tooling-model:model"))
     "pluginLocalTestClasspath"(project(mapOf("path" to ":rewrite-gradle-tooling-model:model", "configuration" to "pluginLocalTestClasspath")))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
+    testImplementation(localGroovy())
 
-    testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly(gradleApi())
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
 }
 
 tasks.withType<Test>().configureEach {
@@ -103,4 +110,10 @@ tasks.withType<Javadoc>().configureEach {
 
 configure<LicenseExtension> {
     excludePatterns.add("**/gradle-wrapper/*")
+}
+
+tasks.register<JavaExec>("syncWrapperScripts") {
+    classpath = sourceSets.test.get().runtimeClasspath + sourceSets.test.get().output
+    mainClass = "org.openrewrite.gradle.internal.GradleWrapperScriptDownloader"
+    workingDir = project.rootDir
 }

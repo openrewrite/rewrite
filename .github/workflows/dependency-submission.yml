@@ -19,10 +19,10 @@ jobs:
         with:
           distribution: temurin
           java-version: |
-            25-ea
+            25
             21
       - name: Generate and submit dependency graph
-        uses: gradle/actions/dependency-submission@v4
+        uses: gradle/actions/dependency-submission@v5
         env:
           # Exclude all dependencies that originate solely in the 'buildSrc' project
           DEPENDENCY_GRAPH_EXCLUDE_PROJECTS: ':buildSrc'

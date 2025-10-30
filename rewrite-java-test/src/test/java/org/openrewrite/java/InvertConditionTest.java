@@ -64,7 +64,7 @@ class InvertConditionTest implements RewriteTest {
                   boolean test() {
                       if(b) {}
                       if(!(b || a)) {}
-                      if(1 >= 2) {}
+                      if(false) {}
                       if(!b) {}
                       if(!(b)) {}
                       if(!test()) {}

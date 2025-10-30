@@ -23,8 +23,10 @@ import {Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
 
-function blankLines(customizer: StyleCustomizer<BlankLinesStyle>): BlankLinesStyle {
-    return produce(IntelliJ.TypeScript.blankLines(), draft => customizer(draft));
+function blankLines(customizer?: StyleCustomizer<BlankLinesStyle>): BlankLinesStyle {
+    return customizer
+        ? produce(IntelliJ.TypeScript.blankLines(), draft => customizer(draft))
+        : IntelliJ.TypeScript.blankLines();
 }
 
 describe('BlankLinesVisitor', () => {
@@ -54,10 +56,9 @@ describe('BlankLinesVisitor', () => {
                 class B {
                 }
 
-                 class C {
+                class C {
                 }
                 `),
-            // TODO the space before `class C` seems excessive, not sure if it's the BlankLinkesVisitor's responsibility though
             // @formatter:on
         )
     });
@@ -114,8 +115,7 @@ describe('BlankLinesVisitor', () => {
     });
 
     test('simple un-minify', () => {
-        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines(draft => {
-        })));
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -131,8 +131,7 @@ describe('BlankLinesVisitor', () => {
     });
 
     test('un-minify', () => {
-        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines(draft => {
-        })));
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript

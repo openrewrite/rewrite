@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {mapAsync} from "../util";
+import {mapAsync, updateIfChanged} from "../util";
 import {produceAsync, TreeVisitor, ValidImmerRecipeReturnType} from "../visitor";
 import {SourceFile} from "../tree";
 import {isJson, Json} from "./tree";
@@ -25,52 +25,77 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
     }
 
     protected async visitArray(array: Json.Array, p: P): Promise<Json | undefined> {
-        return this.produceJson<Json.Array>(array, p, async draft => {
-            draft.values = await mapAsync(array.values, value => this.visitRightPadded(value, p));
-        })
+        const updates: any = {
+            prefix: await this.visitSpace(array.prefix, p),
+            markers: await this.visitMarkers(array.markers, p),
+            values: await mapAsync(array.values, value => this.visitRightPadded(value, p))
+        };
+        return updateIfChanged(array, updates);
     }
 
     protected async visitDocument(document: Json.Document, p: P): Promise<Json | undefined> {
-        return this.produceJson<Json.Document>(document, p, async draft => {
-            draft.value = await this.visitDefined(document.value, p);
-            draft.eof = await this.visitSpace(document.eof, p);
-        })
+        const updates: any = {
+            prefix: await this.visitSpace(document.prefix, p),
+            markers: await this.visitMarkers(document.markers, p),
+            value: await this.visitDefined(document.value, p),
+            eof: await this.visitSpace(document.eof, p)
+        };
+        return updateIfChanged(document, updates);
     }
 
     protected async visitEmpty(empty: Json.Empty, p: P): Promise<Json | undefined> {
-        return this.produceJson(empty, p)
+        const updates: any = {
+            prefix: await this.visitSpace(empty.prefix, p),
+            markers: await this.visitMarkers(empty.markers, p)
+        };
+        return updateIfChanged(empty, updates);
     }
 
     protected async visitIdentifier(identifier: Json.Identifier, p: P): Promise<Json | undefined> {
-        return this.produceJson(identifier, p)
+        const updates: any = {
+            prefix: await this.visitSpace(identifier.prefix, p),
+            markers: await this.visitMarkers(identifier.markers, p)
+        };
+        return updateIfChanged(identifier, updates);
     }
 
     protected async visitLiteral(literal: Json.Literal, p: P): Promise<Json | undefined> {
-        return this.produceJson(literal, p)
+        const updates: any = {
+            prefix: await this.visitSpace(literal.prefix, p),
+            markers: await this.visitMarkers(literal.markers, p)
+        };
+        return updateIfChanged(literal, updates);
     }
 
     protected async visitMember(member: Json.Member, p: P): Promise<Json | undefined> {
-        return this.produceJson<Json.Member>(member, p, async draft => {
-            draft.key = (await this.visitRightPadded(member.key, p))!;
-            draft.value = await this.visitDefined(member.value, p);
-        });
+        const updates: any = {
+            prefix: await this.visitSpace(member.prefix, p),
+            markers: await this.visitMarkers(member.markers, p),
+            key: (await this.visitRightPadded(member.key, p))!,
+            value: await this.visitDefined(member.value, p)
+        };
+        return updateIfChanged(member, updates);
     }
 
     protected async visitObject(jsonObject: Json.Object, p: P): Promise<Json | undefined> {
-        return this.produceJson<Json.Object>(jsonObject, p, async draft => {
-            draft.members = await mapAsync(jsonObject.members, member => this.visitRightPadded(member, p));
-        });
+        const updates: any = {
+            prefix: await this.visitSpace(jsonObject.prefix, p),
+            markers: await this.visitMarkers(jsonObject.markers, p),
+            members: await mapAsync(jsonObject.members, member => this.visitRightPadded(member, p))
+        };
+        return updateIfChanged(jsonObject, updates);
     }
 
-    protected async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: P):
+    public async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: P):
         Promise<Json.RightPadded<T> | undefined> {
-        return produceAsync<Json.RightPadded<T>>(right, async draft => {
-            draft.element = await this.visitDefined(right.element, p);
-            draft.after = await this.visitSpace(right.after, p)
-        });
+        const updates: any = {
+            element: await this.visitDefined(right.element, p),
+            after: await this.visitSpace(right.after, p)
+        };
+        return updateIfChanged(right, updates);
     }
 
-    protected async visitSpace(space: Json.Space, p: P): Promise<Json.Space> {
+    public async visitSpace(space: Json.Space, p: P): Promise<Json.Space> {
         return space;
     }
 

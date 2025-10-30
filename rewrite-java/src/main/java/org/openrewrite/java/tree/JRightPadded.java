@@ -19,12 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.RpcCodec;
-import org.openrewrite.rpc.RpcReceiveQueue;
-import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
 import java.util.function.UnaryOperator;
@@ -39,9 +34,7 @@ import static java.util.Collections.emptyList;
 @Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
-public class JRightPadded<T> implements RpcCodec<JRightPadded<T>> {
-    private static JavaSender RPC_SENDER = new JavaSender();
-    private static JavaReceiver RPC_RECEIVER = new JavaReceiver();
+public class JRightPadded<T> {
 
     T element;
     Space after;
@@ -178,15 +171,5 @@ public class JRightPadded<T> implements RpcCodec<JRightPadded<T>> {
     @Override
     public String toString() {
         return "JRightPadded(element=" + element + ", after=" + after + ')';
-    }
-
-    @Override
-    public void rpcSend(JRightPadded<T> after, RpcSendQueue q) {
-        RPC_SENDER.visitRightPadded(after, q);
-    }
-
-    @Override
-    public JRightPadded<T> rpcReceive(JRightPadded<T> before, RpcReceiveQueue q) {
-        return RPC_RECEIVER.visitRightPadded(before, q);
     }
 }

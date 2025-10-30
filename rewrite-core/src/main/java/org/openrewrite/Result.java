@@ -270,10 +270,10 @@ public class Result {
     public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
         try {
             return (before == after) ||
-                    (before != null && after != null &&
-                            // Remote source files are fetched on `printAll`, let's avoid that cost.
-                            !(before instanceof Remote) && !(after instanceof Remote) &&
-                            before.printAll().equals(after.printAll()));
+                   (before != null && after != null &&
+                    // Remote source files are fetched on `printAll`, let's avoid that cost.
+                    !(before instanceof Remote) && !(after instanceof Remote) &&
+                    before.printAll().equals(after.printAll()));
         } catch (Exception e) {
             return false;
         }

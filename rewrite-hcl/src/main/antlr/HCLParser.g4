@@ -129,7 +129,10 @@ variableExpr
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#functions-and-function-calls
 
 functionCall
-    : Identifier LPAREN arguments? RPAREN;
+    : functionName LPAREN arguments? RPAREN;
+
+functionName
+    : Identifier (DOUBLE_COLON Identifier)*;
 
 arguments
     : expression (COMMA expression)* (COMMA | ELLIPSIS)?

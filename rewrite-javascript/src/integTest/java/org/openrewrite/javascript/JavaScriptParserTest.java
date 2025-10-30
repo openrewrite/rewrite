@@ -42,7 +42,7 @@ class JavaScriptParserTest {
 
     @BeforeEach
     void before() {
-//        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder().trace(true));
+//        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder().inspectBrk(Paths.get("rewrite")));
         this.parser = JavaScriptParser.builder().build();
         this.ctx = new InMemoryExecutionContext();
     }
@@ -56,7 +56,7 @@ class JavaScriptParserTest {
     void helloJavaScript() {
         @Language("js")
         String helloWorld = """
-          console.info("Hello world!")
+          console.info("Hello " + 123n)
           """;
         Parser.Input input = Parser.Input.fromString(Path.of("helloworld.js"), helloWorld);
         Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
@@ -178,6 +178,11 @@ class JavaScriptParserTest {
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(typescript.get()).satisfies(cu ->
           assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+
+        // Shutdown RPC to force sending full LST for print
+        JavaScriptRewriteRpc.shutdownCurrent();
+        assertThat(typescript.get()).satisfies(cu ->
+          assertThat(cu.printAll()).isEqualTo(script));
     }
 
     @Test

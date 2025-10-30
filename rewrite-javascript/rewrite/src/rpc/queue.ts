@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import * as rpc from "vscode-jsonrpc/node";
 import {emptyMarkers, Markers} from "../markers";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
 import {isRef, ReferenceMap} from "../reference";
-import {Writable} from "node:stream";
 
 /**
  * Interface representing an RPC codec that defines methods
@@ -46,37 +46,58 @@ export interface RpcCodec<T> {
  * A registry for managing RPC codecs based on object types.
  */
 export class RpcCodecs {
-    private static codecs = new Map<string, RpcCodec<any>>();
+    private static nonTreeCodecs = new Map<string, RpcCodec<any>>();
+
+    /**
+     * The first key is on sourceFileType and the second on object type
+     */
+    private static treeCodecs = new Map<string, Map<string, RpcCodec<any>>>();
 
     /**
      * Registers an RPC codec for a given type.
      *
      * @param type - The string identifier of the object type.
      * @param codec - The codec implementation to be registered.
+     * @param sourceFileType The source file type of the source file containing (or will contain) this element.
      */
-    static registerCodec(type: string, codec: RpcCodec<any>): void {
-        this.codecs.set(type, codec);
+    static registerCodec(type: string, codec: RpcCodec<any>, sourceFileType?: string): void {
+        if (sourceFileType) {
+            let codecsForSourceFile = this.treeCodecs.get(sourceFileType);
+            if (!codecsForSourceFile) {
+                codecsForSourceFile = new Map<string, RpcCodec<any>>();
+                this.treeCodecs.set(sourceFileType, codecsForSourceFile);
+            }
+            codecsForSourceFile.set(type, codec);
+        } else {
+            this.nonTreeCodecs.set(type, codec);
+        }
     }
 
     /**
      * Retrieves the registered codec for a given type.
      *
      * @param type - The string identifier of the object type.
+     * @param sourceFileType The source file type of the source file containing (or will contain) this element.
      * @returns The corresponding `RpcCodec`, or `undefined` if not found.
      */
-    static forType(type: string): RpcCodec<any> | undefined {
-        return this.codecs.get(type);
+    static forType(type: string, sourceFileType?: string): RpcCodec<any> | undefined {
+        if (sourceFileType) {
+            const treeCodec = this.treeCodecs.get(sourceFileType)?.get(type);
+            return treeCodec || this.nonTreeCodecs.get(type);
+        }
+        return this.nonTreeCodecs.get(type);
     }
 
     /**
      * Determines the appropriate codec for an instance based on its `kind` property.
      *
      * @param before - The object instance to find a codec for.
+     * @param sourceFileType The source file type of the source file containing (or will contain) this element.
      * @returns The corresponding `RpcCodec`, or `undefined` if no matching codec is found.
      */
-    static forInstance(before: any): RpcCodec<any> | undefined {
+    static forInstance(before: any, sourceFileType?: string): RpcCodec<any> | undefined {
         if (before !== undefined && before !== null && typeof before === "object" && "kind" in before) {
-            return RpcCodecs.forType(before["kind"] as string);
+            return RpcCodecs.forType(before["kind"] as string, sourceFileType);
         }
     }
 }
@@ -86,7 +107,9 @@ export class RpcSendQueue {
 
     private before?: any;
 
-    constructor(private readonly refs: ReferenceMap, private readonly trace: boolean) {
+    constructor(private readonly refs: ReferenceMap,
+                private readonly sourceFileType: string | undefined,
+                private readonly trace: boolean) {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
@@ -127,12 +150,13 @@ export class RpcSendQueue {
         return saveTrace(this.trace, async () => {
             if (before === after) {
                 this.put({state: RpcObjectState.NO_CHANGE});
-            } else if (before === undefined) {
+            } else if (before === undefined || (after !== undefined && this.typesAreDifferent(after, before))) {
+                // Treat as ADD when before is undefined OR types differ (it's a new object, not a change)
                 await this.add(after, onChange);
             } else if (after === undefined) {
                 this.put({state: RpcObjectState.DELETE});
             } else {
-                let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after);
+                let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
                 this.put({state: RpcObjectState.CHANGE, value: onChange || afterCodec ? undefined : after});
                 await this.doChange(after, before, onChange, afterCodec);
             }
@@ -159,9 +183,12 @@ export class RpcSendQueue {
                     const aBefore = before ? before[beforePos] : undefined;
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
+                    } else if (anAfter !== undefined && this.typesAreDifferent(anAfter, aBefore)) {
+                        // Type changed - treat as ADD
+                        await this.add(anAfter, onChangeRun);
                     } else {
                         this.put({state: RpcObjectState.CHANGE});
-                        await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter));
+                        await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter, this.sourceFileType));
                     }
                 }
             }
@@ -199,7 +226,7 @@ export class RpcSendQueue {
             }
             ref = this.refs.create(after);
         }
-        let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after);
+        let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
         this.put({
             state: RpcObjectState.ADD,
             valueType: this.getValueType(after),
@@ -225,6 +252,12 @@ export class RpcSendQueue {
         }
     }
 
+    private typesAreDifferent(after: any, before: any): boolean {
+        const afterKind = after !== undefined && after !== null && typeof after === "object" ? after["kind"] : undefined;
+        const beforeKind = before !== undefined && before !== null && typeof before === "object" ? before["kind"] : undefined;
+        return afterKind !== undefined && beforeKind !== undefined && afterKind !== beforeKind;
+    }
+
     private getValueType(after?: any): string | undefined {
         if (after !== undefined && after !== null && typeof after === "object" && "kind" in after) {
             return after["kind"];
@@ -236,8 +269,10 @@ export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
 
     constructor(private readonly refs: Map<number, any>,
+                private readonly sourceFileType: string | undefined,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logFile?: Writable) {
+                private readonly logger: rpc.Logger | undefined,
+                private readonly trace: boolean) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -252,7 +287,7 @@ export class RpcReceiveQueue {
             markers = emptyMarkers;
         }
         return this.receive(markers, async m => {
-            return saveTrace(this.logFile, async () => {
+            return saveTrace(this.trace, async () => {
                 const draft = createDraft(markers!);
                 draft.id = await this.receive(m.id);
                 draft.markers = (await this.receiveList(m.markers))!;
@@ -265,9 +300,9 @@ export class RpcReceiveQueue {
         before: T | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T> {
-        return saveTrace(this.logFile, async () => {
+        return saveTrace(this.trace, async () => {
             const message = await this.take();
-            this.traceMessage(message);
+            RpcObjectData.logTrace(message, this.trace, this.logger);
             let ref: number | undefined;
             switch (message.state) {
                 case RpcObjectState.NO_CHANGE:
@@ -301,7 +336,7 @@ export class RpcReceiveQueue {
                     let codec;
                     if (onChange) {
                         after = await onChange(before!);
-                    } else if ((codec = RpcCodecs.forInstance(before))) {
+                    } else if ((codec = RpcCodecs.forInstance(before, this.sourceFileType))) {
                         after = await codec.rpcReceive(before, this);
                     } else if (message.value !== undefined) {
                         after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
@@ -329,9 +364,9 @@ export class RpcReceiveQueue {
         before: T[] | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T[] | undefined> {
-        return saveTrace(this.logFile, async () => {
+        return saveTrace(this.trace, async () => {
             const message = await this.take();
-            this.traceMessage(message);
+            RpcObjectData.logTrace(message, this.trace, this.logger);
             switch (message.state) {
                 case RpcObjectState.NO_CHANGE:
                     return before;
@@ -361,16 +396,6 @@ export class RpcReceiveQueue {
         });
     }
 
-    private traceMessage(message: RpcObjectData) {
-        if (this.logFile && message.trace) {
-            const sendTrace = message.trace;
-            delete message.trace;
-            this.logFile.write(`${JSON.stringify(message)}\n`);
-            this.logFile.write(`  ${sendTrace}\n`);
-            this.logFile.write(`  ${trace("Receiver")}\n`);
-        }
-    }
-
     private newObj<T>(type: string): T {
         return {
             kind: type
@@ -387,6 +412,18 @@ export interface RpcObjectData {
     value?: any
     ref?: number
     trace?: string
+}
+
+export namespace RpcObjectData {
+    export function logTrace(message: RpcObjectData, enabled: boolean, logger: rpc.Logger | undefined): void {
+        if (enabled && logger && message.trace) {
+            const sendTrace = message.trace;
+            delete message.trace;
+            logger.info(`${JSON.stringify(message)}`);
+            logger.info(`  ${sendTrace || 'No sender trace'}`);
+            logger.info(`  ${trace("Receiver") || 'No receiver trace'}`);
+        }
+    }
 }
 
 export enum RpcObjectState {

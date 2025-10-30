@@ -18,6 +18,7 @@ package org.openrewrite.rpc.request;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.scheduling.RecipeRunCycle;
@@ -26,12 +27,12 @@ import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.ExecutionContext.CURRENT_RECIPE;
 
 @Value
@@ -47,13 +48,13 @@ public class Generate implements RpcRequest {
     public static class Handler extends JsonRpcMethod<Generate> {
         private final Map<String, Object> localObjects;
         private final PreparedRecipeCache preparedRecipes;
-        private final Function<String, ?> getObject;
+        private final BiFunction<String, @Nullable String, ?> getObject;
 
         @Override
         protected Object handle(Generate request) throws Exception {
             Recipe recipe = preparedRecipes.getInstantiated().get(request.getId());
 
-            ExecutionContext ctx = (ExecutionContext) getObject.apply(request.getP());
+            ExecutionContext ctx = (ExecutionContext) getObject.apply(request.getP(), null);
             if (ctx.getMessage(CURRENT_RECIPE) == null) {
                 WatchableExecutionContext wctx = new WatchableExecutionContext(ctx);
                 wctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), wctx,
@@ -68,12 +69,19 @@ public class Generate implements RpcRequest {
                 Object acc = scanningRecipe.getAccumulator(preparedRecipes.getRecipeCursors().computeIfAbsent(recipe,
                         r -> new Cursor(null, Cursor.ROOT_VALUE)), ctx);
                 Collection<? extends SourceFile> generated = scanningRecipe.generate(acc, ctx);
-                generated.forEach(g -> localObjects.put(g.getId().toString(), g));
-                return generated.stream()
-                        .map(SourceFile::getId)
-                        .collect(toList());
+
+                GenerateResponse response = new GenerateResponse(
+                        new ArrayList<>(generated.size()),
+                        new ArrayList<>(generated.size())
+                );
+                for (SourceFile g : generated) {
+                    localObjects.put(g.getId().toString(), g);
+                    response.getIds().add(g.getId().toString());
+                    response.getSourceFileTypes().add(g.getClass().getName());
+                }
+                return response;
             }
-            return emptyList();
+            return new GenerateResponse(emptyList(), emptyList());
         }
     }
 }

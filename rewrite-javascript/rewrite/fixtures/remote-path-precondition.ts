@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 import {check, ExecutionContext, Option, Recipe, TreeVisitor} from "@openrewrite/rewrite";
-import {RewriteRpc} from "@openrewrite/rewrite/rpc";
 import {FindIdentifier} from "./search-recipe";
+import {hasSourcePath} from "@openrewrite/rewrite/javascript";
 
 /**
  * A recipe that finds identifiers in files matching a specific path
@@ -42,12 +42,10 @@ export class FindIdentifierWithRemotePathPrecondition extends Recipe {
     }
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-        const findIdentifier = new FindIdentifier({identifier: this.identifier});
-
         // Use the check function to apply the precondition
         return check(
-            RewriteRpc.get().prepareRecipe("org.openrewrite.FindSourceFiles", {filePattern: this.requiredPath}),
-            findIdentifier.editor()
+            hasSourcePath(this.requiredPath),
+            new FindIdentifier({identifier: this.identifier}).editor()
         );
     }
 }

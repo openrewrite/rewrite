@@ -17,17 +17,30 @@
  */
 
 import {emptyMarkers, Markers} from "../markers";
-import {SourceFile, Tree, TreeKind} from "../tree";
+import {SourceFile, Tree} from "../tree";
 import {Type} from "./type";
-import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {JavaReceiver, JavaSender} from "./rpc";
-import Space = J.Space;
 
 export interface J extends Tree {
     readonly prefix: J.Space;
 }
 
+export namespace J {
+    export function isMethodCall(e?: Expression): e is MethodCall {
+        return e?.kind === J.Kind.NewClass ||
+            e?.kind === J.Kind.MethodInvocation ||
+            e?.kind === J.Kind.MemberReference;
+    }
+
+    export function hasType<T extends J>(tree: T): tree is T & { type: Type } {
+        return tree && 'type' in tree && tree.type != null;
+    }
+}
+
 export interface Expression extends J {
+}
+
+export interface MethodCall extends Expression {
+    readonly methodType?: Type.Method;
 }
 
 export interface TypedTree extends J {
@@ -461,13 +474,12 @@ export namespace J {
         readonly codePoint: string;
     }
 
-    export interface MemberReference extends J, Expression {
+    export interface MemberReference extends J, MethodCall {
         readonly kind: typeof Kind.MemberReference;
         readonly containing: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
         readonly reference: LeftPadded<Identifier>;
         readonly type?: Type;
-        readonly methodType?: Type.Method;
         readonly variableType?: Type.Variable;
     }
 
@@ -486,13 +498,12 @@ export namespace J {
         readonly methodType?: Type.Method;
     }
 
-    export interface MethodInvocation extends J, TypedTree, Expression {
+    export interface MethodInvocation extends J, TypedTree, MethodCall {
         readonly kind: typeof Kind.MethodInvocation;
         readonly select?: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
         readonly name: Identifier;
         readonly arguments: Container<Expression>;
-        readonly methodType?: Type.Method;
     }
 
     export interface Modifier extends J {
@@ -539,7 +550,7 @@ export namespace J {
         readonly type?: Type;
     }
 
-    export interface NewClass extends J, TypedTree, Expression {
+    export interface NewClass extends J, TypedTree, MethodCall {
         readonly kind: typeof Kind.NewClass;
         readonly enclosing?: RightPadded<Expression>;
         readonly new: Space;
@@ -580,7 +591,7 @@ export namespace J {
 
     export interface Primitive extends J, TypeTree, Expression {
         readonly kind: typeof Kind.Primitive;
-        readonly type: Type.Primitive;
+        type: Type.Primitive;
     }
 
     export interface Return extends J, Statement {
@@ -790,6 +801,12 @@ export const emptySpace: J.Space = {
     whitespace: "",
 };
 
+export const singleSpace: J.Space = {
+    kind: J.Kind.Space,
+    comments: [],
+    whitespace: " ",
+};
+
 export function emptyContainer<T extends J>(): J.Container<T> {
     return {
         kind: J.Kind.Container,
@@ -815,12 +832,6 @@ export interface TextComment extends Comment {
 
 export interface DocComment extends Comment {
     // TODO implement me!
-}
-
-const javaKindValues = new Set(Object.values(J.Kind));
-
-export function isJava(tree: any): tree is J {
-    return javaKindValues.has(tree["kind"]);
 }
 
 export function isLiteral(tree: any): tree is J.Literal {
@@ -874,64 +885,3 @@ export namespace TypedTree {
     registerTypeGetter(J.Kind.Wildcard, () => Type.unknownType);
     registerTypeGetter(J.Kind.Unknown, () => Type.unknownType);
 }
-
-const javaReceiver = new JavaReceiver();
-const javaSender = new JavaSender();
-
-const javaCodec: RpcCodec<J> = {
-    async rpcReceive(before: J, q: RpcReceiveQueue): Promise<J> {
-        return (await javaReceiver.visit(before, q))!;
-    },
-
-    async rpcSend(after: J, q: RpcSendQueue): Promise<void> {
-        await javaSender.visit(after, q);
-    }
-}
-
-// Register codec for all Java AST node types
-Object.values(J.Kind).forEach(kind => {
-    if (kind === J.Kind.Space) {
-        RpcCodecs.registerCodec(kind, {
-                async rpcReceive(before: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
-                    return (await javaReceiver.visitSpace(before, q))!;
-                },
-
-                async rpcSend(after: J.Space, q: RpcSendQueue): Promise<void> {
-                    await javaSender.visitSpace(after, q);
-                }
-            }
-        );
-    } else if (kind === J.Kind.RightPadded) {
-        RpcCodecs.registerCodec(kind, {
-            async rpcReceive<T extends J | boolean>(before: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
-                return (await javaReceiver.visitRightPadded(before, q))!;
-            },
-
-            async rpcSend<T extends J | boolean>(after: J.RightPadded<T>, q: RpcSendQueue): Promise<void> {
-                await javaSender.visitRightPadded(after, q);
-            }
-        })
-    } else if (kind === J.Kind.LeftPadded) {
-        RpcCodecs.registerCodec(kind, {
-            async rpcReceive<T extends J | Space | number | string | boolean>(before: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
-                return (await javaReceiver.visitLeftPadded(before, q))!;
-            },
-
-            async rpcSend<T extends J | Space | number | string | boolean>(after: J.LeftPadded<T>, q: RpcSendQueue): Promise<void> {
-                await javaSender.visitLeftPadded(after, q);
-            }
-        })
-    } else if (kind === J.Kind.Container) {
-        RpcCodecs.registerCodec(kind, {
-            async rpcReceive<T extends J>(before: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
-                return (await javaReceiver.visitContainer(before, q))!;
-            },
-
-            async rpcSend<T extends J>(after: J.Container<T>, q: RpcSendQueue): Promise<void> {
-                await javaSender.visitContainer(after, q);
-            }
-        })
-    } else {
-        RpcCodecs.registerCodec(kind, javaCodec);
-    }
-});

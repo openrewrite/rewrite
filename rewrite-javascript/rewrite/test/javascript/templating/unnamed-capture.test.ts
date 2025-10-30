@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 
 describe('unnamed capture', () => {
@@ -25,11 +25,14 @@ describe('unnamed capture', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
 
             protected override async visitExpression(expr: Expression, p: any): Promise<J | undefined> {
-                //language=typescript
-                let m = await pattern`${"left"} + ${"right"}`.match(expr) ||
-                    await pattern`${"left"} * ${"right"}`.match(expr);
+                const left = capture();
+                const right = capture();
 
-                return m && await template`${"right"} + ${"left"}`.apply(this.cursor, expr, m) || expr;
+                //language=typescript
+                let m = await pattern`${left} + ${right}`.match(expr) ||
+                    await pattern`${left} * ${right}`.match(expr);
+
+                return m && await template`${right} + ${left}`.apply(this.cursor, expr, m) || expr;
             }
         });
 
@@ -47,14 +50,17 @@ describe('unnamed capture', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
+                const obj = capture();
+                const property = capture();
+                const defaultValue = capture();
 
                 //language=typescript
                 return await rewrite(() => ({
                     before: [
-                        pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`,
-                        pattern`${"obj"} === undefined || ${"obj"} === null ? ${"defaultValue"} : ${"obj"}.${"property"}`
+                        pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`,
+                        pattern`${obj} === undefined || ${obj} === null ? ${defaultValue} : ${obj}.${property}`
                     ],
-                    after: template`${"obj"}?.${"property"} ?? ${"defaultValue"}`
+                    after: template`${obj}?.${property} ?? ${defaultValue}`
                 }))
                     .tryOn(this.cursor, ternary) || super.visitTernary(ternary, p);
             }

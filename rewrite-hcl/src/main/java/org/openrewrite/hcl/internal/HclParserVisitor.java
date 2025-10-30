@@ -48,7 +48,14 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Nullable
     private final FileAttributes fileAttributes;
 
+    /**
+     * Track position within the file by character
+     */
     private int cursor = 0;
+    /**
+     * Track parsing position within the file by Unicode code point
+     */
+    private int codePointCursor = 0;
 
     public HclParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked, @Nullable FileAttributes fileAttributes) {
         this.path = path;
@@ -146,7 +153,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                     break;
             }
             Space opPrefix = Space.format(prefix(ctx.binaryOperator()));
-            cursor = ctx.binaryOperator().getStop().getStopIndex() + 1;
+            advanceCursor(ctx.binaryOperator().getStop().getStopIndex() + 1);
 
             if (c.unaryOp() != null) {
                 right = (Expression) visit(c.operation() != null ? c.operation() : c.exprTerm(0));
@@ -331,7 +338,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Override
     public Hcl visitFunctionCall(HCLParser.FunctionCallContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            Hcl.Identifier name = visitIdentifier(ctx.Identifier());
+            Hcl.Identifier name = visitFunctionName(ctx.functionName());
 
             Space argPrefix = sourceBefore("(");
             List<HclRightPadded<Expression>> mappedArgs = new ArrayList<>();
@@ -350,6 +357,32 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             return new Hcl.FunctionCall(randomId(), Space.format(prefix), Markers.EMPTY, name,
                     HclContainer.build(argPrefix, mappedArgs, Markers.EMPTY));
         });
+    }
+
+    @Override
+    public Hcl.Identifier visitFunctionName(HCLParser.FunctionNameContext ctx) {
+        List<TerminalNode> identifiers = ctx.Identifier();
+        if (identifiers.size() == 1) {
+            return visitIdentifier(identifiers.get(0));
+        }
+
+        // Build the provider-scoped function name (e.g., "provider::test::count_e")
+        StringBuilder nameBuilder = new StringBuilder();
+        for (int i = 0; i < identifiers.size(); i++) {
+            if (i > 0) {
+                skip(ctx.DOUBLE_COLON(i - 1));
+                nameBuilder.append("::");
+            }
+            nameBuilder.append(identifiers.get(i).getText());
+            skip(identifiers.get(i));
+        }
+
+        return new Hcl.Identifier(
+            randomId(),
+            Space.format(prefix(ctx)),
+            Markers.EMPTY,
+            nameBuilder.toString()
+        );
     }
 
     @Override
@@ -380,7 +413,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             if (part.heredocLiteral() != null) {
                 Space prefix = Space.format(prefix(part.heredocLiteral()));
                 String value = part.heredocLiteral().getText();
-                cursor = part.heredocLiteral().getStop().getStopIndex() + 1;
+                advanceCursor(part.heredocLiteral().getStop().getStopIndex() + 1);
                 expressions.add(new Hcl.Literal(randomId(), prefix, Markers.EMPTY, value, value));
             } else if (part.templateInterpolation() != null) {
                 Space prefix = Space.format(prefix(part.templateInterpolation()));
@@ -623,7 +656,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             if (part.stringLiteral() != null) {
                 Space prefix = Space.format(prefix(part.stringLiteral()));
                 String value = part.stringLiteral().getText();
-                cursor = part.stringLiteral().getStop().getStopIndex() + 1;
+                advanceCursor(part.stringLiteral().getStop().getStopIndex() + 1);
                 expressions.add(new Hcl.Literal(randomId(), prefix, Markers.EMPTY, value, value));
             } else if (part.templateInterpolation() != null) {
                 Space prefix = Space.format(prefix(part.templateInterpolation()));
@@ -638,10 +671,10 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Override
     public Hcl visitTemplateInterpolation(HCLParser.TemplateInterpolationContext ctx) {
         skip(ctx.TEMPLATE_INTERPOLATION_START());
-        Hcl.TemplateInterpolation templateInterpolation = convert(ctx, (c, prefix) -> new Hcl.TemplateInterpolation(randomId(), Space.format(prefix), Markers.EMPTY,
-                (Expression) visit(ctx.expression())));
-        skip(ctx.RBRACE());
-        return templateInterpolation;
+        Expression expression = (Expression) visit(ctx.expression());
+        Space beforeClosingBrace = sourceBefore("}");
+        return convert(ctx, (c, prefix) -> new Hcl.TemplateInterpolation(randomId(), Space.format(prefix), Markers.EMPTY,
+                new HclRightPadded<>(expression, beforeClosingBrace, Markers.EMPTY)));
     }
 
     @Override
@@ -650,10 +683,16 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             Space tuplePrefix = sourceBefore("[");
             List<HclRightPadded<Expression>> mappedValues = new ArrayList<>();
             List<HCLParser.ExpressionContext> values = ctx.expression();
-            for (int i = 0; i < values.size(); i++) {
-                HCLParser.ExpressionContext value = values.get(i);
-                mappedValues.add(HclRightPadded.build((Expression) visit(value))
-                        .withAfter(i == values.size() - 1 ? sourceBefore("]") : sourceBefore(",")));
+            if (values.isEmpty()) {
+                // For empty arrays, preserve the whitespace before the closing bracket using Hcl.Empty
+                mappedValues.add(
+                        HclRightPadded.build(new Hcl.Empty(randomId(), sourceBefore("]"), Markers.EMPTY)));
+            } else {
+                for (int i = 0; i < values.size(); i++) {
+                    HCLParser.ExpressionContext value = values.get(i);
+                    mappedValues.add(HclRightPadded.build((Expression) visit(value))
+                            .withAfter(i == values.size() - 1 ? sourceBefore("]") : sourceBefore(",")));
+                }
             }
 
             return new Hcl.Tuple(randomId(), Space.format(prefix), Markers.EMPTY, HclContainer
@@ -732,12 +771,12 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
 
     private String prefix(Token token) {
         int start = token.getStartIndex();
-        if (start < cursor) {
+        if (start < codePointCursor) {
             return "";
         }
-        String prefix = source.substring(cursor, start);
-        cursor = start;
-        return prefix;
+        int oldCursor = cursor;
+        advanceCursor(start);
+        return source.substring(oldCursor, cursor);
     }
 
     private String prefix(@Nullable TerminalNode terminalNode) {
@@ -751,7 +790,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
 
         T t = conversion.apply(ctx, prefix(ctx));
         if (ctx.getStop() != null) {
-            cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);
+            advanceCursor(ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1));
         }
 
         return t;
@@ -759,7 +798,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
 
     private String skip(TerminalNode node) {
         String prefix = prefix(node);
-        cursor = node.getSymbol().getStopIndex() + 1;
+        advanceCursor(node.getSymbol().getStopIndex() + 1);
         return prefix;
     }
 
@@ -779,7 +818,9 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         }
 
         String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
+        int codePointsInPrefix = prefix.codePointCount(0, prefix.length());
+        // All HCL delimiters are ASCII, so length == code point count
+        advanceCursor(codePointCursor + codePointsInPrefix + untilDelim.length());
         return Space.format(prefix);
     }
 
@@ -825,5 +866,18 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         }
 
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
+    }
+
+    /**
+     *  Advance both the cursor and the code point cursor
+     */
+    @SuppressWarnings("UnusedReturnValue")
+    private int advanceCursor(int newCodePointIndex) {
+        if (newCodePointIndex <= codePointCursor) {
+            return cursor;
+        }
+        cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
+        codePointCursor = newCodePointIndex;
+        return cursor;
     }
 }
