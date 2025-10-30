@@ -35,7 +35,6 @@ version,gradlew,gradlewBat
 8.14-rc-2,7d965ddb,b4858113
 8.14-rc-1,7d965ddb,b4858113
 8.14-milestone-5,7d965ddb,b4858113
-8.14-milestone-7,7d965ddb,b4858113
 8.14-milestone-8,7d965ddb,b4858113
 8.14-milestone-1,7d965ddb,b4858113
 8.14-milestone-2,7d965ddb,b4858113
@@ -105,14 +104,10 @@ version,gradlew,gradlewBat
 8.1-rc-3,7b640e9c,45ee68ff
 8.1-rc-2,7b640e9c,45ee68ff
 8.1-rc-4,7b640e9c,45ee68ff
-8.1-rc-1,7b640e9c,45ee68ff
 8.0.2,4bb41405,d0586e24
 8.0.1,4bb41405,d0586e24
 8.0,4bb41405,d0586e24
 8.0-rc-1,fe360e92,45ee68ff
-8.0-rc-2,fe360e92,45ee68ff
-8.0-rc-3,fe360e92,45ee68ff
-8.0-rc-4,fe360e92,45ee68ff
 8.0-rc-5,fe360e92,45ee68ff
 8.0-milestone-1,fe360e92,45ee68ff
 8.0-milestone-2,fe360e92,45ee68ff
@@ -191,7 +186,6 @@ version,gradlew,gradlewBat
 6.7.1,dd036b7c,16404bda
 6.7,dd036b7c,16404bda
 6.7-rc-1,bac56609,e19346b5
-6.7-rc-2,bac56609,e19346b5
 6.7-rc-3,bac56609,e19346b5
 6.7-rc-4,bac56609,e19346b5
 6.7-rc-5,bac56609,e19346b5
@@ -386,7 +380,6 @@ version,gradlew,gradlewBat
 2.8-rc-2,2abb6eb3,b3a0cfef
 2.7,886668a9,b3a0cfef
 2.7-rc-1,886668a9,b3a0cfef
-2.7-rc-2,886668a9,b3a0cfef
 2.6,6f848fe7,b3a0cfef
 2.6-rc-1,6f848fe7,b3a0cfef
 2.6-rc-2,6f848fe7,b3a0cfef
@@ -400,7 +393,6 @@ version,gradlew,gradlewBat
 2.3-rc-4,6f848fe7,b3a0cfef
 2.3-rc-3,6f848fe7,b3a0cfef
 2.3-rc-2,6f848fe7,b3a0cfef
-2.3-rc-1,6f848fe7,b3a0cfef
 2.2.1,6f848fe7,b3a0cfef
 2.2.1-rc-1,6f848fe7,b3a0cfef
 2.2,6f848fe7,b3a0cfef
@@ -453,11 +445,9 @@ version,gradlew,gradlewBat
 1.1-rc-1,29ce8bd7,b3a0cfef
 1.0,ce5191e8,b3a0cfef
 1.0-rc-2,ce5191e8,b3a0cfef
-1.0-rc-3,ce5191e8,b3a0cfef
 1.0-rc-1,ce5191e8,b3a0cfef
 1.0-milestone-7,7c3190ce,b3a0cfef
 1.0-milestone-8,7c3190ce,b3a0cfef
 1.0-milestone-9,7c3190ce,b3a0cfef
 1.0-milestone-5,ca7f855d,b3a0cfef
-1.0-milestone-6,ca7f855d,b3a0cfef
 1.0-milestone-8a,7c3190ce,b3a0cfef
