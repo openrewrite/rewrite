@@ -23,6 +23,7 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.Expression;
@@ -727,45 +728,25 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                         DependencyInfo dep = acc.dependencies.get(depString);
 
                         if (dep != null) {
-                            // Create proper field access with OmitParentheses marker for Groovy DSL
-                            // Keep the original argument's prefix space for proper formatting
-                            // Only omit parentheses if this is the only argument (no closure/lambda following)
                             boolean hasMultipleArgs = methodInvocation.getArguments().size() > 1;
 
-                            J.Identifier libs = new J.Identifier(
-                                    Tree.randomId(),
-                                    Space.EMPTY,
-                                    Markers.EMPTY,
-                                    emptyList(),
-                                    "libs",
-                                    null,
-                                    null
-                            );
+                            Expression catalogRef = JavaTemplate.builder("libs.#{}")
+                                    .build()
+                                    .apply(
+                                        new Cursor(getCursor(), arg),
+                                        arg.getCoordinates().replace(),
+                                        dep.getAliasName()
+                                    );
 
-                            Markers markers = hasMultipleArgs ?
-                                    Markers.EMPTY :
-                                    new Markers(Tree.randomId(), singletonList(new OmitParentheses(Tree.randomId())));
+                            catalogRef = catalogRef.withPrefix(literal.getPrefix());
 
-                            return new J.FieldAccess(
-                                    Tree.randomId(),
-                                    literal.getPrefix(),  // Preserve the space before the argument
-                                    markers,
-                                    libs,
-                                    new JLeftPadded<>(
-                                            Space.EMPTY,
-                                            new J.Identifier(
-                                                    Tree.randomId(),
-                                                    Space.EMPTY,
-                                                    Markers.EMPTY,
-                                                    emptyList(),
-                                                    dep.getAliasName(),
-                                                    null,
-                                                    null
-                                            ),
-                                            Markers.EMPTY
-                                    ),
-                                    null
-                            );
+                            if (!hasMultipleArgs) {
+                                catalogRef = catalogRef.withMarkers(
+                                    catalogRef.getMarkers().add(new OmitParentheses(Tree.randomId()))
+                                );
+                            }
+
+                            return catalogRef;
                         }
                     }
                 } else if (arg instanceof G.GString) {
@@ -782,43 +763,25 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                             // Look for this dependency in our accumulator by group:artifact
                             for (DependencyInfo dep : acc.dependencies.values()) {
                                 if (dep.group.equals(group) && dep.artifact.equals(artifact)) {
-                                    // Found a match - replace with catalog reference
                                     boolean hasMultipleArgs = methodInvocation.getArguments().size() > 1;
 
-                                    J.Identifier libs = new J.Identifier(
-                                            Tree.randomId(),
-                                            Space.EMPTY,
-                                            Markers.EMPTY,
-                                            emptyList(),
-                                            "libs",
-                                            null,
-                                            null
-                                    );
+                                    Expression catalogRef = JavaTemplate.builder("libs.#{}")
+                                            .build()
+                                            .apply(
+                                                new Cursor(getCursor(), arg),
+                                                arg.getCoordinates().replace(),
+                                                dep.getAliasName()
+                                            );
 
-                                    Markers markers = hasMultipleArgs ?
-                                            Markers.EMPTY :
-                                            new Markers(Tree.randomId(), singletonList(new OmitParentheses(Tree.randomId())));
+                                    catalogRef = catalogRef.withPrefix(gstring.getPrefix());
 
-                                    return new J.FieldAccess(
-                                            Tree.randomId(),
-                                            gstring.getPrefix(),
-                                            markers,
-                                            libs,
-                                            new JLeftPadded<>(
-                                                    Space.EMPTY,
-                                                    new J.Identifier(
-                                                            Tree.randomId(),
-                                                            Space.EMPTY,
-                                                            Markers.EMPTY,
-                                                            emptyList(),
-                                                            dep.getAliasName(),
-                                                            null,
-                                                            null
-                                                    ),
-                                                    Markers.EMPTY
-                                            ),
-                                            null
-                                    );
+                                    if (!hasMultipleArgs) {
+                                        catalogRef = catalogRef.withMarkers(
+                                            catalogRef.getMarkers().add(new OmitParentheses(Tree.randomId()))
+                                        );
+                                    }
+
+                                    return catalogRef;
                                 }
                             }
                         }
