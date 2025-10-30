@@ -38,7 +38,6 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
     @Test
     void doesNotProcessFilesExcludedByPreconditions() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(0),
           java(
             """
               package com.example;
