@@ -77,42 +77,6 @@ class JacocoReportDeprecationsTest implements RewriteTest {
     }
 
     @Test
-    void deprecationsInMethodInvocationSyntax() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport {
-                  reports {
-                      xml.enabled false
-                      csv.enabled true
-                      html.enabled false
-                  }
-              }
-              """,
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport {
-                  reports {
-                      xml.required false
-                      csv.required true
-                      html.required false
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void enabledDeprecatedInCollapsedSyntax() {
         rewriteRun(
           buildGradle(
@@ -498,6 +462,42 @@ class JacocoReportDeprecationsTest implements RewriteTest {
 
     @Nested
     class AsMethodInvocation {
+        @Test
+        void deprecationsInMethodInvocationSyntax() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+
+                  jacocoTestReport {
+                      reports {
+                          xml.enabled false
+                          csv.enabled true
+                          html.enabled false
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+
+                  jacocoTestReport {
+                      reports {
+                          xml.required false
+                          csv.required true
+                          html.required false
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
         @Test
         void deprecationsInMethodInvocationInsideNestedClosure() {
             rewriteRun(
