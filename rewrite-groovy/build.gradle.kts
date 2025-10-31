@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("jvm-test-suite")
@@ -33,6 +35,11 @@ testing {
     }
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
 
 dependencies {
     api(project(":rewrite-java"))

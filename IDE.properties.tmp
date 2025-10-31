@@ -44,7 +44,3 @@ rewrite-yaml
 
 rewrite-benchmarks
 rewrite-bom
-
-# Tools that are used less frequently to, for example, build new language parsers.
-
-#tools

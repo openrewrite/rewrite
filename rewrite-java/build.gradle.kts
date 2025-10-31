@@ -77,6 +77,12 @@ dependencies {
     testRuntimeOnly("jakarta.validation:jakarta.validation-api:3.1.1")
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 tasks.withType<Javadoc>().configureEach {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")

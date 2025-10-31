@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import ts from 'typescript';
+import * as path from 'path';
 import {
     Comment,
     emptyContainer,
@@ -116,7 +117,11 @@ export class JavaScriptParser extends Parser {
 
         // Populate inputFiles map and remove from cache if necessary
         for (const input of inputs) {
-            const sourcePath = parserInputFile(input);
+            let sourcePath = parserInputFile(input);
+            // If relativeTo is set and path is not absolute, make it absolute
+            if (this.relativeTo && !path.isAbsolute(sourcePath)) {
+                sourcePath = path.join(this.relativeTo, sourcePath);
+            }
             inputFiles.set(sourcePath, input);
             // Remove from cache if previously cached
             this.sourceFileCache && this.sourceFileCache.delete(sourcePath);
@@ -187,6 +192,61 @@ export class JavaScriptParser extends Parser {
         host.readFile = (fileName) => {
             const input = inputFiles.get(fileName);
             return input ? parserInputRead(input) : ts.sys.readFile(fileName);
+        };
+
+        // Custom module resolution to handle in-memory imports
+        // This is required because TypeScript's default module resolution looks for files on disk,
+        // but our source files only exist in memory (in the inputFiles map)
+        host.resolveModuleNameLiterals = (moduleLiterals, containingFile) => {
+            const resolvedModules: ts.ResolvedModuleWithFailedLookupLocations[] = [];
+            const containingDir = path.dirname(containingFile);
+
+            for (const moduleLiteral of moduleLiterals) {
+                const moduleName = moduleLiteral.text;
+
+                // For relative imports, try to find in inputFiles first
+                if (moduleName.startsWith('.')) {
+                    const extensions = ['.tsx', '.ts', '.jsx', '.js', '.mts', '.cts'];
+                    let resolved: string | undefined;
+
+                    for (const ext of extensions) {
+                        // Try with extension
+                        const candidate = path.join(containingDir, moduleName + ext);
+                        if (inputFiles.has(candidate)) {
+                            resolved = candidate;
+                            break;
+                        }
+                        // Also try exact match (if moduleName already has extension)
+                        const exactCandidate = path.join(containingDir, moduleName);
+                        if (inputFiles.has(exactCandidate)) {
+                            resolved = exactCandidate;
+                            break;
+                        }
+                    }
+
+                    if (resolved) {
+                        resolvedModules.push({
+                            resolvedModule: {
+                                resolvedFileName: resolved,
+                                extension: path.extname(resolved) as ts.Extension,
+                                isExternalLibraryImport: false,
+                            }
+                        });
+                        continue;
+                    }
+                }
+
+                // Fall back to TypeScript's default resolution for node_modules and absolute paths
+                const result = ts.resolveModuleName(
+                    moduleName,
+                    containingFile,
+                    this.compilerOptions,
+                    host
+                );
+
+                resolvedModules.push(result);
+            }
+            return resolvedModules;
         };
 
         // Create a new Program, passing the oldProgram for incremental parsing
@@ -3071,12 +3131,15 @@ export class JavaScriptParserVisitor {
     }
 
     visitFunctionExpression(node: ts.FunctionExpression): JS.StatementExpression {
+        const delegate = this.mapFunctionDeclaration(node);
         return {
             kind: JS.Kind.StatementExpression,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: delegate.prefix,
             markers: emptyMarkers,
-            statement: this.mapFunctionDeclaration(node)
+            statement: produce(delegate, draft => {
+              draft.prefix = emptySpace;
+            })
         };
     }
 

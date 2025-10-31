@@ -15,7 +15,7 @@
  */
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, emptySpace, J, Statement} from "../java";
+import {Comment, J, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isScope, Tree} from "../tree";
 import {
@@ -84,13 +84,6 @@ export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
             this.cursor?.root.messages.set("stop", true);
         }
         return super.postVisit(tree, p);
-    }
-
-    private concatenatePrefix(node: Draft<J>, right: J.Space) {
-        // TODO look at https://github.com/openrewrite/rewrite/commit/990a366fab9e5656812d81d0eb15ecb6bfd2fde0#diff-ec2e977fe8f1e189735e71b817f8f1ebaf79c1490c0210652e8a559f7f7877de
-        // and possibly incorporate it here - some special logic needed to merge comments better (?)
-        node.prefix.comments = [...node.prefix.comments, ...right.comments];
-        node.prefix.whitespace = node.prefix.whitespace + right.whitespace;
     }
 }
 
@@ -193,11 +186,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
         const ret = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
-        // TODO
-        // if (c.leadingAnnotations.length > 1) {
-        //     c = {...c, leadingAnnotations: spaceBetweenAnnotations(c.leadingAnnotations)};
-        // }
-
         // TODO typeParameters - IntelliJ doesn't seem to provide a setting for angleBrackets spacing for Typescript (while it does for Java),
         // thus we either introduce our own setting or just enforce the natural spacing with no setting
 
@@ -326,10 +314,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
             draft.parameters = await this.spaceBeforeContainer(draft.parameters, this.style.beforeParentheses.functionDeclarationParentheses);
 
             // TODO typeParameters handling - see visitClassDeclaration
-            // TODO
-            // if (m.leadingAnnotations.length > 1) {
-            //     m = m.withLeadingAnnotations(this.spaceBetweenAnnotations(m.leadingAnnotations));
-            // }
         });
     }
 
@@ -349,11 +333,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.arguments.elements[0] = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.arguments.elements[0], this.style.within.functionCallParentheses), false);
             }
             // TODO typeParameters handling - see visitClassDeclaration
-
-            // TODO
-            // m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
-            // if (m.getArguments().isEmpty() || m.getArguments()[0] instanceof J.Empty) {
-            //   ...
         });
     }
 
@@ -445,6 +424,10 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     }
     protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: P): Promise<J | undefined> {
         const ret = await super.visitVariable(variable, p) as J.VariableDeclarations.NamedVariable;
+        if (variable.initializer?.element?.kind == JS.Kind.StatementExpression
+            && (variable.initializer.element as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration) {
+            return ret;
+        }
         return produceAsync(ret, async draft => {
             if (draft.initializer) {
                 draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
@@ -580,20 +563,6 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
             this.cursor?.root.messages.set("stop", true);
         }
         return super.postVisit(tree, p);
-    }
-
-    public async visitStatement(statement: Statement, p: P): Promise<Statement> {
-        const j = await super.visitStatement(statement, p) as Statement;
-        // TODO is it needed?
-        // const parent = this.cursor.parentTree()?.value;
-        // if (parent?.kind === J.Kind.Block && j.kind !== J.Kind.EnumValueSet) {
-        //     if (!j.prefix.whitespace.includes("\n")) {
-        //         return produce(j, draft => {
-        //             draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
-        //         });
-        //     }
-        // }
-        return j;
     }
 
     protected async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: P): Promise<J.VariableDeclarations> {
@@ -968,7 +937,11 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             });
             return super.visit(cu, p, cursor);
         }
-        if (tree.kind === J.Kind.MethodDeclaration) {
+        if (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration) {
+            tree = produce(tree as JS.StatementExpression, draft => {
+                this.ensurePrefixHasNewLine(draft);
+            });
+        } else if (tree.kind === J.Kind.MethodDeclaration && this.cursor.value.kind != JS.Kind.StatementExpression) {
             tree = produce(tree as J.MethodDeclaration, draft => {
                 this.ensurePrefixHasNewLine(draft);
             });
@@ -1060,8 +1033,6 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             if (!draft.end.whitespace.includes("\n")) {
                 draft.end.whitespace = draft.end.whitespace + "\n";
             }
-            // TODO check if it's relevant to TS/JS
-            // draft.end = this.keepMaximumLines(draft.end, this.style.keepMaximum.beforeEndOfBlock);
         });
     }
 
@@ -1070,17 +1041,6 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         this.keepMaximumBlankLines(e, this.style.keepMaximum.inCode);
         return e;
     }
-    // TODO check if it's relevant to TS/JS
-    // protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J.NewClass> {
-    //     const j = await super.visitNewClass(newClass, p) as J.NewClass;
-    //     if (!j.body) return j;
-    //
-    //     return produce(j, draft => {
-    //         if (draft.body!.statements.length > 0) {
-    //             draft.body!.statements[0] = this.minimumLines(draft.body!.statements[0].whitespace, this.style.minimum.afterFunction ?? 0);
-    //         }
-    //     });
-    // }
 
     private keepMaximumBlankLines<T extends J>(node: Draft<T>, max: number) {
         const whitespace = node.prefix.whitespace;
@@ -1129,12 +1089,10 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
 }
 
 export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
-    private readonly newline: string;
     private readonly singleIndent: string;
 
     constructor(private readonly tabsAndIndentsStyle: TabsAndIndentsStyle, private stopAfter?: Tree) {
         super();
-        this.newline = "\n"; // TODO this should be configurable and come from some style too
 
         if (this.tabsAndIndentsStyle.useTabCharacter) {
             this.singleIndent = "\t";
@@ -1144,9 +1102,42 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     protected async preVisit(tree: J, p: P): Promise<J | undefined> {
-        const ret = await super.preVisit(tree, p);
-        let indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+        let ret = await super.preVisit(tree, p)! as J;
 
+        let indentShouldIncrease =
+            tree.kind === J.Kind.Block
+            || this.cursor.parent?.parent?.parent?.value.kind == J.Kind.Case
+            || (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration);
+
+        const previousIndent = this.currentIndent;
+
+        if (tree.kind === J.Kind.IfElse && this.cursor.getNearestMessage("else-indent") !== undefined) {
+            this.cursor.messages.set("indentToUse", this.cursor.getNearestMessage("else-indent"));
+        } else if (indentShouldIncrease) {
+            this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
+        }
+
+        if (tree.kind === J.Kind.IfElse && this.cursor.messages.get("else-indent") !== undefined) {
+            this.cursor.messages.set("indentToUse", this.cursor.messages.get("else-indent"));
+            this.cursor.messages.delete("else-indent");
+        }
+        const relativeIndent: string = this.currentIndent;
+
+        ret = produce(ret, draft => {
+            if (draft.prefix == undefined) {
+                draft.prefix = {kind: J.Kind.Space, comments: [], whitespace: ""};
+            }
+            if (draft.prefix.whitespace.includes("\n")) {
+                draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
+            }
+            if (draft.kind === J.Kind.Block) {
+                const block = draft as Draft<J> as Draft<J.Block>;
+                const indentToUseInClosing = indentShouldIncrease ? previousIndent : relativeIndent;
+                block.end.whitespace = this.combineIndent(block.end.whitespace, indentToUseInClosing);
+            }
+        });
+
+        indentShouldIncrease = false;
         // Increase indent for control structures with non-block bodies
         if (tree.kind === J.Kind.If) {
             const ifStmt = tree as J.If;
@@ -1165,12 +1156,10 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 indentShouldIncrease = true;
             }
         }
-
-        if (tree.kind === J.Kind.IfElse && this.cursor.getNearestMessage("else-indent") !== undefined) {
-            this.cursor.messages.set("indentToUse", this.cursor.getNearestMessage("else-indent"));
-        } else if (indentShouldIncrease) {
+        if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
         }
+
         return ret;
     }
 
@@ -1178,29 +1167,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (this.cursor?.getNearestMessage("stop") != null) {
             return tree as R;
         }
-        let ret = await super.visit(tree, p, parent) as R;
-        if (ret == undefined) {
-            return ret;
-        }
-
-        if (tree.kind === J.Kind.IfElse && this.cursor.messages.get("else-indent") !== undefined) {
-            this.cursor.messages.set("indentToUse", this.cursor.messages.get("else-indent"));
-            this.cursor.messages.delete("else-indent");
-        }
-        const relativeIndent: string = this.currentIndent;
-
-        return produce(ret, draft => {
-            if (draft.prefix == undefined) {
-                draft.prefix = {kind: J.Kind.Space, comments: [], whitespace: ""};
-            }
-            if (draft.prefix.whitespace.includes("\n")) {
-                draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
-            }
-            if (draft.kind === J.Kind.Block) {
-                const block = draft as Draft<J> as Draft<J.Block>;
-                block.end.whitespace = this.combineIndent(block.end.whitespace, relativeIndent);
-            }
-        });
+        return await super.visit(tree, p, parent) as R;
     }
 
     public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
@@ -1216,16 +1183,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     private get currentIndent(): string {
-        const indent = this.cursor.getNearestMessage("indentToUse");
-        if (indent == undefined) {
-            const enclosingWhitespace = this.cursor.firstEnclosing((x: any): x is J => x.prefix && x.prefix.whitespace.includes("\n"))?.prefix.whitespace;
-            if (enclosingWhitespace) {
-                return enclosingWhitespace.substring(enclosingWhitespace.lastIndexOf("\n") + 1);
-            } else {
-                return "";
-            }
-        }
-        return indent;
+        return this.cursor.getNearestMessage("indentToUse") ?? "";
     }
 
     private combineIndent(oldWs: string, relativeIndent: string): string {

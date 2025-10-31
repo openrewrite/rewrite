@@ -185,4 +185,21 @@ describe('AutoformatVisitor', () => {
                  `import {delta, gamma} from 'delta.js'`)
             // @formatter:on
         )});
+
+    test('anonymous function expression', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const fn = function () {return 99;};`,
+                 `
+                const fn =
+                    function () {
+                        return 99;
+                    };
+                `
+            )
+            // @formatter:on
+        )
+    });
 });
