@@ -2637,18 +2637,10 @@ export class JavaScriptParserVisitor {
     }
 
     visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations | J.VariableDeclarations {
+        const prefix = this.prefix(node);
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
-            if (node.modifiers) {
-                draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
-                draft.prefix = this.prefix(node);
-            } else {
-                // When there are no modifiers on the VariableStatement, move the prefix from the first
-                // declaration list modifier (const/let/var) to the parent J.VariableDeclarations
-                if (draft.modifiers.length > 0) {
-                    draft.prefix = draft.modifiers[0].prefix;
-                    draft.modifiers[0].prefix = emptySpace;
-                }
-            }
+            draft.prefix = prefix;
+            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
         });
     }
 
