@@ -2637,11 +2637,10 @@ export class JavaScriptParserVisitor {
     }
 
     visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations | J.VariableDeclarations {
+        const prefix = this.prefix(node);
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
-            if (node.modifiers) {
-                draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
-            }
-            draft.prefix = this.prefix(node);
+            draft.prefix = prefix;
+            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
         });
     }
 
@@ -3064,7 +3063,7 @@ export class JavaScriptParserVisitor {
             modifiers.push({
                 kind: J.Kind.Modifier,
                 id: randomId(),
-                prefix: this.prefix(kind),
+                prefix: modifiers.length === 0 ? this.prefix(kind) : this.prefix(kind),
                 markers: emptyMarkers,
                 annotations: [],
                 keyword: kind.kind === ts.SyntaxKind.VarKeyword ? 'var' :
