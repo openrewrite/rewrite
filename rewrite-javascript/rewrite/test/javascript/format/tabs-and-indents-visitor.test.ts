@@ -49,7 +49,7 @@ describe('TabsAndIndentsVisitor', () => {
                     m() {
                         const z = 5;
                     }
-                }    
+                }
                 `)
             // @formatter:on
         )
@@ -77,7 +77,7 @@ describe('TabsAndIndentsVisitor', () => {
                 }
 
                 const alice = new Person("Alice", 30);
-                alice.greet();                
+                alice.greet();
                 `,
                 `
                 class Person {
@@ -95,7 +95,7 @@ describe('TabsAndIndentsVisitor', () => {
                 }
 
                 const alice = new Person("Alice", 30);
-                alice.greet();                    
+                alice.greet();
                 `)
             // @formatter:on
         )
