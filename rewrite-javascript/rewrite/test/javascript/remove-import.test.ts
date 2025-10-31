@@ -898,4 +898,66 @@ describe('RemoveImport visitor', () => {
             );
         });
     });
+
+    describe('leading empty lines', () => {
+        test('should remove leading empty lines when removing only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from "fs";
+
+                        console.log('test');
+                    `,
+                    `console.log('test');`
+                )
+            );
+        });
+
+        test('should preserve leading empty lines when imports remain', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from "fs";
+                        import {join} from "path";
+
+                        console.log(join("a", "b"));
+                    `,
+                    `
+                        import {join} from "path";
+
+                        console.log(join("a", "b"));
+                    `
+                )
+            );
+        });
+
+        test('should preserve leading comment when removing only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        // File comment
+                        import {readFile} from "fs";
+
+                        console.log('test');
+                    `,
+                    `
+                        // File comment
+                        console.log('test');
+                    `
+                )
+            );
+        });
+    });
 });

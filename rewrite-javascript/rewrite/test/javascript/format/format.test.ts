@@ -196,8 +196,7 @@ describe('AutoformatVisitor', () => {
                 const fn =
                     function () {
                         return 99;
-                    };
-                `
+                    };`
             )
             // @formatter:on
         )
