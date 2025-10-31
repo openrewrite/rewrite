@@ -2640,8 +2640,15 @@ export class JavaScriptParserVisitor {
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
             if (node.modifiers) {
                 draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+                draft.prefix = this.prefix(node);
+            } else {
+                // When there are no modifiers on the VariableStatement, move the prefix from the first
+                // declaration list modifier (const/let/var) to the parent J.VariableDeclarations
+                if (draft.modifiers.length > 0) {
+                    draft.prefix = draft.modifiers[0].prefix;
+                    draft.modifiers[0].prefix = emptySpace;
+                }
             }
-            draft.prefix = this.prefix(node);
         });
     }
 
@@ -3064,7 +3071,7 @@ export class JavaScriptParserVisitor {
             modifiers.push({
                 kind: J.Kind.Modifier,
                 id: randomId(),
-                prefix: this.prefix(kind),
+                prefix: modifiers.length === 0 ? this.prefix(kind) : this.prefix(kind),
                 markers: emptyMarkers,
                 annotations: [],
                 keyword: kind.kind === ts.SyntaxKind.VarKeyword ? 'var' :

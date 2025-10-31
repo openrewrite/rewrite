@@ -959,5 +959,48 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+
+        test('should remove leading empty lines with variable declaration', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from "fs";
+
+                        const foo = 1;
+                        console.log(foo);
+                    `,
+                    `
+                        const foo = 1;
+                        console.log(foo);`
+                )
+            );
+        });
+
+        test('should remove leading empty lines with function declaration', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from "fs";
+
+                        function foo() {
+                            return 42;
+                        }
+                    `,
+                    `
+                        function foo() {
+                            return 42;
+                        }
+                    `
+                )
+            );
+        });
     });
 });
