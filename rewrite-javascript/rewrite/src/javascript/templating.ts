@@ -17,9 +17,9 @@ import {JS} from '.';
 import {JavaScriptParser} from './parser';
 import {JavaScriptVisitor} from './visitor';
 import {Cursor, isTree, Tree} from '..';
-import {J, Type} from '../java';
+import {J} from '../java';
 import {produce} from "immer";
-import {JavaScriptComparatorVisitor} from "./comparator";
+import {JavaScriptSemanticComparatorVisitor} from "./comparator";
 import {DependencyWorkspace} from './dependency-workspace';
 import {Marker} from '../markers';
 import {randomId} from '../uuid';
@@ -265,150 +265,6 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
 }
 
 /**
- * A comparator visitor that checks semantic equality including type attribution.
- * This ensures that patterns only match code with compatible types, not just
- * structurally similar code.
- */
-class JavaScriptTemplateSemanticallyEqualVisitor extends JavaScriptComparatorVisitor {
-    /**
-     * Checks if two types are semantically equal.
-     * For method types, this checks that the declaring type and method name match.
-     */
-    private isOfType(target?: Type, source?: Type): boolean {
-        if (!target || !source) {
-            return target === source;
-        }
-
-        if (target.kind !== source.kind) {
-            return false;
-        }
-
-        // For method types, check declaring type
-        // Note: We don't check the name field because it might not be fully resolved in patterns
-        // The method invocation visitor already checks that simple names match
-        if (target.kind === Type.Kind.Method && source.kind === Type.Kind.Method) {
-            const targetMethod = target as Type.Method;
-            const sourceMethod = source as Type.Method;
-
-            // Only check that declaring types match
-            return this.isOfType(targetMethod.declaringType, sourceMethod.declaringType);
-        }
-
-        // For fully qualified types, check the fully qualified name
-        if (Type.isFullyQualified(target) && Type.isFullyQualified(source)) {
-            return Type.FullyQualified.getFullyQualifiedName(target) ===
-                   Type.FullyQualified.getFullyQualifiedName(source);
-        }
-
-        // Default: types are equal if they're the same kind
-        return true;
-    }
-
-    /**
-     * Override method invocation comparison to include type attribution checking.
-     * When types match semantically, we allow matching even if one has a receiver
-     * and the other doesn't (e.g., `isDate(x)` vs `util.isDate(x)`).
-     */
-    override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
-        if (other.kind !== J.Kind.MethodInvocation) {
-            return method;
-        }
-
-        const otherMethod = other as J.MethodInvocation;
-
-        // Check basic structural equality first
-        if (method.name.simpleName !== otherMethod.name.simpleName ||
-            method.arguments.elements.length !== otherMethod.arguments.elements.length) {
-            this.abort();
-            return method;
-        }
-
-        // Check type attribution
-        // Both must have method types for semantic equality
-        if (!method.methodType || !otherMethod.methodType) {
-            // If template has type but target doesn't, they don't match
-            if (method.methodType || otherMethod.methodType) {
-                this.abort();
-                return method;
-            }
-            // If neither has type, fall through to structural comparison
-            return super.visitMethodInvocation(method, other);
-        }
-
-        // Both have types - check they match semantically
-        const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
-        if (!typesMatch) {
-            // Types don't match - abort comparison
-            this.abort();
-            return method;
-        }
-
-        // Types match! Now we can ignore receiver differences and just compare arguments.
-        // This allows pattern `isDate(x)` to match both `isDate(x)` and `util.isDate(x)`
-        // when they have the same type attribution.
-
-        // Compare type parameters
-        if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
-            this.abort();
-            return method;
-        }
-
-        if (method.typeParameters && otherMethod.typeParameters) {
-            if (method.typeParameters.elements.length !== otherMethod.typeParameters.elements.length) {
-                this.abort();
-                return method;
-            }
-            for (let i = 0; i < method.typeParameters.elements.length; i++) {
-                await this.visit(method.typeParameters.elements[i].element, otherMethod.typeParameters.elements[i].element);
-                if (!this.match) return method;
-            }
-        }
-
-        // Compare name (already checked simpleName above, but visit for markers/prefix)
-        await this.visit(method.name, otherMethod.name);
-        if (!this.match) return method;
-
-        // Compare arguments
-        for (let i = 0; i < method.arguments.elements.length; i++) {
-            await this.visit(method.arguments.elements[i].element, otherMethod.arguments.elements[i].element);
-            if (!this.match) return method;
-        }
-
-        return method;
-    }
-
-    /**
-     * Override identifier comparison to include type checking for field access.
-     */
-    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
-        if (other.kind !== J.Kind.Identifier) {
-            return identifier;
-        }
-
-        const otherIdentifier = other as J.Identifier;
-
-        // Check name matches
-        if (identifier.simpleName !== otherIdentifier.simpleName) {
-            return identifier;
-        }
-
-        // For identifiers with field types, check type attribution
-        if (identifier.fieldType && otherIdentifier.fieldType) {
-            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType)) {
-                this.abort();
-                return identifier;
-            }
-        } else if (identifier.fieldType || otherIdentifier.fieldType) {
-            // If only one has a type, they don't match
-            this.abort();
-            return identifier;
-        }
-
-        return super.visitIdentifier(identifier, other);
-    }
-}
-
-/**
  * Matcher for checking if a pattern matches an AST node and extracting captured nodes.
  */
 class Matcher {
@@ -474,7 +330,7 @@ class Matcher {
         }
 
         const matcher = this;
-        return await ((new class extends JavaScriptTemplateSemanticallyEqualVisitor {
+        return await ((new class extends JavaScriptSemanticComparatorVisitor {
             protected hasSameKind(j: J, other: J): boolean {
                 return super.hasSameKind(j, other) || j.kind == J.Kind.Identifier && this.matchesParameter(j as J.Identifier, other);
             }
