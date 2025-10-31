@@ -42,7 +42,29 @@ val latest = if (project.hasProperty("releasing")) {
 } else {
     "latest.integration"
 }
+
 val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath")
+
+// Helper function to add Gradle 6.1.1 API modules as a bundle
+fun DependencyHandler.gradle611Api(configurationName: String) {
+    listOf(
+        "gradle-base-services",
+        "gradle-core-api",
+        "gradle-language-groovy",
+        "gradle-language-java",
+        "gradle-logging",
+        "gradle-messaging",
+        "gradle-native",
+        "gradle-process-services",
+        "gradle-resources",
+        "gradle-testing-base",
+        "gradle-testing-jvm",
+        "gradle-tooling-api"
+    ).forEach { module ->
+        add(configurationName, "org.gradle:$module:6.1.1")
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-groovy")) {
@@ -56,7 +78,9 @@ dependencies {
     implementation(project(":rewrite-toml"))
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
-    compileOnly(gradleApi())
+    // Use explicit Gradle 6.1.1 dependencies instead of gradleApi() to avoid compilation against Gradle 9
+    // gradleApi() always resolves to the wrapper version (9.1.0), which removed classes like JavaPluginConvention
+    gradle611Api("compileOnly")
     // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
     compileOnly("com.gradle:develocity-gradle-plugin:3.+")
 
@@ -69,10 +93,10 @@ dependencies {
     testImplementation(project(":rewrite-gradle-tooling-model:model"))
     "pluginLocalTestClasspath"(project(mapOf("path" to ":rewrite-gradle-tooling-model:model", "configuration" to "pluginLocalTestClasspath")))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
-    testImplementation(localGroovy())
-
-    testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
-    testRuntimeOnly(gradleApi())
+    // Use explicit Groovy 3.x with all modules instead of localGroovy() which would bring in Gradle 9's Groovy 4.x
+    testImplementation("org.codehaus.groovy:groovy-all:3.0.25")
+    // Use Gradle 6.1.1 API bundle for test dependencies
+    gradle611Api("testImplementation")
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
