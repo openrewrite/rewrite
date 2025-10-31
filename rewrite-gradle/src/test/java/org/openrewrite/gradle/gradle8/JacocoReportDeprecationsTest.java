@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.gradle8;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -493,5 +494,164 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class AsMethodInvocation {
+        @Test
+        void deprecationsInMethodInvocationInsideNestedClosure() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml {
+                              enabled false
+                          }
+                          csv {
+                              enabled true
+                          }
+                          html {
+                              enabled false
+                          }
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml {
+                              required false
+                          }
+                          csv {
+                              required true
+                          }
+                          html {
+                              required false
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void deprecationsInMethodInvocationWithFieldAccess() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports.xml.enabled false
+                      reports.csv.enabled true
+                      reports.html.enabled false
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports.xml.required false
+                      reports.csv.required true
+                      reports.html.required false
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void destinationInMethodInvocationSyntax() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml.destination layout.buildDirectory.dir('jacocoXml')
+                          csv.destination layout.buildDirectory.dir('jacocoCsv')
+                          html.destination layout.buildDirectory.dir('jacocoHtml')
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml.outputLocation layout.buildDirectory.dir('jacocoXml')
+                          csv.outputLocation layout.buildDirectory.dir('jacocoCsv')
+                          html.outputLocation layout.buildDirectory.dir('jacocoHtml')
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void destinationInMethodInvocationInsideNestedClosure() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml {
+                              destination layout.buildDirectory.dir('jacocoXml')
+                          }
+                          csv {
+                              destination layout.buildDirectory.dir('jacocoCsv')
+                          }
+                          html {
+                              destination layout.buildDirectory.dir('jacocoHtml')
+                          }
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml {
+                              outputLocation layout.buildDirectory.dir('jacocoXml')
+                          }
+                          csv {
+                              outputLocation layout.buildDirectory.dir('jacocoCsv')
+                          }
+                          html {
+                              outputLocation layout.buildDirectory.dir('jacocoHtml')
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
     }
 }
