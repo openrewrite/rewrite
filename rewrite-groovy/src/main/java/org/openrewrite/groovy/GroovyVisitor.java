@@ -173,8 +173,23 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
     }
 
-    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
-                                                        GContainer.Location loc, P p) {
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, GContainer.Location loc, P p) {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public J visitDestructuringDeclaration(G.DestructuringDeclaration destructuringDeclaration, P p) {
+        G.DestructuringDeclaration d = destructuringDeclaration;
+        d = d.withPrefix(visitSpace(d.getPrefix(), GSpace.Location.DESTRUCTURING_DECLARATION_PREFIX, p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(d, p);
+        if (!(temp instanceof G.DestructuringDeclaration)) {
+            return temp;
+        } else {
+            d = (G.DestructuringDeclaration) temp;
+        }
+        d = d.withInitializer(visitAndCast(d.getInitializer(), p));
+        d = d.getPadding().withVariables(d.getPadding().getVariables());
+        d = d.getPadding().withVariables(visitContainer(d.getPadding().getVariables(), GContainer.Location.DESTRUCT_ASSIGNMENTS, p));
+        return d;
     }
 }
