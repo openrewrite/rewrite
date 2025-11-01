@@ -34,6 +34,7 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -115,7 +116,7 @@ public class DependencyInsight extends Recipe {
 
         return new MavenIsoVisitor<ExecutionContext>() {
             final DependencyGraph dependencyGraph = new DependencyGraph();
-            final Map<String, Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>>> pathsByScope = new HashMap<>();
+            final Map<String, Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>>> pathsByScope = new LinkedHashMap<>();
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
@@ -123,16 +124,20 @@ public class DependencyInsight extends Recipe {
                 if (requestedScope != null) {
                     List<ResolvedDependency> dependencies = getResolutionResult().getDependencies().get(requestedScope);
                     if (dependencies != null) {
-                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
+                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new LinkedHashMap<>();
                         dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, requestedScope.name().toLowerCase());
                         pathsByScope.put(requestedScope.name().toLowerCase(), projectPaths);
                     }
                 } else {
-                    getResolutionResult().getDependencies().forEach((scope, dependencies) -> {
-                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
-                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, scope.name().toLowerCase());
-                        pathsByScope.put(scope.name().toLowerCase(), projectPaths);
-                    });
+                    getResolutionResult().getDependencies().entrySet().stream()
+                            .sorted(Map.Entry.comparingByKey())
+                            .forEach(entry -> {
+                                Scope scope = entry.getKey();
+                                List<ResolvedDependency> dependencies = entry.getValue();
+                                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new LinkedHashMap<>();
+                                dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, scope.name().toLowerCase());
+                                pathsByScope.put(scope.name().toLowerCase(), projectPaths);
+                            });
                 }
                 return super.visitDocument(document, ctx);
             }
