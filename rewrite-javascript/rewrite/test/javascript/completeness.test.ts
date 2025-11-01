@@ -49,8 +49,18 @@ describe('JS LST element tree', () => {
         .sort();
 
     test("comparator.ts", () => {
+        // Extract all override methods from the file
+        const comparatorContent = readFileToString('javascript/comparator.ts');
+
+        // Find the base JavaScriptComparatorVisitor class methods
+        // (before the JavaScriptSemanticComparatorVisitor class)
+        const semanticComparatorStart = comparatorContent.indexOf('export class JavaScriptSemanticComparatorVisitor');
+        const baseComparatorContent = semanticComparatorStart > 0
+            ? comparatorContent.substring(0, semanticComparatorStart)
+            : comparatorContent;
+
         const comparatorTsMethods = Array.from(
-            readFileToString('javascript/comparator.ts').matchAll(/override async (visit\w+)[(<]/gm), m => m[1])
+            baseComparatorContent.matchAll(/override async (visit\w+)[(<]/gm), m => m[1])
             .sort();
 
         expect(comparatorTsMethods).toEqual(visitorMethods);

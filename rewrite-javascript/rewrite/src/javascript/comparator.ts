@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaScriptVisitor} from './visitor';
-import {J} from '../java';
+import {J, Type} from '../java';
 import {JS, JSX} from './tree';
 import {Cursor, Tree} from "../tree";
 
@@ -63,8 +63,9 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     /**
      * Aborts the visit operation by setting the match flag to false.
      */
-    protected abort(): void {
+    protected abort<T>(t: T): T {
         this.match = false;
+        return t;
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
@@ -75,8 +76,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Check if the nodes have the same kind
         if (!this.hasSameKind(j as J, p)) {
-            this.abort();
-            return j as R;
+            return this.abort(j) as R;
         }
 
         // Continue with normal visitation, passing the other node as context
@@ -92,19 +92,17 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitBinary(binary: J.Binary, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Binary) {
-            this.abort();
-            return binary;
+            return this.abort(binary);
         }
 
         const otherBinary = other as J.Binary;
         if (binary.operator.element !== otherBinary.operator.element) {
-            this.abort();
-            return binary;
+            return this.abort(binary);
         }
 
         // Visit left and right operands in lock step
         await this.visit(binary.left, otherBinary.left);
-        if (!this.match) return binary;
+        if (!this.match) return this.abort(binary);
 
         await this.visit(binary.right, otherBinary.right);
         return binary;
@@ -119,13 +117,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Identifier) {
-            this.abort();
-            return identifier;
+            return this.abort(identifier);
         }
 
         const otherIdentifier = other as J.Identifier;
         if (identifier.simpleName !== otherIdentifier.simpleName) {
-            this.abort();
+            return this.abort(identifier);
         }
 
         return identifier;
@@ -140,13 +137,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitLiteral(literal: J.Literal, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Literal) {
-            this.abort();
-            return literal;
+            return this.abort(literal);
         }
 
         const otherLiteral = other as J.Literal;
         if (literal.valueSource !== otherLiteral.valueSource) {
-            this.abort();
+            return this.abort(literal);
         }
 
         return literal;
@@ -161,20 +157,20 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Block) {
-            this.abort();
-            return block;
+            return this.abort(block);
         }
 
         const otherBlock = other as J.Block;
         if (block.statements.length !== otherBlock.statements.length) {
-            this.abort();
-            return block;
+            return this.abort(block);
         }
 
         // Visit each statement in lock step
         for (let i = 0; i < block.statements.length; i++) {
             await this.visit(block.statements[i].element, otherBlock.statements[i].element);
-            if (!this.match) break;
+            if (!this.match) {
+                return this.abort(block);
+            }
         }
 
         return block;
@@ -189,20 +185,20 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.CompilationUnit) {
-            this.abort();
-            return compilationUnit;
+            return this.abort(compilationUnit);
         }
 
         const otherCompilationUnit = other as JS.CompilationUnit;
         if (compilationUnit.statements.length !== otherCompilationUnit.statements.length) {
-            this.abort();
-            return compilationUnit;
+            return this.abort(compilationUnit);
         }
 
         // Visit each statement in lock step
         for (let i = 0; i < compilationUnit.statements.length; i++) {
             await this.visit(compilationUnit.statements[i].element, otherCompilationUnit.statements[i].element);
-            if (!this.match) break;
+            if (!this.match) {
+                return this.abort(compilationUnit);
+            }
         }
 
         return compilationUnit;
@@ -217,15 +213,16 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitAlias(alias: JS.Alias, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.Alias) {
-            this.abort();
-            return alias;
+            return this.abort(alias);
         }
 
         const otherAlias = other as JS.Alias;
 
         // Visit property name and alias in lock step
         await this.visit(alias.propertyName.element, otherAlias.propertyName.element);
-        if (!this.match) return alias;
+        if (!this.match) {
+            return this.abort(alias);
+        }
 
         await this.visit(alias.alias, otherAlias.alias);
         return alias;
@@ -240,16 +237,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitArrowFunction(arrowFunction: JS.ArrowFunction, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ArrowFunction) {
-            this.abort();
-            return arrowFunction;
+            return this.abort(arrowFunction);
         }
 
         const otherArrowFunction = other as JS.ArrowFunction;
 
         // Compare modifiers
         if (arrowFunction.modifiers.length !== otherArrowFunction.modifiers.length) {
-            this.abort();
-            return arrowFunction;
+            return this.abort(arrowFunction);
         }
 
         // Visit modifiers in lock step
@@ -260,8 +255,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Visit type parameters if present
         if (!!arrowFunction.typeParameters !== !!otherArrowFunction.typeParameters) {
-            this.abort();
-            return arrowFunction;
+            return this.abort(arrowFunction);
         }
 
         if (arrowFunction.typeParameters) {
@@ -275,8 +269,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Visit return type expression if present
         if (!!arrowFunction.returnTypeExpression !== !!otherArrowFunction.returnTypeExpression) {
-            this.abort();
-            return arrowFunction;
+            return this.abort(arrowFunction);
         }
 
         if (arrowFunction.returnTypeExpression) {
@@ -295,8 +288,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitAwait(await_: JS.Await, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.Await) {
-            this.abort();
-            return await_;
+            return this.abort(await_);
         }
 
         const otherAwait = other as JS.Await;
@@ -316,8 +308,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitJsxTag(element: JSX.Tag, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.JsxTag) {
-            this.abort();
-            return element;
+            return this.abort(element);
         }
 
         const otherElement = other as JSX.Tag;
@@ -328,8 +319,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare attributes
         if (element.attributes.length !== otherElement.attributes.length) {
-            this.abort();
-            return element;
+            return this.abort(element);
         }
 
         // Visit attributes in lock step
@@ -340,20 +330,17 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare self-closing
         if (!!element.selfClosing !== !!otherElement.selfClosing) {
-            this.abort();
-            return element;
+            return this.abort(element);
         }
 
         // Compare children
         if (!!element.children !== !!otherElement.children) {
-            this.abort();
-            return element;
+            return this.abort(element);
         }
 
         if (element.children) {
             if (element.children.length !== otherElement.children!.length) {
-                this.abort();
-                return element;
+                return this.abort(element);
             }
 
             // Visit children in lock step
@@ -365,8 +352,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare closing name
         if (!!element.closingName !== !!otherElement.closingName) {
-            this.abort();
-            return element;
+            return this.abort(element);
         }
 
         if (element.closingName) {
@@ -385,8 +371,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitJsxAttribute(attribute: JSX.Attribute, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.JsxAttribute) {
-            this.abort();
-            return attribute;
+            return this.abort(attribute);
         }
 
         const otherAttribute = other as JSX.Attribute;
@@ -397,8 +382,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare value
         if (!!attribute.value !== !!otherAttribute.value) {
-            this.abort();
-            return attribute;
+            return this.abort(attribute);
         }
 
         if (attribute.value) {
@@ -417,8 +401,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitJsxSpreadAttribute(spread: JSX.SpreadAttribute, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.JsxSpreadAttribute) {
-            this.abort();
-            return spread;
+            return this.abort(spread);
         }
 
         const otherSpread = other as JSX.SpreadAttribute;
@@ -438,8 +421,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitJsxEmbeddedExpression(expr: JSX.EmbeddedExpression, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.JsxEmbeddedExpression) {
-            this.abort();
-            return expr;
+            return this.abort(expr);
         }
 
         const otherExpr = other as JSX.EmbeddedExpression;
@@ -459,8 +441,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitJsxNamespacedName(ns: JSX.NamespacedName, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.JsxNamespacedName) {
-            this.abort();
-            return ns;
+            return this.abort(ns);
         }
 
         const otherNs = other as JSX.NamespacedName;
@@ -484,8 +465,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitConditionalType(conditionalType: JS.ConditionalType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ConditionalType) {
-            this.abort();
-            return conditionalType;
+            return this.abort(conditionalType);
         }
 
         const otherConditionalType = other as JS.ConditionalType;
@@ -509,8 +489,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitDelete(delete_: JS.Delete, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.Delete) {
-            this.abort();
-            return delete_;
+            return this.abort(delete_);
         }
 
         const otherDelete = other as JS.Delete;
@@ -530,8 +509,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ExpressionStatement) {
-            this.abort();
-            return expressionStatement;
+            return this.abort(expressionStatement);
         }
 
         const otherExpressionStatement = other as JS.ExpressionStatement;
@@ -551,8 +529,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitExpressionWithTypeArguments(expressionWithTypeArguments: JS.ExpressionWithTypeArguments, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ExpressionWithTypeArguments) {
-            this.abort();
-            return expressionWithTypeArguments;
+            return this.abort(expressionWithTypeArguments);
         }
 
         const otherExpressionWithTypeArguments = other as JS.ExpressionWithTypeArguments;
@@ -563,14 +540,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare type arguments
         if (!!expressionWithTypeArguments.typeArguments !== !!otherExpressionWithTypeArguments.typeArguments) {
-            this.abort();
-            return expressionWithTypeArguments;
+            return this.abort(expressionWithTypeArguments);
         }
 
         if (expressionWithTypeArguments.typeArguments) {
             if (expressionWithTypeArguments.typeArguments.elements.length !== otherExpressionWithTypeArguments.typeArguments!.elements.length) {
-                this.abort();
-                return expressionWithTypeArguments;
+                return this.abort(expressionWithTypeArguments);
             }
 
             // Visit type arguments in lock step
@@ -593,16 +568,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitFunctionCall(functionCall: JS.FunctionCall, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.FunctionCall) {
-            this.abort();
-            return functionCall;
+            return this.abort(functionCall);
         }
 
         const otherFunctionCall = other as JS.FunctionCall;
 
         // Compare function
         if ((functionCall.function === undefined) !== (otherFunctionCall.function === undefined)) {
-            this.abort();
-            return functionCall;
+            return this.abort(functionCall);
         }
 
         // Visit function if present
@@ -613,15 +586,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare typeParameters
         if ((functionCall.typeParameters === undefined) !== (otherFunctionCall.typeParameters === undefined)) {
-            this.abort();
-            return functionCall;
+            return this.abort(functionCall);
         }
 
         // Visit typeParameters if present
         if (functionCall.typeParameters && otherFunctionCall.typeParameters) {
             if (functionCall.typeParameters.elements.length !== otherFunctionCall.typeParameters.elements.length) {
-                this.abort();
-                return functionCall;
+                return this.abort(functionCall);
             }
 
             // Visit each type parameter in lock step
@@ -633,8 +604,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare arguments
         if (functionCall.arguments.elements.length !== otherFunctionCall.arguments.elements.length) {
-            this.abort();
-            return functionCall;
+            return this.abort(functionCall);
         }
 
         // Visit each argument in lock step
@@ -655,29 +625,25 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitFunctionType(functionType: JS.FunctionType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.FunctionType) {
-            this.abort();
-            return functionType;
+            return this.abort(functionType);
         }
 
         const otherFunctionType = other as JS.FunctionType;
 
         // Compare constructor type
         if (!!functionType.constructorType.element !== !!otherFunctionType.constructorType.element) {
-            this.abort();
-            return functionType;
+            return this.abort(functionType);
         }
 
         if (functionType.constructorType.element) {
             if (functionType.constructorType.element !== otherFunctionType.constructorType.element) {
-                this.abort();
-                return functionType;
+                return this.abort(functionType);
             }
         }
 
         // Compare type parameters
         if (!!functionType.typeParameters !== !!otherFunctionType.typeParameters) {
-            this.abort();
-            return functionType;
+            return this.abort(functionType);
         }
 
         if (functionType.typeParameters) {
@@ -687,8 +653,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare parameters
         if (functionType.parameters.elements.length !== otherFunctionType.parameters.elements.length) {
-            this.abort();
-            return functionType;
+            return this.abort(functionType);
         }
 
         // Visit parameters in lock step
@@ -712,8 +677,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitInferType(inferType: JS.InferType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.InferType) {
-            this.abort();
-            return inferType;
+            return this.abort(inferType);
         }
 
         const otherInferType = other as JS.InferType;
@@ -733,22 +697,19 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitImportType(importType: JS.ImportType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ImportType) {
-            this.abort();
-            return importType;
+            return this.abort(importType);
         }
 
         const otherImportType = other as JS.ImportType;
 
         // Compare has typeof
         if (importType.hasTypeof.element !== otherImportType.hasTypeof.element) {
-            this.abort();
-            return importType;
+            return this.abort(importType);
         }
 
         // Compare argument and attributes
         if (importType.argumentAndAttributes.elements.length !== otherImportType.argumentAndAttributes.elements.length) {
-            this.abort();
-            return importType;
+            return this.abort(importType);
         }
 
         // Visit argument and attributes in lock step
@@ -760,8 +721,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare qualifier
         if (!!importType.qualifier !== !!otherImportType.qualifier) {
-            this.abort();
-            return importType;
+            return this.abort(importType);
         }
 
         if (importType.qualifier) {
@@ -771,14 +731,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare type arguments
         if (!!importType.typeArguments !== !!otherImportType.typeArguments) {
-            this.abort();
-            return importType;
+            return this.abort(importType);
         }
 
         if (importType.typeArguments) {
             if (importType.typeArguments.elements.length !== otherImportType.typeArguments!.elements.length) {
-                this.abort();
-                return importType;
+                return this.abort(importType);
             }
 
             // Visit type arguments in lock step
@@ -801,16 +759,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitImportDeclaration(jsImport: JS.Import, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.Import) {
-            this.abort();
-            return jsImport;
+            return this.abort(jsImport);
         }
 
         const otherImport = other as JS.Import;
 
         // Compare modifiers
         if (jsImport.modifiers.length !== otherImport.modifiers.length) {
-            this.abort();
-            return jsImport;
+            return this.abort(jsImport);
         }
 
         // Visit each modifier in lock step
@@ -821,8 +777,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare import clause
         if (!!jsImport.importClause !== !!otherImport.importClause) {
-            this.abort();
-            return jsImport;
+            return this.abort(jsImport);
         }
 
         if (jsImport.importClause) {
@@ -838,8 +793,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare attributes
         if (!!jsImport.attributes !== !!otherImport.attributes) {
-            this.abort();
-            return jsImport;
+            return this.abort(jsImport);
         }
 
         if (jsImport.attributes) {
@@ -864,16 +818,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitImportClause(importClause: JS.ImportClause, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ImportClause) {
-            this.abort();
-            return importClause;
+            return this.abort(importClause);
         }
 
         const otherImportClause = other as JS.ImportClause;
 
         // Compare name
         if (!!importClause.name !== !!otherImportClause.name) {
-            this.abort();
-            return importClause;
+            return this.abort(importClause);
         }
 
         if (importClause.name) {
@@ -883,8 +835,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare named bindings
         if (!!importClause.namedBindings !== !!otherImportClause.namedBindings) {
-            this.abort();
-            return importClause;
+            return this.abort(importClause);
         }
 
         if (importClause.namedBindings) {
@@ -903,16 +854,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitNamedImports(namedImports: JS.NamedImports, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.NamedImports) {
-            this.abort();
-            return namedImports;
+            return this.abort(namedImports);
         }
 
         const otherNamedImports = other as JS.NamedImports;
 
         // Compare elements
         if (namedImports.elements.elements.length !== otherNamedImports.elements.elements.length) {
-            this.abort();
-            return namedImports;
+            return this.abort(namedImports);
         }
 
         // Visit elements in lock step
@@ -933,22 +882,19 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitImportSpecifier(importSpecifier: JS.ImportSpecifier, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ImportSpecifier) {
-            this.abort();
-            return importSpecifier;
+            return this.abort(importSpecifier);
         }
 
         const otherImportSpecifier = other as JS.ImportSpecifier;
 
         // Compare import type
         if (!!importSpecifier.importType.element !== !!otherImportSpecifier.importType.element) {
-            this.abort();
-            return importSpecifier;
+            return this.abort(importSpecifier);
         }
 
         if (importSpecifier.importType.element) {
             if (importSpecifier.importType.element !== otherImportSpecifier.importType.element) {
-                this.abort();
-                return importSpecifier;
+                return this.abort(importSpecifier);
             }
         }
 
@@ -967,16 +913,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitImportAttributes(importAttributes: JS.ImportAttributes, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ImportAttributes) {
-            this.abort();
-            return importAttributes;
+            return this.abort(importAttributes);
         }
 
         const otherImportAttributes = other as JS.ImportAttributes;
 
         // Compare elements
         if (importAttributes.elements.elements.length !== otherImportAttributes.elements.elements.length) {
-            this.abort();
-            return importAttributes;
+            return this.abort(importAttributes);
         }
 
         // Visit elements in lock step
@@ -997,8 +941,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ImportTypeAttributes) {
-            this.abort();
-            return importTypeAttributes;
+            return this.abort(importTypeAttributes);
         }
 
         const otherImportTypeAttributes = other as JS.ImportTypeAttributes;
@@ -1009,8 +952,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare elements
         if (importTypeAttributes.elements.elements.length !== otherImportTypeAttributes.elements.elements.length) {
-            this.abort();
-            return importTypeAttributes;
+            return this.abort(importTypeAttributes);
         }
 
         // Visit elements in lock step
@@ -1031,8 +973,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitImportAttribute(importAttribute: JS.ImportAttribute, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ImportAttribute) {
-            this.abort();
-            return importAttribute;
+            return this.abort(importAttribute);
         }
 
         const otherImportAttribute = other as JS.ImportAttribute;
@@ -1056,8 +997,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitBinaryExtensions(jsBinary: JS.Binary, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.Binary) {
-            this.abort();
-            return jsBinary;
+            return this.abort(jsBinary);
         }
 
         const otherBinary = other as JS.Binary;
@@ -1068,8 +1008,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare operator
         if (jsBinary.operator.element !== otherBinary.operator.element) {
-            this.abort();
-            return jsBinary;
+            return this.abort(jsBinary);
         }
 
         // Visit right operand
@@ -1087,8 +1026,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitLiteralType(literalType: JS.LiteralType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.LiteralType) {
-            this.abort();
-            return literalType;
+            return this.abort(literalType);
         }
 
         const otherLiteralType = other as JS.LiteralType;
@@ -1108,16 +1046,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitMappedType(mappedType: JS.MappedType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.MappedType) {
-            this.abort();
-            return mappedType;
+            return this.abort(mappedType);
         }
 
         const otherMappedType = other as JS.MappedType;
 
         // Compare prefix token
         if (!!mappedType.prefixToken !== !!otherMappedType.prefixToken) {
-            this.abort();
-            return mappedType;
+            return this.abort(mappedType);
         }
 
         if (mappedType.prefixToken) {
@@ -1127,8 +1063,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare has readonly
         if (mappedType.hasReadonly.element !== otherMappedType.hasReadonly.element) {
-            this.abort();
-            return mappedType;
+            return this.abort(mappedType);
         }
 
         // Visit keys remapping
@@ -1137,8 +1072,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare suffix token
         if (!!mappedType.suffixToken !== !!otherMappedType.suffixToken) {
-            this.abort();
-            return mappedType;
+            return this.abort(mappedType);
         }
 
         if (mappedType.suffixToken) {
@@ -1148,14 +1082,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare has question token
         if (mappedType.hasQuestionToken.element !== otherMappedType.hasQuestionToken.element) {
-            this.abort();
-            return mappedType;
+            return this.abort(mappedType);
         }
 
         // Compare value type
         if (mappedType.valueType.elements.length !== otherMappedType.valueType.elements.length) {
-            this.abort();
-            return mappedType;
+            return this.abort(mappedType);
         }
 
         // Visit value type elements in lock step
@@ -1176,8 +1108,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.MappedTypeKeysRemapping) {
-            this.abort();
-            return keysRemapping;
+            return this.abort(keysRemapping);
         }
 
         const otherKeysRemapping = other as JS.MappedType.KeysRemapping;
@@ -1188,8 +1119,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare name type
         if (!!keysRemapping.nameType !== !!otherKeysRemapping.nameType) {
-            this.abort();
-            return keysRemapping;
+            return this.abort(keysRemapping);
         }
 
         if (keysRemapping.nameType) {
@@ -1208,8 +1138,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.MappedTypeParameter) {
-            this.abort();
-            return mappedTypeParameter;
+            return this.abort(mappedTypeParameter);
         }
 
         const otherMappedTypeParameter = other as JS.MappedType.Parameter;
@@ -1233,16 +1162,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ObjectBindingPattern) {
-            this.abort();
-            return objectBindingPattern;
+            return this.abort(objectBindingPattern);
         }
 
         const otherObjectBindingPattern = other as JS.ObjectBindingPattern;
 
         // Compare leading annotations
         if (objectBindingPattern.leadingAnnotations.length !== otherObjectBindingPattern.leadingAnnotations.length) {
-            this.abort();
-            return objectBindingPattern;
+            return this.abort(objectBindingPattern);
         }
 
         // Visit leading annotations in lock step
@@ -1253,8 +1180,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare modifiers
         if (objectBindingPattern.modifiers.length !== otherObjectBindingPattern.modifiers.length) {
-            this.abort();
-            return objectBindingPattern;
+            return this.abort(objectBindingPattern);
         }
 
         // Visit modifiers in lock step
@@ -1265,8 +1191,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare type expression
         if (!!objectBindingPattern.typeExpression !== !!otherObjectBindingPattern.typeExpression) {
-            this.abort();
-            return objectBindingPattern;
+            return this.abort(objectBindingPattern);
         }
 
         if (objectBindingPattern.typeExpression) {
@@ -1276,8 +1201,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare bindings
         if (objectBindingPattern.bindings.elements.length !== otherObjectBindingPattern.bindings.elements.length) {
-            this.abort();
-            return objectBindingPattern;
+            return this.abort(objectBindingPattern);
         }
 
         // Visit bindings in lock step
@@ -1289,8 +1213,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare initializer
         if (!!objectBindingPattern.initializer !== !!otherObjectBindingPattern.initializer) {
-            this.abort();
-            return objectBindingPattern;
+            return this.abort(objectBindingPattern);
         }
 
         if (objectBindingPattern.initializer) {
@@ -1309,8 +1232,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.PropertyAssignment) {
-            this.abort();
-            return propertyAssignment;
+            return this.abort(propertyAssignment);
         }
 
         const otherPropertyAssignment = other as JS.PropertyAssignment;
@@ -1321,8 +1243,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare initializer
         if (!!propertyAssignment.initializer !== !!otherPropertyAssignment.initializer) {
-            this.abort();
-            return propertyAssignment;
+            return this.abort(propertyAssignment);
         }
 
         if (propertyAssignment.initializer) {
@@ -1341,8 +1262,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitSatisfiesExpression(satisfiesExpression: JS.SatisfiesExpression, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.SatisfiesExpression) {
-            this.abort();
-            return satisfiesExpression;
+            return this.abort(satisfiesExpression);
         }
 
         const otherSatisfiesExpression = other as JS.SatisfiesExpression;
@@ -1366,16 +1286,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ScopedVariableDeclarations) {
-            this.abort();
-            return scopedVariableDeclarations;
+            return this.abort(scopedVariableDeclarations);
         }
 
         const otherScopedVariableDeclarations = other as JS.ScopedVariableDeclarations;
 
         // Compare modifiers
         if (scopedVariableDeclarations.modifiers.length !== otherScopedVariableDeclarations.modifiers.length) {
-            this.abort();
-            return scopedVariableDeclarations;
+            return this.abort(scopedVariableDeclarations);
         }
 
         // Visit modifiers in lock step
@@ -1386,8 +1304,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare variables
         if (scopedVariableDeclarations.variables.length !== otherScopedVariableDeclarations.variables.length) {
-            this.abort();
-            return scopedVariableDeclarations;
+            return this.abort(scopedVariableDeclarations);
         }
 
         // Visit variables in lock step
@@ -1408,8 +1325,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitStatementExpression(statementExpression: JS.StatementExpression, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.StatementExpression) {
-            this.abort();
-            return statementExpression;
+            return this.abort(statementExpression);
         }
 
         const otherStatementExpression = other as JS.StatementExpression;
@@ -1429,16 +1345,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TaggedTemplateExpression) {
-            this.abort();
-            return taggedTemplateExpression;
+            return this.abort(taggedTemplateExpression);
         }
 
         const otherTaggedTemplateExpression = other as JS.TaggedTemplateExpression;
 
         // Compare tag
         if (!!taggedTemplateExpression.tag !== !!otherTaggedTemplateExpression.tag) {
-            this.abort();
-            return taggedTemplateExpression;
+            return this.abort(taggedTemplateExpression);
         }
 
         if (taggedTemplateExpression.tag) {
@@ -1448,14 +1362,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare type arguments
         if (!!taggedTemplateExpression.typeArguments !== !!otherTaggedTemplateExpression.typeArguments) {
-            this.abort();
-            return taggedTemplateExpression;
+            return this.abort(taggedTemplateExpression);
         }
 
         if (taggedTemplateExpression.typeArguments) {
             if (taggedTemplateExpression.typeArguments.elements.length !== otherTaggedTemplateExpression.typeArguments!.elements.length) {
-                this.abort();
-                return taggedTemplateExpression;
+                return this.abort(taggedTemplateExpression);
             }
 
             // Visit type arguments in lock step
@@ -1481,8 +1393,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTemplateExpression(templateExpression: JS.TemplateExpression, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TemplateExpression) {
-            this.abort();
-            return templateExpression;
+            return this.abort(templateExpression);
         }
 
         const otherTemplateExpression = other as JS.TemplateExpression;
@@ -1493,8 +1404,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare spans
         if (templateExpression.spans.length !== otherTemplateExpression.spans.length) {
-            this.abort();
-            return templateExpression;
+            return this.abort(templateExpression);
         }
 
         // Visit spans in lock step
@@ -1515,8 +1425,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TemplateExpressionSpan) {
-            this.abort();
-            return span;
+            return this.abort(span);
         }
 
         const otherSpan = other as JS.TemplateExpression.Span;
@@ -1540,16 +1449,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTuple(tuple: JS.Tuple, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.Tuple) {
-            this.abort();
-            return tuple;
+            return this.abort(tuple);
         }
 
         const otherTuple = other as JS.Tuple;
 
         // Compare elements
         if (tuple.elements.elements.length !== otherTuple.elements.elements.length) {
-            this.abort();
-            return tuple;
+            return this.abort(tuple);
         }
 
         // Visit elements in lock step
@@ -1570,16 +1477,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TypeDeclaration) {
-            this.abort();
-            return typeDeclaration;
+            return this.abort(typeDeclaration);
         }
 
         const otherTypeDeclaration = other as JS.TypeDeclaration;
 
         // Compare modifiers
         if (typeDeclaration.modifiers.length !== otherTypeDeclaration.modifiers.length) {
-            this.abort();
-            return typeDeclaration;
+            return this.abort(typeDeclaration);
         }
 
         // Visit modifiers in lock step
@@ -1594,8 +1499,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare type parameters
         if (!!typeDeclaration.typeParameters !== !!otherTypeDeclaration.typeParameters) {
-            this.abort();
-            return typeDeclaration;
+            return this.abort(typeDeclaration);
         }
 
         if (typeDeclaration.typeParameters) {
@@ -1618,8 +1522,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeOf(typeOf: JS.TypeOf, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TypeOf) {
-            this.abort();
-            return typeOf;
+            return this.abort(typeOf);
         }
 
         const otherTypeOf = other as JS.TypeOf;
@@ -1639,8 +1542,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TypeTreeExpression) {
-            this.abort();
-            return typeTreeExpression;
+            return this.abort(typeTreeExpression);
         }
 
         const otherTypeTreeExpression = other as JS.TypeTreeExpression;
@@ -1660,8 +1562,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitAs(as_: JS.As, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.As) {
-            this.abort();
-            return as_;
+            return this.abort(as_);
         }
 
         const otherAs = other as JS.As;
@@ -1683,8 +1584,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.AssignmentOperation) {
-            this.abort();
-            return assignmentOperation;
+            return this.abort(assignmentOperation);
         }
 
         const otherAssignmentOperation = other as JS.AssignmentOperation;
@@ -1695,8 +1595,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare operator
         if (assignmentOperation.operator.element !== otherAssignmentOperation.operator.element) {
-            this.abort();
-            return assignmentOperation;
+            return this.abort(assignmentOperation);
         }
 
         // Visit assignment
@@ -1714,8 +1613,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.IndexedAccessType) {
-            this.abort();
-            return indexedAccessType;
+            return this.abort(indexedAccessType);
         }
 
         const otherIndexedAccessType = other as JS.IndexedAccessType;
@@ -1739,8 +1637,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.IndexType) {
-            this.abort();
-            return indexType;
+            return this.abort(indexType);
         }
 
         const otherIndexType = other as JS.IndexedAccessType.IndexType;
@@ -1760,8 +1657,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeQuery(typeQuery: JS.TypeQuery, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TypeQuery) {
-            this.abort();
-            return typeQuery;
+            return this.abort(typeQuery);
         }
 
         const otherTypeQuery = other as JS.TypeQuery;
@@ -1772,14 +1668,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare type arguments
         if (!!typeQuery.typeArguments !== !!otherTypeQuery.typeArguments) {
-            this.abort();
-            return typeQuery;
+            return this.abort(typeQuery);
         }
 
         if (typeQuery.typeArguments) {
             if (typeQuery.typeArguments.elements.length !== otherTypeQuery.typeArguments!.elements.length) {
-                this.abort();
-                return typeQuery;
+                return this.abort(typeQuery);
             }
 
             // Visit type arguments in lock step
@@ -1802,8 +1696,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeInfo(typeInfo: JS.TypeInfo, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TypeInfo) {
-            this.abort();
-            return typeInfo;
+            return this.abort(typeInfo);
         }
 
         const otherTypeInfo = other as JS.TypeInfo;
@@ -1823,8 +1716,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ComputedPropertyName) {
-            this.abort();
-            return computedPropertyName;
+            return this.abort(computedPropertyName);
         }
 
         const otherComputedPropertyName = other as JS.ComputedPropertyName;
@@ -1844,8 +1736,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeOperator(typeOperator: JS.TypeOperator, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TypeOperator) {
-            this.abort();
-            return typeOperator;
+            return this.abort(typeOperator);
         }
 
         const otherTypeOperator = other as JS.TypeOperator;
@@ -1865,16 +1756,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypePredicate(typePredicate: JS.TypePredicate, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TypePredicate) {
-            this.abort();
-            return typePredicate;
+            return this.abort(typePredicate);
         }
 
         const otherTypePredicate = other as JS.TypePredicate;
 
         // Compare asserts
         if (typePredicate.asserts.element !== otherTypePredicate.asserts.element) {
-            this.abort();
-            return typePredicate;
+            return this.abort(typePredicate);
         }
 
         // Visit parameter name
@@ -1883,8 +1772,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare expression
         if (!!typePredicate.expression !== !!otherTypePredicate.expression) {
-            this.abort();
-            return typePredicate;
+            return this.abort(typePredicate);
         }
 
         if (typePredicate.expression) {
@@ -1903,16 +1791,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitUnion(union: JS.Union, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.Union) {
-            this.abort();
-            return union;
+            return this.abort(union);
         }
 
         const otherUnion = other as JS.Union;
 
         // Compare types
         if (union.types.length !== otherUnion.types.length) {
-            this.abort();
-            return union;
+            return this.abort(union);
         }
 
         // Visit types in lock step
@@ -1933,16 +1819,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitIntersection(intersection: JS.Intersection, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.Intersection) {
-            this.abort();
-            return intersection;
+            return this.abort(intersection);
         }
 
         const otherIntersection = other as JS.Intersection;
 
         // Compare types
         if (intersection.types.length !== otherIntersection.types.length) {
-            this.abort();
-            return intersection;
+            return this.abort(intersection);
         }
 
         // Visit types in lock step
@@ -1963,16 +1847,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitAnnotatedType(annotatedType: J.AnnotatedType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.AnnotatedType) {
-            this.abort();
-            return annotatedType;
+            return this.abort(annotatedType);
         }
 
         const otherAnnotatedType = other as J.AnnotatedType;
 
         // Compare annotations
         if (annotatedType.annotations.length !== otherAnnotatedType.annotations.length) {
-            this.abort();
-            return annotatedType;
+            return this.abort(annotatedType);
         }
 
         // Visit each annotation in lock step
@@ -1996,8 +1878,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitAnnotation(annotation: J.Annotation, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Annotation) {
-            this.abort();
-            return annotation;
+            return this.abort(annotation);
         }
 
         const otherAnnotation = other as J.Annotation;
@@ -2008,15 +1889,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare arguments
         if ((annotation.arguments === undefined) !== (otherAnnotation.arguments === undefined)) {
-            this.abort();
-            return annotation;
+            return this.abort(annotation);
         }
 
         // If both have arguments, visit them
         if (annotation.arguments && otherAnnotation.arguments) {
             if (annotation.arguments.elements.length !== otherAnnotation.arguments.elements.length) {
-                this.abort();
-                return annotation;
+                return this.abort(annotation);
             }
 
             // Visit each argument in lock step
@@ -2038,8 +1917,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitArrayAccess(arrayAccess: J.ArrayAccess, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ArrayAccess) {
-            this.abort();
-            return arrayAccess;
+            return this.abort(arrayAccess);
         }
 
         const otherArrayAccess = other as J.ArrayAccess;
@@ -2063,8 +1941,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitArrayDimension(arrayDimension: J.ArrayDimension, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ArrayDimension) {
-            this.abort();
-            return arrayDimension;
+            return this.abort(arrayDimension);
         }
 
         const otherArrayDimension = other as J.ArrayDimension;
@@ -2074,7 +1951,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             await this.visit(arrayDimension.index.element, otherArrayDimension.index.element);
         } else if (arrayDimension.index !== otherArrayDimension.index) {
             // One has an index and the other doesn't
-            this.abort();
+            return this.abort(arrayDimension);
         }
 
         return arrayDimension;
@@ -2089,8 +1966,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitArrayType(arrayType: J.ArrayType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ArrayType) {
-            this.abort();
-            return arrayType;
+            return this.abort(arrayType);
         }
 
         const otherArrayType = other as J.ArrayType;
@@ -2101,8 +1977,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare annotations
         if ((arrayType.annotations?.length || 0) !== (otherArrayType.annotations?.length || 0)) {
-            this.abort();
-            return arrayType;
+            return this.abort(arrayType);
         }
 
         // Visit annotations if they exist
@@ -2125,8 +2000,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitAssert(anAssert: J.Assert, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Assert) {
-            this.abort();
-            return anAssert;
+            return this.abort(anAssert);
         }
 
         const otherAssert = other as J.Assert;
@@ -2137,8 +2011,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare detail
         if ((anAssert.detail !== undefined) !== (otherAssert.detail !== undefined)) {
-            this.abort();
-            return anAssert;
+            return this.abort(anAssert);
         }
 
         // Visit detail if it exists
@@ -2158,8 +2031,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitAssignment(assignment: J.Assignment, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Assignment) {
-            this.abort();
-            return assignment;
+            return this.abort(assignment);
         }
 
         const otherAssignment = other as J.Assignment;
@@ -2173,7 +2045,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             await this.visit(assignment.assignment.element, otherAssignment.assignment.element);
         } else if (assignment.assignment !== otherAssignment.assignment) {
             // One has an assignment and the other doesn't
-            this.abort();
+            return this.abort(assignment);
         }
 
         return assignment;
@@ -2188,8 +2060,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitAssignmentOperation(assignOp: J.AssignmentOperation, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.AssignmentOperation) {
-            this.abort();
-            return assignOp;
+            return this.abort(assignOp);
         }
 
         const otherAssignOp = other as J.AssignmentOperation;
@@ -2200,8 +2071,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare operator
         if (assignOp.operator.element !== otherAssignOp.operator.element) {
-            this.abort();
-            return assignOp;
+            return this.abort(assignOp);
         }
 
         // Visit assignment
@@ -2219,16 +2089,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitBreak(breakStatement: J.Break, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Break) {
-            this.abort();
-            return breakStatement;
+            return this.abort(breakStatement);
         }
 
         const otherBreak = other as J.Break;
 
         // Compare label presence
         if ((breakStatement.label !== undefined) !== (otherBreak.label !== undefined)) {
-            this.abort();
-            return breakStatement;
+            return this.abort(breakStatement);
         }
 
         // Visit label if it exists
@@ -2248,16 +2116,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitCase(aCase: J.Case, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Case) {
-            this.abort();
-            return aCase;
+            return this.abort(aCase);
         }
 
         const otherCase = other as J.Case;
 
         // Compare case labels
         if (aCase.caseLabels.elements.length !== otherCase.caseLabels.elements.length) {
-            this.abort();
-            return aCase;
+            return this.abort(aCase);
         }
 
         // Visit each case label in lock step
@@ -2268,8 +2134,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare statements
         if (aCase.statements.elements.length !== otherCase.statements.elements.length) {
-            this.abort();
-            return aCase;
+            return this.abort(aCase);
         }
 
         // Visit each statement in lock step
@@ -2280,8 +2145,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare body presence
         if ((aCase.body !== undefined) !== (otherCase.body !== undefined)) {
-            this.abort();
-            return aCase;
+            return this.abort(aCase);
         }
 
         // Visit body if it exists
@@ -2292,8 +2156,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare guard presence
         if ((aCase.guard !== undefined) !== (otherCase.guard !== undefined)) {
-            this.abort();
-            return aCase;
+            return this.abort(aCase);
         }
 
         // Visit guard if it exists
@@ -2313,16 +2176,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitClassDeclaration(classDecl: J.ClassDeclaration, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ClassDeclaration) {
-            this.abort();
-            return classDecl;
+            return this.abort(classDecl);
         }
 
         const otherClassDecl = other as J.ClassDeclaration;
 
         // Compare leading annotations
         if (classDecl.leadingAnnotations.length !== otherClassDecl.leadingAnnotations.length) {
-            this.abort();
-            return classDecl;
+            return this.abort(classDecl);
         }
 
         // Visit each leading annotation in lock step
@@ -2333,8 +2194,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare modifiers
         if (classDecl.modifiers.length !== otherClassDecl.modifiers.length) {
-            this.abort();
-            return classDecl;
+            return this.abort(classDecl);
         }
 
         // Visit each modifier in lock step
@@ -2353,15 +2213,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare type parameters presence
         if ((classDecl.typeParameters !== undefined) !== (otherClassDecl.typeParameters !== undefined)) {
-            this.abort();
-            return classDecl;
+            return this.abort(classDecl);
         }
 
         // Visit type parameters if they exist
         if (classDecl.typeParameters && otherClassDecl.typeParameters) {
             if (classDecl.typeParameters.elements.length !== otherClassDecl.typeParameters.elements.length) {
-                this.abort();
-                return classDecl;
+                return this.abort(classDecl);
             }
 
             // Visit each type parameter in lock step
@@ -2373,15 +2231,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare primary constructor presence
         if ((classDecl.primaryConstructor !== undefined) !== (otherClassDecl.primaryConstructor !== undefined)) {
-            this.abort();
-            return classDecl;
+            return this.abort(classDecl);
         }
 
         // Visit primary constructor if it exists
         if (classDecl.primaryConstructor && otherClassDecl.primaryConstructor) {
             if (classDecl.primaryConstructor.elements.length !== otherClassDecl.primaryConstructor.elements.length) {
-                this.abort();
-                return classDecl;
+                return this.abort(classDecl);
             }
 
             // Visit each primary constructor element in lock step
@@ -2393,8 +2249,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare extends presence
         if ((classDecl.extends !== undefined) !== (otherClassDecl.extends !== undefined)) {
-            this.abort();
-            return classDecl;
+            return this.abort(classDecl);
         }
 
         // Visit extends if it exists
@@ -2405,15 +2260,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare implements presence
         if ((classDecl.implements !== undefined) !== (otherClassDecl.implements !== undefined)) {
-            this.abort();
-            return classDecl;
+            return this.abort(classDecl);
         }
 
         // Visit implements if it exists
         if (classDecl.implements && otherClassDecl.implements) {
             if (classDecl.implements.elements.length !== otherClassDecl.implements.elements.length) {
-                this.abort();
-                return classDecl;
+                return this.abort(classDecl);
             }
 
             // Visit each implements element in lock step
@@ -2425,15 +2278,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare permitting presence
         if ((classDecl.permitting !== undefined) !== (otherClassDecl.permitting !== undefined)) {
-            this.abort();
-            return classDecl;
+            return this.abort(classDecl);
         }
 
         // Visit permitting if it exists
         if (classDecl.permitting && otherClassDecl.permitting) {
             if (classDecl.permitting.elements.length !== otherClassDecl.permitting.elements.length) {
-                this.abort();
-                return classDecl;
+                return this.abort(classDecl);
             }
 
             // Visit each permitting element in lock step
@@ -2458,16 +2309,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ClassDeclarationKind) {
-            this.abort();
-            return kind;
+            return this.abort(kind);
         }
 
         const otherKind = other as J.ClassDeclaration.Kind;
 
         // Compare annotations
         if (kind.annotations.length !== otherKind.annotations.length) {
-            this.abort();
-            return kind;
+            return this.abort(kind);
         }
 
         // Visit each annotation in lock step
@@ -2488,16 +2337,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitCompilationUnit(compilationUnit: J.CompilationUnit, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.CompilationUnit) {
-            this.abort();
-            return compilationUnit;
+            return this.abort(compilationUnit);
         }
 
         const otherCompilationUnit = other as J.CompilationUnit;
 
         // Compare package declaration presence
         if ((compilationUnit.packageDeclaration !== undefined) !== (otherCompilationUnit.packageDeclaration !== undefined)) {
-            this.abort();
-            return compilationUnit;
+            return this.abort(compilationUnit);
         }
 
         // Visit package declaration if it exists
@@ -2508,8 +2355,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare imports
         if (compilationUnit.imports.length !== otherCompilationUnit.imports.length) {
-            this.abort();
-            return compilationUnit;
+            return this.abort(compilationUnit);
         }
 
         // Visit each import in lock step
@@ -2520,8 +2366,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare classes
         if (compilationUnit.classes.length !== otherCompilationUnit.classes.length) {
-            this.abort();
-            return compilationUnit;
+            return this.abort(compilationUnit);
         }
 
         // Visit each class in lock step
@@ -2542,16 +2387,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitContinue(continueStatement: J.Continue, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Continue) {
-            this.abort();
-            return continueStatement;
+            return this.abort(continueStatement);
         }
 
         const otherContinue = other as J.Continue;
 
         // Compare label presence
         if ((continueStatement.label !== undefined) !== (otherContinue.label !== undefined)) {
-            this.abort();
-            return continueStatement;
+            return this.abort(continueStatement);
         }
 
         // Visit label if it exists
@@ -2571,8 +2414,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ControlParentheses) {
-            this.abort();
-            return controlParens;
+            return this.abort(controlParens);
         }
 
         const otherControlParens = other as J.ControlParentheses<J>;
@@ -2592,8 +2434,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitDeconstructionPattern(pattern: J.DeconstructionPattern, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.DeconstructionPattern) {
-            this.abort();
-            return pattern;
+            return this.abort(pattern);
         }
 
         const otherPattern = other as J.DeconstructionPattern;
@@ -2604,8 +2445,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare nested elements
         if (pattern.nested.elements.length !== otherPattern.nested.elements.length) {
-            this.abort();
-            return pattern;
+            return this.abort(pattern);
         }
 
         // Visit each nested element in lock step
@@ -2626,8 +2466,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitDoWhileLoop(doWhileLoop: J.DoWhileLoop, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.DoWhileLoop) {
-            this.abort();
-            return doWhileLoop;
+            return this.abort(doWhileLoop);
         }
 
         const otherDoWhileLoop = other as J.DoWhileLoop;
@@ -2651,8 +2490,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitEmpty(empty: J.Empty, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Empty) {
-            this.abort();
-            return empty;
+            return this.abort(empty);
         }
 
         // Empty statements have no properties to compare, so we just check the kind
@@ -2669,16 +2507,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitEnumValue(enumValue: J.EnumValue, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.EnumValue) {
-            this.abort();
-            return enumValue;
+            return this.abort(enumValue);
         }
 
         const otherEnumValue = other as J.EnumValue;
 
         // Compare annotations
         if (enumValue.annotations.length !== otherEnumValue.annotations.length) {
-            this.abort();
-            return enumValue;
+            return this.abort(enumValue);
         }
 
         // Visit each annotation in lock step
@@ -2693,8 +2529,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare initializer presence
         if ((enumValue.initializer !== undefined) !== (otherEnumValue.initializer !== undefined)) {
-            this.abort();
-            return enumValue;
+            return this.abort(enumValue);
         }
 
         // Visit initializer if it exists
@@ -2714,16 +2549,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitEnumValueSet(enumValueSet: J.EnumValueSet, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.EnumValueSet) {
-            this.abort();
-            return enumValueSet;
+            return this.abort(enumValueSet);
         }
 
         const otherEnumValueSet = other as J.EnumValueSet;
 
         // Compare enums
         if (enumValueSet.enums.length !== otherEnumValueSet.enums.length) {
-            this.abort();
-            return enumValueSet;
+            return this.abort(enumValueSet);
         }
 
         // Visit each enum in lock step
@@ -2744,16 +2577,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitErroneous(erroneous: J.Erroneous, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Erroneous) {
-            this.abort();
-            return erroneous;
+            return this.abort(erroneous);
         }
 
         const otherErroneous = other as J.Erroneous;
 
         // Compare text
         if (erroneous.text !== otherErroneous.text) {
-            this.abort();
-            return erroneous;
+            return this.abort(erroneous);
         }
 
         return erroneous;
@@ -2768,8 +2599,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitFieldAccess(fieldAccess: J.FieldAccess, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.FieldAccess) {
-            this.abort();
-            return fieldAccess;
+            return this.abort(fieldAccess);
         }
 
         const otherFieldAccess = other as J.FieldAccess;
@@ -2794,8 +2624,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitForEachLoop(forEachLoop: J.ForEachLoop, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ForEachLoop) {
-            this.abort();
-            return forEachLoop;
+            return this.abort(forEachLoop);
         }
 
         const otherForEachLoop = other as J.ForEachLoop;
@@ -2820,8 +2649,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitForEachLoopControl(control: J.ForEachLoop.Control, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ForEachLoopControl) {
-            this.abort();
-            return control;
+            return this.abort(control);
         }
 
         const otherControl = other as J.ForEachLoop.Control;
@@ -2846,8 +2674,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitForLoop(forLoop: J.ForLoop, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ForLoop) {
-            this.abort();
-            return forLoop;
+            return this.abort(forLoop);
         }
 
         const otherForLoop = other as J.ForLoop;
@@ -2872,16 +2699,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitForLoopControl(control: J.ForLoop.Control, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ForLoopControl) {
-            this.abort();
-            return control;
+            return this.abort(control);
         }
 
         const otherControl = other as J.ForLoop.Control;
 
         // Compare init statements
         if (control.init.length !== otherControl.init.length) {
-            this.abort();
-            return control;
+            return this.abort(control);
         }
 
         // Visit each init statement in lock step
@@ -2892,8 +2717,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare condition
         if ((control.condition === undefined) !== (otherControl.condition === undefined)) {
-            this.abort();
-            return control;
+            return this.abort(control);
         }
 
         // Visit condition if present
@@ -2904,8 +2728,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare update statements
         if (control.update.length !== otherControl.update.length) {
-            this.abort();
-            return control;
+            return this.abort(control);
         }
 
         // Visit each update statement in lock step
@@ -2926,8 +2749,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitIf(ifStatement: J.If, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.If) {
-            this.abort();
-            return ifStatement;
+            return this.abort(ifStatement);
         }
 
         const otherIfStatement = other as J.If;
@@ -2942,8 +2764,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare else part
         if ((ifStatement.elsePart === undefined) !== (otherIfStatement.elsePart === undefined)) {
-            this.abort();
-            return ifStatement;
+            return this.abort(ifStatement);
         }
 
         // Visit else part if present
@@ -2964,8 +2785,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitElse(elseStatement: J.If.Else, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.IfElse) {
-            this.abort();
-            return elseStatement;
+            return this.abort(elseStatement);
         }
 
         const otherElseStatement = other as J.If.Else;
@@ -2986,16 +2806,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitImport(importStatement: J.Import, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Import) {
-            this.abort();
-            return importStatement;
+            return this.abort(importStatement);
         }
 
         const otherImportStatement = other as J.Import;
 
         // Compare static
         if (importStatement.static.element !== otherImportStatement.static.element) {
-            this.abort();
-            return importStatement;
+            return this.abort(importStatement);
         }
 
         // Visit qualid
@@ -3004,8 +2822,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare alias
         if ((importStatement.alias === undefined) !== (otherImportStatement.alias === undefined)) {
-            this.abort();
-            return importStatement;
+            return this.abort(importStatement);
         }
 
         // Visit alias if present
@@ -3026,8 +2843,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitInstanceOf(instanceOf: J.InstanceOf, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.InstanceOf) {
-            this.abort();
-            return instanceOf;
+            return this.abort(instanceOf);
         }
 
         const otherInstanceOf = other as J.InstanceOf;
@@ -3042,8 +2858,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare pattern
         if ((instanceOf.pattern === undefined) !== (otherInstanceOf.pattern === undefined)) {
-            this.abort();
-            return instanceOf;
+            return this.abort(instanceOf);
         }
 
         // Visit pattern if present
@@ -3054,8 +2869,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare modifier
         if ((instanceOf.modifier === undefined) !== (otherInstanceOf.modifier === undefined)) {
-            this.abort();
-            return instanceOf;
+            return this.abort(instanceOf);
         }
 
         // Visit modifier if present
@@ -3076,16 +2890,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitIntersectionType(intersectionType: J.IntersectionType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.IntersectionType) {
-            this.abort();
-            return intersectionType;
+            return this.abort(intersectionType);
         }
 
         const otherIntersectionType = other as J.IntersectionType;
 
         // Compare bounds
         if (intersectionType.bounds.elements.length !== otherIntersectionType.bounds.elements.length) {
-            this.abort();
-            return intersectionType;
+            return this.abort(intersectionType);
         }
 
         // Visit each bound in lock step
@@ -3106,8 +2918,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitLabel(label: J.Label, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Label) {
-            this.abort();
-            return label;
+            return this.abort(label);
         }
 
         const otherLabel = other as J.Label;
@@ -3132,8 +2943,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitLambda(lambda: J.Lambda, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Lambda) {
-            this.abort();
-            return lambda;
+            return this.abort(lambda);
         }
 
         const otherLambda = other as J.Lambda;
@@ -3158,22 +2968,19 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitLambdaParameters(parameters: J.Lambda.Parameters, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.LambdaParameters) {
-            this.abort();
-            return parameters;
+            return this.abort(parameters);
         }
 
         const otherParameters = other as J.Lambda.Parameters;
 
         // Compare parenthesized
         if (parameters.parenthesized !== otherParameters.parenthesized) {
-            this.abort();
-            return parameters;
+            return this.abort(parameters);
         }
 
         // Compare parameters
         if (parameters.parameters.length !== otherParameters.parameters.length) {
-            this.abort();
-            return parameters;
+            return this.abort(parameters);
         }
 
         // Visit each parameter in lock step
@@ -3194,8 +3001,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitMemberReference(memberReference: J.MemberReference, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.MemberReference) {
-            this.abort();
-            return memberReference;
+            return this.abort(memberReference);
         }
 
         const otherMemberReference = other as J.MemberReference;
@@ -3206,15 +3012,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare typeParameters
         if ((memberReference.typeParameters === undefined) !== (otherMemberReference.typeParameters === undefined)) {
-            this.abort();
-            return memberReference;
+            return this.abort(memberReference);
         }
 
         // Visit typeParameters if present
         if (memberReference.typeParameters && otherMemberReference.typeParameters) {
             if (memberReference.typeParameters.elements.length !== otherMemberReference.typeParameters.elements.length) {
-                this.abort();
-                return memberReference;
+                return this.abort(memberReference);
             }
 
             // Visit each type parameter in lock step
@@ -3240,16 +3044,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.MethodDeclaration) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         const otherMethodDeclaration = other as J.MethodDeclaration;
 
         // Compare leadingAnnotations
         if (methodDeclaration.leadingAnnotations.length !== otherMethodDeclaration.leadingAnnotations.length) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         // Visit each leading annotation in lock step
@@ -3260,8 +3062,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare modifiers
         if (methodDeclaration.modifiers.length !== otherMethodDeclaration.modifiers.length) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         // Visit each modifier in lock step
@@ -3272,8 +3073,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare typeParameters
         if ((methodDeclaration.typeParameters === undefined) !== (otherMethodDeclaration.typeParameters === undefined)) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         // Visit typeParameters if present
@@ -3284,8 +3084,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare returnTypeExpression
         if ((methodDeclaration.returnTypeExpression === undefined) !== (otherMethodDeclaration.returnTypeExpression === undefined)) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         // Visit returnTypeExpression if present
@@ -3296,8 +3095,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare nameAnnotations
         if (methodDeclaration.nameAnnotations.length !== otherMethodDeclaration.nameAnnotations.length) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         // Visit each name annotation in lock step
@@ -3312,8 +3110,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare parameters
         if (methodDeclaration.parameters.elements.length !== otherMethodDeclaration.parameters.elements.length) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         // Visit each parameter in lock step
@@ -3324,15 +3121,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare throws
         if ((methodDeclaration.throws === undefined) !== (otherMethodDeclaration.throws === undefined)) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         // Visit throws if present
         if (methodDeclaration.throws && otherMethodDeclaration.throws) {
             if (methodDeclaration.throws.elements.length !== otherMethodDeclaration.throws.elements.length) {
-                this.abort();
-                return methodDeclaration;
+                return this.abort(methodDeclaration);
             }
 
             // Visit each throw in lock step
@@ -3344,8 +3139,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare body
         if ((methodDeclaration.body === undefined) !== (otherMethodDeclaration.body === undefined)) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         // Visit body if present
@@ -3356,8 +3150,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare defaultValue
         if ((methodDeclaration.defaultValue === undefined) !== (otherMethodDeclaration.defaultValue === undefined)) {
-            this.abort();
-            return methodDeclaration;
+            return this.abort(methodDeclaration);
         }
 
         // Visit defaultValue if present
@@ -3378,16 +3171,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.MethodInvocation) {
-            this.abort();
-            return methodInvocation;
+            return this.abort(methodInvocation);
         }
 
         const otherMethodInvocation = other as J.MethodInvocation;
 
         // Compare select
         if ((methodInvocation.select === undefined) !== (otherMethodInvocation.select === undefined)) {
-            this.abort();
-            return methodInvocation;
+            return this.abort(methodInvocation);
         }
 
         // Visit select if present
@@ -3398,15 +3189,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare typeParameters
         if ((methodInvocation.typeParameters === undefined) !== (otherMethodInvocation.typeParameters === undefined)) {
-            this.abort();
-            return methodInvocation;
+            return this.abort(methodInvocation);
         }
 
         // Visit typeParameters if present
         if (methodInvocation.typeParameters && otherMethodInvocation.typeParameters) {
             if (methodInvocation.typeParameters.elements.length !== otherMethodInvocation.typeParameters.elements.length) {
-                this.abort();
-                return methodInvocation;
+                return this.abort(methodInvocation);
             }
 
             // Visit each type parameter in lock step
@@ -3422,8 +3211,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare arguments
         if (methodInvocation.arguments.elements.length !== otherMethodInvocation.arguments.elements.length) {
-            this.abort();
-            return methodInvocation;
+            return this.abort(methodInvocation);
         }
 
         // Visit each argument in lock step
@@ -3444,28 +3232,24 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitModifier(modifier: J.Modifier, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Modifier) {
-            this.abort();
-            return modifier;
+            return this.abort(modifier);
         }
 
         const otherModifier = other as J.Modifier;
 
         // Compare keyword
         if (modifier.keyword !== otherModifier.keyword) {
-            this.abort();
-            return modifier;
+            return this.abort(modifier);
         }
 
         // Compare type
         if (modifier.type !== otherModifier.type) {
-            this.abort();
-            return modifier;
+            return this.abort(modifier);
         }
 
         // Compare annotations
         if (modifier.annotations.length !== otherModifier.annotations.length) {
-            this.abort();
-            return modifier;
+            return this.abort(modifier);
         }
 
         // Visit each annotation in lock step
@@ -3486,16 +3270,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitMultiCatch(multiCatch: J.MultiCatch, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.MultiCatch) {
-            this.abort();
-            return multiCatch;
+            return this.abort(multiCatch);
         }
 
         const otherMultiCatch = other as J.MultiCatch;
 
         // Compare alternatives
         if (multiCatch.alternatives.length !== otherMultiCatch.alternatives.length) {
-            this.abort();
-            return multiCatch;
+            return this.abort(multiCatch);
         }
 
         // Visit each alternative in lock step
@@ -3516,16 +3298,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitNewArray(newArray: J.NewArray, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.NewArray) {
-            this.abort();
-            return newArray;
+            return this.abort(newArray);
         }
 
         const otherNewArray = other as J.NewArray;
 
         // Compare typeExpression
         if ((newArray.typeExpression === undefined) !== (otherNewArray.typeExpression === undefined)) {
-            this.abort();
-            return newArray;
+            return this.abort(newArray);
         }
 
         // Visit typeExpression if present
@@ -3536,8 +3316,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare dimensions
         if (newArray.dimensions.length !== otherNewArray.dimensions.length) {
-            this.abort();
-            return newArray;
+            return this.abort(newArray);
         }
 
         // Visit each dimension in lock step
@@ -3548,15 +3327,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare initializer
         if ((newArray.initializer === undefined) !== (otherNewArray.initializer === undefined)) {
-            this.abort();
-            return newArray;
+            return this.abort(newArray);
         }
 
         // Visit initializer if present
         if (newArray.initializer && otherNewArray.initializer) {
             if (newArray.initializer.elements.length !== otherNewArray.initializer.elements.length) {
-                this.abort();
-                return newArray;
+                return this.abort(newArray);
             }
 
             // Visit each initializer element in lock step
@@ -3578,16 +3355,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitNewClass(newClass: J.NewClass, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.NewClass) {
-            this.abort();
-            return newClass;
+            return this.abort(newClass);
         }
 
         const otherNewClass = other as J.NewClass;
 
         // Compare enclosing
         if ((newClass.enclosing === undefined) !== (otherNewClass.enclosing === undefined)) {
-            this.abort();
-            return newClass;
+            return this.abort(newClass);
         }
 
         // Visit enclosing if present
@@ -3598,8 +3373,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare class
         if ((newClass.class === undefined) !== (otherNewClass.class === undefined)) {
-            this.abort();
-            return newClass;
+            return this.abort(newClass);
         }
 
         // Visit class if present
@@ -3610,8 +3384,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare arguments
         if (newClass.arguments.elements.length !== otherNewClass.arguments.elements.length) {
-            this.abort();
-            return newClass;
+            return this.abort(newClass);
         }
 
         // Visit each argument in lock step
@@ -3622,8 +3395,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare body
         if ((newClass.body === undefined) !== (otherNewClass.body === undefined)) {
-            this.abort();
-            return newClass;
+            return this.abort(newClass);
         }
 
         // Visit body if present
@@ -3644,16 +3416,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitNullableType(nullableType: J.NullableType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.NullableType) {
-            this.abort();
-            return nullableType;
+            return this.abort(nullableType);
         }
 
         const otherNullableType = other as J.NullableType;
 
         // Compare annotations
         if (nullableType.annotations.length !== otherNullableType.annotations.length) {
-            this.abort();
-            return nullableType;
+            return this.abort(nullableType);
         }
 
         // Visit each annotation in lock step
@@ -3678,8 +3448,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitPackage(packageDeclaration: J.Package, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Package) {
-            this.abort();
-            return packageDeclaration;
+            return this.abort(packageDeclaration);
         }
 
         const otherPackageDeclaration = other as J.Package;
@@ -3690,15 +3459,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare annotations
         if ((packageDeclaration.annotations === undefined) !== (otherPackageDeclaration.annotations === undefined)) {
-            this.abort();
-            return packageDeclaration;
+            return this.abort(packageDeclaration);
         }
 
         // Visit annotations if present
         if (packageDeclaration.annotations && otherPackageDeclaration.annotations) {
             if (packageDeclaration.annotations.length !== otherPackageDeclaration.annotations.length) {
-                this.abort();
-                return packageDeclaration;
+                return this.abort(packageDeclaration);
             }
 
             // Visit each annotation in lock step
@@ -3720,8 +3487,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitParameterizedType(parameterizedType: J.ParameterizedType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ParameterizedType) {
-            this.abort();
-            return parameterizedType;
+            return this.abort(parameterizedType);
         }
 
         const otherParameterizedType = other as J.ParameterizedType;
@@ -3732,15 +3498,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare typeParameters
         if ((parameterizedType.typeParameters === undefined) !== (otherParameterizedType.typeParameters === undefined)) {
-            this.abort();
-            return parameterizedType;
+            return this.abort(parameterizedType);
         }
 
         // Visit typeParameters if present
         if (parameterizedType.typeParameters && otherParameterizedType.typeParameters) {
             if (parameterizedType.typeParameters.elements.length !== otherParameterizedType.typeParameters.elements.length) {
-                this.abort();
-                return parameterizedType;
+                return this.abort(parameterizedType);
             }
 
             // Visit each type parameter in lock step
@@ -3762,8 +3526,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitParentheses(parentheses: J.Parentheses<J>, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Parentheses) {
-            this.abort();
-            return parentheses;
+            return this.abort(parentheses);
         }
 
         const otherParentheses = other as J.Parentheses<J>;
@@ -3784,16 +3547,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitParenthesizedTypeTree(parenthesizedTypeTree: J.ParenthesizedTypeTree, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.ParenthesizedTypeTree) {
-            this.abort();
-            return parenthesizedTypeTree;
+            return this.abort(parenthesizedTypeTree);
         }
 
         const otherParenthesizedTypeTree = other as J.ParenthesizedTypeTree;
 
         // Compare annotations
         if (parenthesizedTypeTree.annotations.length !== otherParenthesizedTypeTree.annotations.length) {
-            this.abort();
-            return parenthesizedTypeTree;
+            return this.abort(parenthesizedTypeTree);
         }
 
         // Visit each annotation in lock step
@@ -3818,16 +3579,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitPrimitive(primitive: J.Primitive, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Primitive) {
-            this.abort();
-            return primitive;
+            return this.abort(primitive);
         }
 
         const otherPrimitive = other as J.Primitive;
 
         // Compare type
         if (primitive.type.kind !== otherPrimitive.type.kind) {
-            this.abort();
-            return primitive;
+            return this.abort(primitive);
         }
 
         return primitive;
@@ -3842,16 +3601,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitReturn(returnStatement: J.Return, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Return) {
-            this.abort();
-            return returnStatement;
+            return this.abort(returnStatement);
         }
 
         const otherReturnStatement = other as J.Return;
 
         // Compare expression
         if ((returnStatement.expression === undefined) !== (otherReturnStatement.expression === undefined)) {
-            this.abort();
-            return returnStatement;
+            return this.abort(returnStatement);
         }
 
         // Visit expression if present
@@ -3872,8 +3629,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitSwitch(switchStatement: J.Switch, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Switch) {
-            this.abort();
-            return switchStatement;
+            return this.abort(switchStatement);
         }
 
         const otherSwitchStatement = other as J.Switch;
@@ -3898,8 +3654,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitSwitchExpression(switchExpression: J.SwitchExpression, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.SwitchExpression) {
-            this.abort();
-            return switchExpression;
+            return this.abort(switchExpression);
         }
 
         const otherSwitchExpression = other as J.SwitchExpression;
@@ -3924,8 +3679,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitSynchronized(synchronizedStatement: J.Synchronized, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Synchronized) {
-            this.abort();
-            return synchronizedStatement;
+            return this.abort(synchronizedStatement);
         }
 
         const otherSynchronizedStatement = other as J.Synchronized;
@@ -3950,8 +3704,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTernary(ternary: J.Ternary, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Ternary) {
-            this.abort();
-            return ternary;
+            return this.abort(ternary);
         }
 
         const otherTernary = other as J.Ternary;
@@ -3980,8 +3733,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitThrow(throwStatement: J.Throw, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Throw) {
-            this.abort();
-            return throwStatement;
+            return this.abort(throwStatement);
         }
 
         const otherThrowStatement = other as J.Throw;
@@ -4002,23 +3754,20 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTry(tryStatement: J.Try, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Try) {
-            this.abort();
-            return tryStatement;
+            return this.abort(tryStatement);
         }
 
         const otherTryStatement = other as J.Try;
 
         // Compare resources
         if ((tryStatement.resources === undefined) !== (otherTryStatement.resources === undefined)) {
-            this.abort();
-            return tryStatement;
+            return this.abort(tryStatement);
         }
 
         // Visit resources if present
         if (tryStatement.resources && otherTryStatement.resources) {
             if (tryStatement.resources.elements.length !== otherTryStatement.resources.elements.length) {
-                this.abort();
-                return tryStatement;
+                return this.abort(tryStatement);
             }
 
             // Visit each resource in lock step
@@ -4034,8 +3783,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare catches
         if (tryStatement.catches.length !== otherTryStatement.catches.length) {
-            this.abort();
-            return tryStatement;
+            return this.abort(tryStatement);
         }
 
         // Visit each catch in lock step
@@ -4046,8 +3794,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare finally
         if ((tryStatement.finally === undefined) !== (otherTryStatement.finally === undefined)) {
-            this.abort();
-            return tryStatement;
+            return this.abort(tryStatement);
         }
 
         // Visit finally if present
@@ -4068,8 +3815,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTryResource(resource: J.Try.Resource, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.TryResource) {
-            this.abort();
-            return resource;
+            return this.abort(resource);
         }
 
         const otherResource = other as J.Try.Resource;
@@ -4080,8 +3826,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare terminatedWithSemicolon
         if (resource.terminatedWithSemicolon !== otherResource.terminatedWithSemicolon) {
-            this.abort();
-            return resource;
+            return this.abort(resource);
         }
 
         return resource;
@@ -4096,8 +3841,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTryCatch(tryCatch: J.Try.Catch, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.TryCatch) {
-            this.abort();
-            return tryCatch;
+            return this.abort(tryCatch);
         }
 
         const otherTryCatch = other as J.Try.Catch;
@@ -4122,8 +3866,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeCast(typeCast: J.TypeCast, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.TypeCast) {
-            this.abort();
-            return typeCast;
+            return this.abort(typeCast);
         }
 
         const otherTypeCast = other as J.TypeCast;
@@ -4148,16 +3891,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeParameter(typeParameter: J.TypeParameter, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.TypeParameter) {
-            this.abort();
-            return typeParameter;
+            return this.abort(typeParameter);
         }
 
         const otherTypeParameter = other as J.TypeParameter;
 
         // Compare annotations
         if (typeParameter.annotations.length !== otherTypeParameter.annotations.length) {
-            this.abort();
-            return typeParameter;
+            return this.abort(typeParameter);
         }
 
         // Visit each annotation in lock step
@@ -4168,8 +3909,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare modifiers
         if (typeParameter.modifiers.length !== otherTypeParameter.modifiers.length) {
-            this.abort();
-            return typeParameter;
+            return this.abort(typeParameter);
         }
 
         // Visit each modifier in lock step
@@ -4184,15 +3924,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare bounds
         if ((typeParameter.bounds === undefined) !== (otherTypeParameter.bounds === undefined)) {
-            this.abort();
-            return typeParameter;
+            return this.abort(typeParameter);
         }
 
         // Visit bounds if present
         if (typeParameter.bounds && otherTypeParameter.bounds) {
             if (typeParameter.bounds.elements.length !== otherTypeParameter.bounds.elements.length) {
-                this.abort();
-                return typeParameter;
+                return this.abort(typeParameter);
             }
 
             // Visit each bound in lock step
@@ -4214,16 +3952,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeParameters(typeParameters: J.TypeParameters, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.TypeParameters) {
-            this.abort();
-            return typeParameters;
+            return this.abort(typeParameters);
         }
 
         const otherTypeParameters = other as J.TypeParameters;
 
         // Compare annotations
         if (typeParameters.annotations.length !== otherTypeParameters.annotations.length) {
-            this.abort();
-            return typeParameters;
+            return this.abort(typeParameters);
         }
 
         // Visit each annotation in lock step
@@ -4234,8 +3970,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare typeParameters
         if (typeParameters.typeParameters.length !== otherTypeParameters.typeParameters.length) {
-            this.abort();
-            return typeParameters;
+            return this.abort(typeParameters);
         }
 
         // Visit each type parameter in lock step
@@ -4256,16 +3991,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitUnary(unary: J.Unary, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Unary) {
-            this.abort();
-            return unary;
+            return this.abort(unary);
         }
 
         const otherUnary = other as J.Unary;
 
         // Compare operator
         if (unary.operator.element !== otherUnary.operator.element) {
-            this.abort();
-            return unary;
+            return this.abort(unary);
         }
 
         // Visit expression
@@ -4284,8 +4017,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitUnknown(unknown: J.Unknown, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Unknown) {
-            this.abort();
-            return unknown;
+            return this.abort(unknown);
         }
 
         const otherUnknown = other as J.Unknown;
@@ -4306,16 +4038,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitUnknownSource(unknownSource: J.UnknownSource, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.UnknownSource) {
-            this.abort();
-            return unknownSource;
+            return this.abort(unknownSource);
         }
 
         const otherUnknownSource = other as J.UnknownSource;
 
         // Compare text
         if (unknownSource.text !== otherUnknownSource.text) {
-            this.abort();
-            return unknownSource;
+            return this.abort(unknownSource);
         }
 
         return unknownSource;
@@ -4330,16 +4060,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.VariableDeclarations) {
-            this.abort();
-            return variableDeclarations;
+            return this.abort(variableDeclarations);
         }
 
         const otherVariableDeclarations = other as J.VariableDeclarations;
 
         // Compare leadingAnnotations
         if (variableDeclarations.leadingAnnotations.length !== otherVariableDeclarations.leadingAnnotations.length) {
-            this.abort();
-            return variableDeclarations;
+            return this.abort(variableDeclarations);
         }
 
         // Visit each leading annotation in lock step
@@ -4350,8 +4078,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare modifiers
         if (variableDeclarations.modifiers.length !== otherVariableDeclarations.modifiers.length) {
-            this.abort();
-            return variableDeclarations;
+            return this.abort(variableDeclarations);
         }
 
         // Visit each modifier in lock step
@@ -4362,8 +4089,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare typeExpression
         if ((variableDeclarations.typeExpression === undefined) !== (otherVariableDeclarations.typeExpression === undefined)) {
-            this.abort();
-            return variableDeclarations;
+            return this.abort(variableDeclarations);
         }
 
         // Visit typeExpression if present
@@ -4374,14 +4100,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare varargs
         if ((variableDeclarations.varargs === undefined) !== (otherVariableDeclarations.varargs === undefined)) {
-            this.abort();
-            return variableDeclarations;
+            return this.abort(variableDeclarations);
         }
 
         // Compare variables
         if (variableDeclarations.variables.length !== otherVariableDeclarations.variables.length) {
-            this.abort();
-            return variableDeclarations;
+            return this.abort(variableDeclarations);
         }
 
         // Visit each variable in lock step
@@ -4402,8 +4126,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitVariable(variable: J.VariableDeclarations.NamedVariable, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.NamedVariable) {
-            this.abort();
-            return variable;
+            return this.abort(variable);
         }
 
         const otherVariable = other as J.VariableDeclarations.NamedVariable;
@@ -4414,14 +4137,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare dimensionsAfterName
         if (variable.dimensionsAfterName.length !== otherVariable.dimensionsAfterName.length) {
-            this.abort();
-            return variable;
+            return this.abort(variable);
         }
 
         // Compare initializer
         if ((variable.initializer === undefined) !== (otherVariable.initializer === undefined)) {
-            this.abort();
-            return variable;
+            return this.abort(variable);
         }
 
         // Visit initializer if present
@@ -4442,8 +4163,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitWhileLoop(whileLoop: J.WhileLoop, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.WhileLoop) {
-            this.abort();
-            return whileLoop;
+            return this.abort(whileLoop);
         }
 
         const otherWhileLoop = other as J.WhileLoop;
@@ -4468,30 +4188,26 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitWildcard(wildcard: J.Wildcard, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Wildcard) {
-            this.abort();
-            return wildcard;
+            return this.abort(wildcard);
         }
 
         const otherWildcard = other as J.Wildcard;
 
         // Compare bound
         if ((wildcard.bound === undefined) !== (otherWildcard.bound === undefined)) {
-            this.abort();
-            return wildcard;
+            return this.abort(wildcard);
         }
 
         // Compare bound if present
         if (wildcard.bound && otherWildcard.bound) {
             if (wildcard.bound.element !== otherWildcard.bound.element) {
-                this.abort();
-                return wildcard;
+                return this.abort(wildcard);
             }
         }
 
         // Compare boundedType
         if ((wildcard.boundedType === undefined) !== (otherWildcard.boundedType === undefined)) {
-            this.abort();
-            return wildcard;
+            return this.abort(wildcard);
         }
 
         // Visit boundedType if present
@@ -4512,16 +4228,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitYield(yieldStatement: J.Yield, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== J.Kind.Yield) {
-            this.abort();
-            return yieldStatement;
+            return this.abort(yieldStatement);
         }
 
         const otherYieldStatement = other as J.Yield;
 
         // Compare implicit
         if (yieldStatement.implicit !== otherYieldStatement.implicit) {
-            this.abort();
-            return yieldStatement;
+            return this.abort(yieldStatement);
         }
 
         // Visit value
@@ -4540,8 +4254,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitVoid(void_: JS.Void, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.Void) {
-            this.abort();
-            return void_;
+            return this.abort(void_);
         }
 
         const otherVoid = other as JS.Void;
@@ -4561,8 +4274,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitWithStatement(withStatement: JS.WithStatement, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.WithStatement) {
-            this.abort();
-            return withStatement;
+            return this.abort(withStatement);
         }
 
         const otherWithStatement = other as JS.WithStatement;
@@ -4586,16 +4298,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.IndexSignatureDeclaration) {
-            this.abort();
-            return indexSignatureDeclaration;
+            return this.abort(indexSignatureDeclaration);
         }
 
         const otherIndexSignatureDeclaration = other as JS.IndexSignatureDeclaration;
 
         // Compare modifiers
         if (indexSignatureDeclaration.modifiers.length !== otherIndexSignatureDeclaration.modifiers.length) {
-            this.abort();
-            return indexSignatureDeclaration;
+            return this.abort(indexSignatureDeclaration);
         }
 
         // Visit modifiers in lock step
@@ -4606,8 +4316,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare parameters
         if (indexSignatureDeclaration.parameters.elements.length !== otherIndexSignatureDeclaration.parameters.elements.length) {
-            this.abort();
-            return indexSignatureDeclaration;
+            return this.abort(indexSignatureDeclaration);
         }
 
         // Visit parameters in lock step
@@ -4632,16 +4341,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitForOfLoop(forOfLoop: JS.ForOfLoop, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ForOfLoop) {
-            this.abort();
-            return forOfLoop;
+            return this.abort(forOfLoop);
         }
 
         const otherForOfLoop = other as JS.ForOfLoop;
 
         // Compare await
         if ((forOfLoop.await === undefined) !== (otherForOfLoop.await === undefined)) {
-            this.abort();
-            return forOfLoop;
+            return this.abort(forOfLoop);
         }
 
         // Visit loop
@@ -4660,8 +4367,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitForInLoop(forInLoop: JS.ForInLoop, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ForInLoop) {
-            this.abort();
-            return forInLoop;
+            return this.abort(forInLoop);
         }
 
         const otherForInLoop = other as JS.ForInLoop;
@@ -4686,16 +4392,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.NamespaceDeclaration) {
-            this.abort();
-            return namespaceDeclaration;
+            return this.abort(namespaceDeclaration);
         }
 
         const otherNamespaceDeclaration = other as JS.NamespaceDeclaration;
 
         // Compare modifiers
         if (namespaceDeclaration.modifiers.length !== otherNamespaceDeclaration.modifiers.length) {
-            this.abort();
-            return namespaceDeclaration;
+            return this.abort(namespaceDeclaration);
         }
 
         // Visit each modifier in lock step
@@ -4706,8 +4410,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare keywordType
         if (namespaceDeclaration.keywordType.element !== otherNamespaceDeclaration.keywordType.element) {
-            this.abort();
-            return namespaceDeclaration;
+            return this.abort(namespaceDeclaration);
         }
 
         // Visit name
@@ -4716,8 +4419,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare body
         if ((namespaceDeclaration.body === undefined) !== (otherNamespaceDeclaration.body === undefined)) {
-            this.abort();
-            return namespaceDeclaration;
+            return this.abort(namespaceDeclaration);
         }
 
         // Visit body if present
@@ -4738,8 +4440,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitTypeLiteral(typeLiteral: JS.TypeLiteral, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.TypeLiteral) {
-            this.abort();
-            return typeLiteral;
+            return this.abort(typeLiteral);
         }
 
         const otherTypeLiteral = other as JS.TypeLiteral;
@@ -4760,16 +4461,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitBindingElement(bindingElement: JS.BindingElement, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.BindingElement) {
-            this.abort();
-            return bindingElement;
+            return this.abort(bindingElement);
         }
 
         const otherBindingElement = other as JS.BindingElement;
 
         // Compare propertyName
         if ((bindingElement.propertyName === undefined) !== (otherBindingElement.propertyName === undefined)) {
-            this.abort();
-            return bindingElement;
+            return this.abort(bindingElement);
         }
 
         // Visit propertyName if present
@@ -4784,8 +4483,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare initializer
         if ((bindingElement.initializer === undefined) !== (otherBindingElement.initializer === undefined)) {
-            this.abort();
-            return bindingElement;
+            return this.abort(bindingElement);
         }
 
         // Visit initializer if present
@@ -4806,16 +4504,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ArrayBindingPattern) {
-            this.abort();
-            return arrayBindingPattern;
+            return this.abort(arrayBindingPattern);
         }
 
         const otherArrayBindingPattern = other as JS.ArrayBindingPattern;
 
         // Compare elements
         if (arrayBindingPattern.elements.elements.length !== otherArrayBindingPattern.elements.elements.length) {
-            this.abort();
-            return arrayBindingPattern;
+            return this.abort(arrayBindingPattern);
         }
 
         // Visit each element in lock step
@@ -4836,16 +4532,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ExportDeclaration) {
-            this.abort();
-            return exportDeclaration;
+            return this.abort(exportDeclaration);
         }
 
         const otherExportDeclaration = other as JS.ExportDeclaration;
 
         // Compare modifiers
         if (exportDeclaration.modifiers.length !== otherExportDeclaration.modifiers.length) {
-            this.abort();
-            return exportDeclaration;
+            return this.abort(exportDeclaration);
         }
 
         // Visit each modifier in lock step
@@ -4856,14 +4550,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare typeOnly
         if (exportDeclaration.typeOnly.element !== otherExportDeclaration.typeOnly.element) {
-            this.abort();
-            return exportDeclaration;
+            return this.abort(exportDeclaration);
         }
 
         // Compare exportClause
         if ((exportDeclaration.exportClause === undefined) !== (otherExportDeclaration.exportClause === undefined)) {
-            this.abort();
-            return exportDeclaration;
+            return this.abort(exportDeclaration);
         }
 
         // Visit exportClause if present
@@ -4874,8 +4566,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare moduleSpecifier
         if ((exportDeclaration.moduleSpecifier === undefined) !== (otherExportDeclaration.moduleSpecifier === undefined)) {
-            this.abort();
-            return exportDeclaration;
+            return this.abort(exportDeclaration);
         }
 
         // Visit moduleSpecifier if present
@@ -4886,8 +4577,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare attributes
         if ((exportDeclaration.attributes === undefined) !== (otherExportDeclaration.attributes === undefined)) {
-            this.abort();
-            return exportDeclaration;
+            return this.abort(exportDeclaration);
         }
 
         // Visit attributes if present
@@ -4908,16 +4598,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitExportAssignment(exportAssignment: JS.ExportAssignment, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ExportAssignment) {
-            this.abort();
-            return exportAssignment;
+            return this.abort(exportAssignment);
         }
 
         const otherExportAssignment = other as JS.ExportAssignment;
 
         // Compare exportEquals
         if (exportAssignment.exportEquals !== otherExportAssignment.exportEquals) {
-            this.abort();
-            return exportAssignment;
+            return this.abort(exportAssignment);
         }
 
         // Visit expression
@@ -4936,16 +4624,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitNamedExports(namedExports: JS.NamedExports, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.NamedExports) {
-            this.abort();
-            return namedExports;
+            return this.abort(namedExports);
         }
 
         const otherNamedExports = other as JS.NamedExports;
 
         // Compare elements
         if (namedExports.elements.elements.length !== otherNamedExports.elements.elements.length) {
-            this.abort();
-            return namedExports;
+            return this.abort(namedExports);
         }
 
         // Visit each element in lock step
@@ -4966,16 +4652,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ExportSpecifier) {
-            this.abort();
-            return exportSpecifier;
+            return this.abort(exportSpecifier);
         }
 
         const otherExportSpecifier = other as JS.ExportSpecifier;
 
         // Compare typeOnly
         if (exportSpecifier.typeOnly.element !== otherExportSpecifier.typeOnly.element) {
-            this.abort();
-            return exportSpecifier;
+            return this.abort(exportSpecifier);
         }
 
         // Visit specifier
@@ -4994,16 +4678,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      */
     override async visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.ComputedPropertyMethodDeclaration) {
-            this.abort();
-            return computedPropMethod;
+            return this.abort(computedPropMethod);
         }
 
         const otherComputedPropMethod = other as JS.ComputedPropertyMethodDeclaration;
 
         // Compare leading annotations
         if (computedPropMethod.leadingAnnotations.length !== otherComputedPropMethod.leadingAnnotations.length) {
-            this.abort();
-            return computedPropMethod;
+            return this.abort(computedPropMethod);
         }
 
         // Visit leading annotations in lock step
@@ -5014,8 +4696,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare modifiers
         if (computedPropMethod.modifiers.length !== otherComputedPropMethod.modifiers.length) {
-            this.abort();
-            return computedPropMethod;
+            return this.abort(computedPropMethod);
         }
 
         // Visit modifiers in lock step
@@ -5026,8 +4707,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare type parameters
         if (!!computedPropMethod.typeParameters !== !!otherComputedPropMethod.typeParameters) {
-            this.abort();
-            return computedPropMethod;
+            return this.abort(computedPropMethod);
         }
 
         if (computedPropMethod.typeParameters) {
@@ -5037,8 +4717,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare return type expression
         if (!!computedPropMethod.returnTypeExpression !== !!otherComputedPropMethod.returnTypeExpression) {
-            this.abort();
-            return computedPropMethod;
+            return this.abort(computedPropMethod);
         }
 
         if (computedPropMethod.returnTypeExpression) {
@@ -5052,8 +4731,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare parameters
         if (computedPropMethod.parameters.elements.length !== otherComputedPropMethod.parameters.elements.length) {
-            this.abort();
-            return computedPropMethod;
+            return this.abort(computedPropMethod);
         }
 
         // Visit parameters in lock step
@@ -5065,8 +4743,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Compare body
         if (!!computedPropMethod.body !== !!otherComputedPropMethod.body) {
-            this.abort();
-            return computedPropMethod;
+            return this.abort(computedPropMethod);
         }
 
         if (computedPropMethod.body) {
@@ -5074,5 +4751,211 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         return computedPropMethod;
+    }
+}
+
+/**
+ * A comparator visitor that checks semantic equality including type attribution.
+ * This ensures comparisons account for type information, allowing semantically
+ * equivalent code to match even when structurally different (e.g., `foo()` vs `module.foo()`
+ * when both refer to the same method).
+ */
+export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVisitor {
+    /**
+     * Checks if two types are semantically equal.
+     * For method types, this checks that the declaring type and method name match.
+     */
+    private isOfType(target?: Type, source?: Type): boolean {
+        if (!target || !source) {
+            return target === source;
+        }
+
+        if (target.kind !== source.kind) {
+            return false;
+        }
+
+        // For method types, check declaring type
+        // Note: We don't check the name field because it might not be fully resolved in patterns
+        // The method invocation visitor already checks that simple names match
+        if (target.kind === Type.Kind.Method && source.kind === Type.Kind.Method) {
+            const targetMethod = target as Type.Method;
+            const sourceMethod = source as Type.Method;
+
+            // Check if declaring types match
+            const declaringTypesMatch = this.isOfType(targetMethod.declaringType, sourceMethod.declaringType);
+            if (declaringTypesMatch) {
+                return true;
+            }
+
+            // If declaring types don't match exactly, check if they might be semantically equivalent
+            // (e.g., 'react' module vs 'React' namespace importing from 'react')
+            // In this case, we check if the method signatures are otherwise identical
+            if (targetMethod.declaringType && sourceMethod.declaringType &&
+                Type.isFullyQualified(targetMethod.declaringType) && Type.isFullyQualified(sourceMethod.declaringType)) {
+
+                const targetDeclType = targetMethod.declaringType as Type.FullyQualified;
+                const sourceDeclType = sourceMethod.declaringType as Type.FullyQualified;
+
+                // Check if the declaring type names could represent the same module
+                // (e.g., 'react' and 'React', where React is a namespace alias)
+                const targetFQN = Type.FullyQualified.getFullyQualifiedName(targetDeclType);
+                const sourceFQN = Type.FullyQualified.getFullyQualifiedName(sourceDeclType);
+
+                // If the names differ only in case and one appears to be a module name
+                // (all lowercase) while the other is capitalized (namespace alias),
+                // check if the method signatures match
+                if (targetFQN.toLowerCase() === sourceFQN.toLowerCase()) {
+                    // Method signatures should match: return type and parameters
+                    if (!this.isOfType(targetMethod.returnType, sourceMethod.returnType)) {
+                        return false;
+                    }
+
+                    if (targetMethod.parameterTypes.length !== sourceMethod.parameterTypes.length) {
+                        return false;
+                    }
+
+                    for (let i = 0; i < targetMethod.parameterTypes.length; i++) {
+                        if (!this.isOfType(targetMethod.parameterTypes[i], sourceMethod.parameterTypes[i])) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // For fully qualified types, check the fully qualified name
+        if (Type.isFullyQualified(target) && Type.isFullyQualified(source)) {
+            return Type.FullyQualified.getFullyQualifiedName(target) ===
+                   Type.FullyQualified.getFullyQualifiedName(source);
+        }
+
+        // Default: types are equal if they're the same kind
+        return true;
+    }
+
+    /**
+     * Override method invocation comparison to include type attribution checking.
+     * When types match semantically, we allow matching even if one has a receiver
+     * and the other doesn't (e.g., `isDate(x)` vs `util.isDate(x)`).
+     */
+    override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.MethodInvocation) {
+            return this.abort(method);
+        }
+
+        const otherMethod = other as J.MethodInvocation;
+
+        // Check basic structural equality first
+        if (method.name.simpleName !== otherMethod.name.simpleName ||
+            method.arguments.elements.length !== otherMethod.arguments.elements.length) {
+            return this.abort(method);
+        }
+
+        // Check type attribution
+        // Both must have method types for semantic equality
+        if (!method.methodType || !otherMethod.methodType) {
+            // If template has type but target doesn't, they don't match
+            if (method.methodType || otherMethod.methodType) {
+                return this.abort(method);
+            }
+            // If neither has type, fall through to structural comparison
+            return super.visitMethodInvocation(method, other);
+        }
+
+        // Both have types - check they match semantically
+        const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
+        if (!typesMatch) {
+            // Types don't match - abort comparison
+            return this.abort(method);
+        }
+
+        // Types match! Now check if we can ignore receiver differences.
+        // We can only ignore receiver differences when one or both receivers are identifiers
+        // that represent module/namespace imports (e.g., `util` in `util.isDate()`).
+        // For other receivers (e.g., variables, expressions), we must compare them.
+
+        const canIgnoreReceiverDifference =
+            // Case 1: One has no select (direct call like `forwardRef()`), other has select (namespace like `React.forwardRef()`)
+            (!method.select && otherMethod.select) ||
+            (method.select && !otherMethod.select);
+
+        if (!canIgnoreReceiverDifference) {
+            // Both have selects or both don't - must compare them structurally
+            if ((method.select === undefined) !== (otherMethod.select === undefined)) {
+                return this.abort(method);
+            }
+
+            if (method.select && otherMethod.select) {
+                await this.visit(method.select.element, otherMethod.select.element);
+                if (!this.match) {
+                    return this.abort(method);
+                }
+            }
+        }
+
+        // Compare type parameters
+        if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
+            return this.abort(method);
+        }
+
+        if (method.typeParameters && otherMethod.typeParameters) {
+            if (method.typeParameters.elements.length !== otherMethod.typeParameters.elements.length) {
+                return this.abort(method);
+            }
+            for (let i = 0; i < method.typeParameters.elements.length; i++) {
+                await this.visit(method.typeParameters.elements[i].element, otherMethod.typeParameters.elements[i].element);
+                if (!this.match) {
+                    return this.abort(method);
+                }
+            }
+        }
+
+        // Compare name (already checked simpleName above, but visit for markers/prefix)
+        await this.visit(method.name, otherMethod.name);
+        if (!this.match) {
+            return this.abort(method);
+        }
+
+        // Compare arguments
+        for (let i = 0; i < method.arguments.elements.length; i++) {
+            await this.visit(method.arguments.elements[i].element, otherMethod.arguments.elements[i].element);
+            if (!this.match) {
+                return this.abort(method);
+            }
+        }
+
+        return method;
+    }
+
+    /**
+     * Override identifier comparison to include type checking for field access.
+     */
+    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.Identifier) {
+            return this.abort(identifier);
+        }
+
+        const otherIdentifier = other as J.Identifier;
+
+        // Check name matches
+        if (identifier.simpleName !== otherIdentifier.simpleName) {
+            return this.abort(identifier);
+        }
+
+        // For identifiers with field types, check type attribution
+        if (identifier.fieldType && otherIdentifier.fieldType) {
+            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType)) {
+                return this.abort(identifier);
+            }
+        } else if (identifier.fieldType || otherIdentifier.fieldType) {
+            // If only one has a type, they don't match
+            return this.abort(identifier);
+        }
+
+        return super.visitIdentifier(identifier, other);
     }
 }
