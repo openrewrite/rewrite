@@ -26,20 +26,16 @@ import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
-import java.io.UncheckedIOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 @RequiredArgsConstructor
 public class ResolvedMavenRecipeBundle implements RecipeBundle {
     private final ResolvedGroupArtifactVersion gav;
     private final Path recipeJar;
     private final List<Path> classpath;
+    private final RecipeClassLoaderFactory classLoaderFactory;
 
     @Getter
     private final @Nullable String team;
@@ -65,7 +61,7 @@ public class ResolvedMavenRecipeBundle implements RecipeBundle {
     }
 
     @Override
-    public String getVersion() {
+    public @Nullable String getVersion() {
         return gav.getDatedSnapshotVersion() == null ? gav.getVersion() : gav.getDatedSnapshotVersion();
     }
 
@@ -81,11 +77,16 @@ public class ResolvedMavenRecipeBundle implements RecipeBundle {
 
     public Environment getEnvironment() {
         if (environment == null) {
-            environment = Environment.builder().scanJar(
-                    recipeJar,
-                    classpath,
-                    classLoader()
-            ).build();
+            // Use standard classloading for scanning since ClassGraph doesn't actually load classes during scanning
+            // It only reads bytecode to determine class structure and hierarchy
+            ClassLoader scanningClassLoader = RecipeClassLoader.forScanning(recipeJar, classpath);
+
+            // Scan all jars in the classloader for both recipes and categories
+            environment = Environment.builder()
+                    .load(new org.openrewrite.config.ClasspathScanningLoader(
+                            new java.util.Properties(),
+                            scanningClassLoader))
+                    .build();
         }
         return environment;
     }
@@ -104,18 +105,9 @@ public class ResolvedMavenRecipeBundle implements RecipeBundle {
 
     private ClassLoader classLoader() {
         if (classLoader == null) {
-            classLoader = new URLClassLoader(
-                    Stream.concat(classpath.stream(), Stream.of(recipeJar))
-                            .map(Path::toUri)
-                            .map(uri -> {
-                                try {
-                                    return uri.toURL();
-                                } catch (MalformedURLException e) {
-                                    throw new UncheckedIOException(e);
-                                }
-                            })
-                            .toArray(URL[]::new)
-            );
+            // Create an isolated classloader with controlled parent delegation
+            // This ensures maximum isolation while still allowing necessary shared types
+            classLoader = classLoaderFactory.create(recipeJar, classpath);
         }
         return classLoader;
     }

@@ -219,7 +219,7 @@ public class RecipeMarketplaceReader {
 
         // Create bundle if ecosystem information is present
         RecipeBundle bundle = null;
-        if (ecosystem != null && packageName != null && version != null) {
+        if (ecosystem != null && packageName != null) {
             RecipeBundleLoader loader = bundleLoaders.get(ecosystem.toLowerCase());
             if (loader != null) {
                 bundle = loader.createBundle(packageName, version, team);

@@ -15,9 +15,7 @@
  */
 package org.openrewrite.maven.marketplace;
 
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.CategoryDescriptor;
 import org.openrewrite.config.DeclarativeRecipe;
@@ -27,9 +25,9 @@ import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.marketplace.RecipeMarketplaceWriter;
 import org.openrewrite.marketplace.YamlRecipeBundle;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
@@ -43,23 +41,52 @@ import java.util.List;
 import java.util.Properties;
 
 import static java.util.Collections.emptyList;
-import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
-@RequiredArgsConstructor
 public class MavenRecipeMarketplaceGenerator {
     private final ResolvedGroupArtifactVersion gav;
     private final Path recipeJar;
     private final List<Path> classpath;
+
+    public MavenRecipeMarketplaceGenerator(GroupArtifact ga, Path recipeJar, List<Path> classpath) {
+        //noinspection DataFlowIssue
+        this.gav = new ResolvedGroupArtifactVersion(null, ga.getGroupId(), ga.getArtifactId(),
+                null, null);
+        this.recipeJar = recipeJar;
+        this.classpath = classpath;
+    }
 
     public RecipeMarketplace generate() {
         try {
             if (Files.notExists(recipeJar)) {
                 throw new IllegalArgumentException("Recipe JAR does not exist " + recipeJar);
             }
-            ResolvedMavenRecipeBundle bundle = new ResolvedMavenRecipeBundle(gav, recipeJar, classpath, null);
+
+            // First pass: Scan only the target jar for recipes (using scanJar with jar name filter)
+            // This gives us the correct set of recipes but without root categories
+            Environment firstPassEnv = Environment.builder().scanJar(
+                    recipeJar.toAbsolutePath(),
+                    classpath.stream().map(Path::toAbsolutePath).collect(toList()),
+                    RecipeClassLoader.forScanning(recipeJar, classpath)
+            ).build();
+
+            // Collect recipe names from first pass
+            List<String> targetRecipeNames = firstPassEnv.listRecipeDescriptors().stream()
+                    .map(RecipeDescriptor::getName)
+                    .collect(toList());
+
+            // Second pass: Scan all jars in classpath for recipes and categories
+            // This gives us proper root categories from core-categories.yml
+            ResolvedMavenRecipeBundle bundle = new ResolvedMavenRecipeBundle(gav, recipeJar, classpath,
+                    RecipeClassLoader::new, null);
             Environment env = bundle.getEnvironment();
+
             RecipeMarketplace root = RecipeMarketplace.newEmpty();
             for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
+                // Only include recipes that were found in the first pass (i.e., from target jar)
+                if (!targetRecipeNames.contains(descriptor.getName())) {
+                    continue;
+                }
                 RecipeDescriptor bundledDescriptor = descriptor.withBundle(createBundle(descriptor, env));
                 List<String> categories = extractCategories(descriptor.getName(), env);
                 root.addRecipe(bundledDescriptor, categories.toArray(new String[0]));
@@ -78,8 +105,9 @@ public class MavenRecipeMarketplaceGenerator {
             if (source != null && isYamlSource(source)) {
                 return new YamlRecipeBundle(
                         URI.create("maven-rewrite-yaml:" + gav.getGroupId() + ":" +
-                                   gav.getArtifactId() + ":" + gav.getVersion() + "!/" +
+                                   gav.getArtifactId() + ":" + "!/" +
                                    extractPathFromJarUri(source.toString())),
+                        gav.getVersion(),
                         new Properties(),
                         null
                 ) {
@@ -92,7 +120,8 @@ public class MavenRecipeMarketplaceGenerator {
                 };
             }
         }
-        return new MavenRecipeBundle(gav, new InMemoryExecutionContext(), null, null);
+        return new ResolvedMavenRecipeBundle(gav, recipeJar, classpath,
+                RecipeClassLoader::new, null);
     }
 
     private @Nullable URI getDeclarativeSource(DeclarativeRecipe recipe) {
@@ -163,26 +192,40 @@ public class MavenRecipeMarketplaceGenerator {
         return categories;
     }
 
-    /* This is just for a quick sanity check */
+    /**
+     * Main method to generate recipe marketplace CSV for a single recipe JAR.
+     *
+     * @param args [0] = groupId:artifactId, [1] = output CSV path, [2] = recipe JAR path, [3...] = classpath entries
+     */
     public static void main(String[] args) throws IOException {
-        Path rewriteJavaBuild = null;
-        for (File f : requireNonNull(new File("rewrite-java/build/libs").listFiles())) {
-            if (f.getName().endsWith(".jar") &&
-                !f.getName().endsWith("-javadoc.jar") &&
-                !f.getName().endsWith("-sources.jar")) {
-                rewriteJavaBuild = f.toPath().toAbsolutePath();
-                break;
-            }
+        if (args.length < 3) {
+            System.err.println("Usage: java MavenRecipeMarketplaceGenerator <groupId:artifactId> <output-csv-path> <recipe-jar> [classpath-entries...]");
+            System.exit(1);
         }
 
-        RecipeMarketplace marketplace = new MavenRecipeMarketplaceGenerator(
-                new ResolvedGroupArtifactVersion(null, "org.openrewrite", "rewrite-java", "8.64.0-SNAPSHOT", null),
-                requireNonNull(rewriteJavaBuild),
-                emptyList()
-        ).generate();
+        String[] gav = args[0].split(":");
+        if (gav.length != 2) {
+            System.err.println("Invalid groupId:artifactId format: " + args[0]);
+            System.exit(1);
+        }
+        String groupId = gav[0];
+        String artifactId = gav[1];
+
+        Path outputCsv = Paths.get(args[1]);
+        Path recipeJar = Paths.get(args[2]);
+
+        List<Path> classpath = new ArrayList<>();
+        for (int i = 3; i < args.length; i++) {
+            classpath.add(Paths.get(args[i]));
+        }
+
+        GroupArtifact ga = new GroupArtifact(groupId, artifactId);
+
+        RecipeMarketplace marketplace = new MavenRecipeMarketplaceGenerator(ga, recipeJar, classpath).generate();
 
         String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
-        Files.write(Paths.get("recipes.csv"), csv.getBytes(StandardCharsets.UTF_8));
-        System.out.println(csv);
+        Files.write(outputCsv, csv.getBytes(StandardCharsets.UTF_8));
+        System.out.println("Generated marketplace CSV with " + marketplace.getAllRecipes().size() + " recipes");
+        System.out.println("Output written to: " + outputCsv.toAbsolutePath());
     }
 }
