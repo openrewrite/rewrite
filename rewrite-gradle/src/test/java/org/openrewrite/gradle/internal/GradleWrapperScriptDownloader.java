@@ -25,13 +25,15 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.LatestRelease;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -39,7 +41,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Adler32;
 
-import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
@@ -115,8 +116,8 @@ public class GradleWrapperScriptDownloader {
             Path windowsFile = WRAPPER_SCRIPTS.resolve("windows").resolve(existingVersion.getGradlewBatChecksum() + ".txt");
 
             if (Files.exists(unixFile) && Files.exists(windowsFile)) {
-              unixChecksums.computeIfAbsent(allVersions.get(v).getGradlewChecksum(), checksum -> loadScript("unix", checksum));
-              batChecksums.computeIfAbsent(allVersions.get(v).getGradlewBatChecksum(), checksum -> loadScript("windows", checksum));
+                unixChecksums.computeIfAbsent(allVersions.get(v).getGradlewChecksum(), checksum -> loadScript("unix", checksum));
+                batChecksums.computeIfAbsent(allVersions.get(v).getGradlewBatChecksum(), checksum -> loadScript("windows", checksum));
                 System.out.printf("%03d: %s already exists. Skipping.%n", i.incrementAndGet(), v);
                 return;
             }
