@@ -39,9 +39,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 public class MavenRecipeMarketplaceGenerator {
     private final ResolvedGroupArtifactVersion gav;
@@ -66,14 +66,14 @@ public class MavenRecipeMarketplaceGenerator {
             // This gives us the correct set of recipes but without root categories
             Environment firstPassEnv = Environment.builder().scanJar(
                     recipeJar.toAbsolutePath(),
-                    classpath.stream().map(Path::toAbsolutePath).collect(Collectors.toList()),
+                    classpath.stream().map(Path::toAbsolutePath).collect(toList()),
                     RecipeClassLoader.forScanning(recipeJar, classpath)
             ).build();
 
             // Collect recipe names from first pass
             List<String> targetRecipeNames = firstPassEnv.listRecipeDescriptors().stream()
                     .map(RecipeDescriptor::getName)
-                    .collect(Collectors.toList());
+                    .collect(toList());
 
             // Second pass: Scan all jars in classpath for recipes and categories
             // This gives us proper root categories from core-categories.yml

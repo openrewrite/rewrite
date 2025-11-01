@@ -19,12 +19,11 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.marketplace.*;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
@@ -32,11 +31,9 @@ import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -145,29 +142,5 @@ public class MavenRecipeBundle implements RecipeBundle {
                 .flatMap(sf -> sf.getMarkers().findFirst(MavenResolutionResult.class))
                 .filter(mrr -> !mrr.getDependencies().isEmpty())
                 .orElseThrow(() -> new IllegalStateException("Unable to download recipe"));
-    }
-
-    public static void main(String[] args) {
-        String artifactCacheDir = System.getenv("RECIPE_DOWNLOAD_DIR");
-        if (artifactCacheDir == null) {
-            artifactCacheDir = ".rewrite";
-        }
-
-        RecipeMarketplaceReader reader = new RecipeMarketplaceReader(
-                new MavenRecipeBundleLoader(
-                        new InMemoryExecutionContext(),
-                        new MavenArtifactDownloader(
-                                new LocalMavenArtifactCache(Paths.get(artifactCacheDir)),
-                                null,
-                                Throwable::printStackTrace
-                        ),
-                        RecipeClassLoader::new
-                ),
-                new YamlRecipeBundleLoader(new Properties())
-        );
-
-        RecipeMarketplace recipeMarketplace = reader.fromCsv(Paths.get("recipes.csv"));
-        System.out.println(new RecipeMarketplacePrinter(opt -> opt.nameStyle(
-                RecipeMarketplacePrinter.NameStyle.DISPLAY_NAME)).print(recipeMarketplace));
     }
 }

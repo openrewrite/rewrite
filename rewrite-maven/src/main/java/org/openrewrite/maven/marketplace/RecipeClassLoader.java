@@ -21,9 +21,10 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
+
+import static java.util.Collections.emptyList;
 
 /**
  * A classloader that provides maximum isolation for recipe implementations
@@ -175,7 +176,7 @@ public class RecipeClassLoader extends URLClassLoader {
      * @return List of class/package prefixes to delegate to parent classloader
      */
     protected List<String> getAdditionalParentDelegatedPackages() {
-        return Collections.emptyList();
+        return emptyList();
     }
 
     /**

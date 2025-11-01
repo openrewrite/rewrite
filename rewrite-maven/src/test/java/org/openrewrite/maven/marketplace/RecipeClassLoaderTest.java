@@ -24,12 +24,12 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
-class RecipeClassLoaderIsolationTest {
+class RecipeClassLoaderTest {
 
     @Test
     void loadRecipeWithIsolatedClassLoader() {
@@ -59,34 +59,34 @@ class RecipeClassLoaderIsolationTest {
 
         // Create a ResolvedMavenRecipeBundle with the isolated classloader
         @SuppressWarnings("DataFlowIssue") ResolvedGroupArtifactVersion gav = new ResolvedGroupArtifactVersion(
-          null,
-          "org.openrewrite",
-          "rewrite-java",
-          null,
-          null
+                null,
+                "org.openrewrite",
+                "rewrite-java",
+                null,
+                null
         );
 
         ResolvedMavenRecipeBundle bundle = new ResolvedMavenRecipeBundle(
-          gav,
-          recipeJar,
-          dependencies,
-          RecipeClassLoader::new,
-          null
+                gav,
+                recipeJar,
+                dependencies,
+                RecipeClassLoader::new,
+                null
         );
 
         // Get any recipe descriptor from the environment
         RecipeDescriptor descriptor = bundle.getEnvironment().listRecipeDescriptors().stream()
-          .findFirst()
-          .orElse(null);
+                .findFirst()
+                .orElse(null);
 
         assertThat(descriptor).isNotNull();
 
-        Recipe recipe = bundle.prepare(descriptor, Collections.emptyMap());
+        Recipe recipe = bundle.prepare(descriptor, emptyMap());
         assertThat(recipe).isNotNull();
         assertThat(recipe.getName()).isEqualTo(descriptor.getName());
 
         assertThat(recipe.getClass().getClassLoader())
-          .as("Recipe should be loaded through RecipeClassLoader for isolation")
-          .isInstanceOf(RecipeClassLoader.class);
+                .as("Recipe should be loaded through RecipeClassLoader for isolation")
+                .isInstanceOf(RecipeClassLoader.class);
     }
 }
