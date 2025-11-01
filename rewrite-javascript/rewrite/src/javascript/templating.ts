@@ -19,7 +19,7 @@ import {JavaScriptVisitor} from './visitor';
 import {Cursor, isTree, Tree} from '..';
 import {J} from '../java';
 import {produce} from "immer";
-import {JavaScriptSemanticComparatorVisitor} from "./comparator";
+import {JavaScriptComparatorVisitor, JavaScriptSemanticComparatorVisitor} from "./comparator";
 import {DependencyWorkspace} from './dependency-workspace';
 import {Marker} from '../markers';
 import {randomId} from '../uuid';
@@ -115,6 +115,64 @@ class CaptureMarker implements Marker {
     constructor(
         public readonly captureName: string
     ) {
+    }
+}
+
+/**
+ * A comparator for pattern matching that is lenient about optional properties.
+ * Allows patterns without type annotations to match actual code with type annotations.
+ */
+class PatternMatchingComparator extends JavaScriptComparatorVisitor {
+    constructor(private readonly matcher: { handleCapture: (pattern: J, target: J) => boolean }) {
+        super();
+    }
+
+    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+        // Check if the pattern node is a capture - this handles captures anywhere in the tree
+        if (PlaceholderUtils.isCapture(j as J)) {
+            const success = this.matcher.handleCapture(j as J, p);
+            if (!success) {
+                return this.abort(j) as R;
+            }
+            return j as R;
+        }
+
+        if (!this.match) {
+            return j as R;
+        }
+
+        return super.visit(j, p, parent);
+    }
+
+    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== J.Kind.VariableDeclarations) {
+            return this.abort(variableDeclarations);
+        }
+
+        let otherVariableDeclarations = other as J.VariableDeclarations;
+
+        // LENIENT: If pattern lacks typeExpression, remove it from other before comparison
+        if (!variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
+            otherVariableDeclarations = produce(otherVariableDeclarations, draft => {
+                draft.typeExpression = undefined;
+            });
+        }
+
+        // Delegate to super implementation
+        return super.visitVariableDeclarations(variableDeclarations, otherVariableDeclarations);
+    }
+
+    protected hasSameKind(j: J, other: J): boolean {
+        return super.hasSameKind(j, other) ||
+               (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));
+    }
+
+    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+        if (PlaceholderUtils.isCapture(identifier)) {
+            const success = this.matcher.handleCapture(identifier, other);
+            return success ? identifier : this.abort(identifier);
+        }
+        return super.visitIdentifier(identifier, other);
     }
 }
 
@@ -329,20 +387,11 @@ class Matcher {
             return false;
         }
 
-        const matcher = this;
-        return await ((new class extends JavaScriptSemanticComparatorVisitor {
-            protected hasSameKind(j: J, other: J): boolean {
-                return super.hasSameKind(j, other) || j.kind == J.Kind.Identifier && this.matchesParameter(j as J.Identifier, other);
-            }
-
-            override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
-                return this.matchesParameter(identifier, other) ? identifier : await super.visitIdentifier(identifier, other);
-            }
-
-            private matchesParameter(identifier: J.Identifier, other: J): boolean {
-                return PlaceholderUtils.isCapture(identifier) && matcher.handleCapture(identifier, other);
-            }
-        }).compare(pattern, target));
+        // Use the pattern matching comparator which is lenient about optional properties
+        const comparator = new PatternMatchingComparator({
+            handleCapture: (p, t) => this.handleCapture(p, t)
+        });
+        return await comparator.compare(pattern, target);
     }
 
     /**
