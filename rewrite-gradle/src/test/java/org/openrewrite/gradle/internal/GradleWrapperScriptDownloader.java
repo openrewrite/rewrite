@@ -161,7 +161,7 @@ public class GradleWrapperScriptDownloader {
 
     private static String loadScript(String os, String checksum) {
         try {
-            return StringUtils.readFully(Files.newInputStream(WRAPPER_SCRIPTS.resolve(os).resolve(checksum + ".txt")));
+            return Files.readString(WRAPPER_SCRIPTS.resolve(os).resolve(checksum + ".txt"));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -224,7 +224,7 @@ public class GradleWrapperScriptDownloader {
             binding.put("entryPointArgs", "");
             binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
         } else {
-            binding.put("classpath", "$APP_HOME/gradle\\wrapper\\gradle-wrapper.jar");
+            binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
             binding.put("entryPointArgs", "");
             binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
         }
@@ -275,17 +275,6 @@ public class GradleWrapperScriptDownloader {
         return bindings;
     }
 
-    private static String defaultJvmOpts(GradleVersion gradleVersion) {
-        if (gradleVersion.compareTo(GRADLE_5_3) >= 0) {
-            return "\"-Xmx64m\" \"-Xms64m\"";
-        } else if (gradleVersion.compareTo(GRADLE_5_0_RC_1) >= 0) {
-            return "\"-Xmx64m\"";
-        } else if (gradleVersion.compareTo(GRADLE_1_7_RC_1) >= 0) {
-            return "\"\"";
-        }
-        return "";
-    }
-
     private static String renderTemplate(String source, Map<String, String> bindings, String lineSeparator) throws IOException, ClassNotFoundException {
         SimpleTemplateEngine engine = new SimpleTemplateEngine();
         return engine.createTemplate(source).make(new HashMap<>(bindings)).toString()
@@ -293,7 +282,7 @@ public class GradleWrapperScriptDownloader {
           .replace("CLASSPATH=\"\\\\\\\\\\\"\\\\\\\\\\\"", "CLASSPATH=\"\\\\\\\"\\\\\\\"");
     }
 
-    private static String hash(String text) throws NoSuchAlgorithmException {
+    private static String hash(String text) {
         byte[] scriptText = text.getBytes(StandardCharsets.UTF_8);
         Adler32 adler32 = new Adler32();
         adler32.update(scriptText, 0, scriptText.length);
