@@ -33,34 +33,32 @@ describe('forwardRef pattern with replacement', () => {
                 imports: [`import { forwardRef } from 'react'`]
             });
 
-        // Create a template that uses the captured name
-        const tmpl = template`const ComponentName = "${capture('name')}";`;
-
-        //language=typescript
-        const testCode = `
-            import { forwardRef } from 'react';
-            const MyComponent = forwardRef(function MyButton(props, ref) { return null; });
-        `;
-
-        let replaced = false;
+        // Create a template that wraps the captured name with console.log
+        const tmpl = template`forwardRef(console.log(${capture('name')}))`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
                 const m = await pat.match(methodInvocation);
                 if (m) {
-                    // Try to use the captured name in a template
-                    const result = await tmpl.apply(this.cursor, methodInvocation, m);
-                    if (result) {
-                        replaced = true;
-                        return result;
-                    }
+                    // Use the captured name in a template to transform the method invocation
+                    return await tmpl.apply(this.cursor, methodInvocation, m);
                 }
                 return methodInvocation;
             }
         });
 
-        await spec.rewriteRun(
-            typescript(testCode)
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    import { forwardRef } from 'react';
+                    const MyComponent = forwardRef(function MyButton(props, ref) { return null; });
+                `,
+                `
+                    import { forwardRef } from 'react';
+                    const MyComponent = forwardRef(console.log(MyButton));
+                `
+            )
         );
     });
 
