@@ -65,6 +65,24 @@ export function findMarker<T extends Marker>(
     );
 }
 
+/**
+ * Sets a marker of the specified kind, replacing any existing marker with the same kind.
+ *
+ * @param markers The Markers instance
+ * @param marker The marker to set
+ * @returns A new Markers instance with the marker set
+ */
+export function setMarkerByKind<T extends Marker>(
+    markers: Markers,
+    marker: T
+): Markers {
+    const filteredMarkers = markers.markers.filter((m) => m.kind !== marker.kind);
+    return {
+        ...markers,
+        markers: [...filteredMarkers, marker]
+    };
+}
+
 export const emptyMarkers: Markers = asRef({
     kind: MarkersKind.Markers,
     id: randomId(),
