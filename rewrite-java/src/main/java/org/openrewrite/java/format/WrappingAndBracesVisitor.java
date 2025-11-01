@@ -114,7 +114,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 );
             }
         }
-        return m;
+        return (J.MethodDeclaration) new WrapMethodDeclarationParameters<>(style).visit(m, p, getCursor().getParentTreeCursor());
     }
 
     @Override

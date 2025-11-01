@@ -32,6 +32,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
     int hardWrapAt;
     IfStatement ifStatement;
     ChainedMethodCalls chainedMethodCalls;
+    MethodDeclarationParameters methodDeclarationParameters;
     @Nullable Annotations classAnnotations;
     @Nullable Annotations methodAnnotations;
     @Nullable Annotations fieldAnnotations;
@@ -81,6 +82,35 @@ public class WrappingAndBracesStyle implements JavaStyle {
         public Boolean getAlignWhenMultiline() {
             //noinspection ConstantConditions
             return alignWhenMultiline == null ? false : alignWhenMultiline;
+        }
+    }
+
+    @Value
+    @With
+    public static class MethodDeclarationParameters {
+        LineWrapSetting wrap;
+        Boolean alignWhenMultiline;
+        Boolean openNewLine;
+        Boolean closeNewLine;
+
+        public LineWrapSetting getWrap() {
+            //noinspection ConstantConditions
+            return wrap == null ? LineWrapSetting.DoNotWrap : wrap;
+        }
+
+        public Boolean getAlignWhenMultiline() {
+            //noinspection ConstantConditions
+            return alignWhenMultiline == null ? false : alignWhenMultiline;
+        }
+
+        public Boolean getOpenNewLine() {
+            //noinspection ConstantConditions
+            return openNewLine == null ? false : openNewLine;
+        }
+
+        public Boolean getCloseNewLine() {
+            //noinspection ConstantConditions
+            return closeNewLine == null ? false : closeNewLine;
         }
     }
 }
