@@ -13,29 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.marketplace;
+package org.openrewrite.maven.marketplace;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.Recipe;
-import org.openrewrite.config.RecipeDescriptor;
+import java.nio.file.Path;
+import java.util.List;
 
-import java.util.Map;
-
-public interface RecipeBundle {
-    String getPackageEcosystem();
-
-    String getPackageName();
-
-    @Nullable String getVersion();
-
+/**
+ * Factory for creating recipe classloaders.
+ */
+@FunctionalInterface
+public interface RecipeClassLoaderFactory {
     /**
-     * @return Teams partitioning of a recipe marketplace can be used
-     * to segment access or visibility of recipes by teams.
+     * Create a new recipe classloader for the given recipe JAR and classpath.
+     *
+     * @param recipeJar Recipe JAR to load
+     * @param classpath Runtime dependencies of the recipe JAR
+     * @return A new recipe classloader instance.
      */
-    @Nullable
-    String getTeam();
-
-    RecipeDescriptor describe(RecipeListing listing);
-
-    Recipe prepare(RecipeListing listing, Map<String, Object> options);
+    RecipeClassLoader create(Path recipeJar, List<Path> classpath);
 }
