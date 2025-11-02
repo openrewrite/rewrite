@@ -375,33 +375,41 @@ export interface VariadicOptions {
 /**
  * Configuration options for captures.
  */
-export interface CaptureOptions<T = any> {
+/**
+ * Options for variadic captures.
+ */
+export interface VariadicOptions {
     /**
-     * If true or VariadicOptions, this capture will match zero or more nodes in a sequence.
-     * If false/undefined, matches exactly one node.
-     *
-     * Phase 1: Only supports function/method call arguments.
-     *
-     * @example
-     * // Match all arguments (0 or more)
-     * capture('args', { variadic: true })
-     *
-     * @example
-     * // Match 1-3 arguments with custom separator
-     * capture('args', { variadic: { min: 1, max: 3, separator: ', ' } })
+     * Separator between elements (default: ', ' for arguments).
      */
-    variadic?: boolean | VariadicOptions;
+    separator?: string;
 
     /**
-     * Optional constraint function to validate captured nodes.
-     * The constraint receives a node of type T and returns true if it should match, false otherwise.
-     *
-     * @example
-     * capture<J.Literal>('size', {
-     *     constraint: (node) => typeof node.value === 'number' && node.value > 100
-     * })
+     * Minimum number of nodes to match (default: 0).
      */
-    constraint?: (node: T) => boolean;
+    min?: number;
+
+    /**
+     * Maximum number of nodes to match (default: unlimited).
+     */
+    max?: number;
+}
+
+/**
+ * Options for the capture function.
+ *
+ * The constraint function receives different parameter types depending on whether
+ * the capture is variadic:
+ * - For regular captures: constraint receives a single node of type T
+ * - For variadic captures: constraint receives an array of nodes of type T[]
+ *
+ * Note: The constraint parameter is typed as 'any' to avoid TypeScript union type
+ * issues when accessing properties. Type safety is enforced through function overloads.
+ * Users should ensure their constraint functions match the variadic setting at runtime.
+ */
+export interface CaptureOptions<T = any> {
+    variadic?: boolean | VariadicOptions;
+    constraint?: (node: any) => boolean;
 }
 
 /**
@@ -462,10 +470,16 @@ export interface Capture<T = any> {
  * A variadic capture that matches zero or more nodes in a sequence.
  * When retrieved from match results, the captured value will be an array of nodes.
  *
- * Extends Capture but is returned when variadic options are specified, providing
- * better type information at compile time.
+ * This interface is intentionally NOT extending Capture to provide better type safety
+ * and avoid ambiguity in TypeScript's overload resolution. Regular and variadic captures
+ * are fundamentally different operations with different semantics.
  */
-export interface VariadicCapture<T = any> extends Capture<T[]> {
+export interface VariadicCapture<T = any> {
+    /**
+     * The name of the capture, used to retrieve the captured nodes later.
+     */
+    readonly name: string;
+
     /**
      * Always returns true for variadic captures.
      */
@@ -475,6 +489,17 @@ export interface VariadicCapture<T = any> extends Capture<T[]> {
      * Returns the variadic options for this capture.
      */
     getVariadicOptions(): VariadicOptions;
+
+    /**
+     * Gets the constraint function if defined.
+     * For variadic captures, the constraint receives an array of nodes.
+     */
+    getConstraint?(): ((nodes: T[]) => boolean) | undefined;
+
+    /**
+     * Gets the internal capture name.
+     */
+    getName(): string;
 }
 
 // Symbol to access the internal capture name without triggering Proxy
@@ -668,12 +693,30 @@ class CaptureValue {
  * const method = capture<J.MethodInvocation>('method');
  * template`console.log(${method.name.simpleName})`  // Accesses properties of captured node
  */
-// Overload: variadic capture with explicit VariadicOptions
-export function capture<T = any>(name: string | undefined, options: CaptureOptions<T> & { variadic: VariadicOptions }): VariadicCapture<T> & T[];
-// Overload: variadic capture with boolean
-export function capture<T = any>(name: string | undefined, options: CaptureOptions<T> & { variadic: true }): VariadicCapture<T> & T[];
-// Overload: regular (non-variadic) capture
-export function capture<T = any>(name?: string, options?: CaptureOptions<T>): Capture<T> & T;
+// Overload 1: Regular capture with constraint (most specific - no variadic property)
+export function capture<T = any>(
+    name: string,
+    options: { constraint: (node: T) => boolean } & { variadic?: never }
+): Capture<T> & T;
+
+// Overload 2: Variadic capture with name (explicitly requires variadic property)
+export function capture<T = any>(
+    name: string,
+    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
+): VariadicCapture<T> & T[];
+
+// Overload 3: Variadic capture without name (explicitly requires variadic property)
+export function capture<T = any>(
+    name: undefined,
+    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
+): VariadicCapture<T> & T[];
+
+// Overload 4: Catch-all for simple captures without special options
+export function capture<T = any>(
+    name?: string,
+    options?: CaptureOptions<T>
+): Capture<T> & T;
+
 // Implementation
 export function capture<T = any>(name?: string, options?: CaptureOptions<T>): Capture<T> & T {
     const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
@@ -1053,7 +1096,7 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
     // Overload: get with string returns J
     get(capture: string): J | undefined;
     // Implementation
-    get(capture: Capture | string): J | J[] | undefined {
+    get(capture: Capture<any> | VariadicCapture<any> | string): J | J[] | undefined {
         // Use symbol to get internal name without triggering Proxy
         const name = typeof capture === "string" ? capture : ((capture as any)[CAPTURE_NAME_SYMBOL] || capture.name);
         return this.bindings.get(name);
@@ -1179,9 +1222,16 @@ class Matcher {
             return false;
         }
 
+        // Find the original capture object to get constraint
+        const captureObj = this.pattern.captures.find(c => c.getName() === captureName);
+        const constraint = captureObj?.getConstraint?.();
+
+        // Apply constraint if present - for variadic captures, constraint receives the array
+        if (constraint && !constraint(targets as any)) {
+            return false;
+        }
+
         // For variadic captures, store the array of matched nodes
-        // We'll need a special container type to distinguish from single captures
-        // For now, store the array directly
         this.bindings.set(captureName, targets as any);
         return true;
     }

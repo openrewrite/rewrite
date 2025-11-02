@@ -27,7 +27,7 @@ This ADR proposes eight enhancements to address these limitations and make the t
 | # | Feature                                      | Status         |
 |---|----------------------------------------------|----------------|
 | 1 | Property Access on Captures                  | ✅ Implemented |
-| 2 | Capture Constraints                          | 📝 Proposed    |
+| 2 | Capture Constraints                          | ✅ Implemented |
 | 3 | Rename `imports` to `context`                | ✅ Implemented |
 | 4 | Pre-parsing Code Interpolation with `code()` | 📝 Proposed    |
 | 5 | Builder API for Dynamic Construction         | ✅ Implemented |
@@ -76,7 +76,7 @@ const tmpl2 = template`baz(${firstArg})`;
 
 ### 2. Constrained Captures
 
-**Status**: 📝 Proposed
+**Status**: ✅ Implemented
 
 Add runtime validation to captures, allowing patterns to specify constraints that matched nodes must satisfy beyond structural matching.
 
@@ -84,17 +84,23 @@ Add runtime validation to captures, allowing patterns to specify constraints tha
 
 ```typescript
 // Define a capture with a constraint
-const arg = capture<J.Expression>('arg')
-    .configure({
-        constraint: (expr: J.Expression) =>
-            expr instanceof J.Literal && typeof expr.value === 'number'
-    });
+const arg = capture<J.Literal>('arg', {
+    constraint: (node) => typeof node.value === 'number' && node.value > 10
+});
 
 // Use in a structural pattern - constraint adds semantic validation
 const pat = pattern`processData(${arg})`;
 // Structurally matches: processData(<any expression>)
-// Constraint validates: expression must be a numeric literal
+// Constraint validates: expression must be a numeric literal > 10
 // Final result: only matches processData(42), processData(3.14), etc.
+
+// Compose constraints using and(), or(), not()
+const evenNumber = capture<J.Literal>('num', {
+    constraint: and(
+        (node) => typeof node.value === 'number',
+        (node) => (node.value as number) % 2 === 0
+    )
+});
 ```
 
 **Rationale:**
@@ -121,13 +127,13 @@ Constraints provide **semantic validation** after **structural matching**:
 
 ```typescript
 // ✅ GOOD: Structural pattern + semantic constraint
-const numArg = capture('arg').configure({
-    constraint: (node) => node instanceof J.Literal && typeof node.value === 'number'
+const numArg = capture<J.Literal>('arg', {
+    constraint: (node) => typeof node.value === 'number'
 });
 pattern`process(${numArg})`; // Matches process(42), rejects process("text")
 
 // ⚠️ LESS EFFICIENT: Bare capture with constraint
-const invocation = capture('invocation').configure({
+const invocation = capture<J.MethodInvocation>('invocation', {
     constraint: (node) => node instanceof J.MethodInvocation
 });
 pattern`${invocation}`; // Structurally matches ANY expression, then filters
@@ -140,33 +146,25 @@ pattern`${invocation}()`; // Structurally requires method invocation
 
 ```typescript
 // TypeScript type is just for autocomplete
-const method = capture<J.MethodInvocation>('method')
-    .configure({
-        // Must still check instanceof at runtime
-        constraint: (node: J.MethodInvocation) =>
-            node instanceof J.MethodInvocation && node.name.simpleName === 'foo'
-    });
+const method = capture<J.MethodInvocation>('method', {
+    // Must still check instanceof at runtime
+    constraint: (node) =>
+        node instanceof J.MethodInvocation && node.name.simpleName === 'foo'
+});
 ```
 
 **Implementation:**
-- `configure()` method on Capture accepts options object with `constraint` function
+- `capture()` function accepts optional `CaptureOptions<T>` parameter with `constraint` field
 - Constraint function receives the matched node and returns boolean
-- Pattern matching evaluates constraints after structural matching succeeds
+- Composition functions `and()`, `or()`, `not()` allow combining constraints
+- Pattern matching evaluates constraints in `Matcher.handleCapture()` after structural matching succeeds
 - Failed constraints cause pattern match to fail (return no match)
-- Constraints stored on Capture object and evaluated during pattern matching phase
-- TypeScript generic on Capture provides type-safe constraint function
+- Constraints stored internally using `CAPTURE_CONSTRAINT_SYMBOL` to avoid Proxy interference
+- TypeScript generic `<T>` on Capture provides type-safe constraint function parameter
 
-**API Consistency:**
-
-```typescript
-// Pattern configuration (existing)
-pattern`forwardRef(${capture('name')})`
-    .configure({ imports: [...], dependencies: {...} });
-
-// Capture configuration (new)
-capture('invocation')
-    .configure({ constraint: node => ... });
-```
+**Test Coverage:**
+- 15 comprehensive tests in `test/javascript/templating/capture-constraints.test.ts`
+- Tests cover simple constraints, composition functions, and complex patterns
 
 ### 3. Rename `imports` to `context`
 
@@ -628,170 +626,93 @@ Decision: Yes, both work (unified template processing), but document that:
 - Prefer consistency - don't mix unnecessarily (can be confusing)
 - If you need property access, use `capture()` everywhere
 
-### 8. Ellipsis Patterns for Sequence Matching
+### 8. Variadic Captures for Sequence Matching
 
-**Status**: 📝 Proposed (Phase 1: Function Arguments)
+**Status**: ✅ Implemented
 
-Add support for matching variable-length sequences of nodes using ellipsis captures. **Phase 1 focuses exclusively on function/method call arguments** - the highest-value, lowest-complexity use case.
+Add support for matching variable-length sequences of nodes using variadic captures. Variadic captures can match zero or more nodes in function/method arguments and other sequence contexts.
 
-**Implementation Approach**: Phased implementation starting with function/method arguments (highest value, lowest complexity), then expanding to statements, arrays, and other sequence contexts in future phases.
-
-**Quick Start - Phase 1:**
+**API:**
 
 ```typescript
-// Capture first arg, rest optional
+// Capture zero or more arguments
+const args = capture('args', { variadic: true });
+const pat = pattern`foo(${args})`;
+
+// Matches: foo(), foo(1), foo(1, 2), foo(1, 2, 3, ...)
+
+// Capture first arg, rest are variadic
 const first = capture('first');
-const rest = ellipsis('rest');
-const pat = pattern`foo(${first}, ${rest})`;
+const rest = capture('rest', { variadic: true });
+const pat2 = pattern`foo(${first}, ${rest})`;
 
 // Matches: foo(1), foo(1, 2), foo(1, 2, 3, ...)
 // Use in template to add an argument while preserving others
 const tmpl = template`foo(${first}, "newArg", ${rest})`;
 ```
 
-**Problem Statement:**
+**Rationale:**
 
-Current patterns can only match fixed-length sequences at specific positions. There's no way to:
-- Match "any arguments after the first two" (PHASE 1 - Function/Method Arguments)
-- Match "any number of elements in an array"
-- Match "any number of statements between two specific statements"
-- Capture variable-length sequences for reuse in templates
+Many refactoring scenarios require matching and transforming code with variable-length sequences:
+- Matching function calls with any number of arguments
+- Adding/removing/reordering arguments while preserving others
+- Capturing "the rest" of arguments after specific ones
+- Working with functions that have optional trailing parameters
 
-This is critical for real-world refactoring scenarios like:
-- **[PHASE 1]** Matching function calls with variable arguments (e.g., `foo(required, ...rest)`)
-- **[PHASE 1]** Wrapping specific function arguments while preserving others
-- **[PHASE 1]** Reordering function arguments while capturing "everything else"
-- Finding try-catch blocks with specific setup/teardown regardless of body contents
-- Finding loops that contain specific operations among other statements
+Without variadic captures, patterns can only match fixed-length sequences, making it impossible to write flexible refactoring recipes.
 
-**Phase 1 Focus: Function/Method Arguments**
-
-The first implementation phase focuses exclusively on function/method call arguments because:
-1. **High Value**: Most common use case in refactoring scenarios
-2. **Clear Semantics**: Arguments are already a well-defined list structure in the AST
-3. **Lower Complexity**: No control flow or scoping concerns (unlike statements)
-4. **Direct AST Support**: `J.MethodInvocation.arguments` is a `List<JRightPadded<Expression>>`
-5. **Proven Patterns**: Similar to JavaScript rest parameters (`...args`)
-
-**Separator Semantics & Zero-Match Problem:**
-
-The challenge with zero-or-more matching is handling separators correctly. Consider:
+**Variadic Options:**
 
 ```typescript
-// ❌ PROBLEM: This pattern won't match foo(a) due to hardcoded comma
-const first = capture('first');
-const rest = ellipsis('rest', ', ');
-pattern`foo(${first}, ${rest})`;  // Matches foo(a, b) but NOT foo(a)!
-```
-
-When this pattern is parsed by TypeScript, the comma becomes part of the AST structure. The pattern AST expects: `MethodInvocation → first arg → comma → rest args`. But `foo(a)` has no comma after the first arg, so it won't match.
-
-**Solution: Two Pattern Styles**
-
-**Style 1: Greedy Ellipsis (match all arguments, including zero)**
-```typescript
-const args = ellipsis('args', ', ');
-pattern`foo(${args})`;
-
-// Matches:
-// - foo()      → args=[] (represented as J.Empty with ellipsis marker)
-// - foo(a)     → args=[a]
-// - foo(a, b)  → args=[a, b]
-```
-
-For zero-match case, the parser creates a `J.Empty` node with an `EllipsisMarker` to indicate "ellipsis matched zero items here".
-
-**Style 2: Required First + Optional Rest**
-```typescript
-const first = capture('first');
-const rest = ellipsis('rest', ', ');
-pattern`foo(${first}${rest})`;  // No comma between them!
-
-// Matches:
-// - foo(a)     → first=a, rest=[]
-// - foo(a, b)  → first=a, rest=[b]
-// Does NOT match foo() - at least one arg required
-```
-
-The pattern has no literal comma, so the matching logic is:
-1. First capture matches one argument
-2. Rest ellipsis greedily consumes remaining arguments (comma-separated)
-3. If only one arg exists, rest=[]
-
-**Pattern Matching Rules:**
-1. Ellipsis with separator consumes comma-separated items
-2. When ellipsis is empty (zero match): represented as J.Empty with marker
-3. When ellipsis is non-empty: captures actual AST nodes
-4. No literal separator in pattern between captures - separator only used during matching/generation
-
-**Template Application Rules:**
-```typescript
-const tmpl = template`bar(${first}${rest})`;  // No comma in template either
-
-// Generation:
-// - If rest=[] → generates: bar(a)
-// - If rest=[b] → generates: bar(a, b)  (separator inserted automatically)
-// - If rest=[b,c] → generates: bar(a, b, c)
-```
-
-The template engine sees:
-1. first is a single Capture → insert one arg
-2. rest is an Ellipsis → if non-empty, insert separator then each arg with separators between
-
-**Why explicit separators?**
-- Allows control over formatting (e.g., `', '` vs `','` vs `, ` with spaces)
-- Works across different contexts (args use `', '`, statements use `\n`, etc.)
-- Simple and explicit - no magic inference needed
-
-**API:**
-
-```typescript
-/**
- * Creates an ellipsis capture that matches zero or more nodes in a sequence.
- *
- * @param name Optional name for the capture. If not provided, matches but doesn't capture.
- * @param separator Optional separator between elements (default: ', ' for arguments, '\n' for statements)
- * @returns An Ellipsis capture that can match sequences
- */
-export function ellipsis<T = any>(name?: string, separator?: string): Ellipsis<T>;
-
-// Alternative concise alias (three underscores)
-export const ___ = ellipsis;
-
-interface Ellipsis<T = any> {
-    name?: string;
+interface VariadicOptions {
+    // Separator between elements (default: ', ' for arguments)
     separator?: string;
-    getName(): string | undefined;
-    getSeparator(): string | undefined;
 
-    // Configuration for constraints
-    configure(options: EllipsisOptions<T>): this;
-}
-
-interface EllipsisOptions<T> {
     // Minimum number of nodes to match (default: 0)
     min?: number;
 
     // Maximum number of nodes to match (default: unlimited)
     max?: number;
-
-    // Constraint that each matched node must satisfy
-    constraint?: (node: J) => boolean;
-
-    // Constraint that the entire sequence must satisfy
-    sequenceConstraint?: (nodes: J[]) => boolean;
 }
+
+// Create a variadic capture
+capture('args', { variadic: true })                    // Simple form with defaults
+capture('args', { variadic: { separator: '; ' } })     // Custom separator
+capture('args', { variadic: { min: 1, max: 3 } })      // With bounds
 ```
 
-**Phase 1 Examples - Function/Method Arguments:**
+**How It Works:**
+
+1. **Zero-or-more matching**: Variadic captures match zero or more nodes in a sequence
+2. **Greedy matching**: Captures as many nodes as possible while allowing subsequent patterns to match
+3. **Separator handling**: Separators are automatically inserted/removed during template application
+4. **Empty matches**: When matching zero nodes, the capture binds to an empty array `[]`
+
+**Pattern Styles:**
+
+```typescript
+// Match all arguments (zero or more)
+const args = capture('args', { variadic: true });
+pattern`foo(${args})`;
+// Matches: foo(), foo(1), foo(1, 2), ...
+
+// Match first + rest (one or more total)
+const first = capture('first');
+const rest = capture('rest', { variadic: true });
+pattern`foo(${first}, ${rest})`;
+// Matches: foo(1), foo(1, 2), foo(1, 2, 3), ...
+// Note: Comma is part of the pattern, so foo() won't match
+```
+
+**Examples:**
 
 ```typescript
 // Example 1: Match all arguments (including zero)
-const args = ellipsis('args', ', ');
+const args = capture('args', { variadic: true });
 const pat = pattern`foo(${args})`;
 
 // Matches:
-// foo()            → args=[] (J.Empty with marker)
+// foo()            → args=[]
 // foo(1)           → args=[1]
 // foo(1, 2, 3)     → args=[1, 2, 3]
 
@@ -800,10 +721,10 @@ const tmpl = template`bar(${args})`;
 // foo()      → bar()
 // foo(1, 2)  → bar(1, 2)
 
-// Example 1b: Required first argument, rest optional
+// Example 2: Required first argument, rest optional
 const first = capture('first');
-const rest = ellipsis('rest', ', ');
-const pat2 = pattern`foo(${first}${rest})`;  // NO comma between captures
+const rest = capture('rest', { variadic: true });
+const pat2 = pattern`foo(${first}, ${rest})`;
 
 // Matches:
 // foo(1)           → first=1, rest=[]
@@ -811,129 +732,84 @@ const pat2 = pattern`foo(${first}${rest})`;  // NO comma between captures
 // foo(1, 2, 3, 4)  → first=1, rest=[2, 3, 4]
 // foo()            → NO MATCH (first is required)
 
-// Use two templates to add an argument (cleaner than mixing literals with ellipsis):
-spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-    override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-        const match = await pat2.match(invocation);
-        if (match) {
-            const restArgs = match.get(rest);
-            if (restArgs.length === 0) {
-                // No additional args: foo(1) → bar(1, "new")
-                return template`bar(${first}, "new")`.apply(this.cursor, invocation, match);
-            } else {
-                // Has additional args: foo(1, 2, 3) → bar(1, "new", 2, 3)
-                return template`bar(${first}, "new", ${rest})`.apply(this.cursor, invocation, match);
-            }
-        }
-        return invocation;
-    }
-});
+// Add an argument while preserving others:
+const tmpl2 = template`bar(${first}, "newArg", ${rest})`;
+// foo(1)       → bar(1, "newArg")
+// foo(1, 2, 3) → bar(1, "newArg", 2, 3)
 
-// Example 2: Capture last argument, ignore the rest
-const args = ellipsis();  // Anonymous - match but don't capture
-const last = capture('last');
-const pat2 = pattern`foo(${args}, ${last})`;
-
-// Matches:
-// foo(1)           → last=1
-// foo(1, 2)        → last=2
-// foo(1, 2, 3)     → last=3
-
-// Example 3: Capture specific arguments, preserve others
-const target = capture('target');
-const before = ellipsis('before');
-const after = ellipsis('after');
-const pat3 = pattern`process(${before}, ${target}, ${after})`;
-
-// Matches:
-// process(x)              → target=x, before=[], after=[]
-// process(a, x)           → target=x, before=[a], after=[]
-// process(a, b, x, c, d)  → target=x, before=[a, b], after=[c, d]
-
-// Wrap target argument while preserving others
-const tmpl3 = template`process(${before}, wrap(${target}), ${after})`;
-// process(a, b, x, c) → process(a, b, wrap(x), c)
-
-// Example 5: Real-world use case - Add logging to specific function calls
-const method = capture<J.Identifier>('method');
-const obj = capture('obj');
-const args = ellipsis('args');
-const pat4 = pattern`${obj}.${method}(${args})`;
-
-// Match any method call on any object with any arguments
-const tmpl4 = template`
-    (() => {
-        console.log('Calling', ${obj}.name, '.', ${method}.simpleName, 'with', ${args}.length, 'args');
-        return ${obj}.${method}(${args});
-    })()
-`;
-
-// Example 6: Constrained ellipsis (min/max arguments)
+// Example 3: Variadic with min/max bounds
 const callback = capture('callback');
-const options = ellipsis('options').configure({
-    max: 1  // At most 1 additional argument
-});
-const pat5 = pattern`addEventListener('click', ${callback}, ${options})`;
+const options = capture('options', { variadic: { max: 1 } });
+const pat3 = pattern`addEventListener('click', ${callback}, ${options})`;
 
 // Matches:
 // addEventListener('click', handler)              → callback=handler, options=[]
 // addEventListener('click', handler, {once:true}) → callback=handler, options=[{once:true}]
 // addEventListener('click', handler, a, b)        → NO MATCH (too many args)
-```
 
-**Alternative Syntax Consideration: Spread Operator in Templates**
+// Example 4: Custom separator
+const items = capture('items', { variadic: { separator: '; ' } });
+const pat4 = pattern`process(${items})`;
+// Matches process(...) and captures args separated by semicolons
 
-An alternative approach for expanding arrays in templates would be to support JavaScript spread syntax:
+// Example 5: Variadic with constraints (validates the entire array)
+const numericArgs = capture<J.Literal>('args', {
+    variadic: true,
+    constraint: (nodes) => nodes.every(n => typeof n.value === 'number')
+});
+const pat5 = pattern`sum(${numericArgs})`;
+// Matches: sum(), sum(1), sum(1, 2, 3)
+// Rejects: sum("text"), sum(1, "text", 3)
 
-```typescript
-// Standard ellipsis approach (Phase 1)
-const args = ellipsis('args');
-const pat = pattern`foo(${args})`;
-const tmpl = template`bar(${args})`;  // Implicit expansion - args already expands
-
-// Potential spread syntax approach
-const args = capture('args');  // Manually captured array
-const tmpl = template`bar(...${args})`;  // Explicit spread operator
-
-// Use case: When you construct arrays in visitor code
-spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-    override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-        // Manually extract some arguments
-        const firstTwoArgs = invocation.arguments.elements.slice(0, 2).map(e => e.element);
-
-        // Spread them back into a template
-        return template`newFunction(...${param('args')})`.apply(
-            this.cursor,
-            invocation,
-            new Map([['args', firstTwoArgs]])
-        );
+// Example 6: Variadic constraint - check relationships between elements
+const sortedArgs = capture<J.Literal>('args', {
+    variadic: true,
+    constraint: (nodes) => {
+        // Ensure all are numbers and in ascending order
+        if (nodes.length < 2) return true;
+        for (let i = 1; i < nodes.length; i++) {
+            if (typeof nodes[i-1].value !== 'number' || typeof nodes[i].value !== 'number') {
+                return false;
+            }
+            if ((nodes[i-1].value as number) > (nodes[i].value as number)) {
+                return false;
+            }
+        }
+        return true;
     }
 });
+const pat6 = pattern`process(${sortedArgs})`;
+// Matches: process(1, 2, 3), process(1, 1, 2)
+// Rejects: process(3, 1, 2), process(1, "x", 3)
 ```
 
-**Analysis:**
+**Implementation:**
 
-Pros:
-- Natural JavaScript syntax that developers already understand
-- Useful for manually constructed arrays (not captured via ellipsis)
-- Explicit about what's being expanded (vs implicit ellipsis expansion)
-- Could work independently of ellipsis() feature
+- `capture()` accepts `variadic` option (boolean or `VariadicOptions` object)
+- Variadic captures work in function/method call arguments
+- Greedy matching: captures as many nodes as possible
+- Separator handling: automatically inserted/removed during template application
+- Type safety: `VariadicCapture<T>` type extends array type `T[]`
+- Empty matches bind to empty array `[]`
+- Min/max bounds supported for constraining match count
+- **Constraints**: For variadic captures, the constraint function receives the entire array `T[]` (not individual elements), enabling validation of:
+  - All elements meeting a criterion (`.every()`, `.some()`)
+  - Array length requirements
+  - Relationships between elements (ordering, uniqueness, etc.)
+  - Specific positions (first/last elements)
 
-Cons:
-- Limited use cases (mainly when manually building arrays in visitor code)
-- Parser complexity: need to detect `...` token before placeholder
-- TypeScript doesn't allow `...${x}` in template literal types (syntax error in IDE)
-- Overlaps with ellipsis() which already expands automatically
-- May be confusing: when does expansion happen automatically vs when do you need `...`?
+**Test Coverage:**
+- 6 test files covering variadic capture functionality
+- Tests include basic matching, expansion, markers, array proxy behavior, matching algorithms, and constraints
+- Constraint tests cover array-level validation, relationship validation, and combination with min/max bounds
 
-**Recommendation:** Consider for future enhancement, but not essential for Phase 1. The primary use case (expanding ellipsis captures) is already handled automatically. The secondary use case (spreading manually-constructed arrays) could be addressed by:
-1. Making those arrays available as ellipsis-like captures
-2. Using helper functions that expand arrays
-3. Building the template differently to avoid needing spread
+**Future Enhancements:**
+Variadic captures currently work in function arguments. Future phases could extend support to:
+- Statement sequences in blocks
+- Array literal elements
+- Other sequence contexts
 
-If there's strong demand for manually spreading captures/params, revisit after Phase 1 implementation with real-world usage feedback.
-
-**Future Phase Examples - Statements and Arrays:**
+**Future Phase Examples - Statements and Arrays (Not Yet Implemented):**
 
 ```typescript
 // Example 7: Statement sequences (PHASE 2)

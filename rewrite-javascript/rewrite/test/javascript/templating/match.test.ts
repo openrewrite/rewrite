@@ -23,7 +23,7 @@ import {
     template,
     typescript
 } from "../../../src/javascript";
-import {J} from "../../../src/java";
+import {Expression, J} from "../../../src/java";
 import {createDraft, produce} from "immer";
 
 describe('match extraction', () => {
@@ -103,7 +103,7 @@ describe('match extraction', () => {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                 if (binary.operator.element === J.Binary.Type.Addition) {
                     // Create capture objects without explicit names
-                    const {left, right} = {left: capture(), right: capture()};
+                    const {left, right} = {left: capture<Expression>(), right: capture<Expression>()};
 
                     // Create a pattern that matches "a + b" using the capture objects
                     const m = await pattern`${left} + ${right}`.match(binary);
