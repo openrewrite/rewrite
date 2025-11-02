@@ -18,8 +18,9 @@ Current limitations:
 - Template literals only - no programmatic construction API
 - Strict type matching prevents patterns from working without full type attribution
 - Using `capture()` in templates without patterns is semantically confusing
+- No way to match variable-length sequences (e.g., "any statements between these two statements")
 
-This ADR proposes seven enhancements to address these limitations and make the templating engine more expressive and flexible.
+This ADR proposes eight enhancements to address these limitations and make the templating engine more expressive and flexible.
 
 ### Summary of Enhancements
 
@@ -32,6 +33,7 @@ This ADR proposes seven enhancements to address these limitations and make the t
 | 5 | Builder API for Dynamic Construction | 📝 Proposed |
 | 6 | Lenient Type Matching in Comparator | 📝 Proposed |
 | 7 | `param()` for Template-Only Parameters | 📝 Proposed |
+| 8 | Ellipsis Patterns for Sequence Matching | 📝 Proposed |
 
 ## Decision
 
@@ -563,6 +565,342 @@ Decision: Allow mixing (they're the same type), but document that:
 - Use `param()` when template is standalone
 - Don't mix both in the same template (confusing)
 
+### 8. Ellipsis Patterns for Sequence Matching
+
+**Status**: 📝 Proposed
+
+Add support for matching variable-length sequences of nodes (statements, arguments, array elements) using ellipsis captures.
+
+**Problem Statement:**
+
+Current patterns can only match fixed-length sequences at specific positions. There's no way to:
+- Match "any number of statements between two specific statements"
+- Match "any arguments after the first two"
+- Match "any number of elements in an array"
+- Capture variable-length sequences
+
+This is critical for real-world refactoring scenarios like:
+- Finding try-catch blocks with specific setup/teardown regardless of body contents
+- Matching function calls with variable arguments
+- Finding loops that contain specific operations among other statements
+
+**API:**
+
+```typescript
+/**
+ * Creates an ellipsis capture that matches zero or more nodes in a sequence.
+ *
+ * @param name Optional name for the capture. If not provided, matches but doesn't capture.
+ * @returns An Ellipsis capture that can match sequences
+ */
+export function ellipsis<T = any>(name?: string): Ellipsis<T>;
+
+// Alternative concise alias (three underscores)
+export const ___ = ellipsis;
+
+interface Ellipsis<T = any> {
+    name?: string;
+    getName(): string | undefined;
+
+    // Configuration for constraints
+    configure(options: EllipsisOptions<T>): this;
+}
+
+interface EllipsisOptions<T> {
+    // Minimum number of nodes to match (default: 0)
+    min?: number;
+
+    // Maximum number of nodes to match (default: unlimited)
+    max?: number;
+
+    // Constraint that each matched node must satisfy
+    constraint?: (node: J) => boolean;
+
+    // Constraint that the entire sequence must satisfy
+    sequenceConstraint?: (nodes: J[]) => boolean;
+}
+```
+
+**Examples:**
+
+```typescript
+// Example 1: Basic statement sequence matching
+const middle = ellipsis('middle');
+const pat = pattern`
+    console.log("start");
+    ${middle}
+    console.log("end");
+`;
+
+// Matches:
+// console.log("start"); console.log("end");
+// console.log("start"); doSomething(); console.log("end");
+// console.log("start"); doX(); doY(); doZ(); console.log("end");
+
+// Example 2: Function arguments with ellipsis
+const first = capture('first');
+const rest = ellipsis('rest');
+const pat = pattern`foo(${first}, ${rest})`;
+
+// Matches: foo(1), foo(1, 2), foo(1, 2, 3, 4)
+
+// Example 3: Anonymous ellipsis (match but don't capture)
+const errorHandler = capture('handler');
+const pat = pattern`
+    try {
+        ${ellipsis()}  // Match any statements, don't capture
+    } catch (e) {
+        ${errorHandler}
+    }
+`;
+
+// Example 4: Constrained ellipsis
+const middle = ellipsis('middle').configure({
+    min: 1,
+    sequenceConstraint: (nodes) => nodes.length > 0
+});
+
+// Example 5: Using ellipsis in templates
+const before = capture('before');
+const middle = ellipsis('middle');
+const after = capture('after');
+
+const pat = pattern`
+    console.log(${before});
+    ${middle}
+    console.log(${after});
+`;
+
+const tmpl = template`
+    console.log(${after});  // Swap order
+    ${middle}               // Keep middle as-is (flattened when inserted)
+    console.log(${before});
+`;
+
+// Example 6: Concise alias
+const pat = pattern`
+    try {
+        ${___()}
+    } catch (e) {
+        console.error(e);
+    }
+`;
+
+// Example 7: Multiple ellipses in one pattern
+const before = ellipsis('before');
+const target = capture('target');
+const after = ellipsis('after');
+
+const pat = pattern`
+    function foo() {
+        ${before}
+        if (${target}) { return; }
+        ${after}
+    }
+`;
+
+// Example 8: Array element ellipsis
+const first = capture('first');
+const rest = ellipsis('rest');
+const pat = pattern`[${first}, ${rest}]`;
+```
+
+**Rationale:**
+- Essential for real-world refactoring patterns (not just toy examples)
+- Common in other pattern matching systems (Semgrep uses `...`, Rust uses `..`, etc.)
+- Enables matching code with variable structure
+- Makes patterns more flexible and powerful
+- Natural extension of existing capture concept
+
+**Implementation Strategy:**
+
+**1. Parser Detection:**
+```typescript
+class TemplateProcessor {
+    private buildTemplateString(): string {
+        for (let i = 0; i < this.captures.length; i++) {
+            const capture = this.captures[i];
+            if (capture instanceof EllipsisImpl) {
+                result += PlaceholderUtils.createEllipsis(capture.name);
+            } else {
+                result += PlaceholderUtils.createCapture(capture.name);
+            }
+        }
+    }
+}
+```
+
+**2. AST Marker:**
+```typescript
+class EllipsisMarker implements Marker {
+    readonly kind = 'org.openrewrite.javascript.EllipsisMarker';
+    readonly id = randomId();
+
+    constructor(
+        public readonly name?: string,
+        public readonly options?: EllipsisOptions<any>
+    ) {}
+}
+```
+
+**3. Sequence Matching Algorithm:**
+
+Use greedy matching with backtracking:
+
+```typescript
+/**
+ * Matches pattern sequence against target sequence where pattern may contain ellipses.
+ *
+ * Pattern: [A, ellipsis, B]
+ * Target:  [A, X, Y, Z, B]
+ * Result:  Match! ellipsis captures [X, Y, Z]
+ *
+ * Uses greedy matching: ellipsis captures as much as possible while still
+ * allowing subsequent pattern elements to match.
+ */
+private matchSequenceWithEllipsis(
+    patternElements: PatternElement[],
+    targetElements: J[],
+    bindings: Map<string, J | J[]>
+): boolean {
+    let patternIdx = 0;
+    let targetIdx = 0;
+
+    while (patternIdx < patternElements.length) {
+        const patternElem = patternElements[patternIdx];
+
+        if (patternElem.isEllipsis) {
+            // Find the next non-ellipsis pattern element
+            const nextPattern = patternElements[patternIdx + 1];
+
+            if (!nextPattern) {
+                // Ellipsis at end - captures rest of target
+                const captured = targetElements.slice(targetIdx);
+                if (patternElem.name) {
+                    bindings.set(patternElem.name, captured);
+                }
+                return true;
+            }
+
+            // Find where nextPattern matches in remaining target
+            let matchPos = -1;
+            for (let i = targetIdx; i < targetElements.length; i++) {
+                if (await this.matchNode(nextPattern.node, targetElements[i])) {
+                    matchPos = i;
+                    break;
+                }
+            }
+
+            if (matchPos === -1) {
+                return false; // Next pattern element not found
+            }
+
+            // Ellipsis captures everything before matchPos
+            const captured = targetElements.slice(targetIdx, matchPos);
+
+            // Validate constraints
+            if (!this.validateEllipsisConstraints(patternElem, captured)) {
+                return false;
+            }
+
+            if (patternElem.name) {
+                bindings.set(patternElem.name, captured);
+            }
+
+            targetIdx = matchPos;
+            patternIdx++;
+        } else {
+            // Regular pattern element - must match current target
+            if (targetIdx >= targetElements.length) {
+                return false;
+            }
+
+            if (!await this.matchNode(patternElem.node, targetElements[targetIdx])) {
+                return false;
+            }
+
+            targetIdx++;
+            patternIdx++;
+        }
+    }
+
+    // All pattern elements matched, but target may have extra elements
+    return targetIdx === targetElements.length;
+}
+```
+
+**4. Statement List Flattening:**
+
+When inserting ellipsis into blocks, flatten arrays:
+
+```typescript
+override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
+    const newStatements = [];
+
+    for (const stmt of block.statements) {
+        const result = await this.visit(stmt.element, p);
+
+        if (Array.isArray(result)) {
+            // Ellipsis returned multiple statements - flatten
+            for (const item of result) {
+                newStatements.push(JRightPadded.build(item));
+            }
+        } else if (result) {
+            newStatements.push(JRightPadded.build(result));
+        }
+    }
+
+    return produce(block, draft => {
+        draft.statements = newStatements;
+    });
+}
+```
+
+**Type System:**
+
+```typescript
+// Ellipsis captures return arrays
+const middle = ellipsis<J.Statement>('middle');
+const match = await pat.match(node);
+
+if (match) {
+    const stmts: J.Statement[] = match.get(middle); // Type is array
+}
+
+// Regular captures return single nodes
+const target = capture<J.Identifier>('target');
+const match2 = await pat.match(node);
+
+if (match2) {
+    const id: J.Identifier = match2.get(target); // Type is single node
+}
+```
+
+Update `MatchResult.get()` to handle both:
+```typescript
+class MatchResult {
+    get<T>(capture: Capture<T> | string): T | undefined;
+    get<T>(capture: Ellipsis<T> | string): T[] | undefined;
+    get(capture: Capture | Ellipsis | string): J | J[] | undefined {
+        // Runtime discrimination based on capture type
+    }
+}
+```
+
+**Edge Cases:**
+
+1. **Multiple ellipses in sequence**: Need greedy matching that doesn't consume too much
+2. **Adjacent ellipses**: `pattern`${ellipsis('a')}${ellipsis('b')}`` - Should this be an error or use min/max to disambiguate?
+3. **Ellipsis contexts**: Works for statement sequences, function arguments, array elements (object properties - future?)
+4. **Empty matches**: Allowed by default (`min: 0`)
+5. **Performance**: Backtracking can be expensive - consider caching and limiting depth
+
+**Applicable Contexts:**
+- Statement sequences in blocks (most common)
+- Function/method arguments
+- Array elements
+- Future: Object properties, class members
+
 ## Consequences
 
 ### Property Access on Captures (Proposed)
@@ -736,3 +1074,114 @@ Decision: Allow mixing (they're the same type), but document that:
 - Linter rule: Suggest `param()` when template variable never used in pattern
 - Keep implementation simple: Just an alias, no runtime behavior difference
 - Accept that some mixing will occur: Both work, document best practices but don't enforce
+
+### Ellipsis Patterns for Sequence Matching (Proposed)
+
+**Positive:**
+1. **Real-world patterns**: Enables matching patterns that actually occur in codebases (variable-length sequences)
+2. **Powerful matching**: Can express complex patterns like "find try blocks with specific error handling regardless of body"
+3. **Flexible**: Works in multiple contexts (statements, arguments, array elements)
+4. **Natural extension**: Fits naturally into existing capture/pattern model
+5. **Industry standard**: Similar to features in Semgrep, Rust patterns, Python unpacking, etc.
+6. **Composable**: Can combine multiple ellipses with regular captures for sophisticated patterns
+7. **Constrained matching**: Options for min/max and custom constraints on sequences
+8. **Type-safe**: TypeScript generics provide array types for ellipsis captures
+
+**Negative:**
+1. **Complexity**: Adds significant complexity to pattern matching algorithm (backtracking, ambiguity)
+2. **Performance**: Sequence matching with multiple ellipses can be expensive (O(n*m) or worse)
+3. **Ambiguity**: Adjacent ellipses or multiple ellipses can have ambiguous matches
+4. **Learning curve**: Another concept for users to understand beyond basic captures
+5. **Edge cases**: Many edge cases to handle (empty sequences, multiple matches, greedy vs minimal)
+6. **Implementation effort**: Requires changes to parser, comparator, and template application
+7. **Debugging difficulty**: Failed matches with ellipses harder to diagnose than simple captures
+8. **Type discrimination**: `MatchResult.get()` must handle both single values and arrays
+
+**Trade-offs:**
+
+**Greedy vs Minimal Matching:**
+- **Greedy** (proposed): Ellipsis captures as much as possible
+  - Pro: Intuitive for most use cases
+  - Con: May not match what user expects in some cases
+- **Minimal**: Ellipsis captures as little as possible
+  - Pro: More predictable in some patterns
+  - Con: Less intuitive, requires more explicit constraints
+
+**Multiple Ellipses:**
+- **Allow with constraints**: Use min/max to disambiguate
+  - Pro: Maximum flexibility
+  - Con: Complex, easy to create ambiguous patterns
+- **Restrict**: Only one ellipsis per sequence
+  - Pro: Simpler implementation and mental model
+  - Con: Less expressive
+
+**Anonymous Ellipsis:**
+- **Allow** (proposed): `${ellipsis()}` matches but doesn't capture
+  - Pro: Useful for "don't care" matching
+  - Con: Might be confusing (why not just omit?)
+- **Disallow**: All ellipses must be named
+  - Pro: Explicit capture intent
+  - Con: Forces capturing even when not needed
+
+**Recommendation**: Start with greedy matching and single ellipsis per context, then expand based on user feedback.
+
+**Mitigation strategies:**
+1. **Performance**:
+   - Add performance warnings for patterns with multiple ellipses
+   - Consider caching partial match results
+   - Limit backtracking depth with configurable timeout
+   - Profile and optimize hot paths
+
+2. **Ambiguity**:
+   - Document greedy matching semantics clearly
+   - Provide examples of common ambiguous patterns and how to resolve them
+   - Consider warning when pattern has multiple valid matches
+   - Add validation that detects obviously ambiguous patterns (adjacent unconstrained ellipses)
+
+3. **Debugging**:
+   - Add detailed logging showing how ellipses matched (what was captured)
+   - Provide visualization of sequence matching steps
+   - Include match diagnostics showing which elements were consumed by each ellipsis
+   - Show alternative matches when pattern is ambiguous
+
+4. **Learning curve**:
+   - Provide comprehensive examples from simple to complex
+   - Document common patterns (cookbook style)
+   - Add interactive tutorial showing ellipsis behavior
+   - Compare to similar features in other tools (Semgrep, etc.)
+
+5. **Type safety**:
+   - Provide clear TypeScript types distinguishing Capture (returns single) from Ellipsis (returns array)
+   - Add runtime checks to prevent incorrect usage
+   - Document type discrimination in `MatchResult.get()`
+
+6. **Edge cases**:
+   - Clearly document behavior for empty sequences (allowed by default)
+   - Show how to use `min` constraint to require non-empty
+   - Explain how multiple ellipses are disambiguated
+   - Provide examples of all edge cases with expected behavior
+
+**Implementation phases:**
+
+**Phase 1: Basic ellipsis (single, unconstrained)**
+- Single ellipsis per sequence context
+- No constraints (matches 0 or more)
+- Works in statement sequences only
+- Greedy matching
+
+**Phase 2: Constraints**
+- Add min/max options
+- Add element and sequence constraints
+- Add validation for ambiguous patterns
+
+**Phase 3: Multiple ellipses**
+- Allow multiple ellipses in same sequence
+- Implement disambiguation via constraints
+- Add performance optimizations
+
+**Phase 4: Extended contexts**
+- Support in function arguments
+- Support in array elements
+- Future: object properties, class members
+
+**Priority**: **High** - Essential for production-quality refactoring patterns. Without this, many real-world patterns cannot be expressed.
