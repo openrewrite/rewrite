@@ -25,6 +25,52 @@ import {randomId} from '../uuid';
 import {produce} from "immer";
 
 /**
+ * Combines multiple constraints with AND logic.
+ * All constraints must return true for the combined constraint to pass.
+ *
+ * @example
+ * const largeEvenNumber = capture('n', {
+ *     constraint: and(
+ *         (node) => typeof node.value === 'number',
+ *         (node) => node.value > 100,
+ *         (node) => node.value % 2 === 0
+ *     )
+ * });
+ */
+export function and<T>(...constraints: ((node: T) => boolean)[]): (node: T) => boolean {
+    return (node: T) => constraints.every(c => c(node));
+}
+
+/**
+ * Combines multiple constraints with OR logic.
+ * At least one constraint must return true for the combined constraint to pass.
+ *
+ * @example
+ * const stringOrNumber = capture('value', {
+ *     constraint: or(
+ *         (node) => node.kind === J.Kind.Literal && typeof node.value === 'string',
+ *         (node) => node.kind === J.Kind.Literal && typeof node.value === 'number'
+ *     )
+ * });
+ */
+export function or<T>(...constraints: ((node: T) => boolean)[]): (node: T) => boolean {
+    return (node: T) => constraints.some(c => c(node));
+}
+
+/**
+ * Negates a constraint.
+ * Returns true when the constraint returns false, and vice versa.
+ *
+ * @example
+ * const notString = capture('value', {
+ *     constraint: not((node) => typeof node.value === 'string')
+ * });
+ */
+export function not<T>(constraint: (node: T) => boolean): (node: T) => boolean {
+    return (node: T) => !constraint(node);
+}
+
+/**
  * Cache for compiled templates and patterns.
  * Stores parsed ASTs to avoid expensive re-parsing and dependency resolution.
  */
@@ -347,9 +393,15 @@ export interface CaptureOptions<T = any> {
     variadic?: boolean | VariadicOptions;
 
     /**
-     * Optional constraint function to validate captured nodes (future enhancement).
+     * Optional constraint function to validate captured nodes.
+     * The constraint receives a node of type T and returns true if it should match, false otherwise.
+     *
+     * @example
+     * capture<J.Literal>('size', {
+     *     constraint: (node) => typeof node.value === 'number' && node.value > 100
+     * })
      */
-    constraint?: (node: J) => boolean;
+    constraint?: (node: T) => boolean;
 }
 
 /**
@@ -399,6 +451,11 @@ export interface Capture<T = any> {
      * Gets the variadic options if this is a variadic capture.
      */
     getVariadicOptions(): VariadicOptions | undefined;
+
+    /**
+     * Gets the constraint function if this capture has one.
+     */
+    getConstraint?(): ((node: T) => boolean) | undefined;
 }
 
 /**
@@ -424,11 +481,14 @@ export interface VariadicCapture<T = any> extends Capture<T[]> {
 const CAPTURE_NAME_SYMBOL = Symbol('captureName');
 // Symbol to access variadic options without triggering Proxy
 const CAPTURE_VARIADIC_SYMBOL = Symbol('captureVariadic');
+// Symbol to access constraint function without triggering Proxy
+const CAPTURE_CONSTRAINT_SYMBOL = Symbol('captureConstraint');
 
 class CaptureImpl<T = any> implements Capture<T> {
     public readonly name: string;
     [CAPTURE_NAME_SYMBOL]: string;
     [CAPTURE_VARIADIC_SYMBOL]: VariadicOptions | undefined;
+    [CAPTURE_CONSTRAINT_SYMBOL]: ((node: T) => boolean) | undefined;
 
     constructor(name: string, options?: CaptureOptions<T>) {
         this.name = name;
@@ -446,6 +506,11 @@ class CaptureImpl<T = any> implements Capture<T> {
                 };
             }
         }
+
+        // Store constraint if provided
+        if (options?.constraint) {
+            this[CAPTURE_CONSTRAINT_SYMBOL] = options.constraint;
+        }
     }
 
     getName(): string {
@@ -458,6 +523,10 @@ class CaptureImpl<T = any> implements Capture<T> {
 
     getVariadicOptions(): VariadicOptions | undefined {
         return this[CAPTURE_VARIADIC_SYMBOL];
+    }
+
+    getConstraint(): ((node: T) => boolean) | undefined {
+        return this[CAPTURE_CONSTRAINT_SYMBOL];
     }
 }
 
@@ -621,8 +690,13 @@ export function capture<T = any>(name?: string, options?: CaptureOptions<T>): Ca
                 return target[CAPTURE_VARIADIC_SYMBOL];
             }
 
+            // Allow access to internal constraint symbol
+            if (prop === CAPTURE_CONSTRAINT_SYMBOL) {
+                return target[CAPTURE_CONSTRAINT_SYMBOL];
+            }
+
             // Allow methods to be called directly on the target
-            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions') {
+            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint') {
                 return target[prop].bind(target);
             }
 
@@ -1074,6 +1148,15 @@ class Matcher {
         const captureName = PlaceholderUtils.getCaptureName(pattern);
 
         if (!captureName) {
+            return false;
+        }
+
+        // Find the original capture object to get constraint
+        const captureObj = this.pattern.captures.find(c => c.getName() === captureName);
+        const constraint = captureObj?.getConstraint?.();
+
+        // Apply constraint if present
+        if (constraint && !constraint(target as any)) {
             return false;
         }
 

@@ -24,16 +24,16 @@ This ADR proposes eight enhancements to address these limitations and make the t
 
 ### Summary of Enhancements
 
-| # | Feature | Status |
-|---|---------|--------|
-| 1 | Property Access on Captures | ✅ Implemented |
-| 2 | Constrained Captures | 📝 Proposed |
-| 3 | Rename `imports` to `context` | ✅ Implemented |
-| 4 | Pre-parsing Code Interpolation with `code()` | 📝 Proposed |
-| 5 | Builder API for Dynamic Construction | ✅ Implemented |
-| 6 | Lenient Type Matching in Comparator | ✅ Implemented |
-| 7 | `param()` for Template-Only Parameters | ✅ Implemented |
-| 8 | Ellipsis Patterns for Sequence Matching | 📝 Proposed |
+| # | Feature                                      | Status         |
+|---|----------------------------------------------|----------------|
+| 1 | Property Access on Captures                  | ✅ Implemented |
+| 2 | Capture Constraints                          | 📝 Proposed    |
+| 3 | Rename `imports` to `context`                | ✅ Implemented |
+| 4 | Pre-parsing Code Interpolation with `code()` | 📝 Proposed    |
+| 5 | Builder API for Dynamic Construction         | ✅ Implemented |
+| 6 | Lenient Type Matching in Comparator          | ✅ Implemented |
+| 7 | `param()` for Template-Only Parameters       | ✅ Implemented |
+| 8 | Ellipsis Patterns for Sequence Matching      | ✅ Implemented |
 
 ## Decision
 
