@@ -225,7 +225,8 @@ public class GradleWrapperScriptDownloader {
             binding.put("entryPointArgs", "");
             binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
         } else {
-            binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
+            // Intentionally mixed slashes to match the 1.0-milestone versions
+            binding.put("classpath", "$APP_HOME/gradle\\wrapper\\gradle-wrapper.jar");
             binding.put("entryPointArgs", "");
             binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
         }
