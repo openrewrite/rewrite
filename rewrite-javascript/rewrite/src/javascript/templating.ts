@@ -17,11 +17,11 @@ import {JS} from '.';
 import {JavaScriptParser} from './parser';
 import {JavaScriptVisitor} from './visitor';
 import {Cursor, isTree, Tree} from '..';
-import {J} from '../java';
+import {emptySpace, J} from '../java';
 import {produce} from "immer";
-import {JavaScriptComparatorVisitor, JavaScriptSemanticComparatorVisitor} from "./comparator";
+import {JavaScriptSemanticComparatorVisitor} from "./comparator";
 import {DependencyWorkspace} from './dependency-workspace';
-import {Marker} from '../markers';
+import {emptyMarkers, Marker} from '../markers';
 import {randomId} from '../uuid';
 
 /**
@@ -121,10 +121,34 @@ class CaptureMarker implements Marker {
 /**
  * A comparator for pattern matching that is lenient about optional properties.
  * Allows patterns without type annotations to match actual code with type annotations.
+ * Uses semantic comparison to match semantically equivalent code (e.g., isDate() and util.isDate()).
  */
-class PatternMatchingComparator extends JavaScriptComparatorVisitor {
+class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
     constructor(private readonly matcher: { handleCapture: (pattern: J, target: J) => boolean }) {
         super();
+    }
+
+    /**
+     * Creates a wildcard identifier that will match any AST node during comparison.
+     * The identifier has a CaptureMarker which causes it to match anything without storing the result.
+     *
+     * @param captureName The name for the capture marker (for debugging purposes)
+     * @returns A wildcard identifier
+     */
+    private createWildcardIdentifier(captureName: string): J.Identifier {
+        return {
+            id: randomId(),
+            kind: J.Kind.Identifier,
+            prefix: emptySpace,
+            markers: {
+                ...emptyMarkers,
+                markers: [new CaptureMarker(captureName)]
+            },
+            annotations: [],
+            simpleName: '__wildcard__',
+            type: undefined,
+            fieldType: undefined
+        };
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
@@ -149,17 +173,37 @@ class PatternMatchingComparator extends JavaScriptComparatorVisitor {
             return this.abort(variableDeclarations);
         }
 
-        let otherVariableDeclarations = other as J.VariableDeclarations;
+        const otherVariableDeclarations = other as J.VariableDeclarations;
 
-        // LENIENT: If pattern lacks typeExpression, remove it from other before comparison
+        // LENIENT: If pattern lacks typeExpression but target has one, add a wildcard capture to pattern
+        // This allows the pattern to match without requiring us to modify the target (which would corrupt captures)
         if (!variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
-            otherVariableDeclarations = produce(otherVariableDeclarations, draft => {
-                draft.typeExpression = undefined;
+            variableDeclarations = produce(variableDeclarations, draft => {
+                draft.typeExpression = this.createWildcardIdentifier('__wildcard_type__') as J.Identifier;
             });
         }
 
         // Delegate to super implementation
         return super.visitVariableDeclarations(variableDeclarations, otherVariableDeclarations);
+    }
+
+    override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== J.Kind.MethodDeclaration) {
+            return this.abort(methodDeclaration);
+        }
+
+        const otherMethodDeclaration = other as J.MethodDeclaration;
+
+        // LENIENT: If pattern lacks returnTypeExpression but target has one, add a wildcard capture to pattern
+        // This allows the pattern to match without requiring us to modify the target (which would corrupt captures)
+        if (!methodDeclaration.returnTypeExpression && otherMethodDeclaration.returnTypeExpression) {
+            methodDeclaration = produce(methodDeclaration, draft => {
+                draft.returnTypeExpression = this.createWildcardIdentifier('__wildcard_return_type__') as J.Identifier;
+            });
+        }
+
+        // Delegate to super implementation
+        return super.visitMethodDeclaration(methodDeclaration, otherMethodDeclaration);
     }
 
     protected hasSameKind(j: J, other: J): boolean {
