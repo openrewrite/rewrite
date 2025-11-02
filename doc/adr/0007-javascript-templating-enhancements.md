@@ -83,21 +83,70 @@ Add runtime validation to captures, allowing patterns to specify constraints tha
 **API:**
 
 ```typescript
-const invocation = capture<J.MethodInvocation>('invocation')
+// Define a capture with a constraint
+const arg = capture<J.Expression>('arg')
     .configure({
-        constraint: (mi: J.MethodInvocation) =>
-            mi.name.simpleName === 'foo'
+        constraint: (expr: J.Expression) =>
+            expr instanceof J.Literal && typeof expr.value === 'number'
     });
 
-const pat = pattern`${invocation}`; // Only matches method invocations named 'foo'
+// Use in a structural pattern - constraint adds semantic validation
+const pat = pattern`processData(${arg})`;
+// Structurally matches: processData(<any expression>)
+// Constraint validates: expression must be a numeric literal
+// Final result: only matches processData(42), processData(3.14), etc.
 ```
 
 **Rationale:**
-- Currently ``pattern`${invocation}` `` matches ANY expression, even non-invocations
-- No way to add semantic constraints without manual validation in visitor code
+- Currently captures match based on pattern structure alone - a bare `pattern`${capture('x')}`` matches ANY expression
+- No way to add semantic constraints (type checks, value validation) without manual validation in visitor code
 - Constraints co-located with capture definitions improve code organization
 - Reusable constraint functions can be packaged with captures
 - Mirrors existing `configure()` API pattern used on Pattern objects
+
+**Important: How Constraints Work**
+
+Constraints provide **semantic validation** after **structural matching**:
+
+1. **Structural matching** (pattern AST determines what can match):
+   - `pattern`processData(${arg})`` structurally matches any call to `processData` with one argument
+   - The argument can be any expression (identifier, literal, call, binary operation, etc.)
+
+2. **Constraint validation** (runtime filter after structural match):
+   - Constraint function receives the matched node: `(expr) => expr instanceof J.Literal && typeof expr.value === 'number'`
+   - Returns `true`: match succeeds, capture is bound
+   - Returns `false`: match fails, pattern returns `undefined`
+
+**Best Practices:**
+
+```typescript
+// ✅ GOOD: Structural pattern + semantic constraint
+const numArg = capture('arg').configure({
+    constraint: (node) => node instanceof J.Literal && typeof node.value === 'number'
+});
+pattern`process(${numArg})`; // Matches process(42), rejects process("text")
+
+// ⚠️ LESS EFFICIENT: Bare capture with constraint
+const invocation = capture('invocation').configure({
+    constraint: (node) => node instanceof J.MethodInvocation
+});
+pattern`${invocation}`; // Structurally matches ANY expression, then filters
+
+// ✅ BETTER: Use structural context when possible
+pattern`${invocation}()`; // Structurally requires method invocation
+```
+
+**Type Safety Note:** The TypeScript generic `<T>` provides IDE autocomplete but doesn't enforce runtime types. Always include explicit type checks in your constraint function:
+
+```typescript
+// TypeScript type is just for autocomplete
+const method = capture<J.MethodInvocation>('method')
+    .configure({
+        // Must still check instanceof at runtime
+        constraint: (node: J.MethodInvocation) =>
+            node instanceof J.MethodInvocation && node.name.simpleName === 'foo'
+    });
+```
 
 **Implementation:**
 - `configure()` method on Capture accepts options object with `constraint` function

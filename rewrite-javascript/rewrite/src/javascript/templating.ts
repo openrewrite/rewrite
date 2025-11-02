@@ -168,6 +168,27 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
  * Represents a placeholder in a template pattern that can capture a part of the AST.
  *
  * @template T The expected type of the captured AST node (for TypeScript autocomplete)
+ *
+ * @remarks
+ * **Important: Type Parameter is for IDE Support Only**
+ *
+ * The generic type parameter `<T>` provides IDE autocomplete and type checking in your code,
+ * but does NOT enforce any runtime constraints on what the capture will match.
+ *
+ * **Pattern Matching Behavior:**
+ * - A bare `pattern`${capture('x')}`` will structurally match ANY expression
+ * - Pattern structure determines matching: `pattern`foo(${capture('x')})`` only matches `foo()` calls
+ * - Use structural patterns to narrow matching scope before applying semantic validation
+ *
+ * **Future Enhancement (Not Yet Implemented):**
+ * Captures will support a `.configure()` method for runtime constraints:
+ * ```typescript
+ * const arg = capture<J.Literal>('arg')
+ *     .configure({
+ *         constraint: (node) => node instanceof J.Literal && typeof node.value === 'number'
+ *     });
+ * ```
+ * When implemented, constraints will provide semantic validation AFTER structural matching.
  */
 export interface Capture<T = any> {
     /**
@@ -234,22 +255,50 @@ class CaptureValue {
 /**
  * Creates a capture specification for use in template patterns.
  *
- * @template T The expected type of the captured AST node (for TypeScript autocomplete)
+ * @template T The expected type of the captured AST node (for TypeScript autocomplete only)
  * @param name Optional name for the capture. If not provided, an auto-generated name is used.
  * @returns A Capture object that supports property access for use in templates
  *
+ * @remarks
+ * **Pattern Matching is Structural:**
+ *
+ * What a capture matches is determined by the pattern structure, not the type parameter:
+ * - `pattern`${capture('x')}`` matches ANY single expression (identifier, literal, call, binary, etc.)
+ * - `pattern`foo(${capture('x')})`` matches only expressions inside `foo()` calls
+ * - `pattern`${capture('x')} + ${capture('y')}`` matches only binary `+` expressions
+ *
+ * The TypeScript type parameter `<T>` provides IDE autocomplete but doesn't enforce runtime types.
+ *
  * @example
  * // Named inline captures
- * const pattern = pattern`${capture('left')} + ${capture('right')}`;
+ * const pat = pattern`${capture('left')} + ${capture('right')}`;
+ * // Matches: <any expression> + <any expression>
  *
  * // Unnamed captures
  * const {left, right} = {left: capture(), right: capture()};
  * const pattern = pattern`${left} + ${right}`;
  *
+ * @example
+ * // Type parameter is for IDE autocomplete only
+ * const method = capture<J.MethodInvocation>('method');
+ * const pat = pattern`foo(${method})`;
+ * // Matches: foo(<any expression>) - not restricted to method invocations!
+ * // Type <J.MethodInvocation> only helps with autocomplete in your code
+ *
+ * @example
+ * // Structural pattern determines what matches
+ * const arg = capture('arg');
+ * const pat = pattern`process(${arg})`;
+ * // Matches: process(42), process("text"), process(x + y), etc.
+ * // The 'arg' capture will bind to whatever expression is passed to process()
+ *
+ * @example
  * // Repeated patterns using the same capture
  * const expr = capture('expr');
  * const redundantOr = pattern`${expr} || ${expr}`;
+ * // Matches expressions where both sides are identical: x || x, foo() || foo()
  *
+ * @example
  * // Property access in templates
  * const method = capture<J.MethodInvocation>('method');
  * template`console.log(${method.name.simpleName})`  // Accesses properties of captured node
@@ -371,6 +420,97 @@ export interface PatternOptions {
 }
 
 /**
+ * Builder for creating patterns programmatically.
+ * Use when pattern structure is not known at compile time.
+ *
+ * @example
+ * // Loop-based pattern generation
+ * const builder = Pattern.builder().code('myFunction(');
+ * for (let i = 0; i < argCount; i++) {
+ *     if (i > 0) builder.code(', ');
+ *     builder.capture(capture(`arg${i}`));
+ * }
+ * builder.code(')');
+ * const pat = builder.build();
+ *
+ * @example
+ * // Conditional pattern construction
+ * const builder = Pattern.builder().code('foo(');
+ * builder.capture(capture('first'));
+ * if (needsSecondArg) {
+ *     builder.code(', ').capture(capture('second'));
+ * }
+ * builder.code(')');
+ * const pat = builder.build();
+ */
+export class PatternBuilder {
+    private parts: string[] = [];
+    private captures: Capture[] = [];
+
+    /**
+     * Adds a static string part to the pattern.
+     *
+     * @param str The string to add
+     * @returns This builder for chaining
+     */
+    code(str: string): this {
+        // If there are already captures, we need to add an empty string before this
+        if (this.captures.length > this.parts.length) {
+            this.parts.push('');
+        }
+        // Append to the last part or start a new one
+        if (this.parts.length === 0) {
+            this.parts.push(str);
+        } else {
+            this.parts[this.parts.length - 1] += str;
+        }
+        return this;
+    }
+
+    /**
+     * Adds a capture to the pattern.
+     *
+     * @param value The capture object or string name
+     * @returns This builder for chaining
+     */
+    capture(value: Capture | string): this {
+        // Ensure we have a part for after this capture
+        if (this.parts.length === 0) {
+            this.parts.push('');
+        }
+        // Convert string to Capture if needed
+        const captureObj = typeof value === 'string' ? new CaptureImpl(value) : value;
+        this.captures.push(captureObj);
+        // Add an empty string for the next part
+        this.parts.push('');
+        return this;
+    }
+
+    /**
+     * Builds the pattern from accumulated parts and captures.
+     *
+     * @returns A Pattern instance
+     */
+    build(): Pattern {
+        // Ensure parts array is one longer than captures array
+        while (this.parts.length <= this.captures.length) {
+            this.parts.push('');
+        }
+
+        // Create a synthetic TemplateStringsArray
+        const templateStrings = this.parts.slice() as any;
+        templateStrings.raw = this.parts.slice();
+        Object.defineProperty(templateStrings, 'raw', {
+            value: this.parts.slice(),
+            writable: false
+        });
+
+        // Delegate to the pattern() function
+        return pattern(templateStrings, ...this.captures);
+    }
+}
+
+/**
  * Represents a pattern that can be matched against AST nodes.
  */
 export class Pattern {
@@ -382,6 +522,24 @@ export class Pattern {
      */
     get options(): Readonly<PatternOptions> {
         return this._options;
+    }
+
+    /**
+     * Creates a new builder for constructing patterns programmatically.
+     *
+     * @returns A new PatternBuilder instance
+     *
+     * @example
+     * const pat = Pattern.builder()
+     *     .code('function ')
+     *     .capture(capture('name'))
+     *     .code('() { return ')
+     *     .capture(capture('value'))
+     *     .code('; }')
+     *     .build();
+     */
+    static builder(): PatternBuilder {
+        return new PatternBuilder();
     }
 
     /**
@@ -627,6 +785,94 @@ export interface TemplateOptions {
 }
 
 /**
+ * Builder for creating templates programmatically.
+ * Use when template structure is not known at compile time.
+ *
+ * @example
+ * // Conditional construction
+ * const builder = Template.builder().code('function foo(x) {');
+ * if (needsValidation) {
+ *     builder.code('if (typeof x !== "number") throw new Error("Invalid");');
+ * }
+ * builder.code('return x * 2; }');
+ * const tmpl = builder.build();
+ *
+ * @example
+ * // Composition from fragments
+ * function createWrapper(innerBody: Capture): Template {
+ *     return Template.builder()
+ *         .code('function wrapper() { try { ')
+ *         .param(innerBody)
+ *         .code(' } catch(e) { console.error(e); } }')
+ *         .build();
+ * }
+ */
+export class TemplateBuilder {
+    private parts: string[] = [];
+    private params: TemplateParameter[] = [];
+
+    /**
+     * Adds a static string part to the template.
+     *
+     * @param str The string to add
+     * @returns This builder for chaining
+     */
+    code(str: string): this {
+        // If there are already params, we need to add an empty string before this
+        if (this.params.length > this.parts.length) {
+            this.parts.push('');
+        }
+        // Append to the last part or start a new one
+        if (this.parts.length === 0) {
+            this.parts.push(str);
+        } else {
+            this.parts[this.parts.length - 1] += str;
+        }
+        return this;
+    }
+
+    /**
+     * Adds a parameter to the template.
+     *
+     * @param value The parameter value (Capture, Tree, or primitive)
+     * @returns This builder for chaining
+     */
+    param(value: TemplateParameter): this {
+        // Ensure we have a part for after this parameter
+        if (this.parts.length === 0) {
+            this.parts.push('');
+        }
+        this.params.push(value);
+        // Add an empty string for the next part
+        this.parts.push('');
+        return this;
+    }
+
+    /**
+     * Builds the template from accumulated parts and parameters.
+     *
+     * @returns A Template instance
+     */
+    build(): Template {
+        // Ensure parts array is one longer than params array
+        while (this.parts.length <= this.params.length) {
+            this.parts.push('');
+        }
+
+        // Create a synthetic TemplateStringsArray
+        const templateStrings = this.parts.slice() as any;
+        templateStrings.raw = this.parts.slice();
+        Object.defineProperty(templateStrings, 'raw', {
+            value: this.parts.slice(),
+            writable: false
+        });
+
+        // Delegate to the template() function
+        return template(templateStrings, ...this.params);
+    }
+}
+
+/**
  * Template for creating AST nodes.
  *
  * This class provides the public API for template generation.
@@ -668,6 +914,23 @@ export interface TemplateOptions {
  */
 export class Template {
     private options: TemplateOptions = {};
+
+    /**
+     * Creates a new builder for constructing templates programmatically.
+     *
+     * @returns A new TemplateBuilder instance
+     *
+     * @example
+     * const tmpl = Template.builder()
+     *     .code('function foo() {')
+     *     .code('return ')
+     *     .param(capture('value'))
+     *     .code('; }')
+     *     .build();
+     */
+    static builder(): TemplateBuilder {
+        return new TemplateBuilder();
+    }
 
     /**
      * Creates a new template.
