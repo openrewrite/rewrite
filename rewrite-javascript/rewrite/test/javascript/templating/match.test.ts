@@ -158,7 +158,7 @@ describe('match extraction', () => {
 
         const pat = pattern`${capture('left')} + ${capture('right')}`
             .configure({
-                imports: [`import { SomeType } from "${nonExistentPackage}"`],
+                context: [`import { SomeType } from "${nonExistentPackage}"`],
                 dependencies: { [nonExistentPackage]: '^1.0.0' }
             });
 

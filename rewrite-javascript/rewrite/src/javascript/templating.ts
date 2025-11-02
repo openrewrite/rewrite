@@ -37,7 +37,7 @@ class TemplateCache {
     private generateKey(
         templateString: string,
         captures: Capture[],
-        imports: string[],
+        contextStatements: string[],
         dependencies: Record<string, string>
     ): string {
         // Use the actual template string (with placeholders) as the primary key
@@ -46,13 +46,13 @@ class TemplateCache {
         // Capture names - use symbol to avoid triggering Proxy
         const capturesKey = captures.map(c => (c as any)[CAPTURE_NAME_SYMBOL] || c.name).join(',');
 
-        // Imports
-        const importsKey = imports.join(';');
+        // Context statements
+        const contextKey = contextStatements.join(';');
 
         // Dependencies
         const depsKey = JSON.stringify(dependencies || {});
 
-        return `${templateKey}::${capturesKey}::${importsKey}::${depsKey}`;
+        return `${templateKey}::${capturesKey}::${contextKey}::${depsKey}`;
     }
 
     /**
@@ -61,10 +61,10 @@ class TemplateCache {
     async getOrParse(
         templateString: string,
         captures: Capture[],
-        imports: string[],
+        contextStatements: string[],
         dependencies: Record<string, string>
     ): Promise<JS.CompilationUnit> {
-        const key = this.generateKey(templateString, captures, imports, dependencies);
+        const key = this.generateKey(templateString, captures, contextStatements, dependencies);
 
         let cu = this.cache.get(key);
         if (cu) {
@@ -79,9 +79,9 @@ class TemplateCache {
             workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
         }
 
-        // Prepend imports for type attribution context
-        const fullTemplateString = imports.length > 0
-            ? imports.join('\n') + '\n' + templateString
+        // Prepend context statements for type attribution context
+        const fullTemplateString = contextStatements.length > 0
+            ? contextStatements.join('\n') + '\n' + templateString
             : templateString;
 
         // Parse and cache (workspace only needed during parsing)
@@ -326,6 +326,27 @@ export const _ = capture;
  */
 export interface PatternOptions {
     /**
+     * Declarations to provide type attribution context for the pattern.
+     * These can include import statements, type declarations, function declarations, or any
+     * other declarations needed for proper type information. They are prepended to the pattern
+     * when parsing to ensure proper type attribution.
+     *
+     * @example
+     * ```typescript
+     * pattern`forwardRef(${capture('comp')})`
+     *     .configure({
+     *         context: [
+     *             `import { forwardRef } from 'react'`,
+     *             `type MyType = { value: number }`
+     *         ]
+     *     })
+     * ```
+     */
+    context?: string[];
+
+    /**
+     * @deprecated Use `context` instead. This alias will be removed in a future version.
+     *
      * Import statements to provide type attribution context.
      * These are prepended to the pattern when parsing to ensure proper type information.
      */
@@ -445,10 +466,12 @@ class Matcher {
      */
     async matches(): Promise<boolean> {
         if (!this.patternAst) {
+            // Prefer 'context' over deprecated 'imports'
+            const contextStatements = this.pattern.options.context || this.pattern.options.imports || [];
             const templateProcessor = new TemplateProcessor(
                 this.pattern.templateParts,
                 this.pattern.captures,
-                this.pattern.options.imports || [],
+                contextStatements,
                 this.pattern.options.dependencies || {}
             );
             this.patternAst = await templateProcessor.toAstPattern();
@@ -569,6 +592,27 @@ export type TemplateParameter = Capture | Tree | string | number | boolean;
  */
 export interface TemplateOptions {
     /**
+     * Declarations to provide type attribution context for the template.
+     * These can include import statements, type declarations, function declarations, or any
+     * other declarations needed for proper type information. They are prepended to the template
+     * when parsing to ensure proper type attribution.
+     *
+     * @example
+     * ```typescript
+     * template`console.log(${capture('value')})`
+     *     .configure({
+     *         context: [
+     *             `type MyType = { value: number }`,
+     *             `const console = { log: (x: any) => void 0 }`
+     *         ]
+     *     })
+     * ```
+     */
+    context?: string[];
+
+    /**
+     * @deprecated Use `context` instead. This alias will be removed in a future version.
+     *
      * Import statements to provide type attribution context.
      * These are prepended to the template when parsing to ensure proper type information.
      */
@@ -680,6 +724,8 @@ export class Template {
             normalizedValues = values;
         }
 
+        // Prefer 'context' over deprecated 'imports'
+        const contextStatements = this.options.context || this.options.imports || [];
         return TemplateEngine.applyTemplate(
             this.templateParts,
             this.parameters,
@@ -689,7 +735,7 @@ export class Template {
                 mode: JavaCoordinates.Mode.Replace
             },
             normalizedValues,
-            this.options.imports || [],
+            contextStatements,
             this.options.dependencies || {}
         );
     }
@@ -774,7 +820,7 @@ class TemplateEngine {
      * @param cursor The cursor pointing to the current location in the AST
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @param values Map of capture names to values to replace the parameters with
-     * @param imports Import statements to prepend for type attribution
+     * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
      * @returns A Promise resolving to the generated AST node
      */
@@ -784,7 +830,7 @@ class TemplateEngine {
         cursor: Cursor,
         coordinates: JavaCoordinates,
         values: Pick<Map<string, J>, 'get'> = new Map(),
-        imports: string[] = [],
+        contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
     ): Promise<J | undefined> {
         // Build the template string with parameter placeholders
@@ -800,7 +846,7 @@ class TemplateEngine {
         const cu = await templateCache.getOrParse(
             templateString,
             [], // templates don't have captures in the cache key
-            imports,
+            contextStatements,
             dependencies
         );
 
@@ -809,8 +855,8 @@ class TemplateEngine {
             return undefined;
         }
 
-        // Skip import statements to get to the actual template code
-        const templateStatementIndex = imports.length;
+        // Skip context statements to get to the actual template code
+        const templateStatementIndex = contextStatements.length;
         if (templateStatementIndex >= cu.statements.length) {
             return undefined;
         }
@@ -1185,13 +1231,13 @@ class TemplateProcessor {
      *
      * @param templateParts The string parts of the template
      * @param captures The captures between the string parts
-     * @param imports Import statements to prepend for type attribution
+     * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
      */
     constructor(
         private readonly templateParts: TemplateStringsArray,
         private readonly captures: Capture[],
-        private readonly imports: string[] = [],
+        private readonly contextStatements: string[] = [],
         private readonly dependencies: Record<string, string> = {}
     ) {
     }
@@ -1209,7 +1255,7 @@ class TemplateProcessor {
         const cu = await templateCache.getOrParse(
             templateString,
             this.captures,
-            this.imports,
+            this.contextStatements,
             this.dependencies
         );
 
@@ -1243,8 +1289,8 @@ class TemplateProcessor {
      * @returns The extracted pattern
      */
     private extractPatternFromAst(cu: JS.CompilationUnit): J {
-        // Skip import statements to get to the actual pattern code
-        const patternStatementIndex = this.imports.length;
+        // Skip context statements to get to the actual pattern code
+        const patternStatementIndex = this.contextStatements.length;
 
         // Extract the relevant part of the AST based on the template content
         const firstStatement = cu.statements[patternStatementIndex].element;

@@ -28,7 +28,7 @@ describe('lenient type matching in patterns', () => {
             // Pattern with unconstrained captures for props, ref, and body
             const pat = pattern`React.forwardRef((${capture('props')}, ${capture('ref')}) => ${capture('body')})`
                 .configure({
-                    imports: [`import * as React from 'react'`],
+                    context: [`import * as React from 'react'`],
                     dependencies: {'@types/react': '^18.0.0'}
                 });
 
@@ -125,7 +125,7 @@ function greet(): string { return "hello"; }
         // This demonstrates: matching untyped pattern against typed code + capturing + template replacement
         const pat = pattern`forwardRef(function ${capture('name')}(props, ref) { return null; })`
             .configure({
-                imports: [`import { forwardRef } from 'react'`]
+                context: [`import { forwardRef } from 'react'`]
             });
 
         // Template that uses the captured name as an identifier
