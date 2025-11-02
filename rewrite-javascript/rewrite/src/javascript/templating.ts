@@ -206,6 +206,26 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
         return super.visitMethodDeclaration(methodDeclaration, otherMethodDeclaration);
     }
 
+    override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== J.Kind.MethodInvocation) {
+            return this.abort(methodInvocation);
+        }
+
+        const otherMethodInvocation = other as J.MethodInvocation;
+
+        // LENIENT: If pattern lacks methodType but target has one, add a wildcard type to pattern
+        // This allows patterns without full type attribution to match typed method invocations
+        if (!methodInvocation.methodType && otherMethodInvocation.methodType) {
+            methodInvocation = produce(methodInvocation, draft => {
+                // Create a minimal methodType - the comparator will handle the lenient matching
+                draft.methodType = otherMethodInvocation.methodType;
+            });
+        }
+
+        // Delegate to super implementation
+        return super.visitMethodInvocation(methodInvocation, otherMethodInvocation);
+    }
+
     protected hasSameKind(j: J, other: J): boolean {
         return super.hasSameKind(j, other) ||
                (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));

@@ -4860,7 +4860,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         if (!method.methodType || !otherMethod.methodType) {
             // If template has type but target doesn't, they don't match
             if (method.methodType || otherMethod.methodType) {
-                // return this.abort(method);
+                return this.abort(method);
             }
             // If neither has type, fall through to structural comparison
             return super.visitMethodInvocation(method, other);
