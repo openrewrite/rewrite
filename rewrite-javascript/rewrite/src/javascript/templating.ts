@@ -89,8 +89,8 @@ class TemplateCache {
         // Use the actual template string (with placeholders) as the primary key
         const templateKey = templateString;
 
-        // Capture names - use symbol to avoid triggering Proxy
-        const capturesKey = captures.map(c => (c as any)[CAPTURE_NAME_SYMBOL] || c.name).join(',');
+        // Capture names
+        const capturesKey = captures.map(c => c.getName()).join(',');
 
         // Context statements
         const contextKey = contextStatements.join(';');
@@ -305,7 +305,7 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
                 for (let i = 0; i < maxConsume; i++) {
                     const arg = targetArgs[targetIdx + i].element;
                     // Skip J.Empty as it represents an empty argument list, not an actual argument
-                    if (arg.kind !== 'org.openrewrite.java.tree.J$Empty') {
+                    if (arg.kind !== J.Kind.Empty) {
                         capturedArgs.push(arg);
                     }
                 }
@@ -332,7 +332,7 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
                 const targetArg = targetArgs[targetIdx].element;
 
                 // J.Empty represents no argument, so regular captures should not match it
-                if (targetArg.kind === 'org.openrewrite.java.tree.J$Empty') {
+                if (targetArg.kind === J.Kind.Empty) {
                     return false;
                 }
 
@@ -375,25 +375,6 @@ export interface VariadicOptions {
 /**
  * Configuration options for captures.
  */
-/**
- * Options for variadic captures.
- */
-export interface VariadicOptions {
-    /**
-     * Separator between elements (default: ', ' for arguments).
-     */
-    separator?: string;
-
-    /**
-     * Minimum number of nodes to match (default: 0).
-     */
-    min?: number;
-
-    /**
-     * Maximum number of nodes to match (default: unlimited).
-     */
-    max?: number;
-}
 
 /**
  * Options for the capture function.
@@ -438,68 +419,26 @@ export interface CaptureOptions<T = any> {
  */
 export interface Capture<T = any> {
     /**
-     * The name of the capture, used to retrieve the captured node later.
-     * Note: Accessing this property on a Proxy-wrapped capture returns a CaptureValue.
-     * Use getName() to get the string name.
-     */
-    name: string;
-
-    /**
      * Gets the string name of this capture.
-     * Use this instead of .name when you need the actual string value.
      */
     getName(): string;
 
     /**
-     * Returns true if this is a variadic capture.
+     * Returns true if this is a variadic capture (matching zero or more nodes).
      */
     isVariadic(): boolean;
 
     /**
-     * Gets the variadic options if this is a variadic capture.
+     * Returns the variadic options if this is a variadic capture, undefined otherwise.
      */
     getVariadicOptions(): VariadicOptions | undefined;
 
     /**
      * Gets the constraint function if this capture has one.
+     * For regular captures (T = Expression), constraint receives a single node.
+     * For variadic captures (T = Expression[]), constraint receives an array of nodes.
      */
     getConstraint?(): ((node: T) => boolean) | undefined;
-}
-
-/**
- * A variadic capture that matches zero or more nodes in a sequence.
- * When retrieved from match results, the captured value will be an array of nodes.
- *
- * This interface is intentionally NOT extending Capture to provide better type safety
- * and avoid ambiguity in TypeScript's overload resolution. Regular and variadic captures
- * are fundamentally different operations with different semantics.
- */
-export interface VariadicCapture<T = any> {
-    /**
-     * The name of the capture, used to retrieve the captured nodes later.
-     */
-    readonly name: string;
-
-    /**
-     * Always returns true for variadic captures.
-     */
-    isVariadic(): true;
-
-    /**
-     * Returns the variadic options for this capture.
-     */
-    getVariadicOptions(): VariadicOptions;
-
-    /**
-     * Gets the constraint function if defined.
-     * For variadic captures, the constraint receives an array of nodes.
-     */
-    getConstraint?(): ((nodes: T[]) => boolean) | undefined;
-
-    /**
-     * Gets the internal capture name.
-     */
-    getName(): string;
 }
 
 // Symbol to access the internal capture name without triggering Proxy
@@ -602,7 +541,7 @@ class CaptureValue {
      * and navigating through the property path.
      */
     resolve(values: Pick<Map<string, J | J[]>, 'get'>): any {
-        const rootName = (this.rootCapture as any)[CAPTURE_NAME_SYMBOL] || this.rootCapture.name;
+        const rootName = (this.rootCapture as any)[CAPTURE_NAME_SYMBOL] || this.rootCapture.getName();
         let current: any = values.get(rootName);
 
         // Handle array operations on variadic captures
@@ -703,13 +642,13 @@ export function capture<T = any>(
 export function capture<T = any>(
     name: string,
     options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
-): VariadicCapture<T> & T[];
+): Capture<T[]> & T[];
 
 // Overload 3: Variadic capture without name (explicitly requires variadic property)
 export function capture<T = any>(
     name: undefined,
     options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
-): VariadicCapture<T> & T[];
+): Capture<T[]> & T[];
 
 // Overload 4: Catch-all for simple captures without special options
 export function capture<T = any>(
@@ -1089,16 +1028,16 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
     ) {
     }
 
-    // Overload: get with VariadicCapture returns array
-    get<T>(capture: VariadicCapture<T>): T[] | undefined;
-    // Overload: get with Capture returns single value
+    // Overload: get with variadic Capture (array type) returns array
+    get<T>(capture: Capture<T[]>): T[] | undefined;
+    // Overload: get with regular Capture returns single value
     get<T>(capture: Capture<T>): T | undefined;
     // Overload: get with string returns J
     get(capture: string): J | undefined;
     // Implementation
-    get(capture: Capture<any> | VariadicCapture<any> | string): J | J[] | undefined {
+    get(capture: Capture<any> | string): J | J[] | undefined {
         // Use symbol to get internal name without triggering Proxy
-        const name = typeof capture === "string" ? capture : ((capture as any)[CAPTURE_NAME_SYMBOL] || capture.name);
+        const name = typeof capture === "string" ? capture : ((capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName());
         return this.bindings.get(name);
     }
 }
@@ -1253,12 +1192,12 @@ export function pattern(strings: TemplateStringsArray, ...captures: (Capture | s
     const capturesByName = captures.reduce((map, c) => {
         const capture = typeof c === "string" ? new CaptureImpl(c) : c;
         // Use symbol to get internal name without triggering Proxy
-        const name = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.name;
+        const name = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
         return map.set(name, capture);
     }, new Map<string, Capture>());
     return new Pattern(strings, captures.map(c => {
         // Use symbol to get internal name without triggering Proxy
-        const name = typeof c === "string" ? c : ((c as any)[CAPTURE_NAME_SYMBOL] || c.name);
+        const name = typeof c === "string" ? c : ((c as any)[CAPTURE_NAME_SYMBOL] || c.getName());
         return capturesByName.get(name)!;
     }));
 }
@@ -2280,7 +2219,7 @@ class TemplateProcessor {
             if (i < this.captures.length) {
                 const capture = this.captures[i];
                 // Use symbol to access capture name without triggering Proxy
-                const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.name;
+                const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
                 result += PlaceholderUtils.createCapture(captureName);
             }
         }
