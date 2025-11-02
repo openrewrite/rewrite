@@ -43,8 +43,8 @@ class TemplateCache {
         // Use the actual template string (with placeholders) as the primary key
         const templateKey = templateString;
 
-        // Capture names
-        const capturesKey = captures.map(c => c.name).join(',');
+        // Capture names - use symbol to avoid triggering Proxy
+        const capturesKey = captures.map(c => (c as any)[CAPTURE_NAME_SYMBOL] || c.name).join(',');
 
         // Imports
         const importsKey = imports.join(';');
@@ -223,26 +223,77 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
 /**
  * Capture specification for pattern matching.
  * Represents a placeholder in a template pattern that can capture a part of the AST.
+ *
+ * @template T The expected type of the captured AST node (for TypeScript autocomplete)
  */
-export interface Capture {
+export interface Capture<T = any> {
     /**
      * The name of the capture, used to retrieve the captured node later.
+     * Note: Accessing this property on a Proxy-wrapped capture returns a CaptureValue.
+     * Use getName() to get the string name.
      */
     name: string;
+
+    /**
+     * Gets the string name of this capture.
+     * Use this instead of .name when you need the actual string value.
+     */
+    getName(): string;
 }
 
-class CaptureImpl implements Capture {
+// Symbol to access the internal capture name without triggering Proxy
+const CAPTURE_NAME_SYMBOL = Symbol('captureName');
+
+class CaptureImpl<T = any> implements Capture<T> {
+    public readonly name: string;
+    [CAPTURE_NAME_SYMBOL]: string;
+
+    constructor(name: string) {
+        this.name = name;
+        this[CAPTURE_NAME_SYMBOL] = name;
+    }
+
+    getName(): string {
+        return this[CAPTURE_NAME_SYMBOL];
+    }
+}
+
+/**
+ * Represents a property access on a captured value.
+ * When you access a property on a Capture (e.g., method.name), you get a CaptureValue
+ * that knows how to resolve that property from the matched values.
+ */
+class CaptureValue {
     constructor(
-        public readonly name: string
-    ) {
+        public readonly rootCapture: Capture,
+        public readonly propertyPath: string[]
+    ) {}
+
+    /**
+     * Resolves this capture value by looking up the root capture in the values map
+     * and navigating through the property path.
+     */
+    resolve(values: Map<string, J>): any {
+        const rootName = (this.rootCapture as any)[CAPTURE_NAME_SYMBOL] || this.rootCapture.name;
+        let current: any = values.get(rootName);
+
+        for (const prop of this.propertyPath) {
+            if (current === null || current === undefined) {
+                return undefined;
+            }
+            current = current[prop];
+        }
+
+        return current;
     }
 }
 
 /**
  * Creates a capture specification for use in template patterns.
  *
+ * @template T The expected type of the captured AST node (for TypeScript autocomplete)
  * @param name Optional name for the capture. If not provided, an auto-generated name is used.
- * @returns A Capture object
+ * @returns A Capture object that supports property access for use in templates
  *
  * @example
  * // Named inline captures
@@ -255,12 +306,60 @@ class CaptureImpl implements Capture {
  * // Repeated patterns using the same capture
  * const expr = capture('expr');
  * const redundantOr = pattern`${expr} || ${expr}`;
+ *
+ * // Property access in templates
+ * const method = capture<J.MethodInvocation>('method');
+ * template`console.log(${method.name.simpleName})`  // Accesses properties of captured node
  */
-export function capture(name?: string): Capture {
-    if (name) {
-        return new CaptureImpl(name);
-    }
-    return new CaptureImpl(`unnamed_${capture.nextUnnamedId++}`);
+export function capture<T = any>(name?: string): Capture<T> & T {
+    const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
+    const impl = new CaptureImpl<T>(captureName);
+
+    // Return a Proxy that intercepts property accesses and creates CaptureValues
+    return new Proxy(impl as any, {
+        get(target: any, prop: string | symbol): any {
+            // Allow access to the internal capture name via symbol
+            if (prop === CAPTURE_NAME_SYMBOL) {
+                return target[CAPTURE_NAME_SYMBOL];
+            }
+
+            // Allow getName() method to return the string name
+            if (prop === 'getName') {
+                return () => target[CAPTURE_NAME_SYMBOL];
+            }
+
+            // For string property access, create a CaptureValue with a property path
+            if (typeof prop === 'string') {
+                return createCaptureValueProxy(target, [prop]);
+            }
+
+            return undefined;
+        }
+    });
+}
+
+/**
+ * Creates a Proxy around a CaptureValue that allows further property access.
+ * This enables chaining like method.name.simpleName
+ */
+function createCaptureValueProxy(rootCapture: Capture, propertyPath: string[]): any {
+    const captureValue = new CaptureValue(rootCapture, propertyPath);
+
+    return new Proxy(captureValue, {
+        get(target: CaptureValue, prop: string | symbol): any {
+            // Allow access to the CaptureValue instance itself
+            if (prop === 'resolve' || prop === 'rootCapture' || prop === 'propertyPath') {
+                return target[prop as keyof CaptureValue];
+            }
+
+            // For string property access, extend the property path
+            if (typeof prop === 'string') {
+                return createCaptureValueProxy(target.rootCapture, [...target.propertyPath, prop]);
+            }
+
+            return undefined;
+        }
+    });
 }
 
 // Static counter for generating unique IDs for unnamed captures
@@ -361,7 +460,8 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
     }
 
     get(capture: Capture | string): J | undefined {
-        const name = typeof capture === "string" ? capture : capture.name;
+        // Use symbol to get internal name without triggering Proxy
+        const name = typeof capture === "string" ? capture : ((capture as any)[CAPTURE_NAME_SYMBOL] || capture.name);
         return this.bindings.get(name);
     }
 }
@@ -473,9 +573,15 @@ class Matcher {
 export function pattern(strings: TemplateStringsArray, ...captures: (Capture | string)[]): Pattern {
     const capturesByName = captures.reduce((map, c) => {
         const capture = typeof c === "string" ? new CaptureImpl(c) : c;
-        return map.set(capture.name, capture);
+        // Use symbol to get internal name without triggering Proxy
+        const name = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.name;
+        return map.set(name, capture);
     }, new Map<string, Capture>());
-    return new Pattern(strings, captures.map(c => capturesByName.get(typeof c === "string" ? c : c.name)!));
+    return new Pattern(strings, captures.map(c => {
+        // Use symbol to get internal name without triggering Proxy
+        const name = typeof c === "string" ? c : ((c as any)[CAPTURE_NAME_SYMBOL] || c.name);
+        return capturesByName.get(name)!;
+    }));
 }
 
 type JavaCoordinates = {
@@ -527,6 +633,10 @@ export interface TemplateOptions {
  * This class provides the public API for template generation.
  * The actual templating logic is handled by the internal TemplateEngine.
  *
+ * Templates can reference captures from patterns, and you can access properties
+ * of captured nodes using dot notation. This allows you to extract and insert
+ * specific subtrees from matched AST nodes.
+ *
  * @example
  * // Generate a literal AST node
  * const result = template`2`.apply(cursor, coordinates);
@@ -534,6 +644,28 @@ export interface TemplateOptions {
  * @example
  * // Generate an AST node with a parameter
  * const result = template`${capture()}`.apply(cursor, coordinates);
+ *
+ * @example
+ * // Access properties of captured nodes in templates
+ * const method = capture<J.MethodInvocation>('method');
+ * const pat = pattern`foo(${method})`;
+ * const tmpl = template`bar(${method.name})`; // Access the 'name' property
+ *
+ * const match = await pat.match(someNode);
+ * if (match) {
+ *     // The template will insert just the 'name' subtree from the captured method
+ *     const result = await tmpl.apply(cursor, someNode, match);
+ * }
+ *
+ * @example
+ * // Deep property access chains
+ * const method = capture<J.MethodInvocation>('method');
+ * template`console.log(${method.name.simpleName})` // Navigate multiple properties
+ *
+ * @example
+ * // Array element access
+ * const invocation = capture<J.MethodInvocation>('invocation');
+ * template`bar(${invocation.arguments.elements[0].element})` // Access array elements
  */
 export class Template {
     private options: TemplateOptions = {};
@@ -576,7 +708,23 @@ export class Template {
      * @param values values for parameters in template
      * @returns A Promise resolving to the generated AST node
      */
-    async apply(cursor: Cursor, tree: J, values?: Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
+    async apply(cursor: Cursor, tree: J, values?: Map<Capture | string, J> | Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
+        // Normalize the values map: convert any Capture keys to string keys
+        let normalizedValues: Pick<Map<string, J>, 'get'> | undefined;
+        if (values instanceof Map) {
+            const normalized = new Map<string, J>();
+            for (const [key, value] of values.entries()) {
+                const stringKey = typeof key === 'string'
+                    ? key
+                    : ((key as any)[CAPTURE_NAME_SYMBOL] || key.getName());
+                normalized.set(stringKey, value);
+            }
+            normalizedValues = normalized;
+        } else {
+            // If it's Pick<Map> (like MatchResult), it already uses string keys
+            normalizedValues = values;
+        }
+
         return TemplateEngine.applyTemplate(
             this.templateParts,
             this.parameters,
@@ -585,13 +733,58 @@ export class Template {
                 tree,
                 mode: JavaCoordinates.Mode.Replace
             },
-            values,
+            normalizedValues,
             this.options.imports || [],
             this.options.dependencies || {}
         );
     }
 }
 
+/**
+ * Tagged template function for creating templates that generate AST nodes.
+ *
+ * Templates support property access on captures from patterns, allowing you to
+ * extract and insert specific subtrees from matched AST nodes. Use dot notation
+ * to navigate properties (e.g., `method.name`) or array bracket notation to
+ * access array elements (e.g., `args.elements[0].element`).
+ *
+ * @param strings The string parts of the template
+ * @param parameters The parameters between the string parts (Capture, Tree, or primitives)
+ * @returns A Template object that can be applied to generate AST nodes
+ *
+ * @example
+ * // Simple template with literal
+ * const tmpl = template`console.log("hello")`;
+ * const result = await tmpl.apply(cursor, node);
+ *
+ * @example
+ * // Template with capture - matches captured value from pattern
+ * const expr = capture('expr');
+ * const pat = pattern`foo(${expr})`;
+ * const tmpl = template`bar(${expr})`;
+ *
+ * const match = await pat.match(node);
+ * if (match) {
+ *     const result = await tmpl.apply(cursor, node, match);
+ * }
+ *
+ * @example
+ * // Property access on captures - extract subtrees
+ * const method = capture<J.MethodInvocation>('method');
+ * const pat = pattern`foo(${method})`;
+ * // Access the 'name' property of the captured method invocation
+ * const tmpl = template`bar(${method.name})`;
+ *
+ * @example
+ * // Deep property chains
+ * const method = capture<J.MethodInvocation>('method');
+ * template`console.log(${method.name.simpleName})`
+ *
+ * @example
+ * // Array element access
+ * const invocation = capture<J.MethodInvocation>('invocation');
+ * template`bar(${invocation.arguments.elements[0].element})`
+ */
 export function template(strings: TemplateStringsArray, ...parameters: TemplateParameter[]): Template {
     // Convert parameters to Parameter objects (no longer need to check for mutable tree property)
     const processedParameters = parameters.map(param => {
@@ -707,9 +900,13 @@ class TemplateEngine {
             result += templateParts[i];
             if (i < parameters.length) {
                 const param = parameters[i].value;
-                // Use a placeholder for Captures and Tree nodes
+                // Use a placeholder for Captures, CaptureValues, and Tree nodes
                 // Inline everything else (strings, numbers, booleans) directly
-                if (param instanceof CaptureImpl || isTree(param)) {
+                // Check for Capture (could be a Proxy, so check for symbol property)
+                const isCapture = param instanceof CaptureImpl ||
+                                (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
+                const isCaptureValue = param instanceof CaptureValue;
+                if (isCapture || isCaptureValue || isTree(param)) {
                     const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
                     result += placeholder;
                 } else {
@@ -865,15 +1062,55 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             return placeholder;
         }
 
-        // If the parameter value is a Capture, look up the matched result
-        if (param.value instanceof CaptureImpl) {
-            const matchedNode = this.values.get(param.value.name);
+        // Check if the parameter value is a CaptureValue
+        const isCaptureValue = param.value instanceof CaptureValue;
+
+        if (isCaptureValue) {
+            // Resolve the capture value to get the actual property value
+            const propertyValue = param.value.resolve(this.values);
+
+            if (propertyValue !== undefined) {
+                // If the property value is already a J node, use it
+                if (isTree(propertyValue)) {
+                    return produce(propertyValue as J, draft => {
+                        draft.markers = placeholder.markers;
+                        draft.prefix = placeholder.prefix;
+                    });
+                }
+                // If it's a primitive value and placeholder is an identifier, update the simpleName
+                if (typeof propertyValue === 'string' && placeholder.kind === J.Kind.Identifier) {
+                    return produce(placeholder as J.Identifier, draft => {
+                        draft.simpleName = propertyValue;
+                    });
+                }
+                // If it's a primitive value and placeholder is a literal, update the value
+                if (typeof propertyValue === 'string' && placeholder.kind === J.Kind.Literal) {
+                    return produce(placeholder as J.Literal, draft => {
+                        draft.value = propertyValue;
+                        draft.valueSource = `"${propertyValue}"`;
+                    });
+                }
+            }
+
+            // If no match found or unhandled type, return placeholder unchanged
+            return placeholder;
+        }
+
+        // Check if the parameter value is a Capture (could be a Proxy)
+        const isCapture = param.value instanceof CaptureImpl ||
+                         (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
+
+        if (isCapture) {
+            // Simple capture (no property path)
+            const captureName = param.value[CAPTURE_NAME_SYMBOL] || param.value.name;
+            const matchedNode = this.values.get(captureName);
             if (matchedNode) {
                 return produce(matchedNode, draft => {
                     draft.markers = placeholder.markers;
                     draft.prefix = placeholder.prefix;
                 });
             }
+
             // If no match found, return placeholder unchanged
             return placeholder;
         }
@@ -904,6 +1141,7 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         }
         return null;
     }
+
 }
 
 /**
@@ -1035,7 +1273,9 @@ class TemplateProcessor {
             result += this.templateParts[i];
             if (i < this.captures.length) {
                 const capture = this.captures[i];
-                result += PlaceholderUtils.createCapture(capture.name);
+                // Use symbol to access capture name without triggering Proxy
+                const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.name;
+                result += PlaceholderUtils.createCapture(captureName);
             }
         }
         return result;

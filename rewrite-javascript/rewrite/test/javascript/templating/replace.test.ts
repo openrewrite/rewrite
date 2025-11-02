@@ -110,7 +110,7 @@ describe('template2 replace', () => {
 
                     // Use capture for late binding - myValue capture is looked up in the values map
                     const myValue = capture();
-                    return template`${myValue}`.apply(this.cursor, literal, new Map([[myValue.name, replacement]]));
+                    return template`${myValue}`.apply(this.cursor, literal, new Map([[myValue, replacement]]));
                 }
                 return literal;
             }
@@ -149,7 +149,7 @@ describe('template2 replace', () => {
 
                     // Mix capture (late binding) with literal string insertion
                     const x = capture();
-                    return template`${x} + ${'y'}`.apply(this.cursor, literal, new Map([[x.name, replacement]]));
+                    return template`${x} + ${'y'}`.apply(this.cursor, literal, new Map([[x, replacement]]));
                 }
                 return literal;
             }
