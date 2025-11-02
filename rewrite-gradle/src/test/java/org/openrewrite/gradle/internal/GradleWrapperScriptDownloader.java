@@ -25,13 +25,15 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.LatestRelease;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -39,7 +41,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Adler32;
 
-import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
@@ -115,8 +116,8 @@ public class GradleWrapperScriptDownloader {
             Path windowsFile = WRAPPER_SCRIPTS.resolve("windows").resolve(existingVersion.getGradlewBatChecksum() + ".txt");
 
             if (Files.exists(unixFile) && Files.exists(windowsFile)) {
-              unixChecksums.computeIfAbsent(allVersions.get(v).getGradlewChecksum(), checksum -> loadScript("unix", checksum));
-              batChecksums.computeIfAbsent(allVersions.get(v).getGradlewBatChecksum(), checksum -> loadScript("windows", checksum));
+                unixChecksums.computeIfAbsent(allVersions.get(v).getGradlewChecksum(), checksum -> loadScript("unix", checksum));
+                batChecksums.computeIfAbsent(allVersions.get(v).getGradlewBatChecksum(), checksum -> loadScript("windows", checksum));
                 System.out.printf("%03d: %s already exists. Skipping.%n", i.incrementAndGet(), v);
                 return;
             }
@@ -161,7 +162,7 @@ public class GradleWrapperScriptDownloader {
 
     private static String loadScript(String os, String checksum) {
         try {
-            return StringUtils.readFully(Files.newInputStream(WRAPPER_SCRIPTS.resolve(os).resolve(checksum + ".txt")));
+            return Files.readString(WRAPPER_SCRIPTS.resolve(os).resolve(checksum + ".txt"));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -224,6 +225,7 @@ public class GradleWrapperScriptDownloader {
             binding.put("entryPointArgs", "");
             binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
         } else {
+            // Intentionally mixed slashes to match the 1.0-milestone versions
             binding.put("classpath", "$APP_HOME/gradle\\wrapper\\gradle-wrapper.jar");
             binding.put("entryPointArgs", "");
             binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
@@ -275,17 +277,6 @@ public class GradleWrapperScriptDownloader {
         return bindings;
     }
 
-    private static String defaultJvmOpts(GradleVersion gradleVersion) {
-        if (gradleVersion.compareTo(GRADLE_5_3) >= 0) {
-            return "\"-Xmx64m\" \"-Xms64m\"";
-        } else if (gradleVersion.compareTo(GRADLE_5_0_RC_1) >= 0) {
-            return "\"-Xmx64m\"";
-        } else if (gradleVersion.compareTo(GRADLE_1_7_RC_1) >= 0) {
-            return "\"\"";
-        }
-        return "";
-    }
-
     private static String renderTemplate(String source, Map<String, String> bindings, String lineSeparator) throws IOException, ClassNotFoundException {
         SimpleTemplateEngine engine = new SimpleTemplateEngine();
         return engine.createTemplate(source).make(new HashMap<>(bindings)).toString()
@@ -293,7 +284,7 @@ public class GradleWrapperScriptDownloader {
           .replace("CLASSPATH=\"\\\\\\\\\\\"\\\\\\\\\\\"", "CLASSPATH=\"\\\\\\\"\\\\\\\"");
     }
 
-    private static String hash(String text) throws NoSuchAlgorithmException {
+    private static String hash(String text) {
         byte[] scriptText = text.getBytes(StandardCharsets.UTF_8);
         Adler32 adler32 = new Adler32();
         adler32.update(scriptText, 0, scriptText.length);
