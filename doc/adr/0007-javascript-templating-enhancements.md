@@ -630,22 +630,118 @@ Decision: Yes, both work (unified template processing), but document that:
 
 ### 8. Ellipsis Patterns for Sequence Matching
 
-**Status**: 📝 Proposed
+**Status**: 📝 Proposed (Phase 1: Function Arguments)
 
-Add support for matching variable-length sequences of nodes (statements, arguments, array elements) using ellipsis captures.
+Add support for matching variable-length sequences of nodes using ellipsis captures. **Phase 1 focuses exclusively on function/method call arguments** - the highest-value, lowest-complexity use case.
+
+**Implementation Approach**: Phased implementation starting with function/method arguments (highest value, lowest complexity), then expanding to statements, arrays, and other sequence contexts in future phases.
+
+**Quick Start - Phase 1:**
+
+```typescript
+// Capture first arg, rest optional
+const first = capture('first');
+const rest = ellipsis('rest');
+const pat = pattern`foo(${first}, ${rest})`;
+
+// Matches: foo(1), foo(1, 2), foo(1, 2, 3, ...)
+// Use in template to add an argument while preserving others
+const tmpl = template`foo(${first}, "newArg", ${rest})`;
+```
 
 **Problem Statement:**
 
 Current patterns can only match fixed-length sequences at specific positions. There's no way to:
-- Match "any number of statements between two specific statements"
-- Match "any arguments after the first two"
+- Match "any arguments after the first two" (PHASE 1 - Function/Method Arguments)
 - Match "any number of elements in an array"
-- Capture variable-length sequences
+- Match "any number of statements between two specific statements"
+- Capture variable-length sequences for reuse in templates
 
 This is critical for real-world refactoring scenarios like:
+- **[PHASE 1]** Matching function calls with variable arguments (e.g., `foo(required, ...rest)`)
+- **[PHASE 1]** Wrapping specific function arguments while preserving others
+- **[PHASE 1]** Reordering function arguments while capturing "everything else"
 - Finding try-catch blocks with specific setup/teardown regardless of body contents
-- Matching function calls with variable arguments
 - Finding loops that contain specific operations among other statements
+
+**Phase 1 Focus: Function/Method Arguments**
+
+The first implementation phase focuses exclusively on function/method call arguments because:
+1. **High Value**: Most common use case in refactoring scenarios
+2. **Clear Semantics**: Arguments are already a well-defined list structure in the AST
+3. **Lower Complexity**: No control flow or scoping concerns (unlike statements)
+4. **Direct AST Support**: `J.MethodInvocation.arguments` is a `List<JRightPadded<Expression>>`
+5. **Proven Patterns**: Similar to JavaScript rest parameters (`...args`)
+
+**Separator Semantics & Zero-Match Problem:**
+
+The challenge with zero-or-more matching is handling separators correctly. Consider:
+
+```typescript
+// ❌ PROBLEM: This pattern won't match foo(a) due to hardcoded comma
+const first = capture('first');
+const rest = ellipsis('rest', ', ');
+pattern`foo(${first}, ${rest})`;  // Matches foo(a, b) but NOT foo(a)!
+```
+
+When this pattern is parsed by TypeScript, the comma becomes part of the AST structure. The pattern AST expects: `MethodInvocation → first arg → comma → rest args`. But `foo(a)` has no comma after the first arg, so it won't match.
+
+**Solution: Two Pattern Styles**
+
+**Style 1: Greedy Ellipsis (match all arguments, including zero)**
+```typescript
+const args = ellipsis('args', ', ');
+pattern`foo(${args})`;
+
+// Matches:
+// - foo()      → args=[] (represented as J.Empty with ellipsis marker)
+// - foo(a)     → args=[a]
+// - foo(a, b)  → args=[a, b]
+```
+
+For zero-match case, the parser creates a `J.Empty` node with an `EllipsisMarker` to indicate "ellipsis matched zero items here".
+
+**Style 2: Required First + Optional Rest**
+```typescript
+const first = capture('first');
+const rest = ellipsis('rest', ', ');
+pattern`foo(${first}${rest})`;  // No comma between them!
+
+// Matches:
+// - foo(a)     → first=a, rest=[]
+// - foo(a, b)  → first=a, rest=[b]
+// Does NOT match foo() - at least one arg required
+```
+
+The pattern has no literal comma, so the matching logic is:
+1. First capture matches one argument
+2. Rest ellipsis greedily consumes remaining arguments (comma-separated)
+3. If only one arg exists, rest=[]
+
+**Pattern Matching Rules:**
+1. Ellipsis with separator consumes comma-separated items
+2. When ellipsis is empty (zero match): represented as J.Empty with marker
+3. When ellipsis is non-empty: captures actual AST nodes
+4. No literal separator in pattern between captures - separator only used during matching/generation
+
+**Template Application Rules:**
+```typescript
+const tmpl = template`bar(${first}${rest})`;  // No comma in template either
+
+// Generation:
+// - If rest=[] → generates: bar(a)
+// - If rest=[b] → generates: bar(a, b)  (separator inserted automatically)
+// - If rest=[b,c] → generates: bar(a, b, c)
+```
+
+The template engine sees:
+1. first is a single Capture → insert one arg
+2. rest is an Ellipsis → if non-empty, insert separator then each arg with separators between
+
+**Why explicit separators?**
+- Allows control over formatting (e.g., `', '` vs `','` vs `, ` with spaces)
+- Works across different contexts (args use `', '`, statements use `\n`, etc.)
+- Simple and explicit - no magic inference needed
 
 **API:**
 
@@ -654,16 +750,19 @@ This is critical for real-world refactoring scenarios like:
  * Creates an ellipsis capture that matches zero or more nodes in a sequence.
  *
  * @param name Optional name for the capture. If not provided, matches but doesn't capture.
+ * @param separator Optional separator between elements (default: ', ' for arguments, '\n' for statements)
  * @returns An Ellipsis capture that can match sequences
  */
-export function ellipsis<T = any>(name?: string): Ellipsis<T>;
+export function ellipsis<T = any>(name?: string, separator?: string): Ellipsis<T>;
 
 // Alternative concise alias (three underscores)
 export const ___ = ellipsis;
 
 interface Ellipsis<T = any> {
     name?: string;
+    separator?: string;
     getName(): string | undefined;
+    getSeparator(): string | undefined;
 
     // Configuration for constraints
     configure(options: EllipsisOptions<T>): this;
@@ -684,50 +783,163 @@ interface EllipsisOptions<T> {
 }
 ```
 
-**Examples:**
+**Phase 1 Examples - Function/Method Arguments:**
 
 ```typescript
-// Example 1: Basic statement sequence matching
-const middle = ellipsis('middle');
-const pat = pattern`
-    console.log("start");
-    ${middle}
-    console.log("end");
-`;
+// Example 1: Match all arguments (including zero)
+const args = ellipsis('args', ', ');
+const pat = pattern`foo(${args})`;
 
 // Matches:
-// console.log("start"); console.log("end");
-// console.log("start"); doSomething(); console.log("end");
-// console.log("start"); doX(); doY(); doZ(); console.log("end");
+// foo()            → args=[] (J.Empty with marker)
+// foo(1)           → args=[1]
+// foo(1, 2, 3)     → args=[1, 2, 3]
 
-// Example 2: Function arguments with ellipsis
+// Use in template:
+const tmpl = template`bar(${args})`;
+// foo()      → bar()
+// foo(1, 2)  → bar(1, 2)
+
+// Example 1b: Required first argument, rest optional
 const first = capture('first');
-const rest = ellipsis('rest');
-const pat = pattern`foo(${first}, ${rest})`;
+const rest = ellipsis('rest', ', ');
+const pat2 = pattern`foo(${first}${rest})`;  // NO comma between captures
 
-// Matches: foo(1), foo(1, 2), foo(1, 2, 3, 4)
+// Matches:
+// foo(1)           → first=1, rest=[]
+// foo(1, 2)        → first=1, rest=[2]
+// foo(1, 2, 3, 4)  → first=1, rest=[2, 3, 4]
+// foo()            → NO MATCH (first is required)
 
-// Example 3: Anonymous ellipsis (match but don't capture)
-const errorHandler = capture('handler');
-const pat = pattern`
-    try {
-        ${ellipsis()}  // Match any statements, don't capture
-    } catch (e) {
-        ${errorHandler}
+// Use two templates to add an argument (cleaner than mixing literals with ellipsis):
+spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+    override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+        const match = await pat2.match(invocation);
+        if (match) {
+            const restArgs = match.get(rest);
+            if (restArgs.length === 0) {
+                // No additional args: foo(1) → bar(1, "new")
+                return template`bar(${first}, "new")`.apply(this.cursor, invocation, match);
+            } else {
+                // Has additional args: foo(1, 2, 3) → bar(1, "new", 2, 3)
+                return template`bar(${first}, "new", ${rest})`.apply(this.cursor, invocation, match);
+            }
+        }
+        return invocation;
     }
-`;
-
-// Example 4: Constrained ellipsis
-const middle = ellipsis('middle').configure({
-    min: 1,
-    sequenceConstraint: (nodes) => nodes.length > 0
 });
 
-// Example 5: Using ellipsis in templates
+// Example 2: Capture last argument, ignore the rest
+const args = ellipsis();  // Anonymous - match but don't capture
+const last = capture('last');
+const pat2 = pattern`foo(${args}, ${last})`;
+
+// Matches:
+// foo(1)           → last=1
+// foo(1, 2)        → last=2
+// foo(1, 2, 3)     → last=3
+
+// Example 3: Capture specific arguments, preserve others
+const target = capture('target');
+const before = ellipsis('before');
+const after = ellipsis('after');
+const pat3 = pattern`process(${before}, ${target}, ${after})`;
+
+// Matches:
+// process(x)              → target=x, before=[], after=[]
+// process(a, x)           → target=x, before=[a], after=[]
+// process(a, b, x, c, d)  → target=x, before=[a, b], after=[c, d]
+
+// Wrap target argument while preserving others
+const tmpl3 = template`process(${before}, wrap(${target}), ${after})`;
+// process(a, b, x, c) → process(a, b, wrap(x), c)
+
+// Example 5: Real-world use case - Add logging to specific function calls
+const method = capture<J.Identifier>('method');
+const obj = capture('obj');
+const args = ellipsis('args');
+const pat4 = pattern`${obj}.${method}(${args})`;
+
+// Match any method call on any object with any arguments
+const tmpl4 = template`
+    (() => {
+        console.log('Calling', ${obj}.name, '.', ${method}.simpleName, 'with', ${args}.length, 'args');
+        return ${obj}.${method}(${args});
+    })()
+`;
+
+// Example 6: Constrained ellipsis (min/max arguments)
+const callback = capture('callback');
+const options = ellipsis('options').configure({
+    max: 1  // At most 1 additional argument
+});
+const pat5 = pattern`addEventListener('click', ${callback}, ${options})`;
+
+// Matches:
+// addEventListener('click', handler)              → callback=handler, options=[]
+// addEventListener('click', handler, {once:true}) → callback=handler, options=[{once:true}]
+// addEventListener('click', handler, a, b)        → NO MATCH (too many args)
+```
+
+**Alternative Syntax Consideration: Spread Operator in Templates**
+
+An alternative approach for expanding arrays in templates would be to support JavaScript spread syntax:
+
+```typescript
+// Standard ellipsis approach (Phase 1)
+const args = ellipsis('args');
+const pat = pattern`foo(${args})`;
+const tmpl = template`bar(${args})`;  // Implicit expansion - args already expands
+
+// Potential spread syntax approach
+const args = capture('args');  // Manually captured array
+const tmpl = template`bar(...${args})`;  // Explicit spread operator
+
+// Use case: When you construct arrays in visitor code
+spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+    override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+        // Manually extract some arguments
+        const firstTwoArgs = invocation.arguments.elements.slice(0, 2).map(e => e.element);
+
+        // Spread them back into a template
+        return template`newFunction(...${param('args')})`.apply(
+            this.cursor,
+            invocation,
+            new Map([['args', firstTwoArgs]])
+        );
+    }
+});
+```
+
+**Analysis:**
+
+Pros:
+- Natural JavaScript syntax that developers already understand
+- Useful for manually constructed arrays (not captured via ellipsis)
+- Explicit about what's being expanded (vs implicit ellipsis expansion)
+- Could work independently of ellipsis() feature
+
+Cons:
+- Limited use cases (mainly when manually building arrays in visitor code)
+- Parser complexity: need to detect `...` token before placeholder
+- TypeScript doesn't allow `...${x}` in template literal types (syntax error in IDE)
+- Overlaps with ellipsis() which already expands automatically
+- May be confusing: when does expansion happen automatically vs when do you need `...`?
+
+**Recommendation:** Consider for future enhancement, but not essential for Phase 1. The primary use case (expanding ellipsis captures) is already handled automatically. The secondary use case (spreading manually-constructed arrays) could be addressed by:
+1. Making those arrays available as ellipsis-like captures
+2. Using helper functions that expand arrays
+3. Building the template differently to avoid needing spread
+
+If there's strong demand for manually spreading captures/params, revisit after Phase 1 implementation with real-world usage feedback.
+
+**Future Phase Examples - Statements and Arrays:**
+
+```typescript
+// Example 7: Statement sequences (PHASE 2)
 const before = capture('before');
 const middle = ellipsis('middle');
 const after = capture('after');
-
 const pat = pattern`
     console.log(${before});
     ${middle}
@@ -740,16 +952,17 @@ const tmpl = template`
     console.log(${before});
 `;
 
-// Example 6: Concise alias
+// Example 8: Try-catch patterns (PHASE 2)
+const errorHandler = capture('handler');
 const pat = pattern`
     try {
-        ${___()}
+        ${ellipsis()}  // Match any statements, don't capture
     } catch (e) {
-        console.error(e);
+        ${errorHandler}
     }
 `;
 
-// Example 7: Multiple ellipses in one pattern
+// Example 9: Multiple ellipses in one pattern (PHASE 2)
 const before = ellipsis('before');
 const target = capture('target');
 const after = ellipsis('after');
@@ -762,10 +975,19 @@ const pat = pattern`
     }
 `;
 
-// Example 8: Array element ellipsis
+// Example 10: Array element ellipsis (PHASE 3)
 const first = capture('first');
 const rest = ellipsis('rest');
 const pat = pattern`[${first}, ${rest}]`;
+
+// Example 11: Concise alias (all phases)
+const pat = pattern`
+    try {
+        ${___()}
+    } catch (e) {
+        console.error(e);
+    }
+`;
 ```
 
 **Rationale:**
@@ -775,7 +997,216 @@ const pat = pattern`[${first}, ${rest}]`;
 - Makes patterns more flexible and powerful
 - Natural extension of existing capture concept
 
-**Implementation Strategy:**
+**Phase 1 Implementation Strategy - Function Arguments:**
+
+**1. AST Context Detection:**
+
+The parser needs to detect when an ellipsis appears in a function argument list context:
+
+```typescript
+// Pattern: foo(${first}, ${rest})
+// Where rest is an Ellipsis
+
+class TemplateProcessor {
+    private buildTemplateString(): string {
+        // Detect argument list context by tracking parentheses depth
+        // and whether we're in a function call or method invocation
+
+        for (let i = 0; i < this.captures.length; i++) {
+            const capture = this.captures[i];
+            if (capture instanceof EllipsisImpl && this.isInArgumentListContext()) {
+                // Create ellipsis placeholder for arguments
+                result += PlaceholderUtils.createEllipsis(capture.name);
+            } else if (capture instanceof EllipsisImpl) {
+                throw new Error('Ellipsis only supported in function arguments (Phase 1)');
+            } else {
+                result += PlaceholderUtils.createCapture(capture.name);
+            }
+        }
+    }
+}
+```
+
+**2. Argument List Matching Algorithm:**
+
+For Phase 1, we only need to handle `J.MethodInvocation.arguments` (a list structure):
+
+```typescript
+/**
+ * Matches pattern arguments against target arguments, handling ellipses.
+ *
+ * Phase 1: Only operates on J.MethodInvocation.arguments
+ */
+private async matchArgumentsWithEllipsis(
+    patternArgs: PatternArgument[],  // Mix of Capture and Ellipsis
+    targetArgs: JRightPadded<Expression>[],
+    bindings: Map<string, J | J[]>
+): Promise<boolean> {
+    let patternIdx = 0;
+    let targetIdx = 0;
+
+    while (patternIdx < patternArgs.length) {
+        const patternArg = patternArgs[patternIdx];
+
+        if (patternArg.isEllipsis) {
+            const ellipsis = patternArg.ellipsis!;
+
+            // Determine how many target args this ellipsis should consume
+            const remainingPatternArgs = patternArgs.length - patternIdx - 1;
+            const remainingTargetArgs = targetArgs.length - targetIdx;
+            const maxCapture = remainingTargetArgs - remainingPatternArgs;
+
+            // Validate min/max constraints
+            if (ellipsis.options?.min && maxCapture < ellipsis.options.min) {
+                return false;  // Not enough args to satisfy minimum
+            }
+
+            const captureCount = ellipsis.options?.max
+                ? Math.min(maxCapture, ellipsis.options.max)
+                : maxCapture;
+
+            if (captureCount < 0) {
+                return false;  // Not enough arguments for remaining pattern
+            }
+
+            // Capture the arguments
+            const captured = targetArgs
+                .slice(targetIdx, targetIdx + captureCount)
+                .map(rp => rp.element);
+
+            // Apply constraints
+            if (ellipsis.options?.constraint) {
+                for (const arg of captured) {
+                    if (!ellipsis.options.constraint(arg)) {
+                        return false;
+                    }
+                }
+            }
+
+            if (ellipsis.options?.sequenceConstraint &&
+                !ellipsis.options.sequenceConstraint(captured)) {
+                return false;
+            }
+
+            // Store capture (empty array if no name = anonymous ellipsis)
+            if (ellipsis.name) {
+                bindings.set(ellipsis.name, captured);
+            }
+
+            targetIdx += captureCount;
+            patternIdx++;
+        } else {
+            // Regular capture - must match exactly one argument
+            if (targetIdx >= targetArgs.length) {
+                return false;  // Pattern expects more args than target has
+            }
+
+            const matched = await this.matchNode(
+                patternArg.node,
+                targetArgs[targetIdx].element
+            );
+
+            if (!matched) {
+                return false;
+            }
+
+            // Store regular capture
+            if (patternArg.capture?.name) {
+                bindings.set(patternArg.capture.name, targetArgs[targetIdx].element);
+            }
+
+            targetIdx++;
+            patternIdx++;
+        }
+    }
+
+    // All pattern arguments matched - but target may have extra args
+    return targetIdx === targetArgs.length;
+}
+```
+
+**3. Template Argument Substitution:**
+
+When applying templates, ellipsis captures (which are arrays) need to be expanded:
+
+```typescript
+override async visitMethodInvocation(
+    invocation: J.MethodInvocation,
+    bindings: Map<string, J | J[]>
+): Promise<J | undefined> {
+    const newArgs: JRightPadded<Expression>[] = [];
+
+    for (const arg of invocation.arguments.elements) {
+        const marker = findEllipsisMarker(arg);
+
+        if (marker) {
+            // This argument position has an ellipsis marker
+            const captured = bindings.get(marker.name);
+
+            if (Array.isArray(captured)) {
+                // Expand array into individual arguments
+                for (const expr of captured) {
+                    newArgs.push(JRightPadded.build(expr as Expression));
+                }
+            } else if (captured) {
+                // Single value (shouldn't happen for ellipsis, but handle gracefully)
+                newArgs.push(JRightPadded.build(captured as Expression));
+            }
+            // If captured is undefined and marker has no name (anonymous), skip
+        } else {
+            // Regular argument - keep as-is or substitute
+            const result = await this.visit(arg.element, bindings);
+            if (result) {
+                newArgs.push(JRightPadded.build(result as Expression));
+            }
+        }
+    }
+
+    return produce(invocation, draft => {
+        draft.arguments = produce(draft.arguments, argsDraft => {
+            argsDraft.elements = newArgs;
+        });
+    });
+}
+```
+
+**4. Type Safety:**
+
+Update type system to distinguish ellipsis captures:
+
+```typescript
+class MatchResult {
+    // Overload for Ellipsis - always returns array
+    get<T>(capture: Ellipsis<T>): T[];
+    get(capture: Ellipsis<any> | string): J[];
+
+    // Overload for regular Capture - returns single value
+    get<T>(capture: Capture<T>): T | undefined;
+    get(capture: Capture | string): J | undefined;
+
+    // Implementation handles both
+    get(capture: Capture | Ellipsis | string): J | J[] | undefined {
+        const key = typeof capture === 'string'
+            ? capture
+            : capture.getName();
+
+        const value = this.bindings.get(key);
+
+        // Runtime check: if it's an array, it was captured by ellipsis
+        return value;
+    }
+}
+```
+
+**Phase 1 Limitations:**
+
+- ❌ Ellipsis NOT supported in statement blocks
+- ❌ Ellipsis NOT supported in array literals
+- ❌ Ellipsis NOT supported in object literals
+- ✅ Ellipsis ONLY supported in function/method call arguments
+- ✅ Multiple ellipses per pattern supported (but must be in argument lists)
+
+**General Implementation Strategy (All Phases):**
 
 **1. Parser Detection:**
 ```typescript
@@ -950,19 +1381,31 @@ class MatchResult {
 }
 ```
 
-**Edge Cases:**
+**Phased Rollout Plan:**
+
+| Phase | Context | Priority | Complexity | Deliverable |
+|-------|---------|----------|------------|-------------|
+| **Phase 1** | Function/Method Arguments | ⭐️ High | 🟢 Medium | `foo(${first}, ${rest})` |
+| **Phase 2** | Statement Sequences | ⭐️ High | 🟡 High | `{ ${before}; stmt; ${after}; }` |
+| **Phase 3** | Array Literals | Medium | 🟢 Medium | `[${first}, ${rest}]` |
+| **Phase 4** | Object Literals | Low | 🔴 Very High | `{${before}, key: val, ${after}}` |
+
+**Phase 1 Success Criteria:**
+- ✅ Ellipsis works in function call arguments (any position)
+- ✅ Multiple ellipses per argument list supported
+- ✅ Template substitution expands ellipsis captures correctly
+- ✅ Type system distinguishes `Capture<T>` vs `Ellipsis<T>`
+- ✅ Clear error messages when ellipsis used outside argument context
+- ✅ Comprehensive test coverage (10+ test cases)
+- ✅ Documentation with real-world examples
+
+**Edge Cases (All Phases):**
 
 1. **Multiple ellipses in sequence**: Need greedy matching that doesn't consume too much
 2. **Adjacent ellipses**: `pattern`${ellipsis('a')}${ellipsis('b')}`` - Should this be an error or use min/max to disambiguate?
-3. **Ellipsis contexts**: Works for statement sequences, function arguments, array elements (object properties - future?)
-4. **Empty matches**: Allowed by default (`min: 0`)
-5. **Performance**: Backtracking can be expensive - consider caching and limiting depth
-
-**Applicable Contexts:**
-- Statement sequences in blocks (most common)
-- Function/method arguments
-- Array elements
-- Future: Object properties, class members
+3. **Empty matches**: Allowed by default (`min: 0`)
+4. **Performance**: Backtracking can be expensive - consider caching and limiting depth
+5. **Phase 1 specific**: Last argument ellipsis is simpler (greedy to end)
 
 ## Consequences
 

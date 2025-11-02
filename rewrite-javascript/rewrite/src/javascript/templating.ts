@@ -17,12 +17,12 @@ import {JS} from '.';
 import {JavaScriptParser} from './parser';
 import {JavaScriptVisitor} from './visitor';
 import {Cursor, isTree, Tree} from '..';
-import {emptySpace, J} from '../java';
-import {produce} from "immer";
+import {J} from '../java';
 import {JavaScriptSemanticComparatorVisitor} from "./comparator";
 import {DependencyWorkspace} from './dependency-workspace';
-import {emptyMarkers, Marker} from '../markers';
+import {Marker} from '../markers';
 import {randomId} from '../uuid';
+import {produce} from "immer";
 
 /**
  * Cache for compiled templates and patterns.
@@ -113,7 +113,8 @@ class CaptureMarker implements Marker {
     readonly id = randomId();
 
     constructor(
-        public readonly captureName: string
+        public readonly captureName: string,
+        public readonly variadicOptions?: VariadicOptions
     ) {
     }
 }
@@ -125,7 +126,10 @@ class CaptureMarker implements Marker {
  */
 class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
     constructor(
-        private readonly matcher: { handleCapture: (pattern: J, target: J) => boolean },
+        private readonly matcher: {
+            handleCapture: (pattern: J, target: J) => boolean;
+            handleVariadicCapture: (pattern: J, targets: J[]) => boolean;
+        },
         lenientTypeMatching: boolean = true
     ) {
         // Enable lenient type matching based on pattern configuration (default: true for backward compatibility)
@@ -161,6 +165,191 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
         }
         return super.visitIdentifier(identifier, other);
     }
+
+    override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
+        // Check if any arguments are variadic captures
+        const hasVariadicCapture = methodInvocation.arguments.elements.some(arg =>
+            PlaceholderUtils.isVariadicCapture(arg.element)
+        );
+
+        // If no variadic captures, use parent implementation (which includes semantic/type-aware matching)
+        if (!hasVariadicCapture) {
+            return super.visitMethodInvocation(methodInvocation, other);
+        }
+
+        // Otherwise, handle variadic captures ourselves
+        if (!this.match || other.kind !== J.Kind.MethodInvocation) {
+            return this.abort(methodInvocation);
+        }
+
+        const otherMethodInvocation = other as J.MethodInvocation;
+
+        // Compare select
+        if ((methodInvocation.select === undefined) !== (otherMethodInvocation.select === undefined)) {
+            return this.abort(methodInvocation);
+        }
+
+        // Visit select if present
+        if (methodInvocation.select && otherMethodInvocation.select) {
+            await this.visit(methodInvocation.select.element, otherMethodInvocation.select.element);
+            if (!this.match) return methodInvocation;
+        }
+
+        // Compare typeParameters
+        if ((methodInvocation.typeParameters === undefined) !== (otherMethodInvocation.typeParameters === undefined)) {
+            return this.abort(methodInvocation);
+        }
+
+        // Visit typeParameters if present
+        if (methodInvocation.typeParameters && otherMethodInvocation.typeParameters) {
+            if (methodInvocation.typeParameters.elements.length !== otherMethodInvocation.typeParameters.elements.length) {
+                return this.abort(methodInvocation);
+            }
+
+            // Visit each type parameter in lock step
+            for (let i = 0; i < methodInvocation.typeParameters.elements.length; i++) {
+                await this.visit(methodInvocation.typeParameters.elements[i].element, otherMethodInvocation.typeParameters.elements[i].element);
+                if (!this.match) return methodInvocation;
+            }
+        }
+
+        // Visit name
+        await this.visit(methodInvocation.name, otherMethodInvocation.name);
+        if (!this.match) return methodInvocation;
+
+        // Special handling for variadic captures in arguments
+        if (!await this.matchArguments(methodInvocation.arguments.elements, otherMethodInvocation.arguments.elements)) {
+            return this.abort(methodInvocation);
+        }
+
+        return methodInvocation;
+    }
+
+    /**
+     * Matches argument lists, with special handling for variadic captures.
+     * A variadic capture can match zero or more consecutive arguments.
+     */
+    private async matchArguments(patternArgs: any[], targetArgs: any[]): Promise<boolean> {
+        let patternIdx = 0;
+        let targetIdx = 0;
+
+        while (patternIdx < patternArgs.length && targetIdx <= targetArgs.length) {
+            const patternArg = patternArgs[patternIdx].element;
+
+            // Check if this pattern argument is a variadic capture
+            if (PlaceholderUtils.isVariadicCapture(patternArg)) {
+                const variadicOptions = PlaceholderUtils.getVariadicOptions(patternArg);
+
+                // Calculate how many target arguments this variadic should consume
+                const remainingPatternArgs = patternArgs.length - patternIdx - 1;
+                const remainingTargetArgs = targetArgs.length - targetIdx;
+                const maxConsume = remainingTargetArgs - remainingPatternArgs;
+
+                // Check min/max constraints
+                const min = variadicOptions?.min ?? 0;
+                const max = variadicOptions?.max ?? Infinity;
+
+                if (maxConsume < min || maxConsume > max) {
+                    return false;
+                }
+
+                // Capture all arguments for this variadic
+                // Filter out J.Empty elements as they represent zero arguments
+                const capturedArgs: J[] = [];
+                for (let i = 0; i < maxConsume; i++) {
+                    const arg = targetArgs[targetIdx + i].element;
+                    // Skip J.Empty as it represents an empty argument list, not an actual argument
+                    if (arg.kind !== 'org.openrewrite.java.tree.J$Empty') {
+                        capturedArgs.push(arg);
+                    }
+                }
+
+                // Re-check min/max constraints against actual captured arguments (after filtering J.Empty)
+                if (capturedArgs.length < min || capturedArgs.length > max) {
+                    return false;
+                }
+
+                // Handle the variadic capture
+                const success = this.matcher.handleVariadicCapture(patternArg, capturedArgs);
+                if (!success) {
+                    return false;
+                }
+
+                targetIdx += maxConsume;
+                patternIdx++;
+            } else {
+                // Regular non-variadic argument - must match exactly one target argument
+                if (targetIdx >= targetArgs.length) {
+                    return false; // Pattern has more args than target
+                }
+
+                const targetArg = targetArgs[targetIdx].element;
+
+                // J.Empty represents no argument, so regular captures should not match it
+                if (targetArg.kind === 'org.openrewrite.java.tree.J$Empty') {
+                    return false;
+                }
+
+                await this.visit(patternArg, targetArg);
+                if (!this.match) {
+                    return false;
+                }
+
+                patternIdx++;
+                targetIdx++;
+            }
+        }
+
+        // Ensure we've consumed all arguments from both pattern and target
+        return patternIdx === patternArgs.length && targetIdx === targetArgs.length;
+    }
+}
+
+/**
+ * Options for variadic captures that match zero or more nodes in a sequence.
+ */
+export interface VariadicOptions {
+    /**
+     * Separator used when expanding the capture in templates (default: ', ').
+     * Examples: ', ' for arguments, '; ' for statements.
+     */
+    separator?: string;
+
+    /**
+     * Minimum number of nodes that must be matched (default: 0).
+     */
+    min?: number;
+
+    /**
+     * Maximum number of nodes that can be matched (default: unlimited).
+     */
+    max?: number;
+}
+
+/**
+ * Configuration options for captures.
+ */
+export interface CaptureOptions<T = any> {
+    /**
+     * If true or VariadicOptions, this capture will match zero or more nodes in a sequence.
+     * If false/undefined, matches exactly one node.
+     *
+     * Phase 1: Only supports function/method call arguments.
+     *
+     * @example
+     * // Match all arguments (0 or more)
+     * capture('args', { variadic: true })
+     *
+     * @example
+     * // Match 1-3 arguments with custom separator
+     * capture('args', { variadic: { min: 1, max: 3, separator: ', ' } })
+     */
+    variadic?: boolean | VariadicOptions;
+
+    /**
+     * Optional constraint function to validate captured nodes (future enhancement).
+     */
+    constraint?: (node: J) => boolean;
 }
 
 /**
@@ -180,15 +369,12 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
  * - Pattern structure determines matching: `pattern`foo(${capture('x')})`` only matches `foo()` calls
  * - Use structural patterns to narrow matching scope before applying semantic validation
  *
- * **Future Enhancement (Not Yet Implemented):**
- * Captures will support a `.configure()` method for runtime constraints:
+ * **Variadic Captures:**
+ * Use `{ variadic: true }` to match zero or more nodes in a sequence:
  * ```typescript
- * const arg = capture<J.Literal>('arg')
- *     .configure({
- *         constraint: (node) => node instanceof J.Literal && typeof node.value === 'number'
- *     });
+ * const args = capture('args', { variadic: true });
+ * pattern`foo(${args})`  // Matches: foo(), foo(a), foo(a, b, c)
  * ```
- * When implemented, constraints will provide semantic validation AFTER structural matching.
  */
 export interface Capture<T = any> {
     /**
@@ -203,22 +389,75 @@ export interface Capture<T = any> {
      * Use this instead of .name when you need the actual string value.
      */
     getName(): string;
+
+    /**
+     * Returns true if this is a variadic capture.
+     */
+    isVariadic(): boolean;
+
+    /**
+     * Gets the variadic options if this is a variadic capture.
+     */
+    getVariadicOptions(): VariadicOptions | undefined;
+}
+
+/**
+ * A variadic capture that matches zero or more nodes in a sequence.
+ * When retrieved from match results, the captured value will be an array of nodes.
+ *
+ * Extends Capture but is returned when variadic options are specified, providing
+ * better type information at compile time.
+ */
+export interface VariadicCapture<T = any> extends Capture<T[]> {
+    /**
+     * Always returns true for variadic captures.
+     */
+    isVariadic(): true;
+
+    /**
+     * Returns the variadic options for this capture.
+     */
+    getVariadicOptions(): VariadicOptions;
 }
 
 // Symbol to access the internal capture name without triggering Proxy
 const CAPTURE_NAME_SYMBOL = Symbol('captureName');
+// Symbol to access variadic options without triggering Proxy
+const CAPTURE_VARIADIC_SYMBOL = Symbol('captureVariadic');
 
 class CaptureImpl<T = any> implements Capture<T> {
     public readonly name: string;
     [CAPTURE_NAME_SYMBOL]: string;
+    [CAPTURE_VARIADIC_SYMBOL]: VariadicOptions | undefined;
 
-    constructor(name: string) {
+    constructor(name: string, options?: CaptureOptions<T>) {
         this.name = name;
         this[CAPTURE_NAME_SYMBOL] = name;
+
+        // Normalize variadic options
+        if (options?.variadic) {
+            if (typeof options.variadic === 'boolean') {
+                this[CAPTURE_VARIADIC_SYMBOL] = { separator: ', ' };
+            } else {
+                this[CAPTURE_VARIADIC_SYMBOL] = {
+                    separator: options.variadic.separator || ', ',
+                    min: options.variadic.min,
+                    max: options.variadic.max
+                };
+            }
+        }
     }
 
     getName(): string {
         return this[CAPTURE_NAME_SYMBOL];
+    }
+
+    isVariadic(): boolean {
+        return this[CAPTURE_VARIADIC_SYMBOL] !== undefined;
+    }
+
+    getVariadicOptions(): VariadicOptions | undefined {
+        return this[CAPTURE_VARIADIC_SYMBOL];
     }
 }
 
@@ -260,17 +499,34 @@ class TemplateParamImpl<T = any> implements TemplateParam<T> {
 class CaptureValue {
     constructor(
         public readonly rootCapture: Capture,
-        public readonly propertyPath: string[]
+        public readonly propertyPath: string[],
+        public readonly arrayOperation?: { type: 'index' | 'slice' | 'length'; args?: any[] }
     ) {}
 
     /**
      * Resolves this capture value by looking up the root capture in the values map
      * and navigating through the property path.
      */
-    resolve(values: Map<string, J>): any {
+    resolve(values: Pick<Map<string, J | J[]>, 'get'>): any {
         const rootName = (this.rootCapture as any)[CAPTURE_NAME_SYMBOL] || this.rootCapture.name;
         let current: any = values.get(rootName);
 
+        // Handle array operations on variadic captures
+        if (this.arrayOperation && Array.isArray(current)) {
+            switch (this.arrayOperation.type) {
+                case 'index':
+                    current = current[this.arrayOperation.args![0]];
+                    break;
+                case 'slice':
+                    current = current.slice(...this.arrayOperation.args!);
+                    break;
+                case 'length':
+                    current = current.length;
+                    break;
+            }
+        }
+
+        // Navigate through property path
         for (const prop of this.propertyPath) {
             if (current === null || current === undefined) {
                 return undefined;
@@ -279,6 +535,16 @@ class CaptureValue {
         }
 
         return current;
+    }
+
+    /**
+     * Checks if this CaptureValue will resolve to an array that should be expanded.
+     */
+    isArrayExpansion(): boolean {
+        // Only slice operations and the root variadic capture return arrays
+        return this.arrayOperation?.type === 'slice' ||
+               (this.arrayOperation === undefined && this.propertyPath.length === 0 &&
+                (this.rootCapture as any).isVariadic?.());
     }
 }
 
@@ -333,21 +599,52 @@ class CaptureValue {
  * const method = capture<J.MethodInvocation>('method');
  * template`console.log(${method.name.simpleName})`  // Accesses properties of captured node
  */
-export function capture<T = any>(name?: string): Capture<T> & T {
+// Overload: variadic capture with explicit VariadicOptions
+export function capture<T = any>(name: string | undefined, options: CaptureOptions<T> & { variadic: VariadicOptions }): VariadicCapture<T> & T[];
+// Overload: variadic capture with boolean
+export function capture<T = any>(name: string | undefined, options: CaptureOptions<T> & { variadic: true }): VariadicCapture<T> & T[];
+// Overload: regular (non-variadic) capture
+export function capture<T = any>(name?: string, options?: CaptureOptions<T>): Capture<T> & T;
+// Implementation
+export function capture<T = any>(name?: string, options?: CaptureOptions<T>): Capture<T> & T {
     const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
-    const impl = new CaptureImpl<T>(captureName);
+    const impl = new CaptureImpl<T>(captureName, options);
 
     // Return a Proxy that intercepts property accesses and creates CaptureValues
     return new Proxy(impl as any, {
         get(target: any, prop: string | symbol): any {
-            // Allow access to the internal capture name via symbol
+            // Allow access to internal symbols
             if (prop === CAPTURE_NAME_SYMBOL) {
                 return target[CAPTURE_NAME_SYMBOL];
             }
+            if (prop === CAPTURE_VARIADIC_SYMBOL) {
+                return target[CAPTURE_VARIADIC_SYMBOL];
+            }
 
-            // Allow getName() method to return the string name
-            if (prop === 'getName') {
-                return () => target[CAPTURE_NAME_SYMBOL];
+            // Allow methods to be called directly on the target
+            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions') {
+                return target[prop].bind(target);
+            }
+
+            // For variadic captures, support array-like operations
+            if (target.isVariadic() && typeof prop === 'string') {
+                // Numeric index access: args[0], args[1], etc.
+                const indexNum = Number(prop);
+                if (!isNaN(indexNum) && indexNum >= 0 && Number.isInteger(indexNum)) {
+                    return createCaptureValueProxy(target, [], { type: 'index', args: [indexNum] });
+                }
+
+                // Array method: slice
+                if (prop === 'slice') {
+                    return (...args: number[]) => {
+                        return createCaptureValueProxy(target, [], { type: 'slice', args });
+                    };
+                }
+
+                // Array property: length
+                if (prop === 'length') {
+                    return createCaptureValueProxy(target, [], { type: 'length' });
+                }
             }
 
             // For string property access, create a CaptureValue with a property path
@@ -364,19 +661,25 @@ export function capture<T = any>(name?: string): Capture<T> & T {
  * Creates a Proxy around a CaptureValue that allows further property access.
  * This enables chaining like method.name.simpleName
  */
-function createCaptureValueProxy(rootCapture: Capture, propertyPath: string[]): any {
-    const captureValue = new CaptureValue(rootCapture, propertyPath);
+function createCaptureValueProxy(
+    rootCapture: Capture,
+    propertyPath: string[],
+    arrayOperation?: { type: 'index' | 'slice' | 'length'; args?: any[] }
+): any {
+    const captureValue = new CaptureValue(rootCapture, propertyPath, arrayOperation);
 
     return new Proxy(captureValue, {
         get(target: CaptureValue, prop: string | symbol): any {
-            // Allow access to the CaptureValue instance itself
-            if (prop === 'resolve' || prop === 'rootCapture' || prop === 'propertyPath') {
-                return target[prop as keyof CaptureValue];
+            // Allow access to the CaptureValue instance itself and its methods
+            if (prop === 'resolve' || prop === 'rootCapture' || prop === 'propertyPath' ||
+                prop === 'arrayOperation' || prop === 'isArrayExpansion') {
+                const value = target[prop as keyof CaptureValue];
+                return typeof value === 'function' ? value.bind(target) : value;
             }
 
             // For string property access, extend the property path
             if (typeof prop === 'string') {
-                return createCaptureValueProxy(target.rootCapture, [...target.propertyPath, prop]);
+                return createCaptureValueProxy(target.rootCapture, [...target.propertyPath, prop], target.arrayOperation);
             }
 
             return undefined;
@@ -669,7 +972,14 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
     ) {
     }
 
-    get(capture: Capture | string): J | undefined {
+    // Overload: get with VariadicCapture returns array
+    get<T>(capture: VariadicCapture<T>): T[] | undefined;
+    // Overload: get with Capture returns single value
+    get<T>(capture: Capture<T>): T | undefined;
+    // Overload: get with string returns J
+    get(capture: string): J | undefined;
+    // Implementation
+    get(capture: Capture | string): J | J[] | undefined {
         // Use symbol to get internal name without triggering Proxy
         const name = typeof capture === "string" ? capture : ((capture as any)[CAPTURE_NAME_SYMBOL] || capture.name);
         return this.bindings.get(name);
@@ -747,7 +1057,8 @@ class Matcher {
         // Default to true for backward compatibility with existing patterns
         const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
         const comparator = new PatternMatchingComparator({
-            handleCapture: (p, t) => this.handleCapture(p, t)
+            handleCapture: (p, t) => this.handleCapture(p, t),
+            handleVariadicCapture: (p, ts) => this.handleVariadicCapture(p, ts)
         }, lenientTypeMatching);
         return await comparator.compare(pattern, target);
     }
@@ -768,6 +1079,27 @@ class Matcher {
 
         // Store the binding
         this.bindings.set(captureName, target);
+        return true;
+    }
+
+    /**
+     * Handles a variadic capture placeholder.
+     *
+     * @param pattern The pattern node (the variadic capture)
+     * @param targets The target nodes that were matched
+     * @returns true if the capture is successful, false otherwise
+     */
+    private handleVariadicCapture(pattern: J, targets: J[]): boolean {
+        const captureName = PlaceholderUtils.getCaptureName(pattern);
+
+        if (!captureName) {
+            return false;
+        }
+
+        // For variadic captures, store the array of matched nodes
+        // We'll need a special container type to distinguish from single captures
+        // For now, store the array directly
+        this.bindings.set(captureName, targets as any);
         return true;
     }
 }
@@ -818,10 +1150,12 @@ namespace JavaCoordinates {
 /**
  * Valid parameter types for template literals.
  * - Capture: For pattern matching and reuse
+ * - CaptureValue: Result of property access or array operations on captures (e.g., capture.prop, capture[0], capture.slice(1))
  * - Tree: AST nodes to be inserted directly
+ * - Tree[]: Arrays of AST nodes (from variadic capture operations like slice)
  * - Primitives: Values to be converted to literals
  */
-export type TemplateParameter = Capture | TemplateParam | Tree | string | number | boolean;
+export type TemplateParameter = Capture | CaptureValue | TemplateParam | Tree | Tree[] | string | number | boolean;
 
 /**
  * Configuration options for templates.
@@ -1242,14 +1576,15 @@ class TemplateEngine {
             result += templateParts[i];
             if (i < parameters.length) {
                 const param = parameters[i].value;
-                // Use a placeholder for Captures, TemplateParams, CaptureValues, and Tree nodes
+                // Use a placeholder for Captures, TemplateParams, CaptureValues, Tree nodes, and Tree arrays
                 // Inline everything else (strings, numbers, booleans) directly
                 // Check for Capture (could be a Proxy, so check for symbol property)
                 const isCapture = param instanceof CaptureImpl ||
                                 (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
                 const isTemplateParam = param instanceof TemplateParamImpl;
                 const isCaptureValue = param instanceof CaptureValue;
-                if (isCapture || isTemplateParam || isCaptureValue || isTree(param)) {
+                const isTreeArray = Array.isArray(param) && param.length > 0 && isTree(param[0]);
+                if (isCapture || isTemplateParam || isCaptureValue || isTree(param) || isTreeArray) {
                     const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
                     result += placeholder;
                 } else {
@@ -1343,6 +1678,36 @@ class PlaceholderUtils {
             ? `${this.CAPTURE_PREFIX}${name}_${typeConstraint}__`
             : `${this.CAPTURE_PREFIX}${name}__`;
     }
+
+    /**
+     * Checks if a capture marker indicates a variadic capture.
+     *
+     * @param node The node to check
+     * @returns true if the node has a variadic CaptureMarker, false otherwise
+     */
+    static isVariadicCapture(node: J): boolean {
+        for (const marker of node.markers.markers) {
+            if (marker instanceof CaptureMarker && marker.variadicOptions) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Gets the variadic options from a capture marker.
+     *
+     * @param node The node to extract variadic options from
+     * @returns The VariadicOptions, or undefined if not a variadic capture
+     */
+    static getVariadicOptions(node: J): VariadicOptions | undefined {
+        for (const marker of node.markers.markers) {
+            if (marker instanceof CaptureMarker) {
+                return marker.variadicOptions;
+            }
+        }
+        return undefined;
+    }
 }
 
 /**
@@ -1351,9 +1716,31 @@ class PlaceholderUtils {
 class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     constructor(
         private readonly substitutions: Map<string, Parameter>,
-        private readonly values: Pick<Map<string, J>, 'get'> = new Map()
+        private readonly values: Pick<Map<string, J | J[]>, 'get'> = new Map()
     ) {
         super();
+    }
+
+    /**
+     * Merges prefixes by preserving comments from the source element
+     * while using whitespace from the template placeholder.
+     *
+     * @param sourcePrefix The prefix from the captured element (may contain comments)
+     * @param templatePrefix The prefix from the template placeholder (defines whitespace)
+     * @returns A merged prefix with source comments and template whitespace
+     */
+    private mergePrefix(sourcePrefix: J.Space, templatePrefix: J.Space): J.Space {
+        // If source has no comments, just use template prefix
+        if (sourcePrefix.comments.length === 0) {
+            return templatePrefix;
+        }
+
+        // Preserve comments from source, use whitespace from template
+        return {
+            kind: J.Kind.Space,
+            comments: sourcePrefix.comments,
+            whitespace: templatePrefix.whitespace
+        };
     }
 
     async visit<R extends J>(tree: J, p: any, parent?: Cursor): Promise<R | undefined> {
@@ -1367,6 +1754,146 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
 
         // Continue with normal traversal
         return super.visit(tree, p, parent);
+    }
+
+    override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+        // First, check if any argument is a variadic placeholder or a CaptureValue that resolves to an array
+        const hasVariadicPlaceholder = method.arguments.elements.some(arg => {
+            const argElement = arg.element;
+            if (!this.isPlaceholder(argElement)) {
+                return false;
+            }
+            const placeholderText = this.getPlaceholderText(argElement);
+            if (!placeholderText) {
+                return false;
+            }
+            const param = this.substitutions.get(placeholderText);
+            if (!param) {
+                return false;
+            }
+
+            // Check if it's a direct Tree[] array
+            if (Array.isArray(param.value)) {
+                return true;
+            }
+
+            // Check if it's a CaptureValue that will expand to an array
+            // Note: CaptureValue might be wrapped in a Proxy, so check for method existence
+            if (param.value instanceof CaptureValue &&
+                typeof param.value.isArrayExpansion === 'function' &&
+                param.value.isArrayExpansion()) {
+                return true;
+            }
+
+            // Check if this is a variadic capture
+            const isCapture = param.value instanceof CaptureImpl ||
+                             (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
+            if (isCapture) {
+                const name = param.value[CAPTURE_NAME_SYMBOL] || param.value.name;
+                const capture = Array.from(this.substitutions.values())
+                    .map(p => p.value)
+                    .find(v => v instanceof CaptureImpl && v.getName() === name) as CaptureImpl | undefined;
+                return capture?.isVariadic() || false;
+            }
+            return false;
+        });
+
+        if (!hasVariadicPlaceholder) {
+            // No variadic placeholders, use standard traversal
+            return super.visitMethodInvocation(method, p);
+        }
+
+        // We have variadic placeholders - need to expand them
+        const newArguments: any[] = [];
+
+        for (const arg of method.arguments.elements) {
+            const argElement = arg.element;
+
+            // Check if this argument is a variadic placeholder
+            if (this.isPlaceholder(argElement)) {
+                const placeholderText = this.getPlaceholderText(argElement);
+                if (placeholderText) {
+                    const param = this.substitutions.get(placeholderText);
+                    if (param) {
+                        let arrayToExpand: J[] | undefined = undefined;
+
+                        // Check if it's a direct Tree[] array
+                        if (Array.isArray(param.value)) {
+                            arrayToExpand = param.value as J[];
+                        }
+                        // Check if it's a CaptureValue (e.g., from .slice() or array index)
+                        else if (param.value instanceof CaptureValue) {
+                            const resolved = param.value.resolve(this.values);
+                            // If resolved value is an array, expand it
+                            if (Array.isArray(resolved)) {
+                                arrayToExpand = resolved;
+                            }
+                        }
+                        // Check if it's a direct variadic capture
+                        else {
+                            const isCapture = param.value instanceof CaptureImpl ||
+                                             (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
+                            if (isCapture) {
+                                const name = param.value[CAPTURE_NAME_SYMBOL] || param.value.name;
+                                const capture = Array.from(this.substitutions.values())
+                                    .map(p => p.value)
+                                    .find(v => v instanceof CaptureImpl && v.getName() === name) as CaptureImpl | undefined;
+
+                                if (capture?.isVariadic()) {
+                                    // Get the matched array
+                                    const matchedArray = this.values.get(name);
+                                    if (Array.isArray(matchedArray)) {
+                                        arrayToExpand = matchedArray;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Expand the array if we found one
+                        if (arrayToExpand) {
+                            if (arrayToExpand.length > 0) {
+                                // Expand the array into multiple arguments
+                                for (let i = 0; i < arrayToExpand.length; i++) {
+                                    const item = arrayToExpand[i];
+                                    newArguments.push(produce(arg, (draft: any) => {
+                                        draft.element = produce(item, (itemDraft: any) => {
+                                            // First item gets merged prefix (placeholder whitespace + item comments)
+                                            // Subsequent items keep their original prefix
+                                            if (i === 0) {
+                                                itemDraft.prefix = this.mergePrefix(item.prefix, argElement.prefix);
+                                            } else {
+                                                // Subsequent items preserve their prefix (including comments)
+                                                itemDraft.prefix = item.prefix;
+                                            }
+                                            itemDraft.markers = argElement.markers;
+                                        });
+                                        // All but the last argument need comma-space in 'after'
+                                        // We keep the 'after' from the original arg structure for proper comma handling
+                                    }));
+                                }
+                                continue; // Skip adding the placeholder itself
+                            } else {
+                                // Empty array - don't add any arguments
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Not a variadic placeholder (or expansion failed) - process normally
+            const replacedElement = await this.visit(argElement, p);
+            if (replacedElement) {
+                newArguments.push(produce(arg, (draft: any) => {
+                    draft.element = replacedElement;
+                }));
+            }
+        }
+
+        // Create new method invocation with expanded arguments
+        return produce(method, (draft: any) => {
+            draft.arguments.elements = newArguments;
+        });
     }
 
     /**
@@ -1415,9 +1942,10 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             if (propertyValue !== undefined) {
                 // If the property value is already a J node, use it
                 if (isTree(propertyValue)) {
-                    return produce(propertyValue as J, draft => {
+                    const propValueAsJ = propertyValue as J;
+                    return produce(propValueAsJ, draft => {
                         draft.markers = placeholder.markers;
-                        draft.prefix = placeholder.prefix;
+                        draft.prefix = this.mergePrefix(propValueAsJ.prefix, placeholder.prefix);
                     });
                 }
                 // If it's a primitive value and placeholder is an identifier, update the simpleName
@@ -1449,10 +1977,10 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             const name = isTemplateParam ? param.value.name :
                         (param.value[CAPTURE_NAME_SYMBOL] || param.value.name);
             const matchedNode = this.values.get(name);
-            if (matchedNode) {
+            if (matchedNode && !Array.isArray(matchedNode)) {
                 return produce(matchedNode, draft => {
                     draft.markers = placeholder.markers;
-                    draft.prefix = placeholder.prefix;
+                    draft.prefix = this.mergePrefix(matchedNode.prefix, placeholder.prefix);
                 });
             }
 
@@ -1462,10 +1990,10 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
 
         // If the parameter value is an AST node, use it directly
         if (isTree(param.value)) {
-            // Return the AST node, preserving the original prefix
+            // Return the AST node, preserving comments from the source
             return produce(param.value as J, draft => {
                 draft.markers = placeholder.markers;
-                draft.prefix = placeholder.prefix;
+                draft.prefix = this.mergePrefix(param.value.prefix, placeholder.prefix);
             });
         }
 
@@ -1692,8 +2220,12 @@ class TemplateProcessor {
                     node.markers.markers = [];
                 }
 
-                // Add CaptureMarker
-                node.markers.markers.push(new CaptureMarker(captureInfo.name));
+                // Find the original capture object to get variadic options
+                const captureObj = this.captures.find(c => c.getName() === captureInfo.name);
+                const variadicOptions = captureObj?.getVariadicOptions();
+
+                // Add CaptureMarker with variadic options if available
+                node.markers.markers.push(new CaptureMarker(captureInfo.name, variadicOptions));
             }
         }
 

@@ -184,7 +184,7 @@ describe('Builder API', () => {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                     const match = await builderPat.match(binary);
                     if (match) {
-                        return template`${match.get(right)} + ${match.get(left)}`.apply(this.cursor, binary, match);
+                        return template`${match.get(right)!} + ${match.get(left)!}`.apply(this.cursor, binary, match);
                     }
                     return binary;
                 }
