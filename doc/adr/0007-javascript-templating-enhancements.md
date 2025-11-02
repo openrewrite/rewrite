@@ -41,7 +41,7 @@ We will implement the following enhancements to the JavaScript templating engine
 
 ### 1. Property Access on Captures
 
-**Status**: 📝 Proposed
+**Status**: ✅ Implemented
 
 Allow accessing properties of captured nodes directly in templates using natural JavaScript syntax, eliminating the need to manually extract properties in visitor code.
 
@@ -170,7 +170,7 @@ capture('invocation')
 
 ### 3. Rename `imports` to `context`
 
-**Status**: 📝 Proposed
+**Status**: ✅ Implemented
 
 Rename the `imports` configuration option to `context` to accurately reflect that it accepts any declarations, not just import statements.
 
@@ -289,7 +289,7 @@ capture:   construct → insert placeholder → parse → substitute captures
 
 ### 5. Builder API for Dynamic Template Construction
 
-**Status**: 📝 Proposed
+**Status**: ✅ Implemented
 
 Add fluent builder API for programmatic template and pattern construction when structure isn't known at compile time.
 
@@ -369,7 +369,7 @@ template`function foo() { ${code(ctx => '...')} }`;
 
 ### 6. Lenient Type Matching in Comparator
 
-**Status**: 📝 Proposed
+**Status**: ✅ Implemented
 
 Add option for lenient type matching in comparator, allowing patterns without full type attribution to still match structurally equivalent code.
 
@@ -601,26 +601,32 @@ const tmpl = Template.builder()
 ```
 
 **Implementation:**
-- `param()` is an alias for `capture()` - identical implementation
-- Both return same `Capture` type, work interchangeably
-- No runtime distinction - purely semantic naming
-- Supports all features: property access, Builder API integration
-- Builder API could also offer `.param()` alongside `.capture()` for templates
-- Type signature: `param<T = any>(name?: string): Capture<T> & T`
+- `param()` returns distinct `TemplateParam<T>` type (not `Capture<T>`)
+- `TemplateParam` is simpler - no Proxy overhead, no property access support
+- Both work in templates through unified template processing
+- Type signature: `param<T = any>(name?: string): TemplateParam<T>`
+- Type safety: Distinct types allow future enhancements specific to each use case
+
+**Key Differences from Capture:**
+- `TemplateParam`: Simple name-only parameter (no property access)
+- `Capture`: Proxy-wrapped to support property access (e.g., `capture('x').name.simpleName`)
+- Both handled identically by template engine during substitution
+- Performance: `TemplateParam` avoids Proxy overhead
 
 **Considerations:**
 
-Should we allow mixing in the same template?
+Can you mix in the same template?
 ```typescript
 const c = capture('fromPattern');
 const p = param('standalone');
-template`${c} + ${p}`  // Both work, but semantically confusing
+template`${c} + ${p}`  // Both work technically
 ```
 
-Decision: Allow mixing (they're the same type), but document that:
+Decision: Yes, both work (unified template processing), but document that:
 - Use `capture()` when template is used with a pattern
 - Use `param()` when template is standalone
-- Don't mix both in the same template (confusing)
+- Prefer consistency - don't mix unnecessarily (can be confusing)
+- If you need property access, use `capture()` everywhere
 
 ### 8. Ellipsis Patterns for Sequence Matching
 
