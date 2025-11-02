@@ -17,11 +17,11 @@ import {JS} from '.';
 import {JavaScriptParser} from './parser';
 import {JavaScriptVisitor} from './visitor';
 import {Cursor, isTree, Tree} from '..';
-import {J} from '../java';
+import {emptySpace, J} from '../java';
 import {produce} from "immer";
 import {JavaScriptSemanticComparatorVisitor} from "./comparator";
 import {DependencyWorkspace} from './dependency-workspace';
-import {Marker} from '../markers';
+import {emptyMarkers, Marker} from '../markers';
 import {randomId} from '../uuid';
 
 /**
@@ -115,6 +115,108 @@ class CaptureMarker implements Marker {
     constructor(
         public readonly captureName: string
     ) {
+    }
+}
+
+/**
+ * A comparator for pattern matching that is lenient about optional properties.
+ * Allows patterns without type annotations to match actual code with type annotations.
+ * Uses semantic comparison to match semantically equivalent code (e.g., isDate() and util.isDate()).
+ */
+class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
+    constructor(private readonly matcher: { handleCapture: (pattern: J, target: J) => boolean }) {
+        super();
+    }
+
+    /**
+     * Creates a wildcard identifier that will match any AST node during comparison.
+     * The identifier has a CaptureMarker which causes it to match anything without storing the result.
+     *
+     * @param captureName The name for the capture marker (for debugging purposes)
+     * @returns A wildcard identifier
+     */
+    private createWildcardIdentifier(captureName: string): J.Identifier {
+        return {
+            id: randomId(),
+            kind: J.Kind.Identifier,
+            prefix: emptySpace,
+            markers: {
+                ...emptyMarkers,
+                markers: [new CaptureMarker(captureName)]
+            },
+            annotations: [],
+            simpleName: '__wildcard__',
+            type: undefined,
+            fieldType: undefined
+        };
+    }
+
+    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+        // Check if the pattern node is a capture - this handles captures anywhere in the tree
+        if (PlaceholderUtils.isCapture(j as J)) {
+            const success = this.matcher.handleCapture(j as J, p);
+            if (!success) {
+                return this.abort(j) as R;
+            }
+            return j as R;
+        }
+
+        if (!this.match) {
+            return j as R;
+        }
+
+        return super.visit(j, p, parent);
+    }
+
+    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== J.Kind.VariableDeclarations) {
+            return this.abort(variableDeclarations);
+        }
+
+        const otherVariableDeclarations = other as J.VariableDeclarations;
+
+        // LENIENT: If pattern lacks typeExpression but target has one, add a wildcard capture to pattern
+        // This allows the pattern to match without requiring us to modify the target (which would corrupt captures)
+        if (!variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
+            variableDeclarations = produce(variableDeclarations, draft => {
+                draft.typeExpression = this.createWildcardIdentifier('__wildcard_type__') as J.Identifier;
+            });
+        }
+
+        // Delegate to super implementation
+        return super.visitVariableDeclarations(variableDeclarations, otherVariableDeclarations);
+    }
+
+    override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== J.Kind.MethodDeclaration) {
+            return this.abort(methodDeclaration);
+        }
+
+        const otherMethodDeclaration = other as J.MethodDeclaration;
+
+        // LENIENT: If pattern lacks returnTypeExpression but target has one, add a wildcard capture to pattern
+        // This allows the pattern to match without requiring us to modify the target (which would corrupt captures)
+        if (!methodDeclaration.returnTypeExpression && otherMethodDeclaration.returnTypeExpression) {
+            methodDeclaration = produce(methodDeclaration, draft => {
+                draft.returnTypeExpression = this.createWildcardIdentifier('__wildcard_return_type__') as J.Identifier;
+            });
+        }
+
+        // Delegate to super implementation
+        return super.visitMethodDeclaration(methodDeclaration, otherMethodDeclaration);
+    }
+
+    protected hasSameKind(j: J, other: J): boolean {
+        return super.hasSameKind(j, other) ||
+               (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));
+    }
+
+    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+        if (PlaceholderUtils.isCapture(identifier)) {
+            const success = this.matcher.handleCapture(identifier, other);
+            return success ? identifier : this.abort(identifier);
+        }
+        return super.visitIdentifier(identifier, other);
     }
 }
 
@@ -329,20 +431,11 @@ class Matcher {
             return false;
         }
 
-        const matcher = this;
-        return await ((new class extends JavaScriptSemanticComparatorVisitor {
-            protected hasSameKind(j: J, other: J): boolean {
-                return super.hasSameKind(j, other) || j.kind == J.Kind.Identifier && this.matchesParameter(j as J.Identifier, other);
-            }
-
-            override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
-                return this.matchesParameter(identifier, other) ? identifier : await super.visitIdentifier(identifier, other);
-            }
-
-            private matchesParameter(identifier: J.Identifier, other: J): boolean {
-                return PlaceholderUtils.isCapture(identifier) && matcher.handleCapture(identifier, other);
-            }
-        }).compare(pattern, target));
+        // Use the pattern matching comparator which is lenient about optional properties
+        const comparator = new PatternMatchingComparator({
+            handleCapture: (p, t) => this.handleCapture(p, t)
+        });
+        return await comparator.compare(pattern, target);
     }
 
     /**
