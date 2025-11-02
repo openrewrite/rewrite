@@ -21,7 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.InlineMe;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -133,7 +132,6 @@ public class ChangeParentPom extends Recipe {
     }
 
     @Deprecated
-    @InlineMe(replacement = "this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion, oldRelativePath, newRelativePath, versionPattern, allowVersionDowngrades, null)")
     public ChangeParentPom(String oldGroupId,
                            @Nullable String newGroupId,
                            String oldArtifactId,
