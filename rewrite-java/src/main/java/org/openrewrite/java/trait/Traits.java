@@ -16,7 +16,6 @@
 package org.openrewrite.java.trait;
 
 import org.openrewrite.java.AnnotationMatcher;
-import org.openrewrite.java.InlineMe;
 import org.openrewrite.java.MethodMatcher;
 
 /**
@@ -32,7 +31,6 @@ public class Traits {
      * @deprecated Use {@link Literal.Matcher} instead.
      */
     @Deprecated
-    @InlineMe(replacement = "new Literal.Matcher()", imports = "org.openrewrite.java.Literal")
     public static Literal.Matcher literal() {
         return new Literal.Matcher();
     }
@@ -41,7 +39,6 @@ public class Traits {
      * @deprecated Use {@link VariableAccess.Matcher} instead.
      */
     @Deprecated
-    @InlineMe(replacement = "new VariableAccess.Matcher()", imports = "org.openrewrite.java.VariableAccess")
     public static VariableAccess.Matcher variableAccess() {
         return new VariableAccess.Matcher();
     }
@@ -50,7 +47,6 @@ public class Traits {
      * @deprecated Use {@link MethodAccess.Matcher} instead.
      */
     @Deprecated
-    @InlineMe(replacement = "new MethodAccess.Matcher()", imports = "org.openrewrite.java.MethodAccess")
     public static MethodAccess.Matcher methodAccess(MethodMatcher matcher) {
         return new MethodAccess.Matcher(matcher);
     }
@@ -59,7 +55,6 @@ public class Traits {
      * @deprecated Use {@link MethodAccess.Matcher} instead.
      */
     @Deprecated
-    @InlineMe(replacement = "new MethodAccess.Matcher(signature)", imports = "org.openrewrite.java.MethodAccess")
     public static MethodAccess.Matcher methodAccess(String signature) {
         return new MethodAccess.Matcher(signature);
     }
@@ -68,7 +63,6 @@ public class Traits {
      * @deprecated Use {@link MethodAccess.Matcher} instead.
      */
     @Deprecated
-    @InlineMe(replacement = "new MethodAccess.Matcher(declaringType, methodName, args)", imports = "org.openrewrite.java.MethodAccess")
     public static Annotated.Matcher annotated(AnnotationMatcher matcher) {
         return new Annotated.Matcher(matcher);
     }
@@ -77,7 +71,6 @@ public class Traits {
      * @deprecated Use {@link Annotated.Matcher} instead.
      */
     @Deprecated
-    @InlineMe(replacement = "new Annotated.Matcher(signature)", imports = "org.openrewrite.java.Annotated")
     public static Annotated.Matcher annotated(String signature) {
         return new Annotated.Matcher(signature);
     }
@@ -86,7 +79,6 @@ public class Traits {
      * @deprecated Use {@link Annotated.Matcher} instead.
      */
     @Deprecated
-    @InlineMe(replacement = "new Annotated.Matcher(annotationType)", imports = "org.openrewrite.java.Annotated")
     public static Annotated.Matcher annotated(Class<?> annotationType) {
         return new Annotated.Matcher(annotationType);
     }

@@ -29,7 +29,7 @@ public class Traits {
      * @deprecated Use {@link GradleDependency.Matcher} instead.
      */
     @Deprecated
-    @InlineMe(replacement = "new GradleDependency.Matcher()", imports = "org.openrewrite.gradle.GradleDependency")
+
     public static GradleDependency.Matcher gradleDependency() {
         return new GradleDependency.Matcher();
     }
@@ -38,7 +38,7 @@ public class Traits {
      * @deprecated Use {@link JvmTestSuite.Matcher} instead.
      */
     @Deprecated
-    @InlineMe(replacement = "new JvmTestSuite.Matcher()", imports = "org.openrewrite.gradle.JvmTestSuite")
+
     public static JvmTestSuite.Matcher jvmTestSuite() {
         return new JvmTestSuite.Matcher();
     }
