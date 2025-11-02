@@ -4762,11 +4762,32 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
  */
 export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVisitor {
     /**
+     * When true, allows patterns without type annotations to match code with type annotations.
+     * This enables lenient matching where undefined types on either side are considered compatible.
+     */
+    protected readonly lenientTypeMatching: boolean;
+
+    /**
+     * Creates a new semantic comparator visitor.
+     *
+     * @param lenientTypeMatching If true, allows matching between nodes with and without type annotations
+     */
+    constructor(lenientTypeMatching: boolean = false) {
+        super();
+        this.lenientTypeMatching = lenientTypeMatching;
+    }
+
+    /**
      * Checks if two types are semantically equal.
      * For method types, this checks that the declaring type and method name match.
+     * With lenient type matching, undefined types on either side are considered compatible.
      */
     private isOfType(target?: Type, source?: Type): boolean {
         if (!target || !source) {
+            // Lenient mode: if either type is undefined, allow the match
+            if (this.lenientTypeMatching && (!target || !source)) {
+                return true;
+            }
             return target === source;
         }
 
@@ -4858,7 +4879,11 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         // Check type attribution
         // Both must have method types for semantic equality
         if (!method.methodType || !otherMethod.methodType) {
-            // If template has type but target doesn't, they don't match
+            // Lenient mode: if either has no type, allow structural matching
+            if (this.lenientTypeMatching) {
+                return super.visitMethodInvocation(method, other);
+            }
+            // Strict mode: if one has type but the other doesn't, they don't match
             if (method.methodType || otherMethod.methodType) {
                 return this.abort(method);
             }
@@ -4952,10 +4977,175 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                 return this.abort(identifier);
             }
         } else if (identifier.fieldType || otherIdentifier.fieldType) {
-            // If only one has a type, they don't match
-            return this.abort(identifier);
+            // Lenient mode: if either has no type, allow structural matching
+            if (!this.lenientTypeMatching) {
+                // Strict mode: if only one has a type, they don't match
+                return this.abort(identifier);
+            }
         }
 
         return super.visitIdentifier(identifier, other);
+    }
+
+    /**
+     * Override variable declarations comparison to handle lenient type matching.
+     * When lenientTypeMatching is true, patterns without typeExpression can match
+     * code with typeExpression.
+     */
+    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== J.Kind.VariableDeclarations) {
+            return this.abort(variableDeclarations);
+        }
+
+        const otherVariableDeclarations = other as J.VariableDeclarations;
+
+        // Visit leading annotations
+        if (variableDeclarations.leadingAnnotations.length !== otherVariableDeclarations.leadingAnnotations.length) {
+            return this.abort(variableDeclarations);
+        }
+
+        for (let i = 0; i < variableDeclarations.leadingAnnotations.length; i++) {
+            await this.visit(variableDeclarations.leadingAnnotations[i], otherVariableDeclarations.leadingAnnotations[i]);
+            if (!this.match) return variableDeclarations;
+        }
+
+        // Visit modifiers
+        if (variableDeclarations.modifiers.length !== otherVariableDeclarations.modifiers.length) {
+            return this.abort(variableDeclarations);
+        }
+
+        for (let i = 0; i < variableDeclarations.modifiers.length; i++) {
+            await this.visit(variableDeclarations.modifiers[i], otherVariableDeclarations.modifiers[i]);
+            if (!this.match) return variableDeclarations;
+        }
+
+        // Compare typeExpression - lenient matching allows one to be undefined
+        if ((variableDeclarations.typeExpression === undefined) !== (otherVariableDeclarations.typeExpression === undefined)) {
+            if (!this.lenientTypeMatching) {
+                return this.abort(variableDeclarations);
+            }
+            // In lenient mode, skip type comparison and continue
+        } else if (variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
+            // Both have typeExpression, visit them
+            await this.visit(variableDeclarations.typeExpression, otherVariableDeclarations.typeExpression);
+            if (!this.match) return variableDeclarations;
+        }
+
+        // Compare varargs
+        if ((variableDeclarations.varargs === undefined) !== (otherVariableDeclarations.varargs === undefined)) {
+            return this.abort(variableDeclarations);
+        }
+
+        // Compare variables
+        if (variableDeclarations.variables.length !== otherVariableDeclarations.variables.length) {
+            return this.abort(variableDeclarations);
+        }
+
+        // Visit each variable in lock step
+        for (let i = 0; i < variableDeclarations.variables.length; i++) {
+            await this.visit(variableDeclarations.variables[i].element, otherVariableDeclarations.variables[i].element);
+            if (!this.match) return variableDeclarations;
+        }
+
+        return variableDeclarations;
+    }
+
+    /**
+     * Override method declaration comparison to handle lenient type matching.
+     * When lenientTypeMatching is true, patterns without returnTypeExpression can match
+     * code with returnTypeExpression.
+     */
+    override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== J.Kind.MethodDeclaration) {
+            return this.abort(methodDeclaration);
+        }
+
+        const otherMethodDeclaration = other as J.MethodDeclaration;
+
+        // Visit leading annotations
+        if (methodDeclaration.leadingAnnotations.length !== otherMethodDeclaration.leadingAnnotations.length) {
+            return this.abort(methodDeclaration);
+        }
+
+        for (let i = 0; i < methodDeclaration.leadingAnnotations.length; i++) {
+            await this.visit(methodDeclaration.leadingAnnotations[i], otherMethodDeclaration.leadingAnnotations[i]);
+            if (!this.match) return methodDeclaration;
+        }
+
+        // Visit modifiers
+        if (methodDeclaration.modifiers.length !== otherMethodDeclaration.modifiers.length) {
+            return this.abort(methodDeclaration);
+        }
+
+        for (let i = 0; i < methodDeclaration.modifiers.length; i++) {
+            await this.visit(methodDeclaration.modifiers[i], otherMethodDeclaration.modifiers[i]);
+            if (!this.match) return methodDeclaration;
+        }
+
+        // Visit type parameters if present
+        if (!!methodDeclaration.typeParameters !== !!otherMethodDeclaration.typeParameters) {
+            return this.abort(methodDeclaration);
+        }
+
+        if (methodDeclaration.typeParameters && otherMethodDeclaration.typeParameters) {
+            await this.visit(methodDeclaration.typeParameters, otherMethodDeclaration.typeParameters);
+            if (!this.match) return methodDeclaration;
+        }
+
+        // Compare returnTypeExpression - lenient matching allows one to be undefined
+        if ((methodDeclaration.returnTypeExpression === undefined) !== (otherMethodDeclaration.returnTypeExpression === undefined)) {
+            if (!this.lenientTypeMatching) {
+                return this.abort(methodDeclaration);
+            }
+            // In lenient mode, skip type comparison and continue
+        } else if (methodDeclaration.returnTypeExpression && otherMethodDeclaration.returnTypeExpression) {
+            // Both have returnTypeExpression, visit them
+            await this.visit(methodDeclaration.returnTypeExpression, otherMethodDeclaration.returnTypeExpression);
+            if (!this.match) return methodDeclaration;
+        }
+
+        // Visit name
+        await this.visit(methodDeclaration.name, otherMethodDeclaration.name);
+        if (!this.match) return methodDeclaration;
+
+        // Compare parameters
+        if (methodDeclaration.parameters.elements.length !== otherMethodDeclaration.parameters.elements.length) {
+            return this.abort(methodDeclaration);
+        }
+
+        // Visit each parameter in lock step
+        for (let i = 0; i < methodDeclaration.parameters.elements.length; i++) {
+            await this.visit(methodDeclaration.parameters.elements[i].element, otherMethodDeclaration.parameters.elements[i].element);
+            if (!this.match) return methodDeclaration;
+        }
+
+        // Visit throws if present
+        if (!!methodDeclaration.throws !== !!otherMethodDeclaration.throws) {
+            return this.abort(methodDeclaration);
+        }
+
+        if (methodDeclaration.throws && otherMethodDeclaration.throws) {
+            // Visit each throws expression in lock step
+            if (methodDeclaration.throws.elements.length !== otherMethodDeclaration.throws.elements.length) {
+                return this.abort(methodDeclaration);
+            }
+
+            for (let i = 0; i < methodDeclaration.throws.elements.length; i++) {
+                await this.visit(methodDeclaration.throws.elements[i].element, otherMethodDeclaration.throws.elements[i].element);
+                if (!this.match) return methodDeclaration;
+            }
+        }
+
+        // Visit body if present
+        if (!!methodDeclaration.body !== !!otherMethodDeclaration.body) {
+            return this.abort(methodDeclaration);
+        }
+
+        if (methodDeclaration.body && otherMethodDeclaration.body) {
+            await this.visit(methodDeclaration.body, otherMethodDeclaration.body);
+            if (!this.match) return methodDeclaration;
+        }
+
+        return methodDeclaration;
     }
 }

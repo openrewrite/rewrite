@@ -124,31 +124,12 @@ class CaptureMarker implements Marker {
  * Uses semantic comparison to match semantically equivalent code (e.g., isDate() and util.isDate()).
  */
 class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
-    constructor(private readonly matcher: { handleCapture: (pattern: J, target: J) => boolean }) {
-        super();
-    }
-
-    /**
-     * Creates a wildcard identifier that will match any AST node during comparison.
-     * The identifier has a CaptureMarker which causes it to match anything without storing the result.
-     *
-     * @param captureName The name for the capture marker (for debugging purposes)
-     * @returns A wildcard identifier
-     */
-    private createWildcardIdentifier(captureName: string): J.Identifier {
-        return {
-            id: randomId(),
-            kind: J.Kind.Identifier,
-            prefix: emptySpace,
-            markers: {
-                ...emptyMarkers,
-                markers: [new CaptureMarker(captureName)]
-            },
-            annotations: [],
-            simpleName: '__wildcard__',
-            type: undefined,
-            fieldType: undefined
-        };
+    constructor(
+        private readonly matcher: { handleCapture: (pattern: J, target: J) => boolean },
+        lenientTypeMatching: boolean = true
+    ) {
+        // Enable lenient type matching based on pattern configuration (default: true for backward compatibility)
+        super(lenientTypeMatching);
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
@@ -166,64 +147,6 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
         }
 
         return super.visit(j, p, parent);
-    }
-
-    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.VariableDeclarations) {
-            return this.abort(variableDeclarations);
-        }
-
-        const otherVariableDeclarations = other as J.VariableDeclarations;
-
-        // LENIENT: If pattern lacks typeExpression but target has one, add a wildcard capture to pattern
-        // This allows the pattern to match without requiring us to modify the target (which would corrupt captures)
-        if (!variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
-            variableDeclarations = produce(variableDeclarations, draft => {
-                draft.typeExpression = this.createWildcardIdentifier('__wildcard_type__') as J.Identifier;
-            });
-        }
-
-        // Delegate to super implementation
-        return super.visitVariableDeclarations(variableDeclarations, otherVariableDeclarations);
-    }
-
-    override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.MethodDeclaration) {
-            return this.abort(methodDeclaration);
-        }
-
-        const otherMethodDeclaration = other as J.MethodDeclaration;
-
-        // LENIENT: If pattern lacks returnTypeExpression but target has one, add a wildcard capture to pattern
-        // This allows the pattern to match without requiring us to modify the target (which would corrupt captures)
-        if (!methodDeclaration.returnTypeExpression && otherMethodDeclaration.returnTypeExpression) {
-            methodDeclaration = produce(methodDeclaration, draft => {
-                draft.returnTypeExpression = this.createWildcardIdentifier('__wildcard_return_type__') as J.Identifier;
-            });
-        }
-
-        // Delegate to super implementation
-        return super.visitMethodDeclaration(methodDeclaration, otherMethodDeclaration);
-    }
-
-    override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.MethodInvocation) {
-            return this.abort(methodInvocation);
-        }
-
-        const otherMethodInvocation = other as J.MethodInvocation;
-
-        // LENIENT: If pattern lacks methodType but target has one, add a wildcard type to pattern
-        // This allows patterns without full type attribution to match typed method invocations
-        if (!methodInvocation.methodType && otherMethodInvocation.methodType) {
-            methodInvocation = produce(methodInvocation, draft => {
-                // Create a minimal methodType - the comparator will handle the lenient matching
-                draft.methodType = otherMethodInvocation.methodType;
-            });
-        }
-
-        // Delegate to super implementation
-        return super.visitMethodInvocation(methodInvocation, otherMethodInvocation);
     }
 
     protected hasSameKind(j: J, other: J): boolean {
@@ -414,6 +337,16 @@ export interface PatternOptions {
      * The template engine will create a package.json with these dependencies.
      */
     dependencies?: Record<string, string>;
+
+    /**
+     * When true, allows patterns without type annotations to match code with type annotations.
+     * This enables more flexible pattern matching during development or when full type attribution
+     * is not needed. When false, enforces strict type matching where both pattern and target must
+     * have matching type annotations.
+     *
+     * @default true (lenient matching enabled for backward compatibility)
+     */
+    lenientTypeMatching?: boolean;
 }
 
 /**
@@ -551,10 +484,12 @@ class Matcher {
             return false;
         }
 
-        // Use the pattern matching comparator which is lenient about optional properties
+        // Use the pattern matching comparator with configured lenient type matching
+        // Default to true for backward compatibility with existing patterns
+        const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
         const comparator = new PatternMatchingComparator({
             handleCapture: (p, t) => this.handleCapture(p, t)
-        });
+        }, lenientTypeMatching);
         return await comparator.compare(pattern, target);
     }
 
