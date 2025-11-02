@@ -26,13 +26,13 @@ This ADR proposes eight enhancements to address these limitations and make the t
 
 | # | Feature | Status |
 |---|---------|--------|
-| 1 | Property Access on Captures | 📝 Proposed |
+| 1 | Property Access on Captures | ✅ Implemented |
 | 2 | Constrained Captures | 📝 Proposed |
-| 3 | Rename `imports` to `context` | 📝 Proposed |
+| 3 | Rename `imports` to `context` | ✅ Implemented |
 | 4 | Pre-parsing Code Interpolation with `code()` | 📝 Proposed |
-| 5 | Builder API for Dynamic Construction | 📝 Proposed |
-| 6 | Lenient Type Matching in Comparator | 📝 Proposed |
-| 7 | `param()` for Template-Only Parameters | 📝 Proposed |
+| 5 | Builder API for Dynamic Construction | ✅ Implemented |
+| 6 | Lenient Type Matching in Comparator | ✅ Implemented |
+| 7 | `param()` for Template-Only Parameters | ✅ Implemented |
 | 8 | Ellipsis Patterns for Sequence Matching | 📝 Proposed |
 
 ## Decision
@@ -549,7 +549,7 @@ const prodPat = pattern`foo(${capture('x')})`
 
 ### 7. `param()` for Template-Only Parameters
 
-**Status**: 📝 Proposed
+**Status**: ✅ Implemented
 
 Add `param()` function as an alternative to `capture()` for use in templates that don't involve pattern matching, making the intent clearer.
 
@@ -564,7 +564,7 @@ const tmpl = template`bar(${method.name})`;
 // For standalone templates - use param() for clarity
 const node = param<J.Identifier>('nodeName');
 const tmpl = template`function ${node}() { return 42; }`;
-tmpl.apply(cursor, someTree, new Map([['nodeName', identifierNode]]));
+await tmpl.apply(cursor, someTree, new Map([['nodeName', identifierNode]]));
 ```
 
 **Rationale:**
@@ -574,29 +574,37 @@ tmpl.apply(cursor, someTree, new Map([['nodeName', identifierNode]]));
 - Aligns terminology with common template systems (parameters, not captures)
 - Both functions work identically - difference is semantic clarity
 
-**Comparison:**
+**When to Use Which:**
 
 ```typescript
-// Using capture() in standalone template - semantically unclear
-const value = capture('value');
-template`return ${value} * 2;`
-    .apply(cursor, node, new Map([['value', someExpr]]));
+// ✅ GOOD: Use capture() with patterns
+const expr = capture('expr');
+const pat = pattern`foo(${expr})`;
+const tmpl = template`bar(${expr})`;  // Makes sense - captured from pattern
 
-// Using param() in standalone template - clearer intent
+// ✅ GOOD: Use param() for standalone templates
 const value = param('value');
-template`return ${value} * 2;`
-    .apply(cursor, node, new Map([['value', someExpr]]));
+const tmpl = template`return ${value} * 2;`;
+await tmpl.apply(cursor, node, new Map([['value', someExpr]]));
 
-// capture() still appropriate with patterns
-const value = capture('value');
-const pat = pattern`foo(${value})`;  // Pattern context makes "capture" make sense
-const tmpl = template`bar(${value})`;
+// ⚠️ CONFUSING: capture() in standalone template
+const value = capture('value');  // "Capturing" what? No pattern here!
+template`return ${value} * 2;`
+
+// ✅ ALSO GOOD: param() works with Builder API
+const value = param('value');
+const tmpl = Template.builder()
+    .code('return ')
+    .param(value)
+    .code(' * 2;')
+    .build();
 ```
 
 **Implementation:**
 - `param()` is an alias for `capture()` - identical implementation
 - Both return same `Capture` type, work interchangeably
 - No runtime distinction - purely semantic naming
+- Supports all features: property access, Builder API integration
 - Builder API could also offer `.param()` alongside `.capture()` for templates
 - Type signature: `param<T = any>(name?: string): Capture<T> & T`
 

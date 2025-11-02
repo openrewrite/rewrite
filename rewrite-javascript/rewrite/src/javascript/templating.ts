@@ -223,6 +223,36 @@ class CaptureImpl<T = any> implements Capture<T> {
 }
 
 /**
+ * Template parameter specification for template-only parameter substitution.
+ * Unlike Capture, TemplateParam does not support property access and is simpler.
+ *
+ * @template T The expected type of the parameter value (for TypeScript autocomplete only)
+ */
+export interface TemplateParam<T = any> {
+    /**
+     * The name of the parameter, used to look up the value in the values map.
+     */
+    readonly name: string;
+
+    /**
+     * Gets the string name of this parameter.
+     */
+    getName(): string;
+}
+
+class TemplateParamImpl<T = any> implements TemplateParam<T> {
+    public readonly name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+/**
  * Represents a property access on a captured value.
  * When you access a property on a Capture (e.g., method.name), you get a CaptureValue
  * that knows how to resolve that property from the matched values.
@@ -356,6 +386,54 @@ function createCaptureValueProxy(rootCapture: Capture, propertyPath: string[]): 
 
 // Static counter for generating unique IDs for unnamed captures
 capture.nextUnnamedId = 1;
+
+/**
+ * Creates a parameter specification for use in standalone templates (not used with patterns).
+ *
+ * Use `param()` when creating templates that are not used with pattern matching.
+ * Use `capture()` when the template works with a pattern.
+ *
+ * @template T The expected type of the parameter value (for TypeScript autocomplete only)
+ * @param name Optional name for the parameter. If not provided, an auto-generated name is used.
+ * @returns A TemplateParam object (simpler than Capture, no property access support)
+ *
+ * @remarks
+ * **When to use `param()` vs `capture()`:**
+ *
+ * - Use `param()` in **standalone templates** (no pattern matching involved)
+ * - Use `capture()` in **patterns** and templates used with patterns
+ *
+ * **Key Differences:**
+ * - `TemplateParam` is simpler - no property access proxy overhead
+ * - `Capture` supports property access (e.g., `capture('x').name.simpleName`)
+ * - Both work in templates, but `param()` makes intent clearer for standalone use
+ *
+ * @example
+ * // ✅ GOOD: Use param() for standalone templates
+ * const value = param<J.Literal>('value');
+ * const tmpl = template`return ${value} * 2;`;
+ * await tmpl.apply(cursor, node, new Map([['value', someLiteral]]));
+ *
+ * @example
+ * // ✅ GOOD: Use capture() with patterns
+ * const value = capture('value');
+ * const pat = pattern`foo(${value})`;
+ * const tmpl = template`bar(${value})`;  // capture() makes sense here
+ *
+ * @example
+ * // ⚠️ CONFUSING: Using capture() in standalone template
+ * const value = capture('value');
+ * template`return ${value} * 2;`;  // "Capturing" what? There's no pattern!
+ *
+ * @example
+ * // ❌ WRONG: param() doesn't support property access
+ * const node = param<J.MethodInvocation>('invocation');
+ * template`console.log(${node.name})`  // Error! Use capture() for property access
+ */
+export function param<T = any>(name?: string): TemplateParam<T> {
+    const paramName = name || `unnamed_${capture.nextUnnamedId++}`;
+    return new TemplateParamImpl<T>(paramName);
+}
 
 /**
  * Concise alias for `capture`. Works well for inline captures in patterns and templates.
@@ -743,7 +821,7 @@ namespace JavaCoordinates {
  * - Tree: AST nodes to be inserted directly
  * - Primitives: Values to be converted to literals
  */
-export type TemplateParameter = Capture | Tree | string | number | boolean;
+export type TemplateParameter = Capture | TemplateParam | Tree | string | number | boolean;
 
 /**
  * Configuration options for templates.
@@ -1164,13 +1242,14 @@ class TemplateEngine {
             result += templateParts[i];
             if (i < parameters.length) {
                 const param = parameters[i].value;
-                // Use a placeholder for Captures, CaptureValues, and Tree nodes
+                // Use a placeholder for Captures, TemplateParams, CaptureValues, and Tree nodes
                 // Inline everything else (strings, numbers, booleans) directly
                 // Check for Capture (could be a Proxy, so check for symbol property)
                 const isCapture = param instanceof CaptureImpl ||
                                 (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
+                const isTemplateParam = param instanceof TemplateParamImpl;
                 const isCaptureValue = param instanceof CaptureValue;
-                if (isCapture || isCaptureValue || isTree(param)) {
+                if (isCapture || isTemplateParam || isCaptureValue || isTree(param)) {
                     const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
                     result += placeholder;
                 } else {
@@ -1360,14 +1439,16 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             return placeholder;
         }
 
-        // Check if the parameter value is a Capture (could be a Proxy)
+        // Check if the parameter value is a Capture (could be a Proxy) or TemplateParam
         const isCapture = param.value instanceof CaptureImpl ||
                          (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
+        const isTemplateParam = param.value instanceof TemplateParamImpl;
 
-        if (isCapture) {
-            // Simple capture (no property path)
-            const captureName = param.value[CAPTURE_NAME_SYMBOL] || param.value.name;
-            const matchedNode = this.values.get(captureName);
+        if (isCapture || isTemplateParam) {
+            // Simple capture/template param (no property path for template params)
+            const name = isTemplateParam ? param.value.name :
+                        (param.value[CAPTURE_NAME_SYMBOL] || param.value.name);
+            const matchedNode = this.values.get(name);
             if (matchedNode) {
                 return produce(matchedNode, draft => {
                     draft.markers = placeholder.markers;
