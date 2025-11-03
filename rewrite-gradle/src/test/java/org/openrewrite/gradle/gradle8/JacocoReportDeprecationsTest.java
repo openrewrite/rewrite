@@ -654,4 +654,48 @@ class JacocoReportDeprecationsTest implements RewriteTest {
             );
         }
     }
+
+    @Test
+    void allNotationsMixed() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport {
+                  reports {
+                      xml.enabled = true
+                      xml.setEnabled(false)
+                      xml.enabled(true)
+                      xml.enabled false
+                      xml.destination = layout.buildDirectory.dir('jacocoXml')
+                      xml.setDestination layout.buildDirectory.dir('jacocoXml2')
+                      xml.destination(layout.buildDirectory.dir('jacocoXml3'))
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport {
+                  reports {
+                      xml.required = true
+                      xml.required(false)
+                      xml.required(true)
+                      xml.required false
+                      xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
+                      xml.outputLocation layout.buildDirectory.dir('jacocoXml2')
+                      xml.outputLocation(layout.buildDirectory.dir('jacocoXml3'))
+                  }
+              }
+              """
+          )
+        );
+    }
 }

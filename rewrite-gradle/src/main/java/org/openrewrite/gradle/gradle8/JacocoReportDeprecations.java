@@ -122,9 +122,9 @@ public class JacocoReportDeprecations extends Recipe {
 
             private J.MethodInvocation replaceDeprecatedMethodName(J.MethodInvocation method) {
                 String methodName = method.getSimpleName();
-                if ("enabled".equalsIgnoreCase(methodName) || "isEnabled".equalsIgnoreCase(methodName)) {
+                if ("enabled".equalsIgnoreCase(methodName) || "isEnabled".equalsIgnoreCase(methodName) || "setEnabled".equalsIgnoreCase(methodName)) {
                     return method.withName(method.getName().withSimpleName("required"));
-                } else if ("destination".equalsIgnoreCase(methodName)) {
+                } else if ("destination".equalsIgnoreCase(methodName) || "setDestination".equalsIgnoreCase(methodName)) {
                     return method.withName(method.getName().withSimpleName("outputLocation"));
                 }
                 return method;
