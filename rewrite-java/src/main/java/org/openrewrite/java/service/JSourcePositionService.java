@@ -20,7 +20,10 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.service.SourcePositionService;
+import org.openrewrite.service.Span;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -32,7 +35,7 @@ import static java.util.Collections.emptyList;
  * elements in chained method calls, multi-line variable declarations, and method parameters.
  */
 @Incubating(since = "8.63.0")
-public class SourcePositionService {
+public class JSourcePositionService implements SourcePositionService {
 
     /**
      * Computes the column position where an element should be aligned to.
@@ -222,5 +225,122 @@ public class SourcePositionService {
         }
 
         return null;
+    }
+
+    @Override
+    public Span positionOf(Cursor cursor) {
+        SourceFile s = cursor.firstEnclosingOrThrow(JavaSourceFile.class);
+        J element = cursor.getValue();
+
+        AtomicInteger startLine = new AtomicInteger(-1);
+        AtomicInteger startColumn = new AtomicInteger(-1);
+        AtomicInteger endLine = new AtomicInteger(-1);
+        AtomicInteger endColumn = new AtomicInteger(-1);
+
+        // Track if we're currently visiting our target element and its children
+        AtomicBoolean insideElement = new AtomicBoolean(false);
+        AtomicInteger depth = new AtomicInteger(0);
+
+        JavaPrinter<TreeVisitor<?, ?>> printer = new JavaPrinter<TreeVisitor<?, ?>>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                // Use reference equality to identify the exact element instance
+                boolean isTarget = tree == element;
+
+                if (isTarget) {
+                    insideElement.set(true);
+                    depth.set(1);
+                } else if (insideElement.get()) {
+                    depth.incrementAndGet();
+                }
+
+                J result = super.visit(tree, p);
+
+                if (insideElement.get()) {
+                    depth.decrementAndGet();
+                    if (depth.get() == 0) {
+                        insideElement.set(false);
+                    }
+                }
+
+                return result;
+            }
+        };
+
+        PrintOutputCapture<TreeVisitor<?, ?>> capture = new PrintOutputCapture<TreeVisitor<?, ?>>(printer, PrintOutputCapture.MarkerPrinter.SANITIZED) {
+            int currentLine = 1;
+            int currentColumn = 1;
+
+            @Override
+            public PrintOutputCapture<TreeVisitor<?, ?>> append(@Nullable String text) {
+                if (text != null && !text.isEmpty()) {
+                    for (int i = 0; i < text.length(); i++) {
+                        char c = text.charAt(i);
+
+                        if (insideElement.get() && startLine.get() == -1) {
+                            startLine.set(currentLine);
+                            startColumn.set(currentColumn);
+                        }
+
+                        if (insideElement.get()) {
+                            endLine.set(currentLine);
+                            endColumn.set(currentColumn);
+                        }
+
+                        // Now update position for next character
+                        if (c == '\n') {
+                            currentLine++;
+                            currentColumn = 1;
+                        } else if (c == '\r') {
+                            if (i + 1 < text.length() && text.charAt(i + 1) == '\n') {
+                                // Skip \r in \r\n
+                                continue;
+                            } else {
+                                currentLine++;
+                                currentColumn = 1;
+                            }
+                        } else {
+                            currentColumn++;
+                        }
+                    }
+                }
+                return super.append(text);
+            }
+
+            @Override
+            public PrintOutputCapture<TreeVisitor<?, ?>> append(char c) {
+                if (insideElement.get() && startLine.get() == -1) {
+                    startLine.set(currentLine);
+                    startColumn.set(currentColumn);
+                }
+
+                if (insideElement.get()) {
+                    endLine.set(currentLine);
+                    endColumn.set(currentColumn);
+                }
+
+                // Update position
+                if (c == '\n') {
+                    currentLine++;
+                    currentColumn = 1;
+                } else if (c == '\r') {
+                    currentLine++;
+                    currentColumn = 1;
+                } else {
+                    currentColumn++;
+                }
+
+                return super.append(c);
+            }
+        };
+
+        printer.visit(s, capture);
+
+        return Span.builder()
+                .startLine(startLine.get())
+                .startColumn(startColumn.get())
+                .endLine(endLine.get())
+                .endColumn(endColumn.get())
+                .build();
     }
 }

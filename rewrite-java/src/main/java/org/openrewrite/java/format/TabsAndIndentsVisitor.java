@@ -21,7 +21,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.service.SourcePositionService;
+import org.openrewrite.java.service.JSourcePositionService;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
@@ -256,7 +256,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                         JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                                         int alignTo;
                                         try {
-                                            alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                                            alignTo = sourceFile.service(JSourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
                                         } catch (UnsupportedOperationException e) {
                                             // Sourcefile$service(...) might give UnsupportedOperationException depending on the runtime, the lst build date... we use deprecated behavior in that case
                                             alignTo = computeFirstParameterColumn(tree);
@@ -286,7 +286,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                                 int alignTo;
                                 try {
-                                    alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                                    alignTo = sourceFile.service(JSourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
                                 } catch (UnsupportedOperationException error) {
                                     // Sourcefile$service(...) might give UnsupportedOperationException depending on the runtime, the lst build date... we use deprecated behavior in that case
                                     alignTo = computeFirstParameterColumn(tree);
@@ -384,7 +384,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                             int alignTo;
                             try {
-                                alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                                alignTo = sourceFile.service(JSourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
                             } catch (UnsupportedOperationException e) {
                                 // Sourcefile$service(...) might give UnsupportedOperationException depending on the runtime, the lst build date... we do not align in that case.
                                 alignTo = -1;

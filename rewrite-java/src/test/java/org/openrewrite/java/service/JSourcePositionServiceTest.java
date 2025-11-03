@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.format;
+package org.openrewrite.java.service;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.service.Span;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 /**
- * Tests for {@link SourcePositionService}.
+ * Tests for {@link JSourcePositionService}.
  * <p>
  * <b>Important:</b> The indentation in these test cases is intentionally non-standard and sometimes incorrect.
  * This is deliberate, as we want to verify that the service correctly calculates alignment positions based on
@@ -40,7 +40,8 @@ import static org.openrewrite.java.Assertions.java;
  * position by finding the previous element with a newline prefix and using its actual indentation as the
  * baseline. This allows formatting recipes to progressively correct indentation issues.
  */
-class SourcePositionServiceTest implements RewriteTest {
+@SuppressWarnings({"NullableProblems", "DataFlowIssue", "StringBufferReplaceableByString", "ConstantValue", "UnnecessaryCallToStringValueOf", "TrailingWhitespacesInTextBlock"})
+class JSourcePositionServiceTest implements RewriteTest {
 
     @DocumentExample
     @Test
@@ -49,11 +50,11 @@ class SourcePositionServiceTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
 
               @Nullable
-              SourcePositionService service;
+              JSourcePositionService service;
 
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  service = cu.service(SourcePositionService.class);
+                  service = cu.service(JSourcePositionService.class);
                   return super.visitCompilationUnit(cu, ctx);
               }
 
@@ -143,11 +144,11 @@ class SourcePositionServiceTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
 
               @Nullable
-              SourcePositionService service;
+              JSourcePositionService service;
 
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  service = cu.service(SourcePositionService.class);
+                  service = cu.service(JSourcePositionService.class);
                   return super.visitCompilationUnit(cu, ctx);
               }
 
@@ -232,11 +233,11 @@ class SourcePositionServiceTest implements RewriteTest {
               .recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
 
               @Nullable
-              SourcePositionService service;
+              JSourcePositionService service;
 
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  service = cu.service(SourcePositionService.class);
+                  service = cu.service(JSourcePositionService.class);
                   return super.visitCompilationUnit(cu, ctx);
               }
 
@@ -312,11 +313,11 @@ class SourcePositionServiceTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
 
               @Nullable
-              SourcePositionService service;
+              JSourcePositionService service;
 
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  service = cu.service(SourcePositionService.class);
+                  service = cu.service(JSourcePositionService.class);
                   return super.visitCompilationUnit(cu, ctx);
               }
 
@@ -375,6 +376,245 @@ class SourcePositionServiceTest implements RewriteTest {
             Integer t2,
             Double u2,
             Float b2) {}
+            }
+            """
+          )
+        );
+    }
+
+    @DocumentExample
+    @Test
+    void calculatesPositionOfSimpleElements() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              JSourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(JSourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+                  var span = service.positionOf(getCursor());
+                  assertThat(span).isEqualTo(Span.builder()
+                      .startLine(1)
+                      .startColumn(1)
+                      .endLine(1)
+                      .endColumn(19)  // Semicolon is suffix, not included
+                    .build());
+                  return super.visitPackage(pkg, ctx);
+              }
+
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  if ("Test".equals(classDecl.getSimpleName())) {
+                      var span = service.positionOf(getCursor());
+                      assertThat(span).isEqualTo(Span.builder()
+                          .startLine(1)
+                          .startColumn(21)  // Starts after package statement (includes prefix whitespace)
+                          .endLine(7)
+                          .endColumn(1)
+                        .build());
+                  }
+                  return super.visitClassDeclaration(classDecl, ctx);
+              }
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  var span = service.positionOf(getCursor());
+                  assertThat(span).isEqualTo(Span.builder()
+                      .startLine(3)
+                      .startColumn(20)  // Starts after class opening brace (includes prefix)
+                      .endLine(6)
+                      .endColumn(5)
+                    .build());
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  var span = service.positionOf(getCursor());
+                  assertThat(span).isEqualTo(Span.builder()
+                      .startLine(4)
+                      .startColumn(28)  // Starts after method opening brace (includes prefix)
+                      .endLine(5)
+                      .endColumn(29)  // Includes semicolon
+                    .build());
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+            package com.example;
+
+            public class Test {
+                public void example() {
+                    String text = "hello";
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void calculatesPositionOfMultiLineElements() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              JSourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(JSourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  // Check specifically for append("world") to test multi-line spanning
+                  if ("append".equals(method.getSimpleName()) &&
+                      method.getArguments().size() == 1 &&
+                      method.getArguments().get(0) instanceof J.Literal &&
+                      "world".equals(((J.Literal)method.getArguments().get(0)).getValue())) {
+                      var span = service.positionOf(getCursor());
+                      assertThat(span).isEqualTo(Span.builder()
+                          .startLine(5)
+                          .startColumn(23)  // Start of "new StringBuilder()"
+                          .endLine(6)
+                          .endColumn(32)  // End of closing paren after "world"
+                        .build());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+            package com.example;
+
+            public class Test {
+                public void example() {
+                    String text = new StringBuilder().append("hello")
+                            .append("world")
+                            .toString();
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void calculatesPositionWithComments() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              JSourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(JSourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  // Method prefix includes the comment on line 4
+                  var span = service.positionOf(getCursor());
+                  assertThat(span).isEqualTo(Span.builder()
+                      .startLine(3)
+                      .startColumn(20)  // Starts after class opening brace (includes prefix with comment)
+                      .endLine(7)
+                      .endColumn(5)
+                    .build());
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  // Variable prefix includes space before it
+                  var span = service.positionOf(getCursor());
+                  assertThat(span).isEqualTo(Span.builder()
+                      .startLine(5)
+                      .startColumn(28)  // Starts after method opening brace (includes prefix)
+                      .endLine(6)
+                      .endColumn(31)  // Ends after the literal value
+                    .build());
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+            package com.example;
+
+            public class Test {
+                // This is a comment
+                public void example() {
+                    int x = /* inline */ 42;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void calculatesPositionOfNestedElements() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              JSourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(JSourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  if ("Inner".equals(classDecl.getSimpleName())) {
+                      var span = service.positionOf(getCursor());
+                      assertThat(span).isEqualTo(Span.builder()
+                          .startLine(3)
+                          .startColumn(20)  // Starts after outer class opening brace (includes prefix)
+                          .endLine(7)
+                          .endColumn(5)
+                        .build());
+                  }
+                  return super.visitClassDeclaration(classDecl, ctx);
+              }
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if ("innerMethod".equals(method.getSimpleName())) {
+                      var span = service.positionOf(getCursor());
+                      assertThat(span).isEqualTo(Span.builder()
+                          .startLine(5)
+                          .startColumn(18)  // Starts after inner class opening brace (includes prefix)
+                          .endLine(6)
+                          .endColumn(29)
+                        .build());
+                  }
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+          })),
+          java(
+            """
+            package com.example;
+
+            public class Test {
+
+                class Inner {
+                    void innerMethod() {}
+                }
             }
             """
           )

@@ -20,7 +20,7 @@ import lombok.Value;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.service.SourcePositionService;
+import org.openrewrite.java.service.JSourcePositionService;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -68,7 +68,7 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                     JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                     if (!isBuilderMethod &&
                             style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong &&
-                            (sourceFile == null || sourceFile.service(SourcePositionService.class).computeTreeLength(getCursor()) <= style.getHardWrapAt())) {
+                            (sourceFile == null || sourceFile.service(JSourcePositionService.class).computeTreeLength(getCursor()) <= style.getHardWrapAt())) {
                         return m;
                     }
 
