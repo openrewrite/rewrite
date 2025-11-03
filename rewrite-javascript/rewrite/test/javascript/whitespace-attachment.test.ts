@@ -47,7 +47,7 @@ class OutputNode {
             return kind;
         };
 
-        return `{${prettifyKind(this.element.kind)}(${childrenStr})}`;
+        return `${prettifyKind(this.element.kind)}{${childrenStr}}`;
     }
 }
 
