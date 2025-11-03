@@ -2645,16 +2645,19 @@ export class JavaScriptParserVisitor {
     }
 
     visitExpressionStatement(node: ts.ExpressionStatement): Statement {
-        const expression = this.visit(node.expression) as Expression;
+        const expression: Expression = this.visit(node.expression) as Expression;
         if (isStatement(expression)) {
             return expression as Statement;
         }
+        const e: Expression = expression;
         return {
             kind: JS.Kind.ExpressionStatement,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: e.prefix,
             markers: emptyMarkers,
-            expression: expression
+            expression: produce(e, draft => {
+                draft.prefix = emptySpace
+            })
         } satisfies JS.ExpressionStatement as JS.ExpressionStatement;
     }
 

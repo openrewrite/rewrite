@@ -162,7 +162,8 @@ function findWhitespaceViolations(rootNodes: OutputNode[]): string[] {
 describe('whitespace attachment', () => {
     test.each([
         "const c =  function(): number { return 116; };",
-        "const x = new Date();"
+        "const x = new Date();",
+        "async function m(): void { await Promise.resolve(); }",
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();
