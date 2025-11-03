@@ -174,7 +174,7 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
     constructor(
         private readonly matcher: {
             handleCapture: (pattern: J, target: J) => boolean;
-            handleVariadicCapture: (pattern: J, targets: J[]) => boolean;
+            handleVariadicCapture: (pattern: J, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
         },
         lenientTypeMatching: boolean = true
     ) {
@@ -271,25 +271,96 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
         return methodInvocation;
     }
 
+    override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
+        // Check if any statements have CaptureMarker indicating they're variadic
+        const hasVariadicCapture = block.statements.some(stmt => {
+            const captureMarker = PlaceholderUtils.getCaptureMarker(stmt.element);
+            return captureMarker?.variadicOptions !== undefined;
+        });
+
+        // If no variadic captures, use parent implementation
+        if (!hasVariadicCapture) {
+            return super.visitBlock(block, other);
+        }
+
+        // Otherwise, handle variadic captures ourselves
+        if (!this.match || other.kind !== J.Kind.Block) {
+            return this.abort(block);
+        }
+
+        const otherBlock = other as J.Block;
+
+        // Special handling for variadic captures in statements
+        if (!await this.matchSequence(block.statements, otherBlock.statements, false)) {
+            return this.abort(block);
+        }
+
+        return block;
+    }
+
+    override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): Promise<J | undefined> {
+        // Check if any statements are variadic captures (unwrap ExpressionStatement wrappers first)
+        const hasVariadicCapture = compilationUnit.statements.some(stmt => {
+            const unwrapped = PlaceholderUtils.unwrapStatementCapture(stmt.element);
+            return PlaceholderUtils.isVariadicCapture(unwrapped);
+        });
+
+        // If no variadic captures, use parent implementation
+        if (!hasVariadicCapture) {
+            return super.visitJsCompilationUnit(compilationUnit, other);
+        }
+
+        // Otherwise, handle variadic captures ourselves
+        if (!this.match || other.kind !== JS.Kind.CompilationUnit) {
+            return this.abort(compilationUnit);
+        }
+
+        const otherCompilationUnit = other as JS.CompilationUnit;
+
+        // Special handling for variadic captures in top-level statements
+        if (!await this.matchSequence(compilationUnit.statements, otherCompilationUnit.statements, false)) {
+            return this.abort(compilationUnit);
+        }
+
+        return compilationUnit;
+    }
+
     /**
      * Matches argument lists, with special handling for variadic captures.
      * A variadic capture can match zero or more consecutive arguments.
      */
-    private async matchArguments(patternArgs: any[], targetArgs: any[]): Promise<boolean> {
+    private async matchArguments(patternArgs: J.RightPadded<J>[], targetArgs: J.RightPadded<J>[]): Promise<boolean> {
+        return this.matchSequence(patternArgs, targetArgs, true);
+    }
+
+    /**
+     * Generic sequence matching with variadic capture support.
+     * Works for any sequence of JRightPadded elements (arguments, statements, etc.).
+     * A variadic capture can match zero or more consecutive elements.
+     *
+     * @param patternElements The pattern elements (JRightPadded)
+     * @param targetElements The target elements to match against (JRightPadded)
+     * @param filterEmpty Whether to filter out J.Empty elements when capturing (true for arguments, false for statements)
+     * @returns true if the sequence matches, false otherwise
+     */
+    private async matchSequence(patternElements: J.RightPadded<J>[], targetElements: J.RightPadded<J>[], filterEmpty: boolean): Promise<boolean> {
         let patternIdx = 0;
         let targetIdx = 0;
 
-        while (patternIdx < patternArgs.length && targetIdx <= targetArgs.length) {
-            const patternArg = patternArgs[patternIdx].element;
+        while (patternIdx < patternElements.length && targetIdx <= targetElements.length) {
+            const patternElement = patternElements[patternIdx].element;
 
-            // Check if this pattern argument is a variadic capture
-            if (PlaceholderUtils.isVariadicCapture(patternArg)) {
-                const variadicOptions = PlaceholderUtils.getVariadicOptions(patternArg);
+            // Check if this pattern element has a CaptureMarker with variadic options
+            const captureMarker = PlaceholderUtils.getCaptureMarker(patternElement);
+            const isVariadic = captureMarker?.variadicOptions !== undefined;
 
-                // Calculate how many target arguments this variadic should consume
-                const remainingPatternArgs = patternArgs.length - patternIdx - 1;
-                const remainingTargetArgs = targetArgs.length - targetIdx;
-                const maxConsume = remainingTargetArgs - remainingPatternArgs;
+            if (isVariadic) {
+                const variadicOptions = captureMarker!.variadicOptions;
+
+                // Calculate how many target elements this variadic should consume
+                const remainingPatternElements = patternElements.length - patternIdx - 1;
+                const remainingTargetElements = targetElements.length - targetIdx;
+                const maxConsume = remainingTargetElements - remainingPatternElements;
 
                 // Check min/max constraints
                 const min = variadicOptions?.min ?? 0;
@@ -299,24 +370,30 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
                     return false;
                 }
 
-                // Capture all arguments for this variadic
-                // Filter out J.Empty elements as they represent zero arguments
-                const capturedArgs: J[] = [];
+                // Capture all elements for this variadic
+                // Store the full JRightPadded wrappers to preserve semicolon markers
+                const capturedWrappers: J.RightPadded<J>[] = [];
                 for (let i = 0; i < maxConsume; i++) {
-                    const arg = targetArgs[targetIdx + i].element;
-                    // Skip J.Empty as it represents an empty argument list, not an actual argument
-                    if (arg.kind !== J.Kind.Empty) {
-                        capturedArgs.push(arg);
+                    const wrapped = targetElements[targetIdx + i];
+                    const element = wrapped.element;
+                    // For arguments, filter out J.Empty as it represents an empty argument list
+                    // For statements, include all elements
+                    if (!filterEmpty || element.kind !== J.Kind.Empty) {
+                        capturedWrappers.push(wrapped);
                     }
                 }
 
-                // Re-check min/max constraints against actual captured arguments (after filtering J.Empty)
-                if (capturedArgs.length < min || capturedArgs.length > max) {
+                // Extract just the elements for the constraint check
+                const capturedElements: J[] = capturedWrappers.map(w => w.element);
+
+                // Re-check min/max constraints against actual captured elements (after filtering if applicable)
+                if (capturedElements.length < min || capturedElements.length > max) {
                     return false;
                 }
 
-                // Handle the variadic capture
-                const success = this.matcher.handleVariadicCapture(patternArg, capturedArgs);
+                // Handle the variadic capture by passing the pattern element (which has the CaptureMarker)
+                // Pass both elements (for constraints/user access) and wrappers (for template expansion)
+                const success = this.matcher.handleVariadicCapture(patternElement, capturedElements, capturedWrappers);
                 if (!success) {
                     return false;
                 }
@@ -324,19 +401,19 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
                 targetIdx += maxConsume;
                 patternIdx++;
             } else {
-                // Regular non-variadic argument - must match exactly one target argument
-                if (targetIdx >= targetArgs.length) {
-                    return false; // Pattern has more args than target
+                // Regular non-variadic element - must match exactly one target element
+                if (targetIdx >= targetElements.length) {
+                    return false; // Pattern has more elements than target
                 }
 
-                const targetArg = targetArgs[targetIdx].element;
+                const targetElement = targetElements[targetIdx].element;
 
-                // J.Empty represents no argument, so regular captures should not match it
-                if (targetArg.kind === J.Kind.Empty) {
+                // For arguments, J.Empty represents no argument, so regular captures should not match it
+                if (filterEmpty && targetElement.kind === J.Kind.Empty) {
                     return false;
                 }
 
-                await this.visit(patternArg, targetArg);
+                await this.visit(patternElement, targetElement);
                 if (!this.match) {
                     return false;
                 }
@@ -346,8 +423,8 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
             }
         }
 
-        // Ensure we've consumed all arguments from both pattern and target
-        return patternIdx === patternArgs.length && targetIdx === targetArgs.length;
+        // Ensure we've consumed all elements from both pattern and target
+        return patternIdx === patternElements.length && targetIdx === targetElements.length;
     }
 }
 
@@ -365,10 +442,6 @@ export interface VariadicOptions {
      */
     max?: number;
 }
-
-/**
- * Configuration options for captures.
- */
 
 /**
  * Options for the capture function.
@@ -506,6 +579,8 @@ const CAPTURE_VARIADIC_SYMBOL = Symbol('captureVariadic');
 const CAPTURE_CONSTRAINT_SYMBOL = Symbol('captureConstraint');
 // Symbol to access capturing flag without triggering Proxy
 const CAPTURE_CAPTURING_SYMBOL = Symbol('captureCapturing');
+// Symbol to access wrappersMap without exposing it as public API
+const WRAPPERS_MAP_SYMBOL = Symbol('wrappersMap');
 
 class CaptureImpl<T = any> implements Capture<T> {
     public readonly name: string;
@@ -597,7 +672,7 @@ class CaptureValue {
     constructor(
         public readonly rootCapture: Capture,
         public readonly propertyPath: string[],
-        public readonly arrayOperation?: { type: 'index' | 'slice' | 'length'; args?: any[] }
+        public readonly arrayOperation?: { type: 'index' | 'slice' | 'length'; args?: number[] }
     ) {}
 
     /**
@@ -605,7 +680,7 @@ class CaptureValue {
      * and navigating through the property path.
      */
     resolve(values: Pick<Map<string, J | J[]>, 'get'>): any {
-        const rootName = (this.rootCapture as any)[CAPTURE_NAME_SYMBOL] || this.rootCapture.getName();
+        const rootName = this.rootCapture.getName();
         let current: any = values.get(rootName);
 
         // Handle array operations on variadic captures
@@ -625,7 +700,7 @@ class CaptureValue {
 
         // Navigate through property path
         for (const prop of this.propertyPath) {
-            if (current === null || current === undefined) {
+            if (current === null || current === undefined || typeof current === 'number') {
                 return undefined;
             }
             current = current[prop];
@@ -791,7 +866,7 @@ export function capture<T = any>(nameOrOptions?: string | CaptureOptions<T>): Ca
 function createCaptureValueProxy(
     rootCapture: Capture,
     propertyPath: string[],
-    arrayOperation?: { type: 'index' | 'slice' | 'length'; args?: any[] }
+    arrayOperation?: { type: 'index' | 'slice' | 'length'; args?: number[] }
 ): any {
     const captureValue = new CaptureValue(rootCapture, propertyPath, arrayOperation);
 
@@ -1213,14 +1288,17 @@ export class Pattern {
     async match(ast: J): Promise<MatchResult | undefined> {
         const matcher = new Matcher(this, ast);
         const success = await matcher.matches();
-        return success ? new MatchResult(matcher.getAll()) : undefined;
+        return success ? new MatchResult(matcher.getAll(), matcher.getWrappersMap()) : undefined;
     }
 }
 
 export class MatchResult implements Pick<Map<string, J>, "get"> {
     constructor(
-        private readonly bindings: Map<string, J> = new Map()
+        private readonly bindings: Map<string, J> = new Map(),
+        wrappersMap: Map<string, J.RightPadded<J>[]> = new Map()
     ) {
+        // Store wrappersMap using a symbol to hide it from public API
+        (this as any)[WRAPPERS_MAP_SYMBOL] = wrappersMap;
     }
 
     // Overload: get with variadic Capture (array type) returns array
@@ -1242,6 +1320,7 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
  */
 class Matcher {
     private readonly bindings = new Map<string, J>();
+    private readonly wrappersMap = new Map<string, J.RightPadded<J>[]>();  // Stores J.RightPadded wrappers for variadic captures
     private patternAst?: J;
 
     /**
@@ -1309,7 +1388,7 @@ class Matcher {
         const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
         const comparator = new PatternMatchingComparator({
             handleCapture: (p, t) => this.handleCapture(p, t),
-            handleVariadicCapture: (p, ts) => this.handleVariadicCapture(p, ts)
+            handleVariadicCapture: (p, ts, ws) => this.handleVariadicCapture(p, ts, ws)
         }, lenientTypeMatching);
         return await comparator.compare(pattern, target);
     }
@@ -1347,13 +1426,23 @@ class Matcher {
     }
 
     /**
+     * Gets the wrappers map containing J.RightPadded wrappers for variadic captures.
+     * Used internally by template expansion to preserve markers like semicolons.
+     *
+     * @returns Map of capture names to arrays of J.RightPadded wrappers
+     */
+    getWrappersMap(): Map<string, J.RightPadded<J>[]> {
+        return this.wrappersMap;
+    }
+
+    /**
      * Handles a variadic capture placeholder.
      *
      * @param pattern The pattern node (the variadic capture)
      * @param targets The target nodes that were matched
      * @returns true if the capture is successful, false otherwise
      */
-    private handleVariadicCapture(pattern: J, targets: J[]): boolean {
+    private handleVariadicCapture(pattern: J, targets: J[], wrappers?: J.RightPadded<J>[]): boolean {
         const captureName = PlaceholderUtils.getCaptureName(pattern);
 
         if (!captureName) {
@@ -1364,7 +1453,7 @@ class Matcher {
         const captureObj = this.pattern.captures.find(c => c.getName() === captureName);
         const constraint = captureObj?.getConstraint?.();
 
-        // Apply constraint if present - for variadic captures, constraint receives the array
+        // Apply constraint if present - for variadic captures, constraint receives the array of elements
         if (constraint && !constraint(targets as any)) {
             return false;
         }
@@ -1372,8 +1461,12 @@ class Matcher {
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
         if (capturing) {
-            // For variadic captures, store the array of matched nodes
+            // For variadic captures, store the array of matched nodes (elements for user access)
             this.bindings.set(captureName, targets as any);
+            // Also store wrappers separately for template expansion (to preserve markers)
+            if (wrappers) {
+                this.wrappersMap.set(captureName, wrappers);
+            }
         }
 
         return true;
@@ -1665,6 +1758,8 @@ export class Template {
     async apply(cursor: Cursor, tree: J, values?: Map<Capture | string, J> | Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
         // Normalize the values map: convert any Capture keys to string keys
         let normalizedValues: Pick<Map<string, J>, 'get'> | undefined;
+        let wrappersMap: Map<string, J.RightPadded<J>[]> = new Map();
+
         if (values instanceof Map) {
             const normalized = new Map<string, J>();
             for (const [key, value] of values.entries()) {
@@ -1674,8 +1769,12 @@ export class Template {
                 normalized.set(stringKey, value);
             }
             normalizedValues = normalized;
+        } else if (values instanceof MatchResult) {
+            // MatchResult - extract both bindings and wrappersMap (via symbol)
+            normalizedValues = values;
+            wrappersMap = (values as any)[WRAPPERS_MAP_SYMBOL] || new Map();
         } else {
-            // If it's Pick<Map> (like MatchResult), it already uses string keys
+            // Other Pick<Map> implementation
             normalizedValues = values;
         }
 
@@ -1690,6 +1789,7 @@ export class Template {
                 mode: JavaCoordinates.Mode.Replace
             },
             normalizedValues,
+            wrappersMap,
             contextStatements,
             this.options.dependencies || {}
         );
@@ -1775,6 +1875,7 @@ class TemplateEngine {
      * @param cursor The cursor pointing to the current location in the AST
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @param values Map of capture names to values to replace the parameters with
+     * @param wrappersMap Map of capture names to J.RightPadded wrappers (for preserving markers)
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
      * @returns A Promise resolving to the generated AST node
@@ -1785,6 +1886,7 @@ class TemplateEngine {
         cursor: Cursor,
         coordinates: JavaCoordinates,
         values: Pick<Map<string, J>, 'get'> = new Map(),
+        wrappersMap: Pick<Map<string, J.RightPadded<J>[]>, 'get'> = new Map(),
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
     ): Promise<J | undefined> {
@@ -1807,7 +1909,7 @@ class TemplateEngine {
 
         // Check if there are any statements
         if (!cu.statements || cu.statements.length === 0) {
-            return undefined;
+            throw new Error(`Failed to parse template code (no statements):\n${templateString}`);
         }
 
         // Skip context statements to get to the actual template code
@@ -1818,12 +1920,27 @@ class TemplateEngine {
 
         // Extract the relevant part of the AST
         const firstStatement = cu.statements[templateStatementIndex].element;
-        let extracted = firstStatement.kind === JS.Kind.ExpressionStatement ?
-            (firstStatement as JS.ExpressionStatement).expression :
-            firstStatement;
+        let extracted: J;
+
+        // Check if this is a wrapped template (function __TEMPLATE__() { ... })
+        if (firstStatement.kind === J.Kind.MethodDeclaration) {
+            const func = firstStatement as J.MethodDeclaration;
+            if (func.name.simpleName === '__TEMPLATE__' && func.body) {
+                // __TEMPLATE__ wrapper indicates the original template was a block.
+                // Always return the block to preserve the block structure.
+                extracted = func.body;
+            } else {
+                // Not a __TEMPLATE__ wrapper
+                extracted = firstStatement;
+            }
+        } else if (firstStatement.kind === JS.Kind.ExpressionStatement) {
+            extracted = (firstStatement as JS.ExpressionStatement).expression;
+        } else {
+            extracted = firstStatement;
+        }
 
         // Create a copy to avoid sharing cached AST instances
-        const ast = produce(extracted, draft => {});
+        const ast = produce(extracted, _ => {});
 
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
@@ -1833,11 +1950,11 @@ class TemplateEngine {
         }
 
         // Unsubstitute placeholders with actual parameter values and match results
-        const visitor = new PlaceholderReplacementVisitor(substitutions, values);
+        const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap);
         const unsubstitutedAst = (await visitor.visit(ast, null))!;
 
         // Apply the template to the current AST
-        return new TemplateApplier(cursor, coordinates, unsubstitutedAst, parameters).apply();
+        return new TemplateApplier(cursor, coordinates, unsubstitutedAst).apply();
     }
 
     /**
@@ -1872,6 +1989,13 @@ class TemplateEngine {
                 }
             }
         }
+
+        // Detect if this is a block template that needs wrapping
+        const trimmed = result.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            result = `function __TEMPLATE__() ${result}`;
+        }
+
         return result;
     }
 }
@@ -1918,6 +2042,21 @@ class PlaceholderUtils {
     }
 
     /**
+     * Gets the CaptureMarker from a node, if present.
+     *
+     * @param node The node to check
+     * @returns The CaptureMarker or undefined
+     */
+    static getCaptureMarker(node: J): CaptureMarker | undefined {
+        for (const marker of node.markers.markers) {
+            if (marker instanceof CaptureMarker) {
+                return marker;
+            }
+        }
+        return undefined;
+    }
+
+    /**
      * Parses a capture placeholder to extract name and type constraint.
      *
      * @param identifier The identifier string to parse
@@ -1951,10 +2090,9 @@ class PlaceholderUtils {
      *
      * @param name The capture name
      * @param typeConstraint Optional type constraint
-     * @param capturing Whether this is a capturing placeholder (not used for prefix, kept for API compatibility)
      * @returns The formatted placeholder string
      */
-    static createCapture(name: string, typeConstraint?: string, capturing: boolean = true): string {
+    static createCapture(name: string, typeConstraint?: string): string {
         // Always use CAPTURE_PREFIX - the capturing flag is used internally for binding behavior
         return typeConstraint
             ? `${this.CAPTURE_PREFIX}${name}_${typeConstraint}__`
@@ -1990,6 +2128,29 @@ class PlaceholderUtils {
         }
         return undefined;
     }
+
+    /**
+     * Checks if a statement is an ExpressionStatement wrapping a capture identifier.
+     * When a capture placeholder appears in statement position, the parser wraps it as
+     * an ExpressionStatement. This method unwraps it to get the identifier.
+     *
+     * @param stmt The statement to check
+     * @returns The unwrapped capture identifier, or the original statement if not wrapped
+     */
+    static unwrapStatementCapture(stmt: J): J {
+        // Check if it's an ExpressionStatement containing a capture identifier
+        if (stmt.kind === JS.Kind.ExpressionStatement) {
+            const exprStmt = stmt as JS.ExpressionStatement;
+            if (exprStmt.expression?.kind === J.Kind.Identifier) {
+                const identifier = exprStmt.expression as J.Identifier;
+                // Check if this is a capture placeholder
+                if (identifier.simpleName?.startsWith(this.CAPTURE_PREFIX)) {
+                    return identifier;
+                }
+            }
+        }
+        return stmt;
+    }
 }
 
 /**
@@ -1998,7 +2159,8 @@ class PlaceholderUtils {
 class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     constructor(
         private readonly substitutions: Map<string, Parameter>,
-        private readonly values: Pick<Map<string, J | J[]>, 'get'> = new Map()
+        private readonly values: Pick<Map<string, J | J[]>, 'get'> = new Map(),
+        private readonly wrappersMap: Pick<Map<string, J.RightPadded<J>[]>, 'get'> = new Map()
     ) {
         super();
     }
@@ -2025,88 +2187,40 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         };
     }
 
-    async visit<R extends J>(tree: J, p: any, parent?: Cursor): Promise<R | undefined> {
-        // Check if this node is a placeholder
-        if (this.isPlaceholder(tree)) {
-            const replacement = this.replacePlaceholder(tree);
-            if (replacement !== tree) {
-                return replacement as R;
-            }
-        }
+    /**
+     * Expands variadic placeholders in a list of elements.
+     *
+     * @param elements The list of wrapped elements to process
+     * @param unwrapElement Optional function to unwrap the placeholder node from its container (e.g., ExpressionStatement)
+     * @param p Context parameter for visitor
+     * @returns Promise of new list with placeholders expanded
+     */
+    private async expandVariadicElements(
+        elements: J.RightPadded<J>[],
+        unwrapElement: (element: J) => J = (e) => e,
+        p: any
+    ): Promise<J.RightPadded<J>[]> {
+        const newElements: J.RightPadded<J>[] = [];
 
-        // Continue with normal traversal
-        return super.visit(tree, p, parent);
-    }
+        for (const wrapped of elements) {
+            const element = wrapped.element;
+            const placeholderNode = unwrapElement(element);
 
-    override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-        // First, check if any argument is a variadic placeholder or a CaptureValue that resolves to an array
-        const hasVariadicPlaceholder = method.arguments.elements.some(arg => {
-            const argElement = arg.element;
-            if (!this.isPlaceholder(argElement)) {
-                return false;
-            }
-            const placeholderText = this.getPlaceholderText(argElement);
-            if (!placeholderText) {
-                return false;
-            }
-            const param = this.substitutions.get(placeholderText);
-            if (!param) {
-                return false;
-            }
-
-            // Check if it's a direct Tree[] array
-            if (Array.isArray(param.value)) {
-                return true;
-            }
-
-            // Check if it's a CaptureValue that will expand to an array
-            // Note: CaptureValue might be wrapped in a Proxy, so check for method existence
-            if (param.value instanceof CaptureValue &&
-                typeof param.value.isArrayExpansion === 'function' &&
-                param.value.isArrayExpansion()) {
-                return true;
-            }
-
-            // Check if this is a variadic capture
-            const isCapture = param.value instanceof CaptureImpl ||
-                             (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
-            if (isCapture) {
-                const name = param.value[CAPTURE_NAME_SYMBOL] || param.value.name;
-                const capture = Array.from(this.substitutions.values())
-                    .map(p => p.value)
-                    .find(v => v instanceof CaptureImpl && v.getName() === name) as CaptureImpl | undefined;
-                return capture?.isVariadic() || false;
-            }
-            return false;
-        });
-
-        if (!hasVariadicPlaceholder) {
-            // No variadic placeholders, use standard traversal
-            return super.visitMethodInvocation(method, p);
-        }
-
-        // We have variadic placeholders - need to expand them
-        const newArguments: any[] = [];
-
-        for (const arg of method.arguments.elements) {
-            const argElement = arg.element;
-
-            // Check if this argument is a variadic placeholder
-            if (this.isPlaceholder(argElement)) {
-                const placeholderText = this.getPlaceholderText(argElement);
+            // Check if this element contains a placeholder
+            if (this.isPlaceholder(placeholderNode)) {
+                const placeholderText = this.getPlaceholderText(placeholderNode);
                 if (placeholderText) {
                     const param = this.substitutions.get(placeholderText);
                     if (param) {
-                        let arrayToExpand: J[] | undefined = undefined;
+                        let arrayToExpand: J[] | J.RightPadded<J>[] | undefined = undefined;
 
                         // Check if it's a direct Tree[] array
                         if (Array.isArray(param.value)) {
                             arrayToExpand = param.value as J[];
                         }
-                        // Check if it's a CaptureValue (e.g., from .slice() or array index)
+                        // Check if it's a CaptureValue
                         else if (param.value instanceof CaptureValue) {
                             const resolved = param.value.resolve(this.values);
-                            // If resolved value is an array, expand it
                             if (Array.isArray(resolved)) {
                                 arrayToExpand = resolved;
                             }
@@ -2122,40 +2236,58 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                                     .find(v => v instanceof CaptureImpl && v.getName() === name) as CaptureImpl | undefined;
 
                                 if (capture?.isVariadic()) {
-                                    // Get the matched array
-                                    const matchedArray = this.values.get(name);
-                                    if (Array.isArray(matchedArray)) {
-                                        arrayToExpand = matchedArray;
+                                    // Prefer wrappers if available (to preserve markers like Semicolon)
+                                    // Otherwise fall back to elements
+                                    const wrappersArray = this.wrappersMap.get(name);
+                                    if (Array.isArray(wrappersArray)) {
+                                        arrayToExpand = wrappersArray;
+                                    } else {
+                                        const matchedArray = this.values.get(name);
+                                        if (Array.isArray(matchedArray)) {
+                                            arrayToExpand = matchedArray;
+                                        }
                                     }
                                 }
                             }
                         }
 
                         // Expand the array if we found one
-                        if (arrayToExpand) {
+                        if (arrayToExpand !== undefined) {
                             if (arrayToExpand.length > 0) {
-                                // Expand the array into multiple arguments
                                 for (let i = 0; i < arrayToExpand.length; i++) {
                                     const item = arrayToExpand[i];
-                                    newArguments.push(produce(arg, (draft: any) => {
-                                        draft.element = produce(item, (itemDraft: any) => {
-                                            // First item gets merged prefix (placeholder whitespace + item comments)
-                                            // Subsequent items keep their original prefix
-                                            if (i === 0) {
-                                                itemDraft.prefix = this.mergePrefix(item.prefix, argElement.prefix);
-                                            } else {
-                                                // Subsequent items preserve their prefix (including comments)
-                                                itemDraft.prefix = item.prefix;
+
+                                    // Check if item is a JRightPadded wrapper or just an element
+                                    // JRightPadded wrappers have 'element', 'after', and 'markers' properties
+                                    // Also ensure the element field is not null
+                                    const isWrapper = item && typeof item === 'object' && 'element' in item && 'after' in item && item.element != null;
+
+                                    if (isWrapper) {
+                                        // Item is a JRightPadded wrapper - use it directly to preserve markers
+                                        newElements.push(produce(item, draft => {
+                                            if (i === 0 && draft.element) {
+                                                // Merge the placeholder's prefix with the first item's prefix
+                                                // Modify prefix directly without nested produce to avoid immer issues
+                                                draft.element.prefix = this.mergePrefix(draft.element.prefix, element.prefix);
                                             }
-                                            itemDraft.markers = argElement.markers;
-                                        });
-                                        // All but the last argument need comma-space in 'after'
-                                        // We keep the 'after' from the original arg structure for proper comma handling
-                                    }));
+                                            // Keep all other wrapper properties (including markers with Semicolon)
+                                        }));
+                                    } else if (item) {
+                                        // Item is just an element (not a wrapper) - wrap it (backward compatibility)
+                                        const elem = item as J;
+                                        newElements.push(produce(wrapped, draft => {
+                                            draft.element = produce(elem, itemDraft => {
+                                                if (i === 0) {
+                                                    itemDraft.prefix = this.mergePrefix(elem.prefix, element.prefix);
+                                                }
+                                                // For i > 0, prefix is already correct, no changes needed
+                                            });
+                                        }));
+                                    }
                                 }
                                 continue; // Skip adding the placeholder itself
                             } else {
-                                // Empty array - don't add any arguments
+                                // Empty array - don't add any elements
                                 continue;
                             }
                         }
@@ -2163,18 +2295,89 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                 }
             }
 
-            // Not a variadic placeholder (or expansion failed) - process normally
-            const replacedElement = await this.visit(argElement, p);
+            // Not a placeholder (or expansion failed) - process normally
+            const replacedElement = await this.visit(element, p);
             if (replacedElement) {
-                newArguments.push(produce(arg, (draft: any) => {
+                newElements.push(produce(wrapped, draft => {
                     draft.element = replacedElement;
                 }));
             }
         }
 
-        // Create new method invocation with expanded arguments
-        return produce(method, (draft: any) => {
+        return newElements;
+    }
+
+    async visit<R extends J>(tree: J, p: any, parent?: Cursor): Promise<R | undefined> {
+        // Check if this node is a placeholder
+        if (this.isPlaceholder(tree)) {
+            const replacement = this.replacePlaceholder(tree);
+            if (replacement !== tree) {
+                return replacement as R;
+            }
+        }
+
+        // Continue with normal traversal
+        return super.visit(tree, p, parent);
+    }
+
+    override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+        // Check if any arguments are placeholders (possibly variadic)
+        const hasPlaceholder = method.arguments.elements.some(arg => this.isPlaceholder(arg.element));
+
+        if (!hasPlaceholder) {
+            return super.visitMethodInvocation(method, p);
+        }
+
+        const newArguments = await this.expandVariadicElements(method.arguments.elements, undefined, p);
+
+        return produce(method, draft => {
             draft.arguments.elements = newArguments;
+        });
+    }
+
+    override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
+        // Check if any statements are placeholders (possibly variadic)
+        const hasPlaceholder = block.statements.some(stmt => {
+            const stmtElement = stmt.element;
+            // Check if it's an ExpressionStatement containing a placeholder
+            if (stmtElement.kind === JS.Kind.ExpressionStatement) {
+                const exprStmt = stmtElement as JS.ExpressionStatement;
+                return this.isPlaceholder(exprStmt.expression);
+            }
+            return this.isPlaceholder(stmtElement);
+        });
+
+        if (!hasPlaceholder) {
+            return super.visitBlock(block, p);
+        }
+
+        // Unwrap function to extract placeholder from ExpressionStatement
+        const unwrapStatement = (element: J): J => {
+            if (element.kind === JS.Kind.ExpressionStatement) {
+                return (element as JS.ExpressionStatement).expression;
+            }
+            return element;
+        };
+
+        const newStatements = await this.expandVariadicElements(block.statements, unwrapStatement, p);
+
+        return produce(block, draft => {
+            draft.statements = newStatements;
+        });
+    }
+
+    override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: any): Promise<J | undefined> {
+        // Check if any statements are placeholders (possibly variadic)
+        const hasPlaceholder = compilationUnit.statements.some(stmt => this.isPlaceholder(stmt.element));
+
+        if (!hasPlaceholder) {
+            return super.visitJsCompilationUnit(compilationUnit, p);
+        }
+
+        const newStatements = await this.expandVariadicElements(compilationUnit.statements, undefined, p);
+
+        return produce(compilationUnit, draft => {
+            draft.statements = newStatements;
         });
     }
 
@@ -2306,8 +2509,7 @@ class TemplateApplier {
     constructor(
         private readonly cursor: Cursor,
         private readonly coordinates: JavaCoordinates,
-        private readonly ast: J,
-        private readonly parameters: Parameter[] = []
+        private readonly ast: J
     ) {
     }
 
@@ -2419,6 +2621,7 @@ class TemplateProcessor {
 
     /**
      * Builds a template string with placeholders for captures.
+     * If the template looks like a block pattern, wraps it in a function.
      *
      * @returns The template string
      */
@@ -2428,12 +2631,23 @@ class TemplateProcessor {
             result += this.templateParts[i];
             if (i < this.captures.length) {
                 const capture = this.captures[i];
-                // Use symbol to access capture name and capturing flag without triggering Proxy
+                // Use symbol to access capture name without triggering Proxy
                 const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
-                const capturing = (capture as any)[CAPTURE_CAPTURING_SYMBOL] ?? true;
-                result += PlaceholderUtils.createCapture(captureName, undefined, capturing);
+                result += PlaceholderUtils.createCapture(captureName, undefined);
             }
         }
+
+        // Check if this looks like a block pattern (starts with { and contains statement keywords)
+        const trimmed = result.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            // Check for statement keywords that indicate this is a block, not an object literal
+            const hasStatementKeywords = /\b(return|if|for|while|do|switch|try|throw|break|continue|const|let|var|function|class)\b/.test(result);
+            if (hasStatementKeywords) {
+                // Wrap in a function to ensure it parses as a block
+                return `function __PATTERN__() ${result}`;
+            }
+        }
+
         return result;
     }
 
@@ -2447,12 +2661,32 @@ class TemplateProcessor {
         // Skip context statements to get to the actual pattern code
         const patternStatementIndex = this.contextStatements.length;
 
+        // Check if we have any statements at the pattern index
+        if (!cu.statements || patternStatementIndex >= cu.statements.length) {
+            // If there's no statement at the index, but we have exactly one statement
+            // and it's a block, it might be the pattern itself (e.g., pattern`{ ... }`)
+            if (cu.statements && cu.statements.length === 1 && cu.statements[0].element.kind === J.Kind.Block) {
+                return this.attachCaptureMarkers(cu.statements[0].element);
+            }
+            throw new Error(`No statement found at index ${patternStatementIndex} in compilation unit with ${cu.statements?.length || 0} statements`);
+        }
+
         // Extract the relevant part of the AST based on the template content
         const firstStatement = cu.statements[patternStatementIndex].element;
 
         let extracted: J;
-        // If the first statement is an expression statement, extract the expression
-        if (firstStatement.kind === JS.Kind.ExpressionStatement) {
+
+        // Check if this is our wrapper function for block patterns
+        if (firstStatement.kind === J.Kind.MethodDeclaration) {
+            const method = firstStatement as J.MethodDeclaration;
+            if (method.name?.simpleName === '__PATTERN__' && method.body) {
+                // Extract the block from the wrapper function
+                extracted = method.body;
+            } else {
+                extracted = firstStatement;
+            }
+        } else if (firstStatement.kind === JS.Kind.ExpressionStatement) {
+            // If the first statement is an expression statement, extract the expression
             extracted = (firstStatement as JS.ExpressionStatement).expression;
         } else {
             // Otherwise, return the statement itself
@@ -2471,7 +2705,7 @@ class TemplateProcessor {
      * @returns The AST with CaptureMarkers attached
      */
     private attachCaptureMarkers(ast: J): J {
-        const visited = new Set<any>();
+        const visited = new Set<J | object>();
         return produce(ast, draft => {
             this.visitAndAttachMarkers(draft, visited);
         });
@@ -2479,11 +2713,13 @@ class TemplateProcessor {
 
     /**
      * Recursively visits AST nodes and attaches CaptureMarkers to capture identifiers.
+     * For statement-level captures (identifiers in ExpressionStatement), the marker
+     * is attached to the ExpressionStatement itself rather than the nested identifier.
      *
      * @param node The node to visit
      * @param visited Set of already visited nodes to avoid cycles
      */
-    private visitAndAttachMarkers(node: any, visited: Set<any>): void {
+    private visitAndAttachMarkers(node: any, visited: Set<J | object>): void {
         if (!node || typeof node !== 'object' || visited.has(node)) {
             return;
         }
@@ -2491,8 +2727,32 @@ class TemplateProcessor {
         // Mark as visited to avoid cycles
         visited.add(node);
 
-        // If this is an identifier that looks like a capture, attach a marker
-        if (node.kind === J.Kind.Identifier && node.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
+        // Check if this is an ExpressionStatement containing a capture identifier
+        // For statement-level captures, we attach the marker to the ExpressionStatement itself
+        if (node.kind === JS.Kind.ExpressionStatement &&
+            node.expression?.kind === J.Kind.Identifier &&
+            node.expression.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
+
+            const captureInfo = PlaceholderUtils.parseCapture(node.expression.simpleName);
+            if (captureInfo) {
+                // Initialize markers on the ExpressionStatement
+                if (!node.markers) {
+                    node.markers = { kind: 'org.openrewrite.marker.Markers', id: randomId(), markers: [] };
+                }
+                if (!node.markers.markers) {
+                    node.markers.markers = [];
+                }
+
+                // Find the original capture object to get variadic options
+                const captureObj = this.captures.find(c => c.getName() === captureInfo.name);
+                const variadicOptions = captureObj?.getVariadicOptions();
+
+                // Add CaptureMarker to the ExpressionStatement
+                node.markers.markers.push(new CaptureMarker(captureInfo.name, variadicOptions));
+            }
+        }
+        // For non-statement captures (expressions), attach marker to the identifier
+        else if (node.kind === J.Kind.Identifier && node.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
             const captureInfo = PlaceholderUtils.parseCapture(node.simpleName);
             if (captureInfo) {
                 // Initialize markers if needed

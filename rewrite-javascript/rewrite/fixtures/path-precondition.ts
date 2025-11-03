@@ -21,7 +21,7 @@ import {
     Option,
     Recipe,
     TreeVisitor
-} from "@openrewrite/rewrite";
+} from "../src";
 import {FindIdentifier} from "./search-recipe";
 
 /**
