@@ -17,11 +17,11 @@ import {JS} from '.';
 import {JavaScriptParser} from './parser';
 import {JavaScriptVisitor} from './visitor';
 import {Cursor, isTree, Tree} from '..';
-import {J, Type} from '../java';
+import {emptySpace, J} from '../java';
 import {produce} from "immer";
-import {JavaScriptComparatorVisitor} from "./comparator";
+import {JavaScriptSemanticComparatorVisitor} from "./comparator";
 import {DependencyWorkspace} from './dependency-workspace';
-import {Marker} from '../markers';
+import {emptyMarkers, Marker} from '../markers';
 import {randomId} from '../uuid';
 
 /**
@@ -115,6 +115,108 @@ class CaptureMarker implements Marker {
     constructor(
         public readonly captureName: string
     ) {
+    }
+}
+
+/**
+ * A comparator for pattern matching that is lenient about optional properties.
+ * Allows patterns without type annotations to match actual code with type annotations.
+ * Uses semantic comparison to match semantically equivalent code (e.g., isDate() and util.isDate()).
+ */
+class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
+    constructor(private readonly matcher: { handleCapture: (pattern: J, target: J) => boolean }) {
+        super();
+    }
+
+    /**
+     * Creates a wildcard identifier that will match any AST node during comparison.
+     * The identifier has a CaptureMarker which causes it to match anything without storing the result.
+     *
+     * @param captureName The name for the capture marker (for debugging purposes)
+     * @returns A wildcard identifier
+     */
+    private createWildcardIdentifier(captureName: string): J.Identifier {
+        return {
+            id: randomId(),
+            kind: J.Kind.Identifier,
+            prefix: emptySpace,
+            markers: {
+                ...emptyMarkers,
+                markers: [new CaptureMarker(captureName)]
+            },
+            annotations: [],
+            simpleName: '__wildcard__',
+            type: undefined,
+            fieldType: undefined
+        };
+    }
+
+    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+        // Check if the pattern node is a capture - this handles captures anywhere in the tree
+        if (PlaceholderUtils.isCapture(j as J)) {
+            const success = this.matcher.handleCapture(j as J, p);
+            if (!success) {
+                return this.abort(j) as R;
+            }
+            return j as R;
+        }
+
+        if (!this.match) {
+            return j as R;
+        }
+
+        return super.visit(j, p, parent);
+    }
+
+    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== J.Kind.VariableDeclarations) {
+            return this.abort(variableDeclarations);
+        }
+
+        const otherVariableDeclarations = other as J.VariableDeclarations;
+
+        // LENIENT: If pattern lacks typeExpression but target has one, add a wildcard capture to pattern
+        // This allows the pattern to match without requiring us to modify the target (which would corrupt captures)
+        if (!variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
+            variableDeclarations = produce(variableDeclarations, draft => {
+                draft.typeExpression = this.createWildcardIdentifier('__wildcard_type__') as J.Identifier;
+            });
+        }
+
+        // Delegate to super implementation
+        return super.visitVariableDeclarations(variableDeclarations, otherVariableDeclarations);
+    }
+
+    override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== J.Kind.MethodDeclaration) {
+            return this.abort(methodDeclaration);
+        }
+
+        const otherMethodDeclaration = other as J.MethodDeclaration;
+
+        // LENIENT: If pattern lacks returnTypeExpression but target has one, add a wildcard capture to pattern
+        // This allows the pattern to match without requiring us to modify the target (which would corrupt captures)
+        if (!methodDeclaration.returnTypeExpression && otherMethodDeclaration.returnTypeExpression) {
+            methodDeclaration = produce(methodDeclaration, draft => {
+                draft.returnTypeExpression = this.createWildcardIdentifier('__wildcard_return_type__') as J.Identifier;
+            });
+        }
+
+        // Delegate to super implementation
+        return super.visitMethodDeclaration(methodDeclaration, otherMethodDeclaration);
+    }
+
+    protected hasSameKind(j: J, other: J): boolean {
+        return super.hasSameKind(j, other) ||
+               (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));
+    }
+
+    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+        if (PlaceholderUtils.isCapture(identifier)) {
+            const success = this.matcher.handleCapture(identifier, other);
+            return success ? identifier : this.abort(identifier);
+        }
+        return super.visitIdentifier(identifier, other);
     }
 }
 
@@ -265,150 +367,6 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
 }
 
 /**
- * A comparator visitor that checks semantic equality including type attribution.
- * This ensures that patterns only match code with compatible types, not just
- * structurally similar code.
- */
-class JavaScriptTemplateSemanticallyEqualVisitor extends JavaScriptComparatorVisitor {
-    /**
-     * Checks if two types are semantically equal.
-     * For method types, this checks that the declaring type and method name match.
-     */
-    private isOfType(target?: Type, source?: Type): boolean {
-        if (!target || !source) {
-            return target === source;
-        }
-
-        if (target.kind !== source.kind) {
-            return false;
-        }
-
-        // For method types, check declaring type
-        // Note: We don't check the name field because it might not be fully resolved in patterns
-        // The method invocation visitor already checks that simple names match
-        if (target.kind === Type.Kind.Method && source.kind === Type.Kind.Method) {
-            const targetMethod = target as Type.Method;
-            const sourceMethod = source as Type.Method;
-
-            // Only check that declaring types match
-            return this.isOfType(targetMethod.declaringType, sourceMethod.declaringType);
-        }
-
-        // For fully qualified types, check the fully qualified name
-        if (Type.isFullyQualified(target) && Type.isFullyQualified(source)) {
-            return Type.FullyQualified.getFullyQualifiedName(target) ===
-                   Type.FullyQualified.getFullyQualifiedName(source);
-        }
-
-        // Default: types are equal if they're the same kind
-        return true;
-    }
-
-    /**
-     * Override method invocation comparison to include type attribution checking.
-     * When types match semantically, we allow matching even if one has a receiver
-     * and the other doesn't (e.g., `isDate(x)` vs `util.isDate(x)`).
-     */
-    override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
-        if (other.kind !== J.Kind.MethodInvocation) {
-            return method;
-        }
-
-        const otherMethod = other as J.MethodInvocation;
-
-        // Check basic structural equality first
-        if (method.name.simpleName !== otherMethod.name.simpleName ||
-            method.arguments.elements.length !== otherMethod.arguments.elements.length) {
-            this.abort();
-            return method;
-        }
-
-        // Check type attribution
-        // Both must have method types for semantic equality
-        if (!method.methodType || !otherMethod.methodType) {
-            // If template has type but target doesn't, they don't match
-            if (method.methodType || otherMethod.methodType) {
-                this.abort();
-                return method;
-            }
-            // If neither has type, fall through to structural comparison
-            return super.visitMethodInvocation(method, other);
-        }
-
-        // Both have types - check they match semantically
-        const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
-        if (!typesMatch) {
-            // Types don't match - abort comparison
-            this.abort();
-            return method;
-        }
-
-        // Types match! Now we can ignore receiver differences and just compare arguments.
-        // This allows pattern `isDate(x)` to match both `isDate(x)` and `util.isDate(x)`
-        // when they have the same type attribution.
-
-        // Compare type parameters
-        if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
-            this.abort();
-            return method;
-        }
-
-        if (method.typeParameters && otherMethod.typeParameters) {
-            if (method.typeParameters.elements.length !== otherMethod.typeParameters.elements.length) {
-                this.abort();
-                return method;
-            }
-            for (let i = 0; i < method.typeParameters.elements.length; i++) {
-                await this.visit(method.typeParameters.elements[i].element, otherMethod.typeParameters.elements[i].element);
-                if (!this.match) return method;
-            }
-        }
-
-        // Compare name (already checked simpleName above, but visit for markers/prefix)
-        await this.visit(method.name, otherMethod.name);
-        if (!this.match) return method;
-
-        // Compare arguments
-        for (let i = 0; i < method.arguments.elements.length; i++) {
-            await this.visit(method.arguments.elements[i].element, otherMethod.arguments.elements[i].element);
-            if (!this.match) return method;
-        }
-
-        return method;
-    }
-
-    /**
-     * Override identifier comparison to include type checking for field access.
-     */
-    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
-        if (other.kind !== J.Kind.Identifier) {
-            return identifier;
-        }
-
-        const otherIdentifier = other as J.Identifier;
-
-        // Check name matches
-        if (identifier.simpleName !== otherIdentifier.simpleName) {
-            return identifier;
-        }
-
-        // For identifiers with field types, check type attribution
-        if (identifier.fieldType && otherIdentifier.fieldType) {
-            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType)) {
-                this.abort();
-                return identifier;
-            }
-        } else if (identifier.fieldType || otherIdentifier.fieldType) {
-            // If only one has a type, they don't match
-            this.abort();
-            return identifier;
-        }
-
-        return super.visitIdentifier(identifier, other);
-    }
-}
-
-/**
  * Matcher for checking if a pattern matches an AST node and extracting captured nodes.
  */
 class Matcher {
@@ -473,20 +431,11 @@ class Matcher {
             return false;
         }
 
-        const matcher = this;
-        return await ((new class extends JavaScriptTemplateSemanticallyEqualVisitor {
-            protected hasSameKind(j: J, other: J): boolean {
-                return super.hasSameKind(j, other) || j.kind == J.Kind.Identifier && this.matchesParameter(j as J.Identifier, other);
-            }
-
-            override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
-                return this.matchesParameter(identifier, other) ? identifier : await super.visitIdentifier(identifier, other);
-            }
-
-            private matchesParameter(identifier: J.Identifier, other: J): boolean {
-                return PlaceholderUtils.isCapture(identifier) && matcher.handleCapture(identifier, other);
-            }
-        }).compare(pattern, target));
+        // Use the pattern matching comparator which is lenient about optional properties
+        const comparator = new PatternMatchingComparator({
+            handleCapture: (p, t) => this.handleCapture(p, t)
+        });
+        return await comparator.compare(pattern, target);
     }
 
     /**

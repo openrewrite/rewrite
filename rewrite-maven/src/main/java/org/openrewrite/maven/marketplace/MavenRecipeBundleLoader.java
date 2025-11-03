@@ -38,10 +38,13 @@ import static java.util.Objects.requireNonNull;
 public class MavenRecipeBundleLoader implements RecipeBundleLoader, URLStreamHandlerFactory {
     private final ExecutionContext ctx;
     private final MavenArtifactDownloader downloader;
+    private final RecipeClassLoaderFactory classLoaderFactory;
 
-    public MavenRecipeBundleLoader(ExecutionContext ctx, MavenArtifactDownloader downloader) {
+    public MavenRecipeBundleLoader(ExecutionContext ctx, MavenArtifactDownloader downloader,
+                                   RecipeClassLoaderFactory classLoaderFactory) {
         this.ctx = ctx;
         this.downloader = downloader;
+        this.classLoaderFactory = classLoaderFactory;
         URL.setURLStreamHandlerFactory(this);
     }
 
@@ -52,8 +55,24 @@ public class MavenRecipeBundleLoader implements RecipeBundleLoader, URLStreamHan
 
     @Override
     public RecipeBundle createBundle(String packageName, String version, @Nullable String team) {
-        ResolvedGroupArtifactVersion gav = parseGav(packageName + ":" + version);
-        return new MavenRecipeBundle(gav, ctx, downloader, team);
+        ResolvedGroupArtifactVersion gav = parseGav(packageName);
+
+        // Check if version is a dated snapshot (e.g., "2.1.0-20231201.123456-1")
+        String maybeSnapshotVersion;
+        String datedSnapshotVersion;
+        if (version.matches(".*-\\d{8}\\.\\d{6}-\\d+")) {
+            // Extract base snapshot version (e.g., "2.1.0-SNAPSHOT" from "2.1.0-20231201.123456-1")
+            datedSnapshotVersion = version;
+            int dashIndex = version.indexOf('-');
+            maybeSnapshotVersion = version.substring(0, dashIndex) + "-SNAPSHOT";
+        } else {
+            maybeSnapshotVersion = version;
+            datedSnapshotVersion = null;
+        }
+
+        gav = gav.withVersion(maybeSnapshotVersion).withDatedSnapshotVersion(datedSnapshotVersion);
+
+        return new MavenRecipeBundle(gav, ctx, downloader, classLoaderFactory, team);
     }
 
     /**
@@ -72,7 +91,8 @@ public class MavenRecipeBundleLoader implements RecipeBundleLoader, URLStreamHan
             protected URLConnection openConnection(URL u) throws IOException {
                 String[] gavAndPath = u.getPath().split("!/", 2);
                 ResolvedGroupArtifactVersion gav = parseGav(gavAndPath[0]);
-                MavenRecipeBundle bundle = new MavenRecipeBundle(gav, ctx, downloader, null);
+                MavenRecipeBundle bundle = new MavenRecipeBundle(gav, ctx, downloader,
+                        classLoaderFactory, null);
                 MavenResolutionResult mrr = bundle.resolve();
                 ResolvedDependency recipeDependency = mrr.getDependencies().get(Scope.Compile).get(0);
                 Path recipeJar = requireNonNull(downloader.downloadArtifact(recipeDependency));
@@ -85,30 +105,17 @@ public class MavenRecipeBundleLoader implements RecipeBundleLoader, URLStreamHan
     private static ResolvedGroupArtifactVersion parseGav(String gav) {
         // Parse packageName as "groupId:artifactId"
         String[] parts = gav.split(":");
-        if (parts.length != 3) {
-            throw new IllegalArgumentException("Maven package name must be in format 'groupId:artifactId:version', but found " + gav);
-        }
-        String version = parts[2];
-
-        // Check if version is a dated snapshot (e.g., "2.1.0-20231201.123456-1")
-        String snapshotVersion;
-        String datedSnapshotVersion;
-        if (version.matches(".*-\\d{8}\\.\\d{6}-\\d+")) {
-            // Extract base snapshot version (e.g., "2.1.0-SNAPSHOT" from "2.1.0-20231201.123456-1")
-            datedSnapshotVersion = version;
-            int dashIndex = version.indexOf('-');
-            snapshotVersion = version.substring(0, dashIndex) + "-SNAPSHOT";
-        } else {
-            snapshotVersion = version;
-            datedSnapshotVersion = null;
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("Maven package name must be in format 'groupId:artifactId', but found " + gav);
         }
 
+        //noinspection DataFlowIssue
         return new ResolvedGroupArtifactVersion(
                 null, // repository
                 parts[0], // groupId
                 parts[1], // artifactId
-                snapshotVersion,
-                datedSnapshotVersion
+                null,
+                null
         );
     }
 }

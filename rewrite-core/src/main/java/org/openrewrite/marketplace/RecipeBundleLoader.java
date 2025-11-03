@@ -33,8 +33,8 @@ public interface RecipeBundleLoader {
      * Create a bundle from CSV data.
      *
      * @param packageName The package name/identifier
-     * @param version The package version
-     * @param team Optional team identifier
+     * @param version     The package version
+     * @param team        Optional team identifier
      * @return A RecipeBundle instance, or null if this factory cannot create a bundle for the given parameters
      */
     @Nullable
