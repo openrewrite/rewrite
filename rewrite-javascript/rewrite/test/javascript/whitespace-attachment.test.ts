@@ -138,7 +138,7 @@ function findWhitespaceViolations(rootNodes: OutputNode[]): string[] {
                     if (typeof grandchild === 'string' && grandchild.trim() === '' && grandchild.length > 0) {
                         const parentKind = prettifyKind(node.element.kind);
                         const childKind = prettifyKind(firstChild.element.kind);
-                        violations.push(`${parentKind} has child ${childKind} starting with whitespace |${grandchild}|. The whitespace should rather be attached to ${parentKind}.`);
+                        violations.push(`${parentKind} has child ${childKind} starting with whitespace |${grandchild}|. The whitespace should rather be attached to ${parentKind} around ${firstChild.toString()}.`);
                     }
                 }
             }
