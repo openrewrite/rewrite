@@ -116,7 +116,7 @@ describe('whitespace attachment', () => {
     test('simple variable declaration', async () => {
         // given
         const parser = new JavaScriptParser();
-        const sourceCode = 'const x = 116;';
+        const sourceCode = "const c =  function(): number { return 116; };";
         const cu = await (await parser.parse({text: sourceCode, sourcePath: 'test.ts'}).next()).value;
         const capture = new TreeStructurePrintOutputCapture(MarkerPrinter.SANITIZED);
         const printer = new TreeCapturingJavaScriptPrinter();
@@ -125,9 +125,41 @@ describe('whitespace attachment', () => {
         await printer.visit(cu, capture);
 
         // then
-        expect(capture.out).toBe(sourceCode);
-        expect(capture.rootNodes.length).toBeGreaterThan(0);
-        console.log('Tree structure:');
-        console.log(capture.getTreeStructure());
+        // Check for problematic whitespace attachment:
+        // - a node starts
+        // - its first child is another node (not text)
+        // - the first child of that child (grandchild) is text containing non-empty whitespace
+        process.stdout.write(capture.rootNodes[0].toString());
+        const violations: string[] = [];
+
+        function checkNode(node: OutputNode, path: string = 'root'): void {
+            if (node.children.length > 0) {
+                const firstChild = node.children[0];
+
+                // Check if first child is a node (not text)
+                if (firstChild instanceof OutputNode) {
+                    // Check if the grandchild exists and is text with non-empty whitespace
+                    if (firstChild.children.length > 0) {
+                        const grandchild = firstChild.children[0];
+                        if (typeof grandchild === 'string' && grandchild.trim() === '' && grandchild.length > 0) {
+                            violations.push(`${path} -> Node -> "${grandchild}"`);
+                        }
+                    }
+                }
+            }
+
+            // Recursively check all child nodes
+            node.children.forEach((child, index) => {
+                if (child instanceof OutputNode) {
+                    checkNode(child, `${path}[${index}]`);
+                }
+            });
+        }
+
+        capture.rootNodes.forEach((node, index) => {
+            checkNode(node, `root[${index}]`);
+        });
+
+        expect(violations).toEqual([]);
     });
 });
