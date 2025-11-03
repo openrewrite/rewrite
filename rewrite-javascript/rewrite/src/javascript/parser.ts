@@ -3458,7 +3458,7 @@ export class JavaScriptParserVisitor {
                         const typeKeyword = node.getChildren().find(n => n.kind === ts.SyntaxKind.TypeKeyword);
                         return this.prefix(typeKeyword!);
                     } else {
-                        return emptySpace;
+                        return this.prefix(node.name);
                     }
                 })(),
                 markers: emptyMarkers,

@@ -165,7 +165,7 @@ describe('whitespace attachment', () => {
         "const x = new Date();",
         "async function m(): void { await Promise.resolve(); }",
         "class ResponseHandler extends EventEmitter<{ success: string; error: Error }> {}",
-
+        "import React = require('react');",
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();
