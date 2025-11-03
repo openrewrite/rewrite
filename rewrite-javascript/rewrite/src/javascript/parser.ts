@@ -612,13 +612,12 @@ export class JavaScriptParserVisitor {
         }
         for (let heritageClause of node.heritageClauses) {
             if (heritageClause.token == ts.SyntaxKind.ExtendsKeyword) {
-                const expression = this.visit(heritageClause.types[0]);
                 return this.leftPadded<TypeTree>(this.prefix(heritageClause.getFirstToken()!), {
                     kind: JS.Kind.TypeTreeExpression,
                     id: randomId(),
-                    prefix: emptySpace,
+                    prefix: this.prefix(heritageClause.types[0]),
                     markers: emptyMarkers,
-                    expression: expression
+                    expression: this.visit(heritageClause.types[0])
                 } satisfies JS.TypeTreeExpression as JS.TypeTreeExpression);
             }
         }

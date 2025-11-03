@@ -164,6 +164,8 @@ describe('whitespace attachment', () => {
         "const c =  function(): number { return 116; };",
         "const x = new Date();",
         "async function m(): void { await Promise.resolve(); }",
+        "class ResponseHandler extends EventEmitter<{ success: string; error: Error }> {}",
+
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();
