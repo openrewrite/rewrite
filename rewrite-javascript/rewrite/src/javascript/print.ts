@@ -1767,7 +1767,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return cursor;
     }
 
-    private async afterSyntax(j: J, p: PrintOutputCapture) {
+    protected async afterSyntax(j: J, p: PrintOutputCapture) {
         await this.afterSyntaxMarkers(j.markers, p);
     }
 
@@ -1777,7 +1777,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         }
     }
 
-    private async beforeSyntax(j: J, p: PrintOutputCapture) {
+    protected async beforeSyntax(j: J, p: PrintOutputCapture) {
         await this.beforeSyntaxExt(j.prefix, j.markers, p);
     }
 
