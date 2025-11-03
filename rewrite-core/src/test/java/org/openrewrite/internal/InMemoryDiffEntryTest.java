@@ -243,4 +243,50 @@ class InMemoryDiffEntryTest {
             );
         }
     }
+
+    @Test
+    void binaryFileWithIso88591() {
+        // Create binary content (PNG header) as ISO_8859_1 string
+        byte[] pngHeader = new byte[]{
+            (byte) 0x89, 0x50, 0x4E, 0x47, // PNG signature
+            0x0D, 0x0A, 0x1A, 0x0A,       // PNG signature cont.
+            0x00, 0x00, 0x00, 0x0D        // IHDR chunk length
+        };
+
+        // Create modified binary content
+        byte[] modifiedPngHeader = new byte[]{
+            (byte) 0x89, 0x50, 0x4E, 0x47, // PNG signature
+            0x0D, 0x0A, 0x1A, 0x0A,       // PNG signature cont.
+            0x00, 0x00, 0x00, 0x0E        // Different IHDR chunk length
+        };
+
+        String beforeContent = new String(pngHeader, java.nio.charset.StandardCharsets.ISO_8859_1);
+        String afterContent = new String(modifiedPngHeader, java.nio.charset.StandardCharsets.ISO_8859_1);
+
+        try (var result = new InMemoryDiffEntry(
+          Path.of("gradle/wrapper/gradle-wrapper.jar"),
+          Path.of("gradle/wrapper/gradle-wrapper.jar"),
+          null,
+          beforeContent,
+          afterContent,
+          emptySet(),
+          FileMode.REGULAR_FILE,
+          FileMode.REGULAR_FILE,
+          java.nio.charset.StandardCharsets.ISO_8859_1  // Use ISO_8859_1 for binary content
+        )) {
+            String diff = result.getDiff();
+
+            // Print the diff output to console
+            System.out.println("=== Binary Patch Output (Base85-encoded) ===");
+            System.out.println(diff);
+            System.out.println("=== End of Binary Patch ===");
+
+            // Verify base85-encoded binary patch format
+            assertThat(diff).contains("GIT binary patch");
+            assertThat(diff).contains("literal");
+            assertThat(diff).contains("gradle-wrapper.jar");
+            assertThat(diff).contains("HcmV?d00001");  // Git's binary patch terminator
+            assertThat(diff).doesNotContain("Binary files differ");  // No longer informational text
+        }
+    }
 }

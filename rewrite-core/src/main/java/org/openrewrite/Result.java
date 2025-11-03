@@ -25,6 +25,7 @@ import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.remote.Remote;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -238,7 +239,8 @@ public class Result {
                 after == null ? "" : after.printAll(out.clone()),
                 recipeSet,
                 beforeMode,
-                afterMode
+                afterMode,
+                (after instanceof Remote) ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8
         )) {
             return diffEntry.getDiff(ignoreAllWhitespace);
         }
