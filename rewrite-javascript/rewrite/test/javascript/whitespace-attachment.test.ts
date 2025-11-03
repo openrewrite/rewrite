@@ -17,9 +17,11 @@ import {JavaScriptParser} from "../../src/javascript";
 import {JavaScriptPrinter} from "../../src/javascript/print";
 import {MarkerPrinter, PrintOutputCapture} from "../../src/print";
 import {J} from "../../src/java";
+import {Tree} from "../../src/tree";
 
 class OutputNode {
     constructor(
+        public readonly element: Tree,
         public readonly children: (OutputNode | string)[] = []
     ) {}
 
@@ -36,7 +38,16 @@ class OutputNode {
             }
         }).join(', ');
 
-        return `{Node(${childrenStr})}`;
+        // Prettify the kind: org.openrewrite.javascript.tree.JS$CompilationUnit -> JS.CompilationUnit
+        const prettifyKind = (kind: string): string => {
+            const match = kind.match(/\.([A-Z]+)\$(.+)$/);
+            if (match) {
+                return `${match[1]}.${match[2]}`;
+            }
+            return kind;
+        };
+
+        return `{${prettifyKind(this.element.kind)}(${childrenStr})}`;
     }
 }
 
@@ -51,8 +62,8 @@ class TreeStructurePrintOutputCapture extends PrintOutputCapture {
         super(markerPrinter);
     }
 
-    startNode(): void {
-        const node = new OutputNode();
+    startNode(element: Tree): void {
+        const node = new OutputNode(element);
 
         if (this.nodeStack.length > 0) {
             // Add to parent's children
@@ -99,7 +110,7 @@ class TreeStructurePrintOutputCapture extends PrintOutputCapture {
 class TreeCapturingJavaScriptPrinter extends JavaScriptPrinter {
     protected override async beforeSyntax(j: J, p: PrintOutputCapture): Promise<void> {
         if (p instanceof TreeStructurePrintOutputCapture) {
-            p.startNode();
+            p.startNode(j);
         }
         await super['beforeSyntax'](j, p);
     }
