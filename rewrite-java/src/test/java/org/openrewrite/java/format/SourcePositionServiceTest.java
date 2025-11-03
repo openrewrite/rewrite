@@ -21,7 +21,10 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -392,67 +395,127 @@ class SourcePositionServiceTest implements RewriteTest {
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                   service = cu.service(SourcePositionService.class);
+                  assertResult(1, 0, 33, 152); //entire file
+                  assertResult(cu.getClasses().getFirst(), 4, 0, 30, 152); //entire Test class declaration
                   return super.visitCompilationUnit(cu, ctx);
               }
 
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                   if ("Test".equals(classDecl.getSimpleName())) {
-                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(19);
+                      assertResult(4, 0, 30, 152); //entire Test class declaration
+                      assertResult(classDecl.getBody().getStatements().get(4), 17, 4, 4, 76); //example2 method
                   }
                   if ("Inner".equals(classDecl.getSimpleName())) {
-                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(84);
+                      assertResult(27, 4, 4, 84); //entire Inner class declaration
                   }
                   if ("RecordDeclaration".equals(classDecl.getSimpleName())) {
-                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(37);
+                      assertResult(32, 4, 1, 152); //entire Inner class declaration
+                      assertResult(classDecl.getPadding().getPrimaryConstructor(), 32, 29, 1, 34);
                   }
                   return super.visitClassDeclaration(classDecl, ctx);
               }
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(68);
+                  switch (method.getSimpleName()) {
+                      case "example1":
+                          assertMinimizedResult(10, 4, 4, 76);
+                          assertResult(10, 4, 6, 60);
+                          assertMinimizedResult(method.getPadding().getParameters(), 10, 54, 1, 73);
+                          assertResult(method.getPadding().getParameters(), 10, 54, 3, 60);
+                          break;
+                      case "example2":
+                          assertMinimizedResult(17, 4, 4, 76);
+                          assertResult(17, 4, 4, 76);
+                          assertMinimizedResult(method.getPadding().getParameters(), 17, 54, 1, 73);
+                          assertResult(method.getPadding().getParameters(), 17, 54, 1, 73);
+                          break;
+                      case "someVeryLongMethodNameThatIsAsLongAsTheMethodsAbove":
+                          assertMinimizedResult(22, 4, 3, 76);
+                          assertResult(22, 4, 4, 74);
+                          assertMinimizedResult(method.getPadding().getParameters(), 23, 68, 1, 73);
+                          assertResult(method.getPadding().getParameters(), 23, 68, 1, 73);
+                          break;
+                  }
                   return super.visitMethodDeclaration(method, ctx);
               }
 
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (multiVariable.getVariables().stream().anyMatch(v -> "abc".contains(v.getSimpleName()))) {
-                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(38);
+                      assertResult(6, 4, 1, 37);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "d".equals(v.getSimpleName()))) {
-                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(14);
+                      assertResult(7, 4, 1, 13);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "e".equals(v.getSimpleName()))) {
-                      assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(10);
+                      assertResult(8, 4, 1, 9);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "f".equals(v.getSimpleName()))) {
-                    assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(5);
+                      assertResult(32, 29, 1, 34);
                   }
-                  if (multiVariable.getVariables().stream().anyMatch(v -> "sum".equals(v.getSimpleName()))) {
-                    assertThat(service.computeDeclarationLength(getCursor())).isEqualTo(24);
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "sum1".equals(v.getSimpleName()))) {
+                      assertResult(13, 8, 1, 24);
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+
+              private void assertResult(int line, int column, int lines, int maxColumn) {
+                  assertThat(service.retrieve(getCursor()).find())
+                    .usingRecursiveComparison()
+                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
+              }
+
+              private void assertResult(J j, int line, int column, int lines, int maxColumn) {
+                  assertThat(service.retrieve(getCursor()).find(j))
+                    .usingRecursiveComparison()
+                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
+              }
+
+              private void assertResult(JContainer<Statement> j, int line, int column, int lines, int maxColumn) {
+                  assertThat(service.retrieve(getCursor()).find(j))
+                    .usingRecursiveComparison()
+                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
+              }
+
+              private void assertMinimizedResult(int line, int column, int lines, int maxColumn) {
+                  assertThat(service.retrieve(getCursor()).minimized(IntelliJ.spaces()).find())
+                    .usingRecursiveComparison()
+                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
+              }
+
+              private void assertMinimizedResult(JContainer<Statement> j, int line, int column, int lines, int maxColumn) {
+                  assertThat(service.retrieve(getCursor()).minimized(IntelliJ.spaces()).find(j))
+                    .usingRecursiveComparison()
+                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
               }
           })),
           java(
             """
             package com.example;
             
-            // Own-line annotations do not impact declaration length
+            // Own-line comments are not considered the start of a line
             @Deprecated
             public class Test {
                 private final int a = 1, b, c = 3;
                 int d = 4;
                 int e;
 
-                public int /* multiline comment can impact though */ example() {
-                    int sum = a + c;
-                    return sum;
+                public int /* multiline comment impact*/ example1(int g,
+                        int h,
+                        int i) {
+                    int sum1 = g + h;
+                    return sum1;
                 }
 
-                @Deprecated // This is also not counted
-                public void someVeryLongMethodNameThatIsAsLongAsTheMethodAbove()
+                public int /* multiline comment impact*/ example2(int g, int h, int i) {
+                    int sum2 = a + c;
+                    return sum2;
+                }
+
+                @Deprecated // eol comments do not impact the col of the element
+                public void someVeryLongMethodNameThatIsAsLongAsTheMethodsAbove(int x)
                 {
                 }
             

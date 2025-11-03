@@ -15,13 +15,25 @@
  */
 package org.openrewrite.java.service;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.format.MinimumViableSpacingVisitor;
+import org.openrewrite.java.format.SpacesVisitor;
 import org.openrewrite.java.search.SemanticallyEqual;
+import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -34,8 +46,6 @@ import static java.util.Collections.emptyList;
  */
 @Incubating(since = "8.63.0")
 public class SourcePositionService {
-
-    private static final String START_COUNTING = "/* START_COUNTING */";
 
     /**
      * Computes the column position where an element should be aligned to.
@@ -128,65 +138,8 @@ public class SourcePositionService {
         throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
     }
 
-    public int computeDeclarationLength(Cursor cursor) {
-        if (cursor.getValue() instanceof J) {
-            J j = cursor.getValue();
-            if (j instanceof J.ClassDeclaration || j instanceof J.VariableDeclarations || j instanceof J.MethodDeclaration) {
-                JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
-                    @Override
-                    public J visitBlock(J.Block block, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                        if (!block.getPrefix().getWhitespace().contains("\n") && block.getPrefix().getComments().stream().noneMatch(c -> c.getSuffix().contains("\n"))) {
-                            beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
-                            p.append('{');
-                        }
-                        return block;
-                    }
-
-                    @Override
-                    public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                        return super.visitClassDeclaration(
-                                startCounting(
-                                        classDecl
-                                                .withModifiers(ListUtils.mapFirst(classDecl.getModifiers(), this::startCounting))
-                                                .withLeadingAnnotations(ListUtils.map(classDecl.getLeadingAnnotations(), this::startCounting))
-                                ), p);
-                    }
-
-                    @Override
-                    public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                        return super.visitMethodDeclaration(
-                                startCounting(
-                                        method
-                                                .withModifiers(ListUtils.mapFirst(method.getModifiers(), this::startCounting))
-                                                .withLeadingAnnotations(ListUtils.map(method.getLeadingAnnotations(), this::startCounting))
-                                ), p);
-                    }
-
-                    private <T extends J> T startCounting(T j) {
-                        return j.withPrefix(
-                                j.getPrefix()
-                                        .withWhitespace(j.getPrefix().getWhitespace().replaceAll("\\n", "\n" + START_COUNTING))
-                                        .withComments(ListUtils.map(j.getComments(), c -> {
-                                            if (c.getSuffix().contains("\n")) {
-                                                return c.withSuffix(c.getSuffix().replaceAll("\\n", "\n" + START_COUNTING));
-                                            }
-                                            return c;
-                                        }))
-                        );
-                    }
-                };
-                PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED);
-                javaPrinter.visit(j, printLine, cursor.getParentOrThrow());
-
-                String printed = printLine.getOut();
-                int i = printed.lastIndexOf(START_COUNTING);
-                if (i >= 0) {
-                    return printed.length() - i - START_COUNTING.length();
-                }
-                return printed.length();
-            }
-        }
-        throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + cursor.getValue().getClass());
+    public SourcePositionRetriever retrieve(Cursor cursor) {
+        return SourcePositionRetriever.of(cursor);
     }
 
     private int getSuffixLength(J tree) {
@@ -286,5 +239,281 @@ public class SourcePositionService {
         }
 
         return null;
+    }
+
+    @Getter
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class SourcePositionRetriever {
+
+        private static final String START_FIND = "/* START_FIND */";
+        private static final String STOP_FIND = "/* STOP_FIND */";
+
+        private final Cursor cursor;
+
+        public SourcePositionRetriever minimized(SpacesStyle spacesStyle) {
+            if (cursor.getValue() instanceof J) {
+                InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+                J cursorValue = cursor.getValue();
+                J j = new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
+                                                                          JRightPadded.Location loc,
+                                                                          ExecutionContext ctx) {
+                        switch (loc) {
+                            case METHOD_DECLARATION_PARAMETER:
+                            case RECORD_STATE_VECTOR: {
+                                if (right != null && right.getElement() instanceof J) {
+                                    //noinspection unchecked
+                                    right = right
+                                            .withAfter(minimized(right.getAfter()))
+                                            .withElement(((J) right.getElement()).withPrefix(minimized(((J) right.getElement()).getPrefix())));
+                                }
+                                break;
+                            }
+                        }
+                        return super.visitRightPadded(right, loc, ctx);
+                    }
+
+                    @Override
+                    public Space visitSpace(@Nullable Space space,
+                                            Space.Location loc,
+                                            ExecutionContext ctx) {
+                        if (space == null) {
+                            return super.visitSpace(space, loc, ctx);
+                        }
+                        if (space == cursorValue.getPrefix()) {
+                            return space;
+                        }
+                        switch (loc) {
+                            case BLOCK_PREFIX:
+                            case MODIFIER_PREFIX:
+                            case METHOD_DECLARATION_PARAMETER_SUFFIX:
+                            case METHOD_DECLARATION_PARAMETERS:
+                            case METHOD_SELECT_SUFFIX:
+                            case METHOD_INVOCATION_ARGUMENTS:
+                            case METHOD_INVOCATION_ARGUMENT_SUFFIX:
+                            case METHOD_INVOCATION_NAME:
+                            case RECORD_STATE_VECTOR_SUFFIX: {
+                                space = minimized(space);
+                                break;
+                            }
+                        }
+                        return super.visitSpace(space, loc, ctx);
+                    }
+
+                    //IntelliJ does not format when comments are present.
+                    private Space minimized(Space space) {
+                        if (space.getComments().isEmpty()) {
+                            return space.getWhitespace().isEmpty() ? space : Space.EMPTY;
+                        }
+                        return space;
+                    }
+                }.visit(cursorValue, ctx);
+                if (j != cursor.getValue()) {
+                    j = new MinimumViableSpacingVisitor<>(null).visit(j, ctx);
+                    j = new SpacesVisitor<>(spacesStyle, null, null).visit(j, ctx);
+                }
+                return new SourcePositionRetriever(new Cursor(cursor.getParent(), Objects.requireNonNull(j)));
+            }
+            throw new IllegalArgumentException("Can only minimize J elements.");
+        }
+
+        public SourcePositionRetriever.SearchResult find() {
+            return findChild(cursor.getValue());
+        }
+
+        public SourcePositionRetriever.SearchResult find(JContainer<? extends J> child) {
+            return findChild(child);
+        }
+
+        public SourcePositionRetriever.SearchResult find(JRightPadded<? extends J> child) {
+            return findChild(child);
+        }
+
+        public SourcePositionRetriever.SearchResult find(J child) {
+            return findChild(child);
+        }
+
+        private SourcePositionRetriever.SearchResult findChild(Object child) {
+            J findJ;
+            JContainer<J> findJContainer;
+            JRightPadded<J> findJRightPadded;
+            if (child instanceof J) {
+                findJContainer = null;
+                findJ = (J) child;
+                findJRightPadded = null;
+            } else if (child instanceof JContainer) {
+                findJContainer = (JContainer<J>) child;
+                findJ = null;
+                findJRightPadded = null;
+            } else if (child instanceof JRightPadded) {
+                findJContainer = null;
+                findJ = null;
+                findJRightPadded = (JRightPadded<J>) child;
+            } else if (child instanceof Collection) {
+                throw new IllegalArgumentException("Can only find J elements or their containers. Did you create a Cursor from a `get...()` method which should be done on the `getPadding().get...()` instead?");
+            } else {
+                throw new IllegalArgumentException("Can only find J elements or their containers. Not on " + child.getClass().getSimpleName() + ".");
+            }
+            JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
+                boolean found = false;
+
+                @Override
+                protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                    if (findJContainer != null && getCursor().getPathAsStream().anyMatch(c -> c == cursor.getValue()) && semanticallyEqual(nodes, findJContainer.getPadding().getElements())) {
+                        p.append(START_FIND);
+                        for (int i = 0; i < nodes.size(); i++) {
+                            JRightPadded<? extends J> node = nodes.get(i);
+                            if (i == 0) {
+                                visit(startFind(node.getElement()), p);
+                            } else {
+                                visit(node.getElement(), p);
+                            }
+                            visitSpace(node.getAfter(), location.getAfterLocation(), p);
+                            visitMarkers(node.getMarkers(), p);
+                            if (i < nodes.size() - 1) {
+                                p.append(suffixBetween);
+                            }
+                        }
+                        p.append(STOP_FIND);
+                        this.found = true;
+                    } else {
+                        super.visitRightPadded(nodes, location, suffixBetween, p);
+                    }
+                }
+
+                @Override
+                protected void visitRightPadded(@Nullable JRightPadded<? extends J> rightPadded, JRightPadded.Location location, @Nullable String suffix, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                    if (findJRightPadded != null) {
+                        if (rightPadded == findJRightPadded || SemanticallyEqual.areEqual(rightPadded.getElement(), findJRightPadded.getElement())) {
+                            p.append(START_FIND);
+                            super.visitRightPadded(rightPadded, location, suffix, p);
+                            p.append(STOP_FIND);
+                            this.found = true;
+                        } else {
+                            super.visitRightPadded(rightPadded, location, suffix, p);
+                        }
+                    } else {
+                        super.visitRightPadded(rightPadded, location, suffix, p);
+                    }
+                }
+
+                @Override
+                public @Nullable J visit(@Nullable Tree tree, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                    if (found) {
+                        return (J) tree;
+                    }
+                    if (tree instanceof J && (tree == cursor.getValue() || SemanticallyEqual.areEqual((J) tree, cursor.getValue()))) {
+                        tree = cursor.getValue();
+                    }
+                    if (findJ != null) {
+                        if (tree == findJ || (tree instanceof J && SemanticallyEqual.areEqual((J) tree, findJ))) {
+                            p.append(START_FIND);
+                            tree = super.visit(startFind((J) tree), p);
+                            p.append(STOP_FIND);
+                            return (J) tree;
+                        }
+                    }
+                    return super.visit(tree, p);
+                }
+
+                private boolean semanticallyEqual(@Nullable List<? extends JRightPadded<? extends J>> left, @Nullable List<JRightPadded<J>> right) {
+                    if (left != null && right != null) {
+                        if (left.size() == right.size()) {
+                            for (int i = 0; i < left.size(); i++) {
+                                if (!SemanticallyEqual.areEqual(left.get(i).getElement(), right.get(i).getElement())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                private J startFind(J tree) {
+                    return tree.withPrefix(tree.getPrefix()
+                            .withWhitespace(tree.getPrefix().getWhitespace().replace("\n", "\n" + START_FIND))
+                            .withComments(ListUtils.map(tree.getComments(), c -> c.withSuffix(c.getSuffix().replace("\n", "\n" + START_FIND))))
+                    );
+                }
+            };
+            PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED);
+            Cursor printCursor = cursor;
+            if (!(cursor.getValue() instanceof JavaSourceFile)) {
+                printCursor = cursor.dropParentUntil(c -> c instanceof JavaSourceFile);
+            }
+            javaPrinter.visit(printCursor.getValue(), printLine, printCursor.getParent());
+
+            return new SourcePositionRetriever.SearchResult(printLine.getOut());
+        }
+
+        public static SourcePositionRetriever of(Cursor cursor) {
+            Object value = cursor.getValue();
+            if (value != Cursor.ROOT_VALUE) {
+                if (value instanceof J || value instanceof JContainer || value instanceof JRightPadded) {
+                    return new SourcePositionRetriever(cursor);
+                }
+            }
+            throw new IllegalArgumentException("Unable to construct SourcePositionRetriever as " + value.getClass().getSimpleName() + " is not a supported type.");
+        }
+
+        @Getter
+        @RequiredArgsConstructor
+        public static class SearchResult {
+            private final int line;
+            private final int column;
+            private final int maxColumn;
+            private final int lines;
+
+            private SearchResult(String printed) {
+                int stopIndex = printed.lastIndexOf(STOP_FIND);
+                if (stopIndex != -1) {
+                    printed = printed.substring(0, stopIndex);
+                }
+                int startIndex = printed.lastIndexOf(START_FIND);
+                if (startIndex >= 0) {
+                    String beforeChild = printed.substring(0, startIndex);
+                    int line = 1;
+                    int col = 0;
+                    for (int i = 0; i < beforeChild.length(); i++) {
+                        char c = beforeChild.charAt(i);
+                        if ('\n' == c) {
+                            line++;
+                            col = 0;
+                        } else {
+                            col++;
+                        }
+                    }
+                    String content = printed.substring(startIndex + START_FIND.length());
+                    int indent = StringUtils.indent(content).length();
+                    int lineLength = col;
+                    int maxColumn = 0;
+                    int lines = 1;
+                    for (int i = 0; i < content.length(); i++) {
+                        char c = content.charAt(i);
+                        if ('\n' == c) {
+                            lines++;
+                            if (maxColumn < lineLength) {
+                                maxColumn = lineLength;
+                            }
+                            lineLength = 0;
+                        } else {
+                            lineLength++;
+                        }
+                    }
+                    if (maxColumn < lineLength) {
+                        maxColumn = lineLength;
+                    }
+
+                    this.line = line;
+                    this.column = col + indent;
+                    this.maxColumn = maxColumn;
+                    this.lines = lines;
+                } else {
+                    throw new IllegalArgumentException("The child was not found in the sourceFile.");
+                }
+            }
+        }
     }
 }

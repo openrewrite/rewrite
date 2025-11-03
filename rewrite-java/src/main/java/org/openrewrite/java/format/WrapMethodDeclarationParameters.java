@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
+import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -30,6 +31,7 @@ import org.openrewrite.style.LineWrapSetting;
 @EqualsAndHashCode(callSuper = false)
 public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
 
+    SpacesStyle spacesStyle;
     WrappingAndBracesStyle style;
 
     @Override
@@ -44,7 +46,7 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
                 }
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 if (style.getMethodDeclarationParameters().getWrap() == LineWrapSetting.ChopIfTooLong &&
-                        (sourceFile == null || sourceFile.service(SourcePositionService.class).computeDeclarationLength(getCursor()) <= style.getHardWrapAt())) {
+                        (sourceFile == null || sourceFile.service(SourcePositionService.class).retrieve(getCursor()).minimized(spacesStyle).find(m.getPadding().getParameters()).getMaxColumn() <= style.getHardWrapAt())) {
                     return m;
                 }
 
