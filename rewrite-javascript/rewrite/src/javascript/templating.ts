@@ -356,12 +356,6 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
  */
 export interface VariadicOptions {
     /**
-     * Separator used when expanding the capture in templates (default: ', ').
-     * Examples: ', ' for arguments, '; ' for statements.
-     */
-    separator?: string;
-
-    /**
      * Minimum number of nodes that must be matched (default: 0).
      */
     min?: number;
@@ -528,10 +522,9 @@ class CaptureImpl<T = any> implements Capture<T> {
         // Normalize variadic options
         if (options?.variadic) {
             if (typeof options.variadic === 'boolean') {
-                this[CAPTURE_VARIADIC_SYMBOL] = { separator: ', ' };
+                this[CAPTURE_VARIADIC_SYMBOL] = {};
             } else {
                 this[CAPTURE_VARIADIC_SYMBOL] = {
-                    separator: options.variadic.separator || ', ',
                     min: options.variadic.min,
                     max: options.variadic.max
                 };
@@ -710,7 +703,7 @@ export function capture<T = any>(
 
 // Overload 2: Options object with variadic
 export function capture<T = any>(
-    options: { name?: string; variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
+    options: { name?: string; variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; min?: number; max?: number }
 ): Capture<T[]> & T[];
 
 // Overload 3: Just a string name (simple named capture)
@@ -881,7 +874,7 @@ export function any<T = any>(
 
 // Overload 2: Variadic any with constraint
 export function any<T = any>(
-    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
+    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; min?: number; max?: number }
 ): Any<T[]> & T[];
 
 // Overload 3: Catch-all for simple any without special options

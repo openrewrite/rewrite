@@ -31,13 +31,12 @@ describe('variadic marker attachment', () => {
 
         // Verify the capture object itself
         expect(args.isVariadic()).toBe(true);
-        expect(args.getVariadicOptions()?.separator).toBe(', ');
+        expect(args.getVariadicOptions()).toBeDefined();
     });
 
     test('variadic capture with custom options stores them correctly', () => {
         const args = capture({
             variadic: {
-                separator: '; ',
                 min: 1,
                 max: 3
             }
@@ -45,7 +44,6 @@ describe('variadic marker attachment', () => {
         const pat = pattern`foo(${args})`;
 
         const options = args.getVariadicOptions();
-        expect(options?.separator).toBe('; ');
         expect(options?.min).toBe(1);
         expect(options?.max).toBe(3);
     });

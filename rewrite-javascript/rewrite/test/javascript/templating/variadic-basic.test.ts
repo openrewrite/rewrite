@@ -28,15 +28,8 @@ describe('variadic capture basic functionality', () => {
 
         const options = args.getVariadicOptions();
         expect(options).toBeDefined();
-        expect(options?.separator).toBe(', ');
         expect(options?.min).toBeUndefined();
         expect(options?.max).toBeUndefined();
-    });
-
-    test('variadic with custom separator', () => {
-        const args = capture({ variadic: { separator: '; ' } });
-        expect(args.isVariadic()).toBe(true);
-        expect(args.getVariadicOptions()?.separator).toBe('; ');
     });
 
     test('variadic with min/max bounds', () => {
@@ -46,16 +39,14 @@ describe('variadic capture basic functionality', () => {
         const options = args.getVariadicOptions();
         expect(options?.min).toBe(1);
         expect(options?.max).toBe(3);
-        expect(options?.separator).toBe(', '); // default
     });
 
     test('variadic with all options', () => {
         const args = capture({ name: 'args',
-            variadic: { separator: ' | ', min: 2, max: 5 }
+            variadic: { min: 2, max: 5 }
         });
 
         const options = args.getVariadicOptions();
-        expect(options?.separator).toBe(' | ');
         expect(options?.min).toBe(2);
         expect(options?.max).toBe(5);
     });

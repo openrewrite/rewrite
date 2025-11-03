@@ -72,7 +72,7 @@ describe('variadic template expansion', () => {
     });
 
     test('expand variadic with fixed arguments before', () => {
-        const first = capture('first');
+        const first = capture();
         const rest = capture({ variadic: true });
         const pat = pattern`foo(${first}, ${rest})`;
         const tmpl = template`bar(${first}, ${rest})`;
@@ -86,7 +86,7 @@ describe('variadic template expansion', () => {
 
     test('expand variadic with fixed arguments after', () => {
         const first = capture({ variadic: true });
-        const last = capture('last');
+        const last = capture();
         const pat = pattern`foo(${first}, ${last})`;
         const tmpl = template`bar(${first}, ${last})`;
 
