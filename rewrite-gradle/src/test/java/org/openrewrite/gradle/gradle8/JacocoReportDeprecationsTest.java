@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.gradle8;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -436,7 +437,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               tasks.jacocoTestReport {
                   reports {
                       xml.isEnabled = false
-                      html.isEnabled = true
+                      html.isEnabled(true)
                       html.destination = layout.buildDirectory.dir("jacocoHtml")
                   }
               }
@@ -450,8 +451,247 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               tasks.jacocoTestReport {
                   reports {
                       xml.required = false
-                      html.required = true
+                      html.required(true)
                       html.outputLocation = layout.buildDirectory.dir("jacocoHtml")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Nested
+    class AsMethodInvocation {
+        @Test
+        void deprecationsInMethodInvocationSyntax() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+
+                  jacocoTestReport {
+                      reports {
+                          xml.enabled false
+                          csv.enabled true
+                          html.enabled false
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+
+                  jacocoTestReport {
+                      reports {
+                          xml.required false
+                          csv.required true
+                          html.required false
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void deprecationsInMethodInvocationInsideNestedClosure() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml {
+                              enabled false
+                          }
+                          csv {
+                              enabled true
+                          }
+                          html {
+                              enabled false
+                          }
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml {
+                              required false
+                          }
+                          csv {
+                              required true
+                          }
+                          html {
+                              required false
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void deprecationsInMethodInvocationWithFieldAccess() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports.xml.enabled false
+                      reports.csv.enabled true
+                      reports.html.enabled false
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports.xml.required false
+                      reports.csv.required true
+                      reports.html.required false
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void destinationInMethodInvocationSyntax() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml.destination layout.buildDirectory.dir('jacocoXml')
+                          csv.destination layout.buildDirectory.dir('jacocoCsv')
+                          html.destination layout.buildDirectory.dir('jacocoHtml')
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml.outputLocation layout.buildDirectory.dir('jacocoXml')
+                          csv.outputLocation layout.buildDirectory.dir('jacocoCsv')
+                          html.outputLocation layout.buildDirectory.dir('jacocoHtml')
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void destinationInMethodInvocationInsideNestedClosure() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml {
+                              destination layout.buildDirectory.dir('jacocoXml')
+                          }
+                          csv {
+                              destination layout.buildDirectory.dir('jacocoCsv')
+                          }
+                          html {
+                              destination layout.buildDirectory.dir('jacocoHtml')
+                          }
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "jacoco"
+                  }
+                  jacocoTestReport {
+                      reports {
+                          xml {
+                              outputLocation layout.buildDirectory.dir('jacocoXml')
+                          }
+                          csv {
+                              outputLocation layout.buildDirectory.dir('jacocoCsv')
+                          }
+                          html {
+                              outputLocation layout.buildDirectory.dir('jacocoHtml')
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Test
+    void allNotationsMixed() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport {
+                  reports {
+                      xml.enabled = true
+                      xml.setEnabled(false)
+                      xml.enabled(true)
+                      xml.enabled false
+                      xml.destination = layout.buildDirectory.dir('jacocoXml')
+                      xml.setDestination layout.buildDirectory.dir('jacocoXml2')
+                      xml.destination(layout.buildDirectory.dir('jacocoXml3'))
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport {
+                  reports {
+                      xml.required = true
+                      xml.required(false)
+                      xml.required(true)
+                      xml.required false
+                      xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
+                      xml.outputLocation layout.buildDirectory.dir('jacocoXml2')
+                      xml.outputLocation(layout.buildDirectory.dir('jacocoXml3'))
                   }
               }
               """
