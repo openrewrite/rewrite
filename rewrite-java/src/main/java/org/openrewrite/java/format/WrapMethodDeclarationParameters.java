@@ -46,7 +46,7 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
                 }
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 if (style.getMethodDeclarationParameters().getWrap() == LineWrapSetting.ChopIfTooLong &&
-                        (sourceFile == null || sourceFile.service(SourcePositionService.class).retrieve(getCursor()).minimized(spacesStyle).find(m.getPadding().getParameters()).getMaxColumn() <= style.getHardWrapAt())) {
+                        (sourceFile == null || sourceFile.service(SourcePositionService.class).retriever(getCursor()).minimized(spacesStyle).find(m.getPadding().getParameters()).getMaxColumn() <= style.getHardWrapAt())) {
                     return m;
                 }
 

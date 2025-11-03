@@ -462,31 +462,31 @@ class SourcePositionServiceTest implements RewriteTest {
               }
 
               private void assertResult(int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retrieve(getCursor()).find())
+                  assertThat(service.retriever(getCursor()).find())
                     .usingRecursiveComparison()
                     .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
               }
 
               private void assertResult(J j, int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retrieve(getCursor()).find(j))
+                  assertThat(service.retriever(getCursor()).find(j))
                     .usingRecursiveComparison()
                     .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
               }
 
               private void assertResult(JContainer<Statement> j, int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retrieve(getCursor()).find(j))
+                  assertThat(service.retriever(getCursor()).find(j))
                     .usingRecursiveComparison()
                     .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
               }
 
               private void assertMinimizedResult(int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retrieve(getCursor()).minimized(IntelliJ.spaces()).find())
+                  assertThat(service.retriever(getCursor()).minimized(IntelliJ.spaces()).find())
                     .usingRecursiveComparison()
                     .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
               }
 
               private void assertMinimizedResult(JContainer<Statement> j, int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retrieve(getCursor()).minimized(IntelliJ.spaces()).find(j))
+                  assertThat(service.retriever(getCursor()).minimized(IntelliJ.spaces()).find(j))
                     .usingRecursiveComparison()
                     .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
               }

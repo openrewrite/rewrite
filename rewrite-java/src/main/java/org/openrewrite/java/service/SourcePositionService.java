@@ -138,7 +138,7 @@ public class SourcePositionService {
         throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
     }
 
-    public SourcePositionRetriever retrieve(Cursor cursor) {
+    public SourcePositionRetriever retriever(Cursor cursor) {
         return SourcePositionRetriever.of(cursor);
     }
 
