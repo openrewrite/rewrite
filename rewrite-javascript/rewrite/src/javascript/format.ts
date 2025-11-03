@@ -826,7 +826,7 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         return produce(ret, draft => {
             if (draft.class) {
                 if (draft.class.kind == JS.Kind.TypeTreeExpression) {
-                    this.ensureSpace((draft.class as Draft<JS.TypeTreeExpression>).expression.prefix);
+                    this.ensureSpace((draft.class as Draft<JS.TypeTreeExpression>).prefix);
                 }
             }
         });

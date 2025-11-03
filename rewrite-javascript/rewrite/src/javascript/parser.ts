@@ -2012,7 +2012,7 @@ export class JavaScriptParserVisitor {
             } satisfies J.ParameterizedType as J.ParameterizedType : {
                 kind: JS.Kind.TypeTreeExpression,
                 id: randomId(),
-                prefix: emptySpace,
+                prefix: this.prefix(node.expression),
                 markers: emptyMarkers,
                 expression: this.visit(node.expression),
             } satisfies JS.TypeTreeExpression as JS.TypeTreeExpression,
