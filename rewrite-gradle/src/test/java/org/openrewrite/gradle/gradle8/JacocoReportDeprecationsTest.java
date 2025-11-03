@@ -437,7 +437,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               tasks.jacocoTestReport {
                   reports {
                       xml.isEnabled = false
-                      html.isEnabled = true
+                      html.isEnabled(true)
                       html.destination = layout.buildDirectory.dir("jacocoHtml")
                   }
               }
@@ -451,7 +451,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               tasks.jacocoTestReport {
                   reports {
                       xml.required = false
-                      html.required = true
+                      html.required(true)
                       html.outputLocation = layout.buildDirectory.dir("jacocoHtml")
                   }
               }
