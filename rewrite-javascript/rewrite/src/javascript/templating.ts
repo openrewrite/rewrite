@@ -441,22 +441,92 @@ export interface Capture<T = any> {
     getConstraint?(): ((node: T) => boolean) | undefined;
 }
 
+/**
+ * Non-capturing pattern match specification.
+ * Represents a placeholder in a pattern that matches AST nodes without binding them to a name.
+ *
+ * Use `any()` when you need to match structure without caring about the specific values.
+ * The key difference from `Capture` is that `Any` cannot be used in templates - the TypeScript
+ * type system prevents this at compile time.
+ *
+ * @template T The expected type of the matched AST node (for TypeScript autocomplete and constraints)
+ *
+ * @remarks
+ * **Why Any<T> is Separate from Capture<T>:**
+ *
+ * Using a separate type provides compile-time safety:
+ * - `pattern`foo(${any()})`` - ✅ OK in patterns
+ * - `template`bar(${any()})`` - ❌ TypeScript error (Any<T> not assignable to template parameters)
+ *
+ * This prevents logical errors where you try to use a non-capturing match in a template.
+ *
+ * **Semantic Parallel with TypeScript's `any`:**
+ *
+ * Just as TypeScript's `any` type means "be permissive about types here",
+ * pattern matching's `any()` means "be permissive about values here":
+ * - TypeScript `any`: Accept any type, don't check it
+ * - Pattern `any()`: Match any value, don't bind it
+ *
+ * @example
+ * // Match without capturing
+ * const pat = pattern`foo(${any()})`;
+ *
+ * @example
+ * // Variadic any - match zero or more without capturing
+ * const rest = any({ variadic: true });
+ * const pat = pattern`bar(${capture('first')}, ${rest})`;
+ *
+ * @example
+ * // With constraints - validate but don't capture
+ * const numericArg = any<J.Literal>({
+ *     constraint: (node) => typeof node.value === 'number'
+ * });
+ * const pat = pattern`process(${numericArg})`;
+ */
+export interface Any<T = any> {
+    /**
+     * Gets the internal identifier for this any pattern.
+     */
+    getName(): string;
+
+    /**
+     * Returns true if this is a variadic any (matching zero or more nodes).
+     */
+    isVariadic(): boolean;
+
+    /**
+     * Returns the variadic options if this is a variadic any, undefined otherwise.
+     */
+    getVariadicOptions(): VariadicOptions | undefined;
+
+    /**
+     * Gets the constraint function if this any pattern has one.
+     * For regular any (T = Expression), constraint receives a single node.
+     * For variadic any (T = Expression[]), constraint receives an array of nodes.
+     */
+    getConstraint?(): ((node: T) => boolean) | undefined;
+}
+
 // Symbol to access the internal capture name without triggering Proxy
 const CAPTURE_NAME_SYMBOL = Symbol('captureName');
 // Symbol to access variadic options without triggering Proxy
 const CAPTURE_VARIADIC_SYMBOL = Symbol('captureVariadic');
 // Symbol to access constraint function without triggering Proxy
 const CAPTURE_CONSTRAINT_SYMBOL = Symbol('captureConstraint');
+// Symbol to access capturing flag without triggering Proxy
+const CAPTURE_CAPTURING_SYMBOL = Symbol('captureCapturing');
 
 class CaptureImpl<T = any> implements Capture<T> {
     public readonly name: string;
     [CAPTURE_NAME_SYMBOL]: string;
     [CAPTURE_VARIADIC_SYMBOL]: VariadicOptions | undefined;
     [CAPTURE_CONSTRAINT_SYMBOL]: ((node: T) => boolean) | undefined;
+    [CAPTURE_CAPTURING_SYMBOL]: boolean;
 
-    constructor(name: string, options?: CaptureOptions<T>) {
+    constructor(name: string, options?: CaptureOptions<T>, capturing: boolean = true) {
         this.name = name;
         this[CAPTURE_NAME_SYMBOL] = name;
+        this[CAPTURE_CAPTURING_SYMBOL] = capturing;
 
         // Normalize variadic options
         if (options?.variadic) {
@@ -491,6 +561,10 @@ class CaptureImpl<T = any> implements Capture<T> {
 
     getConstraint(): ((node: T) => boolean) | undefined {
         return this[CAPTURE_CONSTRAINT_SYMBOL];
+    }
+
+    isCapturing(): boolean {
+        return this[CAPTURE_CAPTURING_SYMBOL];
     }
 }
 
@@ -677,8 +751,13 @@ export function capture<T = any>(name?: string, options?: CaptureOptions<T>): Ca
                 return target[CAPTURE_CONSTRAINT_SYMBOL];
             }
 
+            // Allow access to internal capturing symbol
+            if (prop === CAPTURE_CAPTURING_SYMBOL) {
+                return target[CAPTURE_CAPTURING_SYMBOL];
+            }
+
             // Allow methods to be called directly on the target
-            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint') {
+            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing') {
                 return target[prop].bind(target);
             }
 
@@ -745,6 +824,130 @@ function createCaptureValueProxy(
 
 // Static counter for generating unique IDs for unnamed captures
 capture.nextUnnamedId = 1;
+
+/**
+ * Creates a non-capturing pattern match for use in patterns.
+ *
+ * Use `any()` when you need to match AST structure without binding the matched value to a name.
+ * This is useful for validation patterns where you care about structure but not the specific values.
+ *
+ * **Key Differences from `capture()`:**
+ * - `any()` returns `Any<T>` type (not `Capture<T>`)
+ * - Cannot be used in templates (TypeScript compiler prevents this)
+ * - Does not bind matched values (more memory efficient for patterns)
+ * - Supports same features: constraints, variadic matching
+ *
+ * @template T The expected type of the matched AST node (for TypeScript autocomplete and constraints)
+ * @param options Optional configuration (variadic, constraint)
+ * @returns An Any object that matches patterns without capturing
+ *
+ * @example
+ * // Match any single argument without capturing
+ * const pat = pattern`foo(${any()})`;
+ *
+ * @example
+ * // Match with constraint validation
+ * const numericArg = any<J.Literal>({
+ *     constraint: (node) => typeof node.value === 'number'
+ * });
+ * const pat = pattern`process(${numericArg})`;
+ *
+ * @example
+ * // Variadic any - match zero or more without capturing
+ * const rest = any({ variadic: true });
+ * const first = capture('first');
+ * const pat = pattern`foo(${first}, ${rest})`;
+ *
+ * @example
+ * // Mixed with captures - capture some, ignore others
+ * const important = capture('important');
+ * const pat = pattern`
+ *     if (${any()}) {
+ *         ${important}
+ *     }
+ * `;
+ *
+ * @example
+ * // Variadic with constraints
+ * const numericArgs = any<J.Literal>({
+ *     variadic: true,
+ *     constraint: (nodes) => nodes.every(n => typeof n.value === 'number')
+ * });
+ * const pat = pattern`sum(${numericArgs})`;
+ */
+// Overload 1: Regular any with constraint (most specific - no variadic property)
+export function any<T = any>(
+    options: { constraint: (node: T) => boolean } & { variadic?: never }
+): Any<T> & T;
+
+// Overload 2: Variadic any with constraint
+export function any<T = any>(
+    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
+): Any<T[]> & T[];
+
+// Overload 3: Catch-all for simple any without special options
+export function any<T = any>(
+    options?: CaptureOptions<T>
+): Any<T> & T;
+
+// Implementation
+export function any<T = any>(options?: CaptureOptions<T>): Any<T> & T {
+    const anonName = `anon_${any.nextAnonId++}`;
+    const impl = new CaptureImpl<T>(anonName, options, false); // capturing = false
+
+    // Return a Proxy that intercepts property accesses (though any() results shouldn't be used in templates)
+    // We still need the Proxy infrastructure for internal consistency
+    return new Proxy(impl as any, {
+        get(target: any, prop: string | symbol): any {
+            // Allow access to internal symbols
+            if (prop === CAPTURE_NAME_SYMBOL) {
+                return target[CAPTURE_NAME_SYMBOL];
+            }
+            if (prop === CAPTURE_VARIADIC_SYMBOL) {
+                return target[CAPTURE_VARIADIC_SYMBOL];
+            }
+            if (prop === CAPTURE_CONSTRAINT_SYMBOL) {
+                return target[CAPTURE_CONSTRAINT_SYMBOL];
+            }
+            if (prop === CAPTURE_CAPTURING_SYMBOL) {
+                return target[CAPTURE_CAPTURING_SYMBOL];
+            }
+
+            // Allow methods to be called directly on the target
+            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing') {
+                return target[prop].bind(target);
+            }
+
+            // For variadic any, support array-like operations (though they shouldn't be used in templates)
+            if (target.isVariadic() && typeof prop === 'string') {
+                const indexNum = Number(prop);
+                if (!isNaN(indexNum) && indexNum >= 0 && Number.isInteger(indexNum)) {
+                    return createCaptureValueProxy(target, [], { type: 'index', args: [indexNum] });
+                }
+
+                if (prop === 'slice') {
+                    return (...args: number[]) => {
+                        return createCaptureValueProxy(target, [], { type: 'slice', args });
+                    };
+                }
+
+                if (prop === 'length') {
+                    return createCaptureValueProxy(target, [], { type: 'length' });
+                }
+            }
+
+            // Property access is technically supported but shouldn't be used in templates
+            if (typeof prop === 'string') {
+                return createCaptureValueProxy(target, [prop]);
+            }
+
+            return undefined;
+        }
+    });
+}
+
+// Static counter for generating unique IDs for anonymous (non-capturing) patterns
+any.nextAnonId = 1;
 
 /**
  * Creates a parameter specification for use in standalone templates (not used with patterns).
@@ -882,7 +1085,7 @@ export interface PatternOptions {
  */
 export class PatternBuilder {
     private parts: string[] = [];
-    private captures: Capture[] = [];
+    private captures: (Capture | Any<any>)[] = [];
 
     /**
      * Adds a static string part to the pattern.
@@ -907,17 +1110,17 @@ export class PatternBuilder {
     /**
      * Adds a capture to the pattern.
      *
-     * @param value The capture object or string name
+     * @param value The capture object (Capture or Any) or string name
      * @returns This builder for chaining
      */
-    capture(value: Capture | string): this {
+    capture(value: Capture | Any<any> | string): this {
         // Ensure we have a part for after this capture
         if (this.parts.length === 0) {
             this.parts.push('');
         }
         // Convert string to Capture if needed
         const captureObj = typeof value === 'string' ? new CaptureImpl(value) : value;
-        this.captures.push(captureObj);
+        this.captures.push(captureObj as any);
         // Add an empty string for the next part
         this.parts.push('');
         return this;
@@ -983,11 +1186,11 @@ export class Pattern {
      * Creates a new pattern from template parts and captures.
      *
      * @param templateParts The string parts of the template
-     * @param captures The captures between the string parts
+     * @param captures The captures between the string parts (can be Capture or Any)
      */
     constructor(
         public readonly templateParts: TemplateStringsArray,
-        public readonly captures: Capture[]
+        public readonly captures: (Capture | Any<any>)[]
     ) {
     }
 
@@ -1133,7 +1336,7 @@ class Matcher {
             return false;
         }
 
-        // Find the original capture object to get constraint
+        // Find the original capture object to get constraint and capturing flag
         const captureObj = this.pattern.captures.find(c => c.getName() === captureName);
         const constraint = captureObj?.getConstraint?.();
 
@@ -1142,8 +1345,12 @@ class Matcher {
             return false;
         }
 
-        // Store the binding
-        this.bindings.set(captureName, target);
+        // Only store the binding if this is a capturing placeholder
+        const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
+        if (capturing) {
+            this.bindings.set(captureName, target);
+        }
+
         return true;
     }
 
@@ -1161,7 +1368,7 @@ class Matcher {
             return false;
         }
 
-        // Find the original capture object to get constraint
+        // Find the original capture object to get constraint and capturing flag
         const captureObj = this.pattern.captures.find(c => c.getName() === captureName);
         const constraint = captureObj?.getConstraint?.();
 
@@ -1170,8 +1377,13 @@ class Matcher {
             return false;
         }
 
-        // For variadic captures, store the array of matched nodes
-        this.bindings.set(captureName, targets as any);
+        // Only store the binding if this is a capturing placeholder
+        const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
+        if (capturing) {
+            // For variadic captures, store the array of matched nodes
+            this.bindings.set(captureName, targets as any);
+        }
+
         return true;
     }
 }
@@ -1180,21 +1392,25 @@ class Matcher {
  * Tagged template function for creating patterns.
  *
  * @param strings The string parts of the template
- * @param captures The captures between the string parts
+ * @param captures The captures between the string parts (Capture, Any, or string names)
  * @returns A Pattern object
  *
  * @example
  * // Using the same capture multiple times for repeated patterns
  * const expr = capture('expr');
  * const redundantOr = pattern`${expr} || ${expr}`;
+ *
+ * @example
+ * // Using any() for non-capturing matches
+ * const pat = pattern`foo(${any()})`;
  */
-export function pattern(strings: TemplateStringsArray, ...captures: (Capture | string)[]): Pattern {
+export function pattern(strings: TemplateStringsArray, ...captures: (Capture | Any<any> | string)[]): Pattern {
     const capturesByName = captures.reduce((map, c) => {
         const capture = typeof c === "string" ? new CaptureImpl(c) : c;
         // Use symbol to get internal name without triggering Proxy
         const name = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
         return map.set(name, capture);
-    }, new Map<string, Capture>());
+    }, new Map<string, Capture | Any<any>>());
     return new Pattern(strings, captures.map(c => {
         // Use symbol to get internal name without triggering Proxy
         const name = typeof c === "string" ? c : ((c as any)[CAPTURE_NAME_SYMBOL] || c.getName());
@@ -1673,7 +1889,7 @@ class TemplateEngine {
  * Centralizes all logic related to capture placeholders.
  */
 class PlaceholderUtils {
-    static readonly CAPTURE_PREFIX = '__capture_';
+    static readonly CAPTURE_PREFIX = '__capt_';
     static readonly PLACEHOLDER_PREFIX = '__PLACEHOLDER_';
 
     /**
@@ -1720,14 +1936,14 @@ class PlaceholderUtils {
             return null;
         }
 
-        // Handle unnamed captures: "__capture_unnamed_N__"
+        // Handle unnamed captures: "__capt_unnamed_N__"
         if (identifier.startsWith(`${this.CAPTURE_PREFIX}unnamed_`)) {
-            const match = identifier.match(/__capture_(unnamed_\d+)__/);
+            const match = identifier.match(/__capt_(unnamed_\d+)__/);
             return match ? {name: match[1]} : null;
         }
 
-        // Handle named captures: "__capture_name__" or "__capture_name_type__"
-        const match = identifier.match(/__capture_([^_]+)(?:_([^_]+))?__/);
+        // Handle all other captures (including any()): "__capt_name__" or "__capt_name_type__"
+        const match = identifier.match(/__capt_([^_]+(?:_\d+)?)(?:_([^_]+))?__/);
         if (!match) {
             return null;
         }
@@ -1743,9 +1959,11 @@ class PlaceholderUtils {
      *
      * @param name The capture name
      * @param typeConstraint Optional type constraint
+     * @param capturing Whether this is a capturing placeholder (not used for prefix, kept for API compatibility)
      * @returns The formatted placeholder string
      */
-    static createCapture(name: string, typeConstraint?: string): string {
+    static createCapture(name: string, typeConstraint?: string, capturing: boolean = true): string {
+        // Always use CAPTURE_PREFIX - the capturing flag is used internally for binding behavior
         return typeConstraint
             ? `${this.CAPTURE_PREFIX}${name}_${typeConstraint}__`
             : `${this.CAPTURE_PREFIX}${name}__`;
@@ -2174,13 +2392,13 @@ class TemplateProcessor {
      * Creates a new template processor.
      *
      * @param templateParts The string parts of the template
-     * @param captures The captures between the string parts
+     * @param captures The captures between the string parts (can be Capture or Any)
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
      */
     constructor(
         private readonly templateParts: TemplateStringsArray,
-        private readonly captures: Capture[],
+        private readonly captures: (Capture | Any<any>)[],
         private readonly contextStatements: string[] = [],
         private readonly dependencies: Record<string, string> = {}
     ) {
@@ -2218,9 +2436,10 @@ class TemplateProcessor {
             result += this.templateParts[i];
             if (i < this.captures.length) {
                 const capture = this.captures[i];
-                // Use symbol to access capture name without triggering Proxy
+                // Use symbol to access capture name and capturing flag without triggering Proxy
                 const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
-                result += PlaceholderUtils.createCapture(captureName);
+                const capturing = (capture as any)[CAPTURE_CAPTURING_SYMBOL] ?? true;
+                result += PlaceholderUtils.createCapture(captureName, undefined, capturing);
             }
         }
         return result;

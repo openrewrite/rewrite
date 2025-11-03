@@ -20,7 +20,7 @@ Current limitations:
 - Using `capture()` in templates without patterns is semantically confusing
 - No way to match variable-length sequences (e.g., "any statements between these two statements")
 
-This ADR proposes eight enhancements to address these limitations and make the templating engine more expressive and flexible.
+This ADR proposes nine enhancements to address these limitations and make the templating engine more expressive and flexible.
 
 ### Summary of Enhancements
 
@@ -33,7 +33,8 @@ This ADR proposes eight enhancements to address these limitations and make the t
 | 5 | Builder API for Dynamic Construction         | ✅ Implemented |
 | 6 | Lenient Type Matching in Comparator          | ✅ Implemented |
 | 7 | `param()` for Template-Only Parameters       | ✅ Implemented |
-| 8 | Ellipsis Patterns for Sequence Matching      | ✅ Implemented |
+| 8 | Variadic Captures for Sequence Matching      | ✅ Implemented |
+| 9 | `any()` for Non-Capturing Pattern Matching   | 📝 Proposed    |
 
 ## Decision
 
@@ -1567,3 +1568,332 @@ class MatchResult {
 - Future: object properties, class members
 
 **Priority**: **High** - Essential for production-quality refactoring patterns. Without this, many real-world patterns cannot be expressed.
+
+### `any()` for Non-Capturing Pattern Matching (Proposed)
+
+**Positive:**
+1. **Clear intent**: `any()` clearly communicates "match but don't capture" vs misleading use of `capture()` with unused names
+2. **Semantic correctness**: Distinguishes matching (pattern concern) from binding (template concern)
+3. **Code clarity**: Reading `pattern\`foo(${any()})\`` is more intuitive than `pattern\`foo(${capture('unused')})\``
+4. **Prevents errors**: Type system can prevent accidentally using non-capturing matches in templates
+5. **Memory efficiency**: Pattern matcher doesn't need to store bindings for anonymous matches
+6. **Flexible validation**: Can apply constraints without the overhead of capturing
+7. **Natural extension**: Works with all existing features (variadic, constraints) seamlessly
+
+**Negative:**
+1. **API surface increase**: Another function for users to learn and remember
+2. **Overlapping functionality**: Technically `capture()` can do everything `any()` does (with unused name)
+3. **Implementation complexity**: Requires tracking capturing vs non-capturing state throughout the system
+4. **Naming discussion**: "any" might imply "any type" rather than "any value without capturing"
+5. **Edge case handling**: Need to ensure non-capturing placeholders work correctly in all contexts
+6. **Documentation burden**: Need to explain when to use `capture()` vs `any()`
+
+**Trade-offs:**
+
+**Semantic Clarity vs API Simplicity:**
+- **With `any()`**: More functions to learn, but intent is explicit
+- **Without `any()`**: Simpler API surface, but using `capture('_')` is semantically misleading
+
+**Memory vs Clarity:**
+- **Storing unused bindings**: Wastes memory but simplifies implementation
+- **Tracking capturing flag**: More complex but more efficient
+
+**Type Safety:**
+- **Prevent `any()` in templates**: TypeScript error if you try (good!)
+- **Allow `any()` in templates**: Runtime error or silent no-op (bad!)
+
+**Mitigation strategies:**
+
+1. **Clear documentation**:
+   - Side-by-side examples showing `capture()` vs `any()`
+   - Decision flowchart: "Do you need the value? → Yes: capture() / No: any()"
+   - Common patterns cookbook
+
+2. **Type safety**:
+   - Make `any()` return distinct `Any<T>` type that templates reject
+   - Provide clear TypeScript error messages
+   - Add JSDoc warnings about template usage
+
+3. **Implementation**:
+   - Reuse `Capture` infrastructure with `capturing: false` flag
+   - Minimal code duplication - same overloads, same options
+   - Unified placeholder parsing with different prefix (`__anon_` vs `__capt_`)
+
+4. **Naming alternatives** (considered but not chosen):
+   - `wildcard()` / `Wildcard<T>` - emphasizes "matches anything"
+   - `anonymous()` / `Anonymous<T>` - emphasizes "has no name"
+   - `match()` / `Match<T>` - emphasizes matching without capturing
+   - `_` (function) - traditional placeholder symbol (but may conflict with lodash)
+   - `ignore()` / `Ignore<T>` - emphasizes not caring about the value
+   - **Chosen: `any()` / `Any<T>`** - semantic parallel with TypeScript's `any` type (permissive at this position)
+
+5. **Best practices**:
+   - Lint rule: Suggest `any()` when `capture()` used but value never referenced
+   - IDE hints: Show "This capture is never used" warning
+   - Migration: Automated refactoring to convert unused captures to `any()`
+
+6. **Performance**:
+   - Skip binding step for non-capturing matches
+   - Early return in constraint validation if match fails
+   - Don't allocate map entry for anonymous captures
+
+**Alternative Considered: Using Same `Capture<T>` Type**
+
+Instead of separate `Any<T>` type, `any()` could return `Capture<T>` with internal flag:
+
+```typescript
+// Considered: same type
+export function any<T>(options?: CaptureOptions<T>): Capture<T>;
+// Runtime flag prevents binding, but type system can't prevent template usage
+
+// Chosen: separate type
+export function any<T>(options?: CaptureOptions<T>): Any<T>;
+// Type system prevents template usage at compile time
+```
+
+**Pros of same type**: Simpler type system, less to learn
+**Cons of same type**: No compile-time safety, errors only at runtime
+
+**Decision**: Use separate `Any<T>` type for compile-time safety.
+
+### 9. `any()` for Non-Capturing Pattern Matching
+
+**Status**: ✅ Implemented
+
+Add `any()` function for matching AST nodes without binding them to a name, providing clearer semantic intent for wildcard patterns compared to using `capture()` with an unused name.
+
+**API:**
+
+```typescript
+// Match any expression without capturing it
+const pat = pattern`foo(${any()})`;
+
+// Match multiple arguments without capturing them
+const pat2 = pattern`bar(${any()}, ${any()})`;
+
+// Variadic any - match zero or more without capturing
+const rest = any({ variadic: true });
+const pat3 = pattern`baz(${capture('first')}, ${rest})`;
+
+// With constraints - validate but don't capture
+const numericArg = any<J.Literal>({
+    constraint: (node) => typeof node.value === 'number'
+});
+const pat4 = pattern`process(${numericArg})`;
+```
+
+**Rationale:**
+
+When writing patterns, you often need to match nodes without caring about their specific values:
+- Matching method calls regardless of arguments: `foo(${any()})`
+- Matching structure without needing access to all parts: `if (${any()}) { ${capture('body')} }`
+- Validating presence/type without binding: `validate(${any({ constraint: isNumber })})`
+
+Using `capture()` for this is semantically misleading:
+```typescript
+// ⚠️ CONFUSING: Creating a capture but never using it
+const ignored = capture('ignored');
+pattern`foo(${ignored})`;  // Why capture if you never reference it?
+
+// ✅ CLEAR: Explicitly states "match anything here"
+pattern`foo(${any()})`;    // Intent is obvious
+```
+
+**When to Use Which:**
+
+```typescript
+// Use capture() when you need to reference the value
+const arg = capture('arg');
+const pat = pattern`foo(${arg})`;
+const tmpl = template`bar(${arg})`; // Using captured value
+
+// Use any() when you just need structural matching
+const pat2 = pattern`foo(${any()})`;  // Match foo with any argument
+const tmpl2 = template`bar(42)`;      // Replacement doesn't use the argument
+
+// Use any() with constraints for validation without binding
+const numericArg = any<J.Literal>({
+    constraint: (node) => typeof node.value === 'number'
+});
+const pat3 = pattern`process(${numericArg})`;
+// Matches: process(42), process(3.14)
+// Rejects: process("text")
+// But doesn't bind the value
+```
+
+**Variadic Support:**
+
+`any()` supports the same variadic options as `capture()`:
+
+```typescript
+// Match function with any number of arguments
+const args = any({ variadic: true });
+pattern`foo(${args})`;
+// Matches: foo(), foo(1), foo(1, 2, 3), ...
+
+// Match first arg + any remaining args
+const first = capture('first');
+const rest = any({ variadic: true });
+pattern`bar(${first}, ${rest})`;
+// Matches: bar(1), bar(1, 2), bar(1, 2, 3), ...
+// Only binds 'first', rest are matched but not captured
+
+// Variadic with constraints
+const numericArgs = any<J.Literal>({
+    variadic: true,
+    constraint: (nodes) => nodes.every(n => typeof n.value === 'number')
+});
+pattern`sum(${numericArgs})`;
+// Matches: sum(1, 2, 3) - all arguments must be numbers
+// But doesn't capture the arguments
+```
+
+**Comparison with Capture:**
+
+| Feature | `capture()` | `any()` |
+|---------|-------------|---------|
+| **Purpose** | Match and bind value | Match without binding |
+| **Use in patterns** | ✅ Yes | ✅ Yes |
+| **Use in templates** | ✅ Yes (substitutes value) | ❌ No (nothing to substitute) |
+| **Property access** | ✅ Yes (`capture.name`) | ❌ No (no value to access) |
+| **Constraints** | ✅ Yes | ✅ Yes |
+| **Variadic** | ✅ Yes | ✅ Yes |
+| **Semantic meaning** | "Capture this value" | "Match anything here" |
+
+**Implementation:**
+
+- `any()` returns distinct `Any<T>` type (not `Capture<T>`)
+- Uses same `__capt_` prefix internally as `capture()` (distinction is in type system only)
+- Pattern matcher validates constraints but doesn't store binding (controlled by internal `capturing: false` flag)
+- Template substitution ignores non-capturing placeholders
+- Type system prevents `any()` result from being used in templates (compile-time safety)
+- Same signature as `capture()` including all options (variadic, constraints)
+
+**Implementation Details:**
+
+```typescript
+// Separate interface for non-capturing matches
+export interface Any<T> {
+    getName(): string;
+    isVariadic(): boolean;
+    getVariadicOptions(): VariadicOptions | undefined;
+    getConstraint?(): ((node: T) => boolean) | undefined;
+}
+
+// Function signature - returns Any<T>, not Capture<T>
+export function any<T = any>(
+    options?: CaptureOptions<T>
+): Any<T> & T;
+
+export function any<T = any>(
+    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean }
+): Any<T[]> & T[];
+
+// Internal implementation
+class CaptureImpl {
+    constructor(
+        name: string,
+        options?: CaptureOptions<T>,
+        private readonly capturing: boolean = true  // New field
+    ) { }
+}
+
+// Factory functions
+export function capture<T>(name?: string, options?: CaptureOptions<T>): Capture<T> {
+    const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
+    return new CaptureImpl(captureName, options, true) as Capture<T>;  // capturing = true
+}
+
+export function any<T>(options?: CaptureOptions<T>): Any<T> {
+    const anonName = `anon_${any.nextAnonId++}`;
+    return new CaptureImpl(anonName, options, false) as Any<T>;  // capturing = false
+}
+```
+
+**Placeholder Generation:**
+
+```typescript
+class PlaceholderUtils {
+    static createCapture(name: string, capturing: boolean = true): string {
+        const prefix = capturing ? '__capt_' : '__anon_';
+        return `${prefix}${name}__`;
+    }
+}
+```
+
+**Pattern Matching:**
+
+```typescript
+class Matcher {
+    private handleCapture(pattern: J, target: J, captureInfo: CaptureInfo): boolean {
+        // Validate node matches (structural + constraints)
+        const matches = this.matchNode(pattern, target);
+        if (!matches) return false;
+
+        // Only bind if this is a capturing placeholder
+        if (captureInfo.capturing) {
+            this.bindings.set(captureInfo.name, target);
+        }
+
+        return true;
+    }
+}
+```
+
+**Type Safety:**
+
+```typescript
+// Prevent any() from being used in templates via type system
+const wildcard = any();
+const pat = pattern`foo(${wildcard})`;  // ✅ OK in pattern
+
+const tmpl = template`bar(${wildcard})`;  // ❌ TypeScript error
+// Error: Type 'Any<any>' is not assignable to template parameter
+// Templates only accept 'Capture<T>' or 'TemplateParam<T>'
+```
+
+**Examples:**
+
+```typescript
+// Example 1: Match structure without caring about arguments
+const findFooCalls = pattern`foo(${any()})`;
+// Matches: foo(1), foo("x"), foo(obj), ...
+// Use case: Finding all calls to foo() regardless of arguments
+
+// Example 2: Match with validation but don't capture
+const hasNumericArg = any<J.Literal>({
+    constraint: (node) => typeof node.value === 'number'
+});
+const validatePattern = pattern`validate(${hasNumericArg})`;
+// Matches: validate(42), validate(3.14)
+// Rejects: validate("text")
+// Use case: Ensuring argument type without needing the value
+
+// Example 3: Capture first arg, ignore rest
+const first = capture('first');
+const rest = any({ variadic: true });
+const pat = pattern`process(${first}, ${rest})`;
+const tmpl = template`processModified(${first})`;
+// Input:  process(1, 2, 3)
+// Output: processModified(1)
+// Use case: Dropping extra arguments
+
+// Example 4: Complex pattern with mixed capture/any
+const target = capture('target');
+const pat = pattern`
+    if (${any()}) {
+        ${target}
+    }
+`;
+// Matches if statements, captures body but not condition
+// Use case: Finding specific statement patterns regardless of condition
+
+// Example 5: Variadic with mixed capture and any
+const method = capture('method');
+const leadingArgs = any({ variadic: { max: 2 } });
+const callback = capture('callback');
+const pat = pattern`addEventListener(${method}, ${leadingArgs}, ${callback})`;
+// Matches various addEventListener signatures
+// Captures: event type and callback
+// Ignores: optional middleware arguments
+```
