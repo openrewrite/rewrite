@@ -4785,10 +4785,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
     private isOfType(target?: Type, source?: Type): boolean {
         if (!target || !source) {
             // Lenient mode: if either type is undefined, allow the match
-            if (this.lenientTypeMatching && (!target || !source)) {
-                return true;
-            }
-            return target === source;
+            return this.lenientTypeMatching ? true : target === source;
         }
 
         if (target.kind !== source.kind) {

@@ -39,7 +39,7 @@ describe('Variadic Capture Constraints', () => {
 
     describe('Array-level validation', () => {
         test('constraint validates entire array', async () => {
-            const args = capture<J.Literal>('args', {
+            const args = capture<J.Literal>({
                 variadic: true,
                 constraint: (nodes) => nodes.every(n => typeof n.value === 'number')
             });
@@ -49,7 +49,7 @@ describe('Variadic Capture Constraints', () => {
             const expr1 = await parseExpression('sum(1, 2, 3)');
             const match1 = await pat.match(expr1);
             expect(match1).toBeDefined();
-            expect((match1?.get('args') as unknown as J.Literal[]).length).toBe(3);
+            expect((match1?.get(args) as unknown as J.Literal[]).length).toBe(3);
 
             // Should not match - contains string
             const expr2 = await parseExpression('sum(1, "x", 3)');
@@ -58,7 +58,7 @@ describe('Variadic Capture Constraints', () => {
         });
 
         test('constraint works with empty array', async () => {
-            const args = capture<J.Literal>('args', {
+            const args = capture<J.Literal>({
                 variadic: true,
                 constraint: (nodes) => nodes.length === 0 || nodes.every(n => typeof n.value === 'number')
             });
@@ -68,11 +68,11 @@ describe('Variadic Capture Constraints', () => {
             const expr = await parseExpression('foo()');
             const match = await pat.match(expr);
             expect(match).toBeDefined();
-            expect((match?.get('args') as unknown as J[]).length).toBe(0);
+            expect((match?.get(args) as unknown as J[]).length).toBe(0);
         });
 
         test('constraint can check array length', async () => {
-            const args = capture('args', {
+            const args = capture({
                 variadic: true,
                 constraint: (nodes) => nodes.length >= 2
             });
@@ -97,7 +97,7 @@ describe('Variadic Capture Constraints', () => {
 
     describe('Relationship validation', () => {
         test('constraint can validate relationships between elements', async () => {
-            const args = capture<J.Literal>('args', {
+            const args = capture<J.Literal>({
                 variadic: true,
                 constraint: (nodes) => {
                     // All must be numbers and in ascending order
@@ -137,7 +137,7 @@ describe('Variadic Capture Constraints', () => {
         });
 
         test('constraint can check first/last elements', async () => {
-            const args = capture<J.Literal>('args', {
+            const args = capture<J.Literal>({
                 variadic: true,
                 constraint: (nodes) => {
                     // First and last must be numbers
@@ -168,7 +168,7 @@ describe('Variadic Capture Constraints', () => {
 
     describe('Combined with min/max', () => {
         test('constraint works together with min/max bounds', async () => {
-            const args = capture<J.Literal>('args', {
+            const args = capture<J.Literal>({
                 variadic: { min: 2, max: 4 },
                 constraint: (nodes) => nodes.every(n => typeof n.value === 'number')
             });

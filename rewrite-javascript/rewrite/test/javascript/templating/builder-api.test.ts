@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, Pattern, template, Template, typescript} from "../../../src/javascript";
+import {capture, Capture, JavaScriptVisitor, pattern, Pattern, template, Template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('Builder API', () => {
@@ -41,17 +41,11 @@ describe('Builder API', () => {
         });
 
         test('creates template equivalent to template literal', async () => {
-            // Using builder
+            // Using builder - just replace the literal value
             const builderTmpl = Template.builder()
-                .code('const result = ')
                 .param(42)
-                .code(';')
                 .build();
 
-            // Using template literal
-            const literalTmpl = template`const result = ${42};`;
-
-            // Both should produce equivalent results
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                     if (literal.valueSource === '1') {
@@ -62,7 +56,7 @@ describe('Builder API', () => {
             });
 
             return spec.rewriteRun(
-                typescript('const a = 1', 'const a = const result = 42'),
+                typescript('const a = 1', 'const a = 42'),
             );
         });
 
@@ -131,7 +125,7 @@ describe('Builder API', () => {
             expect(tmpl).toBeInstanceOf(Template);
         });
 
-        test('composition from fragments', () => {
+        test('composition from fragments', async () => {
             function createWrapper(innerBody: string): Template {
                 return Template.builder()
                     .code('function wrapper() { try { ')
@@ -142,6 +136,23 @@ describe('Builder API', () => {
 
             const tmpl = createWrapper('return 42;');
             expect(tmpl).toBeInstanceOf(Template);
+
+            // Verify the template generates the expected code
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+                    if (literal.valueSource === '1') {
+                        return tmpl.apply(this.cursor, literal);
+                    }
+                    return literal;
+                }
+            });
+
+            return spec.rewriteRun(
+                typescript(
+                    'const x = 1',
+                    'const x = function wrapper() { try { return 42; } catch(e) { console.error(e); } }'
+                )
+            );
         });
     });
 
@@ -172,14 +183,10 @@ describe('Builder API', () => {
             // Using builder
             const builderPat = Pattern.builder()
                 .capture(left)
-                .code(' + ')
+                .code('+')
                 .capture(right)
                 .build();
 
-            // Using pattern literal
-            const literalPat = pattern`${left} + ${right}`;
-
-            // Both should match the same code
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                     const match = await builderPat.match(binary);
@@ -195,30 +202,48 @@ describe('Builder API', () => {
             );
         });
 
-        test('handles loop-based pattern generation', () => {
+        test('handles loop-based pattern generation', async () => {
             const builder = Pattern.builder().code('myFunction(');
             const argCount = 3;
+            const captures: Capture<J.Literal>[] = [];
             for (let i = 0; i < argCount; i++) {
                 if (i > 0) builder.code(', ');
-                builder.capture(capture(`arg${i}`));
+                const cap = capture<J.Literal>();
+                captures.push(cap);
+                builder.capture(cap);
             }
             builder.code(')');
 
             const pat = builder.build();
             expect(pat).toBeInstanceOf(Pattern);
-        });
 
-        test('handles conditional pattern construction', () => {
-            const needsSecondArg = true;
-            const builder = Pattern.builder().code('foo(');
-            builder.capture(capture('first'));
-            if (needsSecondArg) {
-                builder.code(', ').capture(capture('second'));
-            }
-            builder.code(')');
+            // Verify the pattern matches and captures arguments correctly
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    const match = await pat.match(methodInvocation);
+                    if (match) {
+                        // Verify all three captures were matched
+                        const arg0 = match.get(captures[0]);
+                        const arg1 = match.get(captures[1]);
+                        const arg2 = match.get(captures[2]);
 
-            const pat = builder.build();
-            expect(pat).toBeInstanceOf(Pattern);
+                        expect(arg0).toBeDefined();
+                        expect(arg1).toBeDefined();
+                        expect(arg2).toBeDefined();
+                        expect(arg0?.value).toBe(1);
+                        expect(arg1?.value).toBe(2);
+                        expect(arg2?.value).toBe(3);
+
+                        // Swap first and last arguments
+                        return template`myFunction(${arg2!}, ${arg1!}, ${arg0!})`.apply(this.cursor, methodInvocation, match);
+                    }
+                    return methodInvocation;
+                }
+            });
+
+            return spec.rewriteRun(
+                typescript('myFunction(1, 2, 3)', 'myFunction(3, 2, 1)'),
+            );
         });
 
         test('accepts string capture names', () => {

@@ -23,7 +23,7 @@ describe('variadic capture basic functionality', () => {
     });
 
     test('variadic: true creates variadic capture with defaults', () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         expect(args.isVariadic()).toBe(true);
 
         const options = args.getVariadicOptions();
@@ -34,13 +34,13 @@ describe('variadic capture basic functionality', () => {
     });
 
     test('variadic with custom separator', () => {
-        const args = capture('args', { variadic: { separator: '; ' } });
+        const args = capture({ variadic: { separator: '; ' } });
         expect(args.isVariadic()).toBe(true);
         expect(args.getVariadicOptions()?.separator).toBe('; ');
     });
 
     test('variadic with min/max bounds', () => {
-        const args = capture('args', { variadic: { min: 1, max: 3 } });
+        const args = capture({ variadic: { min: 1, max: 3 } });
         expect(args.isVariadic()).toBe(true);
 
         const options = args.getVariadicOptions();
@@ -50,7 +50,7 @@ describe('variadic capture basic functionality', () => {
     });
 
     test('variadic with all options', () => {
-        const args = capture('args', {
+        const args = capture({ name: 'args',
             variadic: { separator: ' | ', min: 2, max: 5 }
         });
 
@@ -61,7 +61,7 @@ describe('variadic capture basic functionality', () => {
     });
 
     test('unnamed variadic capture', () => {
-        const args = capture(undefined, { variadic: true });
+        const args = capture({ variadic: true });
         expect(args.isVariadic()).toBe(true);
         expect(args.getName()).toMatch(/^unnamed_\d+$/);
     });

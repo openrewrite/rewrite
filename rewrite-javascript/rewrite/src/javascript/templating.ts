@@ -383,14 +383,11 @@ export interface VariadicOptions {
  * the capture is variadic:
  * - For regular captures: constraint receives a single node of type T
  * - For variadic captures: constraint receives an array of nodes of type T[]
- *
- * Note: The constraint parameter is typed as 'any' to avoid TypeScript union type
- * issues when accessing properties. Type safety is enforced through function overloads.
- * Users should ensure their constraint functions match the variadic setting at runtime.
  */
 export interface CaptureOptions<T = any> {
+    name?: string;
     variadic?: boolean | VariadicOptions;
-    constraint?: (node: any) => boolean;
+    constraint?: (node: T) => boolean;
 }
 
 /**
@@ -706,32 +703,34 @@ class CaptureValue {
  * const method = capture<J.MethodInvocation>('method');
  * template`console.log(${method.name.simpleName})`  // Accesses properties of captured node
  */
-// Overload 1: Regular capture with constraint (most specific - no variadic property)
+// Overload 1: Options object with constraint (no variadic)
 export function capture<T = any>(
-    name: string,
-    options: { constraint: (node: T) => boolean } & { variadic?: never }
+    options: { name?: string; constraint: (node: T) => boolean } & { variadic?: never }
 ): Capture<T> & T;
 
-// Overload 2: Variadic capture with name (explicitly requires variadic property)
+// Overload 2: Options object with variadic
 export function capture<T = any>(
-    name: string,
-    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
+    options: { name?: string; variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
 ): Capture<T[]> & T[];
 
-// Overload 3: Variadic capture without name (explicitly requires variadic property)
-export function capture<T = any>(
-    name: undefined,
-    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; separator?: string; min?: number; max?: number }
-): Capture<T[]> & T[];
-
-// Overload 4: Catch-all for simple captures without special options
-export function capture<T = any>(
-    name?: string,
-    options?: CaptureOptions<T>
-): Capture<T> & T;
+// Overload 3: Just a string name (simple named capture)
+export function capture<T = any>(name?: string): Capture<T> & T;
 
 // Implementation
-export function capture<T = any>(name?: string, options?: CaptureOptions<T>): Capture<T> & T {
+export function capture<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+    let name: string | undefined;
+    let options: CaptureOptions<T> | undefined;
+
+    if (typeof nameOrOptions === 'string') {
+        // Simple named capture: capture('name')
+        name = nameOrOptions;
+        options = undefined;
+    } else {
+        // Options-based API: capture({ name: 'name', ...options }) or capture()
+        options = nameOrOptions;
+        name = options?.name;
+    }
+
     const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
     const impl = new CaptureImpl<T>(captureName, options);
 

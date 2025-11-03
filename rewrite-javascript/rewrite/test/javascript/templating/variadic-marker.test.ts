@@ -26,7 +26,7 @@ describe('variadic marker attachment', () => {
     });
 
     test('variadic capture stores options in capture object', () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         const pat = pattern`foo(${args})`;
 
         // Verify the capture object itself
@@ -35,7 +35,7 @@ describe('variadic marker attachment', () => {
     });
 
     test('variadic capture with custom options stores them correctly', () => {
-        const args = capture('args', {
+        const args = capture({
             variadic: {
                 separator: '; ',
                 min: 1,
@@ -51,7 +51,7 @@ describe('variadic marker attachment', () => {
     });
 
     test('pattern captures array includes variadic capture', () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ name: 'args', variadic: true });
         const pat = pattern`foo(${args})`;
 
         // Pattern should have the captures array

@@ -52,7 +52,7 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageWriter(serverToClient)
         );
         const registry = new RecipeRegistry();
-        activate(registry);
+        activate(registry as any);
         server = new RewriteRpc(serverConnection, {
             registry: registry
         });

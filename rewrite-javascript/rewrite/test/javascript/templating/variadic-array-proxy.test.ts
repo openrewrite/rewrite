@@ -36,7 +36,7 @@ describe('variadic array proxy behavior', () => {
     }
 
     test('access first element with index [0]', () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${args[0]})`));
 
         return spec.rewriteRun(
@@ -45,7 +45,7 @@ describe('variadic array proxy behavior', () => {
     });
 
     test('access second element with index [1]', () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${args[1]})`));
 
         return spec.rewriteRun(
@@ -54,7 +54,7 @@ describe('variadic array proxy behavior', () => {
     });
 
     test('access last element with index [2]', () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${args[2]})`));
 
         return spec.rewriteRun(
@@ -63,7 +63,7 @@ describe('variadic array proxy behavior', () => {
     });
 
     test('slice from index 1', () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${(args.slice(1))})`));
 
         return spec.rewriteRun(
@@ -72,7 +72,7 @@ describe('variadic array proxy behavior', () => {
     });
 
     test('slice with start and end indices', () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${(args.slice(1, 3))})`));
 
         return spec.rewriteRun(
@@ -81,7 +81,7 @@ describe('variadic array proxy behavior', () => {
     });
 
     test('combine first element and slice for rest', () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${args[0]}, ${(args.slice(1))})`));
 
         return spec.rewriteRun(
@@ -90,7 +90,7 @@ describe('variadic array proxy behavior', () => {
     });
 
     test('slice can return empty array', () => {
-        const args = capture<Expression>('args', { variadic: true });
+        const args = capture<Expression>({ variadic: true });
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${(args.slice(10))})`));
 
         return spec.rewriteRun(
@@ -99,7 +99,7 @@ describe('variadic array proxy behavior', () => {
     });
 
     test('reorder arguments using indices', () => {
-        const args = capture<Expression>('args', { variadic: true });
+        const args = capture<Expression>({ variadic: true });
         spec.recipe = fromVisitor(matchAndReplace(
             pattern`foo(${args})`,
             template`bar(${args[1]}, ${args[0]}, ${args.slice(2)})`)

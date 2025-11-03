@@ -26,7 +26,7 @@ describe('variadic pattern matching against real code', () => {
     }
 
     test('variadic capture matches zero arguments', async () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         const pat = pattern`foo(${args})`;
 
         const expr = await parseExpr('foo()');
@@ -42,7 +42,7 @@ describe('variadic pattern matching against real code', () => {
     });
 
     test('variadic capture matches single argument', async () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         const pat = pattern`foo(${args})`;
 
         const expr = await parseExpr('foo(42)');
@@ -56,7 +56,7 @@ describe('variadic pattern matching against real code', () => {
     });
 
     test('variadic capture matches multiple arguments', async () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         const pat = pattern`foo(${args})`;
 
         const expr = await parseExpr('foo(1, 2, 3)');
@@ -71,7 +71,7 @@ describe('variadic pattern matching against real code', () => {
 
     test('required first argument + variadic rest', async () => {
         const first = capture('first');
-        const rest = capture('rest', { variadic: true });
+        const rest = capture({ variadic: true });
         const pat = pattern`foo(${first}, ${rest})`;
 
         // Should NOT match foo() - missing required first
@@ -95,7 +95,7 @@ describe('variadic pattern matching against real code', () => {
     });
 
     test('variadic with min constraint', async () => {
-        const args = capture('args', { variadic: { min: 2 } });
+        const args = capture({ variadic: { min: 2 } });
         const pat = pattern`foo(${args})`;
 
         // Should NOT match foo() - min not satisfied
@@ -112,7 +112,7 @@ describe('variadic pattern matching against real code', () => {
     });
 
     test('variadic with max constraint', async () => {
-        const args = capture('args', { variadic: { max: 2 } });
+        const args = capture({ variadic: { max: 2 } });
         const pat = pattern`foo(${args})`;
 
         // Should match foo() - within max
@@ -126,7 +126,7 @@ describe('variadic pattern matching against real code', () => {
     });
 
     test('variadic with min and max constraints', async () => {
-        const args = capture('args', { variadic: { min: 1, max: 2 } });
+        const args = capture({ variadic: { min: 1, max: 2 } });
         const pat = pattern`foo(${args})`;
 
         // Should NOT match foo() - below min
@@ -144,7 +144,7 @@ describe('variadic pattern matching against real code', () => {
 
     test('pattern with regular captures and variadic', async () => {
         const first = capture('first');
-        const middle = capture('middle', { variadic: true });
+        const middle = capture({ variadic: true });
         const last = capture('last');
         const pat = pattern`foo(${first}, ${middle}, ${last})`;
 
@@ -171,7 +171,7 @@ describe('variadic pattern matching against real code', () => {
     });
 
     test('variadic does not match different method name', async () => {
-        const args = capture('args', { variadic: true });
+        const args = capture({ variadic: true });
         const pat = pattern`foo(${args})`;
 
         const result = await pat.match(await parseExpr('bar(1, 2, 3)'));
