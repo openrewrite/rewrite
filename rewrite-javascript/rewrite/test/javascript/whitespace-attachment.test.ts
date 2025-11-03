@@ -19,6 +19,15 @@ import {MarkerPrinter, PrintOutputCapture} from "../../src/print";
 import {J} from "../../src/java";
 import {Tree} from "../../src/tree";
 
+function prettifyKind(kind: string): string {
+    const match = kind.match(/\.([A-Z]+)\$(.+)$/);
+    if (match) {
+        return `${match[1]}.${match[2]}`;
+    }
+    return kind;
+}
+
+
 class OutputNode {
     constructor(
         public readonly element: Tree,
@@ -37,15 +46,6 @@ class OutputNode {
                 return child.toString();
             }
         }).join(', ');
-
-        // Prettify the kind: org.openrewrite.javascript.tree.JS$CompilationUnit -> JS.CompilationUnit
-        const prettifyKind = (kind: string): string => {
-            const match = kind.match(/\.([A-Z]+)\$(.+)$/);
-            if (match) {
-                return `${match[1]}.${match[2]}`;
-            }
-            return kind;
-        };
 
         return `${prettifyKind(this.element.kind)}{${childrenStr}}`;
     }
@@ -123,6 +123,42 @@ class TreeCapturingJavaScriptPrinter extends JavaScriptPrinter {
     }
 }
 
+function findWhitespaceViolations(rootNodes: OutputNode[]): string[] {
+    const violations: string[] = [];
+
+    function checkNode(node: OutputNode, path: string = 'root'): void {
+        if (node.children.length > 0) {
+            const firstChild = node.children[0];
+
+            // Check if first child is a node (not text)
+            if (firstChild instanceof OutputNode) {
+                // Check if the grandchild exists and is text with non-empty whitespace
+                if (firstChild.children.length > 0) {
+                    const grandchild = firstChild.children[0];
+                    if (typeof grandchild === 'string' && grandchild.trim() === '' && grandchild.length > 0) {
+                        const parentKind = prettifyKind(node.element.kind);
+                        const childKind = prettifyKind(firstChild.element.kind);
+                        violations.push(`${parentKind} has child ${childKind} starting with whitespace |${grandchild}|. The whitespace should rather be attached to ${parentKind}.`);
+                    }
+                }
+            }
+        }
+
+        // Recursively check all child nodes
+        node.children.forEach((child, index) => {
+            if (child instanceof OutputNode) {
+                checkNode(child, `${path}[${index}]`);
+            }
+        });
+    }
+
+    rootNodes.forEach((node, index) => {
+        checkNode(node, `root[${index}]`);
+    });
+
+    return violations;
+}
+
 describe('whitespace attachment', () => {
     test('simple variable declaration', async () => {
         // given
@@ -136,41 +172,7 @@ describe('whitespace attachment', () => {
         await printer.visit(cu, capture);
 
         // then
-        // Check for problematic whitespace attachment:
-        // - a node starts
-        // - its first child is another node (not text)
-        // - the first child of that child (grandchild) is text containing non-empty whitespace
-        process.stdout.write(capture.rootNodes[0].toString());
-        const violations: string[] = [];
-
-        function checkNode(node: OutputNode, path: string = 'root'): void {
-            if (node.children.length > 0) {
-                const firstChild = node.children[0];
-
-                // Check if first child is a node (not text)
-                if (firstChild instanceof OutputNode) {
-                    // Check if the grandchild exists and is text with non-empty whitespace
-                    if (firstChild.children.length > 0) {
-                        const grandchild = firstChild.children[0];
-                        if (typeof grandchild === 'string' && grandchild.trim() === '' && grandchild.length > 0) {
-                            violations.push(`${path} -> Node -> "${grandchild}"`);
-                        }
-                    }
-                }
-            }
-
-            // Recursively check all child nodes
-            node.children.forEach((child, index) => {
-                if (child instanceof OutputNode) {
-                    checkNode(child, `${path}[${index}]`);
-                }
-            });
-        }
-
-        capture.rootNodes.forEach((node, index) => {
-            checkNode(node, `root[${index}]`);
-        });
-
+        const violations = findWhitespaceViolations(capture.rootNodes);
         expect(violations).toEqual([]);
     });
 });
