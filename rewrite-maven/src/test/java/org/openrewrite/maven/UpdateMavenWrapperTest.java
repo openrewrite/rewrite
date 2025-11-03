@@ -45,6 +45,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.utilities.MavenWrapper.*;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.*;
@@ -92,6 +93,15 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>1.0.0</version>
+              </project>
+              """
+          ),
           properties(
             doesNotExist(),
             withLicenseHeader("""
@@ -126,6 +136,15 @@ class UpdateMavenWrapperTest implements RewriteTest {
               assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
               assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
           }),
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>1.0.0</version>
+              </project>
+              """
+          ),
           properties(
             doesNotExist(),
             withLicenseHeader("""
@@ -277,6 +296,109 @@ class UpdateMavenWrapperTest implements RewriteTest {
     }
 
     @Test
+    void doesNotAddWrapperToNonMavenProject() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
+            .afterRecipe(run ->
+              assertThat(run.getChangeset().getAllResults()).isEmpty()
+            ),
+          text(
+            """
+              Some random file content
+              """
+          )
+        );
+    }
+
+    /**
+     * When multiple independent Maven projects exist in subdirectories without a root {@code pom.xml},
+     * the recipe adds wrapper files at the root level. This allows all subprojects to use
+     * the same wrapper from the repository root.
+     */
+    @Test
+    void addsWrapperToRootWhenMultipleIndependentMavenProjectsExist() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
+            .expectedCyclesThatMakeChanges(1)
+            .afterRecipe(run -> {
+                assertThat(run.getChangeset().getAllResults()).hasSize(4);
+
+                // Verify wrapper files are added at root, not in subdirectories
+                var mvnw = run.getChangeset().getAllResults().stream()
+                  .map(Result::getAfter)
+                  .filter(Objects::nonNull)
+                  .filter(r -> r.getSourcePath().endsWith("mvnw"))
+                  .findFirst();
+                assertThat(mvnw).isPresent();
+                assertThat(mvnw.get().getSourcePath().toString()).isEqualTo("mvnw");
+
+                var mavenWrapperJar = run.getChangeset().getAllResults().stream()
+                  .map(Result::getAfter)
+                  .filter(Objects::nonNull)
+                  .filter(r -> r.getSourcePath().endsWith("maven-wrapper.jar"))
+                  .findFirst();
+                assertThat(mavenWrapperJar).isPresent();
+                assertThat(mavenWrapperJar.get().getSourcePath().toString()).isEqualTo(".mvn/wrapper/maven-wrapper.jar");
+
+                var mvnwCmd = run.getChangeset().getAllResults().stream()
+                  .map(Result::getAfter)
+                  .filter(Objects::nonNull)
+                  .filter(r -> r.getSourcePath().endsWith("mvnw.cmd"))
+                  .findFirst();
+                assertThat(mvnwCmd).isPresent();
+
+                var properties = run.getChangeset().getAllResults().stream()
+                  .map(Result::getAfter)
+                  .filter(Objects::nonNull)
+                  .filter(r -> r.getSourcePath().endsWith("maven-wrapper.properties"))
+                  .findFirst();
+                assertThat(properties).isPresent();
+
+                // Verify subdirectories do NOT contain wrapper files
+                var filesInProjectA = run.getChangeset().getAllResults().stream()
+                  .map(Result::getAfter)
+                  .filter(Objects::nonNull)
+                  .filter(r -> r.getSourcePath().toString().startsWith("project-a/") &&
+                               (r.getSourcePath().toString().contains("mvnw") ||
+                                r.getSourcePath().toString().contains("maven-wrapper")))
+                  .toList();
+                assertThat(filesInProjectA).isEmpty();
+
+                var filesInProjectB = run.getChangeset().getAllResults().stream()
+                  .map(Result::getAfter)
+                  .filter(Objects::nonNull)
+                  .filter(r -> r.getSourcePath().toString().startsWith("project-b/") &&
+                               (r.getSourcePath().toString().contains("mvnw") ||
+                                r.getSourcePath().toString().contains("maven-wrapper")))
+                  .toList();
+                assertThat(filesInProjectB).isEmpty();
+            }),
+          dir("project-a",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>project-a</artifactId>
+                  <version>1.0.0</version>
+                </project>
+                """
+            )
+          ),
+          dir("project-b",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>project-b</artifactId>
+                  <version>1.0.0</version>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void updateWrapperInSubDirectory() {
         rewriteRun(
           spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
@@ -327,6 +449,27 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwDownloaderJava.getSourcePath()).isEqualTo(WRAPPER_DOWNLOADER_LOCATION);
                 assertThat(mvnwDownloaderJava.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper-distribution/3.1.1/maven-wrapper-distribution-3.1.1-source.zip"));
             }),
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>1.0.0</version>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>1.0.0</version>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pom ->
+              assertThat(pom.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
+                  assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Maven);
+                  assertThat(buildTool.getVersion()).isEqualTo("3.8.9");
+              }))
+          ),
           properties(
             withLicenseHeader("""
               distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
