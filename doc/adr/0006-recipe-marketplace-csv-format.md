@@ -91,6 +91,27 @@ When a CSV contains multiple top-level categories, a synthetic "epsilon root" (`
   - `NpmRecipeBundleLoader` in `rewrite-javascript`: Creates `NpmRecipeBundle` instances
   - `RecipeBundleLoader` interface allows additional ecosystems to be added without modifying core
 
+- **Generator**: `MavenRecipeMarketplaceGenerator` in `rewrite-maven`
+  - Generates `RecipeMarketplace` from recipe JARs by scanning classpath and extracting recipe metadata
+  - Automatically determines categories from recipe package names and `CategoryDescriptor` annotations
+  - Creates bundle information from GAV coordinates
+  - Distinguishes between YAML-based declarative recipes and Java class-based recipes
+  - Useful for generating initial CSV files from existing recipe JARs
+
+- **Validators**: Tools for ensuring marketplace quality and completeness
+  - `RecipeMarketplaceContentValidator` in `rewrite-core`: Validates content formatting rules
+    - Display names must start with uppercase and not end with a period
+    - Descriptions must end with a period
+    - Returns `Validated<RecipeMarketplace>` with all formatting errors found
+    - Recursively validates all categories and recipes in the hierarchy
+  - `RecipeMarketplaceCompletenessValidator` in `rewrite-core`: Validates CSV ↔ JAR synchronization
+    - Ensures every recipe in CSV exists in the JAR's `Environment`
+    - Ensures every recipe in the JAR has at least one entry in the CSV
+    - Detects "phantom recipes" (in CSV but not in JAR) and "missing recipes" (in JAR but not in CSV)
+    - Returns `Validated<RecipeMarketplace>` with all completeness errors found
+    - Uses `RecipeMarketplace.getAllRecipes()` to handle recipes appearing in multiple categories
+    - Intended to prevent CSV from becoming stale as recipes are added/removed from source code
+
 ## Consequences
 
 ### Positive
@@ -102,13 +123,14 @@ When a CSV contains multiple top-level categories, a synthetic "epsilon root" (`
 5. **Round-trip compatible**: Reader and writer preserve all information
 6. **Familiar pattern**: Mirrors `moderne-organizations-format` conventions, reducing learning curve
 7. **Extensible bundle loading**: RecipeBundleLoader interface allows new package ecosystems to be added without modifying core modules
+8. **Automated generation**: `MavenRecipeMarketplaceGenerator` can automatically create CSV files from recipe JARs
+9. **Quality assurance**: Validators ensure content quality (formatting) and completeness (CSV ↔ JAR synchronization)
 
 ### Negative
 
 1. **CSV limitations**: No native support for nested structures (mitigated by column naming conventions)
 2. **Sparse data**: Recipes with few options result in many empty cells in CSVs with high option counts
-3. **Manual maintenance**: Keeping bundle information synchronized with actual artifact versions requires tooling
-4. **No validation**: CSV format doesn't enforce recipe name uniqueness or category integrity
+3. **Manual maintenance**: Keeping bundle information synchronized with actual artifact versions requires tooling (though `MavenRecipeMarketplaceGenerator` and validators help address this)
 
 ### Trade-offs
 

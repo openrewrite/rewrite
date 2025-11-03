@@ -19,19 +19,23 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.graph.DependencyGraph;
 import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -107,16 +111,39 @@ public class DependencyInsight extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Scope aScope = (scope == null) ? null : Scope.fromName(scope);
+        Scope requestedScope = scope == null ? null : Scope.fromName(scope);
 
         return new MavenIsoVisitor<ExecutionContext>() {
+            final DependencyGraph dependencyGraph = new DependencyGraph();
+            final Map<String, Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>>> pathsByScope = new HashMap<>();
+
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                // Collect dependency paths for each scope separately to avoid non-deterministic HashMap iteration
+                if (requestedScope != null) {
+                    List<ResolvedDependency> dependencies = getResolutionResult().getDependencies().get(requestedScope);
+                    if (dependencies != null) {
+                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
+                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, requestedScope.name().toLowerCase());
+                        pathsByScope.put(requestedScope.name().toLowerCase(), projectPaths);
+                    }
+                } else {
+                    getResolutionResult().getDependencies().forEach((scope, dependencies) -> {
+                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
+                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, scope.name().toLowerCase());
+                        pathsByScope.put(scope.name().toLowerCase(), projectPaths);
+                    });
+                }
+                return super.visitDocument(document, ctx);
+            }
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if(!isDependencyTag()) {
                     return t;
                 }
-                ResolvedDependency dependency = findDependency(t, aScope);
+                ResolvedDependency dependency = findDependency(t, requestedScope);
                 if(dependency == null) {
                     return t;
                 }
@@ -147,6 +174,21 @@ public class DependencyInsight extends Recipe {
                 Optional<JavaSourceSet> javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
                         .findFirst(JavaSourceSet.class);
 
+                Scope matchScope = Scope.fromName(match.getRequested().getScope());
+                String matchScopeName = matchScope.name().toLowerCase();
+
+                // Get the paths for this specific scope
+                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths =
+                        pathsByScope.getOrDefault(matchScopeName, new HashMap<>());
+
+                // Build the dependency graph string
+                String depGraph = dependencyGraph.buildDependencyGraph(
+                        match.getGav(),
+                        projectPaths,
+                        match.getDepth(),
+                        matchScopeName
+                );
+
                 dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                         javaProject.map(JavaProject::getProjectName).orElse(""),
                         javaSourceSet.map(JavaSourceSet::getName).orElse("main"),
@@ -154,9 +196,9 @@ public class DependencyInsight extends Recipe {
                         match.getArtifactId(),
                         match.getVersion(),
                         match.getDatedSnapshotVersion(),
-                        StringUtils.isBlank(match.getRequested().getScope()) ? "compile" :
-                                match.getRequested().getScope(),
-                        match.getDepth()
+                        matchScopeName,
+                        match.getDepth(),
+                        depGraph
                 ));
 
                 return t;

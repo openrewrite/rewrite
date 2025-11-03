@@ -32,6 +32,6 @@ public class YamlRecipeBundleLoader implements RecipeBundleLoader {
 
     @Override
     public @Nullable RecipeBundle createBundle(String packageName, String version, @Nullable String team) {
-        return new YamlRecipeBundle(URI.create(packageName), properties, team);
+        return new YamlRecipeBundle(URI.create(packageName), version, properties, team);
     }
 }

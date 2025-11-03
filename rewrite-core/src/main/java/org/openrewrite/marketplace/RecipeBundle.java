@@ -26,7 +26,7 @@ public interface RecipeBundle {
 
     String getPackageName();
 
-    String getVersion();
+    @Nullable String getVersion();
 
     /**
      * @return Teams partitioning of a recipe marketplace can be used

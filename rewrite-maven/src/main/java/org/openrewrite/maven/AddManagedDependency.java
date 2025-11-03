@@ -21,7 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.InlineMe;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
@@ -114,7 +113,6 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
     String because;
 
     @Deprecated
-    @InlineMe(replacement = "this(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, null)")
     public AddManagedDependency(String groupId,
                                 String artifactId,
                                 String version,
