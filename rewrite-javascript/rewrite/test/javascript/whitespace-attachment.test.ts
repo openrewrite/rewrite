@@ -160,10 +160,12 @@ function findWhitespaceViolations(rootNodes: OutputNode[]): string[] {
 }
 
 describe('whitespace attachment', () => {
-    test('simple variable declaration', async () => {
+    test.each([
+        "const c =  function(): number { return 116; };",
+        "const x = new Date();"
+    ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();
-        const sourceCode = "const c =  function(): number { return 116; };";
         const cu = await (await parser.parse({text: sourceCode, sourcePath: 'test.ts'}).next()).value;
         const capture = new TreeStructurePrintOutputCapture(MarkerPrinter.SANITIZED);
         const printer = new TreeCapturingJavaScriptPrinter();
