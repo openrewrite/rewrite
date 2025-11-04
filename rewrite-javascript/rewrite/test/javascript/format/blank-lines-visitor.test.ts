@@ -158,4 +158,20 @@ describe('BlankLinesVisitor', () => {
             // @formatter:on
         );
     });
+
+    test('just a function', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                    function foo(x) {
+                        return x;
+                    }
+                    `
+                )
+            // @formatter:on
+        );
+    });
 });

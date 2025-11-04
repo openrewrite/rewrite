@@ -941,7 +941,8 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             tree = produce(tree as JS.StatementExpression, draft => {
                 this.ensurePrefixHasNewLine(draft);
             });
-        } else if (tree.kind === J.Kind.MethodDeclaration && this.cursor.value.kind != JS.Kind.StatementExpression) {
+        } else if (tree.kind === J.Kind.MethodDeclaration && this.cursor.value.kind != JS.Kind.StatementExpression
+            && (this.cursor.parent?.value.kind != JS.Kind.CompilationUnit || (this.cursor.parent?.value as JS.CompilationUnit).statements[0].element !== tree)) {
             tree = produce(tree as J.MethodDeclaration, draft => {
                 this.ensurePrefixHasNewLine(draft);
             });
