@@ -29,7 +29,11 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.function.Function;
+
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.java;
 
 /**
@@ -424,19 +428,19 @@ class SourcePositionServiceTest implements RewriteTest {
                           assertResult(10, 4, 15, 5, 60); // calculate the span as is.
                           assertMinimizedResult(10, 4, 13, 5, 76); // collapsing the method args to a single line using minimized (correctly calculate a span after changing an element)
                           assertResult(method.getPadding().getParameters(), 10, 54, 12, 17, 60); // calculate the span of the parameters within the declaration
-                          assertMinimizedResult(method.getPadding().getParameters(), 10, 54, 10, 73, 73); // calculate the span of the parameters after minimization (correctly calculate a nested span after changing an element)
+                          assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 10, 54, 10, 73, 73); // calculate the span of the parameters after minimization (correctly calculate a nested span after changing an element)
                           break;
                       case "example2":
                           assertResult(17, 4, 20, 5, 76);
                           assertMinimizedResult(17, 4, 20, 5, 76);
                           assertResult(method.getPadding().getParameters(), 17, 54, 17, 73, 73);
-                          assertMinimizedResult(method.getPadding().getParameters(), 17, 54, 17, 73, 73);
+                          assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 17, 54, 17, 73, 73);
                           break;
                       case "someVeryLongMethodNameThatIsAsLongAsTheMethodsAbove":
                           assertResult(22, 4, 25, 5, 74);
                           assertMinimizedResult(22, 4, 24, 5, 76); // minimization moves the opening curly causing the end-line to shift by 1 and the maxColumn by 2
                           assertResult(method.getPadding().getParameters(), 23, 68, 23, 73, 73);
-                          assertMinimizedResult(method.getPadding().getParameters(), 23, 68, 23, 73, 73);
+                          assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 23, 68, 23, 73, 73);
                           break;
                   }
                   return super.visitMethodDeclaration(method, ctx);
@@ -482,8 +486,9 @@ class SourcePositionServiceTest implements RewriteTest {
                     .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).build());
               }
 
-              private void assertMinimizedResult(JContainer<Statement> j, int line, int column, int endLine, int endColumn, int maxColumn) {
-                  assertThat(service.positionOf(new Cursor(getCursor().getParent(), minimize(getCursor().getValue())), j))
+              private void assertMinimizedResult(Function<J, JContainer<Statement>> find, int line, int column, int endLine, int endColumn, int maxColumn) {
+                  J minimized = minimize(getCursor().getValue());
+                  assertThat(service.positionOf(new Cursor(getCursor().getParent(), minimized), find.apply(minimized)))
                     .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).build());
               }
           })),
@@ -521,6 +526,62 @@ class SourcePositionServiceTest implements RewriteTest {
                   }
               
                   record RecordDeclaration(int f) { /* We only count till the opening curly (incl if on same line) and not the block's end Space / closing curly. */ }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void semanticallyEqualDoesNotMatchWrongBlock() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              SourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(SourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "x".equals(v.getSimpleName()))) {
+                      J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
+                      if (method != null) {
+                          if ("method1".equals(method.getSimpleName())) {
+                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(6).startColumn(8).endLine(6).maxColumn(17).endColumn(17).build());
+                              J.VariableDeclarations removedComment = multiVariable.withPrefix(multiVariable.getPrefix().withComments(emptyList()));
+                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment))).isEqualTo(Span.builder().startLine(5).startColumn(8).endLine(5).maxColumn(17).endColumn(17).build());
+                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment), removedComment)).isEqualTo(Span.builder().startLine(5).startColumn(8).endLine(5).maxColumn(17).endColumn(17).build());
+
+                              //When the cursor does not contain the referential equal object, we throw
+                              assertThrows(IllegalArgumentException.class, () -> assertThat(service.positionOf(getCursor(), removedComment)));
+                              assertThrows(IllegalArgumentException.class, () -> assertThat(service.positionOf(getCursor().getParentTreeCursor(), removedComment)));
+                          }
+                          if ("method2".equals(method.getSimpleName())) {
+                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(10).startColumn(8).endLine(10).maxColumn(17).endColumn(17).build());
+                          }
+                      }
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+              package com.example;
+
+              public class Test {
+                  public void method1() {
+                      //Some comment
+                      int x = 1;
+                  }
+
+                  public void method2() {
+                      int x = 1;
+                  }
               }
               """
           )

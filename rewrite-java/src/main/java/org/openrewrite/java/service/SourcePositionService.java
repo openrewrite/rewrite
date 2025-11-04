@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.service;
 
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -133,6 +134,7 @@ public class SourcePositionService {
 
     /**
      * Computes the position span of the element at the given cursor.
+     *
      * @see #positionOfChild(Cursor, Object)
      */
     public Span positionOf(Cursor cursor) {
@@ -141,6 +143,7 @@ public class SourcePositionService {
 
     /**
      * Computes the position span of a container element.
+     *
      * @see #positionOfChild(Cursor, Object)
      */
     public Span positionOf(Cursor cursor, JContainer<? extends J> container) {
@@ -149,6 +152,7 @@ public class SourcePositionService {
 
     /**
      * Computes the position span of a right-padded element.
+     *
      * @see #positionOfChild(Cursor, Object)
      */
     public Span positionOf(Cursor cursor, JRightPadded<J> rightPadded) {
@@ -157,6 +161,7 @@ public class SourcePositionService {
 
     /**
      * Computes the position span of a J element.
+     *
      * @see #positionOfChild(Cursor, Object)
      */
     public Span positionOf(Cursor cursor, J child) {
@@ -311,9 +316,11 @@ public class SourcePositionService {
         AtomicBoolean printing = new AtomicBoolean(false);
         AtomicBoolean found = new AtomicBoolean(false);
         JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
+            J foundJ = null;
+
             @Override
             protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                if (findJContainer != null && getCursor().getPathAsStream().anyMatch(c -> c == cursor.getValue()) && semanticallyEqual(nodes, findJContainer.getPadding().getElements())) {
+                if (findJContainer != null && nodes == findJContainer.getPadding().getElements()) {
                     printing.set(true);
                     p.append(START_FIND);
                     for (int i = 0; i < nodes.size(); i++) {
@@ -337,7 +344,7 @@ public class SourcePositionService {
 
             @Override
             protected void visitRightPadded(@Nullable JRightPadded<? extends J> rightPadded, JRightPadded.Location location, @Nullable String suffix, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                if (findJRightPadded != null && (rightPadded == findJRightPadded || SemanticallyEqual.areEqual(rightPadded.getElement(), findJRightPadded.getElement()))) {
+                if (findJRightPadded != null && rightPadded == findJRightPadded) {
                     printing.set(true);
                     p.append(START_FIND);
                     super.visitRightPadded(rightPadded, location, suffix, p);
@@ -348,42 +355,38 @@ public class SourcePositionService {
             }
 
             @Override
-            public @Nullable J visit(@Nullable Tree tree, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+            public @Nullable J preVisit(@NonNull J tree, PrintOutputCapture<TreeVisitor<?, ?>> p) {
                 if (found.get()) {
-                    return (J) tree;
+                    stopAfterPreVisit();
                 }
-                if (tree instanceof J && (tree == cursor.getValue() || SemanticallyEqual.areEqual((J) tree, cursor.getValue()))) {
+
+                if (tree != cursor.getValue() && SemanticallyEqual.areEqual(tree, cursor.getValue()) && cursor.getParentTreeCursor().getValue() == getCursor().getParentTreeCursor().getValue()) {
+                    setCursor(cursor);
                     tree = cursor.getValue();
                 }
-                if (findJ != null && (tree == findJ || (tree instanceof J && SemanticallyEqual.areEqual((J) tree, findJ)))) {
+                if (findJ != null && tree == findJ) {
                     printing.set(true);
                     p.append(START_FIND);
-                    tree = super.visit(startFind((J) tree), p);
-                    found.set(true);
-                    return (J) tree;
+                    foundJ = startFind(tree);
+                    tree = foundJ;
                 }
-                return super.visit(tree, p);
+                return super.preVisit(tree, p);
+            }
+
+            @Override
+            public @Nullable J postVisit(@NonNull J tree, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                if (tree == foundJ) {
+                    found.set(true);
+                }
+                return super.postVisit(tree, p);
             }
 
             private J startFind(J tree) {
-                return tree.withPrefix(tree.getPrefix()
-                        .withWhitespace(tree.getPrefix().getWhitespace().replace("\n", "\n" + START_FIND))
-                        .withComments(ListUtils.map(tree.getComments(), c -> c.withSuffix(c.getSuffix().replace("\n", "\n" + START_FIND))))
-                );
-            }
-
-            private boolean semanticallyEqual(@Nullable List<? extends JRightPadded<? extends J>> left, @Nullable List<JRightPadded<J>> right) {
-                if (left != null && right != null) {
-                    if (left.size() == right.size()) {
-                        for (int i = 0; i < left.size(); i++) {
-                            if (!SemanticallyEqual.areEqual(left.get(i).getElement(), right.get(i).getElement())) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
-                }
-                return false;
+                return tree
+                        .withPrefix(tree.getPrefix()
+                                .withWhitespace(tree.getPrefix().getWhitespace().replace("\n", "\n" + START_FIND))
+                                .withComments(ListUtils.map(tree.getComments(), c -> c.withSuffix(c.getSuffix().replace("\n", "\n" + START_FIND))))
+                        );
             }
         };
         PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<TreeVisitor<?, ?>>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED) {
@@ -477,8 +480,7 @@ public class SourcePositionService {
                         }
                         col = 0;
                     }
-                }
-                else {
+                } else {
                     col++;
                 }
             }
@@ -494,7 +496,7 @@ public class SourcePositionService {
                     .maxColumn(maxColumn)
                     .build();
         } else {
-            throw new IllegalArgumentException("The child was not found in the sourceFile.");
+            throw new IllegalArgumentException("The child was not found in the sourceFile. Are you sure the passed in cursor's value contains the child and you are not searching for a mutated element in a non-mutated Cursor value?");
         }
     }
 }
