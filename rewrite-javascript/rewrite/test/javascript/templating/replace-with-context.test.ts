@@ -31,7 +31,7 @@ describe('replace with context', () => {
 
     describe('new replace API', () => {
         test('multiple patterns replacement', async () => {
-            const normalizeComparisons = rewrite<J.Binary>(() => ({
+            const normalizeComparisons = rewrite(() => ({
                 before: [
                     pattern`${"left"} == ${"right"}`,
                     pattern`${"left"} != ${"right"}`
@@ -63,7 +63,7 @@ describe('replace with context', () => {
         });
 
         test('captures work across patterns and template', async () => {
-            const rule = rewrite<J.Binary>(() => {
+            const rule = rewrite(() => {
                 const {expr} = {expr: capture()};
                 return {
                     before: [
@@ -91,7 +91,7 @@ describe('replace with context', () => {
 
         test('error handling for missing properties', () => {
             expect(() => {
-                rewrite<J.Binary>(() => {
+                rewrite(() => {
                     return {} as any;
                 });
             }).toThrow('Builder function must return an object with before and after properties');

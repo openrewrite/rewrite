@@ -1088,8 +1088,8 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             expression: await q.receive(instanceOf.expression, expr => this.visitRightPadded(expr, q)),
             class: await q.receive(instanceOf.class, clazz => this.visit(clazz, q)),
             pattern: await q.receive(instanceOf.pattern, pattern => this.visit(pattern, q)),
-            modifier: await q.receive(instanceOf.modifier, mod => this.visit(mod, q)),
-            type: await q.receive(instanceOf.type, type => this.visitType(type, q))
+            type: await q.receive(instanceOf.type, type => this.visitType(type, q)),
+            modifier: await q.receive(instanceOf.modifier, mod => this.visit(mod, q))
         };
         return updateIfChanged(instanceOf, updates);
     }

@@ -169,4 +169,70 @@ class FindFieldsOfTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findsMatchingPrimitive() {
+        rewriteRun(
+          spec -> spec.recipe(new FindFieldsOfType("boolean", null)),
+          //language=java
+          java(
+            """
+              public class A {
+                  private boolean x;
+                  private Boolean y;
+              }
+              """,
+            """
+              public class A {
+                  /*~~>*/private boolean x;
+                  private Boolean y;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findsMatchingPrimitiveObjects() {
+        rewriteRun(
+          spec -> spec.recipe(new FindFieldsOfType("java.lang.Boolean", null)),
+          //language=java
+          java(
+            """
+              public class A {
+                  private boolean x;
+                  private Boolean y;
+              }
+              """,
+            """
+              public class A {
+                  private boolean x;
+                  /*~~>*/private Boolean y;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findsMatchingPrimitiveObjectsFromSimpleName() {
+        rewriteRun(
+          spec -> spec.recipe(new FindFieldsOfType("Boolean", null)),
+          //language=java
+          java(
+            """
+              public class A {
+                  private boolean x;
+                  private Boolean y;
+              }
+              """,
+            """
+              public class A {
+                  private boolean x;
+                  /*~~>*/private Boolean y;
+              }
+              """
+          )
+        );
+    }
 }

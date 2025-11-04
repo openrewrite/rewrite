@@ -21,8 +21,8 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
@@ -30,7 +30,6 @@ import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.InlineMe;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -132,7 +131,6 @@ public class ChangeDependency extends Recipe {
         this.changeManagedDependency = changeManagedDependency;
     }
 
-    @InlineMe(replacement = "this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, overrideManagedVersion, true)")
     public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion) {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, overrideManagedVersion, true);
     }
@@ -176,6 +174,7 @@ public class ChangeDependency extends Recipe {
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new JavaIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
 
+            @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
             @Override
@@ -195,7 +194,7 @@ public class ChangeDependency extends Recipe {
                     gradleProject = maybeGp.get();
 
                     sourceFile = (JavaSourceFile) super.visit(sourceFile, ctx);
-                    if (sourceFile != tree) {
+                    if (sourceFile != null && sourceFile != tree) {
                         sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject)));
                         if (changeManagedDependency == null || changeManagedDependency) {
                             doAfterVisit(new ChangeManagedDependency(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern).getVisitor());
@@ -236,14 +235,14 @@ public class ChangeDependency extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
-                        Dependency original = DependencyStringNotationConverter.parse(gav);
+                        Dependency original = DependencyNotation.parse(gav);
                         if (original != null) {
                             Dependency updated = original;
-                            if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
-                                updated = updated.withGroupId(newGroupId);
+                            if (!StringUtils.isBlank(newGroupId) && !Objects.equals(updated.getGroupId(), newGroupId)) {
+                                updated = updated.withGav(updated.getGav().withGroupId(newGroupId));
                             }
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
-                                updated = updated.withArtifactId(newArtifactId);
+                                updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
                             if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(original.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
                                 String resolvedVersion;
@@ -254,11 +253,11 @@ public class ChangeDependency extends Recipe {
                                     return e.warn(m);
                                 }
                                 if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
-                                    updated = updated.withVersion(resolvedVersion);
+                                    updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
                                 }
                             }
                             if (original != updated) {
-                                String replacement = updated.toStringNotation();
+                                String replacement = DependencyNotation.toStringNotation(updated);
                                 m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, replacement)));
                             }
                         }
@@ -270,14 +269,14 @@ public class ChangeDependency extends Recipe {
                             ((J.Literal) strings.get(0)).getValue() != null) {
 
                         J.Literal literal = (J.Literal) strings.get(0);
-                        Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
+                        Dependency original = DependencyNotation.parse((String) requireNonNull(literal.getValue()));
                         if (original != null) {
                             Dependency updated = original;
-                            if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
-                                updated = updated.withGroupId(newGroupId);
+                            if (!StringUtils.isBlank(newGroupId) && !Objects.equals(updated.getGroupId(), newGroupId)) {
+                                updated = updated.withGav(updated.getGav().withGroupId(newGroupId));
                             }
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
-                                updated = updated.withArtifactId(newArtifactId);
+                                updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
                             if (!StringUtils.isBlank(newVersion)) {
                                 String resolvedVersion;
@@ -288,11 +287,11 @@ public class ChangeDependency extends Recipe {
                                     return e.warn(m);
                                 }
                                 if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
-                                    updated = updated.withVersion(resolvedVersion);
+                                    updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
                                 }
                             }
                             if (original != updated) {
-                                String replacement = updated.toStringNotation();
+                                String replacement = DependencyNotation.toStringNotation(updated);
                                 J.Literal newLiteral = literal.withValue(replacement)
                                         .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
                                 m = m.withArguments(singletonList(newLiteral));
@@ -563,14 +562,14 @@ public class ChangeDependency extends Recipe {
                             ((J.Literal) strings.get(0)).getValue() != null) {
 
                         J.Literal literal = (J.Literal) strings.get(0);
-                        Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
+                        Dependency original = DependencyNotation.parse((String) requireNonNull(literal.getValue()));
                         if (original != null) {
                             Dependency updated = original;
-                            if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
-                                updated = updated.withGroupId(newGroupId);
+                            if (!StringUtils.isBlank(newGroupId) && !Objects.equals(updated.getGroupId(), newGroupId)) {
+                                updated = updated.withGav(updated.getGav().withGroupId(newGroupId));
                             }
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
-                                updated = updated.withArtifactId(newArtifactId);
+                                updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
                             if (!StringUtils.isBlank(newVersion)) {
                                 String resolvedVersion;
@@ -581,11 +580,11 @@ public class ChangeDependency extends Recipe {
                                     return e.warn(m);
                                 }
                                 if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
-                                    updated = updated.withVersion(resolvedVersion);
+                                    updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
                                 }
                             }
                             if (original != updated) {
-                                String replacement = updated.toStringNotation();
+                                String replacement = DependencyNotation.toStringNotation(updated);
                                 J.Literal newLiteral = literal.withValue(replacement)
                                         .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
                                 m = m.withArguments(singletonList(newLiteral));
@@ -604,7 +603,6 @@ public class ChangeDependency extends Recipe {
                 for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
                     GradleDependencyConfiguration newGdc = gdc;
                     newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        assert requested != null;
                         if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
                             requested = updatedRequested.computeIfAbsent(requested, r -> {
                                 GroupArtifactVersion gav = r.getGav();

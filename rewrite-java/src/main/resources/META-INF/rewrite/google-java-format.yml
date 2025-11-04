@@ -25,3 +25,20 @@ styleConfigs:
         - import static all other imports
         - <blank line>
         - import all other imports
+  - org.openrewrite.java.style.SpacesStyle:
+      # see https://google.github.io/styleguide/javaguide.html#s4.6.2-horizontal-whitespace
+      beforeLeftBrace:
+        classLeftBrace: true
+        methodLeftBrace: true
+        ifLeftBrace: true
+        elseLeftBrace: true
+        forLeftBrace: true
+        whileLeftBrace: true
+        doLeftBrace: true
+        switchLeftBrace: true
+        tryLeftBrace: true
+        catchLeftBrace: true
+        finallyLeftBrace: true
+        synchronizedLeftBrace: true
+        arrayInitializerLeftBrace: true # Differs from IntelliJ default
+        annotationArrayInitializerLeftBrace: false

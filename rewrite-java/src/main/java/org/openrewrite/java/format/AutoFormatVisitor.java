@@ -19,16 +19,21 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
@@ -68,29 +73,36 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new MinimumViableSpacingVisitor<>(stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        t = new BlankLinesVisitor<>(getStyle(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter)
+        t = new BlankLinesVisitor<>(getStyle(BlankLinesStyle.class, styles, cu, IntelliJ::blankLines), stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        t = new WrappingAndBracesVisitor<>(getStyle(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter)
+        WrappingAndBracesStyle wrappingAndBracesStyle = getStyle(WrappingAndBracesStyle.class, styles, cu, IntelliJ::wrappingAndBraces);
+        SpacesStyle spacesStyle = getStyle(SpacesStyle.class, styles, cu, IntelliJ::spaces);
+        TabsAndIndentsStyle tabsAndIndentsStyle = getStyle(TabsAndIndentsStyle.class, styles, cu, IntelliJ::tabsAndIndents);
+
+        t = new WrappingAndBracesVisitor<>(wrappingAndBracesStyle, stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        SpacesStyle spacesStyle = getStyle(SpacesStyle.class, cu, IntelliJ::spaces);
-        TabsAndIndentsStyle tabsAndIndentsStyle = getStyle(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
-
-        t = new SpacesVisitor<>(spacesStyle, getStyle(EmptyForInitializerPadStyle.class, cu), getStyle(EmptyForIteratorPadStyle.class, cu), stopAfter)
+        t = new SpacesVisitor<>(spacesStyle, getStyle(EmptyForInitializerPadStyle.class, styles, cu), getStyle(EmptyForIteratorPadStyle.class, styles, cu), stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
         t = new NormalizeTabsOrSpacesVisitor<>(tabsAndIndentsStyle, stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        t = new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
+        t = new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, wrappingAndBracesStyle, stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        t = new NormalizeLineBreaksVisitor<>(getStyle(GeneralFormatStyle.class, cu, () -> autodetectGeneralFormatStyle(cu)), stopAfter)
+        t = new NormalizeLineBreaksVisitor<>(getStyle(GeneralFormatStyle.class, styles, cu, () -> autodetectGeneralFormatStyle(cu)), stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        return new RemoveTrailingWhitespaceVisitor<>(stopAfter)
+        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter)
                 .visitNonNull(t, p, cursor.fork());
+
+        if (t instanceof J.CompilationUnit) {
+            return addStyleMarker((JavaSourceFile) t, styles);
+        }
+
+        return t;
     }
 
     @Override
@@ -106,40 +118,71 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter)
                     .visitNonNull(cu, p);
 
-            t = (JavaSourceFile) new BlankLinesVisitor<>(getStyle(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter)
+            t = (JavaSourceFile) new BlankLinesVisitor<>(getStyle(BlankLinesStyle.class, styles, cu, IntelliJ::blankLines), stopAfter)
                     .visitNonNull(t, p);
 
-            SpacesStyle spacesStyle = getStyle(SpacesStyle.class, cu, IntelliJ::spaces);
-            TabsAndIndentsStyle tabsAndIndentsStyle = getStyle(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
+            WrappingAndBracesStyle wrappingAndBracesStyle = getStyle(WrappingAndBracesStyle.class, styles, cu, IntelliJ::wrappingAndBraces);
+            SpacesStyle spacesStyle = getStyle(SpacesStyle.class, styles, cu, IntelliJ::spaces);
+            TabsAndIndentsStyle tabsAndIndentsStyle = getStyle(TabsAndIndentsStyle.class, styles, cu, IntelliJ::tabsAndIndents);
 
-            t = (JavaSourceFile) new SpacesVisitor<P>(spacesStyle, getStyle(EmptyForInitializerPadStyle.class, cu), getStyle(EmptyForIteratorPadStyle.class, cu), stopAfter)
+            t = (JavaSourceFile) new SpacesVisitor<P>(spacesStyle, getStyle(EmptyForInitializerPadStyle.class, styles, cu), getStyle(EmptyForIteratorPadStyle.class, styles, cu), stopAfter)
                     .visitNonNull(t, p);
 
-            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(getStyle(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter)
+            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(wrappingAndBracesStyle, stopAfter)
                     .visitNonNull(t, p);
 
             t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(tabsAndIndentsStyle, stopAfter)
                     .visitNonNull(t, p);
 
-            return new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
+            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, wrappingAndBracesStyle, stopAfter)
                     .visitNonNull(t, p);
+
+            return addStyleMarker(t, styles);
         }
         return (J) tree;
     }
 
-    private <S extends Style> @Nullable S getStyle(Class<S> styleClass, JavaSourceFile sourceFile) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return style;
+    @ToBeRemoved(after = "30-11-2025", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
+    private static <T extends SourceFile> T addStyleMarker(T t, List<NamedStyles> styles) {
+        if (!styles.isEmpty()) {
+            Set<NamedStyles> newNamedStyles = new HashSet<>(styles);
+            boolean styleAlreadyPresent = false;
+            for (NamedStyles namedStyle : t.getMarkers().findAll(NamedStyles.class)) {
+                styleAlreadyPresent = !newNamedStyles.add(namedStyle) || styleAlreadyPresent;
+            }
+            // As the order or NamedStyles matters, we cannot simply use addIfAbsent.
+            if (!styleAlreadyPresent) {
+                Markers markers = t.getMarkers().removeByType(NamedStyles.class);
+                for (NamedStyles namedStyle : newNamedStyles) {
+                    markers = markers.add(namedStyle);
+                }
+
+                return t.withMarkers(markers);
+            }
         }
-        return Style.from(styleClass, sourceFile);
+        return t;
     }
 
-    private <S extends Style> S getStyle(Class<S> styleClass, JavaSourceFile sourceFile, Supplier<S> defaultStyle) {
+    @ToBeRemoved(after = "30-11-2025", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style, T extends SourceFile> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles, T sourceFile) {
+        S projectStyle = Style.from(styleClass, sourceFile);
         S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
+        if (projectStyle == null) {
             return style;
         }
-        return Style.from(styleClass, sourceFile, defaultStyle);
+        if (style != null) {
+            return StyleHelper.merge(projectStyle, style);
+        }
+        return projectStyle;
+    }
+
+    @ToBeRemoved(after = "30-11-2025", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style, T extends SourceFile> S getStyle(Class<S> styleClass, List<NamedStyles> styles, T sourceFile, Supplier<S> defaultStyle) {
+        S projectStyle = Style.from(styleClass, sourceFile, defaultStyle);
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(projectStyle, style);
+        }
+        return projectStyle;
     }
 }

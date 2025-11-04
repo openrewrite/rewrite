@@ -16,6 +16,7 @@
 import ts from "typescript";
 import {Type} from "../java";
 import {immerable} from "immer";
+import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 
 // Helper class to create Type objects that immer won't traverse
 class NonDraftableType {
@@ -79,6 +80,30 @@ export class JavaScriptTypeMapping {
         // Arrays in JavaScript are objects with methods, so we treat them as class types
         const symbol = type.getSymbol?.();
         if (symbol) {
+            // Check for function symbols
+            if (symbol.flags & ts.SymbolFlags.Function) {
+                const callSignatures = type.getCallSignatures();
+                if (callSignatures.length > 0) {
+                    // Create and cache shell first to handle circular references
+                    const functionType = this.createEmptyFunctionType();
+                    this.typeCache.set(signature, functionType);
+                    this.populateFunctionType(functionType, callSignatures[0]);
+                    return functionType;
+                }
+            }
+
+            // Check for function-scoped or block-scoped variables that might be functions
+            if (symbol.flags & (ts.SymbolFlags.FunctionScopedVariable | ts.SymbolFlags.BlockScopedVariable)) {
+                const callSignatures = type.getCallSignatures();
+                if (callSignatures.length > 0) {
+                    // Create and cache shell first to handle circular references
+                    const functionType = this.createEmptyFunctionType();
+                    this.typeCache.set(signature, functionType);
+                    this.populateFunctionType(functionType, callSignatures[0]);
+                    return functionType;
+                }
+            }
+
             if (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias)) {
                 // Create and cache shell first to handle circular references
                 const classType = this.createEmptyClassType(type);
@@ -86,6 +111,16 @@ export class JavaScriptTypeMapping {
                 this.populateClassType(classType, type);
                 return classType;
             }
+        }
+
+        // Check for function types without symbols (anonymous functions, function types)
+        const callSignatures = type.getCallSignatures();
+        if (callSignatures.length > 0) {
+            // Function type - create and cache shell first to handle circular references
+            const functionType = this.createEmptyFunctionType();
+            this.typeCache.set(signature, functionType);
+            this.populateFunctionType(functionType, callSignatures[0]);
+            return functionType;
         }
 
         // For anonymous object types that could have circular references
@@ -214,7 +249,7 @@ export class JavaScriptTypeMapping {
         let declaredFormalTypeNames: string[] = [];
 
         // Handle different kinds of nodes that represent methods or method invocations
-        if (ts.isCallExpression(node)) {
+        if (ts.isCallOrNewExpression(node)) {
             // For method invocations (e.g., _.map(...))
             signature = this.checker.getResolvedSignature(node);
             if (!signature) {
@@ -839,5 +874,95 @@ export class JavaScriptTypeMapping {
         }
 
         return Type.unknownType;
+    }
+
+    /**
+     * Create an empty function type shell with FQN 𝑓.
+     * The shell will be populated later to handle circular references.
+     */
+    private createEmptyFunctionType(): Type.Class {
+        return Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind: Type.Class.Kind.Interface,
+            fullyQualifiedName: FUNCTION_TYPE_NAME,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        }) as Type.Class;
+    }
+
+    /**
+     * Populate a function type with signature information.
+     * The function type has generic type parameters for return type (first) and parameter types (subsequent),
+     * and contains an apply() method with the matching signature.
+     * Since the shell is already in the cache, any recursive references will find it.
+     */
+    private populateFunctionType(functionClass: Type.Class, signature: ts.Signature): void {
+        const returnType = this.getType(signature.getReturnType());
+        const parameters = signature.getParameters();
+        const parameterTypes: Type[] = [];
+        const parameterNames: string[] = [];
+
+        // Get parameter types
+        for (const param of parameters) {
+            const declaration = param.valueDeclaration || param.declarations?.[0];
+            if (declaration) {
+                const paramType = this.checker.getTypeOfSymbolAtLocation(param, declaration);
+                parameterTypes.push(this.getType(paramType));
+                parameterNames.push(param.getName());
+            }
+        }
+
+        // Build the type parameters list with proper variance:
+        // - Return type is covariant (R)
+        // - Parameter types are contravariant (P1, P2, ...)
+        const typeParameters: Type[] = [];
+
+        // Return type parameter (covariant)
+        typeParameters.push(Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.GenericTypeVariable,
+            name: 'R',
+            variance: Type.GenericTypeVariable.Variance.Covariant,
+            bounds: [returnType]
+        }) as Type.GenericTypeVariable);
+
+        // Parameter type variables (contravariant)
+        parameterTypes.forEach((paramType, index) => {
+            typeParameters.push(Object.assign(new NonDraftableType(), {
+                kind: Type.Kind.GenericTypeVariable,
+                name: `P${index + 1}`,
+                variance: Type.GenericTypeVariable.Variance.Contravariant,
+                bounds: [paramType]
+            }) as Type.GenericTypeVariable);
+        });
+
+        functionClass.typeParameters = typeParameters;
+
+        // Create the apply() method
+        const applyMethod = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Method,
+            flags: 0,
+            declaringType: functionClass,
+            name: 'apply',
+            returnType: returnType,
+            parameterNames: parameterNames,
+            parameterTypes: parameterTypes,
+            thrownExceptions: [],
+            annotations: [],
+            defaultValue: undefined,
+            declaredFormalTypeNames: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        }) as Type.Method;
+
+        // Add the apply method to the function class
+        functionClass.methods.push(applyMethod);
     }
 }

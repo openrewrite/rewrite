@@ -29,6 +29,7 @@ import static java.util.Collections.emptyList;
 @With
 public class WrappingAndBracesStyle implements JavaStyle {
 
+    int hardWrapAt;
     IfStatement ifStatement;
     ChainedMethodCalls chainedMethodCalls;
     @Nullable Annotations classAnnotations;
@@ -45,7 +46,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
 
     public ChainedMethodCalls getChainedMethodCalls() {
         //noinspection ConstantConditions
-        return chainedMethodCalls == null ? new ChainedMethodCalls(LineWrapSetting.DoNotWrap, emptyList()) : chainedMethodCalls;
+        return chainedMethodCalls == null ? new ChainedMethodCalls(LineWrapSetting.DoNotWrap, emptyList(), false) : chainedMethodCalls;
     }
 
     @Value
@@ -65,6 +66,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
     public static class ChainedMethodCalls {
         LineWrapSetting wrap;
         List<String> builderMethods;
+        Boolean alignWhenMultiline;
 
         public LineWrapSetting getWrap() {
             //noinspection ConstantConditions
@@ -74,6 +76,11 @@ public class WrappingAndBracesStyle implements JavaStyle {
         public List<String> getBuilderMethods() {
             //noinspection ConstantConditions
             return builderMethods == null ? emptyList() : builderMethods;
+        }
+
+        public Boolean getAlignWhenMultiline() {
+            //noinspection ConstantConditions
+            return alignWhenMultiline == null ? false : alignWhenMultiline;
         }
     }
 }

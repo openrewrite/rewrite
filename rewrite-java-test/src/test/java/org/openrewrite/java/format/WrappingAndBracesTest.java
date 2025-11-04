@@ -44,8 +44,9 @@ class WrappingAndBracesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+          120,
           new WrappingAndBracesStyle.IfStatement(false),
-          new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder")),
+          new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
           new WrappingAndBracesStyle.Annotations(WrapAlways),
           new WrappingAndBracesStyle.Annotations(WrapAlways),
           new WrappingAndBracesStyle.Annotations(WrapAlways),
@@ -925,8 +926,9 @@ class WrappingAndBracesTest implements RewriteTest {
     void annotationWrappingWithNulls() {
         rewriteRun(spec ->
             spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+              120,
               new WrappingAndBracesStyle.IfStatement(false),
-              new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList()),
+              new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList(), false),
               null,
               null,
               null,

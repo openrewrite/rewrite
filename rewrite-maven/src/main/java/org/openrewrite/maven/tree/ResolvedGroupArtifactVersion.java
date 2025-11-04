@@ -21,7 +21,6 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
-import java.util.Objects;
 
 @Value
 @With
@@ -51,12 +50,5 @@ public class ResolvedGroupArtifactVersion implements Serializable {
 
     public GroupArtifactVersion asGroupArtifactVersion() {
         return new GroupArtifactVersion(groupId, artifactId, version);
-    }
-
-    public ResolvedGroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
-        if (Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
-            return this;
-        }
-        return new ResolvedGroupArtifactVersion(repository, ga.getGroupId(), ga.getArtifactId(), version, datedSnapshotVersion);
     }
 }

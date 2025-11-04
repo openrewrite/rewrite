@@ -72,7 +72,7 @@ public class IntelliJ extends NamedStyles {
 
     public static TabsAndIndentsStyle tabsAndIndents() {
         return new TabsAndIndentsStyle(false, 4, 4, 8, false,
-                new TabsAndIndentsStyle.MethodDeclarationParameters(true));
+                new TabsAndIndentsStyle.MethodDeclarationParameters(true), new TabsAndIndentsStyle.RecordComponents(true));
     }
 
     public static BlankLinesStyle blankLines() {
@@ -99,8 +99,9 @@ public class IntelliJ extends NamedStyles {
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
         return new WrappingAndBracesStyle(
+                120,
                 new WrappingAndBracesStyle.IfStatement(false),
-                new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList()),
+                new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList(), false),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),

@@ -155,7 +155,7 @@ public class FindAndReplace extends Recipe {
 
                 return plainText
                         .withText(newText)
-                        .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
+                        .withMarkers(plainText.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
             }
         };
 
@@ -173,5 +173,4 @@ public class FindAndReplace extends Recipe {
         }
         return visitor;
     }
-
 }

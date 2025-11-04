@@ -20,9 +20,10 @@ export * from "./parser";
 export * from "./style";
 export * from "./markers";
 export * from "./preconditions";
-export * from "./templating";
+export * from "./templating/index";
 export * from "./method-matcher";
 
+export * from "./add-import";
 export * from "./remove-import";
 
 import "./print";
