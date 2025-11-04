@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.service.Span;
@@ -400,23 +399,23 @@ class SourcePositionServiceTest implements RewriteTest {
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                   service = cu.service(SourcePositionService.class);
-                  assertResult(1, 0, 33, 1, 152); //entire file
-                  assertResult(cu.getClasses().getFirst(), 4, 0, 33, 1, 152); //entire Test class declaration
+                  assertResult(1, 1, 33, 2, 153); //entire file
+                  assertResult(cu.getClasses().getFirst(), 4, 1, 33, 2, 153); //entire Test class declaration
                   return super.visitCompilationUnit(cu, ctx);
               }
 
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                   if ("Test".equals(classDecl.getSimpleName())) {
-                      assertResult(4, 0, 33, 1, 152); //entire Test class declaration
-                      assertResult(classDecl.getBody().getStatements().get(4), 17, 4, 20, 5, 76); //example2 method
+                      assertResult(4, 1, 33, 2, 153); //entire Test class declaration
+                      assertResult(classDecl.getBody().getStatements().get(4), 17, 5, 20, 6, 77); //example2 method
                   }
                   if ("Inner".equals(classDecl.getSimpleName())) {
-                      assertResult(27, 4, 30, 5, 84); //entire Inner class declaration
+                      assertResult(27, 5, 30, 6, 85); //entire Inner class declaration
                   }
                   if ("RecordDeclaration".equals(classDecl.getSimpleName())) {
-                      assertResult(32, 4, 32, 152, 152); //entire Inner class declaration
-                      assertResult(classDecl.getPadding().getPrimaryConstructor(), 32, 29, 32, 34, 34);
+                      assertResult(32, 5, 32, 153, 153); //entire Inner class declaration
+                      assertResult(classDecl.getPadding().getPrimaryConstructor(), 32, 30, 32, 35, 35);
                   }
                   return super.visitClassDeclaration(classDecl, ctx);
               }
@@ -425,22 +424,22 @@ class SourcePositionServiceTest implements RewriteTest {
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   switch (method.getSimpleName()) {
                       case "example1":
-                          assertResult(10, 4, 15, 5, 60); // calculate the span as is.
-                          assertMinimizedResult(10, 4, 13, 5, 76); // collapsing the method args to a single line using minimized (correctly calculate a span after changing an element)
-                          assertResult(method.getPadding().getParameters(), 10, 54, 12, 17, 60); // calculate the span of the parameters within the declaration
-                          assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 10, 54, 10, 73, 73); // calculate the span of the parameters after minimization (correctly calculate a nested span after changing an element)
+                          assertResult(10, 5, 15, 6, 61); // calculate the span as is.
+                          assertMinimizedResult(10, 5, 13, 6, 77); // collapsing the method args to a single line using minimized (correctly calculate a span after changing an element)
+                          assertResult(method.getPadding().getParameters(), 10, 55, 12, 18, 61); // calculate the span of the parameters within the declaration
+                          assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 10, 55, 10, 74, 74); // calculate the span of the parameters after minimization (correctly calculate a nested span after changing an element)
                           break;
                       case "example2":
-                          assertResult(17, 4, 20, 5, 76);
-                          assertMinimizedResult(17, 4, 20, 5, 76);
-                          assertResult(method.getPadding().getParameters(), 17, 54, 17, 73, 73);
-                          assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 17, 54, 17, 73, 73);
+                          assertResult(17, 5, 20, 6, 77);
+                          assertMinimizedResult(17, 5, 20, 6, 77);
+                          assertResult(method.getPadding().getParameters(), 17, 55, 17, 74, 74);
+                          assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 17, 55, 17, 74, 74);
                           break;
                       case "someVeryLongMethodNameThatIsAsLongAsTheMethodsAbove":
-                          assertResult(22, 4, 25, 5, 74);
-                          assertMinimizedResult(22, 4, 24, 5, 76); // minimization moves the opening curly causing the end-line to shift by 1 and the maxColumn by 2
-                          assertResult(method.getPadding().getParameters(), 23, 68, 23, 73, 73);
-                          assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 23, 68, 23, 73, 73);
+                          assertResult(22, 5, 25, 6, 75);
+                          assertMinimizedResult(22, 5, 24, 6, 77); // minimization moves the opening curly causing the end-line to shift by 1 and the maxColumn by 2
+                          assertResult(method.getPadding().getParameters(), 23, 69, 23, 74, 74);
+                          assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 23, 69, 23, 74, 74);
                           break;
                   }
                   return super.visitMethodDeclaration(method, ctx);
@@ -449,19 +448,19 @@ class SourcePositionServiceTest implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (multiVariable.getVariables().stream().anyMatch(v -> "abc".contains(v.getSimpleName()))) {
-                      assertResult(6, 4, 6, 37, 37);
+                      assertResult(6, 5, 6, 38, 38);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "d".equals(v.getSimpleName()))) {
-                      assertResult(7, 4, 7, 13, 13);
+                      assertResult(7, 5, 7, 14, 14);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "e".equals(v.getSimpleName()))) {
-                      assertResult(8, 4, 8, 9, 9);
+                      assertResult(8, 5, 8, 10, 10);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "f".equals(v.getSimpleName()))) {
-                      assertResult(32, 29, 32, 34, 34);
+                      assertResult(32, 30, 32, 35, 35);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "sum1".equals(v.getSimpleName()))) {
-                      assertResult(13, 8, 13, 24, 24);
+                      assertResult(13, 9, 13, 25, 25);
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
               }
@@ -552,17 +551,17 @@ class SourcePositionServiceTest implements RewriteTest {
                       J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
                       if (method != null) {
                           if ("method1".equals(method.getSimpleName())) {
-                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(6).startColumn(8).endLine(6).maxColumn(17).endColumn(17).build());
+                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(6).startColumn(9).endLine(6).maxColumn(18).endColumn(18).build());
                               J.VariableDeclarations removedComment = multiVariable.withPrefix(multiVariable.getPrefix().withComments(emptyList()));
-                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment))).isEqualTo(Span.builder().startLine(5).startColumn(8).endLine(5).maxColumn(17).endColumn(17).build());
-                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment), removedComment)).isEqualTo(Span.builder().startLine(5).startColumn(8).endLine(5).maxColumn(17).endColumn(17).build());
+                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment))).isEqualTo(Span.builder().startLine(5).startColumn(9).endLine(5).maxColumn(18).endColumn(18).build());
+                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment), removedComment)).isEqualTo(Span.builder().startLine(5).startColumn(9).endLine(5).maxColumn(18).endColumn(18).build());
 
                               //When the cursor does not contain the referential equal object, we throw
                               assertThrows(IllegalArgumentException.class, () -> assertThat(service.positionOf(getCursor(), removedComment)));
                               assertThrows(IllegalArgumentException.class, () -> assertThat(service.positionOf(getCursor().getParentTreeCursor(), removedComment)));
                           }
                           if ("method2".equals(method.getSimpleName())) {
-                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(10).startColumn(8).endLine(10).maxColumn(17).endColumn(17).build());
+                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(10).startColumn(9).endLine(10).maxColumn(18).endColumn(18).build());
                           }
                       }
                   }
@@ -589,12 +588,11 @@ class SourcePositionServiceTest implements RewriteTest {
     }
 
     private static  <T extends J> T minimize(T tree) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        J j = new JavaIsoVisitor<ExecutionContext>() {
+        J j = new JavaIsoVisitor<Integer>() {
             @Override
             public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
                                                                   JRightPadded.Location loc,
-                                                                  ExecutionContext ctx) {
+                                                                  Integer ctx) {
                 switch (loc) {
                     case METHOD_DECLARATION_PARAMETER:
                     case RECORD_STATE_VECTOR: {
@@ -613,7 +611,7 @@ class SourcePositionServiceTest implements RewriteTest {
             @Override
             public Space visitSpace(@Nullable Space space,
                                     Space.Location loc,
-                                    ExecutionContext ctx) {
+                                    Integer ctx) {
                 if (space == null) {
                     return super.visitSpace(space, loc, ctx);
                 }
@@ -644,10 +642,10 @@ class SourcePositionServiceTest implements RewriteTest {
                 }
                 return space;
             }
-        }.visit(tree, ctx);
+        }.visit(tree, -1);
         if (j != tree) {
-            j = new MinimumViableSpacingVisitor<>(null).visit(j, ctx);
-            j = new SpacesVisitor<>(IntelliJ.spaces(), null, null).visit(j, ctx);
+            j = new MinimumViableSpacingVisitor<>(null).visit(j, -1);
+            j = new SpacesVisitor<>(IntelliJ.spaces(), null, null).visit(j, -1);
         }
         return (T) j;
     }

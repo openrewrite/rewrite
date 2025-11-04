@@ -19,8 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
@@ -56,7 +54,7 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
                     if (sourceFile == null) {
                         return m;
                     }
-                    Cursor minimized = minimize(getCursor());
+                    Cursor minimized = minimize(getCursor(), ctx);
                     if (sourceFile.service(SourcePositionService.class).positionOf(minimized, ((J.MethodDeclaration)minimized.getValue()).getPadding().getParameters()).getMaxColumn() <= style.getHardWrapAt()) {
                         return m;
                     }
@@ -110,15 +108,12 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
         return m;
     }
 
-    public Cursor minimize(Cursor cursor) {
+    public Cursor minimize(Cursor cursor, P ctx) {
         if (cursor.getValue() instanceof J) {
-            InMemoryExecutionContext ctx = new InMemoryExecutionContext();
             J cursorValue = cursor.getValue();
-            J j = new JavaIsoVisitor<ExecutionContext>() {
+            J j = new JavaIsoVisitor<P>() {
                 @Override
-                public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
-                                                                      JRightPadded.Location loc,
-                                                                      ExecutionContext ctx) {
+                public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P ctx) {
                     switch (loc) {
                         case METHOD_DECLARATION_PARAMETER:
                         case RECORD_STATE_VECTOR: {
@@ -135,9 +130,7 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
                 }
 
                 @Override
-                public Space visitSpace(@Nullable Space space,
-                                        Space.Location loc,
-                                        ExecutionContext ctx) {
+                public Space visitSpace(@Nullable Space space, Space.Location loc, P ctx) {
                     if (space == null) {
                         return super.visitSpace(space, loc, ctx);
                     }

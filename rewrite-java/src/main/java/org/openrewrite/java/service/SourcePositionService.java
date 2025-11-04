@@ -18,7 +18,6 @@ package org.openrewrite.java.service;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.search.SemanticallyEqual;
@@ -275,7 +274,7 @@ public class SourcePositionService {
      * tracking line and column positions as it prints. When the target child element is encountered,
      * it marks the position and calculates the span including:
      * <ul>
-     *   <li>Start line and column (1-indexed for line, 0-indexed for column)</li>
+     *   <li>Start line and column (1-indexed)</li>
      *   <li>End line and column after the element's content</li>
      *   <li>Maximum column width if the element spans multiple lines</li>
      * </ul>
@@ -312,7 +311,7 @@ public class SourcePositionService {
             throw new IllegalArgumentException("Can only find J elements or their containers. Not on " + child.getClass().getSimpleName() + ".");
         }
         AtomicInteger startLine = new AtomicInteger(1);
-        AtomicInteger startCol = new AtomicInteger(0);
+        AtomicInteger startCol = new AtomicInteger(1);
         AtomicBoolean printing = new AtomicBoolean(false);
         AtomicBoolean found = new AtomicBoolean(false);
         JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
@@ -321,12 +320,10 @@ public class SourcePositionService {
             @Override
             protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {
                 if (findJContainer != null && nodes == findJContainer.getPadding().getElements()) {
-                    printing.set(true);
-                    p.append(START_FIND);
                     for (int i = 0; i < nodes.size(); i++) {
                         JRightPadded<? extends J> node = nodes.get(i);
                         if (i == 0) {
-                            visit(startFind(node.getElement()), p);
+                            visit((J) startFind(node.getElement(), p), p);
                         } else {
                             visit(node.getElement(), p);
                         }
@@ -345,9 +342,7 @@ public class SourcePositionService {
             @Override
             protected void visitRightPadded(@Nullable JRightPadded<? extends J> rightPadded, JRightPadded.Location location, @Nullable String suffix, PrintOutputCapture<TreeVisitor<?, ?>> p) {
                 if (findJRightPadded != null && rightPadded == findJRightPadded) {
-                    printing.set(true);
-                    p.append(START_FIND);
-                    super.visitRightPadded(rightPadded, location, suffix, p);
+                    super.visitRightPadded(rightPadded.withElement(startFind(rightPadded.getElement(), p)), location, suffix, p);
                     found.set(true);
                 } else {
                     super.visitRightPadded(rightPadded, location, suffix, p);
@@ -365,9 +360,7 @@ public class SourcePositionService {
                     tree = cursor.getValue();
                 }
                 if (findJ != null && tree == findJ) {
-                    printing.set(true);
-                    p.append(START_FIND);
-                    foundJ = startFind(tree);
+                    foundJ = startFind(tree, p);
                     tree = foundJ;
                 }
                 return super.preVisit(tree, p);
@@ -381,12 +374,19 @@ public class SourcePositionService {
                 return super.postVisit(tree, p);
             }
 
-            private J startFind(J tree) {
-                return tree
-                        .withPrefix(tree.getPrefix()
-                                .withWhitespace(tree.getPrefix().getWhitespace().replace("\n", "\n" + START_FIND))
-                                .withComments(ListUtils.map(tree.getComments(), c -> c.withSuffix(c.getSuffix().replace("\n", "\n" + START_FIND))))
-                        );
+            public <T extends J> T startFind(J tree, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                Space space = tree.getPrefix();
+                p.append(space.getWhitespace());
+
+                List<Comment> comments = space.getComments();
+                for (int i = 0; i < comments.size(); i++) {
+                    Comment comment = comments.get(i);
+                    comment.printComment(getCursor(), p);
+                    p.append(comment.getSuffix());
+                }
+
+                printing.set(true);
+                return tree.withPrefix(Space.EMPTY);
             }
         };
         PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<TreeVisitor<?, ?>>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED) {
@@ -402,12 +402,12 @@ public class SourcePositionService {
                     char c = text.charAt(i);
                     if (c == '\n') {
                         startLine.incrementAndGet();
-                        startCol.set(0);
+                        startCol.set(1);
                     } else if (c == '\r') {
                         // Skip \r in \r\n
                         if (i + 1 >= text.length() || text.charAt(i + 1) != '\n') {
                             startLine.incrementAndGet();
-                            startCol.set(0);
+                            startCol.set(1);
                         }
                     } else {
                         startCol.incrementAndGet();
@@ -426,7 +426,7 @@ public class SourcePositionService {
                 }
                 if (c == '\n' || c == '\r') {
                     startLine.incrementAndGet();
-                    startCol.set(0);
+                    startCol.set(1);
                 } else {
                     startCol.incrementAndGet();
                 }
@@ -438,28 +438,11 @@ public class SourcePositionService {
             printCursor = cursor.dropParentUntil(c -> c instanceof JavaSourceFile);
         }
         javaPrinter.visit(printCursor.getValue(), printLine, printCursor.getParent());
-        String printed = printLine.getOut();
-        int startIndex = printed.lastIndexOf(START_FIND);
-        if (startIndex >= 0) {
-            String beforeChild = printed.substring(0, startIndex);
-            for (int i = 0; i < beforeChild.length(); i++) {
-                startCol.set(0);
-                char c = beforeChild.charAt(i);
-                if ('\n' == c) {
-                    startLine.incrementAndGet();
-                } else if (c == '\r') {
-                    if (i + 1 < beforeChild.length() && beforeChild.charAt(i + 1) == '\n') {
-                        // Skip \r in \r\n
-                        continue;
-                    } else {
-                        startLine.incrementAndGet();
-                    }
-                }
-            }
-            String content = printed.substring(startIndex + START_FIND.length());
+        String content = printLine.getOut();
+        if (found.get()) {
             int indent = StringUtils.indent(content).length();
             int col = startCol.get();
-            int maxColumn = 0;
+            int maxColumn = 1;
             int lines = 0;
             for (int i = 0; i < content.length(); i++) {
                 char c = content.charAt(i);
@@ -468,9 +451,9 @@ public class SourcePositionService {
                     if (maxColumn < col) {
                         maxColumn = col;
                     }
-                    col = 0;
+                    col = 1;
                 } else if (c == '\r') {
-                    if (i + 1 < beforeChild.length() && beforeChild.charAt(i + 1) == '\n') {
+                    if (i + 1 < content.length() && content.charAt(i + 1) == '\n') {
                         // Skip \r in \r\n
                         continue;
                     } else {
@@ -478,7 +461,7 @@ public class SourcePositionService {
                         if (maxColumn < col) {
                             maxColumn = col;
                         }
-                        col = 0;
+                        col = 1;
                     }
                 } else {
                     col++;
