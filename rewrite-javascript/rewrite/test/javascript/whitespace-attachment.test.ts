@@ -159,13 +159,14 @@ function findWhitespaceViolations(rootNodes: OutputNode[]): string[] {
     return violations;
 }
 
-describe('whitespace attachment', () => {
+describe('whitespace should be attached to the outermost element', () => {
     test.each([
         "const c =  function(): number { return 116; };",
         "const x = new Date();",
         "async function m(): void { await Promise.resolve(); }",
         "class ResponseHandler extends EventEmitter<{ success: string; error: Error }> {}",
         "import React = require('react');",
+        `export const enum Result { Good = "Good", Bad = "Bad" }`,
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();

@@ -3264,7 +3264,7 @@ export class JavaScriptParserVisitor {
                     {
                         kind: J.Kind.EnumValueSet,
                         id: randomId(),
-                        prefix: emptySpace,
+                        prefix: node.members[0] ? this.prefix(node.members[0]) : emptySpace,
                         markers: emptyMarkers,
                         enums: node.members.map(em => this.rightPadded(this.visit(em), this.suffix(em))),
                         terminatedWithSemicolon: node.members.hasTrailingComma
