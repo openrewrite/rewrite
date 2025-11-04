@@ -167,6 +167,7 @@ describe('whitespace should be attached to the outermost element', () => {
         "class ResponseHandler extends EventEmitter<{ success: string; error: Error }> {}",
         "import React = require('react');",
         `export const enum Result { Good = "Good", Bad = "Bad" }`,
+        "for (let i = 1; i < [4, 3, 6].length; i++) {",
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();

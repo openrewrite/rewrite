@@ -2769,7 +2769,7 @@ export class JavaScriptParserVisitor {
                 update: [node.incrementor ? this.rightPadded(ts.isStatement(node.incrementor) ? this.visit(node.incrementor) : {
                         kind: JS.Kind.ExpressionStatement,
                         id: randomId(),
-                        prefix: emptySpace,
+                        prefix: this.prefix(node.incrementor),
                         markers: emptyMarkers,
                         expression: this.visit(node.incrementor)
                     }, this.suffix(node.incrementor)) :
