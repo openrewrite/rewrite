@@ -292,6 +292,11 @@ function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
                 return target[CAPTURE_CAPTURING_SYMBOL];
             }
 
+            // Support using Capture as object key via computed properties {[x]: value}
+            if (prop === Symbol.toPrimitive || prop === 'toString' || prop === 'valueOf') {
+                return () => target[CAPTURE_NAME_SYMBOL];
+            }
+
             // Allow methods to be called directly on the target
             if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing') {
                 return target[prop].bind(target);

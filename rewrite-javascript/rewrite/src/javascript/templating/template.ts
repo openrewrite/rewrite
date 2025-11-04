@@ -227,12 +227,16 @@ export class Template {
      * @param values values for parameters in template
      * @returns A Promise resolving to the generated AST node
      */
-    async apply(cursor: Cursor, tree: J, values?: Map<Capture | string, J> | Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
+    async apply(cursor: Cursor, tree: J, values?: Map<Capture | string, J> | Pick<Map<string, J>, 'get'> | Record<string, J>): Promise<J | undefined> {
         // Normalize the values map: convert any Capture keys to string keys
         let normalizedValues: Pick<Map<string, J>, 'get'> | undefined;
         let wrappersMap: Map<string, J.RightPadded<J> | J.RightPadded<J>[]> = new Map();
 
-        if (values instanceof Map) {
+        if (values instanceof MatchResult) {
+            // MatchResult - extract both bindings and wrappersMap
+            normalizedValues = values;
+            wrappersMap = (values as any)[WRAPPERS_MAP_SYMBOL]();
+        } else if (values instanceof Map) {
             const normalized = new Map<string, J>();
             for (const [key, value] of values.entries()) {
                 const stringKey = typeof key === 'string'
@@ -241,13 +245,22 @@ export class Template {
                 normalized.set(stringKey, value);
             }
             normalizedValues = normalized;
-        } else if (values instanceof MatchResult) {
-            // MatchResult - extract both bindings and wrappersMap
-            normalizedValues = values;
-            wrappersMap = (values as any)[WRAPPERS_MAP_SYMBOL]();
-        } else {
-            // Other Pick<Map> implementation
-            normalizedValues = values;
+        } else if (values && typeof values === 'object') {
+            // Check if it's a Map-like object with 'get' method, or a plain object literal
+            if ('get' in values && typeof values.get === 'function') {
+                // Map-like object with get method
+                normalizedValues = values as Pick<Map<string, J>, 'get'>;
+            } else {
+                // Plain object literal - convert to Map
+                // Keys may be strings or Capture objects (via computed properties {[x]: value})
+                const normalized = new Map<string, J>();
+                for (const [key, value] of Object.entries(values)) {
+                    // If the key happens to be a stringified Capture (from computed properties),
+                    // it's already been converted to a string by JavaScript
+                    normalized.set(key, value);
+                }
+                normalizedValues = normalized;
+            }
         }
 
         // Prefer 'context' over deprecated 'imports'

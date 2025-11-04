@@ -160,6 +160,29 @@ describe('template2 replace', () => {
         );
     });
 
+    test('capture with object literal syntax', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+                if (literal.valueSource === '1') {
+                    // Create a replacement value
+                    const replacement = produce(literal, draft => {
+                        draft.value = 10;
+                        draft.valueSource = '10';
+                    });
+
+                    // Use named capture with object literal syntax
+                    const x = capture();
+                    return template`${x} + ${'y'}`.apply(this.cursor, literal, {[x]: replacement});
+                }
+                return literal;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('const a = 1', 'const a = 10 + y')
+        );
+    });
+
     test('literal string for identifier', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
