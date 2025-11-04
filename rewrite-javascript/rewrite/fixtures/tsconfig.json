@@ -7,5 +7,10 @@
   "include": [
     "./**/*.ts"
   ],
-  "exclude": []
+  "exclude": [],
+  "references": [
+    {
+      "path": "../tsconfig.build.json"
+    }
+  ]
 }
