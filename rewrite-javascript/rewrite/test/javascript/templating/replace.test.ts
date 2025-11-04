@@ -245,4 +245,27 @@ describe('template2 replace', () => {
             )
         );
     });
+
+    test('capture binding in method select position', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if ((method.name as J.Identifier).simpleName === 'oldMethod' && method.select) {
+                    const select = capture();
+                    return await template`${select}.newMethod()`.apply(
+                        this.cursor,
+                        method,
+                        new Map([[select, method.select.element]])
+                    );
+                }
+                return method;
+            }
+        });
+
+        return spec.rewriteRun(
+            typescript(
+                'obj.oldMethod();',
+                'obj.newMethod();'
+            )
+        );
+    });
 });

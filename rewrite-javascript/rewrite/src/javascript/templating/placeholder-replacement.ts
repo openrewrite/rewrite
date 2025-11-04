@@ -191,16 +191,34 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
 
     override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
         // Check if any arguments are placeholders (possibly variadic)
-        const hasPlaceholder = method.arguments.elements.some(arg => this.isPlaceholder(arg.element));
+        const hasPlaceholderInArgs = method.arguments.elements.some(arg => this.isPlaceholder(arg.element));
+        // Check if the select (the object being called on) is a placeholder
+        const hasPlaceholderInSelect = method.select && this.isPlaceholder(method.select.element);
 
-        if (!hasPlaceholder) {
+        if (!hasPlaceholderInArgs && !hasPlaceholderInSelect) {
             return super.visitMethodInvocation(method, p);
         }
 
-        const newArguments = await this.expandVariadicElements(method.arguments.elements, undefined, p);
+        let newArguments = method.arguments.elements;
+        if (hasPlaceholderInArgs) {
+            newArguments = await this.expandVariadicElements(method.arguments.elements, undefined, p);
+        }
+
+        let newSelect = method.select;
+        if (hasPlaceholderInSelect && method.select) {
+            const visitedSelect = await this.visit(method.select.element, p);
+            if (visitedSelect) {
+                newSelect = produce(method.select, draft => {
+                    draft.element = visitedSelect;
+                });
+            }
+        }
 
         return produce(method, draft => {
             draft.arguments.elements = newArguments;
+            if (newSelect !== method.select) {
+                draft.select = newSelect;
+            }
         });
     }
 
