@@ -3324,7 +3324,7 @@ export class JavaScriptParserVisitor {
             return {
                 kind: JS.Kind.NamespaceDeclaration,
                 id: randomId(),
-                prefix: node.parent.kind === ts.SyntaxKind.ModuleBlock ? this.prefix(node) : emptySpace,
+                prefix: this.prefix(node),
                 markers: emptyMarkers,
                 modifiers: this.mapModifiers(node),
                 keywordType: this.leftPadded(
