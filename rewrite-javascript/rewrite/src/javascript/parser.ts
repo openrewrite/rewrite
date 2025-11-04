@@ -1997,7 +1997,7 @@ export class JavaScriptParserVisitor {
             class: node.typeArguments ? {
                 kind: J.Kind.ParameterizedType,
                 id: randomId(),
-                prefix: emptySpace,
+                prefix: this.prefix(node.expression),
                 markers: emptyMarkers,
                 class: {
                     kind: JS.Kind.TypeTreeExpression,

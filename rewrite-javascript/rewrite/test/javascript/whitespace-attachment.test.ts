@@ -169,6 +169,7 @@ describe('whitespace should be attached to the outermost element', () => {
         `export const enum Result { Good = "Good", Bad = "Bad" }`,
         "for (let i = 1; i < [4, 3, 6].length; i++) {",
         `import "./rpc"; declare module "./tree" {}`,
+        "const userScores = new Map<string, number>()",
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();
