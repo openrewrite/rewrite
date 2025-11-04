@@ -316,7 +316,7 @@ public class SourcePositionService {
         AtomicBoolean printing = new AtomicBoolean(false);
         AtomicBoolean found = new AtomicBoolean(false);
         JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
-            J foundJ = null;
+            @Nullable J foundJ = null;
 
             @Override
             protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {
@@ -360,7 +360,7 @@ public class SourcePositionService {
                     stopAfterPreVisit();
                 }
 
-                if (tree != cursor.getValue() && SemanticallyEqual.areEqual(tree, cursor.getValue()) && cursor.getParentTreeCursor().getValue() == getCursor().getParentTreeCursor().getValue()) {
+                if (tree != cursor.getValue() && tree.getId().equals(((J) cursor.getValue()).getId())) {
                     setCursor(cursor);
                     tree = cursor.getValue();
                 }
