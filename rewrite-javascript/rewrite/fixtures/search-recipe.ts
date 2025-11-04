@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, foundSearchResult, Option, Recipe, TreeVisitor} from "../src";
-import {JavaScriptVisitor} from "../src/javascript";
-import {J} from "../src/java";
+import {ExecutionContext, foundSearchResult, Option, Recipe, TreeVisitor} from "@openrewrite/rewrite";
+import {JavaScriptVisitor} from "@openrewrite/rewrite/javascript";
+import {J} from "@openrewrite/rewrite/java";
 
 export class FindIdentifier extends Recipe {
     name = "org.openrewrite.example.javascript.find-identifier"
@@ -37,7 +37,7 @@ export class FindIdentifier extends Recipe {
         return new class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitIdentifier(ident: J.Identifier, ctx: ExecutionContext): Promise<J | undefined> {
                 if (ident.simpleName === identifier) {
-                    return foundSearchResult(ident)
+                    return foundSearchResult(ident);
                 }
                 return super.visitIdentifier(ident, ctx);
             }
