@@ -349,7 +349,6 @@ describe('variadic statement matching and expansion', () => {
                     }
                 }`,
                 `
-
                 function foo() {
                     try {
                         doSomething();
