@@ -72,7 +72,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function foo(x) {
                     console.log('returning');
                     return x;
@@ -102,7 +101,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function foo(x) {
                     console.log('entering');
                     console.log('returning');
@@ -134,7 +132,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function foo(x) {
                     const y = x * 2;
                     console.log(y);
@@ -166,7 +163,6 @@ describe('variadic statement matching and expansion', () => {
                     console.log('end');
                 }`,
                 `
-
                 function foo() {
                     console.log('start');
                     console.log('middle');
@@ -197,7 +193,6 @@ describe('variadic statement matching and expansion', () => {
                     const b = 2;
                 }`,
                 `
-
                 function foo() {
                     const b = 2
                     const a = 1
@@ -234,7 +229,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function bar(x) {
                     const y = x;
                     console.log('returning');
@@ -265,7 +259,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function foo(x) {
                     console.log('returning');
                     return x;
@@ -278,7 +271,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function bar(x) {
                     const y = x;
                     console.log('returning');
@@ -313,7 +305,6 @@ describe('variadic statement matching and expansion', () => {
                 `function foo() {
                 }`,
                 `
-
                 function foo() {
                     console.log('hello');
                 }`
