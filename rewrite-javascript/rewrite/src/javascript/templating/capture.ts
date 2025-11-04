@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {J} from '../../java';
-import {Capture, Any, TemplateParam, CaptureOptions, VariadicOptions} from './types';
+import {J, Type} from '../../java';
+import {Any, Capture, CaptureOptions, TemplateParam, VariadicOptions} from './types';
 
 /**
  * Combines multiple constraints with AND logic.
@@ -70,6 +70,8 @@ export const CAPTURE_VARIADIC_SYMBOL = Symbol('captureVariadic');
 export const CAPTURE_CONSTRAINT_SYMBOL = Symbol('captureConstraint');
 // Symbol to access capturing flag without triggering Proxy
 export const CAPTURE_CAPTURING_SYMBOL = Symbol('captureCapturing');
+// Symbol to access type information without triggering Proxy
+export const CAPTURE_TYPE_SYMBOL = Symbol('captureType');
 
 export class CaptureImpl<T = any> implements Capture<T> {
     public readonly name: string;
@@ -77,6 +79,7 @@ export class CaptureImpl<T = any> implements Capture<T> {
     [CAPTURE_VARIADIC_SYMBOL]: VariadicOptions | undefined;
     [CAPTURE_CONSTRAINT_SYMBOL]: ((node: T) => boolean) | undefined;
     [CAPTURE_CAPTURING_SYMBOL]: boolean;
+    [CAPTURE_TYPE_SYMBOL]: string | Type | undefined;
 
     constructor(name: string, options?: CaptureOptions<T>, capturing: boolean = true) {
         this.name = name;
@@ -99,6 +102,11 @@ export class CaptureImpl<T = any> implements Capture<T> {
         if (options?.constraint) {
             this[CAPTURE_CONSTRAINT_SYMBOL] = options.constraint;
         }
+
+        // Store type if provided
+        if (options?.type) {
+            this[CAPTURE_TYPE_SYMBOL] = options.type;
+        }
     }
 
     getName(): string {
@@ -119,6 +127,10 @@ export class CaptureImpl<T = any> implements Capture<T> {
 
     isCapturing(): boolean {
         return this[CAPTURE_CAPTURING_SYMBOL];
+    }
+
+    getType(): string | Type | undefined {
+        return this[CAPTURE_TYPE_SYMBOL];
     }
 }
 
@@ -291,6 +303,9 @@ function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
             if (prop === CAPTURE_CAPTURING_SYMBOL) {
                 return target[CAPTURE_CAPTURING_SYMBOL];
             }
+            if (prop === CAPTURE_TYPE_SYMBOL) {
+                return target[CAPTURE_TYPE_SYMBOL];
+            }
 
             // Support using Capture as object key via computed properties {[x]: value}
             if (prop === Symbol.toPrimitive || prop === 'toString' || prop === 'valueOf') {
@@ -298,7 +313,7 @@ function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
             }
 
             // Allow methods to be called directly on the target
-            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing') {
+            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing' || prop === 'getType') {
                 return target[prop].bind(target);
             }
 
@@ -335,7 +350,7 @@ function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
 
 // Overload 1: Options object with constraint (no variadic)
 export function capture<T = any>(
-    options: { name?: string; constraint: (node: T) => boolean } & { variadic?: never }
+    options: CaptureOptions<T> & { variadic?: never }
 ): Capture<T> & T;
 
 // Overload 2: Options object with variadic

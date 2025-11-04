@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, Tree} from '../..';
-import {J} from '../../java';
+import {J, Type} from '../../java';
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -43,6 +43,16 @@ export interface CaptureOptions<T = any> {
     name?: string;
     variadic?: boolean | VariadicOptions;
     constraint?: (node: T) => boolean;
+    /**
+     * Type annotation for this capture. When provided, the template engine will generate
+     * a preamble declaring the capture identifier with this type annotation, allowing
+     * the TypeScript parser/compiler to produce a properly type-attributed AST.
+     *
+     * Can be specified as:
+     * - A string type annotation (e.g., "boolean", "string", "number")
+     * - A Type instance from the AST (the type will be inferred from the Type)
+     */
+    type?: string | Type;
 }
 
 /**

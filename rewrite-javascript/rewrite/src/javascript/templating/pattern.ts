@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 import {produce} from 'immer';
-import {J} from '../../java';
+import {J, Type} from '../../java';
 import {JS} from '../index';
 import {randomId} from '../../uuid';
-import {Capture, Any, PatternOptions} from './types';
-import {CaptureImpl, CAPTURE_NAME_SYMBOL, CAPTURE_CAPTURING_SYMBOL} from './capture';
+import {Any, Capture, PatternOptions} from './types';
+import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl} from './capture';
 import {PatternMatchingComparator} from './comparator';
-import {PlaceholderUtils, templateCache, CaptureMarker, CaptureStorageValue, WRAPPERS_MAP_SYMBOL} from './utils';
+import {CaptureMarker, CaptureStorageValue, PlaceholderUtils, templateCache, WRAPPERS_MAP_SYMBOL} from './utils';
 
 /**
  * Builder for creating patterns programmatically.
@@ -514,19 +514,50 @@ class TemplateProcessor {
      * @returns A Promise resolving to the AST pattern
      */
     async toAstPattern(): Promise<J> {
+        // Generate type preamble for captures with types
+        const preamble = this.generateTypePreamble();
+
         // Combine template parts and placeholders
         const templateString = this.buildTemplateString();
+
+        // Add preamble to context statements (so they're skipped during extraction)
+        const contextWithPreamble = preamble.length > 0
+            ? [...this.contextStatements, ...preamble]
+            : this.contextStatements;
 
         // Use cache to get or parse the compilation unit
         const cu = await templateCache.getOrParse(
             templateString,
             this.captures,
-            this.contextStatements,
+            contextWithPreamble,
             this.dependencies
         );
 
         // Extract the relevant part of the AST
+        // The pattern code is always the last statement (after context + preamble)
         return this.extractPatternFromAst(cu);
+    }
+
+    /**
+     * Generates type preamble declarations for captures with type annotations.
+     *
+     * @returns Array of preamble statements
+     */
+    private generateTypePreamble(): string[] {
+        const preamble: string[] = [];
+        for (const capture of this.captures) {
+            const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
+            const captureType = (capture as any)[CAPTURE_TYPE_SYMBOL];
+            if (captureType) {
+                // Convert Type to string if needed
+                const typeString = typeof captureType === 'string'
+                    ? captureType
+                    : this.typeToString(captureType);
+                const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
+                preamble.push(`const ${placeholder}: ${typeString};`);
+            }
+        }
+        return preamble;
     }
 
     /**
@@ -562,45 +593,86 @@ class TemplateProcessor {
     }
 
     /**
+     * Converts a Type instance to a TypeScript type string.
+     *
+     * @param type The Type instance
+     * @returns A TypeScript type string
+     */
+    private typeToString(type: Type): string {
+        // Handle Type.Class and Type.ShallowClass - return their fully qualified names
+        if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
+            const classType = type as Type.Class;
+            return classType.fullyQualifiedName;
+        }
+
+        // Handle Type.Primitive - map to TypeScript primitive types
+        if (type.kind === Type.Kind.Primitive) {
+            const primitiveType = type as Type.Primitive;
+            switch (primitiveType.keyword) {
+                case 'String':
+                    return 'string';
+                case 'boolean':
+                    return 'boolean';
+                case 'double':
+                case 'float':
+                case 'int':
+                case 'long':
+                case 'short':
+                case 'byte':
+                    return 'number';
+                case 'void':
+                    return 'void';
+                default:
+                    return 'any';
+            }
+        }
+
+        // Handle Type.Array - render component type plus []
+        if (type.kind === Type.Kind.Array) {
+            const arrayType = type as Type.Array;
+            const componentTypeString = this.typeToString(arrayType.elemType);
+            return `${componentTypeString}[]`;
+        }
+
+        // For other types, return 'any' as a fallback
+        // TODO: Implement proper Type to string conversion for other Type.Kind values
+        return 'any';
+    }
+
+    /**
      * Extracts the pattern from the parsed AST.
+     * The pattern code is always the last statement in the compilation unit
+     * (after all context statements and type preamble declarations).
      *
      * @param cu The compilation unit
      * @returns The extracted pattern
      */
     private extractPatternFromAst(cu: JS.CompilationUnit): J {
-        // Skip context statements to get to the actual pattern code
-        const patternStatementIndex = this.contextStatements.length;
-
-        // Check if we have any statements at the pattern index
-        if (!cu.statements || patternStatementIndex >= cu.statements.length) {
-            // If there's no statement at the index, but we have exactly one statement
-            // and it's a block, it might be the pattern itself (e.g., pattern`{ ... }`)
-            if (cu.statements && cu.statements.length === 1 && cu.statements[0].element.kind === J.Kind.Block) {
-                return this.attachCaptureMarkers(cu.statements[0].element);
-            }
-            throw new Error(`No statement found at index ${patternStatementIndex} in compilation unit with ${cu.statements?.length || 0} statements`);
+        // Check if we have any statements
+        if (!cu.statements || cu.statements.length === 0) {
+            throw new Error(`No statements found in compilation unit`);
         }
 
-        // Extract the relevant part of the AST based on the template content
-        const firstStatement = cu.statements[patternStatementIndex].element;
+        // The pattern code is always the last statement
+        const lastStatement = cu.statements[cu.statements.length - 1].element;
 
         let extracted: J;
 
         // Check if this is our wrapper function for block patterns
-        if (firstStatement.kind === J.Kind.MethodDeclaration) {
-            const method = firstStatement as J.MethodDeclaration;
+        if (lastStatement.kind === J.Kind.MethodDeclaration) {
+            const method = lastStatement as J.MethodDeclaration;
             if (method.name?.simpleName === '__PATTERN__' && method.body) {
                 // Extract the block from the wrapper function
                 extracted = method.body;
             } else {
-                extracted = firstStatement;
+                extracted = lastStatement;
             }
-        } else if (firstStatement.kind === JS.Kind.ExpressionStatement) {
-            // If the first statement is an expression statement, extract the expression
-            extracted = (firstStatement as JS.ExpressionStatement).expression;
+        } else if (lastStatement.kind === JS.Kind.ExpressionStatement) {
+            // If the statement is an expression statement, extract the expression
+            extracted = (lastStatement as JS.ExpressionStatement).expression;
         } else {
             // Otherwise, return the statement itself
-            extracted = firstStatement;
+            extracted = lastStatement;
         }
 
         // Attach CaptureMarkers to capture identifiers

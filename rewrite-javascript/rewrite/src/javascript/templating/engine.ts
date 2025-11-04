@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 import {Cursor, isTree} from '../..';
-import {J} from '../../java';
+import {J, Type} from '../../java';
 import {JS} from '..';
 import {produce} from 'immer';
-import {TemplateCache, PlaceholderUtils} from './utils';
-import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
+import {PlaceholderUtils, TemplateCache} from './utils';
+import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, TemplateParamImpl} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
 
@@ -66,6 +66,9 @@ export class TemplateEngine {
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
     ): Promise<J | undefined> {
+        // Generate type preamble for captures/parameters with types
+        const preamble = TemplateEngine.generateTypePreamble(parameters);
+
         // Build the template string with parameter placeholders
         const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
 
@@ -74,12 +77,17 @@ export class TemplateEngine {
             return undefined;
         }
 
+        // Add preamble to context statements (so they're skipped during extraction)
+        const contextWithPreamble = preamble.length > 0
+            ? [...contextStatements, ...preamble]
+            : contextStatements;
+
         // Use cache to get or parse the compilation unit
         // For templates, we don't have captures, so use empty array
         const cu = await templateCache.getOrParse(
             templateString,
             [], // templates don't have captures in the cache key
-            contextStatements,
+            contextWithPreamble,
             dependencies
         );
 
@@ -88,31 +96,25 @@ export class TemplateEngine {
             throw new Error(`Failed to parse template code (no statements):\n${templateString}`);
         }
 
-        // Skip context statements to get to the actual template code
-        const templateStatementIndex = contextStatements.length;
-        if (templateStatementIndex >= cu.statements.length) {
-            return undefined;
-        }
-
-        // Extract the relevant part of the AST
-        const firstStatement = cu.statements[templateStatementIndex].element;
+        // The template code is always the last statement (after context + preamble)
+        const lastStatement = cu.statements[cu.statements.length - 1].element;
         let extracted: J;
 
         // Check if this is a wrapped template (function __TEMPLATE__() { ... })
-        if (firstStatement.kind === J.Kind.MethodDeclaration) {
-            const func = firstStatement as J.MethodDeclaration;
+        if (lastStatement.kind === J.Kind.MethodDeclaration) {
+            const func = lastStatement as J.MethodDeclaration;
             if (func.name.simpleName === '__TEMPLATE__' && func.body) {
                 // __TEMPLATE__ wrapper indicates the original template was a block.
                 // Always return the block to preserve the block structure.
                 extracted = func.body;
             } else {
                 // Not a __TEMPLATE__ wrapper
-                extracted = firstStatement;
+                extracted = lastStatement;
             }
-        } else if (firstStatement.kind === JS.Kind.ExpressionStatement) {
-            extracted = (firstStatement as JS.ExpressionStatement).expression;
+        } else if (lastStatement.kind === JS.Kind.ExpressionStatement) {
+            extracted = (lastStatement as JS.ExpressionStatement).expression;
         } else {
-            extracted = firstStatement;
+            extracted = lastStatement;
         }
 
         // Create a copy to avoid sharing cached AST instances
@@ -131,6 +133,58 @@ export class TemplateEngine {
 
         // Apply the template to the current AST
         return new TemplateApplier(cursor, coordinates, unsubstitutedAst).apply();
+    }
+
+    /**
+     * Generates type preamble declarations for captures/parameters with type annotations.
+     *
+     * @param parameters The parameters
+     * @returns Array of preamble statements
+     */
+    private static generateTypePreamble(parameters: Parameter[]): string[] {
+        const preamble: string[] = [];
+
+        for (let i = 0; i < parameters.length; i++) {
+            const param = parameters[i].value;
+            const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
+
+            // Check for Capture (could be a Proxy, so check for symbol property)
+            const isCapture = param instanceof CaptureImpl ||
+                            (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
+            const isCaptureValue = param instanceof CaptureValue;
+            const isTreeArray = Array.isArray(param) && param.length > 0 && isTree(param[0]);
+
+            if (isCapture) {
+                const captureType = param[CAPTURE_TYPE_SYMBOL];
+                if (captureType) {
+                    const typeString = typeof captureType === 'string'
+                        ? captureType
+                        : this.typeToString(captureType);
+                    preamble.push(`const ${placeholder}: ${typeString};`);
+                }
+            } else if (isCaptureValue) {
+                // For CaptureValue, check if the root capture has a type
+                const rootCapture = param.rootCapture;
+                if (rootCapture) {
+                    const captureType = (rootCapture as any)[CAPTURE_TYPE_SYMBOL];
+                    if (captureType) {
+                        const typeString = typeof captureType === 'string'
+                            ? captureType
+                            : this.typeToString(captureType);
+                        preamble.push(`const ${placeholder}: ${typeString};`);
+                    }
+                }
+            } else if (isTree(param) && !isTreeArray) {
+                // For J elements, derive type from the element's type property if it exists
+                const jElement = param as J;
+                if ((jElement as any).type) {
+                    const typeString = this.typeToString((jElement as any).type);
+                    preamble.push(`const ${placeholder}: ${typeString};`);
+                }
+            }
+        }
+
+        return preamble;
     }
 
     /**
@@ -173,6 +227,53 @@ export class TemplateEngine {
         }
 
         return result;
+    }
+
+    /**
+     * Converts a Type instance to a TypeScript type string.
+     *
+     * @param type The Type instance
+     * @returns A TypeScript type string
+     */
+    private static typeToString(type: Type): string {
+        // Handle Type.Class and Type.ShallowClass - return their fully qualified names
+        if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
+            const classType = type as Type.Class;
+            return classType.fullyQualifiedName;
+        }
+
+        // Handle Type.Primitive - map to TypeScript primitive types
+        if (type.kind === Type.Kind.Primitive) {
+            const primitiveType = type as Type.Primitive;
+            switch (primitiveType.keyword) {
+                case 'String':
+                    return 'string';
+                case 'boolean':
+                    return 'boolean';
+                case 'double':
+                case 'float':
+                case 'int':
+                case 'long':
+                case 'short':
+                case 'byte':
+                    return 'number';
+                case 'void':
+                    return 'void';
+                default:
+                    return 'any';
+            }
+        }
+
+        // Handle Type.Array - render component type plus []
+        if (type.kind === Type.Kind.Array) {
+            const arrayType = type as Type.Array;
+            const componentTypeString = this.typeToString(arrayType.elemType);
+            return `${componentTypeString}[]`;
+        }
+
+        // For other types, return 'any' as a fallback
+        // TODO: Implement proper Type to string conversion for other Type.Kind values
+        return 'any';
     }
 }
 
