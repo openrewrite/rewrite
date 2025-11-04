@@ -37,7 +37,7 @@ export class FindIdentifier extends Recipe {
         return new class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitIdentifier(ident: J.Identifier, ctx: ExecutionContext): Promise<J | undefined> {
                 if (ident.simpleName === identifier) {
-                    return foundSearchResult(ident)
+                    return foundSearchResult(ident);
                 }
                 return super.visitIdentifier(ident, ctx);
             }
