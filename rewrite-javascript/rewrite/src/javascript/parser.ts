@@ -3079,7 +3079,7 @@ export class JavaScriptParserVisitor {
             return this.rightPadded({
                 kind: J.Kind.VariableDeclarations,
                 id: randomId(),
-                prefix: isMulti ? this.prefix(declaration) : emptySpace,
+                prefix: this.prefix(declaration),
                 markers: emptyMarkers,
                 leadingAnnotations: [],
                 modifiers: isMulti ? [] : modifiers,
