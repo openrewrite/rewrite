@@ -225,7 +225,6 @@ function createCaptureValueProxy(
  * Creates a capture specification for use in template patterns.
  *
  * @template T The expected type of the captured AST node (for TypeScript autocomplete only)
- * @param name Optional name for the capture. If not provided, an auto-generated name is used.
  * @returns A Capture object that supports property access for use in templates
  *
  * @remarks
@@ -272,38 +271,11 @@ function createCaptureValueProxy(
  * const method = capture<J.MethodInvocation>('method');
  * template`console.log(${method.name.simpleName})`  // Accesses properties of captured node
  */
-// Overload 1: Options object with constraint (no variadic)
-export function capture<T = any>(
-    options: { name?: string; constraint: (node: T) => boolean } & { variadic?: never }
-): Capture<T> & T;
-
-// Overload 2: Options object with variadic
-export function capture<T = any>(
-    options: { name?: string; variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; min?: number; max?: number }
-): Capture<T[]> & T[];
-
-// Overload 3: Just a string name (simple named capture)
-export function capture<T = any>(name?: string): Capture<T> & T;
-
-// Implementation
-export function capture<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
-    let name: string | undefined;
-    let options: CaptureOptions<T> | undefined;
-
-    if (typeof nameOrOptions === 'string') {
-        // Simple named capture: capture('name')
-        name = nameOrOptions;
-        options = undefined;
-    } else {
-        // Options-based API: capture({ name: 'name', ...options }) or capture()
-        options = nameOrOptions;
-        name = options?.name;
-    }
-
-    const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
-    const impl = new CaptureImpl<T>(captureName, options);
-
-    // Return a Proxy that intercepts property accesses and creates CaptureValues
+/**
+ * Creates a Proxy wrapper for CaptureImpl that intercepts property accesses.
+ * Shared logic between capture() and any() to avoid duplication.
+ */
+function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
     return new Proxy(impl as any, {
         get(target: any, prop: string | symbol): any {
             // Allow access to internal symbols
@@ -313,13 +285,9 @@ export function capture<T = any>(nameOrOptions?: string | CaptureOptions<T>): Ca
             if (prop === CAPTURE_VARIADIC_SYMBOL) {
                 return target[CAPTURE_VARIADIC_SYMBOL];
             }
-
-            // Allow access to internal constraint symbol
             if (prop === CAPTURE_CONSTRAINT_SYMBOL) {
                 return target[CAPTURE_CONSTRAINT_SYMBOL];
             }
-
-            // Allow access to internal capturing symbol
             if (prop === CAPTURE_CAPTURING_SYMBOL) {
                 return target[CAPTURE_CAPTURING_SYMBOL];
             }
@@ -358,6 +326,40 @@ export function capture<T = any>(nameOrOptions?: string | CaptureOptions<T>): Ca
             return undefined;
         }
     });
+}
+
+// Overload 1: Options object with constraint (no variadic)
+export function capture<T = any>(
+    options: { name?: string; constraint: (node: T) => boolean } & { variadic?: never }
+): Capture<T> & T;
+
+// Overload 2: Options object with variadic
+export function capture<T = any>(
+    options: { name?: string; variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; min?: number; max?: number }
+): Capture<T[]> & T[];
+
+// Overload 3: Just a string name (simple named capture)
+export function capture<T = any>(name?: string): Capture<T> & T;
+
+// Implementation
+export function capture<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+    let name: string | undefined;
+    let options: CaptureOptions<T> | undefined;
+
+    if (typeof nameOrOptions === 'string') {
+        // Simple named capture: capture('name')
+        name = nameOrOptions;
+        options = undefined;
+    } else {
+        // Options-based API: capture({ name: 'name', ...options }) or capture()
+        options = nameOrOptions;
+        name = options?.name;
+    }
+
+    const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
+    const impl = new CaptureImpl<T>(captureName, options);
+
+    return createCaptureProxy(impl);
 }
 
 // Static counter for generating unique IDs for unnamed captures
@@ -433,55 +435,7 @@ export function any<T = any>(options?: CaptureOptions<T>): Any<T> & T {
     const anonName = `anon_${any.nextAnonId++}`;
     const impl = new CaptureImpl<T>(anonName, options, false); // capturing = false
 
-    // Return a Proxy that intercepts property accesses (though any() results shouldn't be used in templates)
-    // We still need the Proxy infrastructure for internal consistency
-    return new Proxy(impl as any, {
-        get(target: any, prop: string | symbol): any {
-            // Allow access to internal symbols
-            if (prop === CAPTURE_NAME_SYMBOL) {
-                return target[CAPTURE_NAME_SYMBOL];
-            }
-            if (prop === CAPTURE_VARIADIC_SYMBOL) {
-                return target[CAPTURE_VARIADIC_SYMBOL];
-            }
-            if (prop === CAPTURE_CONSTRAINT_SYMBOL) {
-                return target[CAPTURE_CONSTRAINT_SYMBOL];
-            }
-            if (prop === CAPTURE_CAPTURING_SYMBOL) {
-                return target[CAPTURE_CAPTURING_SYMBOL];
-            }
-
-            // Allow methods to be called directly on the target
-            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing') {
-                return target[prop].bind(target);
-            }
-
-            // For variadic any, support array-like operations (though they shouldn't be used in templates)
-            if (target.isVariadic() && typeof prop === 'string') {
-                const indexNum = Number(prop);
-                if (!isNaN(indexNum) && indexNum >= 0 && Number.isInteger(indexNum)) {
-                    return createCaptureValueProxy(target, [], { type: 'index', args: [indexNum] });
-                }
-
-                if (prop === 'slice') {
-                    return (...args: number[]) => {
-                        return createCaptureValueProxy(target, [], { type: 'slice', args });
-                    };
-                }
-
-                if (prop === 'length') {
-                    return createCaptureValueProxy(target, [], { type: 'length' });
-                }
-            }
-
-            // Property access is technically supported but shouldn't be used in templates
-            if (typeof prop === 'string') {
-                return createCaptureValueProxy(target, [prop]);
-            }
-
-            return undefined;
-        }
-    });
+    return createCaptureProxy(impl);
 }
 
 // Static counter for generating unique IDs for anonymous (non-capturing) patterns

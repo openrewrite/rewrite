@@ -17,7 +17,7 @@ import {Cursor} from '../..';
 import {J} from '../../java';
 import {RewriteRule, RewriteConfig} from './types';
 import {Pattern} from './pattern';
-import {Template} from '../templating';  // Will be from './template' once template.ts is created
+import {Template} from './template';
 
 /**
  * Implementation of a replacement rule.
