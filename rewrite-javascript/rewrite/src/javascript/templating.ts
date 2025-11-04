@@ -175,6 +175,8 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
         private readonly matcher: {
             handleCapture: (pattern: J, target: J) => boolean;
             handleVariadicCapture: (pattern: J, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
+            saveState: () => { bindings: Map<string, J>, wrappersMap: Map<string, J.RightPadded<J>[]> };
+            restoreState: (state: { bindings: Map<string, J>, wrappersMap: Map<string, J.RightPadded<J>[]> }) => void;
         },
         lenientTypeMatching: boolean = true
     ) {
@@ -338,42 +340,125 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
      * Works for any sequence of JRightPadded elements (arguments, statements, etc.).
      * A variadic capture can match zero or more consecutive elements.
      *
+     * Uses pivot detection to optimize matching, with backtracking as fallback.
+     *
      * @param patternElements The pattern elements (JRightPadded)
      * @param targetElements The target elements to match against (JRightPadded)
      * @param filterEmpty Whether to filter out J.Empty elements when capturing (true for arguments, false for statements)
      * @returns true if the sequence matches, false otherwise
      */
     private async matchSequence(patternElements: J.RightPadded<J>[], targetElements: J.RightPadded<J>[], filterEmpty: boolean): Promise<boolean> {
-        let patternIdx = 0;
-        let targetIdx = 0;
+        return await this.matchSequenceOptimized(patternElements, targetElements, 0, 0, filterEmpty);
+    }
 
-        while (patternIdx < patternElements.length && targetIdx <= targetElements.length) {
-            const patternElement = patternElements[patternIdx].element;
+    /**
+     * Optimized sequence matcher with pivot detection and backtracking.
+     * For variadic patterns, tries to detect pivots (where next pattern matches) to avoid
+     * unnecessary backtracking. Falls back to full backtracking when pivots are ambiguous.
+     *
+     * @param patternElements The pattern elements (JRightPadded)
+     * @param targetElements The target elements to match against (JRightPadded)
+     * @param patternIdx Current position in pattern
+     * @param targetIdx Current position in target
+     * @param filterEmpty Whether to filter out J.Empty elements when capturing
+     * @returns true if the remaining sequence matches, false otherwise
+     */
+    private async matchSequenceOptimized(
+        patternElements: J.RightPadded<J>[],
+        targetElements: J.RightPadded<J>[],
+        patternIdx: number,
+        targetIdx: number,
+        filterEmpty: boolean
+    ): Promise<boolean> {
+        // Base case: all patterns matched
+        if (patternIdx >= patternElements.length) {
+            return targetIdx >= targetElements.length; // Success if all targets consumed
+        }
 
-            // Check if this pattern element has a CaptureMarker with variadic options
-            const captureMarker = PlaceholderUtils.getCaptureMarker(patternElement);
-            const isVariadic = captureMarker?.variadicOptions !== undefined;
+        const patternElement = patternElements[patternIdx].element;
+        const captureMarker = PlaceholderUtils.getCaptureMarker(patternElement);
+        const isVariadic = captureMarker?.variadicOptions !== undefined;
 
-            if (isVariadic) {
-                const variadicOptions = captureMarker!.variadicOptions;
+        if (isVariadic) {
+            // Variadic pattern: try different consumption amounts with backtracking
+            const variadicOptions = captureMarker!.variadicOptions;
+            const min = variadicOptions?.min ?? 0;
+            const max = variadicOptions?.max ?? Infinity;
 
-                // Calculate how many target elements this variadic should consume
-                const remainingPatternElements = patternElements.length - patternIdx - 1;
-                const remainingTargetElements = targetElements.length - targetIdx;
-                const maxConsume = remainingTargetElements - remainingPatternElements;
-
-                // Check min/max constraints
-                const min = variadicOptions?.min ?? 0;
-                const max = variadicOptions?.max ?? Infinity;
-
-                if (maxConsume < min || maxConsume > max) {
-                    return false;
+            // Calculate maximum possible consumption
+            let nonVariadicRemainingPatterns = 0;
+            for (let i = patternIdx + 1; i < patternElements.length; i++) {
+                const nextPatternElement = patternElements[i].element;
+                const nextCaptureMarker = PlaceholderUtils.getCaptureMarker(nextPatternElement);
+                const nextIsVariadic = nextCaptureMarker?.variadicOptions !== undefined;
+                if (!nextIsVariadic) {
+                    nonVariadicRemainingPatterns++;
                 }
+            }
+            const remainingTargetElements = targetElements.length - targetIdx;
+            const maxPossible = Math.min(remainingTargetElements - nonVariadicRemainingPatterns, max);
 
-                // Capture all elements for this variadic
-                // Store the full JRightPadded wrappers to preserve semicolon markers
+            // Pivot detection optimization: try to find where next pattern matches
+            // This avoids unnecessary backtracking when constraints make the split point obvious
+            let pivotDetected = false;
+            let pivotAt = -1;
+
+            if (patternIdx + 1 < patternElements.length && min <= maxPossible) {
+                const nextPattern = patternElements[patternIdx + 1].element;
+
+                // Scan through possible consumption amounts starting from min
+                for (let tryConsume = min; tryConsume <= maxPossible; tryConsume++) {
+                    // Check if element after our consumption would match next pattern
+                    if (targetIdx + tryConsume < targetElements.length) {
+                        const candidateElement = targetElements[targetIdx + tryConsume].element;
+
+                        // Skip J.Empty for arguments
+                        if (filterEmpty && candidateElement.kind === J.Kind.Empty) {
+                            continue;
+                        }
+
+                        // Test if next pattern matches this element
+                        const savedMatch = this.match;
+                        const savedState = this.matcher.saveState();
+
+                        await this.visit(nextPattern, candidateElement);
+                        const matchesNext = this.match;
+
+                        this.match = savedMatch;
+                        this.matcher.restoreState(savedState);
+
+                        if (matchesNext) {
+                            // Found pivot! Try this consumption amount first
+                            pivotDetected = true;
+                            pivotAt = tryConsume;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Try different consumption amounts
+            // If pivot detected, try that first; otherwise use greedy approach (max to min)
+            const consumptionOrder: number[] = [];
+            if (pivotDetected && pivotAt >= 0) {
+                // Try pivot first, then others as fallback
+                consumptionOrder.push(pivotAt);
+                for (let c = maxPossible; c >= min; c--) {
+                    if (c !== pivotAt) {
+                        consumptionOrder.push(c);
+                    }
+                }
+            } else {
+                // Greedy approach: max to min
+                for (let c = maxPossible; c >= min; c--) {
+                    consumptionOrder.push(c);
+                }
+            }
+
+            for (const consume of consumptionOrder) {
+                // Capture elements for this consumption amount
                 const capturedWrappers: J.RightPadded<J>[] = [];
-                for (let i = 0; i < maxConsume; i++) {
+                for (let i = 0; i < consume; i++) {
                     const wrapped = targetElements[targetIdx + i];
                     const element = wrapped.element;
                     // For arguments, filter out J.Empty as it represents an empty argument list
@@ -388,43 +473,80 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
 
                 // Re-check min/max constraints against actual captured elements (after filtering if applicable)
                 if (capturedElements.length < min || capturedElements.length > max) {
-                    return false;
+                    continue; // Try next consumption amount
                 }
 
-                // Handle the variadic capture by passing the pattern element (which has the CaptureMarker)
-                // Pass both elements (for constraints/user access) and wrappers (for template expansion)
+                // Save current state for backtracking
+                const savedState = this.matcher.saveState();
+
+                // Handle the variadic capture
                 const success = this.matcher.handleVariadicCapture(patternElement, capturedElements, capturedWrappers);
                 if (!success) {
-                    return false;
+                    // Restore state and try next amount
+                    this.matcher.restoreState(savedState);
+                    continue;
                 }
 
-                targetIdx += maxConsume;
-                patternIdx++;
-            } else {
-                // Regular non-variadic element - must match exactly one target element
-                if (targetIdx >= targetElements.length) {
-                    return false; // Pattern has more elements than target
+                // Try to match the rest of the pattern
+                const restMatches = await this.matchSequenceOptimized(
+                    patternElements,
+                    targetElements,
+                    patternIdx + 1,
+                    targetIdx + consume,
+                    filterEmpty
+                );
+
+                if (restMatches) {
+                    return true; // Found a valid matching
                 }
 
-                const targetElement = targetElements[targetIdx].element;
-
-                // For arguments, J.Empty represents no argument, so regular captures should not match it
-                if (filterEmpty && targetElement.kind === J.Kind.Empty) {
-                    return false;
-                }
-
-                await this.visit(patternElement, targetElement);
-                if (!this.match) {
-                    return false;
-                }
-
-                patternIdx++;
-                targetIdx++;
+                // Backtrack: restore state and try next amount
+                this.matcher.restoreState(savedState);
             }
-        }
 
-        // Ensure we've consumed all elements from both pattern and target
-        return patternIdx === patternElements.length && targetIdx === targetElements.length;
+            return false; // No consumption amount worked
+        } else {
+            // Regular non-variadic element - must match exactly one target element
+            if (targetIdx >= targetElements.length) {
+                return false; // Pattern has more elements than target
+            }
+
+            const targetElement = targetElements[targetIdx].element;
+
+            // For arguments, J.Empty represents no argument, so regular captures should not match it
+            if (filterEmpty && targetElement.kind === J.Kind.Empty) {
+                return false;
+            }
+
+            // Save current state for backtracking (both match state and capture bindings)
+            const savedMatch = this.match;
+            const savedState = this.matcher.saveState();
+
+            await this.visit(patternElement, targetElement);
+            if (!this.match) {
+                // Restore state on match failure
+                this.match = savedMatch;
+                this.matcher.restoreState(savedState);
+                return false;
+            }
+
+            // Continue matching the rest
+            const restMatches = await this.matchSequenceOptimized(
+                patternElements,
+                targetElements,
+                patternIdx + 1,
+                targetIdx + 1,
+                filterEmpty
+            );
+
+            if (!restMatches) {
+                // Restore full state on backtracking failure
+                this.match = savedMatch;
+                this.matcher.restoreState(savedState);
+            }
+
+            return restMatches;
+        }
     }
 }
 
@@ -1292,6 +1414,31 @@ export class Pattern {
     }
 }
 
+/**
+ * Result of a successful pattern match containing captured values.
+ *
+ * Provides access to captured AST nodes from pattern matching operations.
+ * Use the `get()` method to retrieve captured values by name or by Capture object.
+ *
+ * @example
+ * const x = capture('x');
+ * const pat = pattern`foo(${x})`;
+ * const match = await pat.match(someNode);
+ * if (match) {
+ *     const captured = match.get('x');  // Get by name
+ *     // or
+ *     const captured = match.get(x);    // Get by Capture object
+ * }
+ *
+ * @example
+ * // Variadic captures return arrays
+ * const args = capture({ variadic: true });
+ * const pat = pattern`foo(${args})`;
+ * const match = await pat.match(methodInvocation);
+ * if (match) {
+ *     const capturedArgs = match.get(args);  // Returns J[] for variadic captures
+ * }
+ */
 export class MatchResult implements Pick<Map<string, J>, "get"> {
     constructor(
         private readonly bindings: Map<string, J> = new Map(),
@@ -1388,9 +1535,35 @@ class Matcher {
         const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
         const comparator = new PatternMatchingComparator({
             handleCapture: (p, t) => this.handleCapture(p, t),
-            handleVariadicCapture: (p, ts, ws) => this.handleVariadicCapture(p, ts, ws)
+            handleVariadicCapture: (p, ts, ws) => this.handleVariadicCapture(p, ts, ws),
+            saveState: () => this.saveState(),
+            restoreState: (state) => this.restoreState(state)
         }, lenientTypeMatching);
         return await comparator.compare(pattern, target);
+    }
+
+    /**
+     * Saves the current state of bindings and wrappersMap for backtracking.
+     *
+     * @returns A snapshot of the current state
+     */
+    private saveState(): { bindings: Map<string, J>, wrappersMap: Map<string, J.RightPadded<J>[]> } {
+        return {
+            bindings: new Map(this.bindings),
+            wrappersMap: new Map(this.wrappersMap)
+        };
+    }
+
+    /**
+     * Restores a previously saved state for backtracking.
+     *
+     * @param state The state to restore
+     */
+    private restoreState(state: { bindings: Map<string, J>, wrappersMap: Map<string, J.RightPadded<J>[]> }): void {
+        this.bindings.clear();
+        state.bindings.forEach((value, key) => this.bindings.set(key, value));
+        this.wrappersMap.clear();
+        state.wrappersMap.forEach((value, key) => this.wrappersMap.set(key, value));
     }
 
     /**

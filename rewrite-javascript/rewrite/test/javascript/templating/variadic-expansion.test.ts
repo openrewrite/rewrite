@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, Pattern, template, Template, typescript} from "../../../src/javascript";
+import {any, capture, JavaScriptVisitor, pattern, Pattern, template, Template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('variadic template expansion', () => {
@@ -94,6 +94,86 @@ describe('variadic template expansion', () => {
 
         return spec.rewriteRun(
             typescript('foo(1, 2, 3)', 'bar(1, 2, 3)')
+        );
+    });
+
+    test('match with any() before-middle-after - zero before, zero after', () => {
+        const before = any({ variadic: true });
+        const middle = capture<J.Identifier>({constraint: node => node.simpleName === 'x'});
+        const after = any({ variadic: true });
+        const pat = pattern`foo(${before}, ${middle}, ${after})`;
+        const tmpl = template`bar(${middle})`;
+
+        spec.recipe = fromVisitor(matchAndReplace(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript('foo(x)', 'bar(x)')
+        );
+    });
+
+    test('match with any() before-middle-after - one before, zero after', () => {
+        const before = any({ variadic: true });
+        const middle = capture<J.Identifier>({constraint: node => node.simpleName === 'x'});
+        const after = any({ variadic: true });
+        const pat = pattern`foo(${before}, ${middle}, ${after})`;
+        const tmpl = template`bar(${middle})`;
+
+        spec.recipe = fromVisitor(matchAndReplace(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript('foo(a, x)', 'bar(x)')
+        );
+    });
+
+    test('match with any() before-middle-after - zero before, one after', () => {
+        const before = any({ variadic: true });
+        const middle = capture<J.Identifier>({constraint: node => node.simpleName === 'x'});
+        const after = any({ variadic: true });
+        const pat = pattern`foo(${before}, ${middle}, ${after})`;
+        const tmpl = template`bar(${middle})`;
+
+        spec.recipe = fromVisitor(matchAndReplace(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript('foo(x, b)', 'bar(x)')
+        );
+    });
+
+    test('match with any() before-middle-after - one before, one after', () => {
+        const before = any({ variadic: true });
+        const middle = capture<J.Identifier>({constraint: node => node.simpleName === 'x'});
+        const after = any({ variadic: true });
+        const pat = pattern`foo(${before}, ${middle}, ${after})`;
+        const tmpl = template`bar(${middle})`;
+
+        spec.recipe = fromVisitor(matchAndReplace(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript('foo(a, x, b)', 'bar(x)')
+        );
+    });
+
+    test('variadic followed by literal - should not consume literal', () => {
+        const args = capture({ variadic: true });
+        const pat = pattern`foo(${args}, 'bar')`;
+        const tmpl = template`baz(${args})`;
+
+        spec.recipe = fromVisitor(matchAndReplace(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript(`foo(1, 2, 'bar')`, `baz(1, 2)`)
+        );
+    });
+
+    test('variadic followed by literal - no match if literal missing', () => {
+        const args = capture({ variadic: true });
+        const pat = pattern`foo(${args}, 'bar')`;
+        const tmpl = template`baz(${args})`;
+
+        spec.recipe = fromVisitor(matchAndReplace(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript(`foo(1, 2, 'baz')`)  // No change - 'baz' doesn't match 'bar'
         );
     });
 });
