@@ -25,6 +25,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.maven.search.FindMavenProject;
 import org.openrewrite.maven.utilities.MavenWrapper;
 import org.openrewrite.properties.PropertiesIsoVisitor;
 import org.openrewrite.properties.PropertiesParser;
@@ -153,6 +154,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     }
 
     static class MavenWrapperState {
+        boolean mavenProject = false;
         boolean needsWrapperUpdate = false;
 
         @Nullable BuildTool updatedMarker;
@@ -244,6 +246,10 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             return false;
                         }
 
+                        if (new FindMavenProject().getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
+                            acc.mavenProject = true;
+                        }
+
                         MavenWrapper mavenWrapper = getMavenWrapper(ctx);
 
                         if (sourceFile instanceof Quark || sourceFile instanceof Remote) {
@@ -281,6 +287,10 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     @Override
     public Collection<SourceFile> generate(MavenWrapperState acc, ExecutionContext ctx) {
         if (Boolean.FALSE.equals(addIfMissing)) {
+            return emptyList();
+        }
+
+        if (!acc.mavenProject) {
             return emptyList();
         }
 
