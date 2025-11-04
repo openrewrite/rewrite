@@ -244,4 +244,20 @@ class EnumTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void enumWhitespaceAttachedToEnumValueSet() {
+        rewriteRun(
+          java(
+            "enum Color { RED, GREEN, BLUE }",
+            spec -> spec.afterRecipe(cu -> {
+                J.EnumValueSet enumValueSet = (J.EnumValueSet) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.EnumValue firstValue = enumValueSet.getEnums().get(0);
+
+                assertEquals(" ", enumValueSet.getPrefix().getWhitespace());
+                assertEquals("", firstValue.getPrefix().getWhitespace());
+            })
+          )
+        );
+    }
 }
