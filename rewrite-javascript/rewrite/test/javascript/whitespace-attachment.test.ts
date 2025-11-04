@@ -172,6 +172,7 @@ describe('whitespace should be attached to the outermost element', () => {
         "const userScores = new Map<string, number>()",
         "function* generateUsers() { yield { id: 1 } };",
         "type T = undefined extends undefined ? string : never;",
+        "const FirstEntity = class FirstEntityClass {};"
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();
