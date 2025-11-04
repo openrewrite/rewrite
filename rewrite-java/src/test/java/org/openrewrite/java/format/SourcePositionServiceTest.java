@@ -17,14 +17,15 @@ package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
+import org.openrewrite.java.service.Span;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JContainer;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -111,23 +112,23 @@ class SourcePositionServiceTest implements RewriteTest {
           })),
           java(
             """
-            package com.example;
-            
-            // Comments should not affect line length calculation
-            public class Test {
-                public int /* multiline comments can impact though */ example() {
-                    String text = "This is a sample string to test line length calculation";
-                    assert text != null;
-                    // Another comment that is not counted
-                    String invocation = String.valueOf("Both lines share the same length.");
-                    return text.length() + invocation.length();
-                }
-            
-                class Inner {
-                    // Inner class to test nested structures
-                }
-            }
-            """
+              package com.example;
+              
+              // Comments should not affect line length calculation
+              public class Test {
+                  public int /* multiline comments can impact though */ example() {
+                      String text = "This is a sample string to test line length calculation";
+                      assert text != null;
+                      // Another comment that is not counted
+                      String invocation = String.valueOf("Both lines share the same length.");
+                      return text.length() + invocation.length();
+                  }
+              
+                  class Inner {
+                      // Inner class to test nested structures
+                  }
+              }
+              """
           )
         );
     }
@@ -189,40 +190,40 @@ class SourcePositionServiceTest implements RewriteTest {
           })),
           java(
             """
-            package com.example;
-
-            public class Test {
-                public void /* multiline comments can impact though */ example(int p, String a, double r, Float m) {
-                    // comments should not be counted
-                    String invocation = String.valueOf("Both lines share the same length.");
-                    String text = new StringBuilder().append("text").reverse().toString();
-                    StringBuilder builder = 
-                        new StringBuilder().append("text").repeat("text", 2);
-                }
-            }
-            """
+              package com.example;
+              
+              public class Test {
+                  public void /* multiline comments can impact though */ example(int p, String a, double r, Float m) {
+                      // comments should not be counted
+                      String invocation = String.valueOf("Both lines share the same length.");
+                      String text = new StringBuilder().append("text").reverse().toString();
+                      StringBuilder builder = 
+                          new StringBuilder().append("text").repeat("text", 2);
+                  }
+              }
+              """
           ),
-          java (
+          java(
             """
-            public record Record1(String s1, Integer t1, Double u1, Float b1) {
-                public record Record2(String s2, Integer t2, Double u2, Float b2) {}
-                public record Record3(
-                        String s3, Integer t3, Double u3, Float b3) {}
-            }
-            """
+              public record Record1(String s1, Integer t1, Double u1, Float b1) {
+                  public record Record2(String s2, Integer t2, Double u2, Float b2) {}
+                  public record Record3(
+                          String s3, Integer t3, Double u3, Float b3) {}
+              }
+              """
           ),
-          java (
+          java(
             """
-            public record Record4(String s1, Integer t1, Double u1, Float b1) {
-                public record Record5(String s2,
-            Integer t2,
-                                                       Double u2,
-            
-            Float b2) {}
-                public record Record6(
-            String s3, Integer t3, Double u3, Float b3) {}
-            }
-            """
+              public record Record4(String s1, Integer t1, Double u1, Float b1) {
+                  public record Record5(String s2,
+              Integer t2,
+                                                         Double u2,
+              
+              Float b2) {}
+                  public record Record6(
+              String s3, Integer t3, Double u3, Float b3) {}
+              }
+              """
           )
         );
     }
@@ -234,65 +235,65 @@ class SourcePositionServiceTest implements RewriteTest {
             spec.typeValidationOptions(TypeValidation.none()) //Deliberately testing missing types here
               .recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
 
-              @Nullable
-              SourcePositionService service;
+                  @Nullable
+                  SourcePositionService service;
 
-              @Override
-              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  service = cu.service(SourcePositionService.class);
-                  return super.visitCompilationUnit(cu, ctx);
-              }
+                  @Override
+                  public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                      service = cu.service(SourcePositionService.class);
+                      return super.visitCompilationUnit(cu, ctx);
+                  }
 
-              @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (multiVariable.getVariables().stream().anyMatch(v -> "stub".contains(v.getSimpleName().substring(0, 1)))) {
-                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("1"))) {
-                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(22);
+                  @Override
+                  public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                      if (multiVariable.getVariables().stream().anyMatch(v -> "stub".contains(v.getSimpleName().substring(0, 1)))) {
+                          if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("1"))) {
+                              assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(22);
+                          }
+                          if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("2"))) {
+                              assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(26);
+                          }
+                          if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("3"))) {
+                              assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(12);
+                          }
                       }
-                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("2"))) {
-                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(26);
+                      if (multiVariable.getVariables().stream().anyMatch(v -> "parm".contains(v.getSimpleName().substring(0, 1)))) {
+                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(67);
                       }
-                      if (multiVariable.getVariables().stream().anyMatch(v -> v.getSimpleName().endsWith("3"))) {
-                          assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(12);
-                      }
+                      return super.visitVariableDeclarations(multiVariable, ctx);
                   }
-                  if (multiVariable.getVariables().stream().anyMatch(v -> "parm".contains(v.getSimpleName().substring(0, 1)))) {
-                      assertThat(service.computeColumnToAlignTo(getCursor(), 8)).isEqualTo(67);
-                  }
-                  return super.visitVariableDeclarations(multiVariable, ctx);
-              }
-          })),
+              })),
           java(
             """
-            package com.example;
-
-            public class Test {
-                public void /* multiline comments can impact though */ example(File p, File a, File r, File m) {
-                }
-            }
-            """
+              package com.example;
+              
+              public class Test {
+                  public void /* multiline comments can impact though */ example(File p, File a, File r, File m) {
+                  }
+              }
+              """
           ),
-          java (
+          java(
             """
-            public record Record1(File s1, File t1, File u1, File b1) {
-                public record Record2(File s2, File t2, File u2, File b2) {}
-                public record Record3(
-                        File s3, File t3, File u3, File b3) {}
-            }
-            """
+              public record Record1(File s1, File t1, File u1, File b1) {
+                  public record Record2(File s2, File t2, File u2, File b2) {}
+                  public record Record3(
+                          File s3, File t3, File u3, File b3) {}
+              }
+              """
           ),
-          java (
+          java(
             """
-            public record Record4(File s1, File t1, File u1, File b1) {
-                public record Record5(File s2,
-            File t2,
-                                                       File u2,
-            
-            File b2) {}
-                public record Record6(
-            File s3, File t3, File u3, File b3) {}
-            }
-            """
+              public record Record4(File s1, File t1, File u1, File b1) {
+                  public record Record5(File s2,
+              File t2,
+                                                         File u2,
+              
+              File b2) {}
+                  public record Record6(
+              File s3, File t3, File u3, File b3) {}
+              }
+              """
           )
         );
     }
@@ -347,45 +348,45 @@ class SourcePositionServiceTest implements RewriteTest {
           })),
           java(
             """
-            package com.example;
-
-            public class Test {
-                public void /* multiline comments can impact though */ example(
-            int p,
-            String a,
-            double r,
-            Float m) {
-                    // comments should not be counted
-                    String invocation = String
-            .valueOf("Both lines share the same length.");
-                    String text = new StringBuilder()
-            .append("text")
-            .reverse()
-            .toString();
-                }
-            }
-            """
+              package com.example;
+              
+              public class Test {
+                  public void /* multiline comments can impact though */ example(
+              int p,
+              String a,
+              double r,
+              Float m) {
+                      // comments should not be counted
+                      String invocation = String
+              .valueOf("Both lines share the same length.");
+                      String text = new StringBuilder()
+              .append("text")
+              .reverse()
+              .toString();
+                  }
+              }
+              """
           ),
-          java (
+          java(
             """
-            public record Record1(
-            String s1,
-            Integer t1,
-            Double u1,
-            Float b1) {
-                public record Record2(
-            String s2,
-            Integer t2,
-            Double u2,
-            Float b2) {}
-            }
-            """
+              public record Record1(
+              String s1,
+              Integer t1,
+              Double u1,
+              Float b1) {
+                  public record Record2(
+              String s2,
+              Integer t2,
+              Double u2,
+              Float b2) {}
+              }
+              """
           )
         );
     }
 
     @Test
-    void correctlyCalculatesDeclarationLength() {
+    void correctlyCalculatesPosition() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
 
@@ -395,23 +396,23 @@ class SourcePositionServiceTest implements RewriteTest {
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                   service = cu.service(SourcePositionService.class);
-                  assertResult(1, 0, 33, 152); //entire file
-                  assertResult(cu.getClasses().getFirst(), 4, 0, 30, 152); //entire Test class declaration
+                  assertResult(1, 0, 33, 1, 152); //entire file
+                  assertResult(cu.getClasses().getFirst(), 4, 0, 33, 1, 152); //entire Test class declaration
                   return super.visitCompilationUnit(cu, ctx);
               }
 
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                   if ("Test".equals(classDecl.getSimpleName())) {
-                      assertResult(4, 0, 30, 152); //entire Test class declaration
-                      assertResult(classDecl.getBody().getStatements().get(4), 17, 4, 4, 76); //example2 method
+                      assertResult(4, 0, 33, 1, 152); //entire Test class declaration
+                      assertResult(classDecl.getBody().getStatements().get(4), 17, 4, 20, 5, 76); //example2 method
                   }
                   if ("Inner".equals(classDecl.getSimpleName())) {
-                      assertResult(27, 4, 4, 84); //entire Inner class declaration
+                      assertResult(27, 4, 30, 5, 84); //entire Inner class declaration
                   }
                   if ("RecordDeclaration".equals(classDecl.getSimpleName())) {
-                      assertResult(32, 4, 1, 152); //entire Inner class declaration
-                      assertResult(classDecl.getPadding().getPrimaryConstructor(), 32, 29, 1, 34);
+                      assertResult(32, 4, 32, 152, 152); //entire Inner class declaration
+                      assertResult(classDecl.getPadding().getPrimaryConstructor(), 32, 29, 32, 34, 34);
                   }
                   return super.visitClassDeclaration(classDecl, ctx);
               }
@@ -420,22 +421,22 @@ class SourcePositionServiceTest implements RewriteTest {
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   switch (method.getSimpleName()) {
                       case "example1":
-                          assertMinimizedResult(10, 4, 4, 76);
-                          assertResult(10, 4, 6, 60);
-                          assertMinimizedResult(method.getPadding().getParameters(), 10, 54, 1, 73);
-                          assertResult(method.getPadding().getParameters(), 10, 54, 3, 60);
+                          assertResult(10, 4, 15, 5, 60); // calculate the span as is.
+                          assertMinimizedResult(10, 4, 13, 5, 76); // collapsing the method args to a single line using minimized (correctly calculate a span after changing an element)
+                          assertResult(method.getPadding().getParameters(), 10, 54, 12, 17, 60); // calculate the span of the parameters within the declaration
+                          assertMinimizedResult(method.getPadding().getParameters(), 10, 54, 10, 73, 73); // calculate the span of the parameters after minimization (correctly calculate a nested span after changing an element)
                           break;
                       case "example2":
-                          assertMinimizedResult(17, 4, 4, 76);
-                          assertResult(17, 4, 4, 76);
-                          assertMinimizedResult(method.getPadding().getParameters(), 17, 54, 1, 73);
-                          assertResult(method.getPadding().getParameters(), 17, 54, 1, 73);
+                          assertResult(17, 4, 20, 5, 76);
+                          assertMinimizedResult(17, 4, 20, 5, 76);
+                          assertResult(method.getPadding().getParameters(), 17, 54, 17, 73, 73);
+                          assertMinimizedResult(method.getPadding().getParameters(), 17, 54, 17, 73, 73);
                           break;
                       case "someVeryLongMethodNameThatIsAsLongAsTheMethodsAbove":
-                          assertMinimizedResult(22, 4, 3, 76);
-                          assertResult(22, 4, 4, 74);
-                          assertMinimizedResult(method.getPadding().getParameters(), 23, 68, 1, 73);
-                          assertResult(method.getPadding().getParameters(), 23, 68, 1, 73);
+                          assertResult(22, 4, 25, 5, 74);
+                          assertMinimizedResult(22, 4, 24, 5, 76); // minimization moves the opening curly causing the end-line to shift by 1 and the maxColumn by 2
+                          assertResult(method.getPadding().getParameters(), 23, 68, 23, 73, 73);
+                          assertMinimizedResult(method.getPadding().getParameters(), 23, 68, 23, 73, 73);
                           break;
                   }
                   return super.visitMethodDeclaration(method, ctx);
@@ -444,90 +445,149 @@ class SourcePositionServiceTest implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (multiVariable.getVariables().stream().anyMatch(v -> "abc".contains(v.getSimpleName()))) {
-                      assertResult(6, 4, 1, 37);
+                      assertResult(6, 4, 6, 37, 37);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "d".equals(v.getSimpleName()))) {
-                      assertResult(7, 4, 1, 13);
+                      assertResult(7, 4, 7, 13, 13);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "e".equals(v.getSimpleName()))) {
-                      assertResult(8, 4, 1, 9);
+                      assertResult(8, 4, 8, 9, 9);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "f".equals(v.getSimpleName()))) {
-                      assertResult(32, 29, 1, 34);
+                      assertResult(32, 29, 32, 34, 34);
                   }
                   if (multiVariable.getVariables().stream().anyMatch(v -> "sum1".equals(v.getSimpleName()))) {
-                      assertResult(13, 8, 1, 24);
+                      assertResult(13, 8, 13, 24, 24);
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
               }
 
-              private void assertResult(int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retriever(getCursor()).find())
-                    .usingRecursiveComparison()
-                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
+              private void assertResult(int line, int column, int endLine, int endColumn, int maxColumn) {
+                  assertThat(service.positionOf(getCursor()))
+                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).build());
               }
 
-              private void assertResult(J j, int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retriever(getCursor()).find(j))
-                    .usingRecursiveComparison()
-                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
+              private void assertResult(J j, int line, int column, int endLine, int endColumn, int maxColumn) {
+                  assertThat(service.positionOf(getCursor(), j))
+                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).build());
               }
 
-              private void assertResult(JContainer<Statement> j, int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retriever(getCursor()).find(j))
-                    .usingRecursiveComparison()
-                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
+              private void assertResult(JContainer<Statement> j, int line, int column, int endLine, int endColumn, int maxColumn) {
+                  assertThat(service.positionOf(getCursor(), j))
+                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).build());
               }
 
-              private void assertMinimizedResult(int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retriever(getCursor()).minimized(IntelliJ.spaces()).find())
-                    .usingRecursiveComparison()
-                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
+              private void assertMinimizedResult(int line, int column, int endLine, int endColumn, int maxColumn) {
+                  assertThat(service.positionOf(new Cursor(getCursor().getParent(), minimize(getCursor().getValue()))))
+                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).build());
               }
 
-              private void assertMinimizedResult(JContainer<Statement> j, int line, int column, int lines, int maxColumn) {
-                  assertThat(service.retriever(getCursor()).minimized(IntelliJ.spaces()).find(j))
-                    .usingRecursiveComparison()
-                    .isEqualTo(new SourcePositionService.SourcePositionRetriever.SearchResult(line, column, maxColumn, lines));
+              private void assertMinimizedResult(JContainer<Statement> j, int line, int column, int endLine, int endColumn, int maxColumn) {
+                  assertThat(service.positionOf(new Cursor(getCursor().getParent(), minimize(getCursor().getValue())), j))
+                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).build());
               }
           })),
           java(
             """
-            package com.example;
-            
-            // Own-line comments are not considered the start of a line
-            @Deprecated
-            public class Test {
-                private final int a = 1, b, c = 3;
-                int d = 4;
-                int e;
-
-                public int /* multiline comment impact*/ example1(int g,
-                        int h,
-                        int i) {
-                    int sum1 = g + h;
-                    return sum1;
-                }
-
-                public int /* multiline comment impact*/ example2(int g, int h, int i) {
-                    int sum2 = a + c;
-                    return sum2;
-                }
-
-                @Deprecated // eol comments do not impact the col of the element
-                public void someVeryLongMethodNameThatIsAsLongAsTheMethodsAbove(int x)
-                {
-                }
-            
-                @Deprecated /* same line annotations do impact declaration length */ class Inner
-                {
-                    // Inner class to test nested structures
-                }
-
-                record RecordDeclaration(int f) { /* We only count till the opening curly (incl if on same line) and not the block's end Space / closing curly. */ }
-            }
-            """
+              package com.example;
+              
+              // Own-line comments are not considered the start of a line
+              @Deprecated
+              public class Test {
+                  private final int a = 1, b, c = 3;
+                  int d = 4;
+                  int e;
+              
+                  public int /* multiline comment impact*/ example1(int g,
+                          int h,
+                          int i) {
+                      int sum1 = g + h;
+                      return sum1;
+                  }
+              
+                  public int /* multiline comment impact*/ example2(int g, int h, int i) {
+                      int sum2 = a + c;
+                      return sum2;
+                  }
+              
+                  @Deprecated // eol comments do not impact the col of the element
+                  public void someVeryLongMethodNameThatIsAsLongAsTheMethodsAbove(int x)
+                  {
+                  }
+              
+                  @Deprecated /* same line annotations do impact declaration length */ class Inner
+                  {
+                      // Inner class to test nested structures
+                  }
+              
+                  record RecordDeclaration(int f) { /* We only count till the opening curly (incl if on same line) and not the block's end Space / closing curly. */ }
+              }
+              """
           )
         );
+    }
+
+    private static  <T extends J> T minimize(T tree) {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        J j = new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
+                                                                  JRightPadded.Location loc,
+                                                                  ExecutionContext ctx) {
+                switch (loc) {
+                    case METHOD_DECLARATION_PARAMETER:
+                    case RECORD_STATE_VECTOR: {
+                        if (right != null && right.getElement() instanceof J) {
+                            //noinspection unchecked
+                            right = right
+                              .withAfter(minimized(right.getAfter()))
+                              .withElement(((J) right.getElement()).withPrefix(minimized(((J) right.getElement()).getPrefix())));
+                        }
+                        break;
+                    }
+                }
+                return super.visitRightPadded(right, loc, ctx);
+            }
+
+            @Override
+            public Space visitSpace(@Nullable Space space,
+                                    Space.Location loc,
+                                    ExecutionContext ctx) {
+                if (space == null) {
+                    return super.visitSpace(space, loc, ctx);
+                }
+                if (space == tree.getPrefix()) {
+                    return space;
+                }
+                switch (loc) {
+                    case BLOCK_PREFIX:
+                    case MODIFIER_PREFIX:
+                    case METHOD_DECLARATION_PARAMETER_SUFFIX:
+                    case METHOD_DECLARATION_PARAMETERS:
+                    case METHOD_SELECT_SUFFIX:
+                    case METHOD_INVOCATION_ARGUMENTS:
+                    case METHOD_INVOCATION_ARGUMENT_SUFFIX:
+                    case METHOD_INVOCATION_NAME:
+                    case RECORD_STATE_VECTOR_SUFFIX: {
+                        space = minimized(space);
+                        break;
+                    }
+                }
+                return super.visitSpace(space, loc, ctx);
+            }
+
+            //IntelliJ does not format when comments are present.
+            private Space minimized(Space space) {
+                if (space.getComments().isEmpty()) {
+                    return space.getWhitespace().isEmpty() ? space : Space.EMPTY;
+                }
+                return space;
+            }
+        }.visit(tree, ctx);
+        if (j != tree) {
+            j = new MinimumViableSpacingVisitor<>(null).visit(j, ctx);
+            j = new SpacesVisitor<>(IntelliJ.spaces(), null, null).visit(j, ctx);
+        }
+        return (T) j;
     }
 }

@@ -15,25 +15,17 @@
  */
 package org.openrewrite.java.service;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.format.MinimumViableSpacingVisitor;
-import org.openrewrite.java.format.SpacesVisitor;
 import org.openrewrite.java.search.SemanticallyEqual;
-import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -46,6 +38,7 @@ import static java.util.Collections.emptyList;
  */
 @Incubating(since = "8.63.0")
 public class SourcePositionService {
+    private static final String START_FIND = "/* START_FIND */";
 
     /**
      * Computes the column position where an element should be aligned to.
@@ -138,8 +131,36 @@ public class SourcePositionService {
         throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
     }
 
-    public SourcePositionRetriever retriever(Cursor cursor) {
-        return SourcePositionRetriever.of(cursor);
+    /**
+     * Computes the position span of the element at the given cursor.
+     * @see #positionOfChild(Cursor, Object)
+     */
+    public Span positionOf(Cursor cursor) {
+        return positionOfChild(cursor, cursor.getValue());
+    }
+
+    /**
+     * Computes the position span of a container element.
+     * @see #positionOfChild(Cursor, Object)
+     */
+    public Span positionOf(Cursor cursor, JContainer<? extends J> container) {
+        return positionOfChild(cursor, container);
+    }
+
+    /**
+     * Computes the position span of a right-padded element.
+     * @see #positionOfChild(Cursor, Object)
+     */
+    public Span positionOf(Cursor cursor, JRightPadded<J> rightPadded) {
+        return positionOfChild(cursor, rightPadded);
+    }
+
+    /**
+     * Computes the position span of a J element.
+     * @see #positionOfChild(Cursor, Object)
+     */
+    public Span positionOf(Cursor cursor, J child) {
+        return positionOfChild(cursor, child);
     }
 
     private int getSuffixLength(J tree) {
@@ -241,279 +262,239 @@ public class SourcePositionService {
         return null;
     }
 
-    @Getter
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    public static class SourcePositionRetriever {
-
-        private static final String START_FIND = "/* START_FIND */";
-        private static final String STOP_FIND = "/* STOP_FIND */";
-
-        private final Cursor cursor;
-
-        public SourcePositionRetriever minimized(SpacesStyle spacesStyle) {
-            if (cursor.getValue() instanceof J) {
-                InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-                J cursorValue = cursor.getValue();
-                J j = new JavaIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
-                                                                          JRightPadded.Location loc,
-                                                                          ExecutionContext ctx) {
-                        switch (loc) {
-                            case METHOD_DECLARATION_PARAMETER:
-                            case RECORD_STATE_VECTOR: {
-                                if (right != null && right.getElement() instanceof J) {
-                                    //noinspection unchecked
-                                    right = right
-                                            .withAfter(minimized(right.getAfter()))
-                                            .withElement(((J) right.getElement()).withPrefix(minimized(((J) right.getElement()).getPrefix())));
-                                }
-                                break;
-                            }
-                        }
-                        return super.visitRightPadded(right, loc, ctx);
-                    }
-
-                    @Override
-                    public Space visitSpace(@Nullable Space space,
-                                            Space.Location loc,
-                                            ExecutionContext ctx) {
-                        if (space == null) {
-                            return super.visitSpace(space, loc, ctx);
-                        }
-                        if (space == cursorValue.getPrefix()) {
-                            return space;
-                        }
-                        switch (loc) {
-                            case BLOCK_PREFIX:
-                            case MODIFIER_PREFIX:
-                            case METHOD_DECLARATION_PARAMETER_SUFFIX:
-                            case METHOD_DECLARATION_PARAMETERS:
-                            case METHOD_SELECT_SUFFIX:
-                            case METHOD_INVOCATION_ARGUMENTS:
-                            case METHOD_INVOCATION_ARGUMENT_SUFFIX:
-                            case METHOD_INVOCATION_NAME:
-                            case RECORD_STATE_VECTOR_SUFFIX: {
-                                space = minimized(space);
-                                break;
-                            }
-                        }
-                        return super.visitSpace(space, loc, ctx);
-                    }
-
-                    //IntelliJ does not format when comments are present.
-                    private Space minimized(Space space) {
-                        if (space.getComments().isEmpty()) {
-                            return space.getWhitespace().isEmpty() ? space : Space.EMPTY;
-                        }
-                        return space;
-                    }
-                }.visit(cursorValue, ctx);
-                if (j != cursor.getValue()) {
-                    j = new MinimumViableSpacingVisitor<>(null).visit(j, ctx);
-                    j = new SpacesVisitor<>(spacesStyle, null, null).visit(j, ctx);
-                }
-                return new SourcePositionRetriever(new Cursor(cursor.getParent(), Objects.requireNonNull(j)));
-            }
-            throw new IllegalArgumentException("Can only minimize J elements.");
+    /**
+     * Computes the position span of a child element within the source code by printing the source
+     * file and tracking line/column positions until the target element is reached.
+     * <p>
+     * This method uses a custom {@link JavaPrinter} to traverse the AST from the source file root,
+     * tracking line and column positions as it prints. When the target child element is encountered,
+     * it marks the position and calculates the span including:
+     * <ul>
+     *   <li>Start line and column (1-indexed for line, 0-indexed for column)</li>
+     *   <li>End line and column after the element's content</li>
+     *   <li>Maximum column width if the element spans multiple lines</li>
+     * </ul>
+     * <p>
+     * The method handles various AST element types including {@link J} elements, {@link JContainer}
+     * containers, and {@link JRightPadded} wrapped elements.
+     *
+     * @param cursor the cursor providing context for the position calculation, must point to or contain
+     *               a {@link JavaSourceFile} ancestor for printing
+     * @param child  the child element to locate (can be same as cursor element) or any child({@link J} element, {@link JContainer} or {@link JRightPadded})
+     * @return a {@link Span} containing the computed position information
+     * @throws IllegalArgumentException if the child is a raw {@link Collection} (use padding accessor methods instead),
+     *                                  if the child type is not supported, or if the child cannot be found in the source file
+     */
+    private Span positionOfChild(Cursor cursor, Object child) {
+        J findJ;
+        JContainer<J> findJContainer;
+        JRightPadded<J> findJRightPadded;
+        if (child instanceof J) {
+            findJContainer = null;
+            findJ = (J) child;
+            findJRightPadded = null;
+        } else if (child instanceof JContainer) {
+            findJContainer = (JContainer<J>) child;
+            findJ = null;
+            findJRightPadded = null;
+        } else if (child instanceof JRightPadded) {
+            findJContainer = null;
+            findJ = null;
+            findJRightPadded = (JRightPadded<J>) child;
+        } else if (child instanceof Collection) {
+            throw new IllegalArgumentException("Can only find J elements or their containers. Did you create a Cursor from a `get...()` method which should be done on the `getPadding().get...()` instead?");
+        } else {
+            throw new IllegalArgumentException("Can only find J elements or their containers. Not on " + child.getClass().getSimpleName() + ".");
         }
-
-        public SourcePositionRetriever.SearchResult find() {
-            return findChild(cursor.getValue());
-        }
-
-        public SourcePositionRetriever.SearchResult find(JContainer<? extends J> child) {
-            return findChild(child);
-        }
-
-        public SourcePositionRetriever.SearchResult find(JRightPadded<? extends J> child) {
-            return findChild(child);
-        }
-
-        public SourcePositionRetriever.SearchResult find(J child) {
-            return findChild(child);
-        }
-
-        private SourcePositionRetriever.SearchResult findChild(Object child) {
-            J findJ;
-            JContainer<J> findJContainer;
-            JRightPadded<J> findJRightPadded;
-            if (child instanceof J) {
-                findJContainer = null;
-                findJ = (J) child;
-                findJRightPadded = null;
-            } else if (child instanceof JContainer) {
-                findJContainer = (JContainer<J>) child;
-                findJ = null;
-                findJRightPadded = null;
-            } else if (child instanceof JRightPadded) {
-                findJContainer = null;
-                findJ = null;
-                findJRightPadded = (JRightPadded<J>) child;
-            } else if (child instanceof Collection) {
-                throw new IllegalArgumentException("Can only find J elements or their containers. Did you create a Cursor from a `get...()` method which should be done on the `getPadding().get...()` instead?");
-            } else {
-                throw new IllegalArgumentException("Can only find J elements or their containers. Not on " + child.getClass().getSimpleName() + ".");
-            }
-            JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
-                boolean found = false;
-
-                @Override
-                protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                    if (findJContainer != null && getCursor().getPathAsStream().anyMatch(c -> c == cursor.getValue()) && semanticallyEqual(nodes, findJContainer.getPadding().getElements())) {
-                        p.append(START_FIND);
-                        for (int i = 0; i < nodes.size(); i++) {
-                            JRightPadded<? extends J> node = nodes.get(i);
-                            if (i == 0) {
-                                visit(startFind(node.getElement()), p);
-                            } else {
-                                visit(node.getElement(), p);
-                            }
-                            visitSpace(node.getAfter(), location.getAfterLocation(), p);
-                            visitMarkers(node.getMarkers(), p);
-                            if (i < nodes.size() - 1) {
-                                p.append(suffixBetween);
-                            }
-                        }
-                        p.append(STOP_FIND);
-                        this.found = true;
-                    } else {
-                        super.visitRightPadded(nodes, location, suffixBetween, p);
-                    }
-                }
-
-                @Override
-                protected void visitRightPadded(@Nullable JRightPadded<? extends J> rightPadded, JRightPadded.Location location, @Nullable String suffix, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                    if (findJRightPadded != null) {
-                        if (rightPadded == findJRightPadded || SemanticallyEqual.areEqual(rightPadded.getElement(), findJRightPadded.getElement())) {
-                            p.append(START_FIND);
-                            super.visitRightPadded(rightPadded, location, suffix, p);
-                            p.append(STOP_FIND);
-                            this.found = true;
+        AtomicInteger startLine = new AtomicInteger(1);
+        AtomicInteger startCol = new AtomicInteger(0);
+        AtomicBoolean printing = new AtomicBoolean(false);
+        AtomicBoolean found = new AtomicBoolean(false);
+        JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
+            @Override
+            protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                if (findJContainer != null && getCursor().getPathAsStream().anyMatch(c -> c == cursor.getValue()) && semanticallyEqual(nodes, findJContainer.getPadding().getElements())) {
+                    printing.set(true);
+                    p.append(START_FIND);
+                    for (int i = 0; i < nodes.size(); i++) {
+                        JRightPadded<? extends J> node = nodes.get(i);
+                        if (i == 0) {
+                            visit(startFind(node.getElement()), p);
                         } else {
-                            super.visitRightPadded(rightPadded, location, suffix, p);
+                            visit(node.getElement(), p);
                         }
-                    } else {
-                        super.visitRightPadded(rightPadded, location, suffix, p);
-                    }
-                }
-
-                @Override
-                public @Nullable J visit(@Nullable Tree tree, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                    if (found) {
-                        return (J) tree;
-                    }
-                    if (tree instanceof J && (tree == cursor.getValue() || SemanticallyEqual.areEqual((J) tree, cursor.getValue()))) {
-                        tree = cursor.getValue();
-                    }
-                    if (findJ != null) {
-                        if (tree == findJ || (tree instanceof J && SemanticallyEqual.areEqual((J) tree, findJ))) {
-                            p.append(START_FIND);
-                            tree = super.visit(startFind((J) tree), p);
-                            p.append(STOP_FIND);
-                            return (J) tree;
+                        visitSpace(node.getAfter(), location.getAfterLocation(), p);
+                        visitMarkers(node.getMarkers(), p);
+                        if (i < nodes.size() - 1) {
+                            p.append(suffixBetween);
                         }
                     }
-                    return super.visit(tree, p);
-                }
-
-                private boolean semanticallyEqual(@Nullable List<? extends JRightPadded<? extends J>> left, @Nullable List<JRightPadded<J>> right) {
-                    if (left != null && right != null) {
-                        if (left.size() == right.size()) {
-                            for (int i = 0; i < left.size(); i++) {
-                                if (!SemanticallyEqual.areEqual(left.get(i).getElement(), right.get(i).getElement())) {
-                                    return false;
-                                }
-                            }
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-
-                private J startFind(J tree) {
-                    return tree.withPrefix(tree.getPrefix()
-                            .withWhitespace(tree.getPrefix().getWhitespace().replace("\n", "\n" + START_FIND))
-                            .withComments(ListUtils.map(tree.getComments(), c -> c.withSuffix(c.getSuffix().replace("\n", "\n" + START_FIND))))
-                    );
-                }
-            };
-            PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED);
-            Cursor printCursor = cursor;
-            if (!(cursor.getValue() instanceof JavaSourceFile)) {
-                printCursor = cursor.dropParentUntil(c -> c instanceof JavaSourceFile);
-            }
-            javaPrinter.visit(printCursor.getValue(), printLine, printCursor.getParent());
-
-            return new SourcePositionRetriever.SearchResult(printLine.getOut());
-        }
-
-        public static SourcePositionRetriever of(Cursor cursor) {
-            Object value = cursor.getValue();
-            if (value != Cursor.ROOT_VALUE) {
-                if (value instanceof J || value instanceof JContainer || value instanceof JRightPadded) {
-                    return new SourcePositionRetriever(cursor);
-                }
-            }
-            throw new IllegalArgumentException("Unable to construct SourcePositionRetriever as " + value.getClass().getSimpleName() + " is not a supported type.");
-        }
-
-        @Getter
-        @RequiredArgsConstructor
-        public static class SearchResult {
-            private final int line;
-            private final int column;
-            private final int maxColumn;
-            private final int lines;
-
-            private SearchResult(String printed) {
-                int stopIndex = printed.lastIndexOf(STOP_FIND);
-                if (stopIndex != -1) {
-                    printed = printed.substring(0, stopIndex);
-                }
-                int startIndex = printed.lastIndexOf(START_FIND);
-                if (startIndex >= 0) {
-                    String beforeChild = printed.substring(0, startIndex);
-                    int line = 1;
-                    int col = 0;
-                    for (int i = 0; i < beforeChild.length(); i++) {
-                        char c = beforeChild.charAt(i);
-                        if ('\n' == c) {
-                            line++;
-                            col = 0;
-                        } else {
-                            col++;
-                        }
-                    }
-                    String content = printed.substring(startIndex + START_FIND.length());
-                    int indent = StringUtils.indent(content).length();
-                    int lineLength = col;
-                    int maxColumn = 0;
-                    int lines = 1;
-                    for (int i = 0; i < content.length(); i++) {
-                        char c = content.charAt(i);
-                        if ('\n' == c) {
-                            lines++;
-                            if (maxColumn < lineLength) {
-                                maxColumn = lineLength;
-                            }
-                            lineLength = 0;
-                        } else {
-                            lineLength++;
-                        }
-                    }
-                    if (maxColumn < lineLength) {
-                        maxColumn = lineLength;
-                    }
-
-                    this.line = line;
-                    this.column = col + indent;
-                    this.maxColumn = maxColumn;
-                    this.lines = lines;
+                    found.set(true);
                 } else {
-                    throw new IllegalArgumentException("The child was not found in the sourceFile.");
+                    super.visitRightPadded(nodes, location, suffixBetween, p);
                 }
             }
+
+            @Override
+            protected void visitRightPadded(@Nullable JRightPadded<? extends J> rightPadded, JRightPadded.Location location, @Nullable String suffix, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                if (findJRightPadded != null && (rightPadded == findJRightPadded || SemanticallyEqual.areEqual(rightPadded.getElement(), findJRightPadded.getElement()))) {
+                    printing.set(true);
+                    p.append(START_FIND);
+                    super.visitRightPadded(rightPadded, location, suffix, p);
+                    found.set(true);
+                } else {
+                    super.visitRightPadded(rightPadded, location, suffix, p);
+                }
+            }
+
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                if (found.get()) {
+                    return (J) tree;
+                }
+                if (tree instanceof J && (tree == cursor.getValue() || SemanticallyEqual.areEqual((J) tree, cursor.getValue()))) {
+                    tree = cursor.getValue();
+                }
+                if (findJ != null && (tree == findJ || (tree instanceof J && SemanticallyEqual.areEqual((J) tree, findJ)))) {
+                    printing.set(true);
+                    p.append(START_FIND);
+                    tree = super.visit(startFind((J) tree), p);
+                    found.set(true);
+                    return (J) tree;
+                }
+                return super.visit(tree, p);
+            }
+
+            private J startFind(J tree) {
+                return tree.withPrefix(tree.getPrefix()
+                        .withWhitespace(tree.getPrefix().getWhitespace().replace("\n", "\n" + START_FIND))
+                        .withComments(ListUtils.map(tree.getComments(), c -> c.withSuffix(c.getSuffix().replace("\n", "\n" + START_FIND))))
+                );
+            }
+
+            private boolean semanticallyEqual(@Nullable List<? extends JRightPadded<? extends J>> left, @Nullable List<JRightPadded<J>> right) {
+                if (left != null && right != null) {
+                    if (left.size() == right.size()) {
+                        for (int i = 0; i < left.size(); i++) {
+                            if (!SemanticallyEqual.areEqual(left.get(i).getElement(), right.get(i).getElement())) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+        PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<TreeVisitor<?, ?>>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED) {
+            @Override
+            public PrintOutputCapture<TreeVisitor<?, ?>> append(@Nullable String text) {
+                if (text == null || text.isEmpty() || found.get()) {
+                    return this;
+                }
+                if (printing.get()) {
+                    return super.append(text);
+                }
+                for (int i = 0; i < text.length(); i++) {
+                    char c = text.charAt(i);
+                    if (c == '\n') {
+                        startLine.incrementAndGet();
+                        startCol.set(0);
+                    } else if (c == '\r') {
+                        // Skip \r in \r\n
+                        if (i + 1 >= text.length() || text.charAt(i + 1) != '\n') {
+                            startLine.incrementAndGet();
+                            startCol.set(0);
+                        }
+                    } else {
+                        startCol.incrementAndGet();
+                    }
+                }
+                return this;
+            }
+
+            @Override
+            public PrintOutputCapture<TreeVisitor<?, ?>> append(char c) {
+                if (found.get()) {
+                    return this;
+                }
+                if (printing.get()) {
+                    return super.append(c);
+                }
+                if (c == '\n' || c == '\r') {
+                    startLine.incrementAndGet();
+                    startCol.set(0);
+                } else {
+                    startCol.incrementAndGet();
+                }
+                return this;
+            }
+        };
+        Cursor printCursor = cursor;
+        if (!(cursor.getValue() instanceof JavaSourceFile)) {
+            printCursor = cursor.dropParentUntil(c -> c instanceof JavaSourceFile);
+        }
+        javaPrinter.visit(printCursor.getValue(), printLine, printCursor.getParent());
+        String printed = printLine.getOut();
+        int startIndex = printed.lastIndexOf(START_FIND);
+        if (startIndex >= 0) {
+            String beforeChild = printed.substring(0, startIndex);
+            for (int i = 0; i < beforeChild.length(); i++) {
+                startCol.set(0);
+                char c = beforeChild.charAt(i);
+                if ('\n' == c) {
+                    startLine.incrementAndGet();
+                } else if (c == '\r') {
+                    if (i + 1 < beforeChild.length() && beforeChild.charAt(i + 1) == '\n') {
+                        // Skip \r in \r\n
+                        continue;
+                    } else {
+                        startLine.incrementAndGet();
+                    }
+                }
+            }
+            String content = printed.substring(startIndex + START_FIND.length());
+            int indent = StringUtils.indent(content).length();
+            int col = startCol.get();
+            int maxColumn = 0;
+            int lines = 0;
+            for (int i = 0; i < content.length(); i++) {
+                char c = content.charAt(i);
+                if ('\n' == c) {
+                    lines++;
+                    if (maxColumn < col) {
+                        maxColumn = col;
+                    }
+                    col = 0;
+                } else if (c == '\r') {
+                    if (i + 1 < beforeChild.length() && beforeChild.charAt(i + 1) == '\n') {
+                        // Skip \r in \r\n
+                        continue;
+                    } else {
+                        lines++;
+                        if (maxColumn < col) {
+                            maxColumn = col;
+                        }
+                        col = 0;
+                    }
+                }
+                else {
+                    col++;
+                }
+            }
+            if (maxColumn < col) {
+                maxColumn = col;
+            }
+
+            return Span.builder()
+                    .startLine(startLine.get())
+                    .startColumn(startCol.get() + indent)
+                    .endLine(startLine.get() + lines)
+                    .endColumn(col)
+                    .maxColumn(maxColumn)
+                    .build();
+        } else {
+            throw new IllegalArgumentException("The child was not found in the sourceFile.");
         }
     }
 }
