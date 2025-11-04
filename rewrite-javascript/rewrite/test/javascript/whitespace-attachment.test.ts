@@ -170,6 +170,7 @@ describe('whitespace should be attached to the outermost element', () => {
         "for (let i = 1; i < [4, 3, 6].length; i++) {",
         `import "./rpc"; declare module "./tree" {}`,
         "const userScores = new Map<string, number>()",
+        "function* generateUsers() { yield { id: 1 } };",
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();

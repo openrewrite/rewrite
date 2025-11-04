@@ -2459,12 +2459,12 @@ export class JavaScriptParserVisitor {
         return {
             kind: JS.Kind.StatementExpression,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: this.prefix(node),
             markers: emptyMarkers,
             statement: {
                 kind: J.Kind.Yield,
                 id: randomId(),
-                prefix: this.prefix(node),
+                prefix: emptySpace,
                 markers: node.asteriskToken ?
                     markers({
                         kind: JS.Markers.DelegatedYield,
