@@ -175,7 +175,7 @@ export class RecipeSpec {
             (spec.after as (actual: string) => string)(actualAfter) : spec.after as string;
         expect(actualAfter).toEqual(afterSource);
         if (spec.afterRecipe) {
-            await spec.afterRecipe(actualAfter);
+            await spec.afterRecipe(after);
         }
     }
 

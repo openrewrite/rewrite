@@ -39,7 +39,7 @@ describe('template dependencies integration', () => {
     test('pattern with dependencies has proper type attribution in AST', async () => {
         // Create a pattern that uses uuid with proper dependencies
         const pat = pattern`v4()`.configure({
-            imports: ['import { v4 } from "uuid"'],
+            context: ['import { v4 } from "uuid"'],
             dependencies: { '@types/uuid': '^9.0.0' }
         });
 
@@ -79,7 +79,7 @@ describe('template dependencies integration', () => {
     test('template with dependencies generates AST with type attribution', async () => {
         // Create a template with dependencies
         const tmpl = template`v1()`.configure({
-            imports: ['import { v1 } from "uuid"'],
+            context: ['import { v1 } from "uuid"'],
             dependencies: { '@types/uuid': '^9.0.0' }
         });
 
@@ -111,17 +111,17 @@ describe('template dependencies integration', () => {
     test('multiple patterns with same dependencies share workspace', async () => {
         // Create multiple patterns with identical dependencies
         const pat1 = pattern`v4()`.configure({
-            imports: ['import { v4 } from "uuid"'],
+            context: ['import { v4 } from "uuid"'],
             dependencies: { '@types/uuid': '^9.0.0' }
         });
 
         const pat2 = pattern`v4()`.configure({
-            imports: ['import { v4 } from "uuid"'],
+            context: ['import { v4 } from "uuid"'],
             dependencies: { '@types/uuid': '^9.0.0' }
         });
 
         const pat3 = pattern`v4()`.configure({
-            imports: ['import { v4 } from "uuid"'],
+            context: ['import { v4 } from "uuid"'],
             dependencies: { '@types/uuid': '^9.0.0' }
         });
 
@@ -160,7 +160,7 @@ describe('template dependencies integration', () => {
     test('template with dependencies provides type attribution verified by MethodMatcher', async () => {
         // Create a pattern that matches v1() with dependencies
         const pat = pattern`v1()`.configure({
-            imports: ['import { v1 } from "uuid"'],
+            context: ['import { v1 } from "uuid"'],
             dependencies: { '@types/uuid': '^9.0.0' }
         });
 
@@ -209,7 +209,7 @@ describe('template dependencies integration', () => {
     test('pattern with dependencies does not match when types differ', async () => {
         // Create a pattern that matches v1() from uuid with proper dependencies
         const pat = pattern`v1()`.configure({
-            imports: ['import { v1 } from "uuid"'],
+            context: ['import { v1 } from "uuid"'],
             dependencies: { '@types/uuid': '^9.0.0' }
         });
 
@@ -257,7 +257,7 @@ describe('template dependencies integration', () => {
     test('pattern with dependencies matches when types are correct', async () => {
         // Create a pattern that matches v1() from uuid with proper dependencies
         const pat = pattern`v1()`.configure({
-            imports: ['import { v1 } from "uuid"'],
+            context: ['import { v1 } from "uuid"'],
             dependencies: { '@types/uuid': '^9.0.0' }
         });
 
@@ -347,7 +347,7 @@ describe('template dependencies integration', () => {
                 const arg = capture();
                 const replaceUtilIsArray = rewrite(() => ({
                     before: pattern`util.isArray(${arg})`.configure({
-                        imports: ["import * as util from 'util'"],
+                        context: ["import * as util from 'util'"],
                         dependencies: {'@types/node': '^20.0.0'}
                     }),
                     after: template`Array.isArray(${arg})`
@@ -355,7 +355,7 @@ describe('template dependencies integration', () => {
 
                 const replaceUtilIsBoolean = rewrite(() => ({
                     before: pattern`util.isBoolean(${arg})`.configure({
-                        imports: ["import * as util from 'util'"],
+                        context: ["import * as util from 'util'"],
                         dependencies: {'@types/node': '^20.0.0'}
                     }),
                     after: template`typeof ${arg} === 'boolean'`
@@ -448,7 +448,7 @@ describe('template dependencies integration', () => {
                 // Single pattern that matches both isDate(x) and util.isDate(x) via type attribution
                 const replaceIsDate = rewrite(() => ({
                     before: pattern`isDate(${dateArg})`.configure({
-                        imports: ['import { isDate } from "util"'],
+                        context: ['import { isDate } from "util"'],
                         dependencies: { '@types/node': '^20.0.0' }
                     }),
                     after: template`${dateArg} instanceof Date`

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 import {produce} from "immer";
 import {produceAsync} from "../../../src";
@@ -110,7 +110,7 @@ describe('template2 replace', () => {
 
                     // Use capture for late binding - myValue capture is looked up in the values map
                     const myValue = capture();
-                    return template`${myValue}`.apply(this.cursor, literal, new Map([[myValue.name, replacement]]));
+                    return template`${myValue}`.apply(this.cursor, literal, new Map([[myValue, replacement]]));
                 }
                 return literal;
             }
@@ -149,7 +149,7 @@ describe('template2 replace', () => {
 
                     // Mix capture (late binding) with literal string insertion
                     const x = capture();
-                    return template`${x} + ${'y'}`.apply(this.cursor, literal, new Map([[x.name, replacement]]));
+                    return template`${x} + ${'y'}`.apply(this.cursor, literal, new Map([[x, replacement]]));
                 }
                 return literal;
             }
@@ -157,6 +157,29 @@ describe('template2 replace', () => {
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1', 'const a = 10 + y'),
+        );
+    });
+
+    test('capture with object literal syntax', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+                if (literal.valueSource === '1') {
+                    // Create a replacement value
+                    const replacement = produce(literal, draft => {
+                        draft.value = 10;
+                        draft.valueSource = '10';
+                    });
+
+                    // Use named capture with object literal syntax
+                    const x = capture();
+                    return template`${x} + ${'y'}`.apply(this.cursor, literal, {[x]: replacement});
+                }
+                return literal;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('const a = 1', 'const a = 10 + y')
         );
     });
 
@@ -174,6 +197,75 @@ describe('template2 replace', () => {
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1', 'const a = 1 instanceof Date'),
+        );
+    });
+
+    test('scalar capture preserves trailing semicolon', () => {
+        const arg = capture();
+        const pat = pattern`foo(${arg})`;
+        const tmpl = template`bar(${arg})`;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const match = await pat.match(method);
+                if (match) {
+                    return await tmpl.apply(this.cursor, method, match);
+                }
+                return method;
+            }
+        });
+
+        return spec.rewriteRun(
+            typescript(
+                'foo(123);',
+                'bar(123);'
+            )
+        );
+    });
+
+    test('scalar capture preserves comments', () => {
+        const arg = capture();
+        const pat = pattern`oldFunc(${arg})`;
+        const tmpl = template`newFunc(${arg})`;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const match = await pat.match(method);
+                if (match) {
+                    return await tmpl.apply(this.cursor, method, match);
+                }
+                return method;
+            }
+        });
+
+        return spec.rewriteRun(
+            typescript(
+                'oldFunc(x); // comment',
+                'newFunc(x); // comment'
+            )
+        );
+    });
+
+    test('capture binding in method select position', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if ((method.name as J.Identifier).simpleName === 'oldMethod' && method.select) {
+                    const select = capture();
+                    return await template`${select}.newMethod()`.apply(
+                        this.cursor,
+                        method,
+                        new Map([[select, method.select.element]])
+                    );
+                }
+                return method;
+            }
+        });
+
+        return spec.rewriteRun(
+            typescript(
+                'obj.oldMethod();',
+                'obj.newMethod();'
+            )
         );
     });
 });
