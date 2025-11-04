@@ -138,7 +138,7 @@ function findWhitespaceViolations(rootNodes: OutputNode[]): string[] {
                     if (typeof grandchild === 'string' && grandchild.trim() === '' && grandchild.length > 0) {
                         const parentKind = prettifyKind(node.element.kind);
                         const childKind = prettifyKind(firstChild.element.kind);
-                        violations.push(`${parentKind} has child ${childKind} starting with whitespace |${grandchild}|. The whitespace should rather be attached to ${parentKind}.`);
+                        violations.push(`${parentKind} has child ${childKind} starting with whitespace |${grandchild}|. The whitespace should rather be attached to ${parentKind} around ${firstChild.toString()}.`);
                     }
                 }
             }
@@ -159,11 +159,23 @@ function findWhitespaceViolations(rootNodes: OutputNode[]): string[] {
     return violations;
 }
 
-describe('whitespace attachment', () => {
-    test('simple variable declaration', async () => {
+describe('whitespace should be attached to the outermost element', () => {
+    test.each([
+        "const c =  function(): number { return 116; };",
+        "const x = new Date();",
+        "async function m(): void { await Promise.resolve(); }",
+        "class ResponseHandler extends EventEmitter<{ success: string; error: Error }> {}",
+        "import React = require('react');",
+        `export const enum Result { Good = "Good", Bad = "Bad" }`,
+        "for (let i = 1; i < [4, 3, 6].length; i++) {",
+        `import "./rpc"; declare module "./tree" {}`,
+        "const userScores = new Map<string, number>()",
+        "function* generateUsers() { yield { id: 1 } };",
+        "type T = undefined extends undefined ? string : never;",
+        "const FirstEntity = class FirstEntityClass {};"
+    ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();
-        const sourceCode = "const c =  function(): number { return 116; };";
         const cu = await (await parser.parse({text: sourceCode, sourcePath: 'test.ts'}).next()).value;
         const capture = new TreeStructurePrintOutputCapture(MarkerPrinter.SANITIZED);
         const printer = new TreeCapturingJavaScriptPrinter();
