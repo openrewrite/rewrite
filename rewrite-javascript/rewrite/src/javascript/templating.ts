@@ -173,10 +173,10 @@ class CaptureMarker implements Marker {
 class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
     constructor(
         private readonly matcher: {
-            handleCapture: (pattern: J, target: J) => boolean;
+            handleCapture: (pattern: J, target: J, wrapper?: J.RightPadded<J>) => boolean;
             handleVariadicCapture: (pattern: J, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
-            saveState: () => { bindings: Map<string, J>, wrappersMap: Map<string, J.RightPadded<J>[]> };
-            restoreState: (state: { bindings: Map<string, J>, wrappersMap: Map<string, J.RightPadded<J>[]> }) => void;
+            saveState: () => Map<string, CaptureStorageValue>;
+            restoreState: (state: Map<string, CaptureStorageValue>) => void;
         },
         lenientTypeMatching: boolean = true
     ) {
@@ -184,10 +184,26 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
         super(lenientTypeMatching);
     }
 
+    /**
+     * Extracts the wrapper from the cursor if the parent is a RightPadded.
+     */
+    private getWrapperFromCursor(cursor: Cursor): J.RightPadded<J> | undefined {
+        if (!cursor.parent) {
+            return undefined;
+        }
+        const parent = cursor.parent.value;
+        // Check if parent is a RightPadded by checking its kind
+        if ((parent as any).kind === J.Kind.RightPadded) {
+            return parent as J.RightPadded<J>;
+        }
+        return undefined;
+    }
+
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
         // Check if the pattern node is a capture - this handles captures anywhere in the tree
         if (PlaceholderUtils.isCapture(j as J)) {
-            const success = this.matcher.handleCapture(j as J, p);
+            const wrapper = this.getWrapperFromCursor(this.cursor);
+            const success = this.matcher.handleCapture(j as J, p, wrapper);
             if (!success) {
                 return this.abort(j) as R;
             }
@@ -208,7 +224,8 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
 
     override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
         if (PlaceholderUtils.isCapture(identifier)) {
-            const success = this.matcher.handleCapture(identifier, other);
+            const wrapper = this.getWrapperFromCursor(this.cursor);
+            const success = this.matcher.handleCapture(identifier, other, wrapper);
             return success ? identifier : this.abort(identifier);
         }
         return super.visitIdentifier(identifier, other);
@@ -511,7 +528,8 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
                 return false; // Pattern has more elements than target
             }
 
-            const targetElement = targetElements[targetIdx].element;
+            const targetWrapper = targetElements[targetIdx];
+            const targetElement = targetWrapper.element;
 
             // For arguments, J.Empty represents no argument, so regular captures should not match it
             if (filterEmpty && targetElement.kind === J.Kind.Empty) {
@@ -522,7 +540,14 @@ class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
             const savedMatch = this.match;
             const savedState = this.matcher.saveState();
 
-            await this.visit(patternElement, targetElement);
+            // Push wrapper onto cursor so captures can access it
+            const savedCursor = this.cursor;
+            this.cursor = new Cursor(targetWrapper, this.cursor);
+            try {
+                await this.visit(patternElement, targetElement);
+            } finally {
+                this.cursor = savedCursor;
+            }
             if (!this.match) {
                 // Restore state on match failure
                 this.match = savedMatch;
@@ -1410,9 +1435,23 @@ export class Pattern {
     async match(ast: J): Promise<MatchResult | undefined> {
         const matcher = new Matcher(this, ast);
         const success = await matcher.matches();
-        return success ? new MatchResult(matcher.getAll(), matcher.getWrappersMap()) : undefined;
+        if (!success) {
+            return undefined;
+        }
+        // Create MatchResult with unified storage
+        const storage = (matcher as any).storage;
+        return new MatchResult(new Map(storage));
     }
 }
+
+/**
+ * Internal storage value type for pattern match captures.
+ * - J: Scalar captures without wrapper (fallback)
+ * - J.RightPadded<J>: Scalar captures with wrapper (preserves trailing markers like semicolons)
+ * - J[]: Variadic captures without wrapper metadata
+ * - J.RightPadded<J>[]: Variadic captures with wrapper metadata (preserves markers like commas)
+ */
+type CaptureStorageValue = J | J.RightPadded<J> | J[] | J.RightPadded<J>[];
 
 /**
  * Result of a successful pattern match containing captured values.
@@ -1441,11 +1480,8 @@ export class Pattern {
  */
 export class MatchResult implements Pick<Map<string, J>, "get"> {
     constructor(
-        private readonly bindings: Map<string, J> = new Map(),
-        wrappersMap: Map<string, J.RightPadded<J>[]> = new Map()
+        private readonly storage: Map<string, CaptureStorageValue> = new Map()
     ) {
-        // Store wrappersMap using a symbol to hide it from public API
-        (this as any)[WRAPPERS_MAP_SYMBOL] = wrappersMap;
     }
 
     // Overload: get with variadic Capture (array type) returns array
@@ -1458,7 +1494,55 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
     get(capture: Capture<any> | string): J | J[] | undefined {
         // Use symbol to get internal name without triggering Proxy
         const name = typeof capture === "string" ? capture : ((capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName());
-        return this.bindings.get(name);
+        const value = this.storage.get(name);
+        if (value === undefined) {
+            return undefined;
+        }
+        return this.extractElements(value);
+    }
+
+    /**
+     * Extracts semantic elements from storage value.
+     * For wrappers, extracts the .element; for arrays, returns array of elements.
+     *
+     * @param value The storage value
+     * @returns The semantic element(s)
+     */
+    private extractElements(value: CaptureStorageValue): J {
+        if (Array.isArray(value)) {
+            // Check if it's an array of wrappers
+            if (value.length > 0 && (value[0] as any).element !== undefined) {
+                // Array of J.RightPadded - extract elements
+                return (value as J.RightPadded<J>[]).map(w => w.element) as any;
+            }
+            // Already an array of elements
+            return value as any;
+        }
+        // Check if it's a scalar wrapper
+        if ((value as any).element !== undefined) {
+            return (value as J.RightPadded<J>).element;
+        }
+        // Scalar element
+        return value as J;
+    }
+
+    /**
+     * Internal method to get wrappers (used by template expansion).
+     * Returns both scalar and variadic wrappers.
+     * @internal
+     */
+    [WRAPPERS_MAP_SYMBOL](): Map<string, J.RightPadded<J> | J.RightPadded<J>[]> {
+        const result = new Map<string, J.RightPadded<J> | J.RightPadded<J>[]>();
+        for (const [name, value] of this.storage) {
+            if (Array.isArray(value) && value.length > 0 && (value[0] as any).element !== undefined) {
+                // This is an array of wrappers (variadic)
+                result.set(name, value as J.RightPadded<J>[]);
+            } else if (!Array.isArray(value) && (value as any).element !== undefined) {
+                // This is a scalar wrapper
+                result.set(name, value as J.RightPadded<J>);
+            }
+        }
+        return result;
     }
 }
 
@@ -1466,8 +1550,8 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
  * Matcher for checking if a pattern matches an AST node and extracting captured nodes.
  */
 class Matcher {
-    private readonly bindings = new Map<string, J>();
-    private readonly wrappersMap = new Map<string, J.RightPadded<J>[]>();  // Stores J.RightPadded wrappers for variadic captures
+    // Unified storage: holds J for scalar captures, J.RightPadded<J>[] or J[] for variadic captures
+    private readonly storage = new Map<string, CaptureStorageValue>();
     private patternAst?: J;
 
     /**
@@ -1504,12 +1588,41 @@ class Matcher {
     }
 
     /**
-     * Gets all captured nodes.
+     * Gets all captured nodes (projected view: extracts elements from wrappers).
      *
      * @returns A map of capture names to captured nodes
      */
     getAll(): Map<string, J> {
-        return new Map(this.bindings);
+        const result = new Map<string, J>();
+        for (const [name, value] of this.storage) {
+            result.set(name, this.extractElements(value));
+        }
+        return result;
+    }
+
+    /**
+     * Extracts semantic elements from storage value.
+     * For wrappers, extracts the .element; for arrays, returns array of elements.
+     *
+     * @param value The storage value
+     * @returns The semantic element(s)
+     */
+    private extractElements(value: CaptureStorageValue): J {
+        if (Array.isArray(value)) {
+            // Check if it's an array of wrappers
+            if (value.length > 0 && (value[0] as any).element !== undefined) {
+                // Array of J.RightPadded - extract elements
+                return (value as J.RightPadded<J>[]).map(w => w.element) as any;
+            }
+            // Already an array of elements
+            return value as any;
+        }
+        // Check if it's a scalar wrapper
+        if ((value as any).element !== undefined) {
+            return (value as J.RightPadded<J>).element;
+        }
+        // Scalar element
+        return value as J;
     }
 
     /**
@@ -1543,15 +1656,12 @@ class Matcher {
     }
 
     /**
-     * Saves the current state of bindings and wrappersMap for backtracking.
+     * Saves the current state of storage for backtracking.
      *
      * @returns A snapshot of the current state
      */
-    private saveState(): { bindings: Map<string, J>, wrappersMap: Map<string, J.RightPadded<J>[]> } {
-        return {
-            bindings: new Map(this.bindings),
-            wrappersMap: new Map(this.wrappersMap)
-        };
+    private saveState(): Map<string, CaptureStorageValue> {
+        return new Map(this.storage);
     }
 
     /**
@@ -1559,11 +1669,9 @@ class Matcher {
      *
      * @param state The state to restore
      */
-    private restoreState(state: { bindings: Map<string, J>, wrappersMap: Map<string, J.RightPadded<J>[]> }): void {
-        this.bindings.clear();
-        state.bindings.forEach((value, key) => this.bindings.set(key, value));
-        this.wrappersMap.clear();
-        state.wrappersMap.forEach((value, key) => this.wrappersMap.set(key, value));
+    private restoreState(state: Map<string, CaptureStorageValue>): void {
+        this.storage.clear();
+        state.forEach((value, key) => this.storage.set(key, value));
     }
 
     /**
@@ -1571,9 +1679,10 @@ class Matcher {
      *
      * @param pattern The pattern node
      * @param target The target node
+     * @param wrapper Optional wrapper containing the target (for preserving markers)
      * @returns true if the capture is successful, false otherwise
      */
-    private handleCapture(pattern: J, target: J): boolean {
+    private handleCapture(pattern: J, target: J, wrapper?: J.RightPadded<J>): boolean {
         const captureName = PlaceholderUtils.getCaptureName(pattern);
 
         if (!captureName) {
@@ -1592,20 +1701,11 @@ class Matcher {
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
         if (capturing) {
-            this.bindings.set(captureName, target);
+            // Store wrapper if available (preserves markers), otherwise store element
+            this.storage.set(captureName, wrapper ?? target);
         }
 
         return true;
-    }
-
-    /**
-     * Gets the wrappers map containing J.RightPadded wrappers for variadic captures.
-     * Used internally by template expansion to preserve markers like semicolons.
-     *
-     * @returns Map of capture names to arrays of J.RightPadded wrappers
-     */
-    getWrappersMap(): Map<string, J.RightPadded<J>[]> {
-        return this.wrappersMap;
     }
 
     /**
@@ -1613,6 +1713,7 @@ class Matcher {
      *
      * @param pattern The pattern node (the variadic capture)
      * @param targets The target nodes that were matched
+     * @param wrappers Optional wrappers to preserve markers
      * @returns true if the capture is successful, false otherwise
      */
     private handleVariadicCapture(pattern: J, targets: J[], wrappers?: J.RightPadded<J>[]): boolean {
@@ -1634,11 +1735,11 @@ class Matcher {
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
         if (capturing) {
-            // For variadic captures, store the array of matched nodes (elements for user access)
-            this.bindings.set(captureName, targets as any);
-            // Also store wrappers separately for template expansion (to preserve markers)
-            if (wrappers) {
-                this.wrappersMap.set(captureName, wrappers);
+            // Store the richest representation: wrappers if available, otherwise elements
+            if (wrappers && wrappers.length > 0) {
+                this.storage.set(captureName, wrappers);
+            } else {
+                this.storage.set(captureName, targets);
             }
         }
 
@@ -1931,7 +2032,7 @@ export class Template {
     async apply(cursor: Cursor, tree: J, values?: Map<Capture | string, J> | Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
         // Normalize the values map: convert any Capture keys to string keys
         let normalizedValues: Pick<Map<string, J>, 'get'> | undefined;
-        let wrappersMap: Map<string, J.RightPadded<J>[]> = new Map();
+        let wrappersMap: Map<string, J.RightPadded<J> | J.RightPadded<J>[]> = new Map();
 
         if (values instanceof Map) {
             const normalized = new Map<string, J>();
@@ -1943,9 +2044,9 @@ export class Template {
             }
             normalizedValues = normalized;
         } else if (values instanceof MatchResult) {
-            // MatchResult - extract both bindings and wrappersMap (via symbol)
+            // MatchResult - extract both bindings and wrappersMap
             normalizedValues = values;
-            wrappersMap = (values as any)[WRAPPERS_MAP_SYMBOL] || new Map();
+            wrappersMap = (values as any)[WRAPPERS_MAP_SYMBOL]();
         } else {
             // Other Pick<Map> implementation
             normalizedValues = values;
@@ -2059,7 +2160,7 @@ class TemplateEngine {
         cursor: Cursor,
         coordinates: JavaCoordinates,
         values: Pick<Map<string, J>, 'get'> = new Map(),
-        wrappersMap: Pick<Map<string, J.RightPadded<J>[]>, 'get'> = new Map(),
+        wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map(),
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
     ): Promise<J | undefined> {
@@ -2333,7 +2434,7 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     constructor(
         private readonly substitutions: Map<string, Parameter>,
         private readonly values: Pick<Map<string, J | J[]>, 'get'> = new Map(),
-        private readonly wrappersMap: Pick<Map<string, J.RightPadded<J>[]>, 'get'> = new Map()
+        private readonly wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map()
     ) {
         super();
     }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 import {produce} from "immer";
 import {produceAsync} from "../../../src";
@@ -174,6 +174,52 @@ describe('template2 replace', () => {
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1', 'const a = 1 instanceof Date'),
+        );
+    });
+
+    test('scalar capture preserves trailing semicolon', () => {
+        const arg = capture();
+        const pat = pattern`foo(${arg})`;
+        const tmpl = template`bar(${arg})`;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const match = await pat.match(method);
+                if (match) {
+                    return await tmpl.apply(this.cursor, method, match);
+                }
+                return method;
+            }
+        });
+
+        return spec.rewriteRun(
+            typescript(
+                'foo(123);',
+                'bar(123);'
+            )
+        );
+    });
+
+    test('scalar capture preserves comments', () => {
+        const arg = capture();
+        const pat = pattern`oldFunc(${arg})`;
+        const tmpl = template`newFunc(${arg})`;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const match = await pat.match(method);
+                if (match) {
+                    return await tmpl.apply(this.cursor, method, match);
+                }
+                return method;
+            }
+        });
+
+        return spec.rewriteRun(
+            typescript(
+                'oldFunc(x); // comment',
+                'newFunc(x); // comment'
+            )
         );
     });
 });
