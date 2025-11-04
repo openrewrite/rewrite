@@ -38,8 +38,6 @@ import static java.util.Collections.emptyList;
  */
 @Incubating(since = "8.63.0")
 public class SourcePositionService {
-    private static final String START_FIND = "/* START_FIND */";
-
     /**
      * Computes the column position where an element should be aligned to.
      * <p>
