@@ -1492,7 +1492,7 @@ export class JavaScriptParserVisitor {
                 element: {
                     kind: J.Kind.Ternary,
                     id: randomId(),
-                    prefix: emptySpace,
+                    prefix: this.prefix(node.extendsType),
                     markers: emptyMarkers,
                     condition: this.convert(node.extendsType),
                     truePart: this.leftPadded(this.suffix(node.extendsType), this.convert(node.trueType)),

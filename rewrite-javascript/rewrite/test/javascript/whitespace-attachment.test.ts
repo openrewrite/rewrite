@@ -171,6 +171,7 @@ describe('whitespace should be attached to the outermost element', () => {
         `import "./rpc"; declare module "./tree" {}`,
         "const userScores = new Map<string, number>()",
         "function* generateUsers() { yield { id: 1 } };",
+        "type T = undefined extends undefined ? string : never;",
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();
