@@ -1817,7 +1817,7 @@ class AddDependencyTest implements RewriteTest {
                 }
                 
                 dependencies {
-                  implementation 'jakarta.xml.bind:jakarta.xml.bind-api:3.0.1'
+                    implementation 'jakarta.xml.bind:jakarta.xml.bind-api:3.0.1'
                   implementation 'org.springframework.boot:spring-boot-starter-cache'
                   implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
                   implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
