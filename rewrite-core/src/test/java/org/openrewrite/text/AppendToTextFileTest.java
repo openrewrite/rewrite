@@ -235,4 +235,173 @@ class AppendToTextFileTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void continueStrategyWithPartialExistingContent() {
+        // This test demonstrates current behavior when the file already contains
+        // part of the content to be appended. The Continue strategy will append
+        // the content even if it results in duplication.
+        // Note: The recipe does NOT currently support intelligent merging of partial content.
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "line2\nline3", null, true, AppendToTextFile.Strategy.Continue)),
+          text(
+            """
+              line1
+              line2
+              """,
+            """
+              line1
+              line2
+              line2
+              line3
+              """,
+            spec -> spec.path("file.txt").noTrim()
+          )
+        );
+    }
+
+    /**
+     * Demonstrates the {@code Replace} strategy when partial content exists.
+     * It completely replaces the file, discarding the partial existing content.
+     */
+    @Test
+    void replaceStrategyWithPartialExistingContent() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "line2\nline3", "# Header", true, AppendToTextFile.Strategy.Replace)),
+          text(
+            """
+              line1
+              line2
+              """,
+            """
+              # Header
+              line2
+              line3
+              """,
+            spec -> spec.path("file.txt").noTrim()
+          )
+        );
+    }
+
+    /**
+     * Demonstrates the {@code Leave} strategy when partial content exists.
+     * The file is left unchanged, even though some of the desired content is missing.
+     */
+    @Test
+    void leaveStrategyWithPartialExistingContent() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "line2\nline3", null, true, AppendToTextFile.Strategy.Leave)),
+          text(
+            """
+              line1
+              line2
+              """,
+            spec -> spec.path("file.txt")
+          )
+        );
+    }
+
+    /**
+     * Demonstrates the @{code Merge} strategy with smart line-based deduplication.
+     * Only lines that don't already exist are appended.
+     */
+    @Test
+    void mergeStrategyWithPartialExistingContent() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "line2\nline3\nline4", null, true, AppendToTextFile.Strategy.Merge)),
+          text(
+            """
+              line1
+              line2
+              """,
+            """
+              line1
+              line2
+              line3
+              line4
+              """,
+            spec -> spec.path("file.txt").noTrim()
+          )
+        );
+    }
+
+    /**
+     * When all content to be appended already exists, no changes are made.
+     */
+    @Test
+    void mergeStrategyWithAllContentAlreadyPresent() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "line1\nline2", null, true, AppendToTextFile.Strategy.Merge)),
+          text(
+            """
+              line1
+              line2
+              """,
+            spec -> spec.path("file.txt")
+          )
+        );
+    }
+
+    /**
+     * When none of the content exists, all lines are appended.
+     */
+    @Test
+    void mergeStrategyWithNoOverlap() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "line3\nline4", null, true, AppendToTextFile.Strategy.Merge)),
+          text(
+            """
+              line1
+              line2
+              """,
+            """
+              line1
+              line2
+              line3
+              line4
+              """,
+            spec -> spec.path("file.txt").noTrim()
+          )
+        );
+    }
+
+    /**
+     * Merge strategy compares lines after trimming whitespace.
+     */
+    @Test
+    void mergeStrategyIgnoresWhitespace() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "  line2  \nline3", null, true, AppendToTextFile.Strategy.Merge)),
+          text(
+            """
+              line1
+              line2
+              """,
+            """
+              line1
+              line2
+              line3
+              """,
+            spec -> spec.path("file.txt").noTrim()
+          )
+        );
+    }
+
+    /**
+     * When the file doesn't exist, Merge behaves the same as creating a new file.
+     */
+    @Test
+    void mergeStrategyOnNewFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "line1\nline2", "# Header", true, AppendToTextFile.Strategy.Merge)),
+          text(
+            null,
+            """
+              # Header
+              line1
+              line2
+              """
+          )
+        );
+    }
 }
