@@ -924,28 +924,33 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         super();
     }
 
-    override async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        if (this.cursor?.getNearestMessage("stop") != null) {
-            return tree as R;
-        }
-        if (tree.kind === JS.Kind.CompilationUnit) {
-            const cu = produce(tree as JS.CompilationUnit, draft => {
+    protected async preVisit(tree: J, p: P): Promise<J | undefined> {
+        let ret = await super.preVisit(tree, p) as J;
+
+        if (ret.kind === JS.Kind.CompilationUnit) {
+            ret = produce(ret as JS.CompilationUnit, draft => {
                 if (draft.prefix.comments.length == 0) {
                     draft.prefix.whitespace = "";
                 }
             });
-            return super.visit(cu, p, cursor);
         }
-        if (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration) {
-            tree = produce(tree as JS.StatementExpression, draft => {
+        if (ret.kind === JS.Kind.StatementExpression && (ret as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration) {
+            ret = produce(ret as JS.StatementExpression, draft => {
                 this.ensurePrefixHasNewLine(draft);
             });
-        } else if (tree.kind === J.Kind.MethodDeclaration && this.cursor.value.kind != JS.Kind.StatementExpression
-            && (this.cursor.parent?.value.kind != JS.Kind.CompilationUnit || (this.cursor.parent?.value as JS.CompilationUnit).statements[0].element !== tree)
-            && this.cursor.parent !== undefined) {
-            tree = produce(tree as J.MethodDeclaration, draft => {
+        } else if (ret.kind === J.Kind.MethodDeclaration && this.cursor.parent?.value.kind != JS.Kind.StatementExpression
+            && (this.cursor.parent?.parent?.value.kind != JS.Kind.CompilationUnit || (this.cursor.parent?.parent?.value as JS.CompilationUnit).statements[0].element.id != ret.id)) {
+            ret = produce(ret as J.MethodDeclaration, draft => {
                 this.ensurePrefixHasNewLine(draft);
             });
+        }
+
+        return ret;
+    }
+
+    override async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
+        if (this.cursor?.getNearestMessage("stop") != null) {
+            return tree as R;
         }
         return super.visit(tree, p, cursor);
     }
