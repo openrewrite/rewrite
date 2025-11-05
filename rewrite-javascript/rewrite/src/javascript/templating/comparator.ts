@@ -41,18 +41,38 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
         // Check if the pattern node is a capture - this handles unwrapped captures
         // (Wrapped captures in J.RightPadded are handled by visitRightPadded override)
-        if (PlaceholderUtils.isCapture(j as J)) {
-            const success = this.matcher.handleCapture(PlaceholderUtils.getCaptureMarker(j)!, p, undefined);
-            if (!success) {
-                return this.abort(j) as R;
+        // Note: targetCursor will be pushed by parent's visit() method after this check
+        const captureMarker = PlaceholderUtils.getCaptureMarker(j)!;
+        if (captureMarker) {
+
+            // Push targetCursor to position it at the captured node for constraint evaluation
+            // Only create cursor if targetCursor was initialized (meaning user provided one)
+            const savedTargetCursor = this.targetCursor;
+            const cursorAtCapturedNode = this.targetCursor !== undefined
+                ? new Cursor(p, this.targetCursor)
+                : undefined;
+            this.targetCursor = cursorAtCapturedNode;
+            try {
+                // Evaluate constraint with cursor at the captured node
+                if (captureMarker.constraint && !captureMarker.constraint(p, cursorAtCapturedNode)) {
+                    return this.abort(j) as R;
+                }
+
+                const success = this.matcher.handleCapture(captureMarker, p, undefined);
+                if (!success) {
+                    return this.abort(j) as R;
+                }
+                return j as R;
+            } finally {
+                this.targetCursor = savedTargetCursor;
             }
-            return j as R;
         }
 
         if (!this.match) {
             return j as R;
         }
 
+        // Continue with parent's visit which will push targetCursor and traverse
         return await super.visit(j, p, parent);
     }
 
@@ -79,12 +99,28 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             const targetWrapper = isRightPadded ? (p as unknown) as J.RightPadded<T> : undefined;
             const targetElement = isRightPadded ? targetWrapper!.element : p;
 
-            // Handle the capture with the wrapper - use the element for pattern matching
-            const success = this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
-            if (!success) {
-                return this.abort(right);
+            // Push targetCursor to position it at the captured element for constraint evaluation
+            // Only create cursor if targetCursor was initialized (meaning user provided one)
+            const savedTargetCursor = this.targetCursor;
+            const cursorAtCapturedNode = this.targetCursor !== undefined
+                ? (targetWrapper ? new Cursor(targetWrapper, this.targetCursor) : new Cursor(targetElement, this.targetCursor))
+                : undefined;
+            this.targetCursor = cursorAtCapturedNode;
+            try {
+                // Evaluate constraint with cursor at the captured node
+                if (captureMarker.constraint && !captureMarker.constraint(targetElement as J, cursorAtCapturedNode)) {
+                    return this.abort(right);
+                }
+
+                // Handle the capture with the wrapper - use the element for pattern matching
+                const success = this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
+                if (!success) {
+                    return this.abort(right);
+                }
+                return right;
+            } finally {
+                this.targetCursor = savedTargetCursor;
             }
-            return right;
         }
 
         // Not a capture wrapper - use parent implementation
@@ -350,6 +386,15 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 // Re-check min/max constraints against actual captured elements (after filtering if applicable)
                 if (capturedElements.length < min || capturedElements.length > max) {
                     continue; // Try next consumption amount
+                }
+
+                // Evaluate constraint for variadic capture
+                // For variadic captures, constraint receives the entire array of captured elements
+                // The targetCursor is positioned in the target tree (parent context)
+                if (captureMarker.constraint) {
+                    if (!captureMarker.constraint(capturedElements as any, this.targetCursor)) {
+                        continue; // Try next consumption amount
+                    }
                 }
 
                 // Save current state for backtracking

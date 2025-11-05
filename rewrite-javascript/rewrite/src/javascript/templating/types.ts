@@ -40,11 +40,41 @@ export interface VariadicOptions {
  * the capture is variadic:
  * - For regular captures: constraint receives a single node of type T
  * - For variadic captures: constraint receives an array of nodes of type T[]
+ *
+ * The constraint function can optionally receive a cursor parameter to perform
+ * context-aware validation during pattern matching.
  */
 export interface CaptureOptions<T = any> {
     name?: string;
     variadic?: boolean | VariadicOptions;
-    constraint?: (node: T) => boolean;
+    /**
+     * Optional constraint function that validates whether a captured node should be accepted.
+     * The function receives:
+     * - node: The captured node (or array of nodes for variadic captures)
+     * - cursor: Optional cursor providing access to the node's context in the AST
+     *
+     * @param node The captured node to validate
+     * @param cursor Optional cursor at the captured node's position
+     * @returns true if the capture should be accepted, false otherwise
+     *
+     * @example
+     * ```typescript
+     * // Simple node validation
+     * capture<J.Literal>('size', {
+     *     constraint: (node) => typeof node.value === 'number' && node.value > 100
+     * })
+     *
+     * // Context-aware validation
+     * capture<J.MethodInvocation>('method', {
+     *     constraint: (node, cursor) => {
+     *         if (!node.name.simpleName.startsWith('get')) return false;
+     *         const cls = cursor?.firstEnclosing(isClassDeclaration);
+     *         return cls?.name.simpleName === 'ApiController';
+     *     }
+     * })
+     * ```
+     */
+    constraint?: (node: T, cursor?: Cursor) => boolean;
     /**
      * Type annotation for this capture. When provided, the template engine will generate
      * a preamble declaring the capture identifier with this type annotation, allowing
@@ -101,8 +131,9 @@ export interface Capture<T = any> {
      * Gets the constraint function if this capture has one.
      * For regular captures (T = Expression), constraint receives a single node.
      * For variadic captures (T = Expression[]), constraint receives an array of nodes.
+     * The constraint function can optionally receive a cursor for context-aware validation.
      */
-    getConstraint?(): ((node: T) => boolean) | undefined;
+    getConstraint?(): ((node: T, cursor?: Cursor) => boolean) | undefined;
 }
 
 /**
@@ -367,6 +398,57 @@ export interface RewriteRule {
  * Configuration for a replacement rule.
  */
 export interface RewriteConfig {
-    before: Pattern | Pattern[],
-    after: Template | ((match: MatchResult) => Template)
+    before: Pattern | Pattern[];
+    after: Template | ((match: MatchResult) => Template);
+
+    /**
+     * Optional context predicate that must evaluate to true for the transformation to be applied.
+     * Evaluated after the pattern matches structurally but before applying the template.
+     * Provides access to both the matched node and the cursor for context inspection.
+     *
+     * @param node The matched AST node
+     * @param cursor The cursor at the matched node, providing access to ancestors and context
+     * @returns true if the transformation should be applied, false otherwise
+     *
+     * @example
+     * ```typescript
+     * rewrite(() => ({
+     *     before: pattern`await ${_('promise')}`,
+     *     after: template`await ${_('promise')}.catch(handleError)`,
+     *     where: (node, cursor) => {
+     *         // Only apply inside async functions
+     *         const method = cursor.firstEnclosing((n: any): n is J.MethodDeclaration =>
+     *             n.kind === J.Kind.MethodDeclaration
+     *         );
+     *         return method?.modifiers.some(m => m.type === 'async') || false;
+     *     }
+     * }));
+     * ```
+     */
+    where?: (node: J, cursor: Cursor) => boolean | Promise<boolean>;
+
+    /**
+     * Optional context predicate that must evaluate to false for the transformation to be applied.
+     * Evaluated after the pattern matches structurally but before applying the template.
+     * Provides access to both the matched node and the cursor for context inspection.
+     *
+     * @param node The matched AST node
+     * @param cursor The cursor at the matched node, providing access to ancestors and context
+     * @returns true if the transformation should NOT be applied, false if it should proceed
+     *
+     * @example
+     * ```typescript
+     * rewrite(() => ({
+     *     before: pattern`await ${_('promise')}`,
+     *     after: template`await ${_('promise')}.catch(handleError)`,
+     *     whereNot: (node, cursor) => {
+     *         // Don't apply inside try-catch blocks
+     *         return cursor.firstEnclosing((n: any): n is J.Try =>
+     *             n.kind === J.Kind.Try
+     *         ) !== undefined;
+     *     }
+     * }));
+     * ```
+     */
+    whereNot?: (node: J, cursor: Cursor) => boolean | Promise<boolean>;
 }

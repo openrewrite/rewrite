@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {Cursor} from '../..';
 import {J, Type} from '../../java';
 import {JS} from '../index';
 import {JavaScriptVisitor} from '../visitor';
@@ -181,10 +182,13 @@ export class Pattern {
      * Creates a matcher for this pattern against a specific AST node.
      *
      * @param ast The AST node to match against
-     * @returns A Matcher object
+     * @param cursor Optional cursor at the node's position in a larger tree. Used for context-aware
+     *               capture constraints to navigate to parent nodes. If omitted, a cursor will be
+     *               created at the ast root, allowing constraints to navigate within the matched subtree.
+     * @returns A MatchResult if the pattern matches, undefined otherwise
      */
-    async match(ast: J): Promise<MatchResult | undefined> {
-        const matcher = new Matcher(this, ast);
+    async match(ast: J, cursor?: Cursor): Promise<MatchResult | undefined> {
+        const matcher = new Matcher(this, ast, cursor);
         const success = await matcher.matches();
         if (!success) {
             return undefined;
@@ -301,12 +305,18 @@ class Matcher {
      *
      * @param pattern The pattern to match
      * @param ast The AST node to match against
+     * @param cursor Optional cursor at the AST node's position
      */
     constructor(
         private readonly pattern: Pattern,
-        private readonly ast: J
+        private readonly ast: J,
+        cursor?: Cursor
     ) {
+        // If no cursor provided, create one at the ast root so constraints can navigate up
+        this.cursor = cursor ?? new Cursor(ast, undefined);
     }
+
+    private readonly cursor: Cursor;
 
     /**
      * Checks if the pattern matches the AST node.
@@ -375,18 +385,11 @@ class Matcher {
      * @returns true if the pattern matches the target, false otherwise
      */
     private async matchNode(pattern: J, target: J): Promise<boolean> {
-        // Check if pattern is a capture placeholder
-        if (PlaceholderUtils.isCapture(pattern)) {
-            return this.handleCapture(PlaceholderUtils.getCaptureMarker(pattern)!, target);
-        }
-
-        // Check if nodes have the same kind
-        if (pattern.kind !== target.kind) {
-            return false;
-        }
-
-        // Use the pattern matching comparator with configured lenient type matching
-        // Default to true for backward compatibility with existing patterns
+        // Always delegate to the comparator visitor, which handles:
+        // - Capture detection and constraint evaluation
+        // - Kind checking
+        // - Deep structural comparison
+        // This centralizes all matching logic in one place
         const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
         const comparator = new PatternMatchingComparator({
             handleCapture: (capture, t, w) => this.handleCapture(capture, t, w),
@@ -394,7 +397,9 @@ class Matcher {
             saveState: () => this.saveState(),
             restoreState: (state) => this.restoreState(state)
         }, lenientTypeMatching);
-        return await comparator.compare(pattern, target);
+        // Pass cursors to allow constraints to navigate to root
+        // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
+        return await comparator.compare(pattern, target, undefined, this.cursor);
     }
 
     /**
@@ -431,14 +436,9 @@ class Matcher {
             return false;
         }
 
-        // Find the original capture object to get constraint and capturing flag
+        // Find the original capture object to get capturing flag
+        // Note: Constraints are now evaluated in PatternMatchingComparator where cursor is correctly positioned
         const captureObj = this.pattern.captures.find(c => c.getName() === captureName);
-        const constraint = captureObj?.getConstraint?.();
-
-        // Apply constraint if present
-        if (constraint && !constraint(target as any)) {
-            return false;
-        }
 
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
@@ -465,14 +465,9 @@ class Matcher {
             return false;
         }
 
-        // Find the original capture object to get constraint and capturing flag
+        // Find the original capture object to get capturing flag
+        // Note: Constraints are now evaluated in PatternMatchingComparator where cursor is correctly positioned
         const captureObj = this.pattern.captures.find(c => c.getName() === captureName);
-        const constraint = captureObj?.getConstraint?.();
-
-        // Apply constraint if present - for variadic captures, constraint receives the array of elements
-        if (constraint && !constraint(targets as any)) {
-            return false;
-        }
 
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
@@ -514,12 +509,13 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
         if (ident.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
             const captureInfo = PlaceholderUtils.parseCapture(ident.simpleName);
             if (captureInfo) {
-                // Find the original capture object to get variadic options
+                // Find the original capture object to get variadic options and constraint
                 const captureObj = this.captures.find(c => c.getName() === captureInfo.name);
                 const variadicOptions = captureObj?.getVariadicOptions();
+                const constraint = captureObj?.getConstraint?.();
 
-                // Add CaptureMarker to the Identifier
-                const marker = new CaptureMarker(captureInfo.name, variadicOptions);
+                // Add CaptureMarker to the Identifier with constraint
+                const marker = new CaptureMarker(captureInfo.name, variadicOptions, constraint);
                 return updateIfChanged(ident, {
                     markers: {
                         ...ident.markers,

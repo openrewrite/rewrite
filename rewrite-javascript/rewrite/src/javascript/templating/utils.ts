@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {Cursor} from '../..';
 import {J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptParser} from '../parser';
@@ -125,7 +126,8 @@ export class CaptureMarker implements Marker {
 
     constructor(
         public readonly captureName: string,
-        public readonly variadicOptions?: VariadicOptions
+        public readonly variadicOptions?: VariadicOptions,
+        public readonly constraint?: (node: any, cursor?: Cursor) => boolean
     ) {
     }
 }

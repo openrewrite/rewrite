@@ -25,14 +25,33 @@ import {Template} from './template';
 class RewriteRuleImpl implements RewriteRule {
     constructor(
         private readonly before: Pattern[],
-        private readonly after: Template | ((match: MatchResult) => Template)
+        private readonly after: Template | ((match: MatchResult) => Template),
+        private readonly where?: (node: J, cursor: Cursor) => boolean | Promise<boolean>,
+        private readonly whereNot?: (node: J, cursor: Cursor) => boolean | Promise<boolean>
     ) {
     }
 
     async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
         for (const pattern of this.before) {
-            const match = await pattern.match(node);
+            // Pass cursor to pattern.match() for context-aware capture constraints
+            const match = await pattern.match(node, cursor);
             if (match) {
+                // Evaluate context predicates after structural match
+                if (this.where) {
+                    const whereResult = await this.where(node, cursor);
+                    if (!whereResult) {
+                        continue; // Pattern matched but context doesn't, try next pattern
+                    }
+                }
+
+                if (this.whereNot) {
+                    const whereNotResult = await this.whereNot(node, cursor);
+                    if (whereNotResult) {
+                        continue; // Pattern matched but context is excluded, try next pattern
+                    }
+                }
+
+                // Apply transformation
                 let result: J | undefined;
 
                 if (typeof this.after === 'function') {
@@ -50,7 +69,7 @@ class RewriteRuleImpl implements RewriteRule {
             }
         }
 
-        // Return undefined if no patterns match
+        // Return undefined if no patterns match or all context checks failed
         return undefined;
     }
 
@@ -140,7 +159,12 @@ export function rewrite(
         throw new Error('Builder function must return an object with before and after properties');
     }
 
-    return new RewriteRuleImpl(Array.isArray(config.before) ? config.before : [config.before], config.after);
+    return new RewriteRuleImpl(
+        Array.isArray(config.before) ? config.before : [config.before],
+        config.after,
+        config.where,
+        config.whereNot
+    );
 }
 
 /**
