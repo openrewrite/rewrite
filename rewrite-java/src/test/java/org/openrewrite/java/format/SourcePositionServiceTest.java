@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.service.Span;
@@ -574,6 +575,63 @@ class SourcePositionServiceTest implements RewriteTest {
 
               public class Test {
                   public void method1() {
+                      //Some comment
+                      int x = 1;
+                  }
+
+                  public void method2() {
+                      int x = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updatingSomeElementCanImpactPositions() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              SourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(SourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  //minimize the first method (all declarations should have an updated position)
+                  super.visitClassDeclaration(classDecl.withBody(classDecl.getBody().withStatements(ListUtils.mapFirst(classDecl.getBody().getStatements(), SourcePositionServiceTest::minimize))), ctx);
+                  return classDecl;
+              }
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if ("method1".equals(method.getSimpleName())) {
+                      //This is the modified method, so doing getCursor is enough here.
+                      assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(4).startColumn(5).endLine(7).maxColumn(40).endColumn(6).build());
+                  } else if ("method2".equals(method.getSimpleName())) {
+                      //The parent cursor (= block of class declaration) contains the modified method1 and in order to be used by the position calculation, you must pass that one.
+                      assertThat(service.positionOf(getCursor().getParentTreeCursor(), method)).isEqualTo(Span.builder().startLine(9).startColumn(5).endLine(11).maxColumn(28).endColumn(6).build());
+                      //Just passing this cursor is not enough for the accurate positioning as the modified element in not in this cursor and the service will start top down from JavaSourceFile -> no updated method is used.
+                      assertThat(service.positionOf(getCursor(), method)).isEqualTo(Span.builder().startLine(12).startColumn(5).endLine(14).maxColumn(28).endColumn(6).build());
+                  }
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+          })),
+          java(
+            """
+              package com.example;
+
+              public class Test {
+                  public void method1(
+                    int a,
+                    int b
+                  ) {
                       //Some comment
                       int x = 1;
                   }
