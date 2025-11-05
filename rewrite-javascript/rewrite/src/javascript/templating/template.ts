@@ -210,7 +210,7 @@ export class Template {
      * @example
      * template`isDate(${capture('date')})`
      *     .configure({
-     *         imports: ['import { isDate } from "util"'],
+     *         context: ['import { isDate } from "util"'],
      *         dependencies: { 'util': '^1.0.0' }
      *     })
      */

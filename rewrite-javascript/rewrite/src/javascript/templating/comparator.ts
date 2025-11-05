@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, Tree} from '../..';
+import {Cursor, isTree, Tree} from '../..';
 import {J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptSemanticComparatorVisitor} from '../comparator';
@@ -75,13 +75,13 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         let captureMarker = undefined;
 
         // Check RightPadded itself
-        if ((right as any).markers) {
-            captureMarker = PlaceholderUtils.getCaptureMarker(right as any as J);
+        if (right.markers) {
+            captureMarker = PlaceholderUtils.getCaptureMarker(right);
         }
 
         // Check element if it's a J node
-        if (!captureMarker && element && typeof element === 'object' && (element as any).markers) {
-            captureMarker = PlaceholderUtils.getCaptureMarker(element as J);
+        if (!captureMarker && isTree(element)) {
+            captureMarker = PlaceholderUtils.getCaptureMarker(element);
         }
         if (captureMarker) {
             // Extract the target wrapper if it's also a RightPadded
@@ -104,7 +104,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
         // Check if any arguments are variadic captures
         const hasVariadicCapture = methodInvocation.arguments.elements.some(arg =>
-            PlaceholderUtils.isVariadicCapture(arg.element)
+            PlaceholderUtils.isVariadicCapture(arg)
         );
 
         // If no variadic captures, use parent implementation (which includes semantic/type-aware matching)
@@ -188,10 +188,9 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     }
 
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): Promise<J | undefined> {
-        // Check if any statements are variadic captures (unwrap ExpressionStatement wrappers first)
+        // Check if any statements are variadic captures
         const hasVariadicCapture = compilationUnit.statements.some(stmt => {
-            const unwrapped = PlaceholderUtils.unwrapStatementCapture(stmt.element);
-            return PlaceholderUtils.isVariadicCapture(unwrapped);
+            return PlaceholderUtils.isVariadicCapture(stmt);
         });
 
         // If no variadic captures, use parent implementation

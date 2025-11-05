@@ -17,7 +17,7 @@ import {J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptParser} from '../parser';
 import {DependencyWorkspace} from '../dependency-workspace';
-import {Marker} from '../../markers';
+import {Marker, Markers} from '../../markers';
 import {randomId} from '../../uuid';
 import {VariadicOptions, Capture, Any} from './types';
 
@@ -177,7 +177,7 @@ export class PlaceholderUtils {
      * @param node The node to check
      * @returns The CaptureMarker or undefined
      */
-    static getCaptureMarker(node: J): CaptureMarker | undefined {
+    static getCaptureMarker(node: { markers: Markers }): CaptureMarker | undefined {
         for (const marker of node.markers.markers) {
             if (marker instanceof CaptureMarker) {
                 return marker;
@@ -235,7 +235,7 @@ export class PlaceholderUtils {
      * @param node The node to check
      * @returns true if the node has a variadic CaptureMarker, false otherwise
      */
-    static isVariadicCapture(node: J): boolean {
+    static isVariadicCapture(node: { markers: Markers }): boolean {
         for (const marker of node.markers.markers) {
             if (marker instanceof CaptureMarker && marker.variadicOptions) {
                 return true;
@@ -250,35 +250,12 @@ export class PlaceholderUtils {
      * @param node The node to extract variadic options from
      * @returns The VariadicOptions, or undefined if not a variadic capture
      */
-    static getVariadicOptions(node: J): VariadicOptions | undefined {
+    static getVariadicOptions(node: { markers: Markers }): VariadicOptions | undefined {
         for (const marker of node.markers.markers) {
             if (marker instanceof CaptureMarker) {
                 return marker.variadicOptions;
             }
         }
         return undefined;
-    }
-
-    /**
-     * Checks if a statement is an ExpressionStatement wrapping a capture identifier.
-     * When a capture placeholder appears in statement position, the parser wraps it as
-     * an ExpressionStatement. This method unwraps it to get the identifier.
-     *
-     * @param stmt The statement to check
-     * @returns The unwrapped capture identifier, or the original statement if not wrapped
-     */
-    static unwrapStatementCapture(stmt: J): J {
-        // Check if it's an ExpressionStatement containing a capture identifier
-        if (stmt.kind === JS.Kind.ExpressionStatement) {
-            const exprStmt = stmt as JS.ExpressionStatement;
-            if (exprStmt.expression?.kind === J.Kind.Identifier) {
-                const identifier = exprStmt.expression as J.Identifier;
-                // Check if this is a capture placeholder
-                if (identifier.simpleName?.startsWith(this.CAPTURE_PREFIX)) {
-                    return identifier;
-                }
-            }
-        }
-        return stmt;
     }
 }

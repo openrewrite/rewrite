@@ -164,10 +164,10 @@ export class Pattern {
      * @returns This pattern for method chaining
      *
      * @example
-     * pattern`isDate(${capture('date')})`
+     * pattern`forwardRef((${props}, ${ref}) => ${body})`
      *     .configure({
-     *         imports: ['import { isDate } from \"util\"'],
-     *         dependencies: { 'util': '^1.0.0' }
+     *         context: ['import { forwardRef } from "react"'],
+     *         dependencies: {'@types/react': '^18.0.0'}
      *     })
      */
     configure(options: PatternOptions): Pattern {
