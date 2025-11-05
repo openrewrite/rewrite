@@ -218,7 +218,7 @@ export class Pattern {
  *     const capturedArgs = match.get(args);  // Returns J[] for variadic captures
  * }
  */
-export class MatchResult implements Pick<Map<string, J>, "get"> {
+export class MatchResult {
     constructor(
         private readonly storage: Map<string, CaptureStorageValue> = new Map()
     ) {

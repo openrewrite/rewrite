@@ -15,6 +15,8 @@
  */
 import {Cursor, Tree} from '../..';
 import {J, Type} from '../../java';
+import type {Pattern, MatchResult} from "./pattern";
+import type {Template} from "./template";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -299,12 +301,42 @@ export interface RewriteRule {
      *          node when there's no match: `return await rule.tryOn(this.cursor, node) || node;`
      */
     tryOn(cursor: Cursor, node: J): Promise<J | undefined>;
+
+    /**
+     * Chains this rule with another rule, creating a composite rule that applies both transformations sequentially.
+     *
+     * The resulting rule:
+     * 1. First applies this rule to the input node
+     * 2. If this rule matches and transforms the node, applies the next rule to the result
+     * 3. If the next rule returns undefined (no match), keeps the result from the first rule
+     * 4. If this rule returns undefined (no match), returns undefined without trying the next rule
+     *
+     * @param next The rule to apply after this rule
+     * @returns A new RewriteRule that applies both rules in sequence
+     *
+     * @example
+     * ```typescript
+     * const rule1 = rewrite(() => ({
+     *     before: pattern`${capture('a')} + ${capture('b')}`,
+     *     after: template`${capture('b')} + ${capture('a')}`
+     * }));
+     *
+     * const rule2 = rewrite(() => ({
+     *     before: pattern`${capture('x')} + 1`,
+     *     after: template`${capture('x')} + 2`
+     * }));
+     *
+     * const combined = rule1.andThen(rule2);
+     * // Will first swap operands, then if result matches "x + 1", change to "x + 2"
+     * ```
+     */
+    andThen(next: RewriteRule): RewriteRule;
 }
 
 /**
  * Configuration for a replacement rule.
  */
 export interface RewriteConfig {
-    before: any; // Pattern | Pattern[], but we'll import Pattern in rewrite.ts
-    after: any;  // Template, but we'll import Template in rewrite.ts
+    before: Pattern | Pattern[],
+    after: Template | ((match: MatchResult) => Promise<J>)
 }
