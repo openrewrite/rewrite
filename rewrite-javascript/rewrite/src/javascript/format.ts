@@ -1037,7 +1037,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
             if (!draft.end.whitespace.includes("\n")) {
-                draft.end.whitespace = draft.end.whitespace + "\n";
+                draft.end.whitespace = draft.end.whitespace.replace(/[ \t]+$/, '') + "\n";
             }
         });
     }
