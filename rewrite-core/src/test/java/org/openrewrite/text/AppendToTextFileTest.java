@@ -404,4 +404,30 @@ class AppendToTextFileTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * Demonstrates that {@code Merge} strategy uses line-based deduplication regardless of line position.
+     * If a line exists anywhere in the file (beginning, middle, or end), it won't be appended again.
+     * In this test, "line1" exists at the beginning, so only "line4" is appended.
+     */
+    @Test
+    void mergeStrategyWithContentAtBeginningNotEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "line1\nline4", null, true, AppendToTextFile.Strategy.Merge)),
+          text(
+            """
+              line1
+              line2
+              line3
+              """,
+            """
+              line1
+              line2
+              line3
+              line4
+              """,
+            spec -> spec.path("file.txt").noTrim()
+          )
+        );
+    }
 }
