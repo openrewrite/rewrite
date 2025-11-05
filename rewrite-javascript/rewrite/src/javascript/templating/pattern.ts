@@ -387,7 +387,7 @@ class Matcher {
         // Default to true for backward compatibility with existing patterns
         const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
         const comparator = new PatternMatchingComparator({
-            handleCapture: (p, t) => this.handleCapture(p, t),
+            handleCapture: (p, t, w) => this.handleCapture(p, t, w),
             handleVariadicCapture: (p, ts, ws) => this.handleVariadicCapture(p, ts, ws),
             saveState: () => this.saveState(),
             restoreState: (state) => this.restoreState(state)
@@ -709,9 +709,33 @@ class TemplateProcessor {
         // Mark as visited to avoid cycles
         visited.add(node);
 
+        // Check if this is a RightPadded containing a capture identifier
+        // Attach marker to the wrapper to preserve markers (like semicolons) during capture
+        if (node.kind === J.Kind.RightPadded &&
+            node.element?.kind === J.Kind.Identifier &&
+            node.element.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
+
+            const captureInfo = PlaceholderUtils.parseCapture(node.element.simpleName);
+            if (captureInfo) {
+                // Initialize markers on the RightPadded
+                if (!node.markers) {
+                    node.markers = { kind: 'org.openrewrite.marker.Markers', id: randomId(), markers: [] };
+                }
+                if (!node.markers.markers) {
+                    node.markers.markers = [];
+                }
+
+                // Find the original capture object to get variadic options
+                const captureObj = this.captures.find(c => c.getName() === captureInfo.name);
+                const variadicOptions = captureObj?.getVariadicOptions();
+
+                // Add CaptureMarker to the RightPadded
+                node.markers.markers.push(new CaptureMarker(captureInfo.name, variadicOptions));
+            }
+        }
         // Check if this is an ExpressionStatement containing a capture identifier
         // For statement-level captures, we attach the marker to the ExpressionStatement itself
-        if (node.kind === JS.Kind.ExpressionStatement &&
+        else if (node.kind === JS.Kind.ExpressionStatement &&
             node.expression?.kind === J.Kind.Identifier &&
             node.expression.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
 
@@ -733,7 +757,7 @@ class TemplateProcessor {
                 node.markers.markers.push(new CaptureMarker(captureInfo.name, variadicOptions));
             }
         }
-        // For non-statement captures (expressions), attach marker to the identifier
+        // For non-statement, non-wrapped captures (expressions), attach marker to the identifier
         else if (node.kind === J.Kind.Identifier && node.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
             const captureInfo = PlaceholderUtils.parseCapture(node.simpleName);
             if (captureInfo) {

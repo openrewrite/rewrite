@@ -38,26 +38,11 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         super(lenientTypeMatching);
     }
 
-    /**
-     * Extracts the wrapper from the cursor if the parent is a RightPadded.
-     */
-    private getWrapperFromCursor(cursor: Cursor): J.RightPadded<J> | undefined {
-        if (!cursor.parent) {
-            return undefined;
-        }
-        const parent = cursor.parent.value;
-        // Check if parent is a RightPadded by checking its kind
-        if ((parent as any).kind === J.Kind.RightPadded) {
-            return parent as J.RightPadded<J>;
-        }
-        return undefined;
-    }
-
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
-        // Check if the pattern node is a capture - this handles captures anywhere in the tree
+        // Check if the pattern node is a capture - this handles unwrapped captures
+        // (Wrapped captures in J.RightPadded are handled by visitRightPadded override)
         if (PlaceholderUtils.isCapture(j as J)) {
-            const wrapper = this.getWrapperFromCursor(this.cursor);
-            const success = this.matcher.handleCapture(j as J, p, wrapper);
+            const success = this.matcher.handleCapture(j as J, p, undefined);
             if (!success) {
                 return this.abort(j) as R;
             }
@@ -68,21 +53,52 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             return j as R;
         }
 
-        return super.visit(j, p, parent);
+        return await super.visit(j, p, parent);
     }
 
     protected hasSameKind(j: J, other: J): boolean {
         return super.hasSameKind(j, other) ||
-               (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));
+            (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));
     }
 
-    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
-        if (PlaceholderUtils.isCapture(identifier)) {
-            const wrapper = this.getWrapperFromCursor(this.cursor);
-            const success = this.matcher.handleCapture(identifier, other, wrapper);
-            return success ? identifier : this.abort(identifier);
+    /**
+     * Override visitRightPadded to check if this wrapper has a CaptureMarker.
+     * If so, capture the entire wrapper (to preserve markers like semicolons).
+     */
+    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): Promise<J.RightPadded<T>> {
+        if (!this.match) {
+            return right;
         }
-        return super.visitIdentifier(identifier, other);
+
+        // Check if this RightPadded or its element has a CaptureMarker (attached during pattern construction)
+        const element = right.element;
+        let captureMarker = undefined;
+
+        // Check RightPadded itself
+        if ((right as any).markers) {
+            captureMarker = PlaceholderUtils.getCaptureMarker(right as any as J);
+        }
+
+        // Check element if it's a J node
+        if (!captureMarker && element && typeof element === 'object' && (element as any).markers) {
+            captureMarker = PlaceholderUtils.getCaptureMarker(element as J);
+        }
+        if (captureMarker) {
+            // Extract the target wrapper if it's also a RightPadded
+            const isRightPadded = (p as any).kind === J.Kind.RightPadded;
+            const targetWrapper = isRightPadded ? (p as unknown) as J.RightPadded<T> : undefined;
+            const targetElement = isRightPadded ? targetWrapper!.element : p;
+
+            // Handle the capture with the wrapper - use the element for pattern matching
+            const success = this.matcher.handleCapture(element as J, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
+            if (!success) {
+                return this.abort(right);
+            }
+            return right;
+        }
+
+        // Not a capture wrapper - use parent implementation
+        return super.visitRightPadded(right, p);
     }
 
     override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
@@ -394,14 +410,8 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             const savedMatch = this.match;
             const savedState = this.matcher.saveState();
 
-            // Push wrapper onto cursor so captures can access it
-            const savedCursor = this.cursor;
-            this.cursor = new Cursor(targetWrapper, this.cursor);
-            try {
-                await this.visit(patternElement, targetElement);
-            } finally {
-                this.cursor = savedCursor;
-            }
+            await this.visit(patternElement, targetElement);
+
             if (!this.match) {
                 // Restore state on match failure
                 this.match = savedMatch;

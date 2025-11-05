@@ -61,6 +61,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         return t;
     }
 
+
     /**
      * Generic method to visit a property value using the appropriate visitor method.
      * This ensures wrappers (RightPadded, LeftPadded, Container) are properly tracked on the cursor.
@@ -180,7 +181,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         // Continue with normal visitation, passing the other node as context
-        return super.visit(j, p);
+        return await super.visit(j, p);
     }
 
     /**
@@ -194,9 +195,8 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         // Extract the other element if it's also a RightPadded
-        const otherElement = (p as any).kind === J.Kind.RightPadded
-            ? ((p as unknown) as J.RightPadded<T>).element
-            : p;
+        const isRightPadded = (p as any).kind === J.Kind.RightPadded;
+        const otherElement = isRightPadded ? ((p as unknown) as J.RightPadded<T>).element : p;
 
         // Push wrapper onto cursor, then compare only the elements, not markers or spacing
         const savedCursor = this.cursor;
@@ -221,9 +221,8 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         // Extract the other element if it's also a LeftPadded
-        const otherElement = (p as any).kind === J.Kind.LeftPadded
-            ? ((p as unknown) as J.LeftPadded<T>).element
-            : p;
+        const isLeftPadded = (p as any).kind === J.Kind.LeftPadded;
+        const otherElement = isLeftPadded ? ((p as unknown) as J.LeftPadded<T>).element : p;
 
         // Push wrapper onto cursor, then compare only the elements, not markers or spacing
         const savedCursor = this.cursor;
@@ -248,9 +247,8 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         // Extract the other elements if it's also a Container
-        const otherElements: J.RightPadded<T>[] = (p as any).kind === J.Kind.Container
-            ? ((p as unknown) as J.Container<T>).elements
-            : (p as any);
+        const isContainer = (p as any).kind === J.Kind.Container;
+        const otherElements: J.RightPadded<T>[] = isContainer ? ((p as unknown) as J.Container<T>).elements : (p as any);
 
         // Compare elements array length
         if (container.elements.length !== otherElements.length) {
