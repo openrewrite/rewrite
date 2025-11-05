@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, isTree, Tree} from '../..';
+import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptSemanticComparatorVisitor} from '../comparator';
-import {PlaceholderUtils, CaptureStorageValue} from './utils';
+import {CaptureMarker, CaptureStorageValue, PlaceholderUtils} from './utils';
 
 /**
  * A comparator for pattern matching that is lenient about optional properties.
@@ -27,8 +27,8 @@ import {PlaceholderUtils, CaptureStorageValue} from './utils';
 export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
     constructor(
         private readonly matcher: {
-            handleCapture: (pattern: J, target: J, wrapper?: J.RightPadded<J>) => boolean;
-            handleVariadicCapture: (pattern: J, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
+            handleCapture: (capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>) => boolean;
+            handleVariadicCapture: (capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
             saveState: () => Map<string, CaptureStorageValue>;
             restoreState: (state: Map<string, CaptureStorageValue>) => void;
         },
@@ -42,7 +42,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         // Check if the pattern node is a capture - this handles unwrapped captures
         // (Wrapped captures in J.RightPadded are handled by visitRightPadded override)
         if (PlaceholderUtils.isCapture(j as J)) {
-            const success = this.matcher.handleCapture(j as J, p, undefined);
+            const success = this.matcher.handleCapture(PlaceholderUtils.getCaptureMarker(j)!, p, undefined);
             if (!success) {
                 return this.abort(j) as R;
             }
@@ -70,19 +70,9 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             return right;
         }
 
-        // Check if this RightPadded or its element has a CaptureMarker (attached during pattern construction)
-        const element = right.element;
-        let captureMarker = undefined;
-
-        // Check RightPadded itself
-        if (right.markers) {
-            captureMarker = PlaceholderUtils.getCaptureMarker(right);
-        }
-
-        // Check element if it's a J node
-        if (!captureMarker && isTree(element)) {
-            captureMarker = PlaceholderUtils.getCaptureMarker(element);
-        }
+        // Check if this RightPadded has a CaptureMarker (attached during pattern construction)
+        // Note: Markers are now only at the wrapper level, not at the element level
+        const captureMarker = PlaceholderUtils.getCaptureMarker(right);
         if (captureMarker) {
             // Extract the target wrapper if it's also a RightPadded
             const isRightPadded = (p as any).kind === J.Kind.RightPadded;
@@ -90,7 +80,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             const targetElement = isRightPadded ? targetWrapper!.element : p;
 
             // Handle the capture with the wrapper - use the element for pattern matching
-            const success = this.matcher.handleCapture(element as J, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
+            const success = this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
             if (!success) {
                 return this.abort(right);
             }
@@ -141,9 +131,9 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 return this.abort(methodInvocation);
             }
 
-            // Visit each type parameter in lock step
+            // Visit each type parameter in lock step (visit RightPadded to check for markers)
             for (let i = 0; i < methodInvocation.typeParameters.elements.length; i++) {
-                await this.visit(methodInvocation.typeParameters.elements[i].element, otherMethodInvocation.typeParameters.elements[i].element);
+                await this.visitRightPadded(methodInvocation.typeParameters.elements[i], otherMethodInvocation.typeParameters.elements[i] as any);
                 if (!this.match) return methodInvocation;
             }
         }
@@ -163,7 +153,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
         // Check if any statements have CaptureMarker indicating they're variadic
         const hasVariadicCapture = block.statements.some(stmt => {
-            const captureMarker = PlaceholderUtils.getCaptureMarker(stmt.element);
+            const captureMarker = PlaceholderUtils.getCaptureMarker(stmt);
             return captureMarker?.variadicOptions !== undefined;
         });
 
@@ -261,8 +251,9 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             return targetIdx >= targetElements.length; // Success if all targets consumed
         }
 
-        const patternElement = patternElements[patternIdx].element;
-        const captureMarker = PlaceholderUtils.getCaptureMarker(patternElement);
+        // Check for markers at wrapper level only (markers are now only at the outermost level)
+        const patternWrapper = patternElements[patternIdx];
+        const captureMarker = PlaceholderUtils.getCaptureMarker(patternWrapper);
         const isVariadic = captureMarker?.variadicOptions !== undefined;
 
         if (isVariadic) {
@@ -274,8 +265,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             // Calculate maximum possible consumption
             let nonVariadicRemainingPatterns = 0;
             for (let i = patternIdx + 1; i < patternElements.length; i++) {
-                const nextPatternElement = patternElements[i].element;
-                const nextCaptureMarker = PlaceholderUtils.getCaptureMarker(nextPatternElement);
+                const nextCaptureMarker = PlaceholderUtils.getCaptureMarker(patternElements[i]);
                 const nextIsVariadic = nextCaptureMarker?.variadicOptions !== undefined;
                 if (!nextIsVariadic) {
                     nonVariadicRemainingPatterns++;
@@ -290,16 +280,16 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             let pivotAt = -1;
 
             if (patternIdx + 1 < patternElements.length && min <= maxPossible) {
-                const nextPattern = patternElements[patternIdx + 1].element;
+                const nextPattern = patternElements[patternIdx + 1];
 
                 // Scan through possible consumption amounts starting from min
                 for (let tryConsume = min; tryConsume <= maxPossible; tryConsume++) {
                     // Check if element after our consumption would match next pattern
                     if (targetIdx + tryConsume < targetElements.length) {
-                        const candidateElement = targetElements[targetIdx + tryConsume].element;
+                        const candidateElement = targetElements[targetIdx + tryConsume];
 
                         // Skip J.Empty for arguments
-                        if (filterEmpty && candidateElement.kind === J.Kind.Empty) {
+                        if (filterEmpty && candidateElement.element.kind === J.Kind.Empty) {
                             continue;
                         }
 
@@ -307,7 +297,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                         const savedMatch = this.match;
                         const savedState = this.matcher.saveState();
 
-                        await this.visit(nextPattern, candidateElement);
+                        await this.visitRightPadded(nextPattern, candidateElement as any);
                         const matchesNext = this.match;
 
                         this.match = savedMatch;
@@ -366,7 +356,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 const savedState = this.matcher.saveState();
 
                 // Handle the variadic capture
-                const success = this.matcher.handleVariadicCapture(patternElement, capturedElements, capturedWrappers);
+                const success = this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
                 if (!success) {
                     // Restore state and try next amount
                     this.matcher.restoreState(savedState);
@@ -409,7 +399,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             const savedMatch = this.match;
             const savedState = this.matcher.saveState();
 
-            await this.visit(patternElement, targetElement);
+            await this.visitRightPadded(patternWrapper, targetWrapper as any);
 
             if (!this.match) {
                 // Restore state on match failure

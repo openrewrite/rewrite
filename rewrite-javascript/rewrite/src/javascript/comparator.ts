@@ -1965,7 +1965,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             }
 
             if (method.select && otherMethod.select) {
-                await this.visit(method.select.element, otherMethod.select.element);
+                await this.visitRightPadded(method.select, otherMethod.select as any);
             }
         }
 
@@ -1979,7 +1979,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                 return this.abort(method);
             }
             for (let i = 0; i < method.typeParameters.elements.length; i++) {
-                await this.visit(method.typeParameters.elements[i].element, otherMethod.typeParameters.elements[i].element);
+                await this.visitRightPadded(method.typeParameters.elements[i], otherMethod.typeParameters.elements[i] as any);
                 if (!this.match) {
                     return this.abort(method);
                 }
@@ -1992,9 +1992,9 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             return this.abort(method);
         }
 
-        // Compare arguments
+        // Compare arguments (visit RightPadded to check for markers)
         for (let i = 0; i < method.arguments.elements.length; i++) {
-            await this.visit(method.arguments.elements[i].element, otherMethod.arguments.elements[i].element);
+            await this.visitRightPadded(method.arguments.elements[i], otherMethod.arguments.elements[i] as any);
             if (!this.match) {
                 return this.abort(method);
             }
@@ -2086,7 +2086,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // Visit each variable in lock step
         for (let i = 0; i < variableDeclarations.variables.length; i++) {
-            await this.visit(variableDeclarations.variables[i].element, otherVariableDeclarations.variables[i].element);
+            await this.visitRightPadded(variableDeclarations.variables[i], otherVariableDeclarations.variables[i] as any);
             if (!this.match) return variableDeclarations;
         }
 
@@ -2154,7 +2154,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // Visit each parameter in lock step
         for (let i = 0; i < methodDeclaration.parameters.elements.length; i++) {
-            await this.visit(methodDeclaration.parameters.elements[i].element, otherMethodDeclaration.parameters.elements[i].element);
+            await this.visitRightPadded(methodDeclaration.parameters.elements[i], otherMethodDeclaration.parameters.elements[i] as any);
             if (!this.match) return methodDeclaration;
         }
 
@@ -2170,7 +2170,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             }
 
             for (let i = 0; i < methodDeclaration.throws.elements.length; i++) {
-                await this.visit(methodDeclaration.throws.elements[i].element, otherMethodDeclaration.throws.elements[i].element);
+                await this.visitRightPadded(methodDeclaration.throws.elements[i], otherMethodDeclaration.throws.elements[i] as any);
                 if (!this.match) return methodDeclaration;
             }
         }

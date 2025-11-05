@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {produce} from 'immer';
 import {J, Type} from '../../java';
 import {JS} from '../index';
-import {randomId} from '../../uuid';
+import {JavaScriptVisitor} from '../visitor';
+import {produceAsync} from '../../visitor';
+import {updateIfChanged} from '../../util';
 import {Any, Capture, PatternOptions} from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl} from './capture';
 import {PatternMatchingComparator} from './comparator';
 import {CaptureMarker, CaptureStorageValue, PlaceholderUtils, templateCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {isTree, Tree} from "../../tree";
 
 /**
  * Builder for creating patterns programmatically.
@@ -171,7 +173,7 @@ export class Pattern {
      *     })
      */
     configure(options: PatternOptions): Pattern {
-        this._options = { ...this._options, ...options };
+        this._options = {...this._options, ...options};
         return this;
     }
 
@@ -375,7 +377,7 @@ class Matcher {
     private async matchNode(pattern: J, target: J): Promise<boolean> {
         // Check if pattern is a capture placeholder
         if (PlaceholderUtils.isCapture(pattern)) {
-            return this.handleCapture(pattern, target);
+            return this.handleCapture(PlaceholderUtils.getCaptureMarker(pattern)!, target);
         }
 
         // Check if nodes have the same kind
@@ -387,8 +389,8 @@ class Matcher {
         // Default to true for backward compatibility with existing patterns
         const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
         const comparator = new PatternMatchingComparator({
-            handleCapture: (p, t, w) => this.handleCapture(p, t, w),
-            handleVariadicCapture: (p, ts, ws) => this.handleVariadicCapture(p, ts, ws),
+            handleCapture: (capture, t, w) => this.handleCapture(capture, t, w),
+            handleVariadicCapture: (capture, ts, ws) => this.handleVariadicCapture(capture, ts, ws),
             saveState: () => this.saveState(),
             restoreState: (state) => this.restoreState(state)
         }, lenientTypeMatching);
@@ -417,13 +419,13 @@ class Matcher {
     /**
      * Handles a capture placeholder.
      *
-     * @param pattern The pattern node
+     * @param capture The pattern node capture
      * @param target The target node
      * @param wrapper Optional wrapper containing the target (for preserving markers)
      * @returns true if the capture is successful, false otherwise
      */
-    private handleCapture(pattern: J, target: J, wrapper?: J.RightPadded<J>): boolean {
-        const captureName = PlaceholderUtils.getCaptureName(pattern);
+    private handleCapture(capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>): boolean {
+        const captureName = capture.captureName;
 
         if (!captureName) {
             return false;
@@ -451,13 +453,13 @@ class Matcher {
     /**
      * Handles a variadic capture placeholder.
      *
-     * @param pattern The pattern node (the variadic capture)
+     * @param capture The pattern node capture (the variadic capture)
      * @param targets The target nodes that were matched
      * @param wrappers Optional wrappers to preserve markers
      * @returns true if the capture is successful, false otherwise
      */
-    private handleVariadicCapture(pattern: J, targets: J[], wrappers?: J.RightPadded<J>[]): boolean {
-        const captureName = PlaceholderUtils.getCaptureName(pattern);
+    private handleVariadicCapture(capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]): boolean {
+        const captureName = capture.captureName;
 
         if (!captureName) {
             return false;
@@ -484,6 +486,101 @@ class Matcher {
         }
 
         return true;
+    }
+}
+
+/**
+ * Visitor that attaches CaptureMarkers to capture identifiers in the AST.
+ * Markers are attached to Identifiers, then moved up to wrappers (RightPadded, ExpressionStatement).
+ * Uses JavaScriptVisitor to properly handle AST traversal and avoid cycles in Type objects.
+ */
+class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
+    constructor(private readonly captures: (Capture | Any<any>)[]) {
+        super();
+    }
+
+    /**
+     * Attaches CaptureMarker to capture identifiers.
+     */
+    protected override async visitIdentifier(ident: J.Identifier, p: undefined): Promise<J | undefined> {
+        // First call parent to handle standard visitation
+        const visited = await super.visitIdentifier(ident, p);
+        if (!visited || visited.kind !== J.Kind.Identifier) {
+            return visited;
+        }
+        ident = visited as J.Identifier;
+
+        // Check if this is a capture placeholder
+        if (ident.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
+            const captureInfo = PlaceholderUtils.parseCapture(ident.simpleName);
+            if (captureInfo) {
+                // Find the original capture object to get variadic options
+                const captureObj = this.captures.find(c => c.getName() === captureInfo.name);
+                const variadicOptions = captureObj?.getVariadicOptions();
+
+                // Add CaptureMarker to the Identifier
+                const marker = new CaptureMarker(captureInfo.name, variadicOptions);
+                return updateIfChanged(ident, {
+                    markers: {
+                        ...ident.markers,
+                        markers: [...ident.markers.markers, marker]
+                    }
+                });
+            }
+        }
+
+        return ident;
+    }
+
+    /**
+     * Propagates markers from element to RightPadded wrapper.
+     */
+    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): Promise<J.RightPadded<T>> {
+        if (!isTree(right.element)) {
+            return right;
+        }
+
+        const visitedElement = await this.visit(right.element as J, p);
+        if (visitedElement && visitedElement !== right.element as Tree) {
+            return produceAsync<J.RightPadded<T>>(right, async (draft: any) => {
+                // Visit element first
+                if (right.element && (right.element as any).kind) {
+                    // Check if element has a CaptureMarker
+                    const elementMarker = PlaceholderUtils.getCaptureMarker(visitedElement);
+                    if (elementMarker) {
+                        draft.markers.markers.push(elementMarker);
+                    } else {
+                        draft.element = visitedElement;
+                    }
+                }
+            });
+        }
+
+        return right;
+    }
+
+    /**
+     * Propagates markers from expression to ExpressionStatement.
+     */
+    protected override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, p: undefined): Promise<J | undefined> {
+        // Visit the expression
+        const visitedExpression = await this.visit(expressionStatement.expression, p);
+
+        // Check if expression has a CaptureMarker
+        const expressionMarker = PlaceholderUtils.getCaptureMarker(visitedExpression as any);
+        if (expressionMarker) {
+            return updateIfChanged(expressionStatement, {
+                markers: {
+                    ...expressionStatement.markers,
+                    markers: [...expressionStatement.markers.markers, expressionMarker]
+                },
+            });
+        }
+
+        // No marker to move, just update with visited expression
+        return updateIfChanged(expressionStatement, {
+            expression: visitedExpression
+        });
     }
 }
 
@@ -535,7 +632,7 @@ class TemplateProcessor {
 
         // Extract the relevant part of the AST
         // The pattern code is always the last statement (after context + preamble)
-        return this.extractPatternFromAst(cu);
+        return await this.extractPatternFromAst(cu);
     }
 
     /**
@@ -647,7 +744,7 @@ class TemplateProcessor {
      * @param cu The compilation unit
      * @returns The extracted pattern
      */
-    private extractPatternFromAst(cu: JS.CompilationUnit): J {
+    private async extractPatternFromAst(cu: JS.CompilationUnit): Promise<J> {
         // Check if we have any statements
         if (!cu.statements || cu.statements.length === 0) {
             throw new Error(`No statements found in compilation unit`);
@@ -676,119 +773,20 @@ class TemplateProcessor {
         }
 
         // Attach CaptureMarkers to capture identifiers
-        return this.attachCaptureMarkers(extracted);
+        return await this.attachCaptureMarkers(extracted);
     }
 
     /**
      * Attaches CaptureMarkers to capture identifiers in the AST.
      * This allows efficient capture detection without string parsing.
+     * Uses JavaScriptVisitor to properly handle AST traversal and avoid cycles in Type objects.
      *
      * @param ast The AST to process
      * @returns The AST with CaptureMarkers attached
      */
-    private attachCaptureMarkers(ast: J): J {
-        const visited = new Set<J | object>();
-        return produce(ast, draft => {
-            this.visitAndAttachMarkers(draft, visited);
-        });
-    }
-
-    /**
-     * Recursively visits AST nodes and attaches CaptureMarkers to capture identifiers.
-     * For statement-level captures (identifiers in ExpressionStatement), the marker
-     * is attached to the ExpressionStatement itself rather than the nested identifier.
-     *
-     * @param node The node to visit
-     * @param visited Set of already visited nodes to avoid cycles
-     */
-    private visitAndAttachMarkers(node: any, visited: Set<J | object>): void {
-        if (!node || typeof node !== 'object' || visited.has(node)) {
-            return;
-        }
-
-        // Mark as visited to avoid cycles
-        visited.add(node);
-
-        // Check if this is a RightPadded containing a capture identifier
-        // Attach marker to the wrapper to preserve markers (like semicolons) during capture
-        if (node.kind === J.Kind.RightPadded &&
-            node.element?.kind === J.Kind.Identifier &&
-            node.element.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
-
-            const captureInfo = PlaceholderUtils.parseCapture(node.element.simpleName);
-            if (captureInfo) {
-                // Initialize markers on the RightPadded
-                if (!node.markers) {
-                    node.markers = { kind: 'org.openrewrite.marker.Markers', id: randomId(), markers: [] };
-                }
-                if (!node.markers.markers) {
-                    node.markers.markers = [];
-                }
-
-                // Find the original capture object to get variadic options
-                const captureObj = this.captures.find(c => c.getName() === captureInfo.name);
-                const variadicOptions = captureObj?.getVariadicOptions();
-
-                // Add CaptureMarker to the RightPadded
-                node.markers.markers.push(new CaptureMarker(captureInfo.name, variadicOptions));
-            }
-        }
-        // Check if this is an ExpressionStatement containing a capture identifier
-        // For statement-level captures, we attach the marker to the ExpressionStatement itself
-        else if (node.kind === JS.Kind.ExpressionStatement &&
-            node.expression?.kind === J.Kind.Identifier &&
-            node.expression.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
-
-            const captureInfo = PlaceholderUtils.parseCapture(node.expression.simpleName);
-            if (captureInfo) {
-                // Initialize markers on the ExpressionStatement
-                if (!node.markers) {
-                    node.markers = { kind: 'org.openrewrite.marker.Markers', id: randomId(), markers: [] };
-                }
-                if (!node.markers.markers) {
-                    node.markers.markers = [];
-                }
-
-                // Find the original capture object to get variadic options
-                const captureObj = this.captures.find(c => c.getName() === captureInfo.name);
-                const variadicOptions = captureObj?.getVariadicOptions();
-
-                // Add CaptureMarker to the ExpressionStatement
-                node.markers.markers.push(new CaptureMarker(captureInfo.name, variadicOptions));
-            }
-        }
-        // For non-statement, non-wrapped captures (expressions), attach marker to the identifier
-        else if (node.kind === J.Kind.Identifier && node.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
-            const captureInfo = PlaceholderUtils.parseCapture(node.simpleName);
-            if (captureInfo) {
-                // Initialize markers if needed
-                if (!node.markers) {
-                    node.markers = { kind: 'org.openrewrite.marker.Markers', id: randomId(), markers: [] };
-                }
-                if (!node.markers.markers) {
-                    node.markers.markers = [];
-                }
-
-                // Find the original capture object to get variadic options
-                const captureObj = this.captures.find(c => c.getName() === captureInfo.name);
-                const variadicOptions = captureObj?.getVariadicOptions();
-
-                // Add CaptureMarker with variadic options if available
-                node.markers.markers.push(new CaptureMarker(captureInfo.name, variadicOptions));
-            }
-        }
-
-        // Recursively visit all properties
-        for (const key in node) {
-            if (node.hasOwnProperty(key)) {
-                const value = node[key];
-                if (Array.isArray(value)) {
-                    value.forEach(item => this.visitAndAttachMarkers(item, visited));
-                } else if (typeof value === 'object' && value !== null) {
-                    this.visitAndAttachMarkers(value, visited);
-                }
-            }
-        }
+    private async attachCaptureMarkers(ast: J): Promise<J> {
+        const visitor = new MarkerAttachmentVisitor(this.captures);
+        return (await visitor.visit(ast, undefined))!;
     }
 }
 
