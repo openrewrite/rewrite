@@ -17,64 +17,49 @@ import {capture, JavaScriptParser, JS, pattern} from "../../../src/javascript";
 
 describe('variadic pattern matching against real code', () => {
     const parser = new JavaScriptParser();
+    const parseCache = new Map<string, any>();
 
-    // Pre-parsed expressions to avoid repeated parsing
-    let fixtures: {
-        foo0: any;
-        foo1: any;
-        foo42: any;
-        foo2: any;
-        foo3: any;
-        foo5: any;
-        bar3: any;
-    };
+    async function parseExpr(code: string) {
+        // Check cache first
+        if (parseCache.has(code)) {
+            return parseCache.get(code)!;
+        }
 
-    beforeAll(async () => {
-        const parseExpr = async (code: string) => {
-            const parseGen = parser.parse({text: code, sourcePath: 'test.ts'});
-            const cu = (await parseGen.next()).value as JS.CompilationUnit;
-            return cu.statements[0].element;
-        };
-
-        // Parse all commonly used expressions once
-        fixtures = {
-            foo0: await parseExpr('foo()'),
-            foo1: await parseExpr('foo(1)'),
-            foo42: await parseExpr('foo(42)'),
-            foo2: await parseExpr('foo(1, 2)'),
-            foo3: await parseExpr('foo(1, 2, 3)'),
-            foo5: await parseExpr('foo(1, 2, 3, 4, 5)'),
-            bar3: await parseExpr('bar(1, 2, 3)'),
-        };
-    });
+        // Parse and cache
+        const parseGen = parser.parse({text: code, sourcePath: 'test.ts'});
+        const cu = (await parseGen.next()).value as JS.CompilationUnit;
+        const result = cu.statements[0].element;
+        parseCache.set(code, result);
+        return result;
+    }
 
     test('variadic capture matches 0, 1, or many arguments', async () => {
         const args = capture({ variadic: true });
         const pat = pattern`foo(${args})`;
 
         // Zero arguments
-        const result0 = await pat.match(fixtures.foo0);
+        const result0 = await pat.match(await parseExpr('foo()'));
         expect(result0).toBeDefined();
         const captured0 = result0!.get(args);
         expect(Array.isArray(captured0)).toBe(true);
         expect((captured0 as any[]).length).toBe(0);
 
         // Single argument
-        const result1 = await pat.match(fixtures.foo42);
+        const result1 = await pat.match(await parseExpr('foo(42)'));
         expect(result1).toBeDefined();
         const captured1 = result1!.get(args);
         expect(Array.isArray(captured1)).toBe(true);
         expect((captured1 as any[]).length).toBe(1);
 
         // Multiple arguments
-        const result3 = await pat.match(fixtures.foo3);
+        const result3 = await pat.match(await parseExpr('foo(1, 2, 3)'));
         expect(result3).toBeDefined();
         const captured3 = result3!.get(args);
         expect(Array.isArray(captured3)).toBe(true);
         expect((captured3 as any[]).length).toBe(3);
 
         // Should NOT match different method name
-        expect(await pat.match(fixtures.bar3)).toBeUndefined();
+        expect(await pat.match(await parseExpr('bar(1, 2, 3)'))).toBeUndefined();
     });
 
     test('required first argument + variadic rest', async () => {
@@ -83,10 +68,10 @@ describe('variadic pattern matching against real code', () => {
         const pat = pattern`foo(${first}, ${rest})`;
 
         // Should NOT match foo() - missing required first
-        expect(await pat.match(fixtures.foo0)).toBeUndefined();
+        expect(await pat.match(await parseExpr('foo()'))).toBeUndefined();
 
         // Should match foo(1) - first=1, rest=[]
-        const result1 = await pat.match(fixtures.foo1);
+        const result1 = await pat.match(await parseExpr('foo(1)'));
         expect(result1).toBeDefined();
         expect(result1!.get(first)).toBeDefined();
         const rest1 = result1!.get(rest);
@@ -94,7 +79,7 @@ describe('variadic pattern matching against real code', () => {
         expect((rest1 as any[]).length).toBe(0);
 
         // Should match foo(1, 2, 3) - first=1, rest=[2, 3]
-        const result3 = await pat.match(fixtures.foo3);
+        const result3 = await pat.match(await parseExpr('foo(1, 2, 3)'));
         expect(result3).toBeDefined();
         const rest3 = result3!.get(rest);
         expect(Array.isArray(rest3)).toBe(true);
@@ -106,27 +91,27 @@ describe('variadic pattern matching against real code', () => {
         const args1 = capture({ variadic: { min: 2 } });
         const pat1 = pattern`foo(${args1})`;
 
-        expect(await pat1.match(fixtures.foo0)).toBeUndefined();  // min not satisfied
-        expect(await pat1.match(fixtures.foo1)).toBeUndefined();  // min not satisfied
-        expect(await pat1.match(fixtures.foo2)).toBeDefined();    // exactly min
-        expect(await pat1.match(fixtures.foo3)).toBeDefined();    // more than min
+        expect(await pat1.match(await parseExpr('foo()'))).toBeUndefined();  // min not satisfied
+        expect(await pat1.match(await parseExpr('foo(1)'))).toBeUndefined();  // min not satisfied
+        expect(await pat1.match(await parseExpr('foo(1, 2)'))).toBeDefined();    // exactly min
+        expect(await pat1.match(await parseExpr('foo(1, 2, 3)'))).toBeDefined();    // more than min
 
         // Test 2: max constraint
         const args2 = capture({ variadic: { max: 2 } });
         const pat2 = pattern`foo(${args2})`;
 
-        expect(await pat2.match(fixtures.foo0)).toBeDefined();    // within max
-        expect(await pat2.match(fixtures.foo2)).toBeDefined();    // exactly max
-        expect(await pat2.match(fixtures.foo3)).toBeUndefined();  // exceeds max
+        expect(await pat2.match(await parseExpr('foo()'))).toBeDefined();    // within max
+        expect(await pat2.match(await parseExpr('foo(1, 2)'))).toBeDefined();    // exactly max
+        expect(await pat2.match(await parseExpr('foo(1, 2, 3)'))).toBeUndefined();  // exceeds max
 
         // Test 3: min and max constraints
         const args3 = capture({ variadic: { min: 1, max: 2 } });
         const pat3 = pattern`foo(${args3})`;
 
-        expect(await pat3.match(fixtures.foo0)).toBeUndefined();  // below min
-        expect(await pat3.match(fixtures.foo1)).toBeDefined();    // within range
-        expect(await pat3.match(fixtures.foo2)).toBeDefined();    // within range
-        expect(await pat3.match(fixtures.foo3)).toBeUndefined();  // exceeds max
+        expect(await pat3.match(await parseExpr('foo()'))).toBeUndefined();  // below min
+        expect(await pat3.match(await parseExpr('foo(1)'))).toBeDefined();    // within range
+        expect(await pat3.match(await parseExpr('foo(1, 2)'))).toBeDefined();    // within range
+        expect(await pat3.match(await parseExpr('foo(1, 2, 3)'))).toBeUndefined();  // exceeds max
     });
 
     test('pattern with regular captures and variadic', async () => {
@@ -136,21 +121,21 @@ describe('variadic pattern matching against real code', () => {
         const pat = pattern`foo(${first}, ${middle}, ${last})`;
 
         // Should match foo(1, 2) - first=1, middle=[], last=2
-        const result2 = await pat.match(fixtures.foo2);
+        const result2 = await pat.match(await parseExpr('foo(1, 2)'));
         expect(result2).toBeDefined();
         const middle2 = result2!.get(middle);
         expect(Array.isArray(middle2)).toBe(true);
         expect((middle2 as any[]).length).toBe(0);
 
         // Should match foo(1, 2, 3) - first=1, middle=[2], last=3
-        const result3 = await pat.match(fixtures.foo3);
+        const result3 = await pat.match(await parseExpr('foo(1, 2, 3)'));
         expect(result3).toBeDefined();
         const middle3 = result3!.get(middle);
         expect(Array.isArray(middle3)).toBe(true);
         expect((middle3 as any[]).length).toBe(1);
 
         // Should match foo(1, 2, 3, 4, 5) - first=1, middle=[2, 3, 4], last=5
-        const result5 = await pat.match(fixtures.foo5);
+        const result5 = await pat.match(await parseExpr('foo(1, 2, 3, 4, 5)'));
         expect(result5).toBeDefined();
         const middle5 = result5!.get(middle);
         expect(Array.isArray(middle5)).toBe(true);
