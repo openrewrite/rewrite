@@ -81,7 +81,11 @@ public class StyleHelper {
                 if (rightValue != null) {
                     if (!isPrimitiveOrWrapper(rightValue) && !isEnum(rightValue)) {
                         Object leftValue = getter.invoke(left);
-                        if (leftValue instanceof Collection && !((Collection<?>) leftValue).isEmpty()) {
+                        if (leftValue instanceof Collection) {
+                            if (!((Collection<?>) leftValue).isEmpty()) {
+                                rightValue = merge(leftValue, rightValue);
+                            }
+                        } else {
                             rightValue = merge(leftValue, rightValue);
                         }
                     }

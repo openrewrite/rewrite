@@ -28,7 +28,7 @@ describe('lenient type matching in patterns', () => {
             // Pattern with unconstrained captures for props, ref, and body
             const pat = pattern`React.forwardRef((${capture('props')}, ${capture('ref')}) => ${capture('body')})`
                 .configure({
-                    imports: [`import * as React from 'react'`],
+                    context: [`import * as React from 'react'`],
                     dependencies: {'@types/react': '^18.0.0'}
                 });
 
@@ -125,7 +125,7 @@ function greet(): string { return "hello"; }
         // This demonstrates: matching untyped pattern against typed code + capturing + template replacement
         const pat = pattern`forwardRef(function ${capture('name')}(props, ref) { return null; })`
             .configure({
-                imports: [`import { forwardRef } from 'react'`]
+                context: [`import { forwardRef } from 'react'`]
             });
 
         // Template that uses the captured name as an identifier
@@ -154,5 +154,105 @@ function greet(): string { return "hello"; }
                 `
             )
         );
+    });
+
+    test('strict type matching mode rejects untyped pattern against typed code', async () => {
+        // Pattern with strict type matching (lenientTypeMatching: false) should NOT match typed function
+        const pat = pattern`function ${capture('name')}() { return "hello"; }`
+            .configure({
+                lenientTypeMatching: false
+            });
+
+        const testCode = `
+function greet(): string { return "hello"; }
+        `;
+
+        let matchFound = false;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): Promise<J | undefined> {
+                const m = await pat.match(methodDeclaration);
+                if (m) {
+                    matchFound = true;
+                }
+                return methodDeclaration;
+            }
+        });
+
+        await spec.rewriteRun(
+            typescript(testCode)
+        );
+
+        // Strict mode: pattern without type should NOT match function with return type
+        expect(matchFound).toBe(false);
+    });
+
+    test('lenient type matching can be explicitly enabled', async () => {
+        // Pattern with explicit lenient type matching should match typed function
+        const pat = pattern`function ${capture('name')}() { return "hello"; }`
+            .configure({
+                lenientTypeMatching: true
+            });
+
+        const testCode = `
+function greet(): string { return "hello"; }
+        `;
+
+        let matchFound = false;
+        let capturedName: any = undefined;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): Promise<J | undefined> {
+                const m = await pat.match(methodDeclaration);
+                if (m) {
+                    matchFound = true;
+                    capturedName = m.get('name');
+                }
+                return methodDeclaration;
+            }
+        });
+
+        await spec.rewriteRun(
+            typescript(testCode)
+        );
+
+        expect(matchFound).toBe(true);
+        expect(capturedName).toBeDefined();
+        expect((capturedName as J.Identifier).simpleName).toBe('greet');
+    });
+
+    test('strict mode with matching types does match', async () => {
+        // Pattern with strict type matching and matching return type SHOULD match
+        const pat = pattern`function ${capture('name')}(): string { return "hello"; }`
+            .configure({
+                lenientTypeMatching: false
+            });
+
+        const testCode = `
+function greet(): string { return "hello"; }
+        `;
+
+        let matchFound = false;
+        let capturedName: any = undefined;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): Promise<J | undefined> {
+                const m = await pat.match(methodDeclaration);
+                if (m) {
+                    matchFound = true;
+                    capturedName = m.get('name');
+                }
+                return methodDeclaration;
+            }
+        });
+
+        await spec.rewriteRun(
+            typescript(testCode)
+        );
+
+        // Strict mode with matching types should succeed
+        expect(matchFound).toBe(true);
+        expect(capturedName).toBeDefined();
+        expect((capturedName as J.Identifier).simpleName).toBe('greet');
     });
 });

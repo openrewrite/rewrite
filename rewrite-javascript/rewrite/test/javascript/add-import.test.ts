@@ -94,7 +94,7 @@ function createAddImportWithTemplateVisitor(
                 (methodInvocation.name as J.Identifier).simpleName === 'placeholder') {
                 // Use template with import context so TypeScript can type-attribute the call
                 return template`${templateCode}`
-                    .configure({ imports: [importStatement] })
+                    .configure({ context: [importStatement] })
                     .apply(this.cursor, methodInvocation);
             }
             return super.visitMethodInvocation(methodInvocation, p);
