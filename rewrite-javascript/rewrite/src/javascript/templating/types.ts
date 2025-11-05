@@ -331,6 +331,36 @@ export interface RewriteRule {
      * ```
      */
     andThen(next: RewriteRule): RewriteRule;
+
+    /**
+     * Creates a composite rule that tries this rule first, and if it doesn't match, tries an alternative rule.
+     *
+     * The resulting rule:
+     * 1. First applies this rule to the input node
+     * 2. If this rule matches and transforms the node, returns the result
+     * 3. If this rule returns undefined (no match), tries the alternative rule on the original node
+     *
+     * @param alternative The rule to try if this rule doesn't match
+     * @returns A new RewriteRule that tries both rules with fallback behavior
+     *
+     * @example
+     * ```typescript
+     * // Try specific pattern first, fall back to general pattern
+     * const specific = rewrite(() => ({
+     *     before: pattern`foo(${capture('x')}, 0)`,
+     *     after: template`bar(${capture('x')})`
+     * }));
+     *
+     * const general = rewrite(() => ({
+     *     before: pattern`foo(${capture('x')}, ${capture('y')})`,
+     *     after: template`baz(${capture('x')}, ${capture('y')})`
+     * }));
+     *
+     * const combined = specific.orElse(general);
+     * // Will try specific pattern first, if no match, try general pattern
+     * ```
+     */
+    orElse(alternative: RewriteRule): RewriteRule;
 }
 
 /**
@@ -338,5 +368,5 @@ export interface RewriteRule {
  */
 export interface RewriteConfig {
     before: Pattern | Pattern[],
-    after: Template | ((match: MatchResult) => Promise<J>)
+    after: Template | ((match: MatchResult) => Template)
 }

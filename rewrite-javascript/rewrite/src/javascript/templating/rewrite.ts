@@ -25,7 +25,7 @@ import {Template} from './template';
 class RewriteRuleImpl implements RewriteRule {
     constructor(
         private readonly before: Pattern[],
-        private readonly after: Template | ((match: MatchResult) => Promise<J>)
+        private readonly after: Template | ((match: MatchResult) => Template)
     ) {
     }
 
@@ -36,8 +36,9 @@ class RewriteRuleImpl implements RewriteRule {
                 let result: J | undefined;
 
                 if (typeof this.after === 'function') {
-                    // Call the function directly with the match result
-                    result = await this.after(match);
+                    // Call the function to get a template, then apply it
+                    const template = this.after(match);
+                    result = await template.apply(cursor, node, match);
                 } else {
                     // Use template.apply() as before
                     result = await this.after.apply(cursor, node, match);
@@ -59,7 +60,7 @@ class RewriteRuleImpl implements RewriteRule {
             constructor() {
                 // Pass empty patterns and a function that will never be called
                 // since we override tryOn
-                super([], async () => undefined as unknown as J);
+                super([], () => undefined as unknown as Template);
             }
 
             async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
@@ -69,6 +70,25 @@ class RewriteRuleImpl implements RewriteRule {
                     return secondResult ?? firstResult;
                 }
                 return undefined;
+            }
+        })();
+    }
+
+    orElse(alternative: RewriteRule): RewriteRule {
+        const first = this;
+        return new (class extends RewriteRuleImpl {
+            constructor() {
+                // Pass empty patterns and a function that will never be called
+                // since we override tryOn
+                super([], () => undefined as unknown as Template);
+            }
+
+            async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
+                const firstResult = await first.tryOn(cursor, node);
+                if (firstResult !== undefined) {
+                    return firstResult;
+                }
+                return await alternative.tryOn(cursor, node);
             }
         })();
     }
@@ -165,7 +185,7 @@ export const fromRecipe = (recipe: Recipe, ctx: ExecutionContext): RewriteRule =
         constructor() {
             // Pass empty patterns and a function that will never be called
             // since we override tryOn
-            super([], async () => undefined as unknown as J);
+            super([], () => undefined as unknown as Template);
         }
 
         async tryOn(cursor: Cursor, tree: J): Promise<J | undefined> {
