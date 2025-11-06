@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JS} from "./tree";
+import {isJavaScript, JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, Statement} from "../java";
+import {Comment, isJava, J, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isScope, Tree} from "../tree";
 import {
@@ -1175,7 +1175,31 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (this.cursor?.getNearestMessage("stop") != null) {
             return tree as R;
         }
-        return await super.visit(tree, p, parent) as R;
+
+        if (parent) {
+            this.cursor = new Cursor(tree, parent);
+            for (let c: Cursor | undefined = this.cursor; c != null; c = c.parent) {
+                let space: J.Space;
+                const v = c.value;
+                if (v.kind == J.Kind.RightPadded) {
+                    space = v.after;
+                } else if (v.kind == J.Kind.LeftPadded || v.kind == J.Kind.Container) {
+                    space = v.before;
+                } else if (isJava(v) || isJavaScript(v)) {
+                    space = v.prefix;
+                } else {
+                    continue;
+                }
+
+                const lastWhitespace = space.comments.length > 0 ? space.comments[space.comments.length - 1].suffix : space.whitespace;
+                const idx = lastWhitespace.lastIndexOf('\n');
+                if (idx !== -1) {
+                    c.messages.set("indentToUse", lastWhitespace.substring(idx + 1));
+                    break;
+                }
+            }
+        }
+        return await super.visit(tree, p) as R;
     }
 
     public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
