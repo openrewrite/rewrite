@@ -405,11 +405,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
             const spacing = this.style.aroundOperators.unary;
 
             switch (draft.operator.element) {
+                case J.Unary.Type.Not:
+                    draft.expression.prefix.whitespace = this.style.aroundOperators.afterUnaryNotAndNotNull ? " " : "";
+                    break;
                 case J.Unary.Type.PreIncrement:
                 case J.Unary.Type.PreDecrement:
                 case J.Unary.Type.Negative:
                 case J.Unary.Type.Positive:
-                case J.Unary.Type.Not:
                 case J.Unary.Type.Complement:
                     draft.expression.prefix.whitespace = spacing ? " " : "";
                     break;

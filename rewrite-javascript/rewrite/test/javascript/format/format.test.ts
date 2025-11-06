@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
-import {AutoformatVisitor} from "../../../src/javascript/format";
+import {AutoformatVisitor, typescript} from "../../../src/javascript";
 
 
 describe('AutoformatVisitor', () => {
@@ -193,6 +192,18 @@ describe('AutoformatVisitor', () => {
                     function () {
                         return 99;
                     };`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('after unary not operator', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const b = ! true`,
+                `const b = !true`,
             )
             // @formatter:on
         )
