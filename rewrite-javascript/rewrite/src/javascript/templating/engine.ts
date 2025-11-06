@@ -21,6 +21,7 @@ import {PlaceholderUtils, TemplateCache} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, TemplateParamImpl} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
+import {maybeAutoFormat} from '../format';
 
 /**
  * Cache for compiled templates.
@@ -318,9 +319,12 @@ export class TemplateApplier {
         const {tree} = this.coordinates;
 
         // Create a copy of the AST with the prefix from the target
-        return tree ? produce(this.ast, draft => {
+        const result = tree ? produce(this.ast, draft => {
             draft.prefix = (tree as J).prefix;
         }) : this.ast;
+
+        // Apply auto-formatting to the result (before = original tree, after = template result)
+        return tree ? maybeAutoFormat(tree as J, result, null, undefined, this.cursor.parent) : result;
     }
 
     /**
@@ -332,9 +336,12 @@ export class TemplateApplier {
         const {tree} = this.coordinates;
 
         // Create a copy of the AST with the prefix from the target
-        return produce(this.ast, draft => {
+        const result = produce(this.ast, draft => {
             draft.prefix = (tree as J).prefix;
         });
+
+        // Apply auto-formatting to the result (before = original tree, after = template result)
+        return maybeAutoFormat(tree as J, result, null, undefined, this.cursor.parent);
     }
 
     /**
@@ -346,8 +353,11 @@ export class TemplateApplier {
         const {tree} = this.coordinates;
 
         // Create a copy of the AST with the prefix from the target
-        return produce(this.ast, draft => {
+        const result = produce(this.ast, draft => {
             draft.prefix = (tree as J).prefix;
         });
+
+        // Apply auto-formatting to the result (before = original tree, after = template result)
+        return maybeAutoFormat(tree as J, result, null, undefined, this.cursor.parent);
     }
 }
