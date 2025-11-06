@@ -98,24 +98,9 @@ export class TemplateEngine {
 
         // The template code is always the last statement (after context + preamble)
         const lastStatement = cu.statements[cu.statements.length - 1].element;
-        let extracted: J;
 
-        // Check if this is a wrapped template (function __TEMPLATE__() { ... })
-        if (lastStatement.kind === J.Kind.MethodDeclaration) {
-            const func = lastStatement as J.MethodDeclaration;
-            if (func.name.simpleName === '__TEMPLATE__' && func.body) {
-                // __TEMPLATE__ wrapper indicates the original template was a block.
-                // Always return the block to preserve the block structure.
-                extracted = func.body;
-            } else {
-                // Not a __TEMPLATE__ wrapper
-                extracted = lastStatement;
-            }
-        } else if (lastStatement.kind === JS.Kind.ExpressionStatement) {
-            extracted = (lastStatement as JS.ExpressionStatement).expression;
-        } else {
-            extracted = lastStatement;
-        }
+        // Extract from wrapper using shared utility
+        const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, '__TEMPLATE__', 'Template');
 
         // Create a copy to avoid sharing cached AST instances
         const ast = produce(extracted, _ => {});
@@ -220,13 +205,9 @@ export class TemplateEngine {
             }
         }
 
-        // Detect if this is a block template that needs wrapping
-        const trimmed = result.trim();
-        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-            result = `function __TEMPLATE__() ${result}`;
-        }
-
-        return result;
+        // Always wrap in function body - let the parser decide what it is,
+        // then we'll extract intelligently based on what was parsed
+        return `function __TEMPLATE__() { ${result} }`;
     }
 
     /**

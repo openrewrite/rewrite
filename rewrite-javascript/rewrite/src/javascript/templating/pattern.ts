@@ -674,18 +674,9 @@ class TemplateProcessor {
             }
         }
 
-        // Check if this looks like a block pattern (starts with { and contains statement keywords)
-        const trimmed = result.trim();
-        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-            // Check for statement keywords that indicate this is a block, not an object literal
-            const hasStatementKeywords = /\b(return|if|for|while|do|switch|try|throw|break|continue|const|let|var|function|class)\b/.test(result);
-            if (hasStatementKeywords) {
-                // Wrap in a function to ensure it parses as a block
-                return `function __PATTERN__() ${result}`;
-            }
-        }
-
-        return result;
+        // Always wrap in function body - let the parser decide what it is,
+        // then we'll extract intelligently based on what was parsed
+        return `function __PATTERN__() { ${result} }`;
     }
 
     /**
@@ -752,24 +743,8 @@ class TemplateProcessor {
         // The pattern code is always the last statement
         const lastStatement = cu.statements[cu.statements.length - 1].element;
 
-        let extracted: J;
-
-        // Check if this is our wrapper function for block patterns
-        if (lastStatement.kind === J.Kind.MethodDeclaration) {
-            const method = lastStatement as J.MethodDeclaration;
-            if (method.name?.simpleName === '__PATTERN__' && method.body) {
-                // Extract the block from the wrapper function
-                extracted = method.body;
-            } else {
-                extracted = lastStatement;
-            }
-        } else if (lastStatement.kind === JS.Kind.ExpressionStatement) {
-            // If the statement is an expression statement, extract the expression
-            extracted = (lastStatement as JS.ExpressionStatement).expression;
-        } else {
-            // Otherwise, return the statement itself
-            extracted = lastStatement;
-        }
+        // Extract from wrapper using shared utility
+        const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, '__PATTERN__', 'Pattern');
 
         // Attach CaptureMarkers to capture identifiers
         return await this.attachCaptureMarkers(extracted);

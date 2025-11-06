@@ -262,4 +262,57 @@ export class PlaceholderUtils {
         }
         return undefined;
     }
+
+    /**
+     * Extracts the relevant AST node from a wrapper function.
+     * Used by both pattern and template processors to intelligently extract
+     * code from `function __WRAPPER__() { code }` wrappers.
+     *
+     * @param lastStatement The last statement from the compilation unit
+     * @param wrapperName The name of the wrapper function to look for (e.g., '__PATTERN__', '__TEMPLATE__')
+     * @param contextName Context name for error messages (e.g., 'Pattern', 'Template')
+     * @returns The extracted AST node
+     */
+    static extractFromWrapper(lastStatement: J, wrapperName: string, contextName: string): J {
+        let extracted: J;
+
+        // Since we always wrap in function __WRAPPER__() { code }, look for it
+        if (lastStatement.kind === J.Kind.MethodDeclaration) {
+            const method = lastStatement as J.MethodDeclaration;
+            if (method.name?.simpleName === wrapperName && method.body) {
+                const body = method.body;
+
+                // Intelligently extract based on what's in the function body
+                if (body.statements.length === 0) {
+                    throw new Error(`${contextName} function body is empty`);
+                } else if (body.statements.length === 1) {
+                    const stmt = body.statements[0].element;
+
+                    // Single expression statement → extract the expression
+                    if (stmt.kind === JS.Kind.ExpressionStatement) {
+                        extracted = (stmt as JS.ExpressionStatement).expression;
+                    }
+                    // Single block statement → keep the block
+                    else if (stmt.kind === J.Kind.Block) {
+                        extracted = stmt;
+                    }
+                    // Other single statement → keep it
+                    else {
+                        extracted = stmt;
+                    }
+                } else {
+                    // Multiple statements → keep the block
+                    extracted = body;
+                }
+            } else {
+                // Not our wrapper function
+                extracted = lastStatement;
+            }
+        } else {
+            // Shouldn't happen with our wrapping strategy, but handle it
+            extracted = lastStatement;
+        }
+
+        return extracted;
+    }
 }
