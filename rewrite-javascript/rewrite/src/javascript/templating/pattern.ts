@@ -647,7 +647,10 @@ class TemplateProcessor {
                     ? captureType
                     : this.typeToString(captureType);
                 const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
-                preamble.push(`const ${placeholder}: ${typeString};`);
+                preamble.push(`let ${placeholder}: ${typeString};`);
+            } else {
+                const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
+                preamble.push(`let ${placeholder};`);
             }
         }
         return preamble;
