@@ -19,7 +19,7 @@ import {JS} from "./tree";
 import ts from 'typescript';
 import {json, Json} from "../json";
 import {DependencyWorkspace} from "./dependency-workspace";
-import {setTemplateSourceFileCache} from "./templating/utils";
+import {setTemplateSourceFileCache} from "./templating/engine";
 
 /**
  * Shared TypeScript source file cache for test parsers.

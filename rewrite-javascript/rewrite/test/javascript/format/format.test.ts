@@ -132,7 +132,8 @@ describe('AutoformatVisitor', () => {
             }
             `)
             // @formatter:on
-        )});
+        )
+    });
 
     test('a statement following an if', () => {
         return spec.rewriteRun(
@@ -149,7 +150,8 @@ describe('AutoformatVisitor', () => {
             let i = 1;
             `)
             // @formatter:on
-        )});
+        )
+    });
 
     test('try catch-all', () => {
         return spec.rewriteRun(
@@ -170,7 +172,8 @@ describe('AutoformatVisitor', () => {
             }
             `)
             // @formatter:on
-        )});
+        )
+    });
 
     test('import', () => {
         return spec.rewriteRun(
@@ -179,7 +182,8 @@ describe('AutoformatVisitor', () => {
             typescript(`import { delta,gamma} from 'delta.js'`,
                  `import {delta, gamma} from 'delta.js'`)
             // @formatter:on
-        )});
+        )
+    });
 
     test('anonymous function expression', () => {
         return spec.rewriteRun(
@@ -206,6 +210,11 @@ describe('AutoformatVisitor', () => {
                     const x = {
                         a: 1
                     };
+                    `
+                    // @formatter:on
+            ))
+    });
+
     test('after unary not operator', () => {
         return spec.rewriteRun(
             // @formatter:off

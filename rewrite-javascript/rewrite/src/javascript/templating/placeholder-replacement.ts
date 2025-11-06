@@ -20,7 +20,7 @@ import {JavaScriptVisitor} from '../visitor';
 import {produce} from 'immer';
 import {PlaceholderUtils} from './utils';
 import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
-import {Parameter} from './engine';
+import {Parameter} from './types';
 
 /**
  * Visitor that replaces placeholder nodes with actual parameter values.
