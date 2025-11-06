@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import ts from 'typescript';
+import {Cursor} from '../..';
 import {J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptParser} from '../parser';
@@ -34,6 +36,20 @@ export type CaptureStorageValue = J | J.RightPadded<J> | J[] | J.RightPadded<J>[
  * Symbol to access wrappersMap without exposing it as public API
  */
 export const WRAPPERS_MAP_SYMBOL = Symbol('wrappersMap');
+
+/**
+ * Module-level TypeScript sourceFileCache for template parsing.
+ */
+let templateSourceFileCache: Map<string, ts.SourceFile> | undefined;
+
+/**
+ * Configure the sourceFileCache used for template parsing.
+ *
+ * @param cache The sourceFileCache to use, or undefined to disable caching
+ */
+export function setTemplateSourceFileCache(cache?: Map<string, ts.SourceFile>): void {
+    templateSourceFileCache = cache;
+}
 
 /**
  * Cache for compiled templates and patterns.
@@ -71,7 +87,7 @@ export class TemplateCache {
      */
     async getOrParse(
         templateString: string,
-        captures: (Capture | Any<any>)[],
+        captures: (Capture | Any)[],
         contextStatements: string[],
         dependencies: Record<string, string>
     ): Promise<JS.CompilationUnit> {
@@ -96,7 +112,11 @@ export class TemplateCache {
             : templateString;
 
         // Parse and cache (workspace only needed during parsing)
-        const parser = new JavaScriptParser({relativeTo: workspaceDir});
+        // Use templateSourceFileCache if configured for ~3.2x speedup on dependency file parsing
+        const parser = new JavaScriptParser({
+            relativeTo: workspaceDir,
+            sourceFileCache: templateSourceFileCache
+        });
         const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.ts'});
         cu = (await parseGenerator.next()).value as JS.CompilationUnit;
 
@@ -125,7 +145,8 @@ export class CaptureMarker implements Marker {
 
     constructor(
         public readonly captureName: string,
-        public readonly variadicOptions?: VariadicOptions
+        public readonly variadicOptions?: VariadicOptions,
+        public readonly constraint?: (node: any, cursor?: Cursor) => boolean
     ) {
     }
 }
@@ -152,23 +173,6 @@ export class PlaceholderUtils {
             }
         }
         return false;
-    }
-
-    /**
-     * Gets the capture name from a node with a CaptureMarker.
-     *
-     * @param node The node to extract capture name from
-     * @returns The capture name, or null if not a capture
-     */
-    static getCaptureName(node: J): string | undefined {
-        // Check for CaptureMarker
-        for (const marker of node.markers.markers) {
-            if (marker instanceof CaptureMarker) {
-                return marker.captureName;
-            }
-        }
-
-        return undefined;
     }
 
     /**

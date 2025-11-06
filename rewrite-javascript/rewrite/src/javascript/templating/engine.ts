@@ -160,7 +160,7 @@ export class TemplateEngine {
                     const typeString = typeof captureType === 'string'
                         ? captureType
                         : this.typeToString(captureType);
-                    preamble.push(`const ${placeholder}: ${typeString};`);
+                    preamble.push(`let ${placeholder}: ${typeString};`);
                 }
             } else if (isCaptureValue) {
                 // For CaptureValue, check if the root capture has a type
@@ -171,7 +171,7 @@ export class TemplateEngine {
                         const typeString = typeof captureType === 'string'
                             ? captureType
                             : this.typeToString(captureType);
-                        preamble.push(`const ${placeholder}: ${typeString};`);
+                        preamble.push(`let ${placeholder}: ${typeString};`);
                     }
                 }
             } else if (isTree(param) && !isTreeArray) {
@@ -179,7 +179,7 @@ export class TemplateEngine {
                 const jElement = param as J;
                 if ((jElement as any).type) {
                     const typeString = this.typeToString((jElement as any).type);
-                    preamble.push(`const ${placeholder}: ${typeString};`);
+                    preamble.push(`let ${placeholder}: ${typeString};`);
                 }
             }
         }
