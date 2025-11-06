@@ -197,6 +197,15 @@ describe('AutoformatVisitor', () => {
         )
     });
 
+    test('object literal in a single line', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript("const x = { a: 1 };",
+                `
+                    const x = {
+                        a: 1
+                    };
     test('after unary not operator', () => {
         return spec.rewriteRun(
             // @formatter:off
