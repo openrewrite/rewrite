@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, isTree} from '../..';
-import {J, Type} from '../../java';
+import {J, Statement, Type} from '../../java';
 import {JS} from '..';
 import {produce} from 'immer';
 import {PlaceholderUtils, TemplateCache} from './utils';
@@ -22,6 +22,8 @@ import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, Tem
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
 import {maybeAutoFormat} from '../format';
+import {isExpression, isStatement} from '../parser-utils';
+import {randomId} from '../../uuid';
 
 /**
  * Cache for compiled templates.
@@ -119,7 +121,8 @@ export class TemplateEngine {
         }
 
         // Create a copy to avoid sharing cached AST instances
-        const ast = produce(extracted, _ => {});
+        const ast = produce(extracted, _ => {
+        });
 
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
@@ -320,16 +323,68 @@ export class TemplateApplier {
             return this.ast;
         }
 
-        // Create a copy of the AST with the prefix from the target
-        const result = produce(this.ast, draft => {
-            draft.prefix = (tree as J).prefix;
-            // We temporarily set the ID so that the formatter can identify the tree
-            draft.id = (tree as J).id;
-        });
+        const originalTree = tree as J;
+        const resultToUse = this.wrapTree(originalTree, this.ast);
+        return this.format(resultToUse, originalTree);
+    }
 
-        // Apply auto-formatting to the result (before = original tree, after = template result)
-        return produce(await maybeAutoFormat(tree as J, result, null, undefined, this.cursor.parent), draft => {
-            draft.id = this.ast.id;
-        });
+    private async format(resultToUse: J, originalTree: J) {
+        // Create a copy of the AST with the prefix from the target
+        const result = {
+            ...resultToUse,
+            // We temporarily set the ID so that the formatter can identify the tree
+            id: originalTree.id,
+            prefix: originalTree.prefix
+        };
+
+        // Apply auto-formatting to the result
+        const formatted =
+            await maybeAutoFormat(originalTree, result, null, undefined, this.cursor?.parent);
+
+        // Restore the original ID
+        return {...formatted, id: resultToUse.id};
+    }
+
+    private wrapTree(originalTree: J, resultToUse: J) {
+        const parentTree = this.cursor?.parentTree()?.value;
+
+        // Only apply wrapping logic if we have parent context
+        if (parentTree) {
+            // FIXME: This is a heuristic to determine if the parent expects a statement child
+            const parentExpectsStatement = parentTree.kind === J.Kind.Block ||
+                parentTree.kind === J.Kind.Case ||
+                parentTree.kind === JS.Kind.CompilationUnit;
+            const originalIsStatement = isStatement(originalTree);
+
+            const resultIsStatement = isStatement(resultToUse);
+            const resultIsExpression = isExpression(resultToUse);
+
+            // Determine context and wrap if needed
+            if (parentExpectsStatement && originalIsStatement) {
+                // Statement context: wrap in ExpressionStatement if result is not a statement
+                if (!resultIsStatement && resultIsExpression) {
+                    resultToUse = {
+                        kind: JS.Kind.ExpressionStatement,
+                        id: randomId(),
+                        prefix: resultToUse.prefix,
+                        markers: resultToUse.markers,
+                        expression: resultToUse
+                    } as JS.ExpressionStatement;
+                }
+            } else if (!parentExpectsStatement) {
+                // Expression context: wrap in StatementExpression if result is statement-only
+                if (resultIsStatement && !resultIsExpression) {
+                    const stmt = resultToUse as Statement;
+                    resultToUse = {
+                        kind: JS.Kind.StatementExpression,
+                        id: randomId(),
+                        prefix: stmt.prefix,
+                        markers: stmt.markers,
+                        statement: stmt
+                    } as JS.StatementExpression;
+                }
+            }
+        }
+        return resultToUse;
     }
 }

@@ -88,10 +88,10 @@ describe('Builder API', () => {
                 typescript('const a = 1',
                     `
                       const a =
-                      function validate(x) {
-                          if (typeof x !== "number") throw new Error("Invalid");
-                          return 1;
-                      }
+                          function validate(x) {
+                              if (typeof x !== "number") throw new Error("Invalid");
+                              return 1;
+                          }
                       `
                 ),
             );
@@ -159,13 +159,13 @@ describe('Builder API', () => {
                     'const x = 1',
                     `
                     const x =
-                    function wrapper() {
-                        try {
-                            return 42;
-                        } catch (e) {
-                            console.error(e);
-                        }
-                    }`
+                        function wrapper() {
+                            try {
+                                return 42;
+                            } catch (e) {
+                                console.error(e);
+                            }
+                        }`
                 )
             );
         });
