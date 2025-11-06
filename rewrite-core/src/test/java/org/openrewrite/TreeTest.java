@@ -17,9 +17,12 @@ package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainText;
 
+import java.nio.file.Paths;
 import java.util.function.UnaryOperator;
 
 import static java.util.Objects.requireNonNull;
@@ -48,5 +51,45 @@ class TreeTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void printRestoresBomWhenPresent() {
+        PlainText sourceFile = new PlainText(
+            Tree.randomId(),
+            Paths.get("test.txt"),
+            Markers.EMPTY,
+            "UTF-8",
+            true, // charsetBomMarked = true
+            null,
+            null,
+            "Hello World",
+            null
+        );
+
+        String printed = sourceFile.printAll();
+
+        assertThat(printed).startsWith("\uFEFF");
+        assertThat(printed).isEqualTo("\uFEFFHello World");
+    }
+
+    @Test
+    void printDoesNotAddBomWhenNotPresent() {
+        PlainText sourceFile = new PlainText(
+            Tree.randomId(),
+            Paths.get("test.txt"),
+            Markers.EMPTY,
+            "UTF-8",
+            false, // charsetBomMarked = false
+            null,
+            null,
+            "Hello World",
+            null
+        );
+
+        String printed = sourceFile.printAll();
+
+        assertThat(printed).doesNotStartWith("\uFEFF");
+        assertThat(printed).isEqualTo("Hello World");
     }
 }

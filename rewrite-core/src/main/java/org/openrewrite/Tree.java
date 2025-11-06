@@ -79,6 +79,17 @@ public interface Tree {
 
     default <P> String print(Cursor cursor, PrintOutputCapture<P> out) {
         this.<P>printer(cursor).visit(this, out, cursor);
+
+        // Restore BOM if the source file originally had one
+        if (this instanceof SourceFile) {
+            SourceFile sourceFile = (SourceFile) this;
+            if (sourceFile.isCharsetBomMarked() &&
+                out.out.length() > 0 &&
+                out.out.charAt(0) != '\uFEFF') {
+                out.out.insert(0, '\uFEFF');
+            }
+        }
+
         return out.getOut();
     }
 
