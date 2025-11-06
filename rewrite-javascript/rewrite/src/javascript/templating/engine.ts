@@ -151,7 +151,7 @@ export class TemplateEngine {
 
             // Check for Capture (could be a Proxy, so check for symbol property)
             const isCapture = param instanceof CaptureImpl ||
-                            (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
+                (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
             const isCaptureValue = param instanceof CaptureValue;
             const isTreeArray = Array.isArray(param) && param.length > 0 && isTree(param[0]);
 
@@ -208,7 +208,7 @@ export class TemplateEngine {
                 // Inline everything else (strings, numbers, booleans) directly
                 // Check for Capture (could be a Proxy, so check for symbol property)
                 const isCapture = param instanceof CaptureImpl ||
-                                (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
+                    (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
                 const isTemplateParam = param instanceof TemplateParamImpl;
                 const isCaptureValue = param instanceof CaptureValue;
                 const isTreeArray = Array.isArray(param) && param.length > 0 && isTree(param[0]);
