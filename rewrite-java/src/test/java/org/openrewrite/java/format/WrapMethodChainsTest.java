@@ -1177,7 +1177,9 @@ class WrapMethodChainsTest implements RewriteTest {
               
               class Test {
                   void test() {
-                      String obj = new StringBuilder().append("test").append("25").toString();
+                      String ob1 = new StringBuilder().append("test").append("25").toString();
+                      String ob2 = new StringBuilder().append("test")
+                          .append("25").toString();
                   }
               }
               """,
@@ -1186,8 +1188,11 @@ class WrapMethodChainsTest implements RewriteTest {
               
               class Test {
                   void test() {
-                      String obj = new StringBuilder().append("test")
+                      String ob1 = new StringBuilder().append("test")
               .append("25")
+              .toString();
+                      String ob2 = new StringBuilder().append("test")
+                          .append("25")
               .toString();
                   }
               }

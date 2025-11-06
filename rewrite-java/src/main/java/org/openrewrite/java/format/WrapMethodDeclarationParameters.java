@@ -17,7 +17,6 @@ package org.openrewrite.java.format;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -25,12 +24,11 @@ import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.LineWrapSetting;
 
-import java.util.Objects;
+import static org.openrewrite.java.format.MinimizationVisitor.minimized;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -54,7 +52,7 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
                     if (sourceFile == null) {
                         return m;
                     }
-                    Cursor minimized = minimize(getCursor(), ctx);
+                    Cursor minimized = minimized(getCursor(), spacesStyle);
                     if (sourceFile.service(SourcePositionService.class).positionOf(minimized, ((J.MethodDeclaration)minimized.getValue()).getPadding().getParameters()).getMaxColumn() <= style.getHardWrapAt()) {
                         return m;
                     }
@@ -106,68 +104,5 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
         }
 
         return m;
-    }
-
-    public Cursor minimize(Cursor cursor, P ctx) {
-        if (cursor.getValue() instanceof J) {
-            J cursorValue = cursor.getValue();
-            J j = new JavaIsoVisitor<P>() {
-                @Override
-                public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P ctx) {
-                    switch (loc) {
-                        case METHOD_DECLARATION_PARAMETER:
-                        case RECORD_STATE_VECTOR: {
-                            if (right != null && right.getElement() instanceof J) {
-                                //noinspection unchecked
-                                right = right
-                                        .withAfter(minimized(right.getAfter()))
-                                        .withElement(((J) right.getElement()).withPrefix(minimized(((J) right.getElement()).getPrefix())));
-                            }
-                            break;
-                        }
-                    }
-                    return super.visitRightPadded(right, loc, ctx);
-                }
-
-                @Override
-                public Space visitSpace(@Nullable Space space, Space.Location loc, P ctx) {
-                    if (space == null) {
-                        return super.visitSpace(space, loc, ctx);
-                    }
-                    if (space == cursorValue.getPrefix()) {
-                        return space;
-                    }
-                    switch (loc) {
-                        case BLOCK_PREFIX:
-                        case MODIFIER_PREFIX:
-                        case METHOD_DECLARATION_PARAMETER_SUFFIX:
-                        case METHOD_DECLARATION_PARAMETERS:
-                        case METHOD_SELECT_SUFFIX:
-                        case METHOD_INVOCATION_ARGUMENTS:
-                        case METHOD_INVOCATION_ARGUMENT_SUFFIX:
-                        case METHOD_INVOCATION_NAME:
-                        case RECORD_STATE_VECTOR_SUFFIX: {
-                            space = minimized(space);
-                            break;
-                        }
-                    }
-                    return super.visitSpace(space, loc, ctx);
-                }
-
-                //IntelliJ does not format when comments are present.
-                private Space minimized(Space space) {
-                    if (space.getComments().isEmpty()) {
-                        return space.getWhitespace().isEmpty() ? space : Space.EMPTY;
-                    }
-                    return space;
-                }
-            }.visit(cursorValue, ctx);
-            if (j != cursor.getValue()) {
-                j = new MinimumViableSpacingVisitor<>(null).visit(j, ctx);
-                j = new SpacesVisitor<>(spacesStyle, null, null).visit(j, ctx);
-            }
-            return new Cursor(cursor.getParent(), Objects.requireNonNull(j));
-        }
-        throw new IllegalArgumentException("Can only minimize J elements.");
     }
 }

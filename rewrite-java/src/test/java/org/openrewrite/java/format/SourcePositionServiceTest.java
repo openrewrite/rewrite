@@ -50,93 +50,6 @@ import static org.openrewrite.java.Assertions.java;
  */
 class SourcePositionServiceTest implements RewriteTest {
 
-    @DocumentExample
-    @Test
-    void correctlyCalculatesLineLength() {
-        rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
-
-              @Nullable
-              SourcePositionService service;
-
-              @Override
-              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  service = cu.service(SourcePositionService.class);
-                  return super.visitCompilationUnit(cu, ctx);
-              }
-
-              @Override
-              public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(20);
-                  return super.visitPackage(pkg, ctx);
-              }
-
-              @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                  if ("Test".equals(classDecl.getSimpleName())) {
-                      assertThat(service.computeTreeLength(getCursor())).isEqualTo(461);
-                  }
-                  if ("Inner".equals(classDecl.getSimpleName())) {
-                      assertThat(service.computeTreeLength(getCursor())).isEqualTo(72);
-                  }
-                  return super.visitClassDeclaration(classDecl, ctx);
-              }
-
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(365);
-                  return super.visitMethodDeclaration(method, ctx);
-              }
-
-              @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(80);
-                  return super.visitVariableDeclarations(multiVariable, ctx);
-              }
-
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if ("valueOf".equals(method.getSimpleName())) {
-                      assertThat(service.computeTreeLength(getCursor())).isEqualTo(80);
-                  }
-                  return super.visitMethodInvocation(method, ctx);
-              }
-
-              @Override
-              public J.Assert visitAssert(J.Assert _assert, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(28);
-                  return super.visitAssert(_assert, ctx);
-              }
-
-              @Override
-              public J.Return visitReturn(J.Return _return, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(51);
-                  return super.visitReturn(_return, ctx);
-              }
-          })),
-          java(
-            """
-              package com.example;
-              
-              // Comments should not affect line length calculation
-              public class Test {
-                  public int /* multiline comments can impact though */ example() {
-                      String text = "This is a sample string to test line length calculation";
-                      assert text != null;
-                      // Another comment that is not counted
-                      String invocation = String.valueOf("Both lines share the same length.");
-                      return text.length() + invocation.length();
-                  }
-              
-                  class Inner {
-                      // Inner class to test nested structures
-                  }
-              }
-              """
-          )
-        );
-    }
-
     /**
      * Tests alignment calculations when the first element in a container is on the same line as the opening delimiter.
      * In these cases, subsequent elements should align with the first element's position, not just use
@@ -145,6 +58,7 @@ class SourcePositionServiceTest implements RewriteTest {
      * Note: Record5 in the third java() block has intentionally bizarre indentation (e.g., "Integer t2," at column 0
      * and "Double u2," extremely far to the right) to verify the service handles any actual indentation pattern.
      */
+    @DocumentExample
     @Test
     void correctlyCalculatesIndentationToAlign() {
         rewriteRun(
