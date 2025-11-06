@@ -300,11 +300,9 @@ export class TemplateApplier {
         // Apply the template based on the location and mode
         switch (loc || 'EXPRESSION_PREFIX') {
             case 'EXPRESSION_PREFIX':
-                return this.applyToExpression();
             case 'STATEMENT_PREFIX':
-                return this.applyToStatement();
             case 'BLOCK_END':
-                return this.applyToBlock();
+                return this.applyInternal();
             default:
                 throw new Error(`Unsupported location: ${loc}`);
         }
@@ -315,49 +313,23 @@ export class TemplateApplier {
      *
      * @returns A Promise resolving to the modified AST
      */
-    private async applyToExpression(): Promise<J | undefined> {
+    private async applyInternal(): Promise<J | undefined> {
         const {tree} = this.coordinates;
 
-        // Create a copy of the AST with the prefix from the target
-        const result = tree ? produce(this.ast, draft => {
-            draft.prefix = (tree as J).prefix;
-        }) : this.ast;
-
-        // Apply auto-formatting to the result (before = original tree, after = template result)
-        return tree ? maybeAutoFormat(tree as J, result, null, undefined, this.cursor.parent) : result;
-    }
-
-    /**
-     * Applies the template to a statement.
-     *
-     * @returns A Promise resolving to the modified AST
-     */
-    private async applyToStatement(): Promise<J | undefined> {
-        const {tree} = this.coordinates;
+        if (!tree) {
+            return this.ast;
+        }
 
         // Create a copy of the AST with the prefix from the target
         const result = produce(this.ast, draft => {
             draft.prefix = (tree as J).prefix;
+            // We temporarily set the ID so that the formatter can identify the tree
+            draft.id = (tree as J).id;
         });
 
         // Apply auto-formatting to the result (before = original tree, after = template result)
-        return maybeAutoFormat(tree as J, result, null, undefined, this.cursor.parent);
-    }
-
-    /**
-     * Applies the template to a block.
-     *
-     * @returns A Promise resolving to the modified AST
-     */
-    private async applyToBlock(): Promise<J | undefined> {
-        const {tree} = this.coordinates;
-
-        // Create a copy of the AST with the prefix from the target
-        const result = produce(this.ast, draft => {
-            draft.prefix = (tree as J).prefix;
+        return produce(await maybeAutoFormat(tree as J, result, null, undefined, this.cursor.parent), draft => {
+            draft.id = this.ast.id;
         });
-
-        // Apply auto-formatting to the result (before = original tree, after = template result)
-        return maybeAutoFormat(tree as J, result, null, undefined, this.cursor.parent);
     }
 }
