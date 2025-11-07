@@ -121,20 +121,26 @@ class RewriteRuleImpl implements RewriteRule {
  *
  * @example
  * // Single pattern
- * const swapOperands = rewrite(() => ({
- *     before: pattern`${"left"} + ${"right"}`,
- *     after: template`${"right"} + ${"left"}`
- * }));
+ * const swapOperands = rewrite(() => {
+ *     const { left, right } = { left: capture(), right: capture() };
+ *     return {
+ *         before: pattern`${left} + ${right}`,
+ *         after: template`${right} + ${left}`
+ *     };
+ * });
  *
  * @example
  * // Multiple patterns
- * const normalizeComparisons = rewrite(() => ({
- *     before: [
- *         pattern`${"left"} == ${"right"}`,
- *         pattern`${"left"} === ${"right"}`
- *     ],
- *     after: template`${"left"} === ${"right"}`
- * }));
+ * const normalizeComparisons = rewrite(() => {
+ *     const { left, right } = { left: capture(), right: capture() };
+ *     return {
+ *         before: [
+ *             pattern`${left} == ${right}`,
+ *             pattern`${left} === ${right}`
+ *         ],
+ *         after: template`${left} === ${right}`
+ *     };
+ * });
  *
  * @example
  * // Using in a visitor - IMPORTANT: use `|| node` to handle undefined when no match
