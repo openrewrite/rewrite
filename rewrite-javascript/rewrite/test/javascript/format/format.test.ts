@@ -185,22 +185,6 @@ describe('AutoformatVisitor', () => {
         )
     });
 
-    test('anonymous function expression', () => {
-        return spec.rewriteRun(
-            // @formatter:off
-            //language=typescript
-            typescript(
-                `const fn = function () {return 99;};`,
-                 `
-                const fn =
-                    function () {
-                        return 99;
-                    };`
-            )
-            // @formatter:on
-        )
-    });
-
     test('object literal in a single line', () => {
         return spec.rewriteRun(
             // @formatter:off
@@ -253,6 +237,56 @@ describe('AutoformatVisitor', () => {
                     logger.info("normal");
                 }
                 `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('honor original lack of newline before function expression', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                "const x = function () { return 136; };",
+                `
+                const x = function () {
+                    return 136;
+                };
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('honor original newline before function expression', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const x =
+                    function () { return 136; };`,
+                `
+                const x =
+                    function () {
+                        return 136;
+                    };
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('class method', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                class A {
+                    m(): number {
+                        return 136;
+                    }
+                }`
             )
             // @formatter:on
         )
