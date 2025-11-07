@@ -344,8 +344,13 @@ export class Template {
  * to navigate properties (e.g., `method.name`) or array bracket notation to
  * access array elements (e.g., `args.elements[0].element`).
  *
+ * Templates can also accept AST wrapper types directly:
+ * - J.RightPadded<T>: The element will be extracted and inserted
+ * - J.RightPadded<T>[]: Elements will be expanded in place
+ * - J.Container<T>: Elements will be expanded in place
+ *
  * @param strings The string parts of the template
- * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, or Tree[])
+ * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container)
  * @returns A Template object that can be applied to generate AST nodes
  *
  * @example
@@ -380,6 +385,12 @@ export class Template {
  * // Array element access
  * const invocation = capture<J.MethodInvocation>('invocation');
  * template`bar(${invocation.arguments.elements[0].element})`
+ *
+ * @example
+ * // Using J.RightPadded and J.Container directly
+ * const selectExpr = method.select;  // J.RightPadded<Expression>
+ * const args = method.arguments;      // J.Container<Expression>
+ * template`${selectExpr}.newMethod(${args})`
  */
 export function template(strings: TemplateStringsArray, ...parameters: TemplateParameter[]): Template {
     // Convert parameters to Parameter objects (no longer need to check for mutable tree property)

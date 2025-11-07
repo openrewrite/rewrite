@@ -278,11 +278,14 @@ export interface PatternOptions {
  * - TemplateParam: For standalone template parameters
  * - Tree: AST nodes to be inserted directly
  * - Tree[]: Arrays of AST nodes (from variadic capture operations like slice)
+ * - J.RightPadded<any>: Wrapper containing an element with markers (element will be extracted)
+ * - J.RightPadded<any>[]: Array of wrappers (elements will be expanded)
+ * - J.Container<any>: Container with elements (elements will be expanded)
  *
  * Note: Primitive values (string, number, boolean) are NOT supported in template literals.
  * Use Template.builder() API if you need to insert literal values.
  */
-export type TemplateParameter = Capture | CaptureValue | TemplateParam | Tree | Tree[];
+export type TemplateParameter = Capture | CaptureValue | TemplateParam | Tree | Tree[] | J.RightPadded<any> | J.RightPadded<any>[] | J.Container<any>;
 
 /**
  * Parameter specification for template generation (internal).
