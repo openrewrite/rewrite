@@ -291,4 +291,15 @@ describe('AutoformatVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('empty braces', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                "const c = typeof {} === 'object';"
+            )
+            // @formatter:on
+        )
+    });
 });
