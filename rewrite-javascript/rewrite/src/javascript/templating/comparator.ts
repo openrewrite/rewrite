@@ -17,7 +17,7 @@ import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptSemanticComparatorVisitor} from '../comparator';
-import {PlaceholderUtils, CaptureStorageValue} from './utils';
+import {CaptureMarker, CaptureStorageValue, PlaceholderUtils} from './utils';
 
 /**
  * A comparator for pattern matching that is lenient about optional properties.
@@ -27,8 +27,8 @@ import {PlaceholderUtils, CaptureStorageValue} from './utils';
 export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisitor {
     constructor(
         private readonly matcher: {
-            handleCapture: (pattern: J, target: J, wrapper?: J.RightPadded<J>) => boolean;
-            handleVariadicCapture: (pattern: J, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
+            handleCapture: (capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>) => boolean;
+            handleVariadicCapture: (capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
             saveState: () => Map<string, CaptureStorageValue>;
             restoreState: (state: Map<string, CaptureStorageValue>) => void;
         },
@@ -38,57 +38,99 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         super(lenientTypeMatching);
     }
 
-    /**
-     * Extracts the wrapper from the cursor if the parent is a RightPadded.
-     */
-    private getWrapperFromCursor(cursor: Cursor): J.RightPadded<J> | undefined {
-        if (!cursor.parent) {
-            return undefined;
-        }
-        const parent = cursor.parent.value;
-        // Check if parent is a RightPadded by checking its kind
-        if ((parent as any).kind === J.Kind.RightPadded) {
-            return parent as J.RightPadded<J>;
-        }
-        return undefined;
-    }
-
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
-        // Check if the pattern node is a capture - this handles captures anywhere in the tree
-        if (PlaceholderUtils.isCapture(j as J)) {
-            const wrapper = this.getWrapperFromCursor(this.cursor);
-            const success = this.matcher.handleCapture(j as J, p, wrapper);
-            if (!success) {
-                return this.abort(j) as R;
+        // Check if the pattern node is a capture - this handles unwrapped captures
+        // (Wrapped captures in J.RightPadded are handled by visitRightPadded override)
+        // Note: targetCursor will be pushed by parent's visit() method after this check
+        const captureMarker = PlaceholderUtils.getCaptureMarker(j)!;
+        if (captureMarker) {
+
+            // Push targetCursor to position it at the captured node for constraint evaluation
+            // Only create cursor if targetCursor was initialized (meaning user provided one)
+            const savedTargetCursor = this.targetCursor;
+            const cursorAtCapturedNode = this.targetCursor !== undefined
+                ? new Cursor(p, this.targetCursor)
+                : undefined;
+            this.targetCursor = cursorAtCapturedNode;
+            try {
+                // Evaluate constraint with cursor at the captured node
+                if (captureMarker.constraint && !captureMarker.constraint(p, cursorAtCapturedNode)) {
+                    return this.abort(j) as R;
+                }
+
+                const success = this.matcher.handleCapture(captureMarker, p, undefined);
+                if (!success) {
+                    return this.abort(j) as R;
+                }
+                return j as R;
+            } finally {
+                this.targetCursor = savedTargetCursor;
             }
-            return j as R;
         }
 
         if (!this.match) {
             return j as R;
         }
 
-        return super.visit(j, p, parent);
+        // Continue with parent's visit which will push targetCursor and traverse
+        return await super.visit(j, p, parent);
     }
 
     protected hasSameKind(j: J, other: J): boolean {
         return super.hasSameKind(j, other) ||
-               (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));
+            (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));
     }
 
-    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
-        if (PlaceholderUtils.isCapture(identifier)) {
-            const wrapper = this.getWrapperFromCursor(this.cursor);
-            const success = this.matcher.handleCapture(identifier, other, wrapper);
-            return success ? identifier : this.abort(identifier);
+    /**
+     * Override visitRightPadded to check if this wrapper has a CaptureMarker.
+     * If so, capture the entire wrapper (to preserve markers like semicolons).
+     */
+    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): Promise<J.RightPadded<T>> {
+        if (!this.match) {
+            return right;
         }
-        return super.visitIdentifier(identifier, other);
+
+        // Check if this RightPadded has a CaptureMarker (attached during pattern construction)
+        // Note: Markers are now only at the wrapper level, not at the element level
+        const captureMarker = PlaceholderUtils.getCaptureMarker(right);
+        if (captureMarker) {
+            // Extract the target wrapper if it's also a RightPadded
+            const isRightPadded = (p as any).kind === J.Kind.RightPadded;
+            const targetWrapper = isRightPadded ? (p as unknown) as J.RightPadded<T> : undefined;
+            const targetElement = isRightPadded ? targetWrapper!.element : p;
+
+            // Push targetCursor to position it at the captured element for constraint evaluation
+            // Only create cursor if targetCursor was initialized (meaning user provided one)
+            const savedTargetCursor = this.targetCursor;
+            const cursorAtCapturedNode = this.targetCursor !== undefined
+                ? (targetWrapper ? new Cursor(targetWrapper, this.targetCursor) : new Cursor(targetElement, this.targetCursor))
+                : undefined;
+            this.targetCursor = cursorAtCapturedNode;
+            try {
+                // Evaluate constraint with cursor at the captured node
+                if (captureMarker.constraint && !captureMarker.constraint(targetElement as J, cursorAtCapturedNode)) {
+                    return this.abort(right);
+                }
+
+                // Handle the capture with the wrapper - use the element for pattern matching
+                const success = this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
+                if (!success) {
+                    return this.abort(right);
+                }
+                return right;
+            } finally {
+                this.targetCursor = savedTargetCursor;
+            }
+        }
+
+        // Not a capture wrapper - use parent implementation
+        return super.visitRightPadded(right, p);
     }
 
     override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
         // Check if any arguments are variadic captures
         const hasVariadicCapture = methodInvocation.arguments.elements.some(arg =>
-            PlaceholderUtils.isVariadicCapture(arg.element)
+            PlaceholderUtils.isVariadicCapture(arg)
         );
 
         // If no variadic captures, use parent implementation (which includes semantic/type-aware matching)
@@ -125,9 +167,9 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 return this.abort(methodInvocation);
             }
 
-            // Visit each type parameter in lock step
+            // Visit each type parameter in lock step (visit RightPadded to check for markers)
             for (let i = 0; i < methodInvocation.typeParameters.elements.length; i++) {
-                await this.visit(methodInvocation.typeParameters.elements[i].element, otherMethodInvocation.typeParameters.elements[i].element);
+                await this.visitRightPadded(methodInvocation.typeParameters.elements[i], otherMethodInvocation.typeParameters.elements[i] as any);
                 if (!this.match) return methodInvocation;
             }
         }
@@ -147,7 +189,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
         // Check if any statements have CaptureMarker indicating they're variadic
         const hasVariadicCapture = block.statements.some(stmt => {
-            const captureMarker = PlaceholderUtils.getCaptureMarker(stmt.element);
+            const captureMarker = PlaceholderUtils.getCaptureMarker(stmt);
             return captureMarker?.variadicOptions !== undefined;
         });
 
@@ -172,10 +214,9 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     }
 
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): Promise<J | undefined> {
-        // Check if any statements are variadic captures (unwrap ExpressionStatement wrappers first)
+        // Check if any statements are variadic captures
         const hasVariadicCapture = compilationUnit.statements.some(stmt => {
-            const unwrapped = PlaceholderUtils.unwrapStatementCapture(stmt.element);
-            return PlaceholderUtils.isVariadicCapture(unwrapped);
+            return PlaceholderUtils.isVariadicCapture(stmt);
         });
 
         // If no variadic captures, use parent implementation
@@ -246,8 +287,9 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             return targetIdx >= targetElements.length; // Success if all targets consumed
         }
 
-        const patternElement = patternElements[patternIdx].element;
-        const captureMarker = PlaceholderUtils.getCaptureMarker(patternElement);
+        // Check for markers at wrapper level only (markers are now only at the outermost level)
+        const patternWrapper = patternElements[patternIdx];
+        const captureMarker = PlaceholderUtils.getCaptureMarker(patternWrapper);
         const isVariadic = captureMarker?.variadicOptions !== undefined;
 
         if (isVariadic) {
@@ -259,8 +301,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             // Calculate maximum possible consumption
             let nonVariadicRemainingPatterns = 0;
             for (let i = patternIdx + 1; i < patternElements.length; i++) {
-                const nextPatternElement = patternElements[i].element;
-                const nextCaptureMarker = PlaceholderUtils.getCaptureMarker(nextPatternElement);
+                const nextCaptureMarker = PlaceholderUtils.getCaptureMarker(patternElements[i]);
                 const nextIsVariadic = nextCaptureMarker?.variadicOptions !== undefined;
                 if (!nextIsVariadic) {
                     nonVariadicRemainingPatterns++;
@@ -275,16 +316,16 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             let pivotAt = -1;
 
             if (patternIdx + 1 < patternElements.length && min <= maxPossible) {
-                const nextPattern = patternElements[patternIdx + 1].element;
+                const nextPattern = patternElements[patternIdx + 1];
 
                 // Scan through possible consumption amounts starting from min
                 for (let tryConsume = min; tryConsume <= maxPossible; tryConsume++) {
                     // Check if element after our consumption would match next pattern
                     if (targetIdx + tryConsume < targetElements.length) {
-                        const candidateElement = targetElements[targetIdx + tryConsume].element;
+                        const candidateElement = targetElements[targetIdx + tryConsume];
 
                         // Skip J.Empty for arguments
-                        if (filterEmpty && candidateElement.kind === J.Kind.Empty) {
+                        if (filterEmpty && candidateElement.element.kind === J.Kind.Empty) {
                             continue;
                         }
 
@@ -292,7 +333,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                         const savedMatch = this.match;
                         const savedState = this.matcher.saveState();
 
-                        await this.visit(nextPattern, candidateElement);
+                        await this.visitRightPadded(nextPattern, candidateElement as any);
                         const matchesNext = this.match;
 
                         this.match = savedMatch;
@@ -347,11 +388,20 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                     continue; // Try next consumption amount
                 }
 
+                // Evaluate constraint for variadic capture
+                // For variadic captures, constraint receives the entire array of captured elements
+                // The targetCursor is positioned in the target tree (parent context)
+                if (captureMarker.constraint) {
+                    if (!captureMarker.constraint(capturedElements as any, this.targetCursor)) {
+                        continue; // Try next consumption amount
+                    }
+                }
+
                 // Save current state for backtracking
                 const savedState = this.matcher.saveState();
 
                 // Handle the variadic capture
-                const success = this.matcher.handleVariadicCapture(patternElement, capturedElements, capturedWrappers);
+                const success = this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
                 if (!success) {
                     // Restore state and try next amount
                     this.matcher.restoreState(savedState);
@@ -394,14 +444,8 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             const savedMatch = this.match;
             const savedState = this.matcher.saveState();
 
-            // Push wrapper onto cursor so captures can access it
-            const savedCursor = this.cursor;
-            this.cursor = new Cursor(targetWrapper, this.cursor);
-            try {
-                await this.visit(patternElement, targetElement);
-            } finally {
-                this.cursor = savedCursor;
-            }
+            await this.visitRightPadded(patternWrapper, targetWrapper as any);
+
             if (!this.match) {
                 // Restore state on match failure
                 this.match = savedMatch;

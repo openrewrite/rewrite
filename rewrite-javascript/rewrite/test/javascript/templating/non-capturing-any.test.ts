@@ -13,8 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {any, capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
-import {JavaScriptParser} from "../../../src/javascript/parser";
+import {
+    any,
+    capture,
+    JavaScriptParser,
+    JavaScriptVisitor,
+    pattern,
+    rewrite,
+    template,
+    typescript
+} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 

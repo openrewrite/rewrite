@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {Cursor} from '../..';
 import {J, Type} from '../../java';
 import {Any, Capture, CaptureOptions, TemplateParam, VariadicOptions} from './types';
 
@@ -29,8 +30,8 @@ import {Any, Capture, CaptureOptions, TemplateParam, VariadicOptions} from './ty
  *     )
  * });
  */
-export function and<T>(...constraints: ((node: T) => boolean)[]): (node: T) => boolean {
-    return (node: T) => constraints.every(c => c(node));
+export function and<T>(...constraints: ((node: T, cursor?: Cursor) => boolean)[]): (node: T, cursor?: Cursor) => boolean {
+    return (node: T, cursor?: Cursor) => constraints.every(c => c(node, cursor));
 }
 
 /**
@@ -45,8 +46,8 @@ export function and<T>(...constraints: ((node: T) => boolean)[]): (node: T) => b
  *     )
  * });
  */
-export function or<T>(...constraints: ((node: T) => boolean)[]): (node: T) => boolean {
-    return (node: T) => constraints.some(c => c(node));
+export function or<T>(...constraints: ((node: T, cursor?: Cursor) => boolean)[]): (node: T, cursor?: Cursor) => boolean {
+    return (node: T, cursor?: Cursor) => constraints.some(c => c(node, cursor));
 }
 
 /**
@@ -58,8 +59,8 @@ export function or<T>(...constraints: ((node: T) => boolean)[]): (node: T) => bo
  *     constraint: not((node) => typeof node.value === 'string')
  * });
  */
-export function not<T>(constraint: (node: T) => boolean): (node: T) => boolean {
-    return (node: T) => !constraint(node);
+export function not<T>(constraint: (node: T, cursor?: Cursor) => boolean): (node: T, cursor?: Cursor) => boolean {
+    return (node: T, cursor?: Cursor) => !constraint(node, cursor);
 }
 
 // Symbol to access the internal capture name without triggering Proxy

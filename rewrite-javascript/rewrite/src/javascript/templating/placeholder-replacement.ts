@@ -20,7 +20,7 @@ import {JavaScriptVisitor} from '../visitor';
 import {produce} from 'immer';
 import {PlaceholderUtils} from './utils';
 import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
-import {Parameter} from './engine';
+import {Parameter} from './types';
 
 /**
  * Visitor that replaces placeholder nodes with actual parameter values.
@@ -167,7 +167,28 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             // Not a placeholder (or expansion failed) - process normally
             const replacedElement = await this.visit(element, p);
             if (replacedElement) {
-                newElements.push(produce(wrapped, draft => {
+                // Check if the replacement came from a capture with a wrapper (to preserve markers)
+                const placeholderNode = unwrapElement(element);
+                const placeholderText = this.getPlaceholderText(placeholderNode);
+                let wrapperToUse = wrapped;
+
+                if (placeholderText && this.isPlaceholder(placeholderNode)) {
+                    const param = this.substitutions.get(placeholderText);
+                    if (param) {
+                        const isCapture = param.value instanceof CaptureImpl ||
+                                         (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
+                        if (isCapture) {
+                            const name = param.value[CAPTURE_NAME_SYMBOL] || param.value.name;
+                            const wrapper = this.wrappersMap.get(name);
+                            // Use captured wrapper if available and not an array (non-variadic)
+                            if (wrapper && !Array.isArray(wrapper)) {
+                                wrapperToUse = wrapper as J.RightPadded<J>;
+                            }
+                        }
+                    }
+                }
+
+                newElements.push(produce(wrapperToUse, draft => {
                     draft.element = replacedElement;
                 }));
             }

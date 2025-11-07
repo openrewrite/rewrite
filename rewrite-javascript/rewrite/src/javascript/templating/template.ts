@@ -15,11 +15,11 @@
  */
 import {Cursor, Tree} from '../..';
 import {J} from '../../java';
-import {TemplateOptions, TemplateParameter, Capture} from './types';
+import {Capture, Parameter, TemplateOptions, TemplateParameter} from './types';
 import {MatchResult} from './pattern';
-import {WRAPPERS_MAP_SYMBOL} from './utils';
+import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL} from './capture';
-import {TemplateEngine, Parameter} from './engine';
+import {TemplateEngine} from './engine';
 
 /**
  * Coordinates for template application.
@@ -171,6 +171,7 @@ export class TemplateBuilder {
  */
 export class Template {
     private options: TemplateOptions = {};
+    private _cachedTemplate?: J;
 
     /**
      * Creates a new builder for constructing templates programmatically.
@@ -210,13 +211,59 @@ export class Template {
      * @example
      * template`isDate(${capture('date')})`
      *     .configure({
-     *         imports: ['import { isDate } from "util"'],
+     *         context: ['import { isDate } from "util"'],
      *         dependencies: { 'util': '^1.0.0' }
      *     })
      */
     configure(options: TemplateOptions): Template {
         this.options = { ...this.options, ...options };
+        // Invalidate cache when configuration changes
+        this._cachedTemplate = undefined;
         return this;
+    }
+
+    /**
+     * Gets the cached template tree or computes it.
+     * Uses two-level caching: instance cache → global cache → compute.
+     *
+     * @returns A Promise resolving to the template AST tree
+     */
+    private async getTemplate(): Promise<J> {
+        // Level 1: Instance cache (fastest path)
+        if (this._cachedTemplate) {
+            return this._cachedTemplate;
+        }
+
+        // Generate cache key for global lookup
+        const contextStatements = this.options.context || this.options.imports || [];
+        const paramNames = this.parameters.map((p, i) => `param${i}`).join(',');
+        const cacheKey = generateCacheKey(
+            this.templateParts,
+            paramNames,
+            contextStatements,
+            this.options.dependencies || {}
+        );
+
+        // Level 2: Global cache (fast path - shared with Pattern)
+        const cached = globalAstCache.get(cacheKey);
+        if (cached) {
+            this._cachedTemplate = cached;
+            return cached;
+        }
+
+        // Level 3: Compute via TemplateEngine (slow path)
+        const result = await TemplateEngine.getTemplateTree(
+            this.templateParts,
+            this.parameters,
+            contextStatements,
+            this.options.dependencies || {}
+        );
+
+        // Cache in both levels
+        globalAstCache.set(cacheKey, result);
+        this._cachedTemplate = result;
+
+        return result;
     }
 
     /**
@@ -263,8 +310,15 @@ export class Template {
             }
         }
 
+        // Get the cached template tree (uses two-level caching)
+        const templateTree = await this.getTemplate();
+
         // Prefer 'context' over deprecated 'imports'
         const contextStatements = this.options.context || this.options.imports || [];
+
+        // Apply template with value substitution using TemplateEngine
+        // Note: TemplateEngine.applyTemplate will call getTemplateTree again,
+        // but that's okay because it hits the templateCache which is fast
         return TemplateEngine.applyTemplate(
             this.templateParts,
             this.parameters,

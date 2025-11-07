@@ -30,14 +30,26 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     protected match: boolean = true;
 
     /**
+     * Cursor tracking the current position in the target tree.
+     * Maintained in parallel with the pattern tree cursor (this.cursor).
+     */
+    protected targetCursor?: Cursor;
+
+    /**
      * Compares two AST trees.
-     * 
-     * @param tree1 The first tree to compare
-     * @param tree2 The second tree to compare
+     *
+     * @param tree1 The first tree to compare (pattern tree)
+     * @param tree2 The second tree to compare (target tree)
+     * @param parentCursor1 Optional parent cursor for the pattern tree (for navigating to root)
+     * @param parentCursor2 Optional parent cursor for the target tree (for navigating to root)
      * @returns true if the trees match, false otherwise
      */
-    async compare(tree1: J, tree2: J): Promise<boolean> {
+    async compare(tree1: J, tree2: J, parentCursor1?: Cursor, parentCursor2?: Cursor): Promise<boolean> {
         this.match = true;
+        // Initialize targetCursor with parent if provided, otherwise undefined (will be set by visit())
+        this.targetCursor = parentCursor2;
+        // Initialize this.cursor (pattern cursor) with parent if provided
+        this.cursor = parentCursor1 || new Cursor(undefined, undefined);
         await this.visit(tree1, tree2);
         return this.match;
     }
@@ -60,6 +72,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         this.match = false;
         return t;
     }
+
 
     /**
      * Generic method to visit a property value using the appropriate visitor method.
@@ -179,14 +192,23 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             return this.abort(j) as R;
         }
 
-        // Continue with normal visitation, passing the other node as context
-        return super.visit(j, p);
+        // Update targetCursor to track the target node in parallel with the pattern cursor
+        // (Can be overridden by subclasses if they need cursor access before calling super)
+        const savedTargetCursor = this.targetCursor;
+        this.targetCursor = new Cursor(p, this.targetCursor);
+        try {
+            // Continue with normal visitation, passing the other node as context
+            return await super.visit(j, p);
+        } finally {
+            this.targetCursor = savedTargetCursor;
+        }
     }
 
     /**
      * Override visitRightPadded to compare only the elements, not markers or spacing.
      * The context parameter p contains the corresponding element from the other tree.
      * Pushes the wrapper onto the cursor stack so captures can access it.
+     * Also updates targetCursor in parallel.
      */
     public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): Promise<J.RightPadded<T>> {
         if (!this.match) {
@@ -194,17 +216,20 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         // Extract the other element if it's also a RightPadded
-        const otherElement = (p as any).kind === J.Kind.RightPadded
-            ? ((p as unknown) as J.RightPadded<T>).element
-            : p;
+        const isRightPadded = (p as any).kind === J.Kind.RightPadded;
+        const otherWrapper = isRightPadded ? (p as unknown) as J.RightPadded<T> : undefined;
+        const otherElement = isRightPadded ? otherWrapper!.element : p;
 
-        // Push wrapper onto cursor, then compare only the elements, not markers or spacing
+        // Push wrappers onto both cursors, then compare only the elements, not markers or spacing
         const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
         this.cursor = new Cursor(right, this.cursor);
+        this.targetCursor = otherWrapper ? new Cursor(otherWrapper, this.targetCursor) : this.targetCursor;
         try {
             await this.visitProperty(right.element, otherElement);
         } finally {
             this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
         }
 
         return right;
@@ -214,6 +239,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * Override visitLeftPadded to compare only the elements, not markers or spacing.
      * The context parameter p contains the corresponding element from the other tree.
      * Pushes the wrapper onto the cursor stack so captures can access it.
+     * Also updates targetCursor in parallel.
      */
     public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: J): Promise<J.LeftPadded<T>> {
         if (!this.match) {
@@ -221,17 +247,20 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         // Extract the other element if it's also a LeftPadded
-        const otherElement = (p as any).kind === J.Kind.LeftPadded
-            ? ((p as unknown) as J.LeftPadded<T>).element
-            : p;
+        const isLeftPadded = (p as any).kind === J.Kind.LeftPadded;
+        const otherWrapper = isLeftPadded ? (p as unknown) as J.LeftPadded<T> : undefined;
+        const otherElement = isLeftPadded ? otherWrapper!.element : p;
 
-        // Push wrapper onto cursor, then compare only the elements, not markers or spacing
+        // Push wrappers onto both cursors, then compare only the elements, not markers or spacing
         const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
         this.cursor = new Cursor(left, this.cursor);
+        this.targetCursor = otherWrapper ? new Cursor(otherWrapper, this.targetCursor) : this.targetCursor;
         try {
             await this.visitProperty(left.element, otherElement);
         } finally {
             this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
         }
 
         return left;
@@ -241,6 +270,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * Override visitContainer to compare only the elements, not markers or spacing.
      * The context parameter p contains the corresponding element from the other tree.
      * Pushes the wrapper onto the cursor stack so captures can access it.
+     * Also updates targetCursor in parallel.
      */
     public async visitContainer<T extends J>(container: J.Container<T>, p: J): Promise<J.Container<T>> {
         if (!this.match) {
@@ -248,18 +278,20 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         // Extract the other elements if it's also a Container
-        const otherElements: J.RightPadded<T>[] = (p as any).kind === J.Kind.Container
-            ? ((p as unknown) as J.Container<T>).elements
-            : (p as any);
+        const isContainer = (p as any).kind === J.Kind.Container;
+        const otherContainer = isContainer ? (p as unknown) as J.Container<T> : undefined;
+        const otherElements: J.RightPadded<T>[] = isContainer ? otherContainer!.elements : (p as any);
 
         // Compare elements array length
         if (container.elements.length !== otherElements.length) {
             return this.abort(container);
         }
 
-        // Push wrapper onto cursor, then compare each element
+        // Push wrappers onto both cursors, then compare each element
         const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
         this.cursor = new Cursor(container, this.cursor);
+        this.targetCursor = otherContainer ? new Cursor(otherContainer, this.targetCursor) : this.targetCursor;
         try {
             for (let i = 0; i < container.elements.length; i++) {
                 await this.visitProperty(container.elements[i], otherElements[i]);
@@ -269,6 +301,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             }
         } finally {
             this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
         }
 
         return container;
@@ -1967,7 +2000,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             }
 
             if (method.select && otherMethod.select) {
-                await this.visit(method.select.element, otherMethod.select.element);
+                await this.visitRightPadded(method.select, otherMethod.select as any);
             }
         }
 
@@ -1981,7 +2014,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                 return this.abort(method);
             }
             for (let i = 0; i < method.typeParameters.elements.length; i++) {
-                await this.visit(method.typeParameters.elements[i].element, otherMethod.typeParameters.elements[i].element);
+                await this.visitRightPadded(method.typeParameters.elements[i], otherMethod.typeParameters.elements[i] as any);
                 if (!this.match) {
                     return this.abort(method);
                 }
@@ -1994,9 +2027,9 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             return this.abort(method);
         }
 
-        // Compare arguments
+        // Compare arguments (visit RightPadded to check for markers)
         for (let i = 0; i < method.arguments.elements.length; i++) {
-            await this.visit(method.arguments.elements[i].element, otherMethod.arguments.elements[i].element);
+            await this.visitRightPadded(method.arguments.elements[i], otherMethod.arguments.elements[i] as any);
             if (!this.match) {
                 return this.abort(method);
             }
@@ -2088,7 +2121,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // Visit each variable in lock step
         for (let i = 0; i < variableDeclarations.variables.length; i++) {
-            await this.visit(variableDeclarations.variables[i].element, otherVariableDeclarations.variables[i].element);
+            await this.visitRightPadded(variableDeclarations.variables[i], otherVariableDeclarations.variables[i] as any);
             if (!this.match) return variableDeclarations;
         }
 
@@ -2156,7 +2189,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // Visit each parameter in lock step
         for (let i = 0; i < methodDeclaration.parameters.elements.length; i++) {
-            await this.visit(methodDeclaration.parameters.elements[i].element, otherMethodDeclaration.parameters.elements[i].element);
+            await this.visitRightPadded(methodDeclaration.parameters.elements[i], otherMethodDeclaration.parameters.elements[i] as any);
             if (!this.match) return methodDeclaration;
         }
 
@@ -2172,7 +2205,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             }
 
             for (let i = 0; i < methodDeclaration.throws.elements.length; i++) {
-                await this.visit(methodDeclaration.throws.elements[i].element, otherMethodDeclaration.throws.elements[i].element);
+                await this.visitRightPadded(methodDeclaration.throws.elements[i], otherMethodDeclaration.throws.elements[i] as any);
                 if (!this.match) return methodDeclaration;
             }
         }

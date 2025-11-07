@@ -49,7 +49,8 @@ export {
 
 // Export rewrite functionality
 export {
-    rewrite
+    rewrite,
+    fromRecipe
 } from './rewrite';
 
 // Export template functionality

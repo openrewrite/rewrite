@@ -17,15 +17,15 @@ import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     capture,
     JavaScriptVisitor,
-    pattern,
+    maybeAutoFormat,
     Pattern,
-    template,
+    pattern,
     Template,
+    template,
     typescript
 } from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {produce} from "immer";
-import {maybeAutoFormat} from "../../../src/javascript/format";
 
 describe('variadic statement matching and expansion', () => {
     const spec = new RecipeSpec();
@@ -194,8 +194,8 @@ describe('variadic statement matching and expansion', () => {
                 }`,
                 `
                 function foo() {
-                    const b = 2
-                    const a = 1
+                    const b = 2;
+                    const a = 1;
                 }`
             )
         );
@@ -347,6 +347,87 @@ describe('variadic statement matching and expansion', () => {
                     } catch (e) {
                         console.error(e);
                     }
+                }`
+            )
+        );
+    });
+
+    test('non-variadic capture should preserve trailing semicolons', () => {
+        // Bug report: using capture() (non-variadic) for function bodies loses trailing semicolons
+        const body = capture();
+        const pat = pattern`{${body}}`;
+        const tmpl = template`{
+            console.log('before');
+            ${body}
+        }`;
+
+        spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript(
+                `function foo() {
+                    return 42;
+                }`,
+                `
+                function foo() {
+                    console.log('before');
+                    return 42;
+                }`
+            )
+        );
+    });
+
+    test('variadic capture should preserve trailing semicolons', () => {
+        // Variadic captures should also preserve semicolons and formatting
+        const body = capture({ variadic: true });
+        const pat = pattern`{${body}}`;
+        const tmpl = template`{
+            console.log('before');
+            ${body}
+        }`;
+
+        spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript(
+                `function foo() {
+                    return 42;
+                }`,
+                `
+                function foo() {
+                    console.log('before');
+                    return 42;
+                }`
+            )
+        );
+    });
+
+    test('function body capture with wrapper pattern should preserve semicolons', () => {
+        // More complex example: extracting function body from wrapper pattern
+        const {args, body} = {args: capture(), body: capture({ variadic: true })};
+        const pat = pattern`{
+            return wrapper(function(${args}) {${body}});
+        }`;
+        const tmpl = template`{
+            function extracted(${args}) {${body}}
+            return extracted;
+        }`;
+
+        spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript(
+                `function foo() {
+                    return wrapper(function(props) {
+                        return props.value;
+                    });
+                }`,
+                `
+                function foo() {
+                    function extracted(props) {
+                        return props.value;
+                    }
+                    return extracted;
                 }`
             )
         );
