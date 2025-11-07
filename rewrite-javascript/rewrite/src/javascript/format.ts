@@ -640,7 +640,9 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
             if (!draft.end.whitespace.includes("\n") && (draft.statements.length == 0 || !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n"))) {
-                draft.end = this.withNewlineSpace(draft.end);
+                if (block.statements.length > 0) {
+                    draft.end = this.withNewlineSpace(draft.end);
+                }
             }
         });
     }
@@ -1034,8 +1036,10 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitBlock(block: J.Block, p: P): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
-            if (!draft.end.whitespace.includes("\n")) {
-                draft.end.whitespace = draft.end.whitespace.replace(/[ \t]+$/, '') + "\n";
+            if (block.statements.length > 0 || this.cursor.parent?.value.kind != J.Kind.NewClass) {
+                if (!draft.end.whitespace.includes("\n")) {
+                    draft.end.whitespace = draft.end.whitespace.replace(/[ \t]+$/, '') + "\n";
+                }
             }
         });
     }
