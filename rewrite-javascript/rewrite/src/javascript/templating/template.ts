@@ -20,6 +20,7 @@ import {MatchResult} from './pattern';
 import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
+import {JS} from '..';
 
 /**
  * Coordinates for template application.
@@ -223,23 +224,30 @@ export class Template {
     }
 
     /**
-     * Gets the cached template tree or computes it.
-     * Uses two-level caching: instance cache → global cache → compute.
+     * Gets the template tree for this template, using two-level caching:
+     * - Level 1: Instance cache (this._cachedTemplate) - fastest, no lookup needed
+     * - Level 2: Global cache (globalAstCache) - fast, shared across all templates
+     * - Level 3: TemplateEngine - slow, parses and processes the template
      *
-     * @returns A Promise resolving to the template AST tree
+     * Since all parameters are now placeholders (no primitives), templates with the same
+     * structure always parse to the same AST regardless of parameter values.
+     *
+     * @returns The cached or newly computed template tree
+     * @internal
      */
-    private async getTemplate(): Promise<J> {
+    async getTemplateTree(): Promise<JS.CompilationUnit> {
         // Level 1: Instance cache (fastest path)
         if (this._cachedTemplate) {
-            return this._cachedTemplate;
+            return this._cachedTemplate as JS.CompilationUnit;
         }
 
         // Generate cache key for global lookup
+        // Since all parameters use placeholders, we only need the template structure
         const contextStatements = this.options.context || this.options.imports || [];
-        const paramNames = this.parameters.map((p, i) => `param${i}`).join(',');
+        const parametersKey = this.parameters.length.toString(); // Just the count
         const cacheKey = generateCacheKey(
             this.templateParts,
-            paramNames,
+            parametersKey,
             contextStatements,
             this.options.dependencies || {}
         );
@@ -247,8 +255,8 @@ export class Template {
         // Level 2: Global cache (fast path - shared with Pattern)
         const cached = globalAstCache.get(cacheKey);
         if (cached) {
-            this._cachedTemplate = cached;
-            return cached;
+            this._cachedTemplate = cached as JS.CompilationUnit;
+            return cached as JS.CompilationUnit;
         }
 
         // Level 3: Compute via TemplateEngine (slow path)
@@ -257,7 +265,7 @@ export class Template {
             this.parameters,
             contextStatements,
             this.options.dependencies || {}
-        );
+        ) as JS.CompilationUnit;
 
         // Cache in both levels
         globalAstCache.set(cacheKey, result);
@@ -310,17 +318,12 @@ export class Template {
             }
         }
 
-        // Get the cached template tree (uses two-level caching)
-        const templateTree = await this.getTemplate();
+        // Use instance-level cache to get the template tree
+        const ast = await this.getTemplateTree();
 
-        // Prefer 'context' over deprecated 'imports'
-        const contextStatements = this.options.context || this.options.imports || [];
-
-        // Apply template with value substitution using TemplateEngine
-        // Note: TemplateEngine.applyTemplate will call getTemplateTree again,
-        // but that's okay because it hits the templateCache which is fast
-        return TemplateEngine.applyTemplate(
-            this.templateParts,
+        // Delegate to TemplateEngine for placeholder substitution and application
+        return TemplateEngine.applyTemplateFromAst(
+            ast,
             this.parameters,
             cursor,
             {
@@ -328,9 +331,7 @@ export class Template {
                 mode: JavaCoordinates.Mode.Replace
             },
             normalizedValues,
-            wrappersMap,
-            contextStatements,
-            this.options.dependencies || {}
+            wrappersMap
         );
     }
 }
@@ -344,7 +345,7 @@ export class Template {
  * access array elements (e.g., `args.elements[0].element`).
  *
  * @param strings The string parts of the template
- * @param parameters The parameters between the string parts (Capture, Tree, or primitives)
+ * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, or Tree[])
  * @returns A Template object that can be applied to generate AST nodes
  *
  * @example

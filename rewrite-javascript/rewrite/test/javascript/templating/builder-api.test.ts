@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, Capture, JavaScriptVisitor, pattern, Pattern, template, Template, typescript} from "../../../src/javascript";
+import {capture, Capture, JavaScriptVisitor, Pattern, template, Template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('Builder API', () => {
@@ -43,7 +43,7 @@ describe('Builder API', () => {
         test('creates template equivalent to template literal', async () => {
             // Using builder - just replace the literal value
             const builderTmpl = Template.builder()
-                .param(42)
+                .code(String(42))
                 .build();
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
@@ -86,7 +86,14 @@ describe('Builder API', () => {
 
             return spec.rewriteRun(
                 typescript('const a = 1',
-                          'const a = function validate(x) { if (typeof x !== "number") throw new Error("Invalid"); return 1; }'),
+                    `
+                      const a =
+                          function validate(x) {
+                              if (typeof x !== "number") throw new Error("Invalid");
+                              return 1;
+                          }
+                      `
+                ),
             );
         });
 
@@ -130,7 +137,7 @@ describe('Builder API', () => {
                 return Template.builder()
                     .code('function wrapper() { try { ')
                     .code(innerBody)
-                    .code(' } catch(e) { console.error(e); } }')
+                    .code(' } catch (e) { console.error(e); } }')
                     .build();
             }
 
@@ -150,7 +157,15 @@ describe('Builder API', () => {
             return spec.rewriteRun(
                 typescript(
                     'const x = 1',
-                    'const x = function wrapper() { try { return 42; } catch(e) { console.error(e); } }'
+                    `
+                    const x =
+                        function wrapper() {
+                            try {
+                                return 42;
+                            } catch (e) {
+                                console.error(e);
+                            }
+                        }`
                 )
             );
         });
