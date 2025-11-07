@@ -54,7 +54,10 @@ public class Print implements RpcRequest {
 
                 // Get the printer from the dummy SourceFile and use it to print the tree
                 Cursor dummyCursor = new Cursor(null, dummySourceFile);
-                return dummySourceFile.print(dummyCursor, outputCapture);
+                TreeVisitor<?, PrintOutputCapture<Integer>> printer = dummySourceFile.printer(dummyCursor);
+                printer.visit(tree, outputCapture);
+
+                return outputCapture.getOut();
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException("Unknown source file type: " + request.getSourceFileType(), e);
             }
