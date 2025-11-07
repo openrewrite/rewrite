@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 import {beforeAll, describe, expect, it} from '@jest/globals';
-import {capture, JavaScriptParser, JS, pattern, template} from '../../../src/javascript';
+import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
+import {fromVisitor, RecipeSpec} from '../../../src/test';
 
 describe('Statement Expression Wrapping', () => {
     let parser: JavaScriptParser;
@@ -154,5 +155,43 @@ describe('Statement Expression Wrapping', () => {
         expect(result!.kind).toBe(JS.Kind.StatementExpression);
         const statementExpr = result as JS.StatementExpression;
         expect(statementExpr.statement.kind).toBe(J.Kind.MethodDeclaration);
+    });
+
+    it('should handle method invocation replacement in both expression and statement contexts of if statement', () => {
+        // Parse: if (foo()) foo();
+        // First foo() is in expression context (condition)
+        // Second foo() is in statement context (body)
+        // Transform both to bar() and verify no unwanted wrapping occurs
+
+        const spec = new RecipeSpec();
+        const pat = pattern`1`;
+        const tmpl = template`bar()`;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+                const match = await pat.match(literal, this.cursor);
+                if (match) {
+                    return tmpl.apply(this.cursor, literal, match);
+                }
+                return literal;
+            }
+        });
+
+        return spec.rewriteRun({
+            ...typescript('if (1) 1;', 'if (bar()) bar();'),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const ifStmt = cu.statements[0].element as J.If;
+
+                // Verify condition (expression context) - should be plain MethodInvocation
+                const condition = ifStmt.ifCondition.tree.element;
+                expect(condition.kind).toBe(J.Kind.MethodInvocation);
+                expect((condition as J.MethodInvocation).name.simpleName).toBe('bar');
+
+                // Verify body (statement context) - should be plain MethodInvocation, not wrapped
+                const body = ifStmt.thenPart.element;
+                expect(body.kind).toBe(JS.Kind.ExpressionStatement);
+                expect((body as JS.ExpressionStatement).expression.kind).toBe(J.Kind.MethodInvocation);
+            }
+        });
     });
 });

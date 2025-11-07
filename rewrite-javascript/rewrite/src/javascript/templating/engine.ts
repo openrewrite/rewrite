@@ -671,7 +671,14 @@ export class TemplateApplier {
             // FIXME: This is a heuristic to determine if the parent expects a statement child
             const parentExpectsStatement = parentTree.kind === J.Kind.Block ||
                 parentTree.kind === J.Kind.Case ||
-                parentTree.kind === JS.Kind.CompilationUnit;
+                parentTree.kind === J.Kind.DoWhileLoop ||
+                parentTree.kind === J.Kind.ForEachLoop ||
+                parentTree.kind === J.Kind.ForLoop ||
+                parentTree.kind === J.Kind.If ||
+                parentTree.kind === J.Kind.IfElse ||
+                parentTree.kind === J.Kind.WhileLoop ||
+                parentTree.kind === JS.Kind.CompilationUnit ||
+                parentTree.kind === JS.Kind.ForInLoop;
             const originalIsStatement = isStatement(originalTree);
 
             const resultIsStatement = isStatement(resultToUse);
