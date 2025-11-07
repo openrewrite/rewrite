@@ -76,7 +76,7 @@ export class JavaScriptParser extends Parser {
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
-    private sourceFileCache?: Map<string, ts.SourceFile>;
+    private readonly sourceFileCache?: Map<string, ts.SourceFile>;
 
     constructor(
         {

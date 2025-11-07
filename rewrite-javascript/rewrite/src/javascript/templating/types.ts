@@ -15,8 +15,9 @@
  */
 import {Cursor, Tree} from '../..';
 import {J, Type} from '../../java';
-import type {Pattern, MatchResult} from "./pattern";
+import type {MatchResult, Pattern} from "./pattern";
 import type {Template} from "./template";
+import type {CaptureValue} from "./capture";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -40,11 +41,41 @@ export interface VariadicOptions {
  * the capture is variadic:
  * - For regular captures: constraint receives a single node of type T
  * - For variadic captures: constraint receives an array of nodes of type T[]
+ *
+ * The constraint function can optionally receive a cursor parameter to perform
+ * context-aware validation during pattern matching.
  */
 export interface CaptureOptions<T = any> {
     name?: string;
     variadic?: boolean | VariadicOptions;
-    constraint?: (node: T) => boolean;
+    /**
+     * Optional constraint function that validates whether a captured node should be accepted.
+     * The function receives:
+     * - node: The captured node (or array of nodes for variadic captures)
+     * - cursor: Optional cursor providing access to the node's context in the AST
+     *
+     * @param node The captured node to validate
+     * @param cursor Optional cursor at the captured node's position
+     * @returns true if the capture should be accepted, false otherwise
+     *
+     * @example
+     * ```typescript
+     * // Simple node validation
+     * capture<J.Literal>('size', {
+     *     constraint: (node) => typeof node.value === 'number' && node.value > 100
+     * })
+     *
+     * // Context-aware validation
+     * capture<J.MethodInvocation>('method', {
+     *     constraint: (node, cursor) => {
+     *         if (!node.name.simpleName.startsWith('get')) return false;
+     *         const cls = cursor?.firstEnclosing(isClassDeclaration);
+     *         return cls?.name.simpleName === 'ApiController';
+     *     }
+     * })
+     * ```
+     */
+    constraint?: (node: T, cursor?: Cursor) => boolean;
     /**
      * Type annotation for this capture. When provided, the template engine will generate
      * a preamble declaring the capture identifier with this type annotation, allowing
@@ -70,14 +101,14 @@ export interface CaptureOptions<T = any> {
  * but does NOT enforce any runtime constraints on what the capture will match.
  *
  * **Pattern Matching Behavior:**
- * - A bare `pattern`${capture('x')}`` will structurally match ANY expression
- * - Pattern structure determines matching: `pattern`foo(${capture('x')})`` only matches `foo()` calls
+ * - A bare `pattern`${capture()}`` will structurally match ANY expression
+ * - Pattern structure determines matching: `pattern`foo(${capture()})`` only matches `foo()` calls with one arg
  * - Use structural patterns to narrow matching scope before applying semantic validation
  *
  * **Variadic Captures:**
  * Use `{ variadic: true }` to match zero or more nodes in a sequence:
  * ```typescript
- * const args = capture('args', { variadic: true });
+ * const args = capture({ variadic: true });
  * pattern`foo(${args})`  // Matches: foo(), foo(a), foo(a, b, c)
  * ```
  */
@@ -101,8 +132,9 @@ export interface Capture<T = any> {
      * Gets the constraint function if this capture has one.
      * For regular captures (T = Expression), constraint receives a single node.
      * For variadic captures (T = Expression[]), constraint receives an array of nodes.
+     * The constraint function can optionally receive a cursor for context-aware validation.
      */
-    getConstraint?(): ((node: T) => boolean) | undefined;
+    getConstraint?(): ((node: T, cursor?: Cursor) => boolean) | undefined;
 }
 
 /**
@@ -137,8 +169,9 @@ export interface Capture<T = any> {
  *
  * @example
  * // Variadic any - match zero or more without capturing
+ * const first = any();
  * const rest = any({ variadic: true });
- * const pat = pattern`bar(${capture('first')}, ${rest})`
+ * const pat = pattern`bar(${first}, ${rest})`
  *
  * @example
  * // With constraints - validate but don't capture
@@ -242,11 +275,33 @@ export interface PatternOptions {
  * Valid parameter types for template literals.
  * - Capture: For pattern matching and reuse
  * - CaptureValue: Result of property access or array operations on captures (e.g., capture.prop, capture[0], capture.slice(1))
+ * - TemplateParam: For standalone template parameters
  * - Tree: AST nodes to be inserted directly
  * - Tree[]: Arrays of AST nodes (from variadic capture operations like slice)
- * - Primitives: Values to be converted to literals
+ * - J.RightPadded<any>: Wrapper containing an element with markers (element will be extracted)
+ * - J.RightPadded<any>[]: Array of wrappers (elements will be expanded)
+ * - J.Container<any>: Container with elements (elements will be expanded)
+ *
+ * Note: Primitive values (string, number, boolean) are NOT supported in template literals.
+ * Use Template.builder() API if you need to insert literal values.
  */
-export type TemplateParameter = Capture | any | TemplateParam | Tree | Tree[] | string | number | boolean;
+export type TemplateParameter = Capture | CaptureValue | TemplateParam | Tree | Tree[] | J.RightPadded<any> | J.RightPadded<any>[] | J.Container<any>;
+
+/**
+ * Parameter specification for template generation (internal).
+ * Represents a placeholder in a template that will be replaced with a parameter value.
+ * This is the internal wrapper used by the template engine.
+ *
+ * Note: The value is typed as `any` rather than `TemplateParameter` to allow flexible
+ * internal handling without excessive type guards. The public API (template function)
+ * constrains inputs to `TemplateParameter`, providing type safety at the API boundary.
+ */
+export interface Parameter {
+    /**
+     * The value to substitute into the template.
+     */
+    value: any;
+}
 
 /**
  * Configuration options for templates.
@@ -316,18 +371,21 @@ export interface RewriteRule {
      *
      * @example
      * ```typescript
-     * const rule1 = rewrite(() => ({
-     *     before: pattern`${capture('a')} + ${capture('b')}`,
-     *     after: template`${capture('b')} + ${capture('a')}`
-     * }));
+     * const rule1 = rewrite(() => {
+     *     const { a, b } = { a: capture(), b: capture() };
+     *     return {
+     *         before: pattern`${a} + ${b}`,
+     *         after: template`${b} + ${a}`
+     *     };
+     * });
      *
      * const rule2 = rewrite(() => ({
      *     before: pattern`${capture('x')} + 1`,
-     *     after: template`${capture('x')} + 2`
+     *     after: template`${capture('x')}++`
      * }));
      *
      * const combined = rule1.andThen(rule2);
-     * // Will first swap operands, then if result matches "x + 1", change to "x + 2"
+     * // Will first swap operands, then if result matches "x + 1", change to "x++"
      * ```
      */
     andThen(next: RewriteRule): RewriteRule;
@@ -367,6 +425,57 @@ export interface RewriteRule {
  * Configuration for a replacement rule.
  */
 export interface RewriteConfig {
-    before: Pattern | Pattern[],
-    after: Template | ((match: MatchResult) => Template)
+    before: Pattern | Pattern[];
+    after: Template | ((match: MatchResult) => Template);
+
+    /**
+     * Optional context predicate that must evaluate to true for the transformation to be applied.
+     * Evaluated after the pattern matches structurally but before applying the template.
+     * Provides access to both the matched node and the cursor for context inspection.
+     *
+     * @param node The matched AST node
+     * @param cursor The cursor at the matched node, providing access to ancestors and context
+     * @returns true if the transformation should be applied, false otherwise
+     *
+     * @example
+     * ```typescript
+     * rewrite(() => ({
+     *     before: pattern`await ${_('promise')}`,
+     *     after: template`await ${_('promise')}.catch(handleError)`,
+     *     where: (node, cursor) => {
+     *         // Only apply inside async functions
+     *         const method = cursor.firstEnclosing((n: any): n is J.MethodDeclaration =>
+     *             n.kind === J.Kind.MethodDeclaration
+     *         );
+     *         return method?.modifiers.some(m => m.type === 'async') || false;
+     *     }
+     * }));
+     * ```
+     */
+    where?: (node: J, cursor: Cursor) => boolean | Promise<boolean>;
+
+    /**
+     * Optional context predicate that must evaluate to false for the transformation to be applied.
+     * Evaluated after the pattern matches structurally but before applying the template.
+     * Provides access to both the matched node and the cursor for context inspection.
+     *
+     * @param node The matched AST node
+     * @param cursor The cursor at the matched node, providing access to ancestors and context
+     * @returns true if the transformation should NOT be applied, false if it should proceed
+     *
+     * @example
+     * ```typescript
+     * rewrite(() => ({
+     *     before: pattern`await ${_('promise')}`,
+     *     after: template`await ${_('promise')}.catch(handleError)`,
+     *     whereNot: (node, cursor) => {
+     *         // Don't apply inside try-catch blocks
+     *         return cursor.firstEnclosing((n: any): n is J.Try =>
+     *             n.kind === J.Kind.Try
+     *         ) !== undefined;
+     *     }
+     * }));
+     * ```
+     */
+    whereNot?: (node: J, cursor: Cursor) => boolean | Promise<boolean>;
 }

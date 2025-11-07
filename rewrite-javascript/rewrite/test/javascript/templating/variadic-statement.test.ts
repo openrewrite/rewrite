@@ -14,18 +14,9 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {
-    capture,
-    JavaScriptVisitor,
-    pattern,
-    Pattern,
-    template,
-    Template,
-    typescript
-} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {produce} from "immer";
-import {maybeAutoFormat} from "../../../src/javascript/format";
 
 describe('variadic statement matching and expansion', () => {
     const spec = new RecipeSpec();
@@ -41,9 +32,9 @@ describe('variadic statement matching and expansion', () => {
                     if (match) {
                         const newBody = await tmpl.apply(this.cursor, func.body, match);
                         if (newBody && newBody !== func.body) {
-                            return maybeAutoFormat(func, produce(func, draft => {
+                            return produce(func, draft => {
                                 draft.body = newBody as J.Block;
-                            }), p, undefined, this.cursor.parent);
+                            });
                         }
                     }
                 }

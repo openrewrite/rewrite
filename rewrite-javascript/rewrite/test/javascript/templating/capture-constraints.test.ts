@@ -13,84 +13,69 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {and, capture, not, or, pattern} from "../../../src/javascript";
-import {JavaScriptParser} from "../../../src/javascript/parser";
+import {and, capture, JavaScriptParser, not, or, pattern} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('Capture Constraints', () => {
     let parser: JavaScriptParser;
+    const parseCache = new Map<string, J>();
 
     beforeEach(() => {
         parser = new JavaScriptParser();
     });
 
     async function parseExpression(code: string): Promise<J> {
+        // Check cache first
+        if (parseCache.has(code)) {
+            return parseCache.get(code)!;
+        }
+
+        // Parse and cache
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value;
         // @ts-ignore
         const statement = cu.statements[0].element;
-        // Handle expression statements
-        if (statement.expression) {
-            return statement.expression;
-        }
-        // Return statement itself for other cases
-        return statement;
+        const result = statement.expression || statement;
+        parseCache.set(code, result);
+        return result;
     }
 
     describe('Simple constraints', () => {
-        test('matches when constraint returns true', async () => {
+        test('number constraint with both success and failure cases', async () => {
             const value = capture<J.Literal>({
                 constraint: (node) => typeof node.value === 'number' && node.value > 100
             });
             const pat = pattern`${value}`;
 
-            const expr = await parseExpression('150');
-            const match = await pat.match(expr);
+            // Should match: 150 > 100
+            const match1 = await pat.match(await parseExpression('150'));
+            expect(match1).toBeDefined();
+            expect(match1?.get(value)).toBeDefined();
 
-            expect(match).toBeDefined();
-            expect(match?.get(value)).toBeDefined();
+            // Should not match: 50 <= 100
+            const match2 = await pat.match(await parseExpression('50'));
+            expect(match2).toBeUndefined();
         });
 
-        test('does not match when constraint returns false', async () => {
-            const value = capture<J.Literal>({
-                constraint: (node) => typeof node.value === 'number' && node.value > 100
-            });
-            const pat = pattern`${value}`;
-
-            const expr = await parseExpression('50');
-            const match = await pat.match(expr);
-
-            expect(match).toBeUndefined();
-        });
-
-        test('matches string literals with constraint', async () => {
+        test('string constraint with both success and failure cases', async () => {
             const text = capture<J.Literal>({
                 constraint: (node) => typeof node.value === 'string' && node.value.startsWith('hello')
             });
             const pat = pattern`${text}`;
 
-            const expr = await parseExpression('"hello world"');
-            const match = await pat.match(expr);
+            // Should match: starts with "hello"
+            const match1 = await pat.match(await parseExpression('"hello world"'));
+            expect(match1).toBeDefined();
+            expect((match1?.get(text) as J.Literal)?.value).toBe('hello world');
 
-            expect(match).toBeDefined();
-            expect((match?.get(text) as J.Literal)?.value).toBe('hello world');
-        });
-
-        test('does not match string when constraint fails', async () => {
-            const text = capture<J.Literal>({
-                constraint: (node) => typeof node.value === 'string' && node.value.startsWith('hello')
-            });
-            const pat = pattern`${text}`;
-
-            const expr = await parseExpression('"goodbye world"');
-            const match = await pat.match(expr);
-
-            expect(match).toBeUndefined();
+            // Should not match: doesn't start with "hello"
+            const match2 = await pat.match(await parseExpression('"goodbye world"'));
+            expect(match2).toBeUndefined();
         });
     });
 
     describe('and() composition', () => {
-        test('matches when all constraints pass', async () => {
+        test('validates all constraints must pass', async () => {
             const value = capture<J.Literal>({
                 constraint: and(
                     (node) => typeof node.value === 'number',
@@ -101,33 +86,19 @@ describe('Capture Constraints', () => {
             });
             const pat = pattern`${value}`;
 
-            const expr = await parseExpression('100');
-            const match = await pat.match(expr);
+            // Should match: 100 satisfies all constraints
+            const match1 = await pat.match(await parseExpression('100'));
+            expect(match1).toBeDefined();
+            expect((match1?.get(value) as J.Literal)?.value).toBe(100);
 
-            expect(match).toBeDefined();
-            expect((match?.get(value) as J.Literal)?.value).toBe(100);
-        });
-
-        test('does not match when any constraint fails', async () => {
-            const value = capture<J.Literal>({
-                constraint: and(
-                    (node) => typeof node.value === 'number',
-                    (node) => (node.value as number) > 50,
-                    (node) => (node.value as number) < 200,
-                    (node) => (node.value as number) % 2 === 0 // This will fail for 99
-                )
-            });
-            const pat = pattern`${value}`;
-
-            const expr = await parseExpression('99');
-            const match = await pat.match(expr);
-
-            expect(match).toBeUndefined();
+            // Should not match: 99 fails even constraint
+            const match2 = await pat.match(await parseExpression('99'));
+            expect(match2).toBeUndefined();
         });
     });
 
     describe('or() composition', () => {
-        test('matches when at least one constraint passes', async () => {
+        test('validates at least one constraint must pass', async () => {
             const value = capture<J.Literal>({
                 constraint: or(
                     (node) => typeof node.value === 'string',
@@ -136,59 +107,34 @@ describe('Capture Constraints', () => {
             });
             const pat = pattern`${value}`;
 
-            // Match with string
-            const expr1 = await parseExpression('"text"');
-            const match1 = await pat.match(expr1);
+            // Should match: is a string
+            const match1 = await pat.match(await parseExpression('"text"'));
             expect(match1).toBeDefined();
 
-            // Match with large number
-            const expr2 = await parseExpression('2000');
-            const match2 = await pat.match(expr2);
+            // Should match: number > 1000
+            const match2 = await pat.match(await parseExpression('2000'));
             expect(match2).toBeDefined();
-        });
 
-        test('does not match when all constraints fail', async () => {
-            const value = capture<J.Literal>({
-                constraint: or(
-                    (node) => typeof node.value === 'string',
-                    (node) => typeof node.value === 'number' && node.value > 1000
-                )
-            });
-            const pat = pattern`${value}`;
-
-            // Small number - both constraints fail
-            const expr = await parseExpression('100');
-            const match = await pat.match(expr);
-
-            expect(match).toBeUndefined();
+            // Should not match: number <= 1000 and not a string
+            const match3 = await pat.match(await parseExpression('100'));
+            expect(match3).toBeUndefined();
         });
     });
 
     describe('not() composition', () => {
-        test('matches when constraint is negated', async () => {
+        test('inverts constraint result', async () => {
             const value = capture<J.Literal>({
                 constraint: not((node) => typeof node.value === 'string')
             });
             const pat = pattern`${value}`;
 
-            // Number should match (not a string)
-            const expr = await parseExpression('42');
-            const match = await pat.match(expr);
+            // Should match: number (not a string)
+            const match1 = await pat.match(await parseExpression('42'));
+            expect(match1).toBeDefined();
 
-            expect(match).toBeDefined();
-        });
-
-        test('does not match when negated constraint would pass', async () => {
-            const value = capture<J.Literal>({
-                constraint: not((node) => typeof node.value === 'string')
-            });
-            const pat = pattern`${value}`;
-
-            // String should not match
-            const expr = await parseExpression('"text"');
-            const match = await pat.match(expr);
-
-            expect(match).toBeUndefined();
+            // Should not match: is a string
+            const match2 = await pat.match(await parseExpression('"text"'));
+            expect(match2).toBeUndefined();
         });
     });
 
@@ -209,44 +155,41 @@ describe('Capture Constraints', () => {
             });
             const pat = pattern`${value}`;
 
+            // Parse test cases inline (only used once each)
+            const expr52 = await parseExpression('52');
+            const expr202 = await parseExpression('202');
+            const expr60 = await parseExpression('60');
+            const expr45 = await parseExpression('45');
+
             // 52: > 50, even, not divisible by 10 ✓
-            expect(await pat.match(await parseExpression('52'))).toBeDefined();
+            expect(await pat.match(expr52)).toBeDefined();
 
             // 202: > 50, > 200, even, not divisible by 10 ✓
-            expect(await pat.match(await parseExpression('202'))).toBeDefined();
+            expect(await pat.match(expr202)).toBeDefined();
 
             // 60: > 50, even, but divisible by 10 ✗
-            expect(await pat.match(await parseExpression('60'))).toBeUndefined();
+            expect(await pat.match(expr60)).toBeUndefined();
 
             // 45: not > 50 ✗
-            expect(await pat.match(await parseExpression('45'))).toBeUndefined();
+            expect(await pat.match(expr45)).toBeUndefined();
         });
     });
 
     describe('Constraints on identifiers', () => {
-        test('matches identifier names with constraint', async () => {
+        test('validates identifier names with both success and failure', async () => {
             const name = capture<J.Identifier>({
                 constraint: (node) => node.simpleName.startsWith('get') && !node.simpleName.includes('_')
             });
             const pat = pattern`${name}`;
 
-            const expr = await parseExpression('getData');
-            const match = await pat.match(expr);
+            // Should match: starts with 'get' and no underscore
+            const match1 = await pat.match(await parseExpression('getData'));
+            expect(match1).toBeDefined();
+            expect((match1?.get(name) as J.Identifier)?.simpleName).toBe('getData');
 
-            expect(match).toBeDefined();
-            expect((match?.get(name) as J.Identifier)?.simpleName).toBe('getData');
-        });
-
-        test('does not match identifier when constraint fails', async () => {
-            const name = capture<J.Identifier>({
-                constraint: (node) => node.simpleName.startsWith('get') && !node.simpleName.includes('_')
-            });
-            const pat = pattern`${name}`;
-
-            const expr = await parseExpression('get_data');
-            const match = await pat.match(expr);
-
-            expect(match).toBeUndefined();
+            // Should not match: contains underscore
+            const match2 = await pat.match(await parseExpression('get_data'));
+            expect(match2).toBeUndefined();
         });
     });
 
@@ -257,14 +200,12 @@ describe('Capture Constraints', () => {
             });
             const pat = pattern`foo(${arg})`;
 
-            // Should match
-            const expr1 = await parseExpression('foo(20)');
-            const match1 = await pat.match(expr1);
+            // Should match: 20 > 10
+            const match1 = await pat.match(await parseExpression('foo(20)'));
             expect(match1).toBeDefined();
 
-            // Should not match
-            const expr2 = await parseExpression('foo(5)');
-            const match2 = await pat.match(expr2);
+            // Should not match: 5 <= 10
+            const match2 = await pat.match(await parseExpression('foo(5)'));
             expect(match2).toBeUndefined();
         });
 
@@ -277,15 +218,173 @@ describe('Capture Constraints', () => {
             });
             const pat = pattern`${left} + ${right}`;
 
-            // Should match: 10 + 2 (10 > 5 and 2 < 5)
-            const expr1 = await parseExpression('10 + 2');
-            const match1 = await pat.match(expr1);
+            // Should match: 10 > 5 and 2 < 5
+            const match1 = await pat.match(await parseExpression('10 + 2'));
             expect(match1).toBeDefined();
 
-            // Should not match: 3 + 10 (3 not > 5)
-            const expr2 = await parseExpression('3 + 10');
-            const match2 = await pat.match(expr2);
+            // Should not match: 3 <= 5
+            const match2 = await pat.match(await parseExpression('3 + 10'));
             expect(match2).toBeUndefined();
+        });
+    });
+
+    describe('Context-aware constraints with cursor', () => {
+        test('constraint with cursor parameter can access context', async () => {
+            // Test that cursor parameter allows navigation up the tree
+            let constraintCalled = false;
+            let parentIsBinary = false;
+
+            const left = capture<J.Literal>({
+                constraint: (node, cursor) => {
+                    constraintCalled = true;
+                    // Check that cursor can navigate to parent
+                    const parent = cursor?.parent?.value;
+                    if (parent && parent.kind === J.Kind.Binary) {
+                        parentIsBinary = true;
+                    }
+                    return typeof node.value === 'number';
+                }
+            });
+            const pat = pattern`${left} + 20`;
+
+            // Match against a binary expression
+            const match = await pat.match(await parseExpression('10 + 20') as J.Binary);
+
+            expect(match).toBeDefined();
+            expect(constraintCalled).toBe(true);
+            // Verify cursor can navigate to parent Binary node
+            expect(parentIsBinary).toBe(true);
+        });
+
+        test('cursor behavior with composition functions', async () => {
+            // Test 1: Cursor at ast root when not explicitly provided
+            let cursorReceived: any = 'not-called';
+            let astNode: J | undefined;
+            const value1 = capture<J.Literal>({
+                constraint: (node, cursor) => {
+                    cursorReceived = cursor;
+                    astNode = node;
+                    return typeof node.value === 'number';
+                }
+            });
+            const pat1 = pattern`${value1}`;
+
+            const match1 = await pat1.match(await parseExpression('42'));
+            expect(match1).toBeDefined();
+            expect(cursorReceived).toBeDefined();
+            expect(cursorReceived.value).toBe(astNode); // Cursor positioned at captured node
+            expect(cursorReceived.parent?.value).toBe(await parseExpression('42'));
+            expect(cursorReceived.parent?.parent).toBeUndefined(); // Root has no parent
+
+            // Test 2: Composition functions forward cursor
+            let cursorReceivedInAnd: any = 'not-called';
+            const value2 = capture<J.Literal>({
+                constraint: and(
+                    (node) => typeof node.value === 'number',
+                    (node, cursor) => {
+                        cursorReceivedInAnd = cursor;
+                        return (node.value as number) > 10;
+                    }
+                )
+            });
+            const pat2 = pattern`${value2}`;
+
+            const match2 = await pat2.match(await parseExpression('50'));
+            expect(match2).toBeDefined();
+            expect(cursorReceivedInAnd).toBeDefined();
+            expect(cursorReceivedInAnd.parent?.value).toBe(await parseExpression('50'));
+
+            // Test 3: or composition with cursor-aware constraints
+            const value3 = capture<J.Literal>({
+                constraint: or(
+                    (node) => typeof node.value === 'string',
+                    (node, cursor) => {
+                        // Accept numbers only if cursor has a grandparent (i.e., not at root)
+                        return cursor?.parent?.parent !== undefined && typeof node.value === 'number';
+                    }
+                )
+            });
+            const pat3 = pattern`${value3}`;
+
+            // String should match regardless
+            const match3a = await pat3.match(await parseExpression('"text"'));
+            expect(match3a).toBeDefined();
+
+            // Number at root should not match (second constraint needs grandparent in cursor chain)
+            const match3b = await pat3.match(await parseExpression('42'));
+            expect(match3b).toBeUndefined();
+
+            // Test 4: not composition with cursor-aware constraint
+            const value4 = capture<J.Literal>({
+                constraint: not((node, cursor) => {
+                    // Reject if cursor has a grandparent (i.e., not at root)
+                    return cursor?.parent?.parent !== undefined;
+                })
+            });
+            const pat4 = pattern`${value4}`;
+
+            // At root level, constraint should pass (not(false) = true), so match succeeds
+            const match4 = await pat4.match(await parseExpression('42'));
+            expect(match4).toBeDefined();
+        });
+    });
+
+    describe('Cursor positioning verification', () => {
+        test('cursor is positioned at captured node, not root', async () => {
+            // Create a pattern that captures the left operand
+            let capturedNode: J | undefined;
+            let cursorValue: J | undefined;
+
+            const left = capture<J.Literal>({
+                constraint: (node, cursor) => {
+                    capturedNode = node;
+                    cursorValue = cursor?.value as J;
+                    return true;
+                }
+            });
+            const pat = pattern`${left} + 20`;
+
+            // Match against the expression
+            const match = await pat.match(await parseExpression('10 + 20') as J.Binary);
+
+            expect(match).toBeDefined();
+            expect(capturedNode).toBeDefined();
+            expect(cursorValue).toBeDefined();
+
+            // Verify the cursor is positioned at the captured node itself
+            expect(cursorValue).toBe(capturedNode);
+
+            // Verify the captured node is the left operand (10)
+            expect((capturedNode as J.Literal)?.value).toBe(10);
+        });
+
+        test('cursor parent provides access to containing expression', async () => {
+            let capturedArg: J | undefined;
+            let parentKind: typeof J.Kind | undefined;
+
+            const arg = capture<J.Literal>({
+                constraint: (node, cursor) => {
+                    capturedArg = node;
+                    // The cursor's parent should be at a higher level in the tree
+                    const parent = cursor?.parent;
+                    if (parent) {
+                        parentKind = parent.value?.kind;
+                    }
+                    return true;
+                }
+            });
+            const pat = pattern`foo(${arg})`;
+
+            const match = await pat.match(await parseExpression('foo(42)') as J.MethodInvocation);
+
+            expect(match).toBeDefined();
+            expect(capturedArg).toBeDefined();
+            expect((capturedArg as J.Literal)?.value).toBe(42);
+
+            // The parent should be something higher up (not the literal itself)
+            // This verifies the cursor is at the captured node, not elsewhere
+            expect(parentKind).toBeDefined();
+            expect(parentKind).not.toBe(J.Kind.Literal);
         });
     });
 });
