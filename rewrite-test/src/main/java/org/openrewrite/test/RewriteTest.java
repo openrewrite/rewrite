@@ -316,10 +316,26 @@ public interface RewriteTest extends SourceSpecs {
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
                         if (beforeValidations.parseAndPrintEquality()) {
+                            // EncodingDetectingInputStream strips BOM from expected
+                            String expected = StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx));
+                            String actual = sourceFile.printAll(out.clone());
+
+                            // Strip BOM from actual for comparison, but verify it matches charsetBomMarked flag
+                            boolean actualHasBom = actual.startsWith("\uFEFF");
+                            if (actualHasBom) {
+                                actual = actual.substring(1);
+                            }
+                            if (sourceFile.isCharsetBomMarked() && !actualHasBom) {
+                                fail("Source file was parsed with a BOM (charsetBomMarked=true) but printAll() did not restore it. " +
+                                     "This indicates a bug in the BOM restoration logic.");
+                            } else if (!sourceFile.isCharsetBomMarked() && actualHasBom) {
+                                fail("Source file was parsed without a BOM (charsetBomMarked=false) but printAll() added one. " +
+                                     "This indicates a bug in the BOM restoration logic.");
+                            }
                             assertContentEquals(
                                     sourceFile,
-                                    StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx)),
-                                    sourceFile.printAll(out.clone()),
+                                    expected,
+                                    actual,
                                     "When parsing and printing the source code back to text without modifications, " +
                                     "the printed source didn't match the original source code. This means there is a bug in the " +
                                     "parser implementation itself. Please open an issue to report this, providing a sample of the " +
