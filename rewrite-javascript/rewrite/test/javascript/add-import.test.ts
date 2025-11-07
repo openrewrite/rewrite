@@ -24,6 +24,7 @@ import {
     JavaScriptVisitor,
     maybeAddImport,
     RemoveImport,
+    Template,
     template,
     typescript
 } from "../../src/javascript";
@@ -100,8 +101,10 @@ function createAddImportWithTemplateVisitor(
         override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
             if (methodInvocation.name?.kind === J.Kind.Identifier &&
                 (methodInvocation.name as J.Identifier).simpleName === 'placeholder') {
-                // Use template with import context so TypeScript can type-attribute the call
-                return template`${templateCode}`
+                // Use builder API for string code with import context so TypeScript can type-attribute the call
+                return Template.builder()
+                    .code(templateCode)
+                    .build()
                     .configure({ context: [importStatement] })
                     .apply(this.cursor, methodInvocation);
             }
