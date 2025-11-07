@@ -17,6 +17,7 @@ import {Cursor, Tree} from '../..';
 import {J, Type} from '../../java';
 import type {MatchResult, Pattern} from "./pattern";
 import type {Template} from "./template";
+import type {CaptureValue} from "./capture";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -274,16 +275,23 @@ export interface PatternOptions {
  * Valid parameter types for template literals.
  * - Capture: For pattern matching and reuse
  * - CaptureValue: Result of property access or array operations on captures (e.g., capture.prop, capture[0], capture.slice(1))
+ * - TemplateParam: For standalone template parameters
  * - Tree: AST nodes to be inserted directly
  * - Tree[]: Arrays of AST nodes (from variadic capture operations like slice)
- * - Primitives: Values to be converted to literals
+ *
+ * Note: Primitive values (string, number, boolean) are NOT supported in template literals.
+ * Use Template.builder() API if you need to insert literal values.
  */
-export type TemplateParameter = Capture | any | TemplateParam | Tree | Tree[] | string | number | boolean;
+export type TemplateParameter = Capture | CaptureValue | TemplateParam | Tree | Tree[];
 
 /**
  * Parameter specification for template generation (internal).
  * Represents a placeholder in a template that will be replaced with a parameter value.
  * This is the internal wrapper used by the template engine.
+ *
+ * Note: The value is typed as `any` rather than `TemplateParameter` to allow flexible
+ * internal handling without excessive type guards. The public API (template function)
+ * constrains inputs to `TemplateParameter`, providing type safety at the API boundary.
  */
 export interface Parameter {
     /**

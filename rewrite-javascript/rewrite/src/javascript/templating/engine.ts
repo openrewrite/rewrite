@@ -18,7 +18,7 @@ import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {produce} from 'immer';
 import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
-import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, TemplateParamImpl} from './capture';
+import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
 import {maybeAutoFormat} from '../format';
@@ -234,42 +234,25 @@ export class TemplateEngine {
     }
 
     /**
-     * Applies a template with optional match results from pattern matching.
+     * Applies a template from a pre-parsed AST and returns the resulting AST.
+     * This method is used by Template.apply() after getting the cached template tree.
      *
-     * @param templateParts The string parts of the template
+     * @param ast The pre-parsed template AST
      * @param parameters The parameters between the string parts
      * @param cursor The cursor pointing to the current location in the AST
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @param values Map of capture names to values to replace the parameters with
      * @param wrappersMap Map of capture names to J.RightPadded wrappers (for preserving markers)
-     * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
-     * @param dependencies NPM dependencies for type attribution
      * @returns A Promise resolving to the generated AST node
      */
-    static async applyTemplate(
-        templateParts: TemplateStringsArray,
+    static async applyTemplateFromAst(
+        ast: JS.CompilationUnit,
         parameters: Parameter[],
         cursor: Cursor,
         coordinates: JavaCoordinates,
         values: Pick<Map<string, J>, 'get'> = new Map(),
-        wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map(),
-        contextStatements: string[] = [],
-        dependencies: Record<string, string> = {}
+        wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map()
     ): Promise<J | undefined> {
-        // Build the template string to check if empty
-        const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
-        if (!templateString.trim()) {
-            return undefined;
-        }
-
-        // Get the parsed and extracted template tree
-        const ast = await TemplateEngine.getTemplateTree(
-            templateParts,
-            parameters,
-            contextStatements,
-            dependencies
-        );
-
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
         for (let i = 0; i < parameters.length; i++) {
@@ -352,21 +335,10 @@ export class TemplateEngine {
         for (let i = 0; i < templateParts.length; i++) {
             result += templateParts[i];
             if (i < parameters.length) {
-                const param = parameters[i].value;
-                // Use a placeholder for Captures, TemplateParams, CaptureValues, Tree nodes, and Tree arrays
-                // Inline everything else (strings, numbers, booleans) directly
-                // Check for Capture (could be a Proxy, so check for symbol property)
-                const isCapture = param instanceof CaptureImpl ||
-                    (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
-                const isTemplateParam = param instanceof TemplateParamImpl;
-                const isCaptureValue = param instanceof CaptureValue;
-                const isTreeArray = Array.isArray(param) && param.length > 0 && isTree(param[0]);
-                if (isCapture || isTemplateParam || isCaptureValue || isTree(param) || isTreeArray) {
-                    const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-                    result += placeholder;
-                } else {
-                    result += param;
-                }
+                // All parameters are now placeholders (no primitive inlining)
+                // This ensures templates with the same structure always produce the same AST
+                const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
+                result += placeholder;
             }
         }
 

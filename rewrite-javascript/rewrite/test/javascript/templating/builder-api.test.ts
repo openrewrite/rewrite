@@ -43,7 +43,7 @@ describe('Builder API', () => {
         test('creates template equivalent to template literal', async () => {
             // Using builder - just replace the literal value
             const builderTmpl = Template.builder()
-                .param(42)
+                .code(String(42))
                 .build();
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
