@@ -46,8 +46,12 @@ public class RemoveByteOrderMark extends Recipe {
                     return sourceFile;
                 }
 
-                if (sourceFile.isCharsetBomMarked()) {
-                    return sourceFile.withCharsetBomMarked(false);
+                try {
+                    if (sourceFile.isCharsetBomMarked()) {
+                        return sourceFile.withCharsetBomMarked(false);
+                    }
+                } catch (UnsupportedOperationException e) {
+                    // Defensive fallback for any other SourceFile implementations that don't support charset operations
                 }
 
                 return sourceFile;
