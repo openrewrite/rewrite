@@ -1876,8 +1876,10 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             return this.lenientTypeMatching ? true : target === source;
         }
 
-        if (target.kind !== source.kind) {
-            return false;
+        if (target.kind !== source.kind && (target.kind == Type.Kind.Unknown || source.kind == Type.Kind.Unknown)) {
+            // In lenient mode, allow kind mismatches (e.g., Unknown vs proper type)
+            // This handles cases where pattern has unresolved types
+            return this.lenientTypeMatching;
         }
 
         // For method types, check declaring type
