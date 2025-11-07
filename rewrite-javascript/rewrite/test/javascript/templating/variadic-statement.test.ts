@@ -17,15 +17,15 @@ import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     capture,
     JavaScriptVisitor,
-    pattern,
+    maybeAutoFormat,
     Pattern,
-    template,
+    pattern,
     Template,
+    template,
     typescript
 } from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {produce} from "immer";
-import {maybeAutoFormat} from "../../../src/javascript/format";
 
 describe('variadic statement matching and expansion', () => {
     const spec = new RecipeSpec();

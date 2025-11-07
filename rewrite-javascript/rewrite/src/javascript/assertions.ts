@@ -18,11 +18,17 @@ import {JavaScriptParser} from "./parser";
 import {JS} from "./tree";
 import ts from 'typescript';
 import {json, Json} from "../json";
-import * as fs from "fs";
-import * as path from "path";
 import {DependencyWorkspace} from "./dependency-workspace";
+import {setTemplateSourceFileCache} from "./templating/engine";
 
-const sourceFileCache: Map<string, ts.SourceFile> = new Map();
+/**
+ * Shared TypeScript source file cache for test parsers.
+ * Automatically configured for template parsing in tests.
+ */
+export const sourceFileCache: Map<string, ts.SourceFile> = new Map();
+
+// Automatically enable sourceFileCache for template parsing in tests
+setTemplateSourceFileCache(sourceFileCache);
 
 export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): AsyncGenerator<SourceSpec<any>, void, unknown> {
     for (const spec of sourceSpecs) {
