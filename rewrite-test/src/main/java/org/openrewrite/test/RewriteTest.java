@@ -326,11 +326,9 @@ public interface RewriteTest extends SourceSpecs {
                                 actual = actual.substring(1);
                             }
                             if (sourceFile.isCharsetBomMarked() && !actualHasBom) {
-                                fail("Source file was parsed with a BOM (charsetBomMarked=true) but printAll() did not restore it. " +
-                                     "This indicates a bug in the BOM restoration logic.");
+                                fail("Source file was parsed with a BOM (charsetBomMarked=true) but printing did not restore it.");
                             } else if (!sourceFile.isCharsetBomMarked() && actualHasBom) {
-                                fail("Source file was parsed without a BOM (charsetBomMarked=false) but printAll() added one. " +
-                                     "This indicates a bug in the BOM restoration logic.");
+                                fail("Source file was parsed without a BOM (charsetBomMarked=false) but printing added one.");
                             }
                             assertContentEquals(
                                     sourceFile,
