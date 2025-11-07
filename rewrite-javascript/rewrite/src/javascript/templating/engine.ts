@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, isTree} from '../..';
-import {J, Statement, Type} from '../../java';
-import {JS} from '..';
+import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
+import {emptySpace, J, Statement, Type} from '../../java';
+import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {produce} from 'immer';
 import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, TemplateParamImpl} from './capture';
@@ -24,6 +24,9 @@ import {JavaCoordinates} from './template';
 import {maybeAutoFormat} from '../format';
 import {isExpression, isStatement} from '../parser-utils';
 import {randomId} from '../../uuid';
+import ts from "typescript";
+import {DependencyWorkspace} from "../dependency-workspace";
+import {Parameter} from "./types";
 
 /**
  * Simple LRU (Least Recently Used) cache implementation.
@@ -93,7 +96,7 @@ class TemplateCache {
      */
     private generateKey(
         templateString: string,
-        captures: (Capture | Any<any>)[],
+        captures: (Capture | Any)[],
         contextStatements: string[],
         dependencies: Record<string, string>
     ): string {
@@ -432,7 +435,7 @@ export class TemplateEngine {
      */
     static async getPatternTree(
         templateParts: TemplateStringsArray,
-        captures: (Capture | Any<any>)[],
+        captures: (Capture | Any)[],
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
     ): Promise<J> {
@@ -506,7 +509,7 @@ export class TemplateEngine {
  * Used by TemplateEngine.getPatternTree() for pattern-specific processing.
  */
 class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
-    constructor(private readonly captures: (Capture | Any<any>)[]) {
+    constructor(private readonly captures: (Capture | Any)[]) {
         super();
     }
 
@@ -683,7 +686,7 @@ export class TemplateApplier {
                         id: randomId(),
                         prefix: resultToUse.prefix,
                         markers: resultToUse.markers,
-                        expression: resultToUse
+                        expression: { ...resultToUse, prefix: emptySpace }
                     } as JS.ExpressionStatement;
                 }
             } else if (!parentExpectsStatement) {
@@ -695,7 +698,7 @@ export class TemplateApplier {
                         id: randomId(),
                         prefix: stmt.prefix,
                         markers: stmt.markers,
-                        statement: stmt
+                        statement: { ...stmt, prefix: emptySpace }
                     } as JS.StatementExpression;
                 }
             }

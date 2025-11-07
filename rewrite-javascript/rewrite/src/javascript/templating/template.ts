@@ -223,50 +223,6 @@ export class Template {
     }
 
     /**
-     * Gets the cached template tree or computes it.
-     * Uses two-level caching: instance cache → global cache → compute.
-     *
-     * @returns A Promise resolving to the template AST tree
-     */
-    private async getTemplate(): Promise<J> {
-        // Level 1: Instance cache (fastest path)
-        if (this._cachedTemplate) {
-            return this._cachedTemplate;
-        }
-
-        // Generate cache key for global lookup
-        const contextStatements = this.options.context || this.options.imports || [];
-        const paramNames = this.parameters.map((p, i) => `param${i}`).join(',');
-        const cacheKey = generateCacheKey(
-            this.templateParts,
-            paramNames,
-            contextStatements,
-            this.options.dependencies || {}
-        );
-
-        // Level 2: Global cache (fast path - shared with Pattern)
-        const cached = globalAstCache.get(cacheKey);
-        if (cached) {
-            this._cachedTemplate = cached;
-            return cached;
-        }
-
-        // Level 3: Compute via TemplateEngine (slow path)
-        const result = await TemplateEngine.getTemplateTree(
-            this.templateParts,
-            this.parameters,
-            contextStatements,
-            this.options.dependencies || {}
-        );
-
-        // Cache in both levels
-        globalAstCache.set(cacheKey, result);
-        this._cachedTemplate = result;
-
-        return result;
-    }
-
-    /**
      * Applies this template and returns the resulting tree.
      *
      * @param cursor The cursor pointing to the current location in the AST
@@ -310,15 +266,10 @@ export class Template {
             }
         }
 
-        // Get the cached template tree (uses two-level caching)
-        const templateTree = await this.getTemplate();
-
         // Prefer 'context' over deprecated 'imports'
         const contextStatements = this.options.context || this.options.imports || [];
 
         // Apply template with value substitution using TemplateEngine
-        // Note: TemplateEngine.applyTemplate will call getTemplateTree again,
-        // but that's okay because it hits the templateCache which is fast
         return TemplateEngine.applyTemplate(
             this.templateParts,
             this.parameters,

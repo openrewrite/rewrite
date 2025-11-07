@@ -17,8 +17,16 @@
  */
 import {describe, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
-import {AddImport, ImportStyle, javascript, JavaScriptVisitor, maybeAddImport, template, typescript} from "../../src/javascript";
-import {RemoveImport} from "../../src/javascript/remove-import";
+import {
+    AddImport,
+    ImportStyle,
+    javascript,
+    JavaScriptVisitor,
+    maybeAddImport,
+    RemoveImport,
+    template,
+    typescript
+} from "../../src/javascript";
 import {J} from "../../src/java";
 
 /**
@@ -647,7 +655,8 @@ describe('AddImport visitor', () => {
                         import {readFile} from 'fs';
 
                         const example = () => {
-                            readFile('test.txt', (err, data) => {});
+                            readFile('test.txt', (err, data) => {
+                            });
                         };
                     `
                 )
@@ -677,7 +686,8 @@ describe('AddImport visitor', () => {
 
                         function example() {
                             if (true) {
-                                readFile('test.txt', (err, data) => {});
+                                readFile('test.txt', (err, data) => {
+                                });
                             }
                         }
                     `

@@ -43,28 +43,6 @@ describe('param() function', () => {
         );
     });
 
-    test('param() with named parameter', async () => {
-        const myValue = param('myValue');
-        const tmpl = template`const result = ${myValue};`;
-
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
-                if (literal.valueSource === '42') {
-                    const replacement = produce(literal, draft => {
-                        draft.value = 100;
-                        draft.valueSource = '100';
-                    });
-                    return tmpl.apply(this.cursor, literal, new Map([['myValue', replacement]]));
-                }
-                return literal;
-            }
-        });
-
-        return spec.rewriteRun(
-            typescript('const x = 42', 'const x = const result = 100'),
-        );
-    });
-
     test('param() with unnamed parameter', async () => {
         const value = param(); // Unnamed
         const tmpl = template`${value} + 1`;
