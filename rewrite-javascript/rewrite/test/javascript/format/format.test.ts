@@ -302,4 +302,18 @@ describe('AutoformatVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('empty class', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                "abstract class L {}",
+                `abstract class L {
+                }
+                `
+            )
+            // @formatter:on
+        )
+    });
 });

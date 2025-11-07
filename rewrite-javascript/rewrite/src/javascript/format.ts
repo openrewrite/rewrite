@@ -1036,7 +1036,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitBlock(block: J.Block, p: P): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
-            if (block.statements.length > 0) {
+            if (block.statements.length > 0 || this.cursor.parent?.value.kind != J.Kind.NewClass) {
                 if (!draft.end.whitespace.includes("\n")) {
                     draft.end.whitespace = draft.end.whitespace.replace(/[ \t]+$/, '') + "\n";
                 }
