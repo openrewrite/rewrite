@@ -184,12 +184,12 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
         String existingText = existingPlainText.getText();
 
         // Split existing content into lines and create a set of trimmed lines for comparison
-        Set<String> existingLines = Arrays.stream(existingText.split("\\r?\\n"))
+        Set<String> existingLines = Arrays.stream(existingText.split("\\R"))
                 .map(String::trim)
                 .collect(toSet());
 
         // Filter new content to only include lines not already present
-        String[] newLines = content.split("\\r?\\n");
+        String[] newLines = content.split("\\R");
         List<String> linesToAdd = new ArrayList<>();
         for (String line : newLines) {
             if (!existingLines.contains(line.trim())) {
