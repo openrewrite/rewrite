@@ -87,11 +87,10 @@ describe('Builder API', () => {
             return spec.rewriteRun(
                 typescript('const a = 1',
                     `
-                      const a =
-                          function validate(x) {
-                              if (typeof x !== "number") throw new Error("Invalid");
-                              return 1;
-                          }
+                      const a = function validate(x) {
+                          if (typeof x !== "number") throw new Error("Invalid");
+                          return 1;
+                      }
                       `
                 ),
             );
@@ -158,14 +157,13 @@ describe('Builder API', () => {
                 typescript(
                     'const x = 1',
                     `
-                    const x =
-                        function wrapper() {
-                            try {
-                                return 42;
-                            } catch (e) {
-                                console.error(e);
-                            }
-                        }`
+                    const x = function wrapper() {
+                        try {
+                            return 42;
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }`
                 )
             );
         });
