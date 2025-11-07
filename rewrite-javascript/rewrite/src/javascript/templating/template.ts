@@ -17,7 +17,7 @@ import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {Capture, Parameter, TemplateOptions, TemplateParameter} from './types';
 import {MatchResult} from './pattern';
-import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
 
@@ -171,7 +171,6 @@ export class TemplateBuilder {
  */
 export class Template {
     private options: TemplateOptions = {};
-    private _cachedTemplate?: J;
 
     /**
      * Creates a new builder for constructing templates programmatically.
@@ -217,8 +216,6 @@ export class Template {
      */
     configure(options: TemplateOptions): Template {
         this.options = { ...this.options, ...options };
-        // Invalidate cache when configuration changes
-        this._cachedTemplate = undefined;
         return this;
     }
 
@@ -266,10 +263,10 @@ export class Template {
             }
         }
 
-        // Prefer 'context' over deprecated 'imports'
+        // Get context for template generation
         const contextStatements = this.options.context || this.options.imports || [];
 
-        // Apply template with value substitution using TemplateEngine
+        // Delegate to TemplateEngine for template generation and application
         return TemplateEngine.applyTemplate(
             this.templateParts,
             this.parameters,
