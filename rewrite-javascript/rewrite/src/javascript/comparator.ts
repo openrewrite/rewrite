@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaScriptVisitor} from './visitor';
-import {J} from '../java';
+import {J, Type} from '../java';
 import {JS, JSX} from './tree';
 import {Cursor, Tree} from "../tree";
 
@@ -30,21 +30,26 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     protected match: boolean = true;
 
     /**
-     * Creates a new comparator visitor.
+     * Cursor tracking the current position in the target tree.
+     * Maintained in parallel with the pattern tree cursor (this.cursor).
      */
-    constructor() {
-        super();
-    }
+    protected targetCursor?: Cursor;
 
     /**
      * Compares two AST trees.
-     * 
-     * @param tree1 The first tree to compare
-     * @param tree2 The second tree to compare
+     *
+     * @param tree1 The first tree to compare (pattern tree)
+     * @param tree2 The second tree to compare (target tree)
+     * @param parentCursor1 Optional parent cursor for the pattern tree (for navigating to root)
+     * @param parentCursor2 Optional parent cursor for the target tree (for navigating to root)
      * @returns true if the trees match, false otherwise
      */
-    async compare(tree1: J, tree2: J): Promise<boolean> {
+    async compare(tree1: J, tree2: J, parentCursor1?: Cursor, parentCursor2?: Cursor): Promise<boolean> {
         this.match = true;
+        // Initialize targetCursor with parent if provided, otherwise undefined (will be set by visit())
+        this.targetCursor = parentCursor2;
+        // Initialize this.cursor (pattern cursor) with parent if provided
+        this.cursor = parentCursor1 || new Cursor(undefined, undefined);
         await this.visit(tree1, tree2);
         return this.match;
     }
@@ -63,8 +68,117 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     /**
      * Aborts the visit operation by setting the match flag to false.
      */
-    protected abort(): void {
+    protected abort<T>(t: T): T {
         this.match = false;
+        return t;
+    }
+
+
+    /**
+     * Generic method to visit a property value using the appropriate visitor method.
+     * This ensures wrappers (RightPadded, LeftPadded, Container) are properly tracked on the cursor.
+     *
+     * @param j The property value from the first tree
+     * @param other The corresponding property value from the second tree
+     * @returns The visited property value from the first tree
+     */
+    protected async visitProperty(j: any, other: any): Promise<any> {
+        // Handle null/undefined (but not other falsy values like 0, false, '')
+        if (j == null || other == null) {
+            if (j !== other) {
+                this.abort(j);
+            }
+            return j;
+        }
+
+        const kind = (j as any).kind;
+
+        // Check wrappers by kind
+        if (kind === J.Kind.RightPadded) {
+            return await this.visitRightPadded(j, other);
+        }
+
+        if (kind === J.Kind.LeftPadded) {
+            return await this.visitLeftPadded(j, other);
+        }
+
+        if (kind === J.Kind.Container) {
+            return await this.visitContainer(j, other);
+        }
+
+        // Check if it's a Space (skip comparison)
+        if (kind === J.Kind.Space) {
+            return j;
+        }
+
+        // Check if it's a Tree node (has a kind property with a string value)
+        if (kind !== undefined && typeof kind === 'string') {
+            // Check if it's a Type node (starts with "org.openrewrite.java.tree.JavaType$")
+            if (kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
+                return await this.visitType(j, other);
+            }
+            return await this.visit(j, other);
+        }
+
+        // For primitive values, compare directly
+        if (j !== other) {
+            this.abort(j);
+        }
+        return j;
+    }
+
+    /**
+     * Generic method to visit all properties of an element, calling visitProperty for each.
+     * This automatically handles wrappers and ensures proper cursor tracking.
+     * Also checks that both elements have the same kind.
+     *
+     * @param j The element from the first tree
+     * @param other The corresponding element from the second tree
+     * @returns The visited element from the first tree
+     */
+    protected async visitElement<T extends J>(j: T, other: T): Promise<T> {
+        if (!this.match) {
+            return j;
+        }
+
+        // Check if kinds match
+        if (j.kind !== other.kind) {
+            return this.abort(j);
+        }
+
+        // Iterate over all properties
+        for (const key of Object.keys(j)) {
+            // Skip internal/private properties, id property, and markers property
+            if (key.startsWith('_') || key === 'id' || key === 'markers') {
+                continue;
+            }
+
+            const jValue = (j as any)[key];
+            const otherValue = (other as any)[key];
+
+            // Handle arrays - compare element by element
+            if (Array.isArray(jValue)) {
+                if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
+                    return this.abort(j);
+                }
+
+                for (let i = 0; i < jValue.length; i++) {
+                    await this.visitProperty(jValue[i], otherValue[i]);
+                    if (!this.match) {
+                        return j;
+                    }
+                }
+            } else {
+                // Visit the property (which will handle wrappers, trees, primitives, etc.)
+                await this.visitProperty(jValue, otherValue);
+
+                if (!this.match) {
+                    return j;
+                }
+            }
+        }
+
+        return j;
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
@@ -75,12 +189,122 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Check if the nodes have the same kind
         if (!this.hasSameKind(j as J, p)) {
-            this.abort();
-            return j as R;
+            return this.abort(j) as R;
         }
 
-        // Continue with normal visitation, passing the other node as context
-        return super.visit(j, p);
+        // Update targetCursor to track the target node in parallel with the pattern cursor
+        // (Can be overridden by subclasses if they need cursor access before calling super)
+        const savedTargetCursor = this.targetCursor;
+        this.targetCursor = new Cursor(p, this.targetCursor);
+        try {
+            // Continue with normal visitation, passing the other node as context
+            return await super.visit(j, p);
+        } finally {
+            this.targetCursor = savedTargetCursor;
+        }
+    }
+
+    /**
+     * Override visitRightPadded to compare only the elements, not markers or spacing.
+     * The context parameter p contains the corresponding element from the other tree.
+     * Pushes the wrapper onto the cursor stack so captures can access it.
+     * Also updates targetCursor in parallel.
+     */
+    public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): Promise<J.RightPadded<T>> {
+        if (!this.match) {
+            return right;
+        }
+
+        // Extract the other element if it's also a RightPadded
+        const isRightPadded = (p as any).kind === J.Kind.RightPadded;
+        const otherWrapper = isRightPadded ? (p as unknown) as J.RightPadded<T> : undefined;
+        const otherElement = isRightPadded ? otherWrapper!.element : p;
+
+        // Push wrappers onto both cursors, then compare only the elements, not markers or spacing
+        const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
+        this.cursor = new Cursor(right, this.cursor);
+        this.targetCursor = otherWrapper ? new Cursor(otherWrapper, this.targetCursor) : this.targetCursor;
+        try {
+            await this.visitProperty(right.element, otherElement);
+        } finally {
+            this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
+        }
+
+        return right;
+    }
+
+    /**
+     * Override visitLeftPadded to compare only the elements, not markers or spacing.
+     * The context parameter p contains the corresponding element from the other tree.
+     * Pushes the wrapper onto the cursor stack so captures can access it.
+     * Also updates targetCursor in parallel.
+     */
+    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: J): Promise<J.LeftPadded<T>> {
+        if (!this.match) {
+            return left;
+        }
+
+        // Extract the other element if it's also a LeftPadded
+        const isLeftPadded = (p as any).kind === J.Kind.LeftPadded;
+        const otherWrapper = isLeftPadded ? (p as unknown) as J.LeftPadded<T> : undefined;
+        const otherElement = isLeftPadded ? otherWrapper!.element : p;
+
+        // Push wrappers onto both cursors, then compare only the elements, not markers or spacing
+        const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
+        this.cursor = new Cursor(left, this.cursor);
+        this.targetCursor = otherWrapper ? new Cursor(otherWrapper, this.targetCursor) : this.targetCursor;
+        try {
+            await this.visitProperty(left.element, otherElement);
+        } finally {
+            this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
+        }
+
+        return left;
+    }
+
+    /**
+     * Override visitContainer to compare only the elements, not markers or spacing.
+     * The context parameter p contains the corresponding element from the other tree.
+     * Pushes the wrapper onto the cursor stack so captures can access it.
+     * Also updates targetCursor in parallel.
+     */
+    public async visitContainer<T extends J>(container: J.Container<T>, p: J): Promise<J.Container<T>> {
+        if (!this.match) {
+            return container;
+        }
+
+        // Extract the other elements if it's also a Container
+        const isContainer = (p as any).kind === J.Kind.Container;
+        const otherContainer = isContainer ? (p as unknown) as J.Container<T> : undefined;
+        const otherElements: J.RightPadded<T>[] = isContainer ? otherContainer!.elements : (p as any);
+
+        // Compare elements array length
+        if (container.elements.length !== otherElements.length) {
+            return this.abort(container);
+        }
+
+        // Push wrappers onto both cursors, then compare each element
+        const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
+        this.cursor = new Cursor(container, this.cursor);
+        this.targetCursor = otherContainer ? new Cursor(otherContainer, this.targetCursor) : this.targetCursor;
+        try {
+            for (let i = 0; i < container.elements.length; i++) {
+                await this.visitProperty(container.elements[i], otherElements[i]);
+                if (!this.match) {
+                    return this.abort(container);
+                }
+            }
+        } finally {
+            this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
+        }
+
+        return container;
     }
 
     /**
@@ -91,23 +315,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited binary expression, or undefined if the visit was aborted
      */
     override async visitBinary(binary: J.Binary, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Binary) {
-            this.abort();
-            return binary;
-        }
-
-        const otherBinary = other as J.Binary;
-        if (binary.operator.element !== otherBinary.operator.element) {
-            this.abort();
-            return binary;
-        }
-
-        // Visit left and right operands in lock step
-        await this.visit(binary.left, otherBinary.left);
-        if (!this.match) return binary;
-
-        await this.visit(binary.right, otherBinary.right);
-        return binary;
+        return this.visitElement(binary, other as J.Binary);
     }
 
     /**
@@ -118,17 +326,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited identifier, or undefined if the visit was aborted
      */
     override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Identifier) {
-            this.abort();
-            return identifier;
-        }
-
-        const otherIdentifier = other as J.Identifier;
-        if (identifier.simpleName !== otherIdentifier.simpleName) {
-            this.abort();
-        }
-
-        return identifier;
+        return this.visitElement(identifier, other as J.Identifier);
     }
 
     /**
@@ -139,17 +337,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited literal, or undefined if the visit was aborted
      */
     override async visitLiteral(literal: J.Literal, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Literal) {
-            this.abort();
-            return literal;
-        }
-
-        const otherLiteral = other as J.Literal;
-        if (literal.valueSource !== otherLiteral.valueSource) {
-            this.abort();
-        }
-
-        return literal;
+        return this.visitElement(literal, other as J.Literal);
     }
 
     /**
@@ -160,24 +348,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited block, or undefined if the visit was aborted
      */
     override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Block) {
-            this.abort();
-            return block;
-        }
-
-        const otherBlock = other as J.Block;
-        if (block.statements.length !== otherBlock.statements.length) {
-            this.abort();
-            return block;
-        }
-
-        // Visit each statement in lock step
-        for (let i = 0; i < block.statements.length; i++) {
-            await this.visit(block.statements[i].element, otherBlock.statements[i].element);
-            if (!this.match) break;
-        }
-
-        return block;
+        return this.visitElement(block, other as J.Block);
     }
 
     /**
@@ -188,24 +359,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited compilation unit, or undefined if the visit was aborted
      */
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.CompilationUnit) {
-            this.abort();
-            return compilationUnit;
-        }
-
-        const otherCompilationUnit = other as JS.CompilationUnit;
-        if (compilationUnit.statements.length !== otherCompilationUnit.statements.length) {
-            this.abort();
-            return compilationUnit;
-        }
-
-        // Visit each statement in lock step
-        for (let i = 0; i < compilationUnit.statements.length; i++) {
-            await this.visit(compilationUnit.statements[i].element, otherCompilationUnit.statements[i].element);
-            if (!this.match) break;
-        }
-
-        return compilationUnit;
+        return this.visitElement(compilationUnit, other as JS.CompilationUnit);
     }
 
     /**
@@ -216,19 +370,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited alias, or undefined if the visit was aborted
      */
     override async visitAlias(alias: JS.Alias, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.Alias) {
-            this.abort();
-            return alias;
-        }
-
-        const otherAlias = other as JS.Alias;
-
-        // Visit property name and alias in lock step
-        await this.visit(alias.propertyName.element, otherAlias.propertyName.element);
-        if (!this.match) return alias;
-
-        await this.visit(alias.alias, otherAlias.alias);
-        return alias;
+        return this.visitElement(alias, other as JS.Alias);
     }
 
     /**
@@ -239,51 +381,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited arrow function, or undefined if the visit was aborted
      */
     override async visitArrowFunction(arrowFunction: JS.ArrowFunction, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ArrowFunction) {
-            this.abort();
-            return arrowFunction;
-        }
-
-        const otherArrowFunction = other as JS.ArrowFunction;
-
-        // Compare modifiers
-        if (arrowFunction.modifiers.length !== otherArrowFunction.modifiers.length) {
-            this.abort();
-            return arrowFunction;
-        }
-
-        // Visit modifiers in lock step
-        for (let i = 0; i < arrowFunction.modifiers.length; i++) {
-            await this.visit(arrowFunction.modifiers[i], otherArrowFunction.modifiers[i]);
-            if (!this.match) return arrowFunction;
-        }
-
-        // Visit type parameters if present
-        if (!!arrowFunction.typeParameters !== !!otherArrowFunction.typeParameters) {
-            this.abort();
-            return arrowFunction;
-        }
-
-        if (arrowFunction.typeParameters) {
-            await this.visit(arrowFunction.typeParameters, otherArrowFunction.typeParameters!);
-            if (!this.match) return arrowFunction;
-        }
-
-        // Visit lambda
-        await this.visit(arrowFunction.lambda, otherArrowFunction.lambda);
-        if (!this.match) return arrowFunction;
-
-        // Visit return type expression if present
-        if (!!arrowFunction.returnTypeExpression !== !!otherArrowFunction.returnTypeExpression) {
-            this.abort();
-            return arrowFunction;
-        }
-
-        if (arrowFunction.returnTypeExpression) {
-            await this.visit(arrowFunction.returnTypeExpression, otherArrowFunction.returnTypeExpression!);
-        }
-
-        return arrowFunction;
+        return this.visitElement(arrowFunction, other as JS.ArrowFunction);
     }
 
     /**
@@ -294,17 +392,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited await expression, or undefined if the visit was aborted
      */
     override async visitAwait(await_: JS.Await, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.Await) {
-            this.abort();
-            return await_;
-        }
-
-        const otherAwait = other as JS.Await;
-
-        // Visit expression
-        await this.visit(await_.expression, otherAwait.expression);
-
-        return await_;
+        return this.visitElement(await_, other as JS.Await);
     }
 
     /**
@@ -315,65 +403,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited JSX tag, or undefined if the visit was aborted
      */
     override async visitJsxTag(element: JSX.Tag, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.JsxTag) {
-            this.abort();
-            return element;
-        }
-
-        const otherElement = other as JSX.Tag;
-
-        // Visit open name
-        await this.visit(element.openName.element, otherElement.openName.element);
-        if (!this.match) return element;
-
-        // Compare attributes
-        if (element.attributes.length !== otherElement.attributes.length) {
-            this.abort();
-            return element;
-        }
-
-        // Visit attributes in lock step
-        for (let i = 0; i < element.attributes.length; i++) {
-            await this.visit(element.attributes[i].element, otherElement.attributes[i].element);
-            if (!this.match) return element;
-        }
-
-        // Compare self-closing
-        if (!!element.selfClosing !== !!otherElement.selfClosing) {
-            this.abort();
-            return element;
-        }
-
-        // Compare children
-        if (!!element.children !== !!otherElement.children) {
-            this.abort();
-            return element;
-        }
-
-        if (element.children) {
-            if (element.children.length !== otherElement.children!.length) {
-                this.abort();
-                return element;
-            }
-
-            // Visit children in lock step
-            for (let i = 0; i < element.children.length; i++) {
-                await this.visit(element.children[i], otherElement.children![i]);
-                if (!this.match) return element;
-            }
-        }
-
-        // Compare closing name
-        if (!!element.closingName !== !!otherElement.closingName) {
-            this.abort();
-            return element;
-        }
-
-        if (element.closingName) {
-            await this.visit(element.closingName.element, otherElement.closingName!.element);
-        }
-
-        return element;
+        return this.visitElement(element, other as JSX.Tag);
     }
 
     /**
@@ -384,28 +414,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited JSX attribute, or undefined if the visit was aborted
      */
     override async visitJsxAttribute(attribute: JSX.Attribute, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.JsxAttribute) {
-            this.abort();
-            return attribute;
-        }
-
-        const otherAttribute = other as JSX.Attribute;
-
-        // Visit key
-        await this.visit(attribute.key, otherAttribute.key);
-        if (!this.match) return attribute;
-
-        // Compare value
-        if (!!attribute.value !== !!otherAttribute.value) {
-            this.abort();
-            return attribute;
-        }
-
-        if (attribute.value) {
-            await this.visit(attribute.value.element, otherAttribute.value!.element);
-        }
-
-        return attribute;
+        return this.visitElement(attribute, other as JSX.Attribute);
     }
 
     /**
@@ -416,17 +425,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited JSX spread attribute, or undefined if the visit was aborted
      */
     override async visitJsxSpreadAttribute(spread: JSX.SpreadAttribute, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.JsxSpreadAttribute) {
-            this.abort();
-            return spread;
-        }
-
-        const otherSpread = other as JSX.SpreadAttribute;
-
-        // Visit expression
-        await this.visit(spread.expression.element, otherSpread.expression.element);
-
-        return spread;
+        return this.visitElement(spread, other as JSX.SpreadAttribute);
     }
 
     /**
@@ -437,17 +436,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited JSX expression, or undefined if the visit was aborted
      */
     override async visitJsxEmbeddedExpression(expr: JSX.EmbeddedExpression, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.JsxEmbeddedExpression) {
-            this.abort();
-            return expr;
-        }
-
-        const otherExpr = other as JSX.EmbeddedExpression;
-
-        // Visit expression
-        await this.visit(expr.expression.element, otherExpr.expression.element);
-
-        return expr;
+        return this.visitElement(expr, other as JSX.EmbeddedExpression);
     }
 
     /**
@@ -458,21 +447,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited JSX namespaced name, or undefined if the visit was aborted
      */
     override async visitJsxNamespacedName(ns: JSX.NamespacedName, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.JsxNamespacedName) {
-            this.abort();
-            return ns;
-        }
-
-        const otherNs = other as JSX.NamespacedName;
-
-        // Visit namespace
-        await this.visit(ns.namespace, otherNs.namespace);
-        if (!this.match) return ns;
-
-        // Visit name
-        await this.visit(ns.name.element, otherNs.name.element);
-
-        return ns;
+        return this.visitElement(ns, other as JSX.NamespacedName);
     }
 
     /**
@@ -483,21 +458,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited conditional type, or undefined if the visit was aborted
      */
     override async visitConditionalType(conditionalType: JS.ConditionalType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ConditionalType) {
-            this.abort();
-            return conditionalType;
-        }
-
-        const otherConditionalType = other as JS.ConditionalType;
-
-        // Visit check type
-        await this.visit(conditionalType.checkType, otherConditionalType.checkType);
-        if (!this.match) return conditionalType;
-
-        // Visit condition
-        await this.visit(conditionalType.condition.element, otherConditionalType.condition.element);
-
-        return conditionalType;
+        return this.visitElement(conditionalType, other as JS.ConditionalType);
     }
 
     /**
@@ -508,17 +469,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited delete expression, or undefined if the visit was aborted
      */
     override async visitDelete(delete_: JS.Delete, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.Delete) {
-            this.abort();
-            return delete_;
-        }
-
-        const otherDelete = other as JS.Delete;
-
-        // Visit expression
-        await this.visit(delete_.expression, otherDelete.expression);
-
-        return delete_;
+        return this.visitElement(delete_, other as JS.Delete);
     }
 
     /**
@@ -529,17 +480,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited expression statement, or undefined if the visit was aborted
      */
     override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ExpressionStatement) {
-            this.abort();
-            return expressionStatement;
-        }
-
-        const otherExpressionStatement = other as JS.ExpressionStatement;
-
-        // Visit expression
-        await this.visit(expressionStatement.expression, otherExpressionStatement.expression);
-
-        return expressionStatement;
+        return this.visitElement(expressionStatement, other as JS.ExpressionStatement);
     }
 
     /**
@@ -550,38 +491,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited expression with type arguments, or undefined if the visit was aborted
      */
     override async visitExpressionWithTypeArguments(expressionWithTypeArguments: JS.ExpressionWithTypeArguments, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ExpressionWithTypeArguments) {
-            this.abort();
-            return expressionWithTypeArguments;
-        }
-
-        const otherExpressionWithTypeArguments = other as JS.ExpressionWithTypeArguments;
-
-        // Visit class
-        await this.visit(expressionWithTypeArguments.clazz, otherExpressionWithTypeArguments.clazz);
-        if (!this.match) return expressionWithTypeArguments;
-
-        // Compare type arguments
-        if (!!expressionWithTypeArguments.typeArguments !== !!otherExpressionWithTypeArguments.typeArguments) {
-            this.abort();
-            return expressionWithTypeArguments;
-        }
-
-        if (expressionWithTypeArguments.typeArguments) {
-            if (expressionWithTypeArguments.typeArguments.elements.length !== otherExpressionWithTypeArguments.typeArguments!.elements.length) {
-                this.abort();
-                return expressionWithTypeArguments;
-            }
-
-            // Visit type arguments in lock step
-            for (let i = 0; i < expressionWithTypeArguments.typeArguments.elements.length; i++) {
-                await this.visit(expressionWithTypeArguments.typeArguments.elements[i].element, 
-                                otherExpressionWithTypeArguments.typeArguments!.elements[i].element);
-                if (!this.match) return expressionWithTypeArguments;
-            }
-        }
-
-        return expressionWithTypeArguments;
+        return this.visitElement(expressionWithTypeArguments, other as JS.ExpressionWithTypeArguments);
     }
 
     /**
@@ -592,58 +502,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited function call, or undefined if the visit was aborted
      */
     override async visitFunctionCall(functionCall: JS.FunctionCall, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.FunctionCall) {
-            this.abort();
-            return functionCall;
-        }
-
-        const otherFunctionCall = other as JS.FunctionCall;
-
-        // Compare function
-        if ((functionCall.function === undefined) !== (otherFunctionCall.function === undefined)) {
-            this.abort();
-            return functionCall;
-        }
-
-        // Visit function if present
-        if (functionCall.function && otherFunctionCall.function) {
-            await this.visit(functionCall.function.element, otherFunctionCall.function.element);
-            if (!this.match) return functionCall;
-        }
-
-        // Compare typeParameters
-        if ((functionCall.typeParameters === undefined) !== (otherFunctionCall.typeParameters === undefined)) {
-            this.abort();
-            return functionCall;
-        }
-
-        // Visit typeParameters if present
-        if (functionCall.typeParameters && otherFunctionCall.typeParameters) {
-            if (functionCall.typeParameters.elements.length !== otherFunctionCall.typeParameters.elements.length) {
-                this.abort();
-                return functionCall;
-            }
-
-            // Visit each type parameter in lock step
-            for (let i = 0; i < functionCall.typeParameters.elements.length; i++) {
-                await this.visit(functionCall.typeParameters.elements[i].element, otherFunctionCall.typeParameters.elements[i].element);
-                if (!this.match) return functionCall;
-            }
-        }
-
-        // Compare arguments
-        if (functionCall.arguments.elements.length !== otherFunctionCall.arguments.elements.length) {
-            this.abort();
-            return functionCall;
-        }
-
-        // Visit each argument in lock step
-        for (let i = 0; i < functionCall.arguments.elements.length; i++) {
-            await this.visit(functionCall.arguments.elements[i].element, otherFunctionCall.arguments.elements[i].element);
-            if (!this.match) return functionCall;
-        }
-
-        return functionCall;
+        return this.visitElement(functionCall, other as JS.FunctionCall);
     }
 
     /**
@@ -654,53 +513,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited function type, or undefined if the visit was aborted
      */
     override async visitFunctionType(functionType: JS.FunctionType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.FunctionType) {
-            this.abort();
-            return functionType;
-        }
-
-        const otherFunctionType = other as JS.FunctionType;
-
-        // Compare constructor type
-        if (!!functionType.constructorType.element !== !!otherFunctionType.constructorType.element) {
-            this.abort();
-            return functionType;
-        }
-
-        if (functionType.constructorType.element) {
-            if (functionType.constructorType.element !== otherFunctionType.constructorType.element) {
-                this.abort();
-                return functionType;
-            }
-        }
-
-        // Compare type parameters
-        if (!!functionType.typeParameters !== !!otherFunctionType.typeParameters) {
-            this.abort();
-            return functionType;
-        }
-
-        if (functionType.typeParameters) {
-            await this.visit(functionType.typeParameters, otherFunctionType.typeParameters!);
-            if (!this.match) return functionType;
-        }
-
-        // Compare parameters
-        if (functionType.parameters.elements.length !== otherFunctionType.parameters.elements.length) {
-            this.abort();
-            return functionType;
-        }
-
-        // Visit parameters in lock step
-        for (let i = 0; i < functionType.parameters.elements.length; i++) {
-            await this.visit(functionType.parameters.elements[i].element, otherFunctionType.parameters.elements[i].element);
-            if (!this.match) return functionType;
-        }
-
-        // Compare return type
-        await this.visit(functionType.returnType.element, otherFunctionType.returnType.element);
-
-        return functionType;
+        return this.visitElement(functionType, other as JS.FunctionType);
     }
 
     /**
@@ -711,17 +524,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited infer type, or undefined if the visit was aborted
      */
     override async visitInferType(inferType: JS.InferType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.InferType) {
-            this.abort();
-            return inferType;
-        }
-
-        const otherInferType = other as JS.InferType;
-
-        // Visit type parameter
-        await this.visit(inferType.typeParameter.element, otherInferType.typeParameter.element);
-
-        return inferType;
+        return this.visitElement(inferType, other as JS.InferType);
     }
 
     /**
@@ -732,64 +535,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited import type, or undefined if the visit was aborted
      */
     override async visitImportType(importType: JS.ImportType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ImportType) {
-            this.abort();
-            return importType;
-        }
-
-        const otherImportType = other as JS.ImportType;
-
-        // Compare has typeof
-        if (importType.hasTypeof.element !== otherImportType.hasTypeof.element) {
-            this.abort();
-            return importType;
-        }
-
-        // Compare argument and attributes
-        if (importType.argumentAndAttributes.elements.length !== otherImportType.argumentAndAttributes.elements.length) {
-            this.abort();
-            return importType;
-        }
-
-        // Visit argument and attributes in lock step
-        for (let i = 0; i < importType.argumentAndAttributes.elements.length; i++) {
-            await this.visit(importType.argumentAndAttributes.elements[i].element, 
-                           otherImportType.argumentAndAttributes.elements[i].element);
-            if (!this.match) return importType;
-        }
-
-        // Compare qualifier
-        if (!!importType.qualifier !== !!otherImportType.qualifier) {
-            this.abort();
-            return importType;
-        }
-
-        if (importType.qualifier) {
-            await this.visit(importType.qualifier.element, otherImportType.qualifier!.element);
-            if (!this.match) return importType;
-        }
-
-        // Compare type arguments
-        if (!!importType.typeArguments !== !!otherImportType.typeArguments) {
-            this.abort();
-            return importType;
-        }
-
-        if (importType.typeArguments) {
-            if (importType.typeArguments.elements.length !== otherImportType.typeArguments!.elements.length) {
-                this.abort();
-                return importType;
-            }
-
-            // Visit type arguments in lock step
-            for (let i = 0; i < importType.typeArguments.elements.length; i++) {
-                await this.visit(importType.typeArguments.elements[i].element, 
-                               otherImportType.typeArguments!.elements[i].element);
-                if (!this.match) return importType;
-            }
-        }
-
-        return importType;
+        return this.visitElement(importType, other as JS.ImportType);
     }
 
     /**
@@ -800,59 +546,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited import declaration, or undefined if the visit was aborted
      */
     override async visitImportDeclaration(jsImport: JS.Import, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.Import) {
-            this.abort();
-            return jsImport;
-        }
-
-        const otherImport = other as JS.Import;
-
-        // Compare modifiers
-        if (jsImport.modifiers.length !== otherImport.modifiers.length) {
-            this.abort();
-            return jsImport;
-        }
-
-        // Visit each modifier in lock step
-        for (let i = 0; i < jsImport.modifiers.length; i++) {
-            await this.visit(jsImport.modifiers[i], otherImport.modifiers[i]);
-            if (!this.match) return jsImport;
-        }
-
-        // Compare import clause
-        if (!!jsImport.importClause !== !!otherImport.importClause) {
-            this.abort();
-            return jsImport;
-        }
-
-        if (jsImport.importClause) {
-            await this.visit(jsImport.importClause, otherImport.importClause!);
-            if (!this.match) return jsImport;
-        }
-
-        // Visit module specifier
-        if (jsImport.moduleSpecifier) {
-            await this.visit(jsImport.moduleSpecifier.element, otherImport.moduleSpecifier!.element);
-            if (!this.match) return jsImport;
-        }
-
-        // Compare attributes
-        if (!!jsImport.attributes !== !!otherImport.attributes) {
-            this.abort();
-            return jsImport;
-        }
-
-        if (jsImport.attributes) {
-            await this.visit(jsImport.attributes, otherImport.attributes!);
-        }
-
-        // Compare initializer
-        if (jsImport.initializer) {
-            await this.visit(jsImport.initializer.element, otherImport.initializer!.element);
-            if (!this.match) return jsImport;
-        }
-
-        return jsImport;
+        return this.visitElement(jsImport, other as JS.Import);
     }
 
     /**
@@ -863,35 +557,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited import clause, or undefined if the visit was aborted
      */
     override async visitImportClause(importClause: JS.ImportClause, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ImportClause) {
-            this.abort();
-            return importClause;
-        }
-
-        const otherImportClause = other as JS.ImportClause;
-
-        // Compare name
-        if (!!importClause.name !== !!otherImportClause.name) {
-            this.abort();
-            return importClause;
-        }
-
-        if (importClause.name) {
-            await this.visit(importClause.name.element, otherImportClause.name!.element);
-            if (!this.match) return importClause;
-        }
-
-        // Compare named bindings
-        if (!!importClause.namedBindings !== !!otherImportClause.namedBindings) {
-            this.abort();
-            return importClause;
-        }
-
-        if (importClause.namedBindings) {
-            await this.visit(importClause.namedBindings, otherImportClause.namedBindings!);
-        }
-
-        return importClause;
+        return this.visitElement(importClause, other as JS.ImportClause);
     }
 
     /**
@@ -902,26 +568,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited named imports, or undefined if the visit was aborted
      */
     override async visitNamedImports(namedImports: JS.NamedImports, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.NamedImports) {
-            this.abort();
-            return namedImports;
-        }
-
-        const otherNamedImports = other as JS.NamedImports;
-
-        // Compare elements
-        if (namedImports.elements.elements.length !== otherNamedImports.elements.elements.length) {
-            this.abort();
-            return namedImports;
-        }
-
-        // Visit elements in lock step
-        for (let i = 0; i < namedImports.elements.elements.length; i++) {
-            await this.visit(namedImports.elements.elements[i].element, otherNamedImports.elements.elements[i].element);
-            if (!this.match) return namedImports;
-        }
-
-        return namedImports;
+        return this.visitElement(namedImports, other as JS.NamedImports);
     }
 
     /**
@@ -932,30 +579,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited import specifier, or undefined if the visit was aborted
      */
     override async visitImportSpecifier(importSpecifier: JS.ImportSpecifier, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ImportSpecifier) {
-            this.abort();
-            return importSpecifier;
-        }
-
-        const otherImportSpecifier = other as JS.ImportSpecifier;
-
-        // Compare import type
-        if (!!importSpecifier.importType.element !== !!otherImportSpecifier.importType.element) {
-            this.abort();
-            return importSpecifier;
-        }
-
-        if (importSpecifier.importType.element) {
-            if (importSpecifier.importType.element !== otherImportSpecifier.importType.element) {
-                this.abort();
-                return importSpecifier;
-            }
-        }
-
-        // Visit specifier
-        await this.visit(importSpecifier.specifier, otherImportSpecifier.specifier);
-
-        return importSpecifier;
+        return this.visitElement(importSpecifier, other as JS.ImportSpecifier);
     }
 
     /**
@@ -966,26 +590,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited import attributes, or undefined if the visit was aborted
      */
     override async visitImportAttributes(importAttributes: JS.ImportAttributes, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ImportAttributes) {
-            this.abort();
-            return importAttributes;
-        }
-
-        const otherImportAttributes = other as JS.ImportAttributes;
-
-        // Compare elements
-        if (importAttributes.elements.elements.length !== otherImportAttributes.elements.elements.length) {
-            this.abort();
-            return importAttributes;
-        }
-
-        // Visit elements in lock step
-        for (let i = 0; i < importAttributes.elements.elements.length; i++) {
-            await this.visit(importAttributes.elements.elements[i].element, otherImportAttributes.elements.elements[i].element);
-            if (!this.match) return importAttributes;
-        }
-
-        return importAttributes;
+        return this.visitElement(importAttributes, other as JS.ImportAttributes);
     }
 
     /**
@@ -996,30 +601,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited import type attributes, or undefined if the visit was aborted
      */
     override async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ImportTypeAttributes) {
-            this.abort();
-            return importTypeAttributes;
-        }
-
-        const otherImportTypeAttributes = other as JS.ImportTypeAttributes;
-
-        // Compare token
-        await this.visit(importTypeAttributes.token.element, otherImportTypeAttributes.token.element);
-        if (!this.match) return importTypeAttributes;
-
-        // Compare elements
-        if (importTypeAttributes.elements.elements.length !== otherImportTypeAttributes.elements.elements.length) {
-            this.abort();
-            return importTypeAttributes;
-        }
-
-        // Visit elements in lock step
-        for (let i = 0; i < importTypeAttributes.elements.elements.length; i++) {
-            await this.visit(importTypeAttributes.elements.elements[i].element, otherImportTypeAttributes.elements.elements[i].element);
-            if (!this.match) return importTypeAttributes;
-        }
-
-        return importTypeAttributes;
+        return this.visitElement(importTypeAttributes, other as JS.ImportTypeAttributes);
     }
 
     /**
@@ -1030,21 +612,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited import attribute, or undefined if the visit was aborted
      */
     override async visitImportAttribute(importAttribute: JS.ImportAttribute, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ImportAttribute) {
-            this.abort();
-            return importAttribute;
-        }
-
-        const otherImportAttribute = other as JS.ImportAttribute;
-
-        // Visit name
-        await this.visit(importAttribute.name, otherImportAttribute.name);
-        if (!this.match) return importAttribute;
-
-        // Visit value
-        await this.visit(importAttribute.value.element, otherImportAttribute.value.element);
-
-        return importAttribute;
+        return this.visitElement(importAttribute, other as JS.ImportAttribute);
     }
 
     /**
@@ -1055,27 +623,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited binary expression, or undefined if the visit was aborted
      */
     override async visitBinaryExtensions(jsBinary: JS.Binary, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.Binary) {
-            this.abort();
-            return jsBinary;
-        }
-
-        const otherBinary = other as JS.Binary;
-
-        // Visit left operand
-        await this.visit(jsBinary.left, otherBinary.left);
-        if (!this.match) return jsBinary;
-
-        // Compare operator
-        if (jsBinary.operator.element !== otherBinary.operator.element) {
-            this.abort();
-            return jsBinary;
-        }
-
-        // Visit right operand
-        await this.visit(jsBinary.right, otherBinary.right);
-
-        return jsBinary;
+        return this.visitElement(jsBinary, other as JS.Binary);
     }
 
     /**
@@ -1086,17 +634,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited literal type, or undefined if the visit was aborted
      */
     override async visitLiteralType(literalType: JS.LiteralType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.LiteralType) {
-            this.abort();
-            return literalType;
-        }
-
-        const otherLiteralType = other as JS.LiteralType;
-
-        // Visit literal
-        await this.visit(literalType.literal, otherLiteralType.literal);
-
-        return literalType;
+        return this.visitElement(literalType, other as JS.LiteralType);
     }
 
     /**
@@ -1107,64 +645,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited mapped type, or undefined if the visit was aborted
      */
     override async visitMappedType(mappedType: JS.MappedType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.MappedType) {
-            this.abort();
-            return mappedType;
-        }
-
-        const otherMappedType = other as JS.MappedType;
-
-        // Compare prefix token
-        if (!!mappedType.prefixToken !== !!otherMappedType.prefixToken) {
-            this.abort();
-            return mappedType;
-        }
-
-        if (mappedType.prefixToken) {
-            await this.visit(mappedType.prefixToken.element, otherMappedType.prefixToken!.element);
-            if (!this.match) return mappedType;
-        }
-
-        // Compare has readonly
-        if (mappedType.hasReadonly.element !== otherMappedType.hasReadonly.element) {
-            this.abort();
-            return mappedType;
-        }
-
-        // Visit keys remapping
-        await this.visit(mappedType.keysRemapping, otherMappedType.keysRemapping);
-        if (!this.match) return mappedType;
-
-        // Compare suffix token
-        if (!!mappedType.suffixToken !== !!otherMappedType.suffixToken) {
-            this.abort();
-            return mappedType;
-        }
-
-        if (mappedType.suffixToken) {
-            await this.visit(mappedType.suffixToken.element, otherMappedType.suffixToken!.element);
-            if (!this.match) return mappedType;
-        }
-
-        // Compare has question token
-        if (mappedType.hasQuestionToken.element !== otherMappedType.hasQuestionToken.element) {
-            this.abort();
-            return mappedType;
-        }
-
-        // Compare value type
-        if (mappedType.valueType.elements.length !== otherMappedType.valueType.elements.length) {
-            this.abort();
-            return mappedType;
-        }
-
-        // Visit value type elements in lock step
-        for (let i = 0; i < mappedType.valueType.elements.length; i++) {
-            await this.visit(mappedType.valueType.elements[i].element, otherMappedType.valueType.elements[i].element);
-            if (!this.match) return mappedType;
-        }
-
-        return mappedType;
+        return this.visitElement(mappedType, other as JS.MappedType);
     }
 
     /**
@@ -1175,28 +656,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited keys remapping, or undefined if the visit was aborted
      */
     override async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.MappedTypeKeysRemapping) {
-            this.abort();
-            return keysRemapping;
-        }
-
-        const otherKeysRemapping = other as JS.MappedType.KeysRemapping;
-
-        // Visit type parameter
-        await this.visit(keysRemapping.typeParameter.element, otherKeysRemapping.typeParameter.element);
-        if (!this.match) return keysRemapping;
-
-        // Compare name type
-        if (!!keysRemapping.nameType !== !!otherKeysRemapping.nameType) {
-            this.abort();
-            return keysRemapping;
-        }
-
-        if (keysRemapping.nameType) {
-            await this.visit(keysRemapping.nameType.element, otherKeysRemapping.nameType!.element);
-        }
-
-        return keysRemapping;
+        return this.visitElement(keysRemapping, other as JS.MappedType.KeysRemapping);
     }
 
     /**
@@ -1207,21 +667,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited mapped type parameter, or undefined if the visit was aborted
      */
     override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.MappedTypeParameter) {
-            this.abort();
-            return mappedTypeParameter;
-        }
-
-        const otherMappedTypeParameter = other as JS.MappedType.Parameter;
-
-        // Visit name
-        await this.visit(mappedTypeParameter.name, otherMappedTypeParameter.name);
-        if (!this.match) return mappedTypeParameter;
-
-        // Visit iterate type
-        await this.visit(mappedTypeParameter.iterateType.element, otherMappedTypeParameter.iterateType.element);
-
-        return mappedTypeParameter;
+        return this.visitElement(mappedTypeParameter, other as JS.MappedType.Parameter);
     }
 
     /**
@@ -1232,72 +678,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited object binding declarations, or undefined if the visit was aborted
      */
     override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ObjectBindingPattern) {
-            this.abort();
-            return objectBindingPattern;
-        }
-
-        const otherObjectBindingPattern = other as JS.ObjectBindingPattern;
-
-        // Compare leading annotations
-        if (objectBindingPattern.leadingAnnotations.length !== otherObjectBindingPattern.leadingAnnotations.length) {
-            this.abort();
-            return objectBindingPattern;
-        }
-
-        // Visit leading annotations in lock step
-        for (let i = 0; i < objectBindingPattern.leadingAnnotations.length; i++) {
-            await this.visit(objectBindingPattern.leadingAnnotations[i], otherObjectBindingPattern.leadingAnnotations[i]);
-            if (!this.match) return objectBindingPattern;
-        }
-
-        // Compare modifiers
-        if (objectBindingPattern.modifiers.length !== otherObjectBindingPattern.modifiers.length) {
-            this.abort();
-            return objectBindingPattern;
-        }
-
-        // Visit modifiers in lock step
-        for (let i = 0; i < objectBindingPattern.modifiers.length; i++) {
-            await this.visit(objectBindingPattern.modifiers[i], otherObjectBindingPattern.modifiers[i]);
-            if (!this.match) return objectBindingPattern;
-        }
-
-        // Compare type expression
-        if (!!objectBindingPattern.typeExpression !== !!otherObjectBindingPattern.typeExpression) {
-            this.abort();
-            return objectBindingPattern;
-        }
-
-        if (objectBindingPattern.typeExpression) {
-            await this.visit(objectBindingPattern.typeExpression, otherObjectBindingPattern.typeExpression!);
-            if (!this.match) return objectBindingPattern;
-        }
-
-        // Compare bindings
-        if (objectBindingPattern.bindings.elements.length !== otherObjectBindingPattern.bindings.elements.length) {
-            this.abort();
-            return objectBindingPattern;
-        }
-
-        // Visit bindings in lock step
-        for (let i = 0; i < objectBindingPattern.bindings.elements.length; i++) {
-            await this.visit(objectBindingPattern.bindings.elements[i].element,
-                           otherObjectBindingPattern.bindings.elements[i].element);
-            if (!this.match) return objectBindingPattern;
-        }
-
-        // Compare initializer
-        if (!!objectBindingPattern.initializer !== !!otherObjectBindingPattern.initializer) {
-            this.abort();
-            return objectBindingPattern;
-        }
-
-        if (objectBindingPattern.initializer) {
-            await this.visit(objectBindingPattern.initializer.element, otherObjectBindingPattern.initializer!.element);
-        }
-
-        return objectBindingPattern;
+        return this.visitElement(objectBindingPattern, other as JS.ObjectBindingPattern);
     }
 
     /**
@@ -1308,28 +689,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited property assignment, or undefined if the visit was aborted
      */
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.PropertyAssignment) {
-            this.abort();
-            return propertyAssignment;
-        }
-
-        const otherPropertyAssignment = other as JS.PropertyAssignment;
-
-        // Visit name
-        await this.visit(propertyAssignment.name.element, otherPropertyAssignment.name.element);
-        if (!this.match) return propertyAssignment;
-
-        // Compare initializer
-        if (!!propertyAssignment.initializer !== !!otherPropertyAssignment.initializer) {
-            this.abort();
-            return propertyAssignment;
-        }
-
-        if (propertyAssignment.initializer) {
-            await this.visit(propertyAssignment.initializer, otherPropertyAssignment.initializer!);
-        }
-
-        return propertyAssignment;
+        return this.visitElement(propertyAssignment, other as JS.PropertyAssignment);
     }
 
     /**
@@ -1340,21 +700,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited satisfies expression, or undefined if the visit was aborted
      */
     override async visitSatisfiesExpression(satisfiesExpression: JS.SatisfiesExpression, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.SatisfiesExpression) {
-            this.abort();
-            return satisfiesExpression;
-        }
-
-        const otherSatisfiesExpression = other as JS.SatisfiesExpression;
-
-        // Visit expression
-        await this.visit(satisfiesExpression.expression, otherSatisfiesExpression.expression);
-        if (!this.match) return satisfiesExpression;
-
-        // Visit satisfies type
-        await this.visit(satisfiesExpression.satisfiesType.element, otherSatisfiesExpression.satisfiesType.element);
-
-        return satisfiesExpression;
+        return this.visitElement(satisfiesExpression, other as JS.SatisfiesExpression);
     }
 
     /**
@@ -1365,38 +711,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited scoped variable declarations, or undefined if the visit was aborted
      */
     override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ScopedVariableDeclarations) {
-            this.abort();
-            return scopedVariableDeclarations;
-        }
-
-        const otherScopedVariableDeclarations = other as JS.ScopedVariableDeclarations;
-
-        // Compare modifiers
-        if (scopedVariableDeclarations.modifiers.length !== otherScopedVariableDeclarations.modifiers.length) {
-            this.abort();
-            return scopedVariableDeclarations;
-        }
-
-        // Visit modifiers in lock step
-        for (let i = 0; i < scopedVariableDeclarations.modifiers.length; i++) {
-            await this.visit(scopedVariableDeclarations.modifiers[i], otherScopedVariableDeclarations.modifiers[i]);
-            if (!this.match) return scopedVariableDeclarations;
-        }
-
-        // Compare variables
-        if (scopedVariableDeclarations.variables.length !== otherScopedVariableDeclarations.variables.length) {
-            this.abort();
-            return scopedVariableDeclarations;
-        }
-
-        // Visit variables in lock step
-        for (let i = 0; i < scopedVariableDeclarations.variables.length; i++) {
-            await this.visit(scopedVariableDeclarations.variables[i].element, otherScopedVariableDeclarations.variables[i].element);
-            if (!this.match) return scopedVariableDeclarations;
-        }
-
-        return scopedVariableDeclarations;
+        return this.visitElement(scopedVariableDeclarations, other as JS.ScopedVariableDeclarations);
     }
 
     /**
@@ -1407,17 +722,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited statement expression, or undefined if the visit was aborted
      */
     override async visitStatementExpression(statementExpression: JS.StatementExpression, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.StatementExpression) {
-            this.abort();
-            return statementExpression;
-        }
-
-        const otherStatementExpression = other as JS.StatementExpression;
-
-        // Visit statement
-        await this.visit(statementExpression.statement, otherStatementExpression.statement);
-
-        return statementExpression;
+        return this.visitElement(statementExpression, other as JS.StatementExpression);
     }
 
     /**
@@ -1428,48 +733,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited tagged template expression, or undefined if the visit was aborted
      */
     override async visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TaggedTemplateExpression) {
-            this.abort();
-            return taggedTemplateExpression;
-        }
-
-        const otherTaggedTemplateExpression = other as JS.TaggedTemplateExpression;
-
-        // Compare tag
-        if (!!taggedTemplateExpression.tag !== !!otherTaggedTemplateExpression.tag) {
-            this.abort();
-            return taggedTemplateExpression;
-        }
-
-        if (taggedTemplateExpression.tag) {
-            await this.visit(taggedTemplateExpression.tag.element, otherTaggedTemplateExpression.tag!.element);
-            if (!this.match) return taggedTemplateExpression;
-        }
-
-        // Compare type arguments
-        if (!!taggedTemplateExpression.typeArguments !== !!otherTaggedTemplateExpression.typeArguments) {
-            this.abort();
-            return taggedTemplateExpression;
-        }
-
-        if (taggedTemplateExpression.typeArguments) {
-            if (taggedTemplateExpression.typeArguments.elements.length !== otherTaggedTemplateExpression.typeArguments!.elements.length) {
-                this.abort();
-                return taggedTemplateExpression;
-            }
-
-            // Visit type arguments in lock step
-            for (let i = 0; i < taggedTemplateExpression.typeArguments.elements.length; i++) {
-                await this.visit(taggedTemplateExpression.typeArguments.elements[i].element, 
-                               otherTaggedTemplateExpression.typeArguments!.elements[i].element);
-                if (!this.match) return taggedTemplateExpression;
-            }
-        }
-
-        // Visit template expression
-        await this.visit(taggedTemplateExpression.templateExpression, otherTaggedTemplateExpression.templateExpression);
-
-        return taggedTemplateExpression;
+        return this.visitElement(taggedTemplateExpression, other as JS.TaggedTemplateExpression);
     }
 
     /**
@@ -1480,30 +744,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited template expression, or undefined if the visit was aborted
      */
     override async visitTemplateExpression(templateExpression: JS.TemplateExpression, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TemplateExpression) {
-            this.abort();
-            return templateExpression;
-        }
-
-        const otherTemplateExpression = other as JS.TemplateExpression;
-
-        // Visit head
-        await this.visit(templateExpression.head, otherTemplateExpression.head);
-        if (!this.match) return templateExpression;
-
-        // Compare spans
-        if (templateExpression.spans.length !== otherTemplateExpression.spans.length) {
-            this.abort();
-            return templateExpression;
-        }
-
-        // Visit spans in lock step
-        for (let i = 0; i < templateExpression.spans.length; i++) {
-            await this.visit(templateExpression.spans[i].element, otherTemplateExpression.spans[i].element);
-            if (!this.match) return templateExpression;
-        }
-
-        return templateExpression;
+        return this.visitElement(templateExpression, other as JS.TemplateExpression);
     }
 
     /**
@@ -1514,21 +755,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited template expression span, or undefined if the visit was aborted
      */
     override async visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TemplateExpressionSpan) {
-            this.abort();
-            return span;
-        }
-
-        const otherSpan = other as JS.TemplateExpression.Span;
-
-        // Visit expression
-        await this.visit(span.expression, otherSpan.expression);
-        if (!this.match) return span;
-
-        // Visit tail
-        await this.visit(span.tail, otherSpan.tail);
-
-        return span;
+        return this.visitElement(span, other as JS.TemplateExpression.Span);
     }
 
     /**
@@ -1539,26 +766,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited tuple, or undefined if the visit was aborted
      */
     override async visitTuple(tuple: JS.Tuple, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.Tuple) {
-            this.abort();
-            return tuple;
-        }
-
-        const otherTuple = other as JS.Tuple;
-
-        // Compare elements
-        if (tuple.elements.elements.length !== otherTuple.elements.elements.length) {
-            this.abort();
-            return tuple;
-        }
-
-        // Visit elements in lock step
-        for (let i = 0; i < tuple.elements.elements.length; i++) {
-            await this.visit(tuple.elements.elements[i].element, otherTuple.elements.elements[i].element);
-            if (!this.match) return tuple;
-        }
-
-        return tuple;
+        return this.visitElement(tuple, other as JS.Tuple);
     }
 
     /**
@@ -1569,44 +777,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type declaration, or undefined if the visit was aborted
      */
     override async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TypeDeclaration) {
-            this.abort();
-            return typeDeclaration;
-        }
-
-        const otherTypeDeclaration = other as JS.TypeDeclaration;
-
-        // Compare modifiers
-        if (typeDeclaration.modifiers.length !== otherTypeDeclaration.modifiers.length) {
-            this.abort();
-            return typeDeclaration;
-        }
-
-        // Visit modifiers in lock step
-        for (let i = 0; i < typeDeclaration.modifiers.length; i++) {
-            await this.visit(typeDeclaration.modifiers[i], otherTypeDeclaration.modifiers[i]);
-            if (!this.match) return typeDeclaration;
-        }
-
-        // Visit name
-        await this.visit(typeDeclaration.name.element, otherTypeDeclaration.name.element);
-        if (!this.match) return typeDeclaration;
-
-        // Compare type parameters
-        if (!!typeDeclaration.typeParameters !== !!otherTypeDeclaration.typeParameters) {
-            this.abort();
-            return typeDeclaration;
-        }
-
-        if (typeDeclaration.typeParameters) {
-            await this.visit(typeDeclaration.typeParameters, otherTypeDeclaration.typeParameters!);
-            if (!this.match) return typeDeclaration;
-        }
-
-        // Visit initializer
-        await this.visit(typeDeclaration.initializer.element, otherTypeDeclaration.initializer.element);
-
-        return typeDeclaration;
+        return this.visitElement(typeDeclaration, other as JS.TypeDeclaration);
     }
 
     /**
@@ -1617,17 +788,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited typeof expression, or undefined if the visit was aborted
      */
     override async visitTypeOf(typeOf: JS.TypeOf, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TypeOf) {
-            this.abort();
-            return typeOf;
-        }
-
-        const otherTypeOf = other as JS.TypeOf;
-
-        // Visit expression
-        await this.visit(typeOf.expression, otherTypeOf.expression);
-
-        return typeOf;
+        return this.visitElement(typeOf, other as JS.TypeOf);
     }
 
     /**
@@ -1638,17 +799,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type tree expression, or undefined if the visit was aborted
      */
     override async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TypeTreeExpression) {
-            this.abort();
-            return typeTreeExpression;
-        }
-
-        const otherTypeTreeExpression = other as JS.TypeTreeExpression;
-
-        // Visit expression
-        await this.visit(typeTreeExpression.expression, otherTypeTreeExpression.expression);
-
-        return typeTreeExpression;
+        return this.visitElement(typeTreeExpression, other as JS.TypeTreeExpression);
     }
 
     /**
@@ -1659,19 +810,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited as expression, or undefined if the visit was aborted
      */
     override async visitAs(as_: JS.As, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.As) {
-            this.abort();
-            return as_;
-        }
-
-        const otherAs = other as JS.As;
-
-        // Visit left and right operands in lock step
-        await this.visit(as_.left.element, otherAs.left.element);
-        if (!this.match) return as_;
-
-        await this.visit(as_.right, otherAs.right);
-        return as_;
+        return this.visitElement(as_, other as JS.As);
     }
 
     /**
@@ -1682,27 +821,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited assignment operation, or undefined if the visit was aborted
      */
     override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.AssignmentOperation) {
-            this.abort();
-            return assignmentOperation;
-        }
-
-        const otherAssignmentOperation = other as JS.AssignmentOperation;
-
-        // Visit variable
-        await this.visit(assignmentOperation.variable, otherAssignmentOperation.variable);
-        if (!this.match) return assignmentOperation;
-
-        // Compare operator
-        if (assignmentOperation.operator.element !== otherAssignmentOperation.operator.element) {
-            this.abort();
-            return assignmentOperation;
-        }
-
-        // Visit assignment
-        await this.visit(assignmentOperation.assignment, otherAssignmentOperation.assignment);
-
-        return assignmentOperation;
+        return this.visitElement(assignmentOperation, other as JS.AssignmentOperation);
     }
 
     /**
@@ -1713,21 +832,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited indexed access type, or undefined if the visit was aborted
      */
     override async visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.IndexedAccessType) {
-            this.abort();
-            return indexedAccessType;
-        }
-
-        const otherIndexedAccessType = other as JS.IndexedAccessType;
-
-        // Visit object type
-        await this.visit(indexedAccessType.objectType, otherIndexedAccessType.objectType);
-        if (!this.match) return indexedAccessType;
-
-        // Visit index type
-        await this.visit(indexedAccessType.indexType, otherIndexedAccessType.indexType);
-
-        return indexedAccessType;
+        return this.visitElement(indexedAccessType, other as JS.IndexedAccessType);
     }
 
     /**
@@ -1738,17 +843,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited index type, or undefined if the visit was aborted
      */
     override async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.IndexType) {
-            this.abort();
-            return indexType;
-        }
-
-        const otherIndexType = other as JS.IndexedAccessType.IndexType;
-
-        // Visit element
-        await this.visit(indexType.element.element, otherIndexType.element.element);
-
-        return indexType;
+        return this.visitElement(indexType, other as JS.IndexedAccessType.IndexType);
     }
 
     /**
@@ -1759,38 +854,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type query, or undefined if the visit was aborted
      */
     override async visitTypeQuery(typeQuery: JS.TypeQuery, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TypeQuery) {
-            this.abort();
-            return typeQuery;
-        }
-
-        const otherTypeQuery = other as JS.TypeQuery;
-
-        // Visit type expression
-        await this.visit(typeQuery.typeExpression, otherTypeQuery.typeExpression);
-        if (!this.match) return typeQuery;
-
-        // Compare type arguments
-        if (!!typeQuery.typeArguments !== !!otherTypeQuery.typeArguments) {
-            this.abort();
-            return typeQuery;
-        }
-
-        if (typeQuery.typeArguments) {
-            if (typeQuery.typeArguments.elements.length !== otherTypeQuery.typeArguments!.elements.length) {
-                this.abort();
-                return typeQuery;
-            }
-
-            // Visit type arguments in lock step
-            for (let i = 0; i < typeQuery.typeArguments.elements.length; i++) {
-                await this.visit(typeQuery.typeArguments.elements[i].element, 
-                               otherTypeQuery.typeArguments!.elements[i].element);
-                if (!this.match) return typeQuery;
-            }
-        }
-
-        return typeQuery;
+        return this.visitElement(typeQuery, other as JS.TypeQuery);
     }
 
     /**
@@ -1801,17 +865,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type info, or undefined if the visit was aborted
      */
     override async visitTypeInfo(typeInfo: JS.TypeInfo, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TypeInfo) {
-            this.abort();
-            return typeInfo;
-        }
-
-        const otherTypeInfo = other as JS.TypeInfo;
-
-        // Visit type identifier
-        await this.visit(typeInfo.typeIdentifier, otherTypeInfo.typeIdentifier);
-
-        return typeInfo;
+        return this.visitElement(typeInfo, other as JS.TypeInfo);
     }
 
     /**
@@ -1822,17 +876,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited computed property name, or undefined if the visit was aborted
      */
     override async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ComputedPropertyName) {
-            this.abort();
-            return computedPropertyName;
-        }
-
-        const otherComputedPropertyName = other as JS.ComputedPropertyName;
-
-        // Visit expression
-        await this.visit(computedPropertyName.expression.element, otherComputedPropertyName.expression.element);
-
-        return computedPropertyName;
+        return this.visitElement(computedPropertyName, other as JS.ComputedPropertyName);
     }
 
     /**
@@ -1843,17 +887,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type operator, or undefined if the visit was aborted
      */
     override async visitTypeOperator(typeOperator: JS.TypeOperator, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TypeOperator) {
-            this.abort();
-            return typeOperator;
-        }
-
-        const otherTypeOperator = other as JS.TypeOperator;
-
-        // Visit expression
-        await this.visit(typeOperator.expression.element, otherTypeOperator.expression.element);
-
-        return typeOperator;
+        return this.visitElement(typeOperator, other as JS.TypeOperator);
     }
 
     /**
@@ -1864,34 +898,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type predicate, or undefined if the visit was aborted
      */
     override async visitTypePredicate(typePredicate: JS.TypePredicate, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TypePredicate) {
-            this.abort();
-            return typePredicate;
-        }
-
-        const otherTypePredicate = other as JS.TypePredicate;
-
-        // Compare asserts
-        if (typePredicate.asserts.element !== otherTypePredicate.asserts.element) {
-            this.abort();
-            return typePredicate;
-        }
-
-        // Visit parameter name
-        await this.visit(typePredicate.parameterName, otherTypePredicate.parameterName);
-        if (!this.match) return typePredicate;
-
-        // Compare expression
-        if (!!typePredicate.expression !== !!otherTypePredicate.expression) {
-            this.abort();
-            return typePredicate;
-        }
-
-        if (typePredicate.expression) {
-            await this.visit(typePredicate.expression.element, otherTypePredicate.expression!.element);
-        }
-
-        return typePredicate;
+        return this.visitElement(typePredicate, other as JS.TypePredicate);
     }
 
     /**
@@ -1902,26 +909,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited union, or undefined if the visit was aborted
      */
     override async visitUnion(union: JS.Union, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.Union) {
-            this.abort();
-            return union;
-        }
-
-        const otherUnion = other as JS.Union;
-
-        // Compare types
-        if (union.types.length !== otherUnion.types.length) {
-            this.abort();
-            return union;
-        }
-
-        // Visit types in lock step
-        for (let i = 0; i < union.types.length; i++) {
-            await this.visit(union.types[i].element, otherUnion.types[i].element);
-            if (!this.match) return union;
-        }
-
-        return union;
+        return this.visitElement(union, other as JS.Union);
     }
 
     /**
@@ -1932,26 +920,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited intersection, or undefined if the visit was aborted
      */
     override async visitIntersection(intersection: JS.Intersection, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.Intersection) {
-            this.abort();
-            return intersection;
-        }
-
-        const otherIntersection = other as JS.Intersection;
-
-        // Compare types
-        if (intersection.types.length !== otherIntersection.types.length) {
-            this.abort();
-            return intersection;
-        }
-
-        // Visit types in lock step
-        for (let i = 0; i < intersection.types.length; i++) {
-            await this.visit(intersection.types[i].element, otherIntersection.types[i].element);
-            if (!this.match) return intersection;
-        }
-
-        return intersection;
+        return this.visitElement(intersection, other as JS.Intersection);
     }
 
     /**
@@ -1962,29 +931,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited annotated type, or undefined if the visit was aborted
      */
     override async visitAnnotatedType(annotatedType: J.AnnotatedType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.AnnotatedType) {
-            this.abort();
-            return annotatedType;
-        }
-
-        const otherAnnotatedType = other as J.AnnotatedType;
-
-        // Compare annotations
-        if (annotatedType.annotations.length !== otherAnnotatedType.annotations.length) {
-            this.abort();
-            return annotatedType;
-        }
-
-        // Visit each annotation in lock step
-        for (let i = 0; i < annotatedType.annotations.length; i++) {
-            await this.visit(annotatedType.annotations[i], otherAnnotatedType.annotations[i]);
-            if (!this.match) return annotatedType;
-        }
-
-        // Visit type expression
-        await this.visit(annotatedType.typeExpression, otherAnnotatedType.typeExpression);
-
-        return annotatedType;
+        return this.visitElement(annotatedType, other as J.AnnotatedType);
     }
 
     /**
@@ -1995,38 +942,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited annotation, or undefined if the visit was aborted
      */
     override async visitAnnotation(annotation: J.Annotation, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Annotation) {
-            this.abort();
-            return annotation;
-        }
-
-        const otherAnnotation = other as J.Annotation;
-
-        // Visit annotation type
-        await this.visit(annotation.annotationType, otherAnnotation.annotationType);
-        if (!this.match) return annotation;
-
-        // Compare arguments
-        if ((annotation.arguments === undefined) !== (otherAnnotation.arguments === undefined)) {
-            this.abort();
-            return annotation;
-        }
-
-        // If both have arguments, visit them
-        if (annotation.arguments && otherAnnotation.arguments) {
-            if (annotation.arguments.elements.length !== otherAnnotation.arguments.elements.length) {
-                this.abort();
-                return annotation;
-            }
-
-            // Visit each argument in lock step
-            for (let i = 0; i < annotation.arguments.elements.length; i++) {
-                await this.visit(annotation.arguments.elements[i].element, otherAnnotation.arguments.elements[i].element);
-                if (!this.match) return annotation;
-            }
-        }
-
-        return annotation;
+        return this.visitElement(annotation, other as J.Annotation);
     }
 
     /**
@@ -2037,21 +953,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited array access expression, or undefined if the visit was aborted
      */
     override async visitArrayAccess(arrayAccess: J.ArrayAccess, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ArrayAccess) {
-            this.abort();
-            return arrayAccess;
-        }
-
-        const otherArrayAccess = other as J.ArrayAccess;
-
-        // Visit indexed expression
-        await this.visit(arrayAccess.indexed, otherArrayAccess.indexed);
-        if (!this.match) return arrayAccess;
-
-        // Visit dimension
-        await this.visit(arrayAccess.dimension, otherArrayAccess.dimension);
-
-        return arrayAccess;
+        return this.visitElement(arrayAccess, other as J.ArrayAccess);
     }
 
     /**
@@ -2062,22 +964,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited array dimension, or undefined if the visit was aborted
      */
     override async visitArrayDimension(arrayDimension: J.ArrayDimension, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ArrayDimension) {
-            this.abort();
-            return arrayDimension;
-        }
-
-        const otherArrayDimension = other as J.ArrayDimension;
-
-        // Visit index
-        if (arrayDimension.index && otherArrayDimension.index) {
-            await this.visit(arrayDimension.index.element, otherArrayDimension.index.element);
-        } else if (arrayDimension.index !== otherArrayDimension.index) {
-            // One has an index and the other doesn't
-            this.abort();
-        }
-
-        return arrayDimension;
+        return this.visitElement(arrayDimension, other as J.ArrayDimension);
     }
 
     /**
@@ -2088,32 +975,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited array type, or undefined if the visit was aborted
      */
     override async visitArrayType(arrayType: J.ArrayType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ArrayType) {
-            this.abort();
-            return arrayType;
-        }
-
-        const otherArrayType = other as J.ArrayType;
-
-        // Visit element type
-        await this.visit(arrayType.elementType, otherArrayType.elementType);
-        if (!this.match) return arrayType;
-
-        // Compare annotations
-        if ((arrayType.annotations?.length || 0) !== (otherArrayType.annotations?.length || 0)) {
-            this.abort();
-            return arrayType;
-        }
-
-        // Visit annotations if they exist
-        if (arrayType.annotations && otherArrayType.annotations) {
-            for (let i = 0; i < arrayType.annotations.length; i++) {
-                await this.visit(arrayType.annotations[i], otherArrayType.annotations[i]);
-                if (!this.match) return arrayType;
-            }
-        }
-
-        return arrayType;
+        return this.visitElement(arrayType, other as J.ArrayType);
     }
 
     /**
@@ -2124,29 +986,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited assert statement, or undefined if the visit was aborted
      */
     override async visitAssert(anAssert: J.Assert, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Assert) {
-            this.abort();
-            return anAssert;
-        }
-
-        const otherAssert = other as J.Assert;
-
-        // Visit condition
-        await this.visit(anAssert.condition, otherAssert.condition);
-        if (!this.match) return anAssert;
-
-        // Compare detail
-        if ((anAssert.detail !== undefined) !== (otherAssert.detail !== undefined)) {
-            this.abort();
-            return anAssert;
-        }
-
-        // Visit detail if it exists
-        if (anAssert.detail && otherAssert.detail) {
-            await this.visit(anAssert.detail.element, otherAssert.detail.element);
-        }
-
-        return anAssert;
+        return this.visitElement(anAssert, other as J.Assert);
     }
 
     /**
@@ -2157,26 +997,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited assignment expression, or undefined if the visit was aborted
      */
     override async visitAssignment(assignment: J.Assignment, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Assignment) {
-            this.abort();
-            return assignment;
-        }
-
-        const otherAssignment = other as J.Assignment;
-
-        // Visit variable
-        await this.visit(assignment.variable, otherAssignment.variable);
-        if (!this.match) return assignment;
-
-        // Visit assignment
-        if (assignment.assignment && otherAssignment.assignment) {
-            await this.visit(assignment.assignment.element, otherAssignment.assignment.element);
-        } else if (assignment.assignment !== otherAssignment.assignment) {
-            // One has an assignment and the other doesn't
-            this.abort();
-        }
-
-        return assignment;
+        return this.visitElement(assignment, other as J.Assignment);
     }
 
     /**
@@ -2187,27 +1008,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited assignment operation expression, or undefined if the visit was aborted
      */
     override async visitAssignmentOperation(assignOp: J.AssignmentOperation, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.AssignmentOperation) {
-            this.abort();
-            return assignOp;
-        }
-
-        const otherAssignOp = other as J.AssignmentOperation;
-
-        // Visit variable
-        await this.visit(assignOp.variable, otherAssignOp.variable);
-        if (!this.match) return assignOp;
-
-        // Compare operator
-        if (assignOp.operator.element !== otherAssignOp.operator.element) {
-            this.abort();
-            return assignOp;
-        }
-
-        // Visit assignment
-        await this.visit(assignOp.assignment, otherAssignOp.assignment);
-
-        return assignOp;
+        return this.visitElement(assignOp, other as J.AssignmentOperation);
     }
 
     /**
@@ -2218,25 +1019,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited break statement, or undefined if the visit was aborted
      */
     override async visitBreak(breakStatement: J.Break, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Break) {
-            this.abort();
-            return breakStatement;
-        }
-
-        const otherBreak = other as J.Break;
-
-        // Compare label presence
-        if ((breakStatement.label !== undefined) !== (otherBreak.label !== undefined)) {
-            this.abort();
-            return breakStatement;
-        }
-
-        // Visit label if it exists
-        if (breakStatement.label && otherBreak.label) {
-            await this.visit(breakStatement.label, otherBreak.label);
-        }
-
-        return breakStatement;
+        return this.visitElement(breakStatement, other as J.Break);
     }
 
     /**
@@ -2247,61 +1030,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited case statement, or undefined if the visit was aborted
      */
     override async visitCase(aCase: J.Case, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Case) {
-            this.abort();
-            return aCase;
-        }
-
-        const otherCase = other as J.Case;
-
-        // Compare case labels
-        if (aCase.caseLabels.elements.length !== otherCase.caseLabels.elements.length) {
-            this.abort();
-            return aCase;
-        }
-
-        // Visit each case label in lock step
-        for (let i = 0; i < aCase.caseLabels.elements.length; i++) {
-            await this.visit(aCase.caseLabels.elements[i].element, otherCase.caseLabels.elements[i].element);
-            if (!this.match) return aCase;
-        }
-
-        // Compare statements
-        if (aCase.statements.elements.length !== otherCase.statements.elements.length) {
-            this.abort();
-            return aCase;
-        }
-
-        // Visit each statement in lock step
-        for (let i = 0; i < aCase.statements.elements.length; i++) {
-            await this.visit(aCase.statements.elements[i].element, otherCase.statements.elements[i].element);
-            if (!this.match) return aCase;
-        }
-
-        // Compare body presence
-        if ((aCase.body !== undefined) !== (otherCase.body !== undefined)) {
-            this.abort();
-            return aCase;
-        }
-
-        // Visit body if it exists
-        if (aCase.body && otherCase.body) {
-            await this.visit(aCase.body.element, otherCase.body.element);
-            if (!this.match) return aCase;
-        }
-
-        // Compare guard presence
-        if ((aCase.guard !== undefined) !== (otherCase.guard !== undefined)) {
-            this.abort();
-            return aCase;
-        }
-
-        // Visit guard if it exists
-        if (aCase.guard && otherCase.guard) {
-            await this.visit(aCase.guard, otherCase.guard);
-        }
-
-        return aCase;
+        return this.visitElement(aCase, other as J.Case);
     }
 
     /**
@@ -2312,141 +1041,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited class declaration, or undefined if the visit was aborted
      */
     override async visitClassDeclaration(classDecl: J.ClassDeclaration, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ClassDeclaration) {
-            this.abort();
-            return classDecl;
-        }
-
-        const otherClassDecl = other as J.ClassDeclaration;
-
-        // Compare leading annotations
-        if (classDecl.leadingAnnotations.length !== otherClassDecl.leadingAnnotations.length) {
-            this.abort();
-            return classDecl;
-        }
-
-        // Visit each leading annotation in lock step
-        for (let i = 0; i < classDecl.leadingAnnotations.length; i++) {
-            await this.visit(classDecl.leadingAnnotations[i], otherClassDecl.leadingAnnotations[i]);
-            if (!this.match) return classDecl;
-        }
-
-        // Compare modifiers
-        if (classDecl.modifiers.length !== otherClassDecl.modifiers.length) {
-            this.abort();
-            return classDecl;
-        }
-
-        // Visit each modifier in lock step
-        for (let i = 0; i < classDecl.modifiers.length; i++) {
-            await this.visit(classDecl.modifiers[i], otherClassDecl.modifiers[i]);
-            if (!this.match) return classDecl;
-        }
-
-        // Visit class kind
-        await this.visit(classDecl.classKind, otherClassDecl.classKind);
-        if (!this.match) return classDecl;
-
-        // Visit name
-        await this.visit(classDecl.name, otherClassDecl.name);
-        if (!this.match) return classDecl;
-
-        // Compare type parameters presence
-        if ((classDecl.typeParameters !== undefined) !== (otherClassDecl.typeParameters !== undefined)) {
-            this.abort();
-            return classDecl;
-        }
-
-        // Visit type parameters if they exist
-        if (classDecl.typeParameters && otherClassDecl.typeParameters) {
-            if (classDecl.typeParameters.elements.length !== otherClassDecl.typeParameters.elements.length) {
-                this.abort();
-                return classDecl;
-            }
-
-            // Visit each type parameter in lock step
-            for (let i = 0; i < classDecl.typeParameters.elements.length; i++) {
-                await this.visit(classDecl.typeParameters.elements[i].element, otherClassDecl.typeParameters.elements[i].element);
-                if (!this.match) return classDecl;
-            }
-        }
-
-        // Compare primary constructor presence
-        if ((classDecl.primaryConstructor !== undefined) !== (otherClassDecl.primaryConstructor !== undefined)) {
-            this.abort();
-            return classDecl;
-        }
-
-        // Visit primary constructor if it exists
-        if (classDecl.primaryConstructor && otherClassDecl.primaryConstructor) {
-            if (classDecl.primaryConstructor.elements.length !== otherClassDecl.primaryConstructor.elements.length) {
-                this.abort();
-                return classDecl;
-            }
-
-            // Visit each primary constructor element in lock step
-            for (let i = 0; i < classDecl.primaryConstructor.elements.length; i++) {
-                await this.visit(classDecl.primaryConstructor.elements[i].element, otherClassDecl.primaryConstructor.elements[i].element);
-                if (!this.match) return classDecl;
-            }
-        }
-
-        // Compare extends presence
-        if ((classDecl.extends !== undefined) !== (otherClassDecl.extends !== undefined)) {
-            this.abort();
-            return classDecl;
-        }
-
-        // Visit extends if it exists
-        if (classDecl.extends && otherClassDecl.extends) {
-            await this.visit(classDecl.extends.element, otherClassDecl.extends.element);
-            if (!this.match) return classDecl;
-        }
-
-        // Compare implements presence
-        if ((classDecl.implements !== undefined) !== (otherClassDecl.implements !== undefined)) {
-            this.abort();
-            return classDecl;
-        }
-
-        // Visit implements if it exists
-        if (classDecl.implements && otherClassDecl.implements) {
-            if (classDecl.implements.elements.length !== otherClassDecl.implements.elements.length) {
-                this.abort();
-                return classDecl;
-            }
-
-            // Visit each implements element in lock step
-            for (let i = 0; i < classDecl.implements.elements.length; i++) {
-                await this.visit(classDecl.implements.elements[i].element, otherClassDecl.implements.elements[i].element);
-                if (!this.match) return classDecl;
-            }
-        }
-
-        // Compare permitting presence
-        if ((classDecl.permitting !== undefined) !== (otherClassDecl.permitting !== undefined)) {
-            this.abort();
-            return classDecl;
-        }
-
-        // Visit permitting if it exists
-        if (classDecl.permitting && otherClassDecl.permitting) {
-            if (classDecl.permitting.elements.length !== otherClassDecl.permitting.elements.length) {
-                this.abort();
-                return classDecl;
-            }
-
-            // Visit each permitting element in lock step
-            for (let i = 0; i < classDecl.permitting.elements.length; i++) {
-                await this.visit(classDecl.permitting.elements[i].element, otherClassDecl.permitting.elements[i].element);
-                if (!this.match) return classDecl;
-            }
-        }
-
-        // Visit body
-        await this.visit(classDecl.body, otherClassDecl.body);
-
-        return classDecl;
+        return this.visitElement(classDecl, other as J.ClassDeclaration);
     }
 
     /**
@@ -2457,26 +1052,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited class declaration kind, or undefined if the visit was aborted
      */
     override async visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ClassDeclarationKind) {
-            this.abort();
-            return kind;
-        }
-
-        const otherKind = other as J.ClassDeclaration.Kind;
-
-        // Compare annotations
-        if (kind.annotations.length !== otherKind.annotations.length) {
-            this.abort();
-            return kind;
-        }
-
-        // Visit each annotation in lock step
-        for (let i = 0; i < kind.annotations.length; i++) {
-            await this.visit(kind.annotations[i], otherKind.annotations[i]);
-            if (!this.match) return kind;
-        }
-
-        return kind;
+        return this.visitElement(kind, other as J.ClassDeclaration.Kind);
     }
 
     /**
@@ -2487,50 +1063,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited compilation unit, or undefined if the visit was aborted
      */
     override async visitCompilationUnit(compilationUnit: J.CompilationUnit, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.CompilationUnit) {
-            this.abort();
-            return compilationUnit;
-        }
-
-        const otherCompilationUnit = other as J.CompilationUnit;
-
-        // Compare package declaration presence
-        if ((compilationUnit.packageDeclaration !== undefined) !== (otherCompilationUnit.packageDeclaration !== undefined)) {
-            this.abort();
-            return compilationUnit;
-        }
-
-        // Visit package declaration if it exists
-        if (compilationUnit.packageDeclaration && otherCompilationUnit.packageDeclaration) {
-            await this.visit(compilationUnit.packageDeclaration.element, otherCompilationUnit.packageDeclaration.element);
-            if (!this.match) return compilationUnit;
-        }
-
-        // Compare imports
-        if (compilationUnit.imports.length !== otherCompilationUnit.imports.length) {
-            this.abort();
-            return compilationUnit;
-        }
-
-        // Visit each import in lock step
-        for (let i = 0; i < compilationUnit.imports.length; i++) {
-            await this.visit(compilationUnit.imports[i].element, otherCompilationUnit.imports[i].element);
-            if (!this.match) return compilationUnit;
-        }
-
-        // Compare classes
-        if (compilationUnit.classes.length !== otherCompilationUnit.classes.length) {
-            this.abort();
-            return compilationUnit;
-        }
-
-        // Visit each class in lock step
-        for (let i = 0; i < compilationUnit.classes.length; i++) {
-            await this.visit(compilationUnit.classes[i], otherCompilationUnit.classes[i]);
-            if (!this.match) return compilationUnit;
-        }
-
-        return compilationUnit;
+        return this.visitElement(compilationUnit, other as J.CompilationUnit);
     }
 
     /**
@@ -2541,25 +1074,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited continue statement, or undefined if the visit was aborted
      */
     override async visitContinue(continueStatement: J.Continue, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Continue) {
-            this.abort();
-            return continueStatement;
-        }
-
-        const otherContinue = other as J.Continue;
-
-        // Compare label presence
-        if ((continueStatement.label !== undefined) !== (otherContinue.label !== undefined)) {
-            this.abort();
-            return continueStatement;
-        }
-
-        // Visit label if it exists
-        if (continueStatement.label && otherContinue.label) {
-            await this.visit(continueStatement.label, otherContinue.label);
-        }
-
-        return continueStatement;
+        return this.visitElement(continueStatement, other as J.Continue);
     }
 
     /**
@@ -2570,17 +1085,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited control parentheses, or undefined if the visit was aborted
      */
     override async visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ControlParentheses) {
-            this.abort();
-            return controlParens;
-        }
-
-        const otherControlParens = other as J.ControlParentheses<J>;
-
-        // Visit tree
-        await this.visit(controlParens.tree.element, otherControlParens.tree.element);
-
-        return controlParens;
+        return this.visitElement(controlParens, other as J.ControlParentheses<T>);
     }
 
     /**
@@ -2591,30 +1096,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited deconstruction pattern, or undefined if the visit was aborted
      */
     override async visitDeconstructionPattern(pattern: J.DeconstructionPattern, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.DeconstructionPattern) {
-            this.abort();
-            return pattern;
-        }
-
-        const otherPattern = other as J.DeconstructionPattern;
-
-        // Visit deconstructor
-        await this.visit(pattern.deconstructor, otherPattern.deconstructor);
-        if (!this.match) return pattern;
-
-        // Compare nested elements
-        if (pattern.nested.elements.length !== otherPattern.nested.elements.length) {
-            this.abort();
-            return pattern;
-        }
-
-        // Visit each nested element in lock step
-        for (let i = 0; i < pattern.nested.elements.length; i++) {
-            await this.visit(pattern.nested.elements[i].element, otherPattern.nested.elements[i].element);
-            if (!this.match) return pattern;
-        }
-
-        return pattern;
+        return this.visitElement(pattern, other as J.DeconstructionPattern);
     }
 
     /**
@@ -2625,21 +1107,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited do-while loop, or undefined if the visit was aborted
      */
     override async visitDoWhileLoop(doWhileLoop: J.DoWhileLoop, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.DoWhileLoop) {
-            this.abort();
-            return doWhileLoop;
-        }
-
-        const otherDoWhileLoop = other as J.DoWhileLoop;
-
-        // Visit body
-        await this.visit(doWhileLoop.body.element, otherDoWhileLoop.body.element);
-        if (!this.match) return doWhileLoop;
-
-        // Visit while condition
-        await this.visit(doWhileLoop.whileCondition.element, otherDoWhileLoop.whileCondition.element);
-
-        return doWhileLoop;
+        return this.visitElement(doWhileLoop, other as J.DoWhileLoop);
     }
 
     /**
@@ -2650,14 +1118,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited empty statement, or undefined if the visit was aborted
      */
     override async visitEmpty(empty: J.Empty, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Empty) {
-            this.abort();
-            return empty;
-        }
-
-        // Empty statements have no properties to compare, so we just check the kind
-
-        return empty;
+        return this.visitElement(empty, other as J.Empty);
     }
 
     /**
@@ -2668,41 +1129,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited enum value, or undefined if the visit was aborted
      */
     override async visitEnumValue(enumValue: J.EnumValue, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.EnumValue) {
-            this.abort();
-            return enumValue;
-        }
-
-        const otherEnumValue = other as J.EnumValue;
-
-        // Compare annotations
-        if (enumValue.annotations.length !== otherEnumValue.annotations.length) {
-            this.abort();
-            return enumValue;
-        }
-
-        // Visit each annotation in lock step
-        for (let i = 0; i < enumValue.annotations.length; i++) {
-            await this.visit(enumValue.annotations[i], otherEnumValue.annotations[i]);
-            if (!this.match) return enumValue;
-        }
-
-        // Visit name
-        await this.visit(enumValue.name, otherEnumValue.name);
-        if (!this.match) return enumValue;
-
-        // Compare initializer presence
-        if ((enumValue.initializer !== undefined) !== (otherEnumValue.initializer !== undefined)) {
-            this.abort();
-            return enumValue;
-        }
-
-        // Visit initializer if it exists
-        if (enumValue.initializer && otherEnumValue.initializer) {
-            await this.visit(enumValue.initializer, otherEnumValue.initializer);
-        }
-
-        return enumValue;
+        return this.visitElement(enumValue, other as J.EnumValue);
     }
 
     /**
@@ -2713,26 +1140,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited enum value set, or undefined if the visit was aborted
      */
     override async visitEnumValueSet(enumValueSet: J.EnumValueSet, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.EnumValueSet) {
-            this.abort();
-            return enumValueSet;
-        }
-
-        const otherEnumValueSet = other as J.EnumValueSet;
-
-        // Compare enums
-        if (enumValueSet.enums.length !== otherEnumValueSet.enums.length) {
-            this.abort();
-            return enumValueSet;
-        }
-
-        // Visit each enum in lock step
-        for (let i = 0; i < enumValueSet.enums.length; i++) {
-            await this.visit(enumValueSet.enums[i].element, otherEnumValueSet.enums[i].element);
-            if (!this.match) return enumValueSet;
-        }
-
-        return enumValueSet;
+        return this.visitElement(enumValueSet, other as J.EnumValueSet);
     }
 
     /**
@@ -2743,20 +1151,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited erroneous node, or undefined if the visit was aborted
      */
     override async visitErroneous(erroneous: J.Erroneous, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Erroneous) {
-            this.abort();
-            return erroneous;
-        }
-
-        const otherErroneous = other as J.Erroneous;
-
-        // Compare text
-        if (erroneous.text !== otherErroneous.text) {
-            this.abort();
-            return erroneous;
-        }
-
-        return erroneous;
+        return this.visitElement(erroneous, other as J.Erroneous);
     }
 
     /**
@@ -2767,22 +1162,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited field access expression, or undefined if the visit was aborted
      */
     override async visitFieldAccess(fieldAccess: J.FieldAccess, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.FieldAccess) {
-            this.abort();
-            return fieldAccess;
-        }
-
-        const otherFieldAccess = other as J.FieldAccess;
-
-        // Visit target
-        await this.visit(fieldAccess.target, otherFieldAccess.target);
-        if (!this.match) return fieldAccess;
-
-        // Visit name
-        await this.visit(fieldAccess.name.element, otherFieldAccess.name.element);
-        if (!this.match) return fieldAccess;
-
-        return fieldAccess;
+        return this.visitElement(fieldAccess, other as J.FieldAccess);
     }
 
     /**
@@ -2793,22 +1173,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited for-each loop, or undefined if the visit was aborted
      */
     override async visitForEachLoop(forEachLoop: J.ForEachLoop, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ForEachLoop) {
-            this.abort();
-            return forEachLoop;
-        }
-
-        const otherForEachLoop = other as J.ForEachLoop;
-
-        // Visit control
-        await this.visit(forEachLoop.control, otherForEachLoop.control);
-        if (!this.match) return forEachLoop;
-
-        // Visit body
-        await this.visit(forEachLoop.body.element, otherForEachLoop.body.element);
-        if (!this.match) return forEachLoop;
-
-        return forEachLoop;
+        return this.visitElement(forEachLoop, other as J.ForEachLoop);
     }
 
     /**
@@ -2819,22 +1184,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited for-each loop control, or undefined if the visit was aborted
      */
     override async visitForEachLoopControl(control: J.ForEachLoop.Control, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ForEachLoopControl) {
-            this.abort();
-            return control;
-        }
-
-        const otherControl = other as J.ForEachLoop.Control;
-
-        // Visit variable
-        await this.visit(control.variable.element, otherControl.variable.element);
-        if (!this.match) return control;
-
-        // Visit iterable
-        await this.visit(control.iterable.element, otherControl.iterable.element);
-        if (!this.match) return control;
-
-        return control;
+        return this.visitElement(control, other as J.ForEachLoop.Control);
     }
 
     /**
@@ -2845,22 +1195,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited for loop, or undefined if the visit was aborted
      */
     override async visitForLoop(forLoop: J.ForLoop, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ForLoop) {
-            this.abort();
-            return forLoop;
-        }
-
-        const otherForLoop = other as J.ForLoop;
-
-        // Visit control
-        await this.visit(forLoop.control, otherForLoop.control);
-        if (!this.match) return forLoop;
-
-        // Visit body
-        await this.visit(forLoop.body.element, otherForLoop.body.element);
-        if (!this.match) return forLoop;
-
-        return forLoop;
+        return this.visitElement(forLoop, other as J.ForLoop);
     }
 
     /**
@@ -2871,50 +1206,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited for loop control, or undefined if the visit was aborted
      */
     override async visitForLoopControl(control: J.ForLoop.Control, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ForLoopControl) {
-            this.abort();
-            return control;
-        }
-
-        const otherControl = other as J.ForLoop.Control;
-
-        // Compare init statements
-        if (control.init.length !== otherControl.init.length) {
-            this.abort();
-            return control;
-        }
-
-        // Visit each init statement in lock step
-        for (let i = 0; i < control.init.length; i++) {
-            await this.visit(control.init[i].element, otherControl.init[i].element);
-            if (!this.match) return control;
-        }
-
-        // Compare condition
-        if ((control.condition === undefined) !== (otherControl.condition === undefined)) {
-            this.abort();
-            return control;
-        }
-
-        // Visit condition if present
-        if (control.condition && otherControl.condition) {
-            await this.visit(control.condition.element, otherControl.condition.element);
-            if (!this.match) return control;
-        }
-
-        // Compare update statements
-        if (control.update.length !== otherControl.update.length) {
-            this.abort();
-            return control;
-        }
-
-        // Visit each update statement in lock step
-        for (let i = 0; i < control.update.length; i++) {
-            await this.visit(control.update[i].element, otherControl.update[i].element);
-            if (!this.match) return control;
-        }
-
-        return control;
+        return this.visitElement(control, other as J.ForLoop.Control);
     }
 
     /**
@@ -2925,34 +1217,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited if statement, or undefined if the visit was aborted
      */
     override async visitIf(ifStatement: J.If, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.If) {
-            this.abort();
-            return ifStatement;
-        }
-
-        const otherIfStatement = other as J.If;
-
-        // Visit condition
-        await this.visit(ifStatement.ifCondition, otherIfStatement.ifCondition);
-        if (!this.match) return ifStatement;
-
-        // Visit then part
-        await this.visit(ifStatement.thenPart.element, otherIfStatement.thenPart.element);
-        if (!this.match) return ifStatement;
-
-        // Compare else part
-        if ((ifStatement.elsePart === undefined) !== (otherIfStatement.elsePart === undefined)) {
-            this.abort();
-            return ifStatement;
-        }
-
-        // Visit else part if present
-        if (ifStatement.elsePart && otherIfStatement.elsePart) {
-            await this.visit(ifStatement.elsePart, otherIfStatement.elsePart);
-            if (!this.match) return ifStatement;
-        }
-
-        return ifStatement;
+        return this.visitElement(ifStatement, other as J.If);
     }
 
     /**
@@ -2963,18 +1228,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited else statement, or undefined if the visit was aborted
      */
     override async visitElse(elseStatement: J.If.Else, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.IfElse) {
-            this.abort();
-            return elseStatement;
-        }
-
-        const otherElseStatement = other as J.If.Else;
-
-        // Visit body
-        await this.visit(elseStatement.body.element, otherElseStatement.body.element);
-        if (!this.match) return elseStatement;
-
-        return elseStatement;
+        return this.visitElement(elseStatement, other as J.If.Else);
     }
 
     /**
@@ -2985,36 +1239,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited import statement, or undefined if the visit was aborted
      */
     override async visitImport(importStatement: J.Import, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Import) {
-            this.abort();
-            return importStatement;
-        }
-
-        const otherImportStatement = other as J.Import;
-
-        // Compare static
-        if (importStatement.static.element !== otherImportStatement.static.element) {
-            this.abort();
-            return importStatement;
-        }
-
-        // Visit qualid
-        await this.visit(importStatement.qualid, otherImportStatement.qualid);
-        if (!this.match) return importStatement;
-
-        // Compare alias
-        if ((importStatement.alias === undefined) !== (otherImportStatement.alias === undefined)) {
-            this.abort();
-            return importStatement;
-        }
-
-        // Visit alias if present
-        if (importStatement.alias && otherImportStatement.alias) {
-            await this.visit(importStatement.alias.element, otherImportStatement.alias.element);
-            if (!this.match) return importStatement;
-        }
-
-        return importStatement;
+        return this.visitElement(importStatement, other as J.Import);
     }
 
     /**
@@ -3025,46 +1250,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited instanceof expression, or undefined if the visit was aborted
      */
     override async visitInstanceOf(instanceOf: J.InstanceOf, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.InstanceOf) {
-            this.abort();
-            return instanceOf;
-        }
-
-        const otherInstanceOf = other as J.InstanceOf;
-
-        // Visit expression
-        await this.visit(instanceOf.expression.element, otherInstanceOf.expression.element);
-        if (!this.match) return instanceOf;
-
-        // Visit class
-        await this.visit(instanceOf.class, otherInstanceOf.class);
-        if (!this.match) return instanceOf;
-
-        // Compare pattern
-        if ((instanceOf.pattern === undefined) !== (otherInstanceOf.pattern === undefined)) {
-            this.abort();
-            return instanceOf;
-        }
-
-        // Visit pattern if present
-        if (instanceOf.pattern && otherInstanceOf.pattern) {
-            await this.visit(instanceOf.pattern, otherInstanceOf.pattern);
-            if (!this.match) return instanceOf;
-        }
-
-        // Compare modifier
-        if ((instanceOf.modifier === undefined) !== (otherInstanceOf.modifier === undefined)) {
-            this.abort();
-            return instanceOf;
-        }
-
-        // Visit modifier if present
-        if (instanceOf.modifier && otherInstanceOf.modifier) {
-            await this.visit(instanceOf.modifier, otherInstanceOf.modifier);
-            if (!this.match) return instanceOf;
-        }
-
-        return instanceOf;
+        return this.visitElement(instanceOf, other as J.InstanceOf);
     }
 
     /**
@@ -3075,26 +1261,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited intersection type, or undefined if the visit was aborted
      */
     override async visitIntersectionType(intersectionType: J.IntersectionType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.IntersectionType) {
-            this.abort();
-            return intersectionType;
-        }
-
-        const otherIntersectionType = other as J.IntersectionType;
-
-        // Compare bounds
-        if (intersectionType.bounds.elements.length !== otherIntersectionType.bounds.elements.length) {
-            this.abort();
-            return intersectionType;
-        }
-
-        // Visit each bound in lock step
-        for (let i = 0; i < intersectionType.bounds.elements.length; i++) {
-            await this.visit(intersectionType.bounds.elements[i].element, otherIntersectionType.bounds.elements[i].element);
-            if (!this.match) return intersectionType;
-        }
-
-        return intersectionType;
+        return this.visitElement(intersectionType, other as J.IntersectionType);
     }
 
     /**
@@ -3105,22 +1272,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited label statement, or undefined if the visit was aborted
      */
     override async visitLabel(label: J.Label, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Label) {
-            this.abort();
-            return label;
-        }
-
-        const otherLabel = other as J.Label;
-
-        // Visit label identifier
-        await this.visit(label.label.element, otherLabel.label.element);
-        if (!this.match) return label;
-
-        // Visit statement
-        await this.visit(label.statement, otherLabel.statement);
-        if (!this.match) return label;
-
-        return label;
+        return this.visitElement(label, other as J.Label);
     }
 
     /**
@@ -3131,22 +1283,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited lambda expression, or undefined if the visit was aborted
      */
     override async visitLambda(lambda: J.Lambda, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Lambda) {
-            this.abort();
-            return lambda;
-        }
-
-        const otherLambda = other as J.Lambda;
-
-        // Visit parameters
-        await this.visit(lambda.parameters, otherLambda.parameters);
-        if (!this.match) return lambda;
-
-        // Visit body
-        await this.visit(lambda.body, otherLambda.body);
-        if (!this.match) return lambda;
-
-        return lambda;
+        return this.visitElement(lambda, other as J.Lambda);
     }
 
     /**
@@ -3157,32 +1294,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited lambda parameters, or undefined if the visit was aborted
      */
     override async visitLambdaParameters(parameters: J.Lambda.Parameters, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.LambdaParameters) {
-            this.abort();
-            return parameters;
-        }
-
-        const otherParameters = other as J.Lambda.Parameters;
-
-        // Compare parenthesized
-        if (parameters.parenthesized !== otherParameters.parenthesized) {
-            this.abort();
-            return parameters;
-        }
-
-        // Compare parameters
-        if (parameters.parameters.length !== otherParameters.parameters.length) {
-            this.abort();
-            return parameters;
-        }
-
-        // Visit each parameter in lock step
-        for (let i = 0; i < parameters.parameters.length; i++) {
-            await this.visit(parameters.parameters[i].element, otherParameters.parameters[i].element);
-            if (!this.match) return parameters;
-        }
-
-        return parameters;
+        return this.visitElement(parameters, other as J.Lambda.Parameters);
     }
 
     /**
@@ -3193,42 +1305,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited member reference, or undefined if the visit was aborted
      */
     override async visitMemberReference(memberReference: J.MemberReference, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.MemberReference) {
-            this.abort();
-            return memberReference;
-        }
-
-        const otherMemberReference = other as J.MemberReference;
-
-        // Visit containing
-        await this.visit(memberReference.containing.element, otherMemberReference.containing.element);
-        if (!this.match) return memberReference;
-
-        // Compare typeParameters
-        if ((memberReference.typeParameters === undefined) !== (otherMemberReference.typeParameters === undefined)) {
-            this.abort();
-            return memberReference;
-        }
-
-        // Visit typeParameters if present
-        if (memberReference.typeParameters && otherMemberReference.typeParameters) {
-            if (memberReference.typeParameters.elements.length !== otherMemberReference.typeParameters.elements.length) {
-                this.abort();
-                return memberReference;
-            }
-
-            // Visit each type parameter in lock step
-            for (let i = 0; i < memberReference.typeParameters.elements.length; i++) {
-                await this.visit(memberReference.typeParameters.elements[i].element, otherMemberReference.typeParameters.elements[i].element);
-                if (!this.match) return memberReference;
-            }
-        }
-
-        // Visit reference
-        await this.visit(memberReference.reference.element, otherMemberReference.reference.element);
-        if (!this.match) return memberReference;
-
-        return memberReference;
+        return this.visitElement(memberReference, other as J.MemberReference);
     }
 
     /**
@@ -3239,134 +1316,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited method declaration, or undefined if the visit was aborted
      */
     override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.MethodDeclaration) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        const otherMethodDeclaration = other as J.MethodDeclaration;
-
-        // Compare leadingAnnotations
-        if (methodDeclaration.leadingAnnotations.length !== otherMethodDeclaration.leadingAnnotations.length) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        // Visit each leading annotation in lock step
-        for (let i = 0; i < methodDeclaration.leadingAnnotations.length; i++) {
-            await this.visit(methodDeclaration.leadingAnnotations[i], otherMethodDeclaration.leadingAnnotations[i]);
-            if (!this.match) return methodDeclaration;
-        }
-
-        // Compare modifiers
-        if (methodDeclaration.modifiers.length !== otherMethodDeclaration.modifiers.length) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        // Visit each modifier in lock step
-        for (let i = 0; i < methodDeclaration.modifiers.length; i++) {
-            await this.visit(methodDeclaration.modifiers[i], otherMethodDeclaration.modifiers[i]);
-            if (!this.match) return methodDeclaration;
-        }
-
-        // Compare typeParameters
-        if ((methodDeclaration.typeParameters === undefined) !== (otherMethodDeclaration.typeParameters === undefined)) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        // Visit typeParameters if present
-        if (methodDeclaration.typeParameters && otherMethodDeclaration.typeParameters) {
-            await this.visit(methodDeclaration.typeParameters, otherMethodDeclaration.typeParameters);
-            if (!this.match) return methodDeclaration;
-        }
-
-        // Compare returnTypeExpression
-        if ((methodDeclaration.returnTypeExpression === undefined) !== (otherMethodDeclaration.returnTypeExpression === undefined)) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        // Visit returnTypeExpression if present
-        if (methodDeclaration.returnTypeExpression && otherMethodDeclaration.returnTypeExpression) {
-            await this.visit(methodDeclaration.returnTypeExpression, otherMethodDeclaration.returnTypeExpression);
-            if (!this.match) return methodDeclaration;
-        }
-
-        // Compare nameAnnotations
-        if (methodDeclaration.nameAnnotations.length !== otherMethodDeclaration.nameAnnotations.length) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        // Visit each name annotation in lock step
-        for (let i = 0; i < methodDeclaration.nameAnnotations.length; i++) {
-            await this.visit(methodDeclaration.nameAnnotations[i], otherMethodDeclaration.nameAnnotations[i]);
-            if (!this.match) return methodDeclaration;
-        }
-
-        // Visit name
-        await this.visit(methodDeclaration.name, otherMethodDeclaration.name);
-        if (!this.match) return methodDeclaration;
-
-        // Compare parameters
-        if (methodDeclaration.parameters.elements.length !== otherMethodDeclaration.parameters.elements.length) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        // Visit each parameter in lock step
-        for (let i = 0; i < methodDeclaration.parameters.elements.length; i++) {
-            await this.visit(methodDeclaration.parameters.elements[i].element, otherMethodDeclaration.parameters.elements[i].element);
-            if (!this.match) return methodDeclaration;
-        }
-
-        // Compare throws
-        if ((methodDeclaration.throws === undefined) !== (otherMethodDeclaration.throws === undefined)) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        // Visit throws if present
-        if (methodDeclaration.throws && otherMethodDeclaration.throws) {
-            if (methodDeclaration.throws.elements.length !== otherMethodDeclaration.throws.elements.length) {
-                this.abort();
-                return methodDeclaration;
-            }
-
-            // Visit each throw in lock step
-            for (let i = 0; i < methodDeclaration.throws.elements.length; i++) {
-                await this.visit(methodDeclaration.throws.elements[i].element, otherMethodDeclaration.throws.elements[i].element);
-                if (!this.match) return methodDeclaration;
-            }
-        }
-
-        // Compare body
-        if ((methodDeclaration.body === undefined) !== (otherMethodDeclaration.body === undefined)) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        // Visit body if present
-        if (methodDeclaration.body && otherMethodDeclaration.body) {
-            await this.visit(methodDeclaration.body, otherMethodDeclaration.body);
-            if (!this.match) return methodDeclaration;
-        }
-
-        // Compare defaultValue
-        if ((methodDeclaration.defaultValue === undefined) !== (otherMethodDeclaration.defaultValue === undefined)) {
-            this.abort();
-            return methodDeclaration;
-        }
-
-        // Visit defaultValue if present
-        if (methodDeclaration.defaultValue && otherMethodDeclaration.defaultValue) {
-            await this.visit(methodDeclaration.defaultValue.element, otherMethodDeclaration.defaultValue.element);
-            if (!this.match) return methodDeclaration;
-        }
-
-        return methodDeclaration;
+        return this.visitElement(methodDeclaration, other as J.MethodDeclaration);
     }
 
     /**
@@ -3377,62 +1327,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited method invocation, or undefined if the visit was aborted
      */
     override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.MethodInvocation) {
-            this.abort();
-            return methodInvocation;
-        }
-
-        const otherMethodInvocation = other as J.MethodInvocation;
-
-        // Compare select
-        if ((methodInvocation.select === undefined) !== (otherMethodInvocation.select === undefined)) {
-            this.abort();
-            return methodInvocation;
-        }
-
-        // Visit select if present
-        if (methodInvocation.select && otherMethodInvocation.select) {
-            await this.visit(methodInvocation.select.element, otherMethodInvocation.select.element);
-            if (!this.match) return methodInvocation;
-        }
-
-        // Compare typeParameters
-        if ((methodInvocation.typeParameters === undefined) !== (otherMethodInvocation.typeParameters === undefined)) {
-            this.abort();
-            return methodInvocation;
-        }
-
-        // Visit typeParameters if present
-        if (methodInvocation.typeParameters && otherMethodInvocation.typeParameters) {
-            if (methodInvocation.typeParameters.elements.length !== otherMethodInvocation.typeParameters.elements.length) {
-                this.abort();
-                return methodInvocation;
-            }
-
-            // Visit each type parameter in lock step
-            for (let i = 0; i < methodInvocation.typeParameters.elements.length; i++) {
-                await this.visit(methodInvocation.typeParameters.elements[i].element, otherMethodInvocation.typeParameters.elements[i].element);
-                if (!this.match) return methodInvocation;
-            }
-        }
-
-        // Visit name
-        await this.visit(methodInvocation.name, otherMethodInvocation.name);
-        if (!this.match) return methodInvocation;
-
-        // Compare arguments
-        if (methodInvocation.arguments.elements.length !== otherMethodInvocation.arguments.elements.length) {
-            this.abort();
-            return methodInvocation;
-        }
-
-        // Visit each argument in lock step
-        for (let i = 0; i < methodInvocation.arguments.elements.length; i++) {
-            await this.visit(methodInvocation.arguments.elements[i].element, otherMethodInvocation.arguments.elements[i].element);
-            if (!this.match) return methodInvocation;
-        }
-
-        return methodInvocation;
+        return this.visitElement(methodInvocation, other as J.MethodInvocation);
     }
 
     /**
@@ -3443,38 +1338,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited modifier, or undefined if the visit was aborted
      */
     override async visitModifier(modifier: J.Modifier, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Modifier) {
-            this.abort();
-            return modifier;
-        }
-
-        const otherModifier = other as J.Modifier;
-
-        // Compare keyword
-        if (modifier.keyword !== otherModifier.keyword) {
-            this.abort();
-            return modifier;
-        }
-
-        // Compare type
-        if (modifier.type !== otherModifier.type) {
-            this.abort();
-            return modifier;
-        }
-
-        // Compare annotations
-        if (modifier.annotations.length !== otherModifier.annotations.length) {
-            this.abort();
-            return modifier;
-        }
-
-        // Visit each annotation in lock step
-        for (let i = 0; i < modifier.annotations.length; i++) {
-            await this.visit(modifier.annotations[i], otherModifier.annotations[i]);
-            if (!this.match) return modifier;
-        }
-
-        return modifier;
+        return this.visitElement(modifier, other as J.Modifier);
     }
 
     /**
@@ -3485,26 +1349,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited multi-catch expression, or undefined if the visit was aborted
      */
     override async visitMultiCatch(multiCatch: J.MultiCatch, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.MultiCatch) {
-            this.abort();
-            return multiCatch;
-        }
-
-        const otherMultiCatch = other as J.MultiCatch;
-
-        // Compare alternatives
-        if (multiCatch.alternatives.length !== otherMultiCatch.alternatives.length) {
-            this.abort();
-            return multiCatch;
-        }
-
-        // Visit each alternative in lock step
-        for (let i = 0; i < multiCatch.alternatives.length; i++) {
-            await this.visit(multiCatch.alternatives[i].element, otherMultiCatch.alternatives[i].element);
-            if (!this.match) return multiCatch;
-        }
-
-        return multiCatch;
+        return this.visitElement(multiCatch, other as J.MultiCatch);
     }
 
     /**
@@ -3515,58 +1360,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited new array expression, or undefined if the visit was aborted
      */
     override async visitNewArray(newArray: J.NewArray, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.NewArray) {
-            this.abort();
-            return newArray;
-        }
-
-        const otherNewArray = other as J.NewArray;
-
-        // Compare typeExpression
-        if ((newArray.typeExpression === undefined) !== (otherNewArray.typeExpression === undefined)) {
-            this.abort();
-            return newArray;
-        }
-
-        // Visit typeExpression if present
-        if (newArray.typeExpression && otherNewArray.typeExpression) {
-            await this.visit(newArray.typeExpression, otherNewArray.typeExpression);
-            if (!this.match) return newArray;
-        }
-
-        // Compare dimensions
-        if (newArray.dimensions.length !== otherNewArray.dimensions.length) {
-            this.abort();
-            return newArray;
-        }
-
-        // Visit each dimension in lock step
-        for (let i = 0; i < newArray.dimensions.length; i++) {
-            await this.visit(newArray.dimensions[i], otherNewArray.dimensions[i]);
-            if (!this.match) return newArray;
-        }
-
-        // Compare initializer
-        if ((newArray.initializer === undefined) !== (otherNewArray.initializer === undefined)) {
-            this.abort();
-            return newArray;
-        }
-
-        // Visit initializer if present
-        if (newArray.initializer && otherNewArray.initializer) {
-            if (newArray.initializer.elements.length !== otherNewArray.initializer.elements.length) {
-                this.abort();
-                return newArray;
-            }
-
-            // Visit each initializer element in lock step
-            for (let i = 0; i < newArray.initializer.elements.length; i++) {
-                await this.visit(newArray.initializer.elements[i].element, otherNewArray.initializer.elements[i].element);
-                if (!this.match) return newArray;
-            }
-        }
-
-        return newArray;
+        return this.visitElement(newArray, other as J.NewArray);
     }
 
     /**
@@ -3577,62 +1371,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited new class expression, or undefined if the visit was aborted
      */
     override async visitNewClass(newClass: J.NewClass, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.NewClass) {
-            this.abort();
-            return newClass;
-        }
-
-        const otherNewClass = other as J.NewClass;
-
-        // Compare enclosing
-        if ((newClass.enclosing === undefined) !== (otherNewClass.enclosing === undefined)) {
-            this.abort();
-            return newClass;
-        }
-
-        // Visit enclosing if present
-        if (newClass.enclosing && otherNewClass.enclosing) {
-            await this.visit(newClass.enclosing.element, otherNewClass.enclosing.element);
-            if (!this.match) return newClass;
-        }
-
-        // Compare class
-        if ((newClass.class === undefined) !== (otherNewClass.class === undefined)) {
-            this.abort();
-            return newClass;
-        }
-
-        // Visit class if present
-        if (newClass.class && otherNewClass.class) {
-            await this.visit(newClass.class, otherNewClass.class);
-            if (!this.match) return newClass;
-        }
-
-        // Compare arguments
-        if (newClass.arguments.elements.length !== otherNewClass.arguments.elements.length) {
-            this.abort();
-            return newClass;
-        }
-
-        // Visit each argument in lock step
-        for (let i = 0; i < newClass.arguments.elements.length; i++) {
-            await this.visit(newClass.arguments.elements[i].element, otherNewClass.arguments.elements[i].element);
-            if (!this.match) return newClass;
-        }
-
-        // Compare body
-        if ((newClass.body === undefined) !== (otherNewClass.body === undefined)) {
-            this.abort();
-            return newClass;
-        }
-
-        // Visit body if present
-        if (newClass.body && otherNewClass.body) {
-            await this.visit(newClass.body, otherNewClass.body);
-            if (!this.match) return newClass;
-        }
-
-        return newClass;
+        return this.visitElement(newClass, other as J.NewClass);
     }
 
     /**
@@ -3643,30 +1382,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited nullable type, or undefined if the visit was aborted
      */
     override async visitNullableType(nullableType: J.NullableType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.NullableType) {
-            this.abort();
-            return nullableType;
-        }
-
-        const otherNullableType = other as J.NullableType;
-
-        // Compare annotations
-        if (nullableType.annotations.length !== otherNullableType.annotations.length) {
-            this.abort();
-            return nullableType;
-        }
-
-        // Visit each annotation in lock step
-        for (let i = 0; i < nullableType.annotations.length; i++) {
-            await this.visit(nullableType.annotations[i], otherNullableType.annotations[i]);
-            if (!this.match) return nullableType;
-        }
-
-        // Visit typeTree
-        await this.visit(nullableType.typeTree.element, otherNullableType.typeTree.element);
-        if (!this.match) return nullableType;
-
-        return nullableType;
+        return this.visitElement(nullableType, other as J.NullableType);
     }
 
     /**
@@ -3677,38 +1393,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited package declaration, or undefined if the visit was aborted
      */
     override async visitPackage(packageDeclaration: J.Package, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Package) {
-            this.abort();
-            return packageDeclaration;
-        }
-
-        const otherPackageDeclaration = other as J.Package;
-
-        // Visit expression
-        await this.visit(packageDeclaration.expression, otherPackageDeclaration.expression);
-        if (!this.match) return packageDeclaration;
-
-        // Compare annotations
-        if ((packageDeclaration.annotations === undefined) !== (otherPackageDeclaration.annotations === undefined)) {
-            this.abort();
-            return packageDeclaration;
-        }
-
-        // Visit annotations if present
-        if (packageDeclaration.annotations && otherPackageDeclaration.annotations) {
-            if (packageDeclaration.annotations.length !== otherPackageDeclaration.annotations.length) {
-                this.abort();
-                return packageDeclaration;
-            }
-
-            // Visit each annotation in lock step
-            for (let i = 0; i < packageDeclaration.annotations.length; i++) {
-                await this.visit(packageDeclaration.annotations[i], otherPackageDeclaration.annotations[i]);
-                if (!this.match) return packageDeclaration;
-            }
-        }
-
-        return packageDeclaration;
+        return this.visitElement(packageDeclaration, other as J.Package);
     }
 
     /**
@@ -3719,38 +1404,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited parameterized type, or undefined if the visit was aborted
      */
     override async visitParameterizedType(parameterizedType: J.ParameterizedType, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ParameterizedType) {
-            this.abort();
-            return parameterizedType;
-        }
-
-        const otherParameterizedType = other as J.ParameterizedType;
-
-        // Visit class
-        await this.visit(parameterizedType.class, otherParameterizedType.class);
-        if (!this.match) return parameterizedType;
-
-        // Compare typeParameters
-        if ((parameterizedType.typeParameters === undefined) !== (otherParameterizedType.typeParameters === undefined)) {
-            this.abort();
-            return parameterizedType;
-        }
-
-        // Visit typeParameters if present
-        if (parameterizedType.typeParameters && otherParameterizedType.typeParameters) {
-            if (parameterizedType.typeParameters.elements.length !== otherParameterizedType.typeParameters.elements.length) {
-                this.abort();
-                return parameterizedType;
-            }
-
-            // Visit each type parameter in lock step
-            for (let i = 0; i < parameterizedType.typeParameters.elements.length; i++) {
-                await this.visit(parameterizedType.typeParameters.elements[i].element, otherParameterizedType.typeParameters.elements[i].element);
-                if (!this.match) return parameterizedType;
-            }
-        }
-
-        return parameterizedType;
+        return this.visitElement(parameterizedType, other as J.ParameterizedType);
     }
 
     /**
@@ -3761,18 +1415,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited parentheses expression, or undefined if the visit was aborted
      */
     override async visitParentheses(parentheses: J.Parentheses<J>, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Parentheses) {
-            this.abort();
-            return parentheses;
-        }
-
-        const otherParentheses = other as J.Parentheses<J>;
-
-        // Visit tree
-        await this.visit(parentheses.tree.element, otherParentheses.tree.element);
-        if (!this.match) return parentheses;
-
-        return parentheses;
+        return this.visitElement(parentheses, other as J.Parentheses<J>);
     }
 
     /**
@@ -3783,30 +1426,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited parenthesized type tree, or undefined if the visit was aborted
      */
     override async visitParenthesizedTypeTree(parenthesizedTypeTree: J.ParenthesizedTypeTree, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.ParenthesizedTypeTree) {
-            this.abort();
-            return parenthesizedTypeTree;
-        }
-
-        const otherParenthesizedTypeTree = other as J.ParenthesizedTypeTree;
-
-        // Compare annotations
-        if (parenthesizedTypeTree.annotations.length !== otherParenthesizedTypeTree.annotations.length) {
-            this.abort();
-            return parenthesizedTypeTree;
-        }
-
-        // Visit each annotation in lock step
-        for (let i = 0; i < parenthesizedTypeTree.annotations.length; i++) {
-            await this.visit(parenthesizedTypeTree.annotations[i], otherParenthesizedTypeTree.annotations[i]);
-            if (!this.match) return parenthesizedTypeTree;
-        }
-
-        // Visit parenthesizedType
-        await this.visit(parenthesizedTypeTree.parenthesizedType, otherParenthesizedTypeTree.parenthesizedType);
-        if (!this.match) return parenthesizedTypeTree;
-
-        return parenthesizedTypeTree;
+        return this.visitElement(parenthesizedTypeTree, other as J.ParenthesizedTypeTree);
     }
 
     /**
@@ -3817,20 +1437,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited primitive type, or undefined if the visit was aborted
      */
     override async visitPrimitive(primitive: J.Primitive, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Primitive) {
-            this.abort();
-            return primitive;
-        }
-
-        const otherPrimitive = other as J.Primitive;
-
-        // Compare type
-        if (primitive.type.kind !== otherPrimitive.type.kind) {
-            this.abort();
-            return primitive;
-        }
-
-        return primitive;
+        return this.visitElement(primitive, other as J.Primitive);
     }
 
     /**
@@ -3841,26 +1448,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited return statement, or undefined if the visit was aborted
      */
     override async visitReturn(returnStatement: J.Return, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Return) {
-            this.abort();
-            return returnStatement;
-        }
-
-        const otherReturnStatement = other as J.Return;
-
-        // Compare expression
-        if ((returnStatement.expression === undefined) !== (otherReturnStatement.expression === undefined)) {
-            this.abort();
-            return returnStatement;
-        }
-
-        // Visit expression if present
-        if (returnStatement.expression && otherReturnStatement.expression) {
-            await this.visit(returnStatement.expression, otherReturnStatement.expression);
-            if (!this.match) return returnStatement;
-        }
-
-        return returnStatement;
+        return this.visitElement(returnStatement, other as J.Return);
     }
 
     /**
@@ -3871,22 +1459,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited switch statement, or undefined if the visit was aborted
      */
     override async visitSwitch(switchStatement: J.Switch, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Switch) {
-            this.abort();
-            return switchStatement;
-        }
-
-        const otherSwitchStatement = other as J.Switch;
-
-        // Visit selector
-        await this.visit(switchStatement.selector, otherSwitchStatement.selector);
-        if (!this.match) return switchStatement;
-
-        // Visit cases
-        await this.visit(switchStatement.cases, otherSwitchStatement.cases);
-        if (!this.match) return switchStatement;
-
-        return switchStatement;
+        return this.visitElement(switchStatement, other as J.Switch);
     }
 
     /**
@@ -3897,22 +1470,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited switch expression, or undefined if the visit was aborted
      */
     override async visitSwitchExpression(switchExpression: J.SwitchExpression, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.SwitchExpression) {
-            this.abort();
-            return switchExpression;
-        }
-
-        const otherSwitchExpression = other as J.SwitchExpression;
-
-        // Visit selector
-        await this.visit(switchExpression.selector, otherSwitchExpression.selector);
-        if (!this.match) return switchExpression;
-
-        // Visit cases
-        await this.visit(switchExpression.cases, otherSwitchExpression.cases);
-        if (!this.match) return switchExpression;
-
-        return switchExpression;
+        return this.visitElement(switchExpression, other as J.SwitchExpression);
     }
 
     /**
@@ -3923,22 +1481,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited synchronized statement, or undefined if the visit was aborted
      */
     override async visitSynchronized(synchronizedStatement: J.Synchronized, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Synchronized) {
-            this.abort();
-            return synchronizedStatement;
-        }
-
-        const otherSynchronizedStatement = other as J.Synchronized;
-
-        // Visit lock
-        await this.visit(synchronizedStatement.lock, otherSynchronizedStatement.lock);
-        if (!this.match) return synchronizedStatement;
-
-        // Visit body
-        await this.visit(synchronizedStatement.body, otherSynchronizedStatement.body);
-        if (!this.match) return synchronizedStatement;
-
-        return synchronizedStatement;
+        return this.visitElement(synchronizedStatement, other as J.Synchronized);
     }
 
     /**
@@ -3949,26 +1492,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited ternary expression, or undefined if the visit was aborted
      */
     override async visitTernary(ternary: J.Ternary, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Ternary) {
-            this.abort();
-            return ternary;
-        }
-
-        const otherTernary = other as J.Ternary;
-
-        // Visit condition
-        await this.visit(ternary.condition, otherTernary.condition);
-        if (!this.match) return ternary;
-
-        // Visit truePart
-        await this.visit(ternary.truePart.element, otherTernary.truePart.element);
-        if (!this.match) return ternary;
-
-        // Visit falsePart
-        await this.visit(ternary.falsePart.element, otherTernary.falsePart.element);
-        if (!this.match) return ternary;
-
-        return ternary;
+        return this.visitElement(ternary, other as J.Ternary);
     }
 
     /**
@@ -3979,18 +1503,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited throw statement, or undefined if the visit was aborted
      */
     override async visitThrow(throwStatement: J.Throw, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Throw) {
-            this.abort();
-            return throwStatement;
-        }
-
-        const otherThrowStatement = other as J.Throw;
-
-        // Visit exception
-        await this.visit(throwStatement.exception, otherThrowStatement.exception);
-        if (!this.match) return throwStatement;
-
-        return throwStatement;
+        return this.visitElement(throwStatement, other as J.Throw);
     }
 
     /**
@@ -4001,62 +1514,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited try statement, or undefined if the visit was aborted
      */
     override async visitTry(tryStatement: J.Try, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Try) {
-            this.abort();
-            return tryStatement;
-        }
-
-        const otherTryStatement = other as J.Try;
-
-        // Compare resources
-        if ((tryStatement.resources === undefined) !== (otherTryStatement.resources === undefined)) {
-            this.abort();
-            return tryStatement;
-        }
-
-        // Visit resources if present
-        if (tryStatement.resources && otherTryStatement.resources) {
-            if (tryStatement.resources.elements.length !== otherTryStatement.resources.elements.length) {
-                this.abort();
-                return tryStatement;
-            }
-
-            // Visit each resource in lock step
-            for (let i = 0; i < tryStatement.resources.elements.length; i++) {
-                await this.visit(tryStatement.resources.elements[i].element, otherTryStatement.resources.elements[i].element);
-                if (!this.match) return tryStatement;
-            }
-        }
-
-        // Visit body
-        await this.visit(tryStatement.body, otherTryStatement.body);
-        if (!this.match) return tryStatement;
-
-        // Compare catches
-        if (tryStatement.catches.length !== otherTryStatement.catches.length) {
-            this.abort();
-            return tryStatement;
-        }
-
-        // Visit each catch in lock step
-        for (let i = 0; i < tryStatement.catches.length; i++) {
-            await this.visit(tryStatement.catches[i], otherTryStatement.catches[i]);
-            if (!this.match) return tryStatement;
-        }
-
-        // Compare finally
-        if ((tryStatement.finally === undefined) !== (otherTryStatement.finally === undefined)) {
-            this.abort();
-            return tryStatement;
-        }
-
-        // Visit finally if present
-        if (tryStatement.finally && otherTryStatement.finally) {
-            await this.visit(tryStatement.finally.element, otherTryStatement.finally.element);
-            if (!this.match) return tryStatement;
-        }
-
-        return tryStatement;
+        return this.visitElement(tryStatement, other as J.Try);
     }
 
     /**
@@ -4067,24 +1525,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited try resource, or undefined if the visit was aborted
      */
     override async visitTryResource(resource: J.Try.Resource, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.TryResource) {
-            this.abort();
-            return resource;
-        }
-
-        const otherResource = other as J.Try.Resource;
-
-        // Visit variableDeclarations
-        await this.visit(resource.variableDeclarations, otherResource.variableDeclarations);
-        if (!this.match) return resource;
-
-        // Compare terminatedWithSemicolon
-        if (resource.terminatedWithSemicolon !== otherResource.terminatedWithSemicolon) {
-            this.abort();
-            return resource;
-        }
-
-        return resource;
+        return this.visitElement(resource, other as J.Try.Resource);
     }
 
     /**
@@ -4095,22 +1536,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited try catch block, or undefined if the visit was aborted
      */
     override async visitTryCatch(tryCatch: J.Try.Catch, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.TryCatch) {
-            this.abort();
-            return tryCatch;
-        }
-
-        const otherTryCatch = other as J.Try.Catch;
-
-        // Visit parameter
-        await this.visit(tryCatch.parameter, otherTryCatch.parameter);
-        if (!this.match) return tryCatch;
-
-        // Visit body
-        await this.visit(tryCatch.body, otherTryCatch.body);
-        if (!this.match) return tryCatch;
-
-        return tryCatch;
+        return this.visitElement(tryCatch, other as J.Try.Catch);
     }
 
     /**
@@ -4121,22 +1547,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type cast expression, or undefined if the visit was aborted
      */
     override async visitTypeCast(typeCast: J.TypeCast, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.TypeCast) {
-            this.abort();
-            return typeCast;
-        }
-
-        const otherTypeCast = other as J.TypeCast;
-
-        // Visit class
-        await this.visit(typeCast.class, otherTypeCast.class);
-        if (!this.match) return typeCast;
-
-        // Visit expression
-        await this.visit(typeCast.expression, otherTypeCast.expression);
-        if (!this.match) return typeCast;
-
-        return typeCast;
+        return this.visitElement(typeCast, other as J.TypeCast);
     }
 
     /**
@@ -4147,62 +1558,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type parameter, or undefined if the visit was aborted
      */
     override async visitTypeParameter(typeParameter: J.TypeParameter, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.TypeParameter) {
-            this.abort();
-            return typeParameter;
-        }
-
-        const otherTypeParameter = other as J.TypeParameter;
-
-        // Compare annotations
-        if (typeParameter.annotations.length !== otherTypeParameter.annotations.length) {
-            this.abort();
-            return typeParameter;
-        }
-
-        // Visit each annotation in lock step
-        for (let i = 0; i < typeParameter.annotations.length; i++) {
-            await this.visit(typeParameter.annotations[i], otherTypeParameter.annotations[i]);
-            if (!this.match) return typeParameter;
-        }
-
-        // Compare modifiers
-        if (typeParameter.modifiers.length !== otherTypeParameter.modifiers.length) {
-            this.abort();
-            return typeParameter;
-        }
-
-        // Visit each modifier in lock step
-        for (let i = 0; i < typeParameter.modifiers.length; i++) {
-            await this.visit(typeParameter.modifiers[i], otherTypeParameter.modifiers[i]);
-            if (!this.match) return typeParameter;
-        }
-
-        // Visit name
-        await this.visit(typeParameter.name, otherTypeParameter.name);
-        if (!this.match) return typeParameter;
-
-        // Compare bounds
-        if ((typeParameter.bounds === undefined) !== (otherTypeParameter.bounds === undefined)) {
-            this.abort();
-            return typeParameter;
-        }
-
-        // Visit bounds if present
-        if (typeParameter.bounds && otherTypeParameter.bounds) {
-            if (typeParameter.bounds.elements.length !== otherTypeParameter.bounds.elements.length) {
-                this.abort();
-                return typeParameter;
-            }
-
-            // Visit each bound in lock step
-            for (let i = 0; i < typeParameter.bounds.elements.length; i++) {
-                await this.visit(typeParameter.bounds.elements[i].element, otherTypeParameter.bounds.elements[i].element);
-                if (!this.match) return typeParameter;
-            }
-        }
-
-        return typeParameter;
+        return this.visitElement(typeParameter, other as J.TypeParameter);
     }
 
     /**
@@ -4213,38 +1569,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type parameters, or undefined if the visit was aborted
      */
     override async visitTypeParameters(typeParameters: J.TypeParameters, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.TypeParameters) {
-            this.abort();
-            return typeParameters;
-        }
-
-        const otherTypeParameters = other as J.TypeParameters;
-
-        // Compare annotations
-        if (typeParameters.annotations.length !== otherTypeParameters.annotations.length) {
-            this.abort();
-            return typeParameters;
-        }
-
-        // Visit each annotation in lock step
-        for (let i = 0; i < typeParameters.annotations.length; i++) {
-            await this.visit(typeParameters.annotations[i], otherTypeParameters.annotations[i]);
-            if (!this.match) return typeParameters;
-        }
-
-        // Compare typeParameters
-        if (typeParameters.typeParameters.length !== otherTypeParameters.typeParameters.length) {
-            this.abort();
-            return typeParameters;
-        }
-
-        // Visit each type parameter in lock step
-        for (let i = 0; i < typeParameters.typeParameters.length; i++) {
-            await this.visit(typeParameters.typeParameters[i].element, otherTypeParameters.typeParameters[i].element);
-            if (!this.match) return typeParameters;
-        }
-
-        return typeParameters;
+        return this.visitElement(typeParameters, other as J.TypeParameters);
     }
 
     /**
@@ -4255,24 +1580,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited unary expression, or undefined if the visit was aborted
      */
     override async visitUnary(unary: J.Unary, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Unary) {
-            this.abort();
-            return unary;
-        }
-
-        const otherUnary = other as J.Unary;
-
-        // Compare operator
-        if (unary.operator.element !== otherUnary.operator.element) {
-            this.abort();
-            return unary;
-        }
-
-        // Visit expression
-        await this.visit(unary.expression, otherUnary.expression);
-        if (!this.match) return unary;
-
-        return unary;
+        return this.visitElement(unary, other as J.Unary);
     }
 
     /**
@@ -4283,18 +1591,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited unknown node, or undefined if the visit was aborted
      */
     override async visitUnknown(unknown: J.Unknown, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Unknown) {
-            this.abort();
-            return unknown;
-        }
-
-        const otherUnknown = other as J.Unknown;
-
-        // Visit source
-        await this.visit(unknown.source, otherUnknown.source);
-        if (!this.match) return unknown;
-
-        return unknown;
+        return this.visitElement(unknown, other as J.Unknown);
     }
 
     /**
@@ -4305,20 +1602,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited unknown source, or undefined if the visit was aborted
      */
     override async visitUnknownSource(unknownSource: J.UnknownSource, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.UnknownSource) {
-            this.abort();
-            return unknownSource;
-        }
-
-        const otherUnknownSource = other as J.UnknownSource;
-
-        // Compare text
-        if (unknownSource.text !== otherUnknownSource.text) {
-            this.abort();
-            return unknownSource;
-        }
-
-        return unknownSource;
+        return this.visitElement(unknownSource, other as J.UnknownSource);
     }
 
     /**
@@ -4329,68 +1613,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited variable declarations, or undefined if the visit was aborted
      */
     override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.VariableDeclarations) {
-            this.abort();
-            return variableDeclarations;
-        }
-
-        const otherVariableDeclarations = other as J.VariableDeclarations;
-
-        // Compare leadingAnnotations
-        if (variableDeclarations.leadingAnnotations.length !== otherVariableDeclarations.leadingAnnotations.length) {
-            this.abort();
-            return variableDeclarations;
-        }
-
-        // Visit each leading annotation in lock step
-        for (let i = 0; i < variableDeclarations.leadingAnnotations.length; i++) {
-            await this.visit(variableDeclarations.leadingAnnotations[i], otherVariableDeclarations.leadingAnnotations[i]);
-            if (!this.match) return variableDeclarations;
-        }
-
-        // Compare modifiers
-        if (variableDeclarations.modifiers.length !== otherVariableDeclarations.modifiers.length) {
-            this.abort();
-            return variableDeclarations;
-        }
-
-        // Visit each modifier in lock step
-        for (let i = 0; i < variableDeclarations.modifiers.length; i++) {
-            await this.visit(variableDeclarations.modifiers[i], otherVariableDeclarations.modifiers[i]);
-            if (!this.match) return variableDeclarations;
-        }
-
-        // Compare typeExpression
-        if ((variableDeclarations.typeExpression === undefined) !== (otherVariableDeclarations.typeExpression === undefined)) {
-            this.abort();
-            return variableDeclarations;
-        }
-
-        // Visit typeExpression if present
-        if (variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
-            await this.visit(variableDeclarations.typeExpression, otherVariableDeclarations.typeExpression);
-            if (!this.match) return variableDeclarations;
-        }
-
-        // Compare varargs
-        if ((variableDeclarations.varargs === undefined) !== (otherVariableDeclarations.varargs === undefined)) {
-            this.abort();
-            return variableDeclarations;
-        }
-
-        // Compare variables
-        if (variableDeclarations.variables.length !== otherVariableDeclarations.variables.length) {
-            this.abort();
-            return variableDeclarations;
-        }
-
-        // Visit each variable in lock step
-        for (let i = 0; i < variableDeclarations.variables.length; i++) {
-            await this.visit(variableDeclarations.variables[i].element, otherVariableDeclarations.variables[i].element);
-            if (!this.match) return variableDeclarations;
-        }
-
-        return variableDeclarations;
+        return this.visitElement(variableDeclarations, other as J.VariableDeclarations);
     }
 
     /**
@@ -4401,36 +1624,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited variable declaration, or undefined if the visit was aborted
      */
     override async visitVariable(variable: J.VariableDeclarations.NamedVariable, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.NamedVariable) {
-            this.abort();
-            return variable;
-        }
-
-        const otherVariable = other as J.VariableDeclarations.NamedVariable;
-
-        // Visit name
-        await this.visit(variable.name, otherVariable.name);
-        if (!this.match) return variable;
-
-        // Compare dimensionsAfterName
-        if (variable.dimensionsAfterName.length !== otherVariable.dimensionsAfterName.length) {
-            this.abort();
-            return variable;
-        }
-
-        // Compare initializer
-        if ((variable.initializer === undefined) !== (otherVariable.initializer === undefined)) {
-            this.abort();
-            return variable;
-        }
-
-        // Visit initializer if present
-        if (variable.initializer && otherVariable.initializer) {
-            await this.visit(variable.initializer.element, otherVariable.initializer.element);
-            if (!this.match) return variable;
-        }
-
-        return variable;
+        return this.visitElement(variable, other as J.VariableDeclarations.NamedVariable);
     }
 
     /**
@@ -4441,22 +1635,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited while loop, or undefined if the visit was aborted
      */
     override async visitWhileLoop(whileLoop: J.WhileLoop, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.WhileLoop) {
-            this.abort();
-            return whileLoop;
-        }
-
-        const otherWhileLoop = other as J.WhileLoop;
-
-        // Visit condition
-        await this.visit(whileLoop.condition, otherWhileLoop.condition);
-        if (!this.match) return whileLoop;
-
-        // Visit body
-        await this.visit(whileLoop.body.element, otherWhileLoop.body.element);
-        if (!this.match) return whileLoop;
-
-        return whileLoop;
+        return this.visitElement(whileLoop, other as J.WhileLoop);
     }
 
     /**
@@ -4467,40 +1646,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited wildcard, or undefined if the visit was aborted
      */
     override async visitWildcard(wildcard: J.Wildcard, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Wildcard) {
-            this.abort();
-            return wildcard;
-        }
-
-        const otherWildcard = other as J.Wildcard;
-
-        // Compare bound
-        if ((wildcard.bound === undefined) !== (otherWildcard.bound === undefined)) {
-            this.abort();
-            return wildcard;
-        }
-
-        // Compare bound if present
-        if (wildcard.bound && otherWildcard.bound) {
-            if (wildcard.bound.element !== otherWildcard.bound.element) {
-                this.abort();
-                return wildcard;
-            }
-        }
-
-        // Compare boundedType
-        if ((wildcard.boundedType === undefined) !== (otherWildcard.boundedType === undefined)) {
-            this.abort();
-            return wildcard;
-        }
-
-        // Visit boundedType if present
-        if (wildcard.boundedType && otherWildcard.boundedType) {
-            await this.visit(wildcard.boundedType, otherWildcard.boundedType);
-            if (!this.match) return wildcard;
-        }
-
-        return wildcard;
+        return this.visitElement(wildcard, other as J.Wildcard);
     }
 
     /**
@@ -4511,24 +1657,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited yield statement, or undefined if the visit was aborted
      */
     override async visitYield(yieldStatement: J.Yield, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== J.Kind.Yield) {
-            this.abort();
-            return yieldStatement;
-        }
-
-        const otherYieldStatement = other as J.Yield;
-
-        // Compare implicit
-        if (yieldStatement.implicit !== otherYieldStatement.implicit) {
-            this.abort();
-            return yieldStatement;
-        }
-
-        // Visit value
-        await this.visit(yieldStatement.value, otherYieldStatement.value);
-        if (!this.match) return yieldStatement;
-
-        return yieldStatement;
+        return this.visitElement(yieldStatement, other as J.Yield);
     }
 
     /**
@@ -4539,17 +1668,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited void expression, or undefined if the visit was aborted
      */
     override async visitVoid(void_: JS.Void, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.Void) {
-            this.abort();
-            return void_;
-        }
-
-        const otherVoid = other as JS.Void;
-
-        // Visit expression
-        await this.visit(void_.expression, otherVoid.expression);
-
-        return void_;
+        return this.visitElement(void_, other as JS.Void);
     }
 
     /**
@@ -4560,21 +1679,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited with statement, or undefined if the visit was aborted
      */
     override async visitWithStatement(withStatement: JS.WithStatement, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.WithStatement) {
-            this.abort();
-            return withStatement;
-        }
-
-        const otherWithStatement = other as JS.WithStatement;
-
-        // Visit expression
-        await this.visit(withStatement.expression, otherWithStatement.expression);
-        if (!this.match) return withStatement;
-
-        // Visit body
-        await this.visit(withStatement.body.element, otherWithStatement.body.element);
-
-        return withStatement;
+        return this.visitElement(withStatement, other as JS.WithStatement);
     }
 
     /**
@@ -4585,42 +1690,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited index signature declaration, or undefined if the visit was aborted
      */
     override async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.IndexSignatureDeclaration) {
-            this.abort();
-            return indexSignatureDeclaration;
-        }
-
-        const otherIndexSignatureDeclaration = other as JS.IndexSignatureDeclaration;
-
-        // Compare modifiers
-        if (indexSignatureDeclaration.modifiers.length !== otherIndexSignatureDeclaration.modifiers.length) {
-            this.abort();
-            return indexSignatureDeclaration;
-        }
-
-        // Visit modifiers in lock step
-        for (let i = 0; i < indexSignatureDeclaration.modifiers.length; i++) {
-            await this.visit(indexSignatureDeclaration.modifiers[i], otherIndexSignatureDeclaration.modifiers[i]);
-            if (!this.match) return indexSignatureDeclaration;
-        }
-
-        // Compare parameters
-        if (indexSignatureDeclaration.parameters.elements.length !== otherIndexSignatureDeclaration.parameters.elements.length) {
-            this.abort();
-            return indexSignatureDeclaration;
-        }
-
-        // Visit parameters in lock step
-        for (let i = 0; i < indexSignatureDeclaration.parameters.elements.length; i++) {
-            await this.visit(indexSignatureDeclaration.parameters.elements[i].element, 
-                           otherIndexSignatureDeclaration.parameters.elements[i].element);
-            if (!this.match) return indexSignatureDeclaration;
-        }
-
-        // Visit type expression
-        await this.visit(indexSignatureDeclaration.typeExpression.element, otherIndexSignatureDeclaration.typeExpression.element);
-
-        return indexSignatureDeclaration;
+        return this.visitElement(indexSignatureDeclaration, other as JS.IndexSignatureDeclaration);
     }
 
     /**
@@ -4631,24 +1701,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited for-of loop, or undefined if the visit was aborted
      */
     override async visitForOfLoop(forOfLoop: JS.ForOfLoop, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ForOfLoop) {
-            this.abort();
-            return forOfLoop;
-        }
-
-        const otherForOfLoop = other as JS.ForOfLoop;
-
-        // Compare await
-        if ((forOfLoop.await === undefined) !== (otherForOfLoop.await === undefined)) {
-            this.abort();
-            return forOfLoop;
-        }
-
-        // Visit loop
-        await this.visit(forOfLoop.loop, otherForOfLoop.loop);
-        if (!this.match) return forOfLoop;
-
-        return forOfLoop;
+        return this.visitElement(forOfLoop, other as JS.ForOfLoop);
     }
 
     /**
@@ -4659,22 +1712,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited for-in loop, or undefined if the visit was aborted
      */
     override async visitForInLoop(forInLoop: JS.ForInLoop, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ForInLoop) {
-            this.abort();
-            return forInLoop;
-        }
-
-        const otherForInLoop = other as JS.ForInLoop;
-
-        // Visit control
-        await this.visit(forInLoop.control, otherForInLoop.control);
-        if (!this.match) return forInLoop;
-
-        // Visit body
-        await this.visit(forInLoop.body.element, otherForInLoop.body.element);
-        if (!this.match) return forInLoop;
-
-        return forInLoop;
+        return this.visitElement(forInLoop, other as JS.ForInLoop);
     }
 
     /**
@@ -4685,48 +1723,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited namespace declaration, or undefined if the visit was aborted
      */
     override async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.NamespaceDeclaration) {
-            this.abort();
-            return namespaceDeclaration;
-        }
-
-        const otherNamespaceDeclaration = other as JS.NamespaceDeclaration;
-
-        // Compare modifiers
-        if (namespaceDeclaration.modifiers.length !== otherNamespaceDeclaration.modifiers.length) {
-            this.abort();
-            return namespaceDeclaration;
-        }
-
-        // Visit each modifier in lock step
-        for (let i = 0; i < namespaceDeclaration.modifiers.length; i++) {
-            await this.visit(namespaceDeclaration.modifiers[i], otherNamespaceDeclaration.modifiers[i]);
-            if (!this.match) return namespaceDeclaration;
-        }
-
-        // Compare keywordType
-        if (namespaceDeclaration.keywordType.element !== otherNamespaceDeclaration.keywordType.element) {
-            this.abort();
-            return namespaceDeclaration;
-        }
-
-        // Visit name
-        await this.visit(namespaceDeclaration.name.element, otherNamespaceDeclaration.name.element);
-        if (!this.match) return namespaceDeclaration;
-
-        // Compare body
-        if ((namespaceDeclaration.body === undefined) !== (otherNamespaceDeclaration.body === undefined)) {
-            this.abort();
-            return namespaceDeclaration;
-        }
-
-        // Visit body if present
-        if (namespaceDeclaration.body && otherNamespaceDeclaration.body) {
-            await this.visit(namespaceDeclaration.body, otherNamespaceDeclaration.body);
-            if (!this.match) return namespaceDeclaration;
-        }
-
-        return namespaceDeclaration;
+        return this.visitElement(namespaceDeclaration, other as JS.NamespaceDeclaration);
     }
 
     /**
@@ -4737,18 +1734,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited type literal, or undefined if the visit was aborted
      */
     override async visitTypeLiteral(typeLiteral: JS.TypeLiteral, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TypeLiteral) {
-            this.abort();
-            return typeLiteral;
-        }
-
-        const otherTypeLiteral = other as JS.TypeLiteral;
-
-        // Visit members
-        await this.visit(typeLiteral.members, otherTypeLiteral.members);
-        if (!this.match) return typeLiteral;
-
-        return typeLiteral;
+        return this.visitElement(typeLiteral, other as JS.TypeLiteral);
     }
 
     /**
@@ -4759,42 +1745,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited binding element, or undefined if the visit was aborted
      */
     override async visitBindingElement(bindingElement: JS.BindingElement, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.BindingElement) {
-            this.abort();
-            return bindingElement;
-        }
-
-        const otherBindingElement = other as JS.BindingElement;
-
-        // Compare propertyName
-        if ((bindingElement.propertyName === undefined) !== (otherBindingElement.propertyName === undefined)) {
-            this.abort();
-            return bindingElement;
-        }
-
-        // Visit propertyName if present
-        if (bindingElement.propertyName && otherBindingElement.propertyName) {
-            await this.visit(bindingElement.propertyName.element, otherBindingElement.propertyName.element);
-            if (!this.match) return bindingElement;
-        }
-
-        // Visit name
-        await this.visit(bindingElement.name, otherBindingElement.name);
-        if (!this.match) return bindingElement;
-
-        // Compare initializer
-        if ((bindingElement.initializer === undefined) !== (otherBindingElement.initializer === undefined)) {
-            this.abort();
-            return bindingElement;
-        }
-
-        // Visit initializer if present
-        if (bindingElement.initializer && otherBindingElement.initializer) {
-            await this.visit(bindingElement.initializer.element, otherBindingElement.initializer.element);
-            if (!this.match) return bindingElement;
-        }
-
-        return bindingElement;
+        return this.visitElement(bindingElement, other as JS.BindingElement);
     }
 
     /**
@@ -4805,26 +1756,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited array binding pattern, or undefined if the visit was aborted
      */
     override async visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ArrayBindingPattern) {
-            this.abort();
-            return arrayBindingPattern;
-        }
-
-        const otherArrayBindingPattern = other as JS.ArrayBindingPattern;
-
-        // Compare elements
-        if (arrayBindingPattern.elements.elements.length !== otherArrayBindingPattern.elements.elements.length) {
-            this.abort();
-            return arrayBindingPattern;
-        }
-
-        // Visit each element in lock step
-        for (let i = 0; i < arrayBindingPattern.elements.elements.length; i++) {
-            await this.visit(arrayBindingPattern.elements.elements[i].element, otherArrayBindingPattern.elements.elements[i].element);
-            if (!this.match) return arrayBindingPattern;
-        }
-
-        return arrayBindingPattern;
+        return this.visitElement(arrayBindingPattern, other as JS.ArrayBindingPattern);
     }
 
     /**
@@ -4835,68 +1767,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited export declaration, or undefined if the visit was aborted
      */
     override async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ExportDeclaration) {
-            this.abort();
-            return exportDeclaration;
-        }
-
-        const otherExportDeclaration = other as JS.ExportDeclaration;
-
-        // Compare modifiers
-        if (exportDeclaration.modifiers.length !== otherExportDeclaration.modifiers.length) {
-            this.abort();
-            return exportDeclaration;
-        }
-
-        // Visit each modifier in lock step
-        for (let i = 0; i < exportDeclaration.modifiers.length; i++) {
-            await this.visit(exportDeclaration.modifiers[i], otherExportDeclaration.modifiers[i]);
-            if (!this.match) return exportDeclaration;
-        }
-
-        // Compare typeOnly
-        if (exportDeclaration.typeOnly.element !== otherExportDeclaration.typeOnly.element) {
-            this.abort();
-            return exportDeclaration;
-        }
-
-        // Compare exportClause
-        if ((exportDeclaration.exportClause === undefined) !== (otherExportDeclaration.exportClause === undefined)) {
-            this.abort();
-            return exportDeclaration;
-        }
-
-        // Visit exportClause if present
-        if (exportDeclaration.exportClause && otherExportDeclaration.exportClause) {
-            await this.visit(exportDeclaration.exportClause, otherExportDeclaration.exportClause);
-            if (!this.match) return exportDeclaration;
-        }
-
-        // Compare moduleSpecifier
-        if ((exportDeclaration.moduleSpecifier === undefined) !== (otherExportDeclaration.moduleSpecifier === undefined)) {
-            this.abort();
-            return exportDeclaration;
-        }
-
-        // Visit moduleSpecifier if present
-        if (exportDeclaration.moduleSpecifier && otherExportDeclaration.moduleSpecifier) {
-            await this.visit(exportDeclaration.moduleSpecifier.element, otherExportDeclaration.moduleSpecifier.element);
-            if (!this.match) return exportDeclaration;
-        }
-
-        // Compare attributes
-        if ((exportDeclaration.attributes === undefined) !== (otherExportDeclaration.attributes === undefined)) {
-            this.abort();
-            return exportDeclaration;
-        }
-
-        // Visit attributes if present
-        if (exportDeclaration.attributes && otherExportDeclaration.attributes) {
-            await this.visit(exportDeclaration.attributes, otherExportDeclaration.attributes);
-            if (!this.match) return exportDeclaration;
-        }
-
-        return exportDeclaration;
+        return this.visitElement(exportDeclaration, other as JS.ExportDeclaration);
     }
 
     /**
@@ -4907,24 +1778,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited export assignment, or undefined if the visit was aborted
      */
     override async visitExportAssignment(exportAssignment: JS.ExportAssignment, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ExportAssignment) {
-            this.abort();
-            return exportAssignment;
-        }
-
-        const otherExportAssignment = other as JS.ExportAssignment;
-
-        // Compare exportEquals
-        if (exportAssignment.exportEquals !== otherExportAssignment.exportEquals) {
-            this.abort();
-            return exportAssignment;
-        }
-
-        // Visit expression
-        await this.visit(exportAssignment.expression.element, otherExportAssignment.expression.element);
-        if (!this.match) return exportAssignment;
-
-        return exportAssignment;
+        return this.visitElement(exportAssignment, other as JS.ExportAssignment);
     }
 
     /**
@@ -4935,26 +1789,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited named exports, or undefined if the visit was aborted
      */
     override async visitNamedExports(namedExports: JS.NamedExports, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.NamedExports) {
-            this.abort();
-            return namedExports;
-        }
-
-        const otherNamedExports = other as JS.NamedExports;
-
-        // Compare elements
-        if (namedExports.elements.elements.length !== otherNamedExports.elements.elements.length) {
-            this.abort();
-            return namedExports;
-        }
-
-        // Visit each element in lock step
-        for (let i = 0; i < namedExports.elements.elements.length; i++) {
-            await this.visit(namedExports.elements.elements[i].element, otherNamedExports.elements.elements[i].element);
-            if (!this.match) return namedExports;
-        }
-
-        return namedExports;
+        return this.visitElement(namedExports, other as JS.NamedExports);
     }
 
     /**
@@ -4965,24 +1800,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited export specifier, or undefined if the visit was aborted
      */
     override async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ExportSpecifier) {
-            this.abort();
-            return exportSpecifier;
-        }
-
-        const otherExportSpecifier = other as JS.ExportSpecifier;
-
-        // Compare typeOnly
-        if (exportSpecifier.typeOnly.element !== otherExportSpecifier.typeOnly.element) {
-            this.abort();
-            return exportSpecifier;
-        }
-
-        // Visit specifier
-        await this.visit(exportSpecifier.specifier, otherExportSpecifier.specifier);
-        if (!this.match) return exportSpecifier;
-
-        return exportSpecifier;
+        return this.visitElement(exportSpecifier, other as JS.ExportSpecifier);
     }
 
     /**
@@ -4993,86 +1811,415 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @returns The visited computed property method declaration, or undefined if the visit was aborted
      */
     override async visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ComputedPropertyMethodDeclaration) {
-            this.abort();
-            return computedPropMethod;
+        return this.visitElement(computedPropMethod, other as JS.ComputedPropertyMethodDeclaration);
+    }
+}
+
+/**
+ * A comparator visitor that checks semantic equality including type attribution.
+ * This ensures comparisons account for type information, allowing semantically
+ * equivalent code to match even when structurally different (e.g., `foo()` vs `module.foo()`
+ * when both refer to the same method).
+ */
+export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVisitor {
+    /**
+     * When true, allows patterns without type annotations to match code with type annotations.
+     * This enables lenient matching where undefined types on either side are considered compatible.
+     */
+    protected readonly lenientTypeMatching: boolean;
+
+    /**
+     * Creates a new semantic comparator visitor.
+     *
+     * @param lenientTypeMatching If true, allows matching between nodes with and without type annotations
+     */
+    constructor(lenientTypeMatching: boolean = false) {
+        super();
+        this.lenientTypeMatching = lenientTypeMatching;
+    }
+
+    /**
+     * Override visitProperty to allow lenient type matching.
+     * When lenientTypeMatching is enabled, null vs Type comparisons are allowed
+     * (where one value is null/undefined and the other is a Type object).
+     */
+    protected override async visitProperty(j: any, other: any): Promise<any> {
+        // Handle null/undefined with lenient type matching
+        if (this.lenientTypeMatching && (j == null || other == null)) {
+            if (j !== other) {
+                // Don't abort if one is null and the other is a Type
+                const jKind = (j as any)?.kind;
+                const otherKind = (other as any)?.kind;
+                const isTypeComparison =
+                    (jKind && typeof jKind === 'string' && jKind.startsWith('org.openrewrite.java.tree.JavaType$')) ||
+                    (otherKind && typeof otherKind === 'string' && otherKind.startsWith('org.openrewrite.java.tree.JavaType$'));
+
+                if (!isTypeComparison) {
+                    this.abort(j);
+                }
+            }
+            return j;
         }
 
-        const otherComputedPropMethod = other as JS.ComputedPropertyMethodDeclaration;
+        // Otherwise, use base class behavior
+        return super.visitProperty(j, other);
+    }
 
-        // Compare leading annotations
-        if (computedPropMethod.leadingAnnotations.length !== otherComputedPropMethod.leadingAnnotations.length) {
-            this.abort();
-            return computedPropMethod;
+    /**
+     * Checks if two types are semantically equal.
+     * For method types, this checks that the declaring type and method name match.
+     * With lenient type matching, undefined types on either side are considered compatible.
+     */
+    private isOfType(target?: Type, source?: Type): boolean {
+        if (!target || !source) {
+            // Lenient mode: if either type is undefined, allow the match
+            return this.lenientTypeMatching ? true : target === source;
         }
 
-        // Visit leading annotations in lock step
-        for (let i = 0; i < computedPropMethod.leadingAnnotations.length; i++) {
-            await this.visit(computedPropMethod.leadingAnnotations[i], otherComputedPropMethod.leadingAnnotations[i]);
-            if (!this.match) return computedPropMethod;
+        if (target.kind !== source.kind) {
+            return false;
         }
 
-        // Compare modifiers
-        if (computedPropMethod.modifiers.length !== otherComputedPropMethod.modifiers.length) {
-            this.abort();
-            return computedPropMethod;
+        // For method types, check declaring type
+        // Note: We don't check the name field because it might not be fully resolved in patterns
+        // The method invocation visitor already checks that simple names match
+        if (target.kind === Type.Kind.Method && source.kind === Type.Kind.Method) {
+            const targetMethod = target as Type.Method;
+            const sourceMethod = source as Type.Method;
+
+            // Check if declaring types match
+            const declaringTypesMatch = this.isOfType(targetMethod.declaringType, sourceMethod.declaringType);
+            if (declaringTypesMatch) {
+                return true;
+            }
+
+            // If declaring types don't match exactly, check if they might be semantically equivalent
+            // (e.g., 'react' module vs 'React' namespace importing from 'react')
+            // In this case, we check if the method signatures are otherwise identical
+            if (targetMethod.declaringType && sourceMethod.declaringType &&
+                Type.isFullyQualified(targetMethod.declaringType) && Type.isFullyQualified(sourceMethod.declaringType)) {
+
+                const targetDeclType = targetMethod.declaringType as Type.FullyQualified;
+                const sourceDeclType = sourceMethod.declaringType as Type.FullyQualified;
+
+                // Check if the declaring type names could represent the same module
+                // (e.g., 'react' and 'React', where React is a namespace alias)
+                const targetFQN = Type.FullyQualified.getFullyQualifiedName(targetDeclType);
+                const sourceFQN = Type.FullyQualified.getFullyQualifiedName(sourceDeclType);
+
+                // If the names differ only in case and one appears to be a module name
+                // (all lowercase) while the other is capitalized (namespace alias),
+                // check if the method signatures match
+                if (targetFQN.toLowerCase() === sourceFQN.toLowerCase()) {
+                    // Method signatures should match: return type and parameters
+                    if (!this.isOfType(targetMethod.returnType, sourceMethod.returnType)) {
+                        return false;
+                    }
+
+                    if (targetMethod.parameterTypes.length !== sourceMethod.parameterTypes.length) {
+                        return false;
+                    }
+
+                    for (let i = 0; i < targetMethod.parameterTypes.length; i++) {
+                        if (!this.isOfType(targetMethod.parameterTypes[i], sourceMethod.parameterTypes[i])) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        // Visit modifiers in lock step
-        for (let i = 0; i < computedPropMethod.modifiers.length; i++) {
-            await this.visit(computedPropMethod.modifiers[i], otherComputedPropMethod.modifiers[i]);
-            if (!this.match) return computedPropMethod;
+        // For fully qualified types, check the fully qualified name
+        if (Type.isFullyQualified(target) && Type.isFullyQualified(source)) {
+            return Type.FullyQualified.getFullyQualifiedName(target) ===
+                   Type.FullyQualified.getFullyQualifiedName(source);
+        }
+
+        // Default: types are equal if they're the same kind
+        return true;
+    }
+
+    /**
+     * Override method invocation comparison to include type attribution checking.
+     * When types match semantically, we allow matching even if one has a receiver
+     * and the other doesn't (e.g., `isDate(x)` vs `util.isDate(x)`).
+     */
+    override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.MethodInvocation) {
+            return this.abort(method);
+        }
+
+        const otherMethod = other as J.MethodInvocation;
+
+        // Check basic structural equality first
+        if (method.name.simpleName !== otherMethod.name.simpleName ||
+            method.arguments.elements.length !== otherMethod.arguments.elements.length) {
+            return this.abort(method);
+        }
+
+        // Check type attribution
+        // Both must have method types for semantic equality
+        if (!method.methodType || !otherMethod.methodType) {
+            // Lenient mode: if either has no type, allow structural matching
+            if (this.lenientTypeMatching) {
+                return super.visitMethodInvocation(method, other);
+            }
+            // Strict mode: if one has type but the other doesn't, they don't match
+            if (method.methodType || otherMethod.methodType) {
+                return this.abort(method);
+            }
+            // If neither has type, fall through to structural comparison
+            return super.visitMethodInvocation(method, other);
+        }
+
+        // Both have types - check they match semantically
+        const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
+        if (!typesMatch) {
+            // Types don't match - abort comparison
+            return this.abort(method);
+        }
+
+        // Types match! Now check if we can ignore receiver differences.
+        // We can only ignore receiver differences when one or both receivers are identifiers
+        // that represent module/namespace imports (e.g., `util` in `util.isDate()`).
+        // For other receivers (e.g., variables, expressions), we must compare them.
+
+        const canIgnoreReceiverDifference =
+            // Case 1: One has no select (direct call like `forwardRef()`), other has select (namespace like `React.forwardRef()`)
+            (!method.select && otherMethod.select) ||
+            (method.select && !otherMethod.select);
+
+        if (!canIgnoreReceiverDifference) {
+            // Both have selects or both don't - must compare them structurally
+            if ((method.select === undefined) !== (otherMethod.select === undefined)) {
+                return this.abort(method);
+            }
+
+            if (method.select && otherMethod.select) {
+                await this.visitRightPadded(method.select, otherMethod.select as any);
+            }
         }
 
         // Compare type parameters
-        if (!!computedPropMethod.typeParameters !== !!otherComputedPropMethod.typeParameters) {
-            this.abort();
-            return computedPropMethod;
+        if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
+            return this.abort(method);
         }
 
-        if (computedPropMethod.typeParameters) {
-            await this.visit(computedPropMethod.typeParameters, otherComputedPropMethod.typeParameters!);
-            if (!this.match) return computedPropMethod;
+        if (method.typeParameters && otherMethod.typeParameters) {
+            if (method.typeParameters.elements.length !== otherMethod.typeParameters.elements.length) {
+                return this.abort(method);
+            }
+            for (let i = 0; i < method.typeParameters.elements.length; i++) {
+                await this.visitRightPadded(method.typeParameters.elements[i], otherMethod.typeParameters.elements[i] as any);
+                if (!this.match) {
+                    return this.abort(method);
+                }
+            }
         }
 
-        // Compare return type expression
-        if (!!computedPropMethod.returnTypeExpression !== !!otherComputedPropMethod.returnTypeExpression) {
-            this.abort();
-            return computedPropMethod;
+        // Compare name (already checked simpleName above, but visit for markers/prefix)
+        await this.visit(method.name, otherMethod.name);
+        if (!this.match) {
+            return this.abort(method);
         }
 
-        if (computedPropMethod.returnTypeExpression) {
-            await this.visit(computedPropMethod.returnTypeExpression, otherComputedPropMethod.returnTypeExpression!);
-            if (!this.match) return computedPropMethod;
+        // Compare arguments (visit RightPadded to check for markers)
+        for (let i = 0; i < method.arguments.elements.length; i++) {
+            await this.visitRightPadded(method.arguments.elements[i], otherMethod.arguments.elements[i] as any);
+            if (!this.match) {
+                return this.abort(method);
+            }
+        }
+
+        return method;
+    }
+
+    /**
+     * Override identifier comparison to include type checking for field access.
+     */
+    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.Identifier) {
+            return this.abort(identifier);
+        }
+
+        const otherIdentifier = other as J.Identifier;
+
+        // Check name matches
+        if (identifier.simpleName !== otherIdentifier.simpleName) {
+            return this.abort(identifier);
+        }
+
+        // For identifiers with field types, check type attribution
+        if (identifier.fieldType && otherIdentifier.fieldType) {
+            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType)) {
+                return this.abort(identifier);
+            }
+        } else if (identifier.fieldType || otherIdentifier.fieldType) {
+            // Lenient mode: if either has no type, allow structural matching
+            if (!this.lenientTypeMatching) {
+                // Strict mode: if only one has a type, they don't match
+                return this.abort(identifier);
+            }
+        }
+
+        return super.visitIdentifier(identifier, other);
+    }
+
+    /**
+     * Override variable declarations comparison to handle lenient type matching.
+     * When lenientTypeMatching is true, patterns without typeExpression can match
+     * code with typeExpression.
+     */
+    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+        const otherVariableDeclarations = other as J.VariableDeclarations;
+
+        // Visit leading annotations
+        if (variableDeclarations.leadingAnnotations.length !== otherVariableDeclarations.leadingAnnotations.length) {
+            return this.abort(variableDeclarations);
+        }
+
+        for (let i = 0; i < variableDeclarations.leadingAnnotations.length; i++) {
+            await this.visit(variableDeclarations.leadingAnnotations[i], otherVariableDeclarations.leadingAnnotations[i]);
+            if (!this.match) return variableDeclarations;
+        }
+
+        // Visit modifiers
+        if (variableDeclarations.modifiers.length !== otherVariableDeclarations.modifiers.length) {
+            return this.abort(variableDeclarations);
+        }
+
+        for (let i = 0; i < variableDeclarations.modifiers.length; i++) {
+            await this.visit(variableDeclarations.modifiers[i], otherVariableDeclarations.modifiers[i]);
+            if (!this.match) return variableDeclarations;
+        }
+
+        // Compare typeExpression - lenient matching allows one to be undefined
+        if ((variableDeclarations.typeExpression === undefined) !== (otherVariableDeclarations.typeExpression === undefined)) {
+            if (!this.lenientTypeMatching) {
+                return this.abort(variableDeclarations);
+            }
+            // In lenient mode, skip type comparison and continue
+        } else if (variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
+            // Both have typeExpression, visit them
+            await this.visit(variableDeclarations.typeExpression, otherVariableDeclarations.typeExpression);
+            if (!this.match) return variableDeclarations;
+        }
+
+        // Compare varargs
+        if ((variableDeclarations.varargs === undefined) !== (otherVariableDeclarations.varargs === undefined)) {
+            return this.abort(variableDeclarations);
+        }
+
+        // Compare variables
+        if (variableDeclarations.variables.length !== otherVariableDeclarations.variables.length) {
+            return this.abort(variableDeclarations);
+        }
+
+        // Visit each variable in lock step
+        for (let i = 0; i < variableDeclarations.variables.length; i++) {
+            await this.visitRightPadded(variableDeclarations.variables[i], otherVariableDeclarations.variables[i] as any);
+            if (!this.match) return variableDeclarations;
+        }
+
+        return variableDeclarations;
+    }
+
+    /**
+     * Override method declaration comparison to handle lenient type matching.
+     * When lenientTypeMatching is true, patterns without returnTypeExpression can match
+     * code with returnTypeExpression.
+     */
+    override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+        const otherMethodDeclaration = other as J.MethodDeclaration;
+
+        // Visit leading annotations
+        if (methodDeclaration.leadingAnnotations.length !== otherMethodDeclaration.leadingAnnotations.length) {
+            return this.abort(methodDeclaration);
+        }
+
+        for (let i = 0; i < methodDeclaration.leadingAnnotations.length; i++) {
+            await this.visit(methodDeclaration.leadingAnnotations[i], otherMethodDeclaration.leadingAnnotations[i]);
+            if (!this.match) return methodDeclaration;
+        }
+
+        // Visit modifiers
+        if (methodDeclaration.modifiers.length !== otherMethodDeclaration.modifiers.length) {
+            return this.abort(methodDeclaration);
+        }
+
+        for (let i = 0; i < methodDeclaration.modifiers.length; i++) {
+            await this.visit(methodDeclaration.modifiers[i], otherMethodDeclaration.modifiers[i]);
+            if (!this.match) return methodDeclaration;
+        }
+
+        // Visit type parameters if present
+        if (!!methodDeclaration.typeParameters !== !!otherMethodDeclaration.typeParameters) {
+            return this.abort(methodDeclaration);
+        }
+
+        if (methodDeclaration.typeParameters && otherMethodDeclaration.typeParameters) {
+            await this.visit(methodDeclaration.typeParameters, otherMethodDeclaration.typeParameters);
+            if (!this.match) return methodDeclaration;
+        }
+
+        // Compare returnTypeExpression - lenient matching allows one to be undefined
+        if ((methodDeclaration.returnTypeExpression === undefined) !== (otherMethodDeclaration.returnTypeExpression === undefined)) {
+            if (!this.lenientTypeMatching) {
+                return this.abort(methodDeclaration);
+            }
+            // In lenient mode, skip type comparison and continue
+        } else if (methodDeclaration.returnTypeExpression && otherMethodDeclaration.returnTypeExpression) {
+            // Both have returnTypeExpression, visit them
+            await this.visit(methodDeclaration.returnTypeExpression, otherMethodDeclaration.returnTypeExpression);
+            if (!this.match) return methodDeclaration;
         }
 
         // Visit name
-        await this.visit(computedPropMethod.name, otherComputedPropMethod.name);
-        if (!this.match) return computedPropMethod;
+        await this.visit(methodDeclaration.name, otherMethodDeclaration.name);
+        if (!this.match) return methodDeclaration;
 
         // Compare parameters
-        if (computedPropMethod.parameters.elements.length !== otherComputedPropMethod.parameters.elements.length) {
-            this.abort();
-            return computedPropMethod;
+        if (methodDeclaration.parameters.elements.length !== otherMethodDeclaration.parameters.elements.length) {
+            return this.abort(methodDeclaration);
         }
 
-        // Visit parameters in lock step
-        for (let i = 0; i < computedPropMethod.parameters.elements.length; i++) {
-            await this.visit(computedPropMethod.parameters.elements[i].element, 
-                           otherComputedPropMethod.parameters.elements[i].element);
-            if (!this.match) return computedPropMethod;
+        // Visit each parameter in lock step
+        for (let i = 0; i < methodDeclaration.parameters.elements.length; i++) {
+            await this.visitRightPadded(methodDeclaration.parameters.elements[i], otherMethodDeclaration.parameters.elements[i] as any);
+            if (!this.match) return methodDeclaration;
         }
 
-        // Compare body
-        if (!!computedPropMethod.body !== !!otherComputedPropMethod.body) {
-            this.abort();
-            return computedPropMethod;
+        // Visit throws if present
+        if (!!methodDeclaration.throws !== !!otherMethodDeclaration.throws) {
+            return this.abort(methodDeclaration);
         }
 
-        if (computedPropMethod.body) {
-            await this.visit(computedPropMethod.body, otherComputedPropMethod.body!);
+        if (methodDeclaration.throws && otherMethodDeclaration.throws) {
+            // Visit each throws expression in lock step
+            if (methodDeclaration.throws.elements.length !== otherMethodDeclaration.throws.elements.length) {
+                return this.abort(methodDeclaration);
+            }
+
+            for (let i = 0; i < methodDeclaration.throws.elements.length; i++) {
+                await this.visitRightPadded(methodDeclaration.throws.elements[i], otherMethodDeclaration.throws.elements[i] as any);
+                if (!this.match) return methodDeclaration;
+            }
         }
 
-        return computedPropMethod;
+        // Visit body if present
+        if (!!methodDeclaration.body !== !!otherMethodDeclaration.body) {
+            return this.abort(methodDeclaration);
+        }
+
+        if (methodDeclaration.body && otherMethodDeclaration.body) {
+            await this.visit(methodDeclaration.body, otherMethodDeclaration.body);
+            if (!this.match) return methodDeclaration;
+        }
+
+        return methodDeclaration;
     }
 }

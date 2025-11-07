@@ -74,10 +74,58 @@ public class JacocoReportDeprecations extends Recipe {
                 } else {
                     parent++;
                 }
+
+                // Handle method invocation syntax at various nesting levels
+                if (!method.getArguments().isEmpty()) {
+                    boolean shouldReplace = false;
+
+                    // xml.enabled(false) or csv.enabled(false) - inside reports closure
+                    if (parent == 2 && method.getSelect() instanceof J.Identifier) {
+                        J.Identifier select = (J.Identifier) method.getSelect();
+                        shouldReplace = isReportType(select.getSimpleName());
+                    }
+                    // reports.xml.enabled(false) - inside jacocoTestReport closure
+                    else if (parent == 1 && method.getSelect() instanceof J.FieldAccess) {
+                        J.FieldAccess selectField = (J.FieldAccess) method.getSelect();
+                        if (selectField.getTarget() instanceof J.Identifier) {
+                            J.Identifier target = (J.Identifier) selectField.getTarget();
+                            shouldReplace = "reports".equalsIgnoreCase(target.getSimpleName()) &&
+                                          isReportType(selectField.getSimpleName());
+                        }
+                    }
+                    // enabled(false) - inside xml/csv/html closure
+                    else if (parent == 3 && method.getSelect() == null) {
+                        shouldReplace = true;
+                    }
+
+                    if (shouldReplace) {
+                        J.MethodInvocation replacement = replaceDeprecatedMethodName(method);
+                        if (replacement != method) {
+                            return replacement;
+                        }
+                    }
+                }
+
                 if (isPartOfDeprecatedPath(method.getSimpleName(), parent)) {
                     getCursor().putMessage(JACOCO_SETTINGS_INDEX, parent);
 
                     return super.visitMethodInvocation(method, ctx);
+                }
+                return method;
+            }
+
+            private boolean isReportType(String name) {
+                return "xml".equalsIgnoreCase(name) ||
+                       "csv".equalsIgnoreCase(name) ||
+                       "html".equalsIgnoreCase(name);
+            }
+
+            private J.MethodInvocation replaceDeprecatedMethodName(J.MethodInvocation method) {
+                String methodName = method.getSimpleName();
+                if ("enabled".equalsIgnoreCase(methodName) || "isEnabled".equalsIgnoreCase(methodName) || "setEnabled".equalsIgnoreCase(methodName)) {
+                    return method.withName(method.getName().withSimpleName("required"));
+                } else if ("destination".equalsIgnoreCase(methodName) || "setDestination".equalsIgnoreCase(methodName)) {
+                    return method.withName(method.getName().withSimpleName("outputLocation"));
                 }
                 return method;
             }

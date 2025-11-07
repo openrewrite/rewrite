@@ -76,7 +76,7 @@ export class JavaScriptParser extends Parser {
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
-    private sourceFileCache?: Map<string, ts.SourceFile>;
+    private readonly sourceFileCache?: Map<string, ts.SourceFile>;
 
     constructor(
         {
@@ -612,13 +612,12 @@ export class JavaScriptParserVisitor {
         }
         for (let heritageClause of node.heritageClauses) {
             if (heritageClause.token == ts.SyntaxKind.ExtendsKeyword) {
-                const expression = this.visit(heritageClause.types[0]);
                 return this.leftPadded<TypeTree>(this.prefix(heritageClause.getFirstToken()!), {
                     kind: JS.Kind.TypeTreeExpression,
                     id: randomId(),
-                    prefix: emptySpace,
+                    prefix: this.prefix(heritageClause.types[0]),
                     markers: emptyMarkers,
-                    expression: expression
+                    expression: this.visit(heritageClause.types[0])
                 } satisfies JS.TypeTreeExpression as JS.TypeTreeExpression);
             }
         }
@@ -1493,7 +1492,7 @@ export class JavaScriptParserVisitor {
                 element: {
                     kind: J.Kind.Ternary,
                     id: randomId(),
-                    prefix: emptySpace,
+                    prefix: this.prefix(node.extendsType),
                     markers: emptyMarkers,
                     condition: this.convert(node.extendsType),
                     truePart: this.leftPadded(this.suffix(node.extendsType), this.convert(node.trueType)),
@@ -1998,7 +1997,7 @@ export class JavaScriptParserVisitor {
             class: node.typeArguments ? {
                 kind: J.Kind.ParameterizedType,
                 id: randomId(),
-                prefix: emptySpace,
+                prefix: this.prefix(node.expression),
                 markers: emptyMarkers,
                 class: {
                     kind: JS.Kind.TypeTreeExpression,
@@ -2012,7 +2011,7 @@ export class JavaScriptParserVisitor {
             } satisfies J.ParameterizedType as J.ParameterizedType : {
                 kind: JS.Kind.TypeTreeExpression,
                 id: randomId(),
-                prefix: emptySpace,
+                prefix: this.prefix(node.expression),
                 markers: emptyMarkers,
                 expression: this.visit(node.expression),
             } satisfies JS.TypeTreeExpression as JS.TypeTreeExpression,
@@ -2460,12 +2459,12 @@ export class JavaScriptParserVisitor {
         return {
             kind: JS.Kind.StatementExpression,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: this.prefix(node),
             markers: emptyMarkers,
             statement: {
                 kind: J.Kind.Yield,
                 id: randomId(),
-                prefix: this.prefix(node),
+                prefix: emptySpace,
                 markers: node.asteriskToken ?
                     markers({
                         kind: JS.Markers.DelegatedYield,
@@ -2492,12 +2491,12 @@ export class JavaScriptParserVisitor {
         return {
             kind: JS.Kind.StatementExpression,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: this.prefix(node),
             markers: emptyMarkers,
             statement: {
                 kind: J.Kind.ClassDeclaration,
                 id: randomId(),
-                prefix: this.prefix(node),
+                prefix: emptySpace,
                 markers: emptyMarkers,
                 leadingAnnotations: this.mapDecorators(node),
                 modifiers: [],
@@ -2637,25 +2636,27 @@ export class JavaScriptParserVisitor {
     }
 
     visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations | J.VariableDeclarations {
+        const prefix = this.prefix(node);
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
-            if (node.modifiers) {
-                draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
-            }
-            draft.prefix = this.prefix(node);
+            draft.prefix = prefix;
+            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
         });
     }
 
     visitExpressionStatement(node: ts.ExpressionStatement): Statement {
-        const expression = this.visit(node.expression) as Expression;
+        const expression: Expression = this.visit(node.expression) as Expression;
         if (isStatement(expression)) {
             return expression as Statement;
         }
+        const e: Expression = expression;
         return {
             kind: JS.Kind.ExpressionStatement,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: e.prefix,
             markers: emptyMarkers,
-            expression: expression
+            expression: produce(e, draft => {
+                draft.prefix = emptySpace
+            })
         } satisfies JS.ExpressionStatement as JS.ExpressionStatement;
     }
 
@@ -2768,7 +2769,7 @@ export class JavaScriptParserVisitor {
                 update: [node.incrementor ? this.rightPadded(ts.isStatement(node.incrementor) ? this.visit(node.incrementor) : {
                         kind: JS.Kind.ExpressionStatement,
                         id: randomId(),
-                        prefix: emptySpace,
+                        prefix: this.prefix(node.incrementor),
                         markers: emptyMarkers,
                         expression: this.visit(node.incrementor)
                     }, this.suffix(node.incrementor)) :
@@ -3064,7 +3065,7 @@ export class JavaScriptParserVisitor {
             modifiers.push({
                 kind: J.Kind.Modifier,
                 id: randomId(),
-                prefix: this.prefix(kind),
+                prefix: modifiers.length === 0 ? this.prefix(kind) : this.prefix(kind),
                 markers: emptyMarkers,
                 annotations: [],
                 keyword: kind.kind === ts.SyntaxKind.VarKeyword ? 'var' :
@@ -3263,7 +3264,7 @@ export class JavaScriptParserVisitor {
                     {
                         kind: J.Kind.EnumValueSet,
                         id: randomId(),
-                        prefix: emptySpace,
+                        prefix: node.members[0] ? this.prefix(node.members[0]) : emptySpace,
                         markers: emptyMarkers,
                         enums: node.members.map(em => this.rightPadded(this.visit(em), this.suffix(em))),
                         terminatedWithSemicolon: node.members.hasTrailingComma
@@ -3323,7 +3324,7 @@ export class JavaScriptParserVisitor {
             return {
                 kind: JS.Kind.NamespaceDeclaration,
                 id: randomId(),
-                prefix: node.parent.kind === ts.SyntaxKind.ModuleBlock ? this.prefix(node) : emptySpace,
+                prefix: this.prefix(node),
                 markers: emptyMarkers,
                 modifiers: this.mapModifiers(node),
                 keywordType: this.leftPadded(
@@ -3457,7 +3458,7 @@ export class JavaScriptParserVisitor {
                         const typeKeyword = node.getChildren().find(n => n.kind === ts.SyntaxKind.TypeKeyword);
                         return this.prefix(typeKeyword!);
                     } else {
-                        return emptySpace;
+                        return this.prefix(node.name);
                     }
                 })(),
                 markers: emptyMarkers,

@@ -20,6 +20,8 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 
@@ -36,13 +38,15 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     private final Tree stopAfter;
 
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
+    private final SpacesStyle spacesStyle;
     private final WrappingAndBracesStyle style;
 
     public WrappingAndBracesVisitor(WrappingAndBracesStyle style) {
-        this(style, null);
+        this(IntelliJ.spaces(), style, null);
     }
 
-    public WrappingAndBracesVisitor(WrappingAndBracesStyle style, @Nullable Tree stopAfter) {
+    public WrappingAndBracesVisitor(SpacesStyle spacesStyle, WrappingAndBracesStyle style, @Nullable Tree stopAfter) {
+        this.spacesStyle = spacesStyle;
         this.style = style;
         this.stopAfter = stopAfter;
     }
@@ -114,7 +118,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 );
             }
         }
-        return m;
+        return (J.MethodDeclaration) new WrapMethodDeclarationParameters<>(spacesStyle, style).visit(m, p, getCursor().getParentTreeCursor());
     }
 
     @Override

@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
-import {AutoformatVisitor} from "../../../src/javascript/format";
+import {autoFormat, AutoformatVisitor, JavaScriptVisitor, typescript} from "../../../src/javascript";
 
 
 describe('AutoformatVisitor', () => {
@@ -100,7 +99,6 @@ describe('AutoformatVisitor', () => {
                     if (1 > 0) {
                         console.log("four", "three", "six");
                     }
-
                     let i = 1;
                     while (i < 4) {
                         i++;
@@ -112,7 +110,6 @@ describe('AutoformatVisitor', () => {
                     } finally {
                         console.log("finally");
                     }
-
                     const isTypeScriptFun = i > 3 ? "yes" : "hell yeah!";
                     for (let j = 1; j <= 5; j++) {
                         console.log(\`Number: \` + j);
@@ -135,10 +132,10 @@ describe('AutoformatVisitor', () => {
             }
             `)
             // @formatter:on
-        )});
+        )
+    });
 
     test('a statement following an if', () => {
-        // TODO not sure if there should be a newline after the if
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -150,11 +147,11 @@ describe('AutoformatVisitor', () => {
             `
             if (1 > 0) {
             }
-
             let i = 1;
             `)
             // @formatter:on
-        )});
+        )
+    });
 
     test('try catch-all', () => {
         return spec.rewriteRun(
@@ -175,7 +172,8 @@ describe('AutoformatVisitor', () => {
             }
             `)
             // @formatter:on
-        )});
+        )
+    });
 
     test('import', () => {
         return spec.rewriteRun(
@@ -184,7 +182,8 @@ describe('AutoformatVisitor', () => {
             typescript(`import { delta,gamma} from 'delta.js'`,
                  `import {delta, gamma} from 'delta.js'`)
             // @formatter:on
-        )});
+        )
+    });
 
     test('anonymous function expression', () => {
         return spec.rewriteRun(
@@ -196,7 +195,63 @@ describe('AutoformatVisitor', () => {
                 const fn =
                     function () {
                         return 99;
+                    };`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('object literal in a single line', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript("const x = { a: 1 };",
+                `
+                    const x = {
+                        a: 1
                     };
+                    `
+                    // @formatter:on
+            ))
+    });
+
+    test('after unary not operator', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const b = ! true`,
+                `const b = !true`,
+            )
+            // @formatter:on
+        )
+    });
+
+    test('nested method invocation preserves indentation when formatting subtree', () => {
+        // This test simulates what happens when the templating system replaces a node
+        // and calls maybeAutoFormat() on just that subtree
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+                // Only format the logger.info() call, simulating a template replacement
+                if (methodInvocation.name?.simpleName === 'info') {
+                    // Format just this subtree (this is what causes the bug)
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent);
+                }
+                return super.visitMethodInvocation(methodInvocation, p);
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                function normalFunction() {
+                    logger.info("normal");
+                }
                 `
             )
             // @formatter:on

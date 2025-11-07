@@ -16,35 +16,31 @@
 package org.openrewrite.gradle.internal;
 
 import groovy.text.SimpleTemplateEngine;
+import org.gradle.util.GradleVersion;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.gradle.internal.GradleWrapperScriptLoader.Version;
 import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.LatestRelease;
-import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.Adler32;
 
-import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
@@ -52,111 +48,185 @@ import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
 public class GradleWrapperScriptDownloader {
     private static final Path WRAPPER_SCRIPTS = Paths.get("rewrite-gradle/src/main/resources/META-INF/rewrite/gradle-wrapper/");
 
-    public static void main(String[] args) throws IOException, InterruptedException {
-        Lock lock = new ReentrantLock();
+    public static void main(String[] args) throws Exception {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        Map<String, GradleWrapper.GradleVersion> allGradleReleases = GradleWrapper.listAllPublicVersions(ctx)
-                .stream()
-                .filter(v -> v.getDistributionType() == GradleWrapper.DistributionType.Bin)
-                .collect(toMap(GradleWrapper.GradleVersion::getVersion, v -> v));
-        Map<String, GradleWrapperScriptLoader.Version> allDownloadedVersions =
-                new ConcurrentHashMap<>(new GradleWrapperScriptLoader().getAllVersions());
-        allDownloadedVersions.forEach((key, value) -> {
-            if (!allGradleReleases.containsKey(key)) {
-                allDownloadedVersions.remove(key);
-            }
-        });
+        Map<String, GradleWrapper.GradleVersion> gradleBinVersions = GradleWrapper.listAllPublicVersions(ctx).stream()
+          .filter(v -> v.getDistributionType() == GradleWrapper.DistributionType.Bin)
+          .collect(toMap(GradleWrapper.GradleVersion::getVersion, v -> v));
+        Map<String, Version> csvVersions = new GradleWrapperScriptLoader().getAllVersions();
+        Map<String, Version> allVersions = new ConcurrentHashMap<>(csvVersions);
+        allVersions.keySet().retainAll(gradleBinVersions.keySet());
 
-        Set<String> unixChecksums = new CopyOnWriteArraySet<>();
-        Set<String> batChecksums = new CopyOnWriteArraySet<>();
+        Map<String, String> unixChecksums = new ConcurrentHashMap<>();
+        Map<String, String> batChecksums = new ConcurrentHashMap<>();
         AtomicInteger i = new AtomicInteger();
-        ForkJoinPool pool = ForkJoinPool.commonPool();
-        pool.invokeAll(allGradleReleases.values().stream().map(version -> (Callable<Void>) () -> {
-            String v = version.getVersion();
-            String threadName = " [" + Thread.currentThread().getName() + "]";
 
-            if (allDownloadedVersions.containsKey(v)) {
-                unixChecksums.add(allDownloadedVersions.get(v).getGradlewChecksum());
-                batChecksums.add(allDownloadedVersions.get(v).getGradlewChecksum());
-                System.out.printf("%03d: %s already exists. Skipping.%s%n", i.incrementAndGet(),
-                        v, threadName);
-                return null;
+        // Use virtual threads for I/O-bound workload
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (GradleWrapper.GradleVersion version : gradleBinVersions.values()) {
+                executor.submit(() -> processVersion(version, allVersions, unixChecksums, batChecksums, i, ctx));
             }
-
-            try {
-                DistributionInfos infos = DistributionInfos.fetch(version, ctx);
-                GradleWrapper wrapper = new GradleWrapper(v, infos);
-
-                // download
-                String gradlewTemplate = downloadScript(WRAPPER_SCRIPT_LOCATION, wrapper, "unix", ctx);
-                String gradlewBatTemplate = downloadScript(WRAPPER_BATCH_LOCATION, wrapper, "windows", ctx);
-
-                // validate
-                String gradlew = renderTemplate(gradlewTemplate, unixBindings(wrapper.getVersion()), "\n");
-                String gradlewBat = renderTemplate(gradlewBatTemplate, windowsBindings(wrapper.getVersion()), "\r\n");
-
-                // checksum
-                String gradlewChecksum = hash("unix", gradlew);
-                String gradlewBatChecksum = hash("windows", gradlewBat);
-
-                unixChecksums.add(gradlewChecksum);
-                batChecksums.add(gradlewBatChecksum);
-
-                lock.lock();
-                allDownloadedVersions.put(v, new GradleWrapperScriptLoader.Version(v, gradlewChecksum, gradlewBatChecksum));
-
-                List<String> sortedVersions = new ArrayList<>(allDownloadedVersions.keySet());
-                sortedVersions.sort(new LatestRelease(null).reversed());
-                try (BufferedWriter writer = Files.newBufferedWriter(WRAPPER_SCRIPTS.resolve("versions.csv"))) {
-                    writer.write("version,gradlew,gradlewBat\n");
-                    for (String sortedVersion : sortedVersions) {
-                        GradleWrapperScriptLoader.Version version1 = allDownloadedVersions.get(sortedVersion);
-                        writer.write(sortedVersion + "," + version1.getGradlewChecksum() + "," + version1.getGradlewBatChecksum() + "\n");
-                    }
-                }
-                System.out.printf("%03d: %s downloaded.%s%n", i.incrementAndGet(), v, threadName);
-            } catch (Throwable t) {
-                // FIXME There are some wrappers that are not downloading successfully. Why?
-                System.out.printf("%03d: %s failed to download: %s.%s%n", i.incrementAndGet(), v, t.getMessage(), threadName);
-                return null;
-            } finally {
-                lock.unlock();
-            }
-            return null;
-        }).collect(toList()));
-
-        while (pool.getActiveThreadCount() > 0) {
-            //noinspection BusyWait
-            Thread.sleep(100);
         }
 
-        cleanupScripts("unix", unixChecksums);
-        cleanupScripts("windows", batChecksums);
+        // Write versions.csv once at the end
+        List<String> sortedVersions = new ArrayList<>(allVersions.keySet());
+        sortedVersions.sort(new LatestRelease(null).reversed());
+        try (BufferedWriter writer = Files.newBufferedWriter(WRAPPER_SCRIPTS.resolve("versions.csv"))) {
+            writer.write("version,gradlew,gradlewBat\n");
+            for (String sortedVersion : sortedVersions) {
+                Version version = allVersions.get(sortedVersion);
+                writer.write("%s,%s,%s\n".formatted(
+                  sortedVersion,
+                  version.getGradlewChecksum(),
+                  version.getGradlewBatChecksum()));
+            }
+        }
+
+        // Write new files once
+        for (Map.Entry<String, String> entry : unixChecksums.entrySet()) {
+            if (!entry.getValue().isBlank()) {
+                Path scriptChecksumPath = WRAPPER_SCRIPTS.resolve("unix").resolve(entry.getKey() + ".txt");
+                Files.writeString(scriptChecksumPath, entry.getValue());
+            }
+        }
+        for (Map.Entry<String, String> entry : batChecksums.entrySet()) {
+            if (!entry.getValue().isBlank()) {
+                Path scriptChecksumPath = WRAPPER_SCRIPTS.resolve("windows").resolve(entry.getKey() + ".txt");
+                Files.writeString(scriptChecksumPath, entry.getValue());
+            }
+        }
+
+        // Remove old unused scripts
+        cleanupScripts("unix", unixChecksums.keySet());
+        cleanupScripts("windows", batChecksums.keySet());
+    }
+
+    private static void processVersion(
+      GradleWrapper.GradleVersion version,
+      Map<String, Version> allVersions,
+      Map<String, String> unixChecksums,
+      Map<String, String> batChecksums,
+      AtomicInteger i,
+      InMemoryExecutionContext ctx
+    ) {
+        String v = version.getVersion();
+        if (allVersions.containsKey(v)) {
+            GradleWrapperScriptLoader.Version existingVersion = allVersions.get(v);
+            Path unixFile = WRAPPER_SCRIPTS.resolve("unix").resolve(existingVersion.getGradlewChecksum() + ".txt");
+            Path windowsFile = WRAPPER_SCRIPTS.resolve("windows").resolve(existingVersion.getGradlewBatChecksum() + ".txt");
+
+            if (Files.exists(unixFile) && Files.exists(windowsFile)) {
+                unixChecksums.computeIfAbsent(allVersions.get(v).getGradlewChecksum(), checksum -> loadScript("unix", checksum));
+                batChecksums.computeIfAbsent(allVersions.get(v).getGradlewBatChecksum(), checksum -> loadScript("windows", checksum));
+                System.out.printf("%03d: %s already exists. Skipping.%n", i.incrementAndGet(), v);
+                return;
+            }
+            System.out.printf("%03d: %s exists in CSV but files missing. Re-downloading.%n", i.incrementAndGet(), v);
+        }
+
+        try {
+            DistributionInfos infos = DistributionInfos.fetch(version, ctx);
+            GradleWrapper wrapper = new GradleWrapper(v, infos);
+
+            // download
+            String gradlewTemplate = downloadScript(WRAPPER_SCRIPT_LOCATION, wrapper, "unix", ctx);
+            String gradlewBatTemplate = downloadScript(WRAPPER_BATCH_LOCATION, wrapper, "windows", ctx);
+
+            // validate
+            String gradlew = renderTemplate(gradlewTemplate, unixBindings(wrapper.getVersion()), "\n");
+            String gradlewBat = renderTemplate(gradlewBatTemplate, windowsBindings(wrapper.getVersion()), "\r\n");
+
+            // checksum
+            String gradlewChecksum = hash(gradlew);
+            String gradlewBatChecksum = hash(gradlewBat);
+
+            // verify non-collision
+            if ((unixChecksums.containsKey(gradlewChecksum) && !unixChecksums.get(gradlewChecksum).equals(gradlew)) ||
+              (batChecksums.containsKey(gradlewBatChecksum) && !batChecksums.get(gradlewBatChecksum).equals(gradlewBat))) {
+                throw new IllegalStateException(String.format("Checksum collision [gradlew=%s, gradlew.bat=%s]", gradlewChecksum, gradlewBatChecksum));
+            }
+
+            // content
+            unixChecksums.put(gradlewChecksum, gradlew);
+            batChecksums.put(gradlewBatChecksum, gradlewBat);
+
+            // Update map (ConcurrentHashMap is thread-safe)
+            allVersions.put(v, new Version(v, gradlewChecksum, gradlewBatChecksum));
+
+            System.out.printf("%03d: %s downloaded.%n", i.incrementAndGet(), v);
+        } catch (Throwable t) {
+            // FIXME There are some wrappers that are not downloading successfully. Why?
+            System.out.printf("%03d: %s failed to download: %s.%n", i.incrementAndGet(), v, t.getMessage());
+        }
+    }
+
+    private static String loadScript(String os, String checksum) {
+        try {
+            return Files.readString(WRAPPER_SCRIPTS.resolve(os).resolve(checksum + ".txt"));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static String downloadScript(Path wrapperScriptLocation, GradleWrapper wrapper, String os,
                                          InMemoryExecutionContext ctx) {
         InputStream is = Remote.builder(wrapperScriptLocation)
-                .build(
-                        URI.create(wrapper.getDistributionInfos().getDownloadUrl()),
-                        "gradle-[^\\/]+/(?:.*\\/)+gradle-plugins-.*\\.jar",
-                        "org/gradle/api/internal/plugins/" + os + "StartScript.txt"
-                )
-                .getInputStream(ctx);
+          .build(
+            URI.create(wrapper.getDistributionInfos().getDownloadUrl()),
+            "gradle-[^\\/]+/(?:.*\\/)+gradle-plugins-.*\\.jar",
+            "org/gradle/api/internal/plugins/" + os + "StartScript.txt"
+          )
+          .getInputStream(ctx);
 
         return StringUtils.readFully(is);
     }
 
+    private static final GradleVersion GRADLE_9_1_0_RC_1 = GradleVersion.version("9.1.0-rc-1");
+    private static final GradleVersion GRADLE_9_0_M_2 = GradleVersion.version("9.0-milestone-2");
+    private static final GradleVersion GRADLE_9_0_M_1 = GradleVersion.version("9.0-milestone-1");
+    private static final GradleVersion GRADLE_8_14_RC_1 = GradleVersion.version("8.14-rc-1");
+    private static final GradleVersion GRADLE_5_3 = GradleVersion.version("5.3");
+    private static final GradleVersion GRADLE_5_0_RC_1 = GradleVersion.version("5.0-rc-1");
+    private static final GradleVersion GRADLE_1_7_RC_1 = GradleVersion.version("1.7-rc-1");
+    private static final GradleVersion GRADLE_1_0_M_8 = GradleVersion.version("1.0-milestone-8");
+
     private static Map<String, String> unixBindings(String gradleVersion) {
+        GradleVersion current = GradleVersion.version(gradleVersion);
+
         Map<String, String> binding = defaultBindings();
-        String defaultJvmOpts = defaultJvmOpts(gradleVersion);
-        binding.put("defaultJvmOpts", StringUtils.isNotEmpty(defaultJvmOpts) ? "'" + defaultJvmOpts + "'" : "");
-        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleVersion, "8.14") >= 0) {
+        if (current.compareTo(GRADLE_5_3) >= 0) {
+            binding.put("defaultJvmOpts", "'\"-Xmx64m\" \"-Xms64m\"'");
+        } else if (current.compareTo(GRADLE_5_0_RC_1) >= 0) {
+            binding.put("defaultJvmOpts", "'\"-Xmx64m\"'");
+        } else if (current.compareTo(GRADLE_1_7_RC_1) >= 0) {
+            binding.put("defaultJvmOpts", "\"\"");
+        } else {
+            binding.put("defaultJvmOpts", "");
+        }
+
+        if (current.compareTo(GRADLE_9_1_0_RC_1) >= 0) {
+            binding.put("classpath", "");
+            binding.put("entryPointArgs", "-jar \"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"");
+            binding.put("mainClassName", "");
+        } else if (current.compareTo(GRADLE_9_0_M_2) >= 0) {
+            binding.put("classpath", "\"\\\\\\\"\\\\\\\"\"");
+            binding.put("entryPointArgs", "-jar \"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"");
+            binding.put("mainClassName", "");
+        } else if (current.compareTo(GRADLE_9_0_M_1) >= 0) {
+            binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
+            binding.put("entryPointArgs", "");
+            binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
+        } else if (current.compareTo(GRADLE_8_14_RC_1) >= 0) {
             binding.put("classpath", "\"\\\\\\\\\\\"\\\\\\\\\\\"\"");
             binding.put("entryPointArgs", "-jar \"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"");
             binding.put("mainClassName", "");
-        } else {
+        } else if (current.compareTo(GRADLE_1_0_M_8) >= 0) {
             binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
+            binding.put("entryPointArgs", "");
+            binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
+        } else {
+            // Intentionally mixed slashes to match the 1.0-milestone versions
+            binding.put("classpath", "$APP_HOME/gradle\\wrapper\\gradle-wrapper.jar");
             binding.put("entryPointArgs", "");
             binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
         }
@@ -164,9 +234,26 @@ public class GradleWrapperScriptDownloader {
     }
 
     private static Map<String, String> windowsBindings(String gradleVersion) {
+        GradleVersion current = GradleVersion.version(gradleVersion);
+
         Map<String, String> binding = defaultBindings();
-        binding.put("defaultJvmOpts", defaultJvmOpts(gradleVersion));
-        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleVersion, "8.14") >= 0) {
+        if (current.compareTo(GRADLE_5_3) >= 0) {
+            binding.put("defaultJvmOpts", "\"-Xmx64m\" \"-Xms64m\"");
+        } else if (current.compareTo(GRADLE_5_0_RC_1) >= 0) {
+            binding.put("defaultJvmOpts", "\"-Xmx64m\"");
+        } else {
+            binding.put("defaultJvmOpts", "");
+        }
+
+        if (current.compareTo(GRADLE_9_0_M_2) >= 0) {
+            binding.put("classpath", "");
+            binding.put("mainClassName", "");
+            binding.put("entryPointArgs", "-jar \"%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar\"");
+        } else if (current.compareTo(GRADLE_9_0_M_1) >= 0) {
+            binding.put("classpath", "%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar");
+            binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
+            binding.put("entryPointArgs", "");
+        } else if (current.compareTo(GRADLE_8_14_RC_1) >= 0) {
             binding.put("classpath", "");
             binding.put("mainClassName", "");
             binding.put("entryPointArgs", "-jar \"%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar\"");
@@ -190,49 +277,31 @@ public class GradleWrapperScriptDownloader {
         return bindings;
     }
 
-    private static String defaultJvmOpts(String gradleVersion) {
-        VersionComparator gradle53VersionComparator = requireNonNull(Semver.validate("[5.3,)", null).getValue());
-        VersionComparator gradle50VersionComparator = requireNonNull(Semver.validate("[5.0,)", null).getValue());
-
-        if (gradle53VersionComparator.isValid(null, gradleVersion)) {
-            return "\"-Xmx64m\" \"-Xms64m\"";
-        } else if (gradle50VersionComparator.isValid(null, gradleVersion)) {
-            return "\"-Xmx64m\"";
-        }
-        return "";
-    }
-
     private static String renderTemplate(String source, Map<String, String> bindings, String lineSeparator) throws IOException, ClassNotFoundException {
         SimpleTemplateEngine engine = new SimpleTemplateEngine();
         return engine.createTemplate(source).make(new HashMap<>(bindings)).toString()
-          .replaceAll("\r\n|\r|\n", lineSeparator)
+          .replaceAll("\\R", lineSeparator)
           .replace("CLASSPATH=\"\\\\\\\\\\\"\\\\\\\\\\\"", "CLASSPATH=\"\\\\\\\"\\\\\\\"");
     }
 
-    private static String hash(String os, String text) throws IOException {
+    private static String hash(String text) {
         byte[] scriptText = text.getBytes(StandardCharsets.UTF_8);
         Adler32 adler32 = new Adler32();
         adler32.update(scriptText, 0, scriptText.length);
-
-        String scriptChecksum = Long.toHexString(adler32.getValue());
-        Path scriptChecksumPath = WRAPPER_SCRIPTS.resolve(os).resolve(scriptChecksum + ".txt");
-        if (!Files.exists(scriptChecksumPath)) {
-            Files.write(scriptChecksumPath, scriptText);
-        }
-
-        return scriptChecksum;
+        return Long.toHexString(adler32.getValue());
     }
 
     private static void cleanupScripts(String os, Set<String> checksums) throws IOException {
-        Files.list(WRAPPER_SCRIPTS.resolve(os))
-                .forEach(path -> {
-                    if (!checksums.contains(path.getFileName().toString().replace(".txt", ""))) {
-                        try {
-                            Files.delete(path);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                });
+        try (var stream = Files.list(WRAPPER_SCRIPTS.resolve(os))) {
+            stream
+              .filter(path -> !checksums.contains(path.getFileName().toString().replace(".txt", "")))
+              .forEach(path -> {
+                  try {
+                      Files.deleteIfExists(path);
+                  } catch (IOException e) {
+                      throw new UncheckedIOException(e);
+                  }
+              });
+        }
     }
 }

@@ -125,7 +125,11 @@ public class RecipeMarketplaceWriter {
                 row.add(bundle != null ? bundle.getPackageName() : "");
             }
             if (optionalColumns.contains("version")) {
-                row.add(bundle != null ? bundle.getVersion() : "");
+                if (bundle == null) {
+                    row.add("");
+                } else {
+                    row.add(bundle.getVersion() == null ? "" : bundle.getVersion());
+                }
             }
 
             // Required columns
@@ -133,7 +137,7 @@ public class RecipeMarketplaceWriter {
             row.add(recipe.getDisplayName());
             row.add(recipe.getDescription());
 
-            // Category columns (left = deepest, so reverse the path)
+            // Category columns (right-aligned: empty columns first, then categories from deepest to shallowest)
             // Filter out the epsilon root from the path
             List<String> filteredPath = new ArrayList<>();
             for (String category : categoryPath) {
@@ -142,8 +146,14 @@ public class RecipeMarketplaceWriter {
                 }
             }
             reverse(filteredPath);
+            // Right-align: pad with empty strings at the beginning
+            int padding = maxCategoryDepth - filteredPath.size();
             for (int i = 0; i < maxCategoryDepth; i++) {
-                row.add(i < filteredPath.size() ? filteredPath.get(i) : "");
+                if (i < padding) {
+                    row.add("");
+                } else {
+                    row.add(filteredPath.get(i - padding));
+                }
             }
 
             // Option columns
@@ -212,11 +222,13 @@ public class RecipeMarketplaceWriter {
     private Set<String> findUsedOptionalColumns(RecipeMarketplace marketplace) {
         Set<String> columns = new LinkedHashSet<>();
 
-        if (hasAnyBundleInfo(marketplace)) {
+        if (hasAnyBundle(marketplace)) {
             columns.add("ecosystem");
             columns.add("packageName");
-            columns.add("version");
-            if (hasTeamInfo(marketplace)) {
+            if (hasAnyVersion(marketplace)) {
+                columns.add("version");
+            }
+            if (hasAnyTeam(marketplace)) {
                 columns.add("team");
             }
         }
@@ -224,7 +236,7 @@ public class RecipeMarketplaceWriter {
         return columns;
     }
 
-    private boolean hasAnyBundleInfo(RecipeMarketplace marketplace) {
+    private boolean hasAnyBundle(RecipeMarketplace marketplace) {
         for (RecipeListing recipe : marketplace.getRecipes()) {
             if (recipe.getBundle() != null) {
                 return true;
@@ -232,7 +244,7 @@ public class RecipeMarketplaceWriter {
         }
 
         for (RecipeMarketplace child : marketplace.getCategories()) {
-            if (hasAnyBundleInfo(child)) {
+            if (hasAnyBundle(child)) {
                 return true;
             }
         }
@@ -240,7 +252,7 @@ public class RecipeMarketplaceWriter {
         return false;
     }
 
-    private boolean hasTeamInfo(RecipeMarketplace marketplace) {
+    private boolean hasAnyTeam(RecipeMarketplace marketplace) {
         for (RecipeListing recipe : marketplace.getRecipes()) {
             RecipeBundle bundle = recipe.getBundle();
             if (bundle != null && bundle.getTeam() != null) {
@@ -249,7 +261,24 @@ public class RecipeMarketplaceWriter {
         }
 
         for (RecipeMarketplace child : marketplace.getCategories()) {
-            if (hasTeamInfo(child)) {
+            if (hasAnyTeam(child)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean hasAnyVersion(RecipeMarketplace marketplace) {
+        for (RecipeListing recipe : marketplace.getRecipes()) {
+            RecipeBundle bundle = recipe.getBundle();
+            if (bundle != null && bundle.getVersion() != null) {
+                return true;
+            }
+        }
+
+        for (RecipeMarketplace child : marketplace.getCategories()) {
+            if (hasAnyVersion(child)) {
                 return true;
             }
         }

@@ -70,12 +70,13 @@ dependencies {
     "pluginLocalTestClasspath"(project(mapOf("path" to ":rewrite-gradle-tooling-model:model", "configuration" to "pluginLocalTestClasspath")))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
     testImplementation(localGroovy())
+    testImplementation(gradleApi())
 
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
-    testRuntimeOnly(gradleApi())
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
 }
 
