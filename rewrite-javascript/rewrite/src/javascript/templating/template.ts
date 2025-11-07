@@ -345,7 +345,7 @@ export class Template {
  * access array elements (e.g., `args.elements[0].element`).
  *
  * @param strings The string parts of the template
- * @param parameters The parameters between the string parts (Capture, Tree, or primitives)
+ * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, or Tree[])
  * @returns A Template object that can be applied to generate AST nodes
  *
  * @example
