@@ -190,11 +190,8 @@ describe('AutoformatVisitor', () => {
             // @formatter:off
             //language=typescript
             typescript("const x = { a: 1 };",
-                `
-                    const x = {
-                        a: 1
-                    };
-                    `
+                // TODO the leading space before `a` seems excessive
+                "const x = { a: 1};"
                     // @formatter:on
             ))
     });
@@ -315,5 +312,15 @@ describe('AutoformatVisitor', () => {
             )
             // @formatter:on
         )
+    });
+
+    test.each([
+        // @formatter:off
+        `const short = {name: "Ivan Almeida", age: 36};`,
+        `const long = {make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true};`,
+        // @formatter:on
+        ])('do not wrap object literals - %s', async (code) => {
+        // TODO we might eventually implement the "Chop down if long" setting for this
+        return spec.rewriteRun(typescript(code));
     });
 });
