@@ -49,7 +49,8 @@ export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
 export class LRUCache<K, V> {
     private cache = new Map<K, V>();
 
-    constructor(private maxSize: number) {}
+    constructor(private maxSize: number) {
+    }
 
     get(key: K): V | undefined {
         const value = this.cache.get(key);
@@ -111,7 +112,7 @@ export function generateCacheKey(
         Array.from(templateParts).join('|'),
         itemsKey,
         contextStatements.join(';'),
-        JSON.stringify(dependencies || {})
+        JSON.stringify(dependencies)
     ].join('::');
 }
 

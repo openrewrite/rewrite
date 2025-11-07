@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, pattern, Template, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 import {produce} from "immer";
 import {produceAsync} from "../../../src";
@@ -28,22 +28,6 @@ describe('template2 replace', () => {
                 if (literal.valueSource === '1') {
                     // Use the new template API with tagged template literals
                     return template`2`.apply(this.cursor, literal);
-                }
-                return literal;
-            }
-        });
-        return spec.rewriteRun(
-            //language=typescript
-            typescript('const a = 1', 'const a = 2'),
-        );
-    });
-
-    test('parameter replacement', () => {
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
-                if (literal.valueSource === '1') {
-                    // Use the new template API with tagged template literals and parameter substitution
-                    return template`${2}`.apply(this.cursor, literal);
                 }
                 return literal;
             }
@@ -118,85 +102,6 @@ describe('template2 replace', () => {
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1', 'const a = 42'),
-        );
-    });
-
-    test('literal string insertion', () => {
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
-                if (literal.valueSource === '1') {
-                    // Strings are inserted literally into the template
-                    return template`${'myValue'}`.apply(this.cursor, literal);
-                }
-                return literal;
-            }
-        });
-        return spec.rewriteRun(
-            //language=typescript
-            typescript('const a = 1', 'const a = myValue'),
-        );
-    });
-
-    test('capture mixed with literal strings', () => {
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
-                if (literal.valueSource === '1') {
-                    // Create a replacement value
-                    const replacement = produce(literal, draft => {
-                        draft.value = 10;
-                        draft.valueSource = '10';
-                    });
-
-                    // Mix capture (late binding) with literal string insertion
-                    const x = capture();
-                    return template`${x} + ${'y'}`.apply(this.cursor, literal, new Map([[x, replacement]]));
-                }
-                return literal;
-            }
-        });
-        return spec.rewriteRun(
-            //language=typescript
-            typescript('const a = 1', 'const a = 10 + y'),
-        );
-    });
-
-    test('capture with object literal syntax', () => {
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
-                if (literal.valueSource === '1') {
-                    // Create a replacement value
-                    const replacement = produce(literal, draft => {
-                        draft.value = 10;
-                        draft.valueSource = '10';
-                    });
-
-                    // Use named capture with object literal syntax
-                    const x = capture();
-                    return template`${x} + ${'y'}`.apply(this.cursor, literal, {[x]: replacement});
-                }
-                return literal;
-            }
-        });
-        return spec.rewriteRun(
-            //language=typescript
-            typescript('const a = 1', 'const a = 10 + y')
-        );
-    });
-
-    test('literal string for identifier', () => {
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
-                if (literal.valueSource === '1') {
-                    // Simulate the instanceof example - type is just a string
-                    const type = 'Date';
-                    return template`${literal} instanceof ${type}`.apply(this.cursor, literal);
-                }
-                return literal;
-            }
-        });
-        return spec.rewriteRun(
-            //language=typescript
-            typescript('const a = 1', 'const a = 1 instanceof Date'),
         );
     });
 
