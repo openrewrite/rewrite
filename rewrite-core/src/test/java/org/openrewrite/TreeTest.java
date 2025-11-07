@@ -16,6 +16,8 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
@@ -53,14 +55,18 @@ class TreeTest implements RewriteTest {
         );
     }
 
-    @Test
-    void printRestoresBomWhenPresent() {
+    @ParameterizedTest
+    @CsvSource({
+        "true, '\uFEFFHello World'",
+        "false, 'Hello World'"
+    })
+    void printBomHandling(boolean charsetBomMarked, String expected) {
         PlainText sourceFile = new PlainText(
             Tree.randomId(),
             Paths.get("test.txt"),
             Markers.EMPTY,
             "UTF-8",
-            true, // charsetBomMarked = true
+            charsetBomMarked,
             null,
             null,
             "Hello World",
@@ -69,27 +75,6 @@ class TreeTest implements RewriteTest {
 
         String printed = sourceFile.printAll();
 
-        assertThat(printed).startsWith("\uFEFF");
-        assertThat(printed).isEqualTo("\uFEFFHello World");
-    }
-
-    @Test
-    void printDoesNotAddBomWhenNotPresent() {
-        PlainText sourceFile = new PlainText(
-            Tree.randomId(),
-            Paths.get("test.txt"),
-            Markers.EMPTY,
-            "UTF-8",
-            false, // charsetBomMarked = false
-            null,
-            null,
-            "Hello World",
-            null
-        );
-
-        String printed = sourceFile.printAll();
-
-        assertThat(printed).doesNotStartWith("\uFEFF");
-        assertThat(printed).isEqualTo("Hello World");
+        assertThat(printed).isEqualTo(expected);
     }
 }
