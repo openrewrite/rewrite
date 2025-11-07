@@ -18,7 +18,7 @@ import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {produce} from 'immer';
 import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
-import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue} from './capture';
+import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
 import {maybeAutoFormat} from '../format';
@@ -322,6 +322,8 @@ export class TemplateEngine {
 
     /**
      * Builds a template string with parameter placeholders.
+     * RawCode parameters are spliced directly into the template at construction time.
+     * Other parameters use placeholders that are replaced during application.
      *
      * @param templateParts The string parts of the template
      * @param parameters The parameters between the string parts
@@ -335,10 +337,17 @@ export class TemplateEngine {
         for (let i = 0; i < templateParts.length; i++) {
             result += templateParts[i];
             if (i < parameters.length) {
-                // All parameters are now placeholders (no primitive inlining)
-                // This ensures templates with the same structure always produce the same AST
-                const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-                result += placeholder;
+                const param = parameters[i].value;
+
+                // Check if this is a RawCode instance - splice directly
+                if (param instanceof RawCode || (param && typeof param === 'object' && param[RAW_CODE_SYMBOL])) {
+                    result += (param as RawCode).code;
+                } else {
+                    // All other parameters use placeholders
+                    // This ensures templates with the same structure always produce the same AST
+                    const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
+                    result += placeholder;
+                }
             }
         }
 

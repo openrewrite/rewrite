@@ -17,7 +17,7 @@ import {Cursor, Tree} from '../..';
 import {J, Type} from '../../java';
 import type {MatchResult, Pattern} from "./pattern";
 import type {Template} from "./template";
-import type {CaptureValue} from "./capture";
+import type {CaptureValue, RawCode} from "./capture";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -276,6 +276,7 @@ export interface PatternOptions {
  * - Capture: For pattern matching and reuse
  * - CaptureValue: Result of property access or array operations on captures (e.g., capture.prop, capture[0], capture.slice(1))
  * - TemplateParam: For standalone template parameters
+ * - RawCode: For inserting literal code strings at construction time
  * - Tree: AST nodes to be inserted directly
  * - Tree[]: Arrays of AST nodes (from variadic capture operations like slice)
  * - J.RightPadded<any>: Wrapper containing an element with markers (element will be extracted)
@@ -283,9 +284,9 @@ export interface PatternOptions {
  * - J.Container<any>: Container with elements (elements will be expanded)
  *
  * Note: Primitive values (string, number, boolean) are NOT supported in template literals.
- * Use Template.builder() API if you need to insert literal values.
+ * Use raw() for inserting code strings, or Template.builder() API for programmatic construction.
  */
-export type TemplateParameter = Capture | CaptureValue | TemplateParam | Tree | Tree[] | J.RightPadded<any> | J.RightPadded<any>[] | J.Container<any>;
+export type TemplateParameter = Capture | CaptureValue | TemplateParam | RawCode | Tree | Tree[] | J.RightPadded<any> | J.RightPadded<any>[] | J.Container<any>;
 
 /**
  * Parameter specification for template generation (internal).

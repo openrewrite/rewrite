@@ -1,0 +1,181 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {fromVisitor, RecipeSpec} from "../../../src/test";
+import {capture, JavaScriptVisitor, pattern, raw, rewrite, template, typescript, _} from "../../../src/javascript";
+import {J} from "../../../src/java";
+
+describe('raw() function', () => {
+    const spec = new RecipeSpec();
+
+    describe('construction-time string interpolation', () => {
+        test('splices raw code directly into template', () => {
+            const methodName = "info";
+            const msg = capture('msg');
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    if ((method.select?.element as J.Identifier)?.simpleName === 'console' &&
+                        (method.name as J.Identifier).simpleName === 'log') {
+                        return template`logger.${raw(methodName)}(${msg})`.apply(this.cursor, method, new Map([
+                            ['msg', method.arguments.elements[0].element]
+                        ]));
+                    }
+                    return method;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'console.log("test message")',
+                    'logger.info("test message")'
+                )
+            );
+        });
+
+        test('works with multiple raw() interpolations', () => {
+            const obj = "console";
+            const method = "log";
+            const msg = capture('msg');
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    if ((invocation.select?.element as J.Identifier)?.simpleName === 'logger' &&
+                        (invocation.name as J.Identifier).simpleName === 'info') {
+                        return template`${raw(obj)}.${raw(method)}(${msg})`.apply(this.cursor, invocation, new Map([
+                            ['msg', invocation.arguments.elements[0].element]
+                        ]));
+                    }
+                    return invocation;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'logger.info("hello")',
+                    'console.log("hello")'
+                )
+            );
+        });
+
+        test('works with operators', () => {
+            const operator = ">=";
+            const value = capture('value');
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    if (binary.operator.element === J.Binary.Type.Equal) {
+                        return template`${value} ${raw(operator)} threshold`.apply(this.cursor, binary, new Map([
+                            ['value', binary.left]
+                        ]));
+                    }
+                    return binary;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'count == threshold',
+                    'count >= threshold'
+                )
+            );
+        });
+    });
+
+    describe('integration with rewrite()', () => {
+        test('works in rewrite rules', () => {
+            const logLevel = "warn";
+            const msg = _('msg');
+
+            const rule = rewrite(() => ({
+                before: pattern`console.log(${msg})`,
+                after: template`logger.${raw(logLevel)}(${msg})`
+            }));
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, method) || method;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'console.log("warning")',
+                    'logger.warn("warning")'
+                )
+            );
+        });
+    });
+
+    describe('mixed with other parameters', () => {
+        test('can mix raw() with capture()', () => {
+            const prefix = "user";
+            const value = capture('value');
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    if (binary.operator.element === J.Binary.Type.LessThan &&
+                        (binary.left as J.Identifier)?.simpleName === 'age') {
+                        return template`${raw(prefix)}.age < ${value}`.apply(this.cursor, binary, new Map([
+                            ['value', binary.right]
+                        ]));
+                    }
+                    return binary;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'age < 18',
+                    'user.age < 18'
+                )
+            );
+        });
+    });
+
+    describe('recipe option use case', () => {
+        test('uses raw() with dynamic recipe configuration', () => {
+            // Simulates a recipe with an option for the log level
+            const logLevel = "debug";
+            const msg = _('msg');
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    if ((method.select?.element as J.Identifier)?.simpleName === 'console' &&
+                        (method.name as J.Identifier).simpleName === 'log') {
+                        // Template is constructed with the dynamic log level from recipe option
+                        return template`logger.${raw(logLevel)}(${msg})`.apply(this.cursor, method, new Map([
+                            ['msg', method.arguments.elements[0].element]
+                        ]));
+                    }
+                    return method;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'console.log("Debug info")',
+                    'logger.debug("Debug info")'
+                )
+            );
+        });
+    });
+});

@@ -18,7 +18,7 @@ import {J} from '../../java';
 import {Capture, Parameter, TemplateOptions, TemplateParameter} from './types';
 import {MatchResult} from './pattern';
 import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
-import {CAPTURE_NAME_SYMBOL} from './capture';
+import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
 import {JS} from '..';
 
@@ -229,8 +229,9 @@ export class Template {
      * - Level 2: Global cache (globalAstCache) - fast, shared across all templates
      * - Level 3: TemplateEngine - slow, parses and processes the template
      *
-     * Since all parameters are now placeholders (no primitives), templates with the same
-     * structure always parse to the same AST regardless of parameter values.
+     * Most parameters use placeholders that are replaced during application, so templates
+     * with the same structure share cached ASTs. However, raw() parameters are spliced at
+     * construction time, so their values must be included in the cache key.
      *
      * @returns The cached or newly computed template tree
      * @internal
@@ -242,9 +243,17 @@ export class Template {
         }
 
         // Generate cache key for global lookup
-        // Since all parameters use placeholders, we only need the template structure
+        // For raw() parameters, we need to include their code values in the key
+        // since they're spliced at construction time, not application time
         const contextStatements = this.options.context || this.options.imports || [];
-        const parametersKey = this.parameters.length.toString(); // Just the count
+        const parametersKey = this.parameters.map((p, i) => {
+            const value = p.value;
+            // Include raw code values in the cache key using the symbol
+            if (value && typeof value === 'object' && value[RAW_CODE_SYMBOL]) {
+                return `raw:${value.code}`;
+            }
+            return i.toString();
+        }).join(',');
         const cacheKey = generateCacheKey(
             this.templateParts,
             parametersKey,

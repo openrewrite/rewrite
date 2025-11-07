@@ -73,6 +73,8 @@ export const CAPTURE_CONSTRAINT_SYMBOL = Symbol('captureConstraint');
 export const CAPTURE_CAPTURING_SYMBOL = Symbol('captureCapturing');
 // Symbol to access type information without triggering Proxy
 export const CAPTURE_TYPE_SYMBOL = Symbol('captureType');
+// Symbol to identify RawCode instances
+export const RAW_CODE_SYMBOL = Symbol('rawCode');
 
 export class CaptureImpl<T = any> implements Capture<T> {
     public readonly name: string;
@@ -508,6 +510,75 @@ any.nextAnonId = 1;
 export function param<T = any>(name?: string): TemplateParam<T> {
     const paramName = name || `unnamed_${capture.nextUnnamedId++}`;
     return new TemplateParamImpl<T>(paramName);
+}
+
+/**
+ * Represents raw code that should be inserted verbatim into templates at construction time.
+ * This is useful for dynamic code generation where the code structure is determined at runtime.
+ */
+export class RawCode {
+    [RAW_CODE_SYMBOL] = true;
+
+    constructor(public readonly code: string) {}
+}
+
+/**
+ * Creates a raw code specification for inserting literal code strings into templates.
+ *
+ * Use `raw()` when you need to insert code that is generated dynamically (e.g., from recipe options,
+ * computed field names, or programmatic string manipulation) directly into a template at construction time.
+ *
+ * The string is spliced into the template before parsing, so it becomes part of the template's AST.
+ * This is different from `param()` or `capture()` which are placeholders replaced during application.
+ *
+ * @param code The code string to insert verbatim into the template
+ * @returns A RawCode object that will be spliced into the template
+ *
+ * @remarks
+ * **When to use `raw()` vs `param()` vs `capture()`:**
+ *
+ * - Use `raw()` when you have a **code string** to insert at **template construction time**
+ * - Use `param()` when you have an **AST node** to substitute at **template application time**
+ * - Use `capture()` when working with **pattern matching** and need to reference matched values
+ *
+ * **Safety Considerations:**
+ * - No validation is performed on the code string
+ * - The code must be syntactically valid at the position where it's inserted
+ * - Recipe authors are trusted to provide valid code
+ *
+ * @example
+ * // Recipe option determines the log level
+ * class MyRecipe extends Recipe {
+ *     @Option
+ *     logLevel: string = "info";
+ *
+ *     getVisitor() {
+ *         // Template constructed with dynamic method name
+ *         const replacement = template`logger.${raw(this.logLevel)}(${_('msg')})`;
+ *         // Produces: logger.info(...) or logger.warn(...) etc.
+ *     }
+ * }
+ *
+ * @example
+ * // Build object literal from collected field names
+ * const fields = ["userId", "timestamp", "status"];
+ * template`{ ${raw(fields.join(', '))} }`
+ * // Produces: { userId, timestamp, status }
+ *
+ * @example
+ * // Dynamic import path
+ * const modulePath = "./utils";
+ * template`import { helper } from ${raw(`'${modulePath}'`)}`
+ * // Produces: import { helper } from './utils'
+ *
+ * @example
+ * // Configurable operator
+ * const operator = ">=";
+ * template`${_('value')} ${raw(operator)} threshold`
+ * // Produces: value >= threshold
+ */
+export function raw(code: string): RawCode {
+    return new RawCode(code);
 }
 
 /**

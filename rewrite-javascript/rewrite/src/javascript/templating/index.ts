@@ -36,6 +36,7 @@ export {
     capture,
     any,
     param,
+    raw,
     _
 } from './capture';
 
