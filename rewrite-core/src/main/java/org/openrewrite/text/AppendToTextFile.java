@@ -56,13 +56,13 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Option(displayName = "Existing file strategy",
             description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n" +
-                    "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n" +
-                    "- `Replace`: remove existing content from file.\n" +
-                    "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n" +
-                    "- `Merge`: append only lines from new content that are not already present in the file. " +
-                    "Lines are compared line-by-line after trimming whitespace. Preserves existing line order.\n\n" +
-                    "Note: this only affects the first interaction with the specified file per Rewrite execution.\n" +
-                    "Subsequent instances of this recipe in the same Rewrite execution will always append.",
+                          "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n" +
+                          "- `Replace`: remove existing content from file.\n" +
+                          "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n" +
+                          "- `Merge`: append only lines from new content that are not already present in the file. " +
+                          "Lines are compared line-by-line after trimming whitespace. Preserves existing line order.\n\n" +
+                          "Note: this only affects the first interaction with the specified file per Rewrite execution.\n" +
+                          "Subsequent instances of this recipe in the same Rewrite execution will always append.",
             valid = {"Continue", "Replace", "Leave", "Merge"},
             required = false)
     @Nullable Strategy existingFileStrategy;
@@ -77,10 +77,10 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public String getDescription() {
         return "Appends or replaces content of an existing plain text file, or creates a new one if it doesn't already exist. " +
-                "Please note that this recipes requires existing plain text files' format to be successfully parsable by OpenRewrite. " +
-                "If a file is left unchanged, it might be parsed as a `Quark` rather than plain text. In such case, use the `plainTextMask` option. " +
-                "See the [Gradle](https://docs.openrewrite.org/reference/gradle-plugin-configuration#configuring-the-rewrite-dsl) or " +
-                "[Maven](https://openrewrite.github.io/rewrite-maven-plugin/run-mojo.html#plainTextMasks) plugin configuration page.";
+               "Please note that this recipes requires existing plain text files' format to be successfully parsable by OpenRewrite. " +
+               "If a file is left unchanged, it might be parsed as a `Quark` rather than plain text. In such case, use the `plainTextMask` option. " +
+               "See the [Gradle](https://docs.openrewrite.org/reference/gradle-plugin-configuration#configuring-the-rewrite-dsl) or " +
+               "[Maven](https://openrewrite.github.io/rewrite-maven-plugin/run-mojo.html#plainTextMasks) plugin configuration page.";
     }
 
     @Override
