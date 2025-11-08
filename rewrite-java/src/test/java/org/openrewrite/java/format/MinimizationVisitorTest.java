@@ -47,8 +47,7 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                void method(String name, int age) {
-                }
+                void method(String name, int age) {}
             }
             """
           )
@@ -67,8 +66,7 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                void method(String param1, int param2, boolean param3) {
-                }
+                void method(String param1, int param2, boolean param3) {}
             }
             """
           )
@@ -81,8 +79,7 @@ class MinimizationVisitorTest implements RewriteTest {
           java(
             """
             class Test {
-                void method(String name  /* comment */  , int age) {
-                }
+                void method(String name  /* comment */  , int age) {}
             }
             """
           )
@@ -166,8 +163,7 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                public static final void method() {
-                }
+                public static final void method() {}
             }
             """
           )
@@ -180,8 +176,7 @@ class MinimizationVisitorTest implements RewriteTest {
           java(
             """
             class Test {
-                public  /* important */  static void method() {
-                }
+                public  /* important */  static void method() {}
             }
             """
           )
@@ -257,8 +252,7 @@ class MinimizationVisitorTest implements RewriteTest {
           java(
             """
             class Test {
-                void method()  /* comment */  {
-                }
+                void method()  /* comment */  {}
             }
             """
           )
@@ -277,8 +271,7 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                public <T> void method(T param1, String param2) {
-                }
+                public <T> void method(T param1, String param2) {}
             }
             """
           )
@@ -297,8 +290,7 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                Test(String name, int age) {
-                }
+                Test(String name, int age) {}
             }
             """
           )
@@ -329,8 +321,7 @@ class MinimizationVisitorTest implements RewriteTest {
             @interface MyAnnotation {}
 
             class Test {
-                void method(@MyAnnotation String name, int age) {
-                }
+                void method(@MyAnnotation String name, int age) {}
             }
             """
           )
@@ -349,8 +340,7 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                void method(String first, int... values) {
-                }
+                void method(String first, int... values) {}
             }
             """
           )
@@ -369,8 +359,7 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                void method(String param1, String param2) {
-                }
+                void method(String param1, String param2) {}
             }
             """
           )
@@ -439,8 +428,7 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                void method() {
-                }
+                void method() {}
             }
             """
           )
@@ -459,8 +447,7 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                void method(String param) {
-                }
+                void method(String param) {}
             }
             """
           )
@@ -596,7 +583,1641 @@ class MinimizationVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                void method(String name, int age) {
+                void method(String name, int age) {}
+            }
+            """
+          )
+        );
+    }
+
+    // ===========================
+    // BeforeParentheses tests
+    // ===========================
+
+    @Test
+    void minimizeBeforeIfParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    if     (true) {
+                        System.out.println("true");
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    if (true) {
+                        System.out.println("true");
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeForParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    for     (int i = 0; i < 10; i++) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    for (int i = 0; i < 10; i++) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeWhileParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    while     (true) {
+                        break;
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    while (true) {
+                        break;
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeSwitchParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method(int value) {
+                    switch     (value) {
+                        case 1:
+                            break;
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method(int value) {
+                    switch (value) {
+                        case 1:
+                            break;
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeTryParentheses() {
+        rewriteRun(
+          java(
+            """
+            import java.io.FileInputStream;
+
+            class Test {
+                void method() {
+                    try     (FileInputStream fis = new FileInputStream("file.txt")) {
+                        // do something
+                    } catch (Exception e) {}
+                }
+            }
+            """,
+            """
+            import java.io.FileInputStream;
+
+            class Test {
+                void method() {
+                    try (FileInputStream fis = new FileInputStream("file.txt")) {
+                        // do something
+                    } catch (Exception e) {}
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeCatchParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    try {
+                        throw new Exception();
+                    } catch     (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    try {
+                        throw new Exception();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeSynchronizedParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    Object lock = new Object();
+                    synchronized     (lock) {
+                        // critical section
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    Object lock = new Object();
+                    synchronized (lock) {
+                        // critical section
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeAnnotationParameters() {
+        rewriteRun(
+          java(
+            """
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+
+            @Retention     (RetentionPolicy.RUNTIME)
+            @interface MyAnnotation {
+                String value();
+            }
+
+            class Test {
+                @MyAnnotation     ("test")
+                void method() {}
+            }
+            """,
+            """
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @interface MyAnnotation {
+                String value();
+            }
+
+            class Test {
+                @MyAnnotation("test")
+                void method() {}
+            }
+            """
+          )
+        );
+    }
+
+    // ===========================
+    // AroundOperators tests
+    // ===========================
+
+    @Test
+    void minimizeAroundAssignmentOperators() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x   =   5;
+                    x   +=   3;
+                    x   -=   2;
+                    x   *=   4;
+                    x   /=   2;
+                    x   %=   3;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = 5;
+                    x += 3;
+                    x -= 2;
+                    x *= 4;
+                    x /= 2;
+                    x %= 3;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundLogicalOperators() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    boolean result = true   &&   false   ||   true;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    boolean result = true && false || true;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundEqualityOperators() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    boolean eq = 5   ==   5;
+                    boolean neq = 5   !=   3;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    boolean eq = 5 == 5;
+                    boolean neq = 5 != 3;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundRelationalOperators() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    boolean lt = 5   <   10;
+                    boolean gt = 5   >   3;
+                    boolean lte = 5   <=   5;
+                    boolean gte = 5   >=   5;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    boolean lt = 5 < 10;
+                    boolean gt = 5 > 3;
+                    boolean lte = 5 <= 5;
+                    boolean gte = 5 >= 5;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundBitwiseOperators() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x = 5   &   3;
+                    int y = 5   |   3;
+                    int z = 5   ^   3;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = 5 & 3;
+                    int y = 5 | 3;
+                    int z = 5 ^ 3;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundAdditiveOperators() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int sum = 5   +   3;
+                    int diff = 5   -   3;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int sum = 5 + 3;
+                    int diff = 5 - 3;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundMultiplicativeOperators() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int product = 5   *   3;
+                    int quotient = 10   /   2;
+                    int remainder = 10   %   3;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int product = 5 * 3;
+                    int quotient = 10 / 2;
+                    int remainder = 10 % 3;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundShiftOperators() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x = 5   <<   2;
+                    int y = 20   >>   2;
+                    int z = -20   >>>   2;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = 5 << 2;
+                    int y = 20 >> 2;
+                    int z = -20 >>> 2;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundUnaryOperators() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x = 5;
+                    int y =   +   x;
+                    int z =   -   x;
+                    boolean b =   !   true;
+                    int complement =   ~   x;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = 5;
+                    int y = +x;
+                    int z = -x;
+                    boolean b = !true;
+                    int complement = ~x;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundMethodReferenceDoubleColon() {
+        rewriteRun(
+          java(
+            """
+            import java.util.function.Function;
+
+            class Test {
+                void method() {
+                    Function<String, Integer> f = String   ::   length;
+                }
+            }
+            """,
+            """
+            import java.util.function.Function;
+
+            class Test {
+                void method() {
+                    Function<String, Integer> f = String::length;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    // ===========================
+    // BeforeKeywords tests
+    // ===========================
+
+    @Test
+    void minimizeBeforeElseKeyword() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    if (true) {
+                        System.out.println("true");
+                    }     else {
+                        System.out.println("false");
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    if (true) {
+                        System.out.println("true");
+                    } else {
+                        System.out.println("false");
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeWhileKeywordInDoWhile() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    do {
+                        System.out.println("loop");
+                    }     while (false);
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    do {
+                        System.out.println("loop");
+                    } while (false);
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeCatchKeyword() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    try {
+                        throw new Exception();
+                    }     catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    try {
+                        throw new Exception();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeFinallyKeyword() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    try {
+                        System.out.println("try");
+                    }     finally {
+                        System.out.println("finally");
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    try {
+                        System.out.println("try");
+                    } finally {
+                        System.out.println("finally");
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    // ===========================
+    // Within tests
+    // ===========================
+
+    @Test
+    void minimizeWithinCodeBraces() {
+        rewriteRun(
+          java(
+            """
+            interface EmptyInterface {   }
+            class EmptyClass {   }
+            """,
+            """
+            interface EmptyInterface {}
+            class EmptyClass {}
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinBrackets() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int[] array = new int[   10   ];
+                    int value = array[   0   ];
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int[] array = new int[10];
+                    int value = array[0];
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinArrayInitializerBraces() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int[] array = {   1, 2, 3   };
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int[] array = {1, 2, 3};
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinEmptyArrayInitializerBraces() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int[] array = {   };
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int[] array = {};
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinGroupingParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int result = (   5 + 3   ) * 2;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int result = (5 + 3) * 2;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinEmptyMethodCallParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    test(   );
+                }
+                void test() {}
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    test();
+                }
+                void test() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinIfParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    if (   true   ) {
+                        System.out.println("true");
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    if (true) {
+                        System.out.println("true");
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinForParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    for (   int i = 0; i < 10; i++   ) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    for (int i = 0; i < 10; i++) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinWhileParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    while (   true   ) {
+                        break;
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    while (true) {
+                        break;
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinSwitchParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method(int value) {
+                    switch   (   value   ) {
+                        case 1:
+                            break;
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method(int value) {
+                    switch (value) {
+                        case 1:
+                            break;
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinTryParentheses() {
+        rewriteRun(
+          java(
+            """
+            import java.io.FileInputStream;
+
+            class Test {
+                void method() {
+                    try (   FileInputStream fis   =   new FileInputStream("file.txt")   ) {
+                        // do something
+                    } catch (Exception e) {
+                    }
+                }
+            }
+            """,
+            """
+            import java.io.FileInputStream;
+
+            class Test {
+                void method() {
+                    try (FileInputStream fis = new FileInputStream("file.txt")) {
+                        // do something
+                    } catch (Exception e) {}
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinCatchParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    try {
+                        throw new Exception();
+                    } catch (   Exception e   ) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    try {
+                        throw new Exception();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinSynchronizedParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    Object lock = new Object();
+                    synchronized (   lock   ) {
+                        // critical section
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    Object lock = new Object();
+                    synchronized (lock) {
+                        // critical section
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinTypeCastParentheses() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    Object obj = "hello";
+                    String str = (   String   )obj;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    Object obj = "hello";
+                    String str = (String) obj;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinAnnotationParentheses() {
+        rewriteRun(
+          java(
+            """
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @interface MyAnnotation {
+                String value();
+            }
+
+            class Test {
+                @MyAnnotation(   "test"   )
+                void method() {}
+            }
+            """,
+            """
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @interface MyAnnotation {
+                String value();
+            }
+
+            class Test {
+                @MyAnnotation("test")
+                void method() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeWithinAngleBrackets() {
+        rewriteRun(
+          java(
+            """
+            import java.util.List;
+
+            class Test {
+                void method() {
+                    List<   String   > list = null;
+                }
+            }
+            """,
+            """
+            import java.util.List;
+
+            class Test {
+                void method() {
+                    List<String> list = null;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    // ===========================
+    // TernaryOperator tests
+    // ===========================
+
+    @Test
+    void minimizeBeforeQuestionMarkInTernary() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x = true   ? 1 : 2;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = true ? 1 : 2;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAfterQuestionMarkInTernary() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x = true ?   1 : 2;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = true ? 1 : 2;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeColonInTernary() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x = true ? 1   : 2;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = true ? 1 : 2;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAfterColonInTernary() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x = true ? 1 :   2;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = true ? 1 : 2;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeTernaryOperatorCompletely() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x = true   ?   1   :   2;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = true ? 1 : 2;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    // ===========================
+    // TypeArguments tests
+    // ===========================
+
+    @Test
+    void minimizeAfterCommaInTypeArguments() {
+        rewriteRun(
+          java(
+            """
+            import java.util.Map;
+
+            class Test {
+                void method() {
+                    Map<String,     Integer> map = null;
+                }
+            }
+            """,
+            """
+            import java.util.Map;
+
+            class Test {
+                void method() {
+                    Map<String, Integer> map = null;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeOpeningAngleBracketInTypeArguments() {
+        rewriteRun(
+          java(
+            """
+            import java.util.List;
+
+            class Test {
+                void method() {
+                    List     <String> list = null;
+                }
+            }
+            """,
+            """
+            import java.util.List;
+
+            class Test {
+                void method() {
+                    List<String> list = null;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAfterClosingAngleBracketInTypeArguments() {
+        rewriteRun(
+          java(
+            """
+            import java.util.List;
+
+            class Test {
+                List<String>     getList() {
+                    return null;
+                }
+            }
+            """,
+            """
+            import java.util.List;
+
+            class Test {
+                List<String> getList() {
+                    return null;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    // ===========================
+    // Other tests
+    // ===========================
+
+    @Test
+    void minimizeBeforeForSemicolon() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    for (int i = 0   ; i < 10   ; i++) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    for (int i = 0; i < 10; i++) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeForSemicolon() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    for (   int i = 0   ;     i < 10         ;     i++   ) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    for (int i = 0; i < 10; i++) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAfterTypeCast() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    Object obj = "hello";
+                    String str = (String)     obj;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    Object obj = "hello";
+                    String str = (String) obj;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeBeforeColonInForEach() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int[] array = {1, 2, 3};
+                    for (int value   : array) {
+                        System.out.println(value);
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int[] array = {1, 2, 3};
+                    for (int value : array) {
+                        System.out.println(value);
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeInsideOneLineEnumBraces() {
+        rewriteRun(
+          java(
+            """
+            enum Color {   RED, GREEN, BLUE   }
+            """,
+            """
+            enum Color {RED, GREEN, BLUE}
+            """
+          )
+        );
+    }
+
+    // ===========================
+    // TypeParameters tests
+    // ===========================
+
+    @Test
+    void minimizeBeforeOpeningAngleBracketInTypeParameters() {
+        rewriteRun(
+          java(
+            """
+            class Test     <T> {
+                void method() {}
+            }
+            """,
+            """
+            class Test<T> {
+                void method() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundTypeBounds() {
+        rewriteRun(
+          java(
+            """
+            import java.io.Serializable;
+
+            class Test<T   extends   Serializable> {
+                void method() {}
+            }
+            """,
+            """
+            import java.io.Serializable;
+
+            class Test<T extends Serializable> {
+                void method() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeMethodTypeParameters() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                <T   extends   Comparable<T>>   T method(T value) {
+                    return value;
+                }
+            }
+            """,
+            """
+            class Test {
+                <T extends Comparable<T>> T method(T value) {
+                    return value;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    // ===========================
+    // Additional comprehensive tests
+    // ===========================
+
+    @Test
+    void minimizeBeforeAnnotationArrayInitializerLeftBrace() {
+        rewriteRun(
+          java(
+            """
+            @interface MyAnnotation {
+                String[] values() default     {};
+            }
+
+            class Test {
+                @MyAnnotation(values =     {"a", "b"})
+                void method() {}
+            }
+            """,
+            """
+            @interface MyAnnotation {
+                String[] values() default {};
+            }
+
+            class Test {
+                @MyAnnotation(values = {"a", "b"})
+                void method() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeComplexNestedStructures() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    if     (true)     {
+                        for     (int i = 0   ;   i < 10   ;   i++)     {
+                            while     (i > 0)     {
+                                switch     (i)     {
+                                    case 1:
+                                        break;
+                                }
+                            }
+                        }
+                    }     else     {
+                        System.out.println("false");
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    if (true) {
+                        for (int i = 0; i < 10; i++) {
+                            while (i > 0) {
+                                switch (i) {
+                                    case 1:
+                                        break;
+                                }
+                            }
+                        }
+                    } else {
+                        System.out.println("false");
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeComplexExpressions() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int result = (   (   5   +   3   )   *   2   )   -   (   10   /   2   );
+                    boolean condition = true   &&   (   false   ||   true   )   &&   !   false;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int result = ((5 + 3) * 2) - (10 / 2);
+                    boolean condition = true && (false || true) && !false;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    //NewArray in annotations handle correctly? IntelliJ has different style for that.
+    //TODO for where there is only a condition and no init/update
+    //TODO a test for non-primitive return types in methods
+    //TODO lambda test where params are not in parentheses
+    //TODO add test for records if not yet present
+    //TODO test without modifiers in classes / methods / fields
+    //TODO is there already method invocations with generics in the return type to verify their spacing?
+    //TODO the default of a lot of IntelliJ spaces settings can be found in the IntelliJ class. as the default space handling will trim to single space, we should have a test that validates the addition of spaces when not present.
+    @Test
+    void minimizeForEachWithComplexTypes() {
+        rewriteRun(
+          java(
+            """
+            import java.util.List;
+            import java.util.Map;
+
+            class Test {
+                void method() {
+                    Map<String, List<Integer>> map = null;
+                    for (   Map.Entry<String, List<Integer>>   entry   :   map.entrySet()   ) {
+                        System.out.println(entry);
+                    }
+                }
+            }
+            """,
+            """
+            import java.util.List;
+            import java.util.Map;
+
+            class Test {
+                void method() {
+                    Map<String, List<Integer>> map = null;
+                    for (Map.Entry<String, List<Integer>> entry : map.entrySet()) {
+                        System.out.println(entry);
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeTryWithMultipleResourcesAndMultipleCatches() {
+        rewriteRun(
+          java(
+            """
+            import java.io.FileInputStream;
+            import java.io.IOException;
+
+            class Test {
+                void method() {
+                    try     (   FileInputStream fis1 = new FileInputStream("file1.txt")   ;   FileInputStream fis2 = new FileInputStream("file2.txt")   )     {
+                        // do something
+                    }     catch     (   IOException e   )     {
+                        e.printStackTrace();
+                    }     catch     (   Exception e   )     {
+                        e.printStackTrace();
+                    }     finally     {
+                        System.out.println("done");
+                    }
+                }
+            }
+            """,
+            """
+            import java.io.FileInputStream;
+            import java.io.IOException;
+
+            class Test {
+                void method() {
+                    try (FileInputStream fis1 = new FileInputStream("file1.txt"); FileInputStream fis2 = new FileInputStream("file2.txt")) {
+                        // do something
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        System.out.println("done");
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeComplexGenericDeclarations() {
+        rewriteRun(
+          java(
+            """
+            import java.util.List;
+            import java.util.Map;
+
+            class Test     <   K   extends   Comparable<K>   ,   V   extends   List<String>   >     {
+                <   T   extends   Map<K, V>   >   T method(   T   param   ) {
+                    return param;
+                }
+            }
+            """,
+            """
+            import java.util.List;
+            import java.util.Map;
+
+            class Test<K extends Comparable<K>, V extends List<String>> {
+                <T extends Map<K, V>> T method(T param) {
+                    return param;
                 }
             }
             """
