@@ -1098,7 +1098,8 @@ public class Autodetect extends NamedStyles {
                             afterForSemiColon >= 0,
                             afterTypeCast > 0,
                             beforeColonInForEach > 0,
-                            false
+                            false,
+                            true
                     ));
         }
     }

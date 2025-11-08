@@ -53,15 +53,6 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public @Nullable J visit(@Nullable Tree tree, P p) {
-        J changeTree = super.visit(tree, p);
-        if (changeTree != tree) {
-            return changeTree;
-        }
-        return (J) tree;
-    }
-
-    @Override
     public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
         if (right == null || !(right.getElement() instanceof J)) {
             return super.visitRightPadded(right, loc, p);
@@ -101,6 +92,8 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
                     before = evaluate(() -> spacesStyle.getWithin().getBrackets(), false) ? " " : "";
                 } else if (parent instanceof J.NewArray) {
                     before = evaluate(() -> spacesStyle.getWithin().getBrackets(), false) ? " " : "";
+                } else if (((J.Parentheses<?>) getCursor().getValue()).getTree() instanceof J.Binary) {
+                    before = evaluate(() -> spacesStyle.getWithin().getGroupingParentheses(), false) ? " " : "";
                 }
                 after = before;
                 break;
@@ -446,6 +439,20 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
                         }
                     }
                     break;
+                case BINARY_OPERATOR:
+                    J.Binary binary = getCursor().getParentTreeCursor().getValue();
+                    whitespace = getWhitespaceAroundOperator(binary.getOperator());
+                    break;
+                case ASSIGNMENT_OPERATION_OPERATOR:
+                case ASSIGNMENT:
+                case VARIABLE_INITIALIZER:
+                    parentTreeCursor = getCursor().getParentTreeCursor().getParentTreeCursor();
+                    if (parentTreeCursor.getValue() instanceof J.Annotation) {
+                        whitespace = evaluate(() -> spacesStyle.getOther().getAroundEqualInAnnotationValuePair(), true) ? " " : "";
+                    } else {
+                        whitespace = evaluate(() -> spacesStyle.getAroundOperators().getAssignment(), true) ? " " : "";
+                    }
+                    break;
                 default:
                     if (!StringUtils.hasLineBreak(space.getWhitespace()) && !space.getWhitespace().isEmpty()) {
                         whitespace = " ";
@@ -462,8 +469,53 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.TypeCast visitTypeCast(J.TypeCast typeCast, P p) {
         String afterTypeCast = evaluate(() -> spacesStyle.getOther().getAfterTypeCast(), true) ? " " : "";
-        ;
+
         return super.visitTypeCast(typeCast.withExpression(minimized(typeCast.getExpression(), afterTypeCast)), p);
+    }
+
+    @Override
+    public J.Unary visitUnary(J.Unary unary, P p) {
+        switch (unary.getOperator()) {
+            case PreIncrement:
+            case PreDecrement:
+            case Positive:
+            case Negative:
+            case Complement:
+            case Not:
+                unary = unary.withExpression(minimized(unary.getExpression(), evaluate(() -> spacesStyle.getAroundOperators().getUnary(), false) ? " " : ""));
+        }
+        return super.visitUnary(unary, p);
+    }
+
+    @Override
+    public J.Binary visitBinary(J.Binary binary, P p) {
+        return super.visitBinary(binary.withRight(minimized(binary.getRight(), getWhitespaceAroundOperator(binary.getOperator()))), p);
+    }
+
+    @Override
+    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
+        if (variable.getInitializer() != null) {
+            String afterOperator = evaluate(() -> spacesStyle.getAroundOperators().getAssignment(), true) ? " " : "";
+            variable = variable.withInitializer(minimized(variable.getInitializer(), afterOperator));
+        }
+        return super.visitVariable(variable, p);
+    }
+
+    @Override
+    public J.Assignment visitAssignment(J.Assignment assignment, P p) {
+        String afterOperator;
+        if (getCursor().getParentTreeCursor().getValue() instanceof J.Annotation) {
+            afterOperator = evaluate(() -> spacesStyle.getOther().getAroundEqualInAnnotationValuePair(), true) ? " " : "";
+        } else {
+            afterOperator = evaluate(() -> spacesStyle.getAroundOperators().getAssignment(), true) ? " " : "";
+        }
+        return super.visitAssignment(assignment.withAssignment(minimized(assignment.getAssignment(), afterOperator)), p);
+    }
+
+    @Override
+    public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
+        String afterOperator = evaluate(() -> spacesStyle.getAroundOperators().getAssignment(), true) ? " " : "";
+        return super.visitAssignmentOperation(assignOp.withAssignment(minimized(assignOp.getAssignment(), afterOperator)), p);
     }
 
     @Override
@@ -512,7 +564,7 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
         switch (loc) {
             case RECORD_STATE_VECTOR:
                 if (getCursor().getValue() instanceof J.Empty) {
-                    return ""; //TODO there is no intelliJ style existing for this
+                    return ""; // there is no intelliJ style existing for this
                 }
                 return evaluate(() -> spacesStyle.getWithin().getRecordHeader(), false) ? " " : "";
             case METHOD_DECLARATION_PARAMETERS:
@@ -558,6 +610,38 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
                 return "";
         }
         return whitespace;
+    }
+
+    private String getWhitespaceAroundOperator(J.Binary.Type operator) {
+        switch (operator) {
+            case Addition:
+            case Subtraction:
+                return evaluate(() -> spacesStyle.getAroundOperators().getAdditive(), true) ? " " : "";
+            case Multiplication:
+            case Division:
+            case Modulo:
+                return evaluate(() -> spacesStyle.getAroundOperators().getMultiplicative(), true) ? " " : "";
+            case LessThan:
+            case GreaterThan:
+            case LessThanOrEqual:
+            case GreaterThanOrEqual:
+                return evaluate(() -> spacesStyle.getAroundOperators().getRelational(), true) ? " " : "";
+            case Equal:
+            case NotEqual:
+                return evaluate(() -> spacesStyle.getAroundOperators().getEquality(), true) ? " " : "";
+            case BitAnd:
+            case BitOr:
+            case BitXor:
+                return evaluate(() -> spacesStyle.getAroundOperators().getBitwise(), true) ? " " : "";
+            case LeftShift:
+            case RightShift:
+            case UnsignedRightShift:
+                return evaluate(() -> spacesStyle.getAroundOperators().getShift(), true) ? " " : "";
+            case Or:
+            case And:
+            default:
+                return evaluate(() -> spacesStyle.getAroundOperators().getLogical(), true) ? " " : "";
+        }
     }
 
     private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {

@@ -92,7 +92,7 @@ public class IntelliJ extends NamedStyles {
                 new SpacesStyle.Within(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false),
                 new SpacesStyle.TernaryOperator(true, true, true, true),
                 new SpacesStyle.TypeArguments(true, false, false),
-                new SpacesStyle.Other(false, true, false, true, true, true, false),
+                new SpacesStyle.Other(false, true, false, true, true, true, false, true),
                 new SpacesStyle.TypeParameters(false, true)
         );
     }

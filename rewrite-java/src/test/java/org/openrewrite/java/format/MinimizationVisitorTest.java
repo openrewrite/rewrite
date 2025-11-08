@@ -1308,6 +1308,7 @@ class MinimizationVisitorTest implements RewriteTest {
             class Test {
                 void method() {
                     int result = (   5 + 3   ) * 2;
+                    int result2 = (   5 + 3   * 2);
                 }
             }
             """,
@@ -1315,6 +1316,7 @@ class MinimizationVisitorTest implements RewriteTest {
             class Test {
                 void method() {
                     int result = (5 + 3) * 2;
+                    int result2 = (5 + 3 * 2);
                 }
             }
             """
@@ -2044,6 +2046,66 @@ class MinimizationVisitorTest implements RewriteTest {
     }
 
     @Test
+    void minimizeWithinAnnotationArrayValueBraces() {
+        rewriteRun(
+          java(
+            """
+            @interface MyAnnotation {
+                String[] values();
+                int[] numbers() default {   };
+            }
+
+            class Test {
+                @MyAnnotation(values = {   "a", "b", "c"   }, numbers = {   1, 2, 3   })
+                void method() {}
+            }
+            """,
+            """
+            @interface MyAnnotation {
+                String[] values();
+                int[] numbers() default {};
+            }
+
+            class Test {
+                @MyAnnotation(values = {"a", "b", "c"}, numbers = {1, 2, 3})
+                void method() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeAroundEqualsInAnnotationAssignment() {
+        rewriteRun(
+          java(
+            """
+            @interface MyAnnotation {
+                String value();
+                int number() default 0;
+            }
+
+            class Test {
+                @MyAnnotation(value   =   "test", number   =   42)
+                void method() {}
+            }
+            """,
+            """
+            @interface MyAnnotation {
+                String value();
+                int number() default 0;
+            }
+
+            class Test {
+                @MyAnnotation(value = "test", number = 42)
+                void method() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void minimizeComplexNestedStructures() {
         rewriteRun(
           java(
@@ -2111,14 +2173,6 @@ class MinimizationVisitorTest implements RewriteTest {
         );
     }
 
-    //NewArray in annotations handle correctly? IntelliJ has different style for that.
-    //TODO for where there is only a condition and no init/update
-    //TODO a test for non-primitive return types in methods
-    //TODO lambda test where params are not in parentheses
-    //TODO add test for records if not yet present
-    //TODO test without modifiers in classes / methods / fields
-    //TODO is there already method invocations with generics in the return type to verify their spacing?
-    //TODO the default of a lot of IntelliJ spaces settings can be found in the IntelliJ class. as the default space handling will trim to single space, we should have a test that validates the addition of spaces when not present.
     @Test
     void minimizeForEachWithComplexTypes() {
         rewriteRun(
@@ -2218,6 +2272,179 @@ class MinimizationVisitorTest implements RewriteTest {
             class Test<K extends Comparable<K>, V extends List<String>> {
                 <T extends Map<K, V>> T method(T param) {
                     return param;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeForLoopWithOnlyCondition() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    for (   ;   true    ;   ) {
+                        break;
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    for (; true; ) {
+                        break;
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeLambdaWithSingleParameterWithoutParentheses() {
+        rewriteRun(
+          java(
+            """
+            import java.util.function.Function;
+
+            class Test {
+                void test() {
+                    Function<String, String> fn = s   ->   s.toUpperCase();
+                }
+            }
+            """,
+            """
+            import java.util.function.Function;
+
+            class Test {
+                void test() {
+                    Function<String, String> fn = s -> s.toUpperCase();
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizePackagePrivateClassAndMethods() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method(  String   param  ) {
+                }
+            }
+            """,
+            """
+            class Test {
+                void method(String param) {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void minimizeMethodInvocationWithExplicitTypeArguments() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void test() {
+                    this.  <  String  >  method(  "hello"  );
+                }
+                <T> void method(T value) {}
+            }
+            """,
+            """
+            class Test {
+                void test() {
+                    this.<String>method("hello");
+                }
+                <T> void method(T value) {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void addSpaceAfterCommaWhenMissing() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method(String param1,String param2,int param3) {
+                    method("a","b",1);
+                }
+            }
+            """,
+            """
+            class Test {
+                void method(String param1, String param2, int param3) {
+                    method("a", "b", 1);
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void addSpaceAroundBinaryOperatorsWhenMissing() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    int x=5+3;
+                    boolean b=true&&false;
+                    x=2-1;
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    int x = 5 + 3;
+                    boolean b = true && false;
+                    x = 2 - 1;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void addSpaceBeforeKeywordsWhenMissing() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void method() {
+                    if (true) {
+                        System.out.println("true");
+                    }else{
+                        System.out.println("false");
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void method() {
+                    if (true) {
+                        System.out.println("true");
+                    } else {
+                        System.out.println("false");
+                    }
                 }
             }
             """
