@@ -1550,4 +1550,29 @@ class TypeUtilsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6140")
+    @Test
+    void isAssignableToWithCircularTypeReference() {
+        // Create a mock type with a circular supertype reference
+        JavaType.Class circularType = JavaType.ShallowClass.build("com.example.CircularType");
+        JavaType.Class withCircularSupertype = new JavaType.Class(
+            null,
+            0L,
+            "com.example.CircularType",
+            JavaType.Class.Kind.Class,
+            (JavaType[]) null, // typeParameters
+            circularType, // Set supertype to itself - this creates a cycle
+            null, // owningClass
+            (JavaType.FullyQualified[]) null, // annotations
+            (JavaType.FullyQualified[]) null, // interfaces
+            (JavaType.Variable[]) null, // members
+            (JavaType.Method[]) null  // methods
+        );
+        
+        // This should not cause a StackOverflowError
+        assertFalse(TypeUtils.isAssignableTo("java.lang.String", withCircularSupertype));
+        // Even though it has itself as supertype, Object match should work
+        assertTrue(TypeUtils.isAssignableTo("java.lang.Object", withCircularSupertype));
+    }
 }

@@ -804,8 +804,17 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
+        return isAssignableTo(to, from, new HashSet<>());
+    }
+
+    private static boolean isAssignableTo(String to, @Nullable JavaType from, Set<JavaType> visited) {
         try {
             if (from instanceof JavaType.FullyQualified) {
+                // Prevent infinite recursion by tracking visited types
+                if (!visited.add(from)) {
+                    return false;
+                }
+                
                 if (from instanceof JavaType.Parameterized) {
                     int lessThanIndex = to.indexOf('<');
                     String fromRawType = ((JavaType.Parameterized) from).getType().getFullyQualifiedName();
@@ -815,11 +824,11 @@ public class TypeUtils {
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
                 if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
-                    isAssignableTo(to, classFrom.getSupertype())) {
+                    isAssignableTo(to, classFrom.getSupertype(), visited)) {
                     return true;
                 }
                 for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
-                    if (isAssignableTo(to, i)) {
+                    if (isAssignableTo(to, i, visited)) {
                         return true;
                     }
                 }
@@ -827,7 +836,7 @@ public class TypeUtils {
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
-                    if (isAssignableTo(to, bound)) {
+                    if (isAssignableTo(to, bound, visited)) {
                         return true;
                     }
                 }
@@ -839,12 +848,12 @@ public class TypeUtils {
                     return isAssignableTo(JavaType.Primitive.String, from);
                 }
             } else if (from instanceof JavaType.Variable) {
-                return isAssignableTo(to, ((JavaType.Variable) from).getType());
+                return isAssignableTo(to, ((JavaType.Variable) from).getType(), visited);
             } else if (from instanceof JavaType.Method) {
-                return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+                return isAssignableTo(to, ((JavaType.Method) from).getReturnType(), visited);
             } else if (from instanceof JavaType.Intersection) {
                 for (JavaType bound : ((JavaType.Intersection) from).getBounds()) {
-                    if (isAssignableTo(to, bound)) {
+                    if (isAssignableTo(to, bound, visited)) {
                         return true;
                     }
                 }
