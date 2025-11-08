@@ -47,7 +47,7 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
 
     public static Cursor minimized(Cursor cursor, SpacesStyle spacesStyle) {
         if (cursor.getValue() instanceof J) {
-            return new Cursor(cursor.getParent(), new MinimizationVisitor<Integer>(spacesStyle).visit((J) cursor.getValue(), -1));
+            return new Cursor(cursor.getParent(), new MinimizationVisitor<Integer>(spacesStyle).visit((J) cursor.getValue(), -1, cursor.getParent()));
         }
         throw new IllegalArgumentException("Can only minimize J elements.");
     }
@@ -64,8 +64,8 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
         String before = null;
         String after = null;
 
-        ContainerPosition beforePosition = null;
-        ContainerPosition afterPosition = null;
+        ContainerPosition beforePosition;
+        ContainerPosition afterPosition;
         JContainer.Location containerLocation = cursor.getMessage("location");
         int index = -1;
         int size = -1;
@@ -191,8 +191,8 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
             if (index == size - 1) {
                 afterPosition = ContainerPosition.CLOSE;
             }
-            before = getMinimizedWhitespaceWithin(null, containerLocation, beforePosition);
-            after = getMinimizedWhitespaceWithin(null, containerLocation, afterPosition);
+            before = getMinimizedWhitespaceWithin(containerLocation, beforePosition);
+            after = getMinimizedWhitespaceWithin(containerLocation, afterPosition);
         }
 
         if (after != null) {
@@ -428,14 +428,12 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
                     break;
                 case BLOCK_END:
                     J.Block block = getCursor().getValue();
-                    if (block.getStatements().isEmpty() && block.getEnd().getComments().isEmpty()) {
-                        whitespace = "";
-                    } else if (!StringUtils.hasLineBreak(space.getWhitespace()) && !space.getWhitespace().isEmpty()) {
-                        parentTreeCursor = getCursor().dropParentWhile(v -> !(v instanceof J.ClassDeclaration));
-                        if (parentTreeCursor.getMessage("singleLineEnum") == Boolean.TRUE) {
-                            whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
-                        } else {
-                            whitespace = " ";
+                    if (getCursor().dropParentWhile(v -> !(v instanceof J.ClassDeclaration) && !Cursor.ROOT_VALUE.equals(v)).getMessage("singleLineEnum") == Boolean.TRUE) {
+                        whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
+                    } else if (block.getStatements().isEmpty() && block.getEnd().getComments().isEmpty()) {
+                        parentTreeCursor = getCursor().getParentTreeCursor();
+                        if (parentTreeCursor.getValue() instanceof J.ClassDeclaration || parentTreeCursor.getValue() instanceof J.MethodDeclaration) {
+                            whitespace = "";
                         }
                     }
                     break;
@@ -521,10 +519,7 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
-            boolean singleLineEnum = true;
-            if (hasLineBreakInSpace(classDecl.getBody().getPrefix()) || hasLineBreakInSpace(classDecl.getBody().getEnd())) {
-                singleLineEnum = false;
-            }
+            boolean singleLineEnum = !hasLineBreakInSpace(classDecl.getBody().getPrefix()) && !hasLineBreakInSpace(classDecl.getBody().getEnd());
             if (classDecl.getBody().getStatements().size() == 1 && classDecl.getBody().getStatements().get(0) instanceof J.EnumValueSet) {
                 J.EnumValueSet enumValueSet = (J.EnumValueSet) classDecl.getBody().getStatements().get(0);
                 if (hasLineBreakInSpace(enumValueSet.getPrefix()) || enumValueSet.getEnums().stream().map(J.EnumValue::getPrefix).anyMatch(this::hasLineBreakInSpace)) {
@@ -554,7 +549,7 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
         return space;
     }
 
-    private @Nullable String getMinimizedWhitespaceWithin(@Nullable String whitespace, JContainer.Location loc, ContainerPosition containerPosition) {
+    private @Nullable String getMinimizedWhitespaceWithin(JContainer.Location loc, ContainerPosition containerPosition) {
         if (loc != JContainer.Location.TYPE_BOUNDS && loc != JContainer.Location.TRY_RESOURCES && containerPosition == ContainerPosition.AFTER_SEPARATOR) {
             return evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
         }
@@ -609,7 +604,7 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
                 }
                 return "";
         }
-        return whitespace;
+        return null;
     }
 
     private String getWhitespaceAroundOperator(J.Binary.Type operator) {

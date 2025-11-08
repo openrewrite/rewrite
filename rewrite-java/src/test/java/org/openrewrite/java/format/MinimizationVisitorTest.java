@@ -711,7 +711,8 @@ class MinimizationVisitorTest implements RewriteTest {
                 void method() {
                     try     (FileInputStream fis = new FileInputStream("file.txt")) {
                         // do something
-                    } catch (Exception e) {}
+                    } catch (Exception e) {
+                    }
                 }
             }
             """,
@@ -722,7 +723,8 @@ class MinimizationVisitorTest implements RewriteTest {
                 void method() {
                     try (FileInputStream fis = new FileInputStream("file.txt")) {
                         // do something
-                    } catch (Exception e) {}
+                    } catch (Exception e) {
+                    }
                 }
             }
             """
@@ -1477,7 +1479,8 @@ class MinimizationVisitorTest implements RewriteTest {
                 void method() {
                     try (FileInputStream fis = new FileInputStream("file.txt")) {
                         // do something
-                    } catch (Exception e) {}
+                    } catch (Exception e) {
+                    }
                 }
             }
             """
