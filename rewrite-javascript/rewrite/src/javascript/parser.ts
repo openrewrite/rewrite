@@ -612,13 +612,10 @@ export class JavaScriptParserVisitor {
         }
         for (let heritageClause of node.heritageClauses) {
             if (heritageClause.token == ts.SyntaxKind.ExtendsKeyword) {
-                return this.leftPadded<TypeTree>(this.prefix(heritageClause.getFirstToken()!), {
-                    kind: JS.Kind.TypeTreeExpression,
-                    id: randomId(),
-                    prefix: this.prefix(heritageClause.types[0]),
-                    markers: emptyMarkers,
-                    expression: this.visit(heritageClause.types[0])
-                } satisfies JS.TypeTreeExpression as JS.TypeTreeExpression);
+                return this.leftPadded<TypeTree>(
+                    this.prefix(heritageClause.getFirstToken()!),
+                    this.mapTypeTree(heritageClause.types[0])
+                );
             }
         }
         return undefined;
@@ -664,6 +661,33 @@ export class JavaScriptParserVisitor {
             }
         }
         return undefined;
+    }
+
+    private mapTypeTree(node: ts.LeftHandSideExpression | ts.ExpressionWithTypeArguments | ts.Expression): TypeTree {
+        const expression = this.visit(node);
+
+        // Check if the expression is already a TypeTree
+        // J.Identifier, J.FieldAccess, J.ArrayType, and J.ParameterizedType all implement TypeTree
+        if (expression.kind === J.Kind.Identifier ||
+            expression.kind === J.Kind.FieldAccess ||
+            expression.kind === J.Kind.ArrayType ||
+            expression.kind === J.Kind.ParameterizedType) {
+            return expression as TypeTree;
+        }
+
+        // For expressions that don't implement TypeTree, wrap them in JS.TypeTreeExpression
+        // Transfer the prefix from the expression to the wrapper
+        const prefix = expression.prefix;
+        return {
+            kind: JS.Kind.TypeTreeExpression,
+            id: randomId(),
+            prefix: prefix,
+            markers: emptyMarkers,
+            expression: {
+                ...expression,
+                prefix: emptySpace
+            },
+        } satisfies JS.TypeTreeExpression as JS.TypeTreeExpression;
     }
 
     visitNumericLiteral(node: ts.NumericLiteral): J.Literal {
@@ -921,13 +945,7 @@ export class JavaScriptParserVisitor {
         } else if (ts.isPropertyAccessExpression(node.expression)) {
             annotationType = this.convert(node.expression);
         } else if (ts.isParenthesizedExpression(node.expression)) {
-            annotationType = {
-                kind: JS.Kind.TypeTreeExpression,
-                id: randomId(),
-                prefix: this.prefix(node.expression),
-                markers: emptyMarkers,
-                expression: this.convert(node.expression) as Expression
-            } satisfies JS.TypeTreeExpression as JS.TypeTreeExpression;
+            annotationType = this.mapTypeTree(node.expression);
         } else {
             return this.visitUnknown(node);
         }
@@ -1999,22 +2017,21 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: this.prefix(node.expression),
                 markers: emptyMarkers,
-                class: {
-                    kind: JS.Kind.TypeTreeExpression,
-                    id: randomId(),
-                    prefix: emptySpace,
-                    markers: emptyMarkers,
-                    expression: this.visit(node.expression),
-                } satisfies JS.TypeTreeExpression as JS.TypeTreeExpression,
+                class: (() => {
+                    // For parameterized types, we need to handle the prefix differently
+                    const typeTree = this.mapTypeTree(node.expression);
+                    // If it's a TypeTreeExpression, clear the prefix since it was already set on the ParameterizedType
+                    if (typeTree.kind === JS.Kind.TypeTreeExpression) {
+                        return {
+                            ...typeTree,
+                            prefix: emptySpace
+                        };
+                    }
+                    return typeTree;
+                })(),
                 typeParameters: this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments),
                 type: undefined
-            } satisfies J.ParameterizedType as J.ParameterizedType : {
-                kind: JS.Kind.TypeTreeExpression,
-                id: randomId(),
-                prefix: this.prefix(node.expression),
-                markers: emptyMarkers,
-                expression: this.visit(node.expression),
-            } satisfies JS.TypeTreeExpression as JS.TypeTreeExpression,
+            } satisfies J.ParameterizedType as J.ParameterizedType : this.mapTypeTree(node.expression),
             arguments: node.arguments ?
                 this.mapCommaSeparatedList(this.getParameterListNodes(node)) : {
                     ...emptyContainer<Expression>(),
