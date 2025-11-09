@@ -1,0 +1,154 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * Tests for variadic pattern matching in J.Container elements (e.g., object/array destructuring patterns).
+ *
+ * This test file validates that variadic captures work correctly in destructuring patterns.
+ * The implementation required two key fixes:
+ *
+ * 1. MarkerAttachmentVisitor.visitBindingElement (engine.ts) - Promotes CaptureMarkers from
+ *    the name identifier to the BindingElement itself, so visitRightPadded can then promote
+ *    them to the J.RightPadded wrapper where the comparator can find them.
+ *
+ * 2. PatternMatchingComparator.visitContainer (comparator.ts) - Overrides the base container
+ *    visitor to use matchSequence logic instead of strict length comparison when variadic
+ *    captures are present, similar to how method invocations are handled.
+ */
+import {capture, JavaScriptParser, JS, pattern} from "../../../src/javascript";
+
+describe('variadic pattern matching in containers', () => {
+    const parser = new JavaScriptParser();
+    const parseCache = new Map<string, any>();
+
+    async function parse(code: string) {
+        // Check cache first
+        if (parseCache.has(code)) {
+            return parseCache.get(code)!;
+        }
+
+        // Parse and cache
+        const parseGen = parser.parse({text: code, sourcePath: 'test.ts'});
+        const cu = (await parseGen.next()).value as JS.CompilationUnit;
+        const result = cu.statements[0].element;
+        parseCache.set(code, result);
+        return result;
+    }
+
+    test('variadic capture in object destructuring pattern', async () => {
+        const props = capture({ variadic: true });
+        const pat = pattern`function foo({${props}}) {}`;
+
+        // The pattern has 1 element (variadic capture), but the target has 2+ elements
+        // This demonstrates the length mismatch issue in visitContainer
+
+        // Should match function with multiple properties (pattern: 1 elem, target: 2 elems)
+        const result2 = await pat.match(await parse('function foo({a, b}) {}'));
+        expect(result2).toBeDefined();
+        const captured2 = result2!.get(props);
+        expect(Array.isArray(captured2)).toBe(true);
+        expect((captured2 as any[]).length).toBe(2);
+
+        // Should match function with even more properties (pattern: 1 elem, target: 3 elems)
+        const result3 = await pat.match(await parse('function foo({a, b, c}) {}'));
+        expect(result3).toBeDefined();
+        const captured3 = result3!.get(props);
+        expect(Array.isArray(captured3)).toBe(true);
+        expect((captured3 as any[]).length).toBe(3);
+
+        // Should also match with single property (lengths match)
+        const result1 = await pat.match(await parse('function foo({a}) {}'));
+        expect(result1).toBeDefined();
+        const captured1 = result1!.get(props);
+        expect(Array.isArray(captured1)).toBe(true);
+        expect((captured1 as any[]).length).toBe(1);
+    });
+
+    test('variadic capture with required property in object destructuring', async () => {
+        const first = capture('first');
+        const rest = capture({ variadic: true });
+        const pat = pattern`function foo({${first}, ${rest}}) {}`;
+
+        // The pattern has 2 elements (first + variadic), but target has 3+ elements
+        // This demonstrates the length mismatch: pattern=2, target=3
+
+        // Should match function with multiple properties (pattern: 2 elems, target: 3 elems)
+        const result3 = await pat.match(await parse('function foo({a, b, c}) {}'));
+        expect(result3).toBeDefined();
+        const rest3 = result3!.get(rest);
+        expect(Array.isArray(rest3)).toBe(true);
+        expect((rest3 as any[]).length).toBe(2);
+
+        // Should also match when lengths are equal (pattern: 2 elems, target: 2 elems)
+        // In this case the variadic captures zero elements
+        const result2 = await pat.match(await parse('function foo({a, b}) {}'));
+        expect(result2).toBeDefined();
+        const rest2 = result2!.get(rest);
+        expect(Array.isArray(rest2)).toBe(true);
+        expect((rest2 as any[]).length).toBe(1);
+
+        // Should NOT match function with no properties - missing required first
+        expect(await pat.match(await parse('function foo({}) {}'))).toBeUndefined();
+    });
+
+    test('variadic capture in array destructuring pattern', async () => {
+        const elements = capture({ variadic: true });
+        const pat = pattern`function foo([${elements}]) {}`;
+
+        // The pattern has 1 element (variadic capture), but the target has 2+ elements
+        // This demonstrates the length mismatch issue in visitContainer
+
+        // Should match function with multiple elements (pattern: 1 elem, target: 2 elems)
+        const result2 = await pat.match(await parse('function foo([a, b]) {}'));
+        expect(result2).toBeDefined();
+        const captured2 = result2!.get(elements);
+        expect(Array.isArray(captured2)).toBe(true);
+        expect((captured2 as any[]).length).toBe(2);
+
+        // Should match function with even more elements (pattern: 1 elem, target: 3 elems)
+        const result3 = await pat.match(await parse('function foo([a, b, c]) {}'));
+        expect(result3).toBeDefined();
+        const captured3 = result3!.get(elements);
+        expect(Array.isArray(captured3)).toBe(true);
+        expect((captured3 as any[]).length).toBe(3);
+
+        // Should also match with single element (lengths match)
+        const result1 = await pat.match(await parse('function foo([a]) {}'));
+        expect(result1).toBeDefined();
+        const captured1 = result1!.get(elements);
+        expect(Array.isArray(captured1)).toBe(true);
+        expect((captured1 as any[]).length).toBe(1);
+    });
+
+    test('variadic capture with min/max constraints in containers', async () => {
+        // Test min constraint
+        const props1 = capture({ variadic: { min: 2 } });
+        const pat1 = pattern`function foo({${props1}}) {}`;
+
+        expect(await pat1.match(await parse('function foo({}) {}'))).toBeUndefined();  // min not satisfied
+        expect(await pat1.match(await parse('function foo({a}) {}'))).toBeUndefined();  // min not satisfied
+        expect(await pat1.match(await parse('function foo({a, b}) {}'))).toBeDefined();    // exactly min
+        expect(await pat1.match(await parse('function foo({a, b, c}) {}'))).toBeDefined();    // more than min
+
+        // Test max constraint
+        const props2 = capture({ variadic: { max: 2 } });
+        const pat2 = pattern`function foo({${props2}}) {}`;
+
+        expect(await pat2.match(await parse('function foo({}) {}'))).toBeDefined();    // within max
+        expect(await pat2.match(await parse('function foo({a, b}) {}'))).toBeDefined();    // exactly max
+        expect(await pat2.match(await parse('function foo({a, b, c}) {}'))).toBeUndefined();  // exceeds max
+    });
+});

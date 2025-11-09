@@ -594,6 +594,33 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
             expression: visitedExpression
         });
     }
+
+    /**
+     * Propagates markers from name identifier to BindingElement.
+     * This handles destructuring patterns like {${props}} where the capture marker
+     * is on the identifier but needs to be on the BindingElement for container matching.
+     */
+    protected override async visitBindingElement(bindingElement: JS.BindingElement, p: undefined): Promise<J | undefined> {
+        // Visit the name
+        const visitedName = await this.visit(bindingElement.name, p);
+
+        // Check if name has a CaptureMarker
+        const nameMarker = PlaceholderUtils.getCaptureMarker(visitedName as any);
+        if (nameMarker) {
+            return updateIfChanged(bindingElement, {
+                name: visitedName,
+                markers: {
+                    ...bindingElement.markers,
+                    markers: [...bindingElement.markers.markers, nameMarker]
+                },
+            });
+        }
+
+        // No marker to move, just update with visited name
+        return updateIfChanged(bindingElement, {
+            name: visitedName
+        });
+    }
 }
 
 /**
