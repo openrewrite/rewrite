@@ -178,4 +178,131 @@ describe('raw() function', () => {
             );
         });
     });
+
+    describe('raw() in patterns', () => {
+        test('matches pattern with raw() method name', async () => {
+            const methodName = "log";
+            const msg = capture('msg');
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    // Pattern with raw() for dynamic method name matching
+                    const m = await pattern`console.${raw(methodName)}(${msg})`.match(method);
+                    if (m) {
+                        return template`logger.info(${msg})`.apply(this.cursor, method, m);
+                    }
+                    return method;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'console.log("test")',
+                    'logger.info("test")'
+                )
+            );
+        });
+
+        test('combines raw() in both pattern and template', async () => {
+            const oldMethod = "warn";
+            const newMethod = "error";
+            const msg = capture('msg');
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    // Use raw() in pattern to match specific method
+                    const m = await pattern`logger.${raw(oldMethod)}(${msg})`.match(method);
+                    if (m) {
+                        // Use raw() in template to replace with different method
+                        return template`logger.${raw(newMethod)}(${msg})`.apply(this.cursor, method, m);
+                    }
+                    return method;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'logger.warn("warning message")',
+                    'logger.error("warning message")'
+                )
+            );
+        });
+
+        test('works with rewrite() using raw() in pattern', () => {
+            const operator = "==";
+            const left = _('left');
+            const right = _('right');
+
+            const rule = rewrite(() => ({
+                before: pattern`${left} ${raw(operator)} ${right}`,
+                after: template`${left} === ${right}`
+            }));
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, binary) || binary;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'x == y',
+                    'x === y'
+                )
+            );
+        });
+
+        test('multiple raw() in single pattern', async () => {
+            const obj = "console";
+            const method = "log";
+            const msg = capture('msg');
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    // Pattern with multiple raw() calls
+                    const m = await pattern`${raw(obj)}.${raw(method)}(${msg})`.match(invocation);
+                    if (m) {
+                        return template`logger.info(${msg})`.apply(this.cursor, invocation, m);
+                    }
+                    return invocation;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'console.log("hello")',
+                    'logger.info("hello")'
+                )
+            );
+        });
+
+        test('raw() with captures in complex pattern', async () => {
+            const prefix = "user";
+            const field = capture('field');
+            const value = capture('value');
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    // Pattern matching property access with raw() prefix
+                    const m = await pattern`${raw(prefix)}.${field} < ${value}`.match(binary);
+                    if (m) {
+                        return template`${raw(prefix)}.${field} >= ${value}`.apply(this.cursor, binary, m);
+                    }
+                    return binary;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'user.age < 18',
+                    'user.age >= 18'
+                )
+            );
+        });
+    });
 });
