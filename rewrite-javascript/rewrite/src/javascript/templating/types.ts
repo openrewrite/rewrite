@@ -15,8 +15,9 @@
  */
 import {Cursor, Tree} from '../..';
 import {J, Type} from '../../java';
-import type {Pattern, MatchResult} from "./pattern";
+import type {MatchResult, Pattern} from "./pattern";
 import type {Template} from "./template";
+import type {CaptureValue, RawCode} from "./capture";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -100,14 +101,14 @@ export interface CaptureOptions<T = any> {
  * but does NOT enforce any runtime constraints on what the capture will match.
  *
  * **Pattern Matching Behavior:**
- * - A bare `pattern`${capture('x')}`` will structurally match ANY expression
- * - Pattern structure determines matching: `pattern`foo(${capture('x')})`` only matches `foo()` calls
+ * - A bare `pattern`${capture()}`` will structurally match ANY expression
+ * - Pattern structure determines matching: `pattern`foo(${capture()})`` only matches `foo()` calls with one arg
  * - Use structural patterns to narrow matching scope before applying semantic validation
  *
  * **Variadic Captures:**
  * Use `{ variadic: true }` to match zero or more nodes in a sequence:
  * ```typescript
- * const args = capture('args', { variadic: true });
+ * const args = capture({ variadic: true });
  * pattern`foo(${args})`  // Matches: foo(), foo(a), foo(a, b, c)
  * ```
  */
@@ -168,8 +169,9 @@ export interface Capture<T = any> {
  *
  * @example
  * // Variadic any - match zero or more without capturing
+ * const first = any();
  * const rest = any({ variadic: true });
- * const pat = pattern`bar(${capture('first')}, ${rest})`
+ * const pat = pattern`bar(${first}, ${rest})`
  *
  * @example
  * // With constraints - validate but don't capture
@@ -273,11 +275,34 @@ export interface PatternOptions {
  * Valid parameter types for template literals.
  * - Capture: For pattern matching and reuse
  * - CaptureValue: Result of property access or array operations on captures (e.g., capture.prop, capture[0], capture.slice(1))
+ * - TemplateParam: For standalone template parameters
+ * - RawCode: For inserting literal code strings at construction time
  * - Tree: AST nodes to be inserted directly
  * - Tree[]: Arrays of AST nodes (from variadic capture operations like slice)
- * - Primitives: Values to be converted to literals
+ * - J.RightPadded<any>: Wrapper containing an element with markers (element will be extracted)
+ * - J.RightPadded<any>[]: Array of wrappers (elements will be expanded)
+ * - J.Container<any>: Container with elements (elements will be expanded)
+ *
+ * Note: Primitive values (string, number, boolean) are NOT supported in template literals.
+ * Use raw() for inserting code strings, or Template.builder() API for programmatic construction.
  */
-export type TemplateParameter = Capture | any | TemplateParam | Tree | Tree[] | string | number | boolean;
+export type TemplateParameter = Capture | CaptureValue | TemplateParam | RawCode | Tree | Tree[] | J.RightPadded<any> | J.RightPadded<any>[] | J.Container<any>;
+
+/**
+ * Parameter specification for template generation (internal).
+ * Represents a placeholder in a template that will be replaced with a parameter value.
+ * This is the internal wrapper used by the template engine.
+ *
+ * Note: The value is typed as `any` rather than `TemplateParameter` to allow flexible
+ * internal handling without excessive type guards. The public API (template function)
+ * constrains inputs to `TemplateParameter`, providing type safety at the API boundary.
+ */
+export interface Parameter {
+    /**
+     * The value to substitute into the template.
+     */
+    value: any;
+}
 
 /**
  * Configuration options for templates.
@@ -347,18 +372,21 @@ export interface RewriteRule {
      *
      * @example
      * ```typescript
-     * const rule1 = rewrite(() => ({
-     *     before: pattern`${capture('a')} + ${capture('b')}`,
-     *     after: template`${capture('b')} + ${capture('a')}`
-     * }));
+     * const rule1 = rewrite(() => {
+     *     const { a, b } = { a: capture(), b: capture() };
+     *     return {
+     *         before: pattern`${a} + ${b}`,
+     *         after: template`${b} + ${a}`
+     *     };
+     * });
      *
      * const rule2 = rewrite(() => ({
      *     before: pattern`${capture('x')} + 1`,
-     *     after: template`${capture('x')} + 2`
+     *     after: template`${capture('x')}++`
      * }));
      *
      * const combined = rule1.andThen(rule2);
-     * // Will first swap operands, then if result matches "x + 1", change to "x + 2"
+     * // Will first swap operands, then if result matches "x + 1", change to "x++"
      * ```
      */
     andThen(next: RewriteRule): RewriteRule;

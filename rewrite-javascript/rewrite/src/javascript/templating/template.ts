@@ -15,11 +15,12 @@
  */
 import {Cursor, Tree} from '../..';
 import {J} from '../../java';
-import {TemplateOptions, TemplateParameter, Capture} from './types';
+import {Capture, Parameter, TemplateOptions, TemplateParameter} from './types';
 import {MatchResult} from './pattern';
-import {WRAPPERS_MAP_SYMBOL} from './utils';
-import {CAPTURE_NAME_SYMBOL} from './capture';
-import {TemplateEngine, Parameter} from './engine';
+import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
+import {TemplateEngine} from './engine';
+import {JS} from '..';
 
 /**
  * Coordinates for template application.
@@ -171,6 +172,7 @@ export class TemplateBuilder {
  */
 export class Template {
     private options: TemplateOptions = {};
+    private _cachedTemplate?: J;
 
     /**
      * Creates a new builder for constructing templates programmatically.
@@ -216,7 +218,69 @@ export class Template {
      */
     configure(options: TemplateOptions): Template {
         this.options = { ...this.options, ...options };
+        // Invalidate cache when configuration changes
+        this._cachedTemplate = undefined;
         return this;
+    }
+
+    /**
+     * Gets the template tree for this template, using two-level caching:
+     * - Level 1: Instance cache (this._cachedTemplate) - fastest, no lookup needed
+     * - Level 2: Global cache (globalAstCache) - fast, shared across all templates
+     * - Level 3: TemplateEngine - slow, parses and processes the template
+     *
+     * Most parameters use placeholders that are replaced during application, so templates
+     * with the same structure share cached ASTs. However, raw() parameters are spliced at
+     * construction time, so their values must be included in the cache key.
+     *
+     * @returns The cached or newly computed template tree
+     * @internal
+     */
+    async getTemplateTree(): Promise<JS.CompilationUnit> {
+        // Level 1: Instance cache (fastest path)
+        if (this._cachedTemplate) {
+            return this._cachedTemplate as JS.CompilationUnit;
+        }
+
+        // Generate cache key for global lookup
+        // For raw() parameters, we need to include their code values in the key
+        // since they're spliced at construction time, not application time
+        const contextStatements = this.options.context || this.options.imports || [];
+        const parametersKey = this.parameters.map((p, i) => {
+            const value = p.value;
+            // Include raw code values in the cache key using the symbol
+            if (value && typeof value === 'object' && value[RAW_CODE_SYMBOL]) {
+                return `raw:${value.code}`;
+            }
+            return i.toString();
+        }).join(',');
+        const cacheKey = generateCacheKey(
+            this.templateParts,
+            parametersKey,
+            contextStatements,
+            this.options.dependencies || {}
+        );
+
+        // Level 2: Global cache (fast path - shared with Pattern)
+        const cached = globalAstCache.get(cacheKey);
+        if (cached) {
+            this._cachedTemplate = cached as JS.CompilationUnit;
+            return cached as JS.CompilationUnit;
+        }
+
+        // Level 3: Compute via TemplateEngine (slow path)
+        const result = await TemplateEngine.getTemplateTree(
+            this.templateParts,
+            this.parameters,
+            contextStatements,
+            this.options.dependencies || {}
+        ) as JS.CompilationUnit;
+
+        // Cache in both levels
+        globalAstCache.set(cacheKey, result);
+        this._cachedTemplate = result;
+
+        return result;
     }
 
     /**
@@ -263,10 +327,12 @@ export class Template {
             }
         }
 
-        // Prefer 'context' over deprecated 'imports'
-        const contextStatements = this.options.context || this.options.imports || [];
-        return TemplateEngine.applyTemplate(
-            this.templateParts,
+        // Use instance-level cache to get the template tree
+        const ast = await this.getTemplateTree();
+
+        // Delegate to TemplateEngine for placeholder substitution and application
+        return TemplateEngine.applyTemplateFromAst(
+            ast,
             this.parameters,
             cursor,
             {
@@ -274,9 +340,7 @@ export class Template {
                 mode: JavaCoordinates.Mode.Replace
             },
             normalizedValues,
-            wrappersMap,
-            contextStatements,
-            this.options.dependencies || {}
+            wrappersMap
         );
     }
 }
@@ -289,8 +353,13 @@ export class Template {
  * to navigate properties (e.g., `method.name`) or array bracket notation to
  * access array elements (e.g., `args.elements[0].element`).
  *
+ * Templates can also accept AST wrapper types directly:
+ * - J.RightPadded<T>: The element will be extracted and inserted
+ * - J.RightPadded<T>[]: Elements will be expanded in place
+ * - J.Container<T>: Elements will be expanded in place
+ *
  * @param strings The string parts of the template
- * @param parameters The parameters between the string parts (Capture, Tree, or primitives)
+ * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container)
  * @returns A Template object that can be applied to generate AST nodes
  *
  * @example
@@ -325,6 +394,12 @@ export class Template {
  * // Array element access
  * const invocation = capture<J.MethodInvocation>('invocation');
  * template`bar(${invocation.arguments.elements[0].element})`
+ *
+ * @example
+ * // Using J.RightPadded and J.Container directly
+ * const selectExpr = method.select;  // J.RightPadded<Expression>
+ * const args = method.arguments;      // J.Container<Expression>
+ * template`${selectExpr}.newMethod(${args})`
  */
 export function template(strings: TemplateStringsArray, ...parameters: TemplateParameter[]): Template {
     // Convert parameters to Parameter objects (no longer need to check for mutable tree property)

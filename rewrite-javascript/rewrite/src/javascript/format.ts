@@ -640,7 +640,9 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
             if (!draft.end.whitespace.includes("\n") && (draft.statements.length == 0 || !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n"))) {
-                draft.end = this.withNewlineSpace(draft.end);
+                if (this.cursor.parent?.value.kind !== J.Kind.NewClass) {
+                    draft.end = this.withNewlineSpace(draft.end);
+                }
             }
         });
     }
@@ -936,13 +938,9 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
                 }
             });
         }
-        if (ret.kind === JS.Kind.StatementExpression && (ret as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration) {
+        if (ret.kind === J.Kind.MethodDeclaration
+            && this.cursor.parent?.parent?.parent?.value.kind === J.Kind.ClassDeclaration) {
             ret = produce(ret as JS.StatementExpression, draft => {
-                this.ensurePrefixHasNewLine(draft);
-            });
-        } else if (ret.kind === J.Kind.MethodDeclaration && this.cursor.parent?.value.kind != JS.Kind.StatementExpression
-            && (this.cursor.parent?.parent?.value.kind != JS.Kind.CompilationUnit || (this.cursor.parent?.parent?.value as JS.CompilationUnit).statements[0].element.id != ret.id)) {
-            ret = produce(ret as J.MethodDeclaration, draft => {
                 this.ensurePrefixHasNewLine(draft);
             });
         }
@@ -1025,7 +1023,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
                     }
                     this.keepMaximumBlankLines(draft, this.style.keepMaximum.inCode);
                 }
-            } else if (parent?.kind === J.Kind.Block ||
+            } else if (parent?.kind === J.Kind.Block && grandparent?.kind !== J.Kind.NewClass ||
                       (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
                       (parent?.kind === J.Kind.Case)) {
                 if (draft.kind != J.Kind.Case) {
@@ -1038,8 +1036,10 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitBlock(block: J.Block, p: P): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
-            if (!draft.end.whitespace.includes("\n")) {
-                draft.end.whitespace = draft.end.whitespace.replace(/[ \t]+$/, '') + "\n";
+            if (this.cursor.parent?.value.kind != J.Kind.NewClass) {
+                if (!draft.end.whitespace.includes("\n")) {
+                    draft.end.whitespace = draft.end.whitespace.replace(/[ \t]+$/, '') + "\n";
+                }
             }
         });
     }
@@ -1115,7 +1115,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         let indentShouldIncrease =
             tree.kind === J.Kind.Block
             || this.cursor.parent?.parent?.parent?.value.kind == J.Kind.Case
-            || (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration);
+            || (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration && tree.prefix.whitespace.includes("\n"));
 
         const previousIndent = this.currentIndent;
 

@@ -127,6 +127,48 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         return super.visitRightPadded(right, p);
     }
 
+    override async visitContainer<T extends J>(container: J.Container<T>, p: J): Promise<J.Container<T>> {
+        // Check if any elements are variadic captures
+        const hasVariadicCapture = container.elements.some(elem =>
+            PlaceholderUtils.isVariadicCapture(elem)
+        );
+
+        // If no variadic captures, use parent implementation
+        if (!hasVariadicCapture) {
+            return super.visitContainer(container, p);
+        }
+
+        // Otherwise, handle variadic captures ourselves
+        if (!this.match) {
+            return container;
+        }
+
+        // Extract the other container
+        const isContainer = (p as any).kind === J.Kind.Container;
+        if (!isContainer) {
+            return this.abort(container);
+        }
+        const otherContainer = p as unknown as J.Container<T>;
+
+        // Push wrappers onto both cursors
+        const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
+        this.cursor = new Cursor(container, this.cursor);
+        this.targetCursor = new Cursor(otherContainer, this.targetCursor);
+        try {
+            // Use matchSequence for variadic matching
+            // filterEmpty=true to skip J.Empty elements (they represent missing elements in destructuring)
+            if (!await this.matchSequence(container.elements as J.RightPadded<J>[], otherContainer.elements as J.RightPadded<J>[], true)) {
+                return this.abort(container);
+            }
+        } finally {
+            this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
+        }
+
+        return container;
+    }
+
     override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
         // Check if any arguments are variadic captures
         const hasVariadicCapture = methodInvocation.arguments.elements.some(arg =>
