@@ -139,7 +139,14 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         method = (J.MethodInvocation) new WrapMethodChains<>(style).visit(method, p, getCursor().getParentTreeCursor());
-        return super.visitMethodInvocation(method, p);
+        method = super.visitMethodInvocation(method, p);
+        return (J.MethodInvocation) new WrapMethodInvocationArguments<>(spacesStyle, style).visit(method, p, getCursor().getParentTreeCursor());
+    }
+
+    @Override
+    public J.NewClass visitNewClass(J.NewClass newClass, P p) {
+        J.NewClass n = super.visitNewClass(newClass, p);
+        return (J.NewClass) new WrapMethodInvocationArguments<>(spacesStyle, style).visit(n, p, getCursor().getParentTreeCursor());
     }
 
     @Override
@@ -177,7 +184,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
-        if (!b.getEnd().getWhitespace().contains("\n")) {
+        Tree parent = getCursor().getParentTreeCursor().getValue();
+        boolean isMethodOrClassBody = parent instanceof J.MethodDeclaration || parent instanceof J.ClassDeclaration;
+        if (!b.getEnd().getWhitespace().contains("\n") && (!isMethodOrClassBody || !b.getStatements().isEmpty())) {
             b = b.withEnd(withNewline(b.getEnd()));
         }
         return b;

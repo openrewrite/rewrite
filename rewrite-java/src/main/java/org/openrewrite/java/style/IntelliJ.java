@@ -103,6 +103,7 @@ public class IntelliJ extends NamedStyles {
                 new WrappingAndBracesStyle.IfStatement(false),
                 new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList(), false),
                 new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
+                new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),
