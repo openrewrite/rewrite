@@ -1569,7 +1569,6 @@ class TypeUtilsTest implements RewriteTest {
             (JavaType.Variable[]) null, // members
             (JavaType.Method[]) null  // methods
         );
-        
         // This should not cause a StackOverflowError
         assertFalse(TypeUtils.isAssignableTo("java.lang.String", withCircularSupertype));
         // Even though it has itself as supertype, Object match should work
