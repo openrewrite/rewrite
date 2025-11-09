@@ -28,7 +28,9 @@
  *    visitor to use matchSequence logic instead of strict length comparison when variadic
  *    captures are present, similar to how method invocations are handled.
  */
-import {capture, JavaScriptParser, JS, pattern} from "../../../src/javascript";
+import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
+import {fromVisitor, RecipeSpec} from "../../../src/test";
 
 describe('variadic pattern matching in containers', () => {
     const parser = new JavaScriptParser();
@@ -150,5 +152,44 @@ describe('variadic pattern matching in containers', () => {
         expect(await pat2.match(await parse('function foo({}) {}'))).toBeDefined();    // within max
         expect(await pat2.match(await parse('function foo({a, b}) {}'))).toBeDefined();    // exactly max
         expect(await pat2.match(await parse('function foo({a, b, c}) {}'))).toBeUndefined();  // exceeds max
+    });
+
+    test('variadic replacement in object destructuring pattern', () => {
+        // This test reproduces the issue where variadic captures in containers
+        // are not properly expanded during template replacement
+
+        const propsWithBindings = capture({ variadic: true });
+        const ref = capture();
+        const body = capture({ variadic: true });
+        const name = capture();
+
+        // Pattern: forwardRef(function Name({...props}, ref) {...})
+        const beforePattern = pattern`forwardRef(function ${name}({${propsWithBindings}}, ${ref}) {${body}})`;
+
+        // Template: function Name({ ref: ref, ...props }) {...}
+        const afterTemplate = template`function ${name}({ ref: ${ref}, ${propsWithBindings} }) {${body}}`;
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const match = await beforePattern.match(methodInvocation);
+                if (match) {
+                    return await afterTemplate.apply(this.cursor, methodInvocation, match);
+                }
+                return super.visitMethodInvocation(methodInvocation, p);
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `forwardRef(function MyInput({ className, ...rest }, ref) { return null; })`,
+                `
+                    function MyInput({ ref, className, ...rest }) {
+                        return null;
+                    }
+                `
+            )
+        );
     });
 });

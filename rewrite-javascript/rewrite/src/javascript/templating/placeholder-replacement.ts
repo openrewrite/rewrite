@@ -313,6 +313,10 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         } else if (node.kind === J.Kind.Literal) {
             const literal = node as J.Literal;
             return literal.valueSource?.startsWith(PlaceholderUtils.PLACEHOLDER_PREFIX) || false;
+        } else if (node.kind === JS.Kind.BindingElement) {
+            // Check if the BindingElement's name is a placeholder
+            const bindingElement = node as JS.BindingElement;
+            return this.isPlaceholder(bindingElement.name);
         }
         return false;
     }
@@ -439,6 +443,10 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             return (node as J.Identifier).simpleName;
         } else if (node.kind === J.Kind.Literal) {
             return (node as J.Literal).valueSource || null;
+        } else if (node.kind === JS.Kind.BindingElement) {
+            // Extract placeholder text from the BindingElement's name
+            const bindingElement = node as JS.BindingElement;
+            return this.getPlaceholderText(bindingElement.name);
         }
         return null;
     }
