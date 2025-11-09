@@ -35,6 +35,7 @@ class AutoFormatTest implements RewriteTest {
             package com.example;
 
             public class MyObject {
+                public MyObject(String... x) {}
                 public static Builder builder() { return new Builder(); }
                 public static Builder newBuilder() { return new Builder(); }
                 public static class Builder {
@@ -45,8 +46,9 @@ class AutoFormatTest implements RewriteTest {
                     MyObject build() { return new MyObject(); }
                 }
 
-                public static void outerMethod(String a, String b, String c) {}
-                public static String innerMethod(String x, String y, String z) { return ""; }
+                public static void outerMethod(String... x) {}
+                public static String innerMethod(String... x) { return ""; }
+                public static String veryLongMethodNameThatExceedsTheMaxLimit(String... x) { return ""; }
             }
             """))
           .recipeFromYaml(
@@ -1557,8 +1559,7 @@ class AutoFormatTest implements RewriteTest {
                           return false;
                       }
                   
-                      static class Item {
-                      }
+                      static class Item {}
                   }
                   """
               )
@@ -3495,6 +3496,786 @@ class AutoFormatTest implements RewriteTest {
                               wrap: ChopIfTooLong
               """.formatted(hardWrapAt),
               "org.openrewrite.java.AutoFormatWithMethodParameterChopIfTooLong"
+            );
+        }
+    }
+
+    @Nested
+    class MethodInvocationArguments {
+
+        @Test
+        void formatMethodInvocationWithMultipleArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithTwoArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotFormatMethodInvocationWithSingleArgument() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatNewClassWithMultipleArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject obj = new MyObject("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject obj = new MyObject("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void preserveAlreadyFormattedMethodInvocation() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod(
+                                  "arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod(
+                                  "arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithComments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", /* comment */ "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  /* comment */ "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatNestedMethodInvocations() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", MyObject.innerMethod("nested1", "nested2", "nested3"), "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  MyObject.innerMethod("nested1",
+                                          "nested2",
+                                          "nested3"),
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationInFieldDeclaration() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      private final String value = MyObject.innerMethod("arg1", "arg2", "arg3");
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      private final String value = MyObject.innerMethod("arg1",
+                              "arg2",
+                              "arg3");
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationInReturn() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      String test() {
+                          return MyObject.innerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      String test() {
+                          return MyObject.innerMethod("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithPartialNewlines() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                              "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatLongLinesOnly() {
+            rewriteRun(
+              spec -> withMethodInvocationArgumentChopIfTooLong(spec, 80),
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          short1("a", "b");
+                          MyObject.veryLongMethodNameThatExceedsTheMaxLimit("arg1", "arg2", "arg3");
+                      }
+
+                      private static void short1(String a, String b) {}
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          short1("a", "b");
+                          MyObject.veryLongMethodNameThatExceedsTheMaxLimit("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+
+                      private static void short1(String a, String b) {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void preserveMethodInvocationBelowThreshold() {
+            rewriteRun(
+              spec -> withMethodInvocationArgumentChopIfTooLong(spec, 120),
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatWithOpenNewLine() {
+            rewriteRun(
+              this::withMethodInvocationArgumentOpenNewLine,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod(
+                                  "arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatWithCloseNewLine() {
+            rewriteRun(
+              this::withMethodInvocationArgumentCloseNewLine,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2",
+                                  "arg3"
+                          );
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatWithOpenAndCloseNewLine() {
+            rewriteRun(
+              this::withMethodInvocationArgumentOpenAndCloseNewLine,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod(
+                                  "arg1",
+                                  "arg2",
+                                  "arg3"
+                          );
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMultipleMethodInvocationsInClass() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test1() {
+                          MyObject.outerMethod("a", "b", "c");
+                      }
+
+                      void test2() {
+                          MyObject.innerMethod("x", "y", "z");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test1() {
+                          MyObject.outerMethod("a",
+                                  "b",
+                                  "c");
+                      }
+
+                      void test2() {
+                          MyObject.innerMethod("x",
+                                  "y",
+                                  "z");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithLambdaArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.util.function.Function;
+
+                  class Test {
+                      void test() {
+                          process("arg1", x -> x.toUpperCase(), "arg3");
+                      }
+
+                      void process(String a, Function<String, String> f, String c) {}
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.util.function.Function;
+
+                  class Test {
+                      void test() {
+                          process("arg1",
+                                  x -> x.toUpperCase(),
+                                  "arg3");
+                      }
+
+                      void process(String a, Function<String, String> f, String c) {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithMultilineLambda() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.util.function.Function;
+
+                  class Test {
+                      void test() {
+                          process("arg1", x -> {
+                              return x.toUpperCase();
+                          }, "arg3");
+                      }
+
+                      void process(String a, Function<String, String> f, String c) {}
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.util.function.Function;
+
+                  class Test {
+                      void test() {
+                          process("arg1",
+                                  x -> {
+                                      return x.toUpperCase();
+                                  },
+                                  "arg3");
+                      }
+
+                      void process(String a, Function<String, String> f, String c) {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void indentArgumentsOnTheirOwnNewLineAlready() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod(
+                          "arg1",
+                          "arg2",
+                          "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod(
+                                  "arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatNewClassInFieldInitializer() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.util.ArrayList;
+                  import java.util.List;
+
+                  class Test {
+                      private final MyObject obj = new MyObject("a", "b", "c");
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.util.ArrayList;
+                  import java.util.List;
+
+                  class Test {
+                      private final MyObject obj = new MyObject("a",
+                              "b",
+                              "c");
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatChainedMethodCallsWithArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          String result = "hello"
+                              .substring(1, 3)
+                              .concat("world");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          String result = "hello"
+                                  .substring(1,
+                                          3)
+                                  .concat("world");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        private void withMethodInvocationArgumentWrapping(RecipeSpec spec) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentWrapping
+              displayName: Autoformat java code with method invocation argument wrapping
+              description: Formats the code with method invocation argument wrapping enabled.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            methodCallArguments:
+                              wrap: WrapAlways
+              """,
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentWrapping"
+            );
+        }
+
+        private void withMethodInvocationArgumentChopIfTooLong(RecipeSpec spec, int hardWrapAt) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentChopIfTooLong
+              displayName: Autoformat java code with method invocation argument chop if too long
+              description: Formats the code with method invocation argument wrapping only for long lines.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            hardWrapAt: %d
+                            methodCallArguments:
+                              wrap: ChopIfTooLong
+              """.formatted(hardWrapAt),
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentChopIfTooLong"
+            );
+        }
+
+        private void withMethodInvocationArgumentOpenNewLine(RecipeSpec spec) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenNewLine
+              displayName: Autoformat java code with method invocation argument open new line
+              description: Formats the code with method invocation argument wrapping and open new line.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            methodCallArguments:
+                              wrap: WrapAlways
+                              openNewLine: true
+              """,
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenNewLine"
+            );
+        }
+
+        private void withMethodInvocationArgumentCloseNewLine(RecipeSpec spec) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentCloseNewLine
+              displayName: Autoformat java code with method invocation argument close new line
+              description: Formats the code with method invocation argument wrapping and close new line.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            methodCallArguments:
+                              wrap: WrapAlways
+                              closeNewLine: true
+              """,
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentCloseNewLine"
+            );
+        }
+
+        private void withMethodInvocationArgumentOpenAndCloseNewLine(RecipeSpec spec) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenAndCloseNewLine
+              displayName: Autoformat java code with method invocation argument open and close new line
+              description: Formats the code with method invocation argument wrapping and both open and close new lines.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            methodCallArguments:
+                              wrap: WrapAlways
+                              openNewLine: true
+                              closeNewLine: true
+              """,
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenAndCloseNewLine"
             );
         }
     }

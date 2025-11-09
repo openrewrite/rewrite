@@ -140,5 +140,10 @@ public class WrappingAndBracesStyle implements JavaStyle {
             //noinspection ConstantConditions
             return openNewLine == null ? false : openNewLine;
         }
+
+        public Boolean getCloseNewLine() {
+            //noinspection ConstantConditions
+            return closeNewLine == null ? false : closeNewLine;
+        }
     }
 }
