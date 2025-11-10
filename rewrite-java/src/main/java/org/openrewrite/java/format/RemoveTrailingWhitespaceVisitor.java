@@ -57,7 +57,8 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
         String whitespace = s.getWhitespace();
         int lastNewline = whitespace.lastIndexOf('\n');
         // Skip import prefixes, leave those up to OrderImports which better understands that domain
-        if (lastNewline > 0 && loc != Space.Location.IMPORT_PREFIX) {
+        // Skip compilation unit prefix to preserve shebangs and other file-level prefixes
+        if (lastNewline > 0 && loc != Space.Location.IMPORT_PREFIX && loc != Space.Location.COMPILATION_UNIT_PREFIX) {
             StringBuilder ws = new StringBuilder();
             for (int i = 0; i < whitespace.length(); i++) {
                 char c = whitespace.charAt(i);
