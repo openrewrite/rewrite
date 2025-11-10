@@ -36,7 +36,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
 
     async visit<R extends J>(tree: J, p: any, parent?: Cursor): Promise<R | undefined> {
         // Check if this node is a placeholder
-        if (this.isPlaceholder(tree)) {
+        // BUT: Don't handle `JS.BindingElement` here - let `visitBindingElement` preserve `propertyName`
+        if (tree.kind !== JS.Kind.BindingElement && this.isPlaceholder(tree)) {
             const replacement = this.replacePlaceholder(tree);
             if (replacement !== tree) {
                 return replacement as R;
@@ -45,6 +46,26 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
 
         // Continue with normal traversal
         return super.visit(tree, p, parent);
+    }
+
+    /**
+     * Override visitBindingElement to preserve propertyName from template when replacing.
+     * For example, in `{ ref: ${ref} }`, we want to preserve `ref:` when replacing ${ref}.
+     */
+    override async visitBindingElement(bindingElement: JS.BindingElement, p: any): Promise<J | undefined> {
+        // Visit the name to potentially replace placeholders
+        const visitedName = await this.visit(bindingElement.name, p);
+
+        // If the name changed (placeholder was replaced), preserve the BindingElement structure
+        // including the propertyName from the template
+        if (visitedName !== bindingElement.name) {
+            return produce(bindingElement, draft => {
+                draft.name = visitedName as any;
+                // propertyName is already set from the template and will be preserved by produce
+            });
+        }
+
+        return bindingElement;
     }
 
     /**

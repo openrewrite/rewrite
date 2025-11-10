@@ -185,10 +185,124 @@ describe('variadic pattern matching in containers', () => {
             typescript(
                 `forwardRef(function MyInput({ className, ...rest }, ref) { return null; })`,
                 `
-                    function MyInput({ ref, className, ...rest }) {
+                    function MyInput({ ref: ref, className, ...rest }) {
                         return null;
                     }
                 `
+            )
+        );
+    });
+
+    test('preserve propertyName in BindingElement replacement', () => {
+        // This test verifies that { ref: ${ref} } preserves the "ref:" property name
+        // when replacing ${ref} with the captured value
+
+        const ref = capture();
+        const props = capture({ variadic: true });
+        const body = capture({ variadic: true });
+        const name = capture();
+
+        // Reuse the forwardRef pattern but with a template that has propertyName
+        const beforePattern = pattern`forwardRef(function ${name}({${props}}, ${ref}) {${body}})`;
+
+        // Template with propertyName: { ref: ${ref} }
+        const afterTemplate = template`function ${name}({ ref: ${ref}, ${props} }) {${body}}`;
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const match = await beforePattern.match(methodInvocation);
+                if (match) {
+                    return await afterTemplate.apply(this.cursor, methodInvocation, match);
+                }
+                return super.visitMethodInvocation(methodInvocation, p);
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `forwardRef(function MyInput({ className, ...rest }, ref) { return null; })`,
+                `
+                    function MyInput({ ref: ref, className, ...rest }) {
+                        return null;
+                    }
+                `
+            )
+        );
+    });
+
+    test('preserve Spread marker on non-variadic capture in function declaration', () => {
+        // This test demonstrates the issue where the Spread marker gets lost during
+        // marker propagation. When we have ...${capture} in a template, the Spread
+        // marker is on the placeholder identifier. During marker propagation (in
+        // MarkerAttachmentVisitor), the CaptureMarker gets propagated up, but the
+        // Spread marker can get lost.
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodDeclaration(method: J.MethodDeclaration, p: any): Promise<J | undefined> {
+                // Template with spread: function Name(...params) {...}
+                const afterTemplate = template`function ${method.name}(...${method.parameters.elements[0]}) {${method.body!.statements}}`;
+                return await afterTemplate.apply(this.cursor, method);
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `function myFunc(props) {
+                    return null;
+                }`,
+                `function myFunc(...props) {
+                    return null;
+                }`
+            )
+        );
+    });
+
+    test('preserve Spread marker on non-variadic capture in function call', () => {
+        // This test verifies that the Spread marker is preserved when using
+        // a non-variadic capture with spread operator in a function call context.
+        // Example: myFunc(args) -> myFunc(...args)
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                // Template with spread: myFunc(...args)
+                const afterTemplate = template`myFunc(...${method.arguments.elements[0]})`;
+                return await afterTemplate.apply(this.cursor, method);
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `myFunc(props)`,
+                `myFunc(...props)`
+            )
+        );
+    });
+
+    test('preserve Spread marker on non-variadic capture in object literal', () => {
+        // This test verifies that the Spread marker is preserved when using
+        // a non-variadic capture with spread operator in an object literal context.
+        // Example: { foo: bar } -> { foo: bar, ...rest }
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                // Template with spread in object literal: myFunc({ ...obj })
+                const afterTemplate = template`myFunc({ ...${method.arguments.elements[0]} })`;
+                return await afterTemplate.apply(this.cursor, method);
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `myFunc(props)`,
+                `myFunc({ ...props})`
             )
         );
     });
