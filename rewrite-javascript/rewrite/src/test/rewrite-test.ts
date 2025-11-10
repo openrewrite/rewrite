@@ -279,9 +279,14 @@ function dedent(s: string): string {
     const str = start > 0 || end < s.length ? s.slice(start, end) : s;
     const lines = str.split('\n');
 
-    // Find minimum indentation (avoid regex for performance)
+    // If we removed a leading newline, consider all lines for minIndent
+    // Otherwise, skip the first line (it's on the same line as the opening quote)
+    const startLine = start > 0 ? 0 : 1;
+
+    // Find minimum indentation
     let minIndent = Infinity;
-    for (const line of lines) {
+    for (let i = startLine; i < lines.length; i++) {
+        const line = lines[i];
         let indent = 0;
         for (let j = 0; j < line.length; j++) {
             const ch = line.charCodeAt(j);
@@ -297,12 +302,12 @@ function dedent(s: string): string {
 
     // If all lines are empty or no indentation
     if (minIndent === Infinity || minIndent === 0) {
-        return lines.map(line => line.trim() || '').join('\n');
+        return lines.join('\n');
     }
 
-    // Remove common indentation from each line
-    return lines.map(line =>
-        line.length >= minIndent ? line.slice(minIndent) : ''
+    // Remove common indentation from lines (skip first line only if we didn't remove leading newline)
+    return lines.map((line, i) =>
+        (i === 0 && startLine === 1) ? line : (line.length >= minIndent ? line.slice(minIndent) : '')
     ).join('\n');
 }
 
