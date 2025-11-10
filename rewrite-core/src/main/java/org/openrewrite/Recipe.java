@@ -37,8 +37,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
 
@@ -227,7 +225,7 @@ public abstract class Recipe implements Cloneable {
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), getExamples(), null);
+                getMaintainers(), getContributors(), getExamples());
     }
 
     private List<OptionDescriptor> getOptionDescriptors() {
@@ -247,7 +245,6 @@ public abstract class Recipe implements Cloneable {
                 value = null;
             }
             Option option = field.getAnnotation(Option.class);
-            //noinspection ConstantValue
             if (option != null) {
                 options.add(new OptionDescriptor(field.getName(),
                         field.getType().getSimpleName(),
@@ -263,7 +260,6 @@ public abstract class Recipe implements Cloneable {
         for (Method method : recipe.getClass().getDeclaredMethods()) {
             if (method.getName().startsWith("get") && method.getParameterCount() == 0) {
                 Option option = method.getAnnotation(Option.class);
-                //noinspection ConstantValue
                 if (option != null) {
                     options.add(new OptionDescriptor(StringUtils.uncapitalize(method.getName().substring(3)),
                             method.getReturnType().getSimpleName(),
@@ -280,7 +276,6 @@ public abstract class Recipe implements Cloneable {
             Constructor<?> c = RecipeIntrospectionUtils.getPrimaryConstructor(getClass());
             for (Parameter parameter : c.getParameters()) {
                 Option option = parameter.getAnnotation(Option.class);
-                //noinspection ConstantValue
                 if (option != null) {
                     options.add(new OptionDescriptor(parameter.getName(),
                             parameter.getType().getSimpleName(),
@@ -504,9 +499,9 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Override
-    public Object clone() {
+    public Recipe clone() {
         try {
-            return super.clone();
+            return (Recipe) super.clone();
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }

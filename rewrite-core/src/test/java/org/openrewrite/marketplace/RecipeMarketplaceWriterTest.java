@@ -214,5 +214,10 @@ class RecipeMarketplaceWriterTest {
             public org.openrewrite.Recipe prepare(RecipeListing listing, java.util.Map<String, Object> options) {
                 throw new UnsupportedOperationException();
             }
+
+        @Override
+        public RecipeMarketplace listRecipes(RecipeMarketplaceReader reader) {
+            return RecipeMarketplace.newEmpty();
         }
+    }
 }

@@ -15,27 +15,17 @@
  */
 package org.openrewrite.marketplace;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Recipe;
-import org.openrewrite.config.RecipeDescriptor;
 
-import java.util.Map;
+@Data
+@AllArgsConstructor
+public class RecipeBundle {
+    String packageEcosystem;
+    String packageName;
+    String version;
 
-public interface RecipeBundle {
-    String getPackageEcosystem();
-
-    String getPackageName();
-
-    @Nullable String getVersion();
-
-    /**
-     * @return Teams partitioning of a recipe marketplace can be used
-     * to segment access or visibility of recipes by teams.
-     */
     @Nullable
-    String getTeam();
-
-    RecipeDescriptor describe(RecipeListing listing);
-
-    Recipe prepare(RecipeListing listing, Map<String, Object> options);
+    String team;
 }

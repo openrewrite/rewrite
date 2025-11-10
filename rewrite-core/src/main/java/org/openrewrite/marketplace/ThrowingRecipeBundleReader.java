@@ -13,22 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.marketplace;
+package org.openrewrite.marketplace;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.PackageVersion;
-import org.openrewrite.marketplace.RecipeBundle;
-import org.openrewrite.marketplace.RecipeBundleLoader;
+import lombok.RequiredArgsConstructor;
+import org.openrewrite.Recipe;
+import org.openrewrite.config.RecipeDescriptor;
 
-public class NpmRecipeBundleLoader implements RecipeBundleLoader {
+import java.util.List;
+import java.util.Map;
+
+@RequiredArgsConstructor
+public class ThrowingRecipeBundleReader implements RecipeBundleReader {
+    private final RuntimeException t;
+
     @Override
-    public String getEcosystem() {
-        return "npm";
+    public List<RecipeListing> listRecipes() {
+        throw t;
     }
 
     @Override
-    public RecipeBundle createBundle(String packageName, String version, @Nullable String team) {
-        PackageVersion packageVersion = new PackageVersion(packageName, version);
-        return new NpmRecipeBundle(packageVersion, team);
+    public RecipeDescriptor describe(RecipeListing listing) {
+        throw t;
+    }
+
+    @Override
+    public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+        throw t;
     }
 }

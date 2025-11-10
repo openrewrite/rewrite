@@ -99,7 +99,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     @Deprecated
-    public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    public void initialize(Collection<Recipe> availableRecipes,
+                           @SuppressWarnings("unused") Map<String, List<Contributor>> recipeToContributors) {
         this.initialize(availableRecipes);
     }
 
@@ -109,9 +110,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes);
     }
 
-    @SuppressWarnings("unused")
     @Deprecated
-    public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    public void initialize(Function<String, @Nullable Recipe> availableRecipes,
+                           @SuppressWarnings("unused") Map<String, List<Contributor>> recipeToContributors) {
         this.initialize(availableRecipes);
     }
 
@@ -145,7 +146,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
-                                              Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+                                             Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
         String recipeName = declarativeRecipe.getName();
         if (initializingRecipes.contains(recipeName)) {
             // Cycle detected - throw exception to fail fast
@@ -473,7 +474,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
-                getExamples(), null);
+                getExamples());
     }
 
     @Override
