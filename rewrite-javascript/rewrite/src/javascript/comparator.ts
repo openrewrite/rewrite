@@ -1957,54 +1957,93 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         const otherMethod = other as J.MethodInvocation;
 
-        // Check basic structural equality first
-        if (method.name.simpleName !== otherMethod.name.simpleName ||
-            method.arguments.elements.length !== otherMethod.arguments.elements.length) {
+        // Check argument length (always required)
+        if (method.arguments.elements.length !== otherMethod.arguments.elements.length) {
             return this.abort(method);
         }
 
-        // Check type attribution
-        // Both must have method types for semantic equality
-        if (!method.methodType || !otherMethod.methodType) {
-            // Lenient mode: if either has no type, allow structural matching
-            if (this.lenientTypeMatching) {
-                return super.visitMethodInvocation(method, other);
+        // Check if we can skip name checking based on type attribution
+        // We can only skip the name check if both have method types AND they represent the SAME method
+        // (not just type-compatible methods, but the actual same function with same FQN)
+        let canSkipNameCheck = false;
+        if (method.methodType && otherMethod.methodType) {
+            // Check if both method types have fully qualified declaring types with the same FQN
+            // This indicates they're the same method from the same module (possibly aliased)
+            const methodDeclaringType = method.methodType.declaringType;
+            const otherDeclaringType = otherMethod.methodType.declaringType;
+
+            if (methodDeclaringType && otherDeclaringType &&
+                Type.isFullyQualified(methodDeclaringType) && Type.isFullyQualified(otherDeclaringType)) {
+
+                const methodFQN = Type.FullyQualified.getFullyQualifiedName(methodDeclaringType as Type.FullyQualified);
+                const otherFQN = Type.FullyQualified.getFullyQualifiedName(otherDeclaringType as Type.FullyQualified);
+
+                // Same module/class AND same method name in the type = same method (can be aliased)
+                if (methodFQN === otherFQN && method.methodType.name === otherMethod.methodType.name) {
+                    canSkipNameCheck = true;
+                }
+                // If FQNs or method names don't match, we can't skip name check - fall through to name checking
             }
-            // Strict mode: if one has type but the other doesn't, they don't match
-            if (method.methodType || otherMethod.methodType) {
+            // If one or both don't have fully qualified types, we can't safely skip name checking
+            // Fall through to normal name comparison below
+        }
+
+        // Check names unless we determined we can skip based on type FQN matching
+        if (!canSkipNameCheck) {
+            if (method.name.simpleName !== otherMethod.name.simpleName) {
                 return this.abort(method);
             }
-            // If neither has type, fall through to structural comparison
-            return super.visitMethodInvocation(method, other);
+
+            // In strict mode, check type attribution requirements
+            if (!this.lenientTypeMatching) {
+                // Strict mode: if one has type but the other doesn't, they don't match
+                if ((method.methodType && !otherMethod.methodType) ||
+                    (!method.methodType && otherMethod.methodType)) {
+                    return this.abort(method);
+                }
+            }
+
+            // If neither has type, use structural comparison
+            if (!method.methodType && !otherMethod.methodType) {
+                return super.visitMethodInvocation(method, other);
+            }
+
+            // If both have types with FQ declaring types, verify they're compatible
+            // (This prevents matching completely different methods like util.isArray vs util.isBoolean)
+            if (method.methodType && otherMethod.methodType) {
+                const methodDeclaringType = method.methodType.declaringType;
+                const otherDeclaringType = otherMethod.methodType.declaringType;
+
+                if (methodDeclaringType && otherDeclaringType &&
+                    Type.isFullyQualified(methodDeclaringType) && Type.isFullyQualified(otherDeclaringType)) {
+
+                    const methodFQN = Type.FullyQualified.getFullyQualifiedName(methodDeclaringType as Type.FullyQualified);
+                    const otherFQN = Type.FullyQualified.getFullyQualifiedName(otherDeclaringType as Type.FullyQualified);
+
+                    // Different declaring types = different methods, even with same name
+                    if (methodFQN !== otherFQN) {
+                        return this.abort(method);
+                    }
+                }
+            }
         }
 
-        // Both have types - check they match semantically
-        const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
-        if (!typesMatch) {
-            // Types don't match - abort comparison
-            return this.abort(method);
-        }
-
-        // Types match! Now check if we can ignore receiver differences.
-        // We can only ignore receiver differences when one or both receivers are identifiers
-        // that represent module/namespace imports (e.g., `util` in `util.isDate()`).
-        // For other receivers (e.g., variables, expressions), we must compare them.
-
-        const canIgnoreReceiverDifference =
-            // Case 1: One has no select (direct call like `forwardRef()`), other has select (namespace like `React.forwardRef()`)
-            (!method.select && otherMethod.select) ||
-            (method.select && !otherMethod.select);
-
-        if (!canIgnoreReceiverDifference) {
-            // Both have selects or both don't - must compare them structurally
+        // When types match (canSkipNameCheck = true), we can skip select comparison entirely.
+        // This allows matching forwardRef() vs React.forwardRef() where types indicate same method.
+        if (!canSkipNameCheck) {
+            // Types didn't provide a match - must compare receivers structurally
             if ((method.select === undefined) !== (otherMethod.select === undefined)) {
                 return this.abort(method);
             }
 
             if (method.select && otherMethod.select) {
                 await this.visitRightPadded(method.select, otherMethod.select as any);
+                if (!this.match) {
+                    return this.abort(method);
+                }
             }
         }
+        // else: types matched, skip select comparison (allows namespace vs named imports)
 
         // Compare type parameters
         if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
@@ -2023,10 +2062,14 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             }
         }
 
-        // Compare name (already checked simpleName above, but visit for markers/prefix)
-        await this.visit(method.name, otherMethod.name);
-        if (!this.match) {
-            return this.abort(method);
+        // Compare name
+        // If we determined we can skip name check (same FQN method, possibly aliased), skip it
+        // This allows matching aliased imports where names differ but types are the same
+        if (!canSkipNameCheck) {
+            await this.visit(method.name, otherMethod.name);
+            if (!this.match) {
+                return this.abort(method);
+            }
         }
 
         // Compare arguments (visit RightPadded to check for markers)

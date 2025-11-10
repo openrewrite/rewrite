@@ -18,7 +18,7 @@ import {J} from '../../java';
 import {JS} from '../index';
 import {Marker, Markers} from '../../markers';
 import {randomId} from '../../uuid';
-import {VariadicOptions} from './types';
+import {ConstraintFunction, VariadicOptions} from './types';
 
 /**
  * Internal storage value type for pattern match captures.
@@ -127,7 +127,7 @@ export class CaptureMarker implements Marker {
     constructor(
         public readonly captureName: string,
         public readonly variadicOptions?: VariadicOptions,
-        public readonly constraint?: (node: any, cursor?: Cursor) => boolean
+        public readonly constraint?: ConstraintFunction<any>
     ) {
     }
 }

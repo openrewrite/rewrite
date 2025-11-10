@@ -35,6 +35,19 @@ export interface VariadicOptions {
 }
 
 /**
+ * Constraint function for captures.
+ * The cursor parameter is always provided with a defined value, but functions can
+ * choose to accept it or not (TypeScript allows functions with fewer parameters).
+ *
+ * For non-variadic captures: use ConstraintFunction<T> where T is the node type
+ * For variadic captures: use ConstraintFunction<T[]> where T[] is the array type
+ *
+ * When used with variadic captures, the cursor points to the nearest common parent
+ * of the captured elements.
+ */
+export type ConstraintFunction<T> = (node: T, cursor: Cursor) => boolean;
+
+/**
  * Options for the capture function.
  *
  * The constraint function receives different parameter types depending on whether
@@ -50,32 +63,34 @@ export interface CaptureOptions<T = any> {
     variadic?: boolean | VariadicOptions;
     /**
      * Optional constraint function that validates whether a captured node should be accepted.
-     * The function receives:
+     * The function always receives:
      * - node: The captured node (or array of nodes for variadic captures)
-     * - cursor: Optional cursor providing access to the node's context in the AST
+     * - cursor: A cursor at the captured node's position (always defined)
+     *
+     * Functions can choose to accept just the node parameter if they don't need the cursor.
      *
      * @param node The captured node to validate
-     * @param cursor Optional cursor at the captured node's position
+     * @param cursor Cursor at the captured node's position
      * @returns true if the capture should be accepted, false otherwise
      *
      * @example
      * ```typescript
-     * // Simple node validation
+     * // Simple node validation (cursor parameter ignored)
      * capture<J.Literal>('size', {
      *     constraint: (node) => typeof node.value === 'number' && node.value > 100
      * })
      *
-     * // Context-aware validation
+     * // Context-aware validation (using cursor)
      * capture<J.MethodInvocation>('method', {
      *     constraint: (node, cursor) => {
      *         if (!node.name.simpleName.startsWith('get')) return false;
-     *         const cls = cursor?.firstEnclosing(isClassDeclaration);
+     *         const cls = cursor.firstEnclosing(isClassDeclaration);
      *         return cls?.name.simpleName === 'ApiController';
      *     }
      * })
      * ```
      */
-    constraint?: (node: T, cursor?: Cursor) => boolean;
+    constraint?: ConstraintFunction<T>;
     /**
      * Type annotation for this capture. When provided, the template engine will generate
      * a preamble declaring the capture identifier with this type annotation, allowing
@@ -134,7 +149,7 @@ export interface Capture<T = any> {
      * For variadic captures (T = Expression[]), constraint receives an array of nodes.
      * The constraint function can optionally receive a cursor for context-aware validation.
      */
-    getConstraint?(): ((node: T, cursor?: Cursor) => boolean) | undefined;
+    getConstraint?(): ConstraintFunction<T> | undefined;
 }
 
 /**
@@ -201,7 +216,7 @@ export interface Any<T = any> {
      * For regular any (T = Expression), constraint receives a single node.
      * For variadic any (T = Expression[]), constraint receives an array of nodes.
      */
-    getConstraint?(): ((node: T) => boolean) | undefined;
+    getConstraint?(): ConstraintFunction<T> | undefined;
 }
 
 /**

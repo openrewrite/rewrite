@@ -16,7 +16,7 @@
 import {Cursor} from '../..';
 import {J} from '../../java';
 import {Any, Capture, PatternOptions} from './types';
-import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl} from './capture';
+import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PatternMatchingComparator} from './comparator';
 import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {TemplateEngine} from './engine';
@@ -48,7 +48,7 @@ import {TemplateEngine} from './engine';
  */
 export class PatternBuilder {
     private parts: string[] = [];
-    private captures: (Capture | Any<any>)[] = [];
+    private captures: (Capture | Any<any> | RawCode)[] = [];
 
     /**
      * Adds a static string part to the pattern.
@@ -73,15 +73,15 @@ export class PatternBuilder {
     /**
      * Adds a capture to the pattern.
      *
-     * @param value The capture object (Capture or Any) or string name
+     * @param value The capture object (Capture, Any, or RawCode) or string name
      * @returns This builder for chaining
      */
-    capture(value: Capture | Any<any> | string): this {
+    capture(value: Capture | Any<any> | RawCode | string): this {
         // Ensure we have a part for after this capture
         if (this.parts.length === 0) {
             this.parts.push('');
         }
-        // Convert string to Capture if needed
+        // Convert string to Capture if needed, or use value as-is for RawCode
         const captureObj = typeof value === 'string' ? new CaptureImpl(value) : value;
         this.captures.push(captureObj as any);
         // Add an empty string for the next part
@@ -150,11 +150,11 @@ export class Pattern {
      * Creates a new pattern from template parts and captures.
      *
      * @param templateParts The string parts of the template
-     * @param captures The captures between the string parts (can be Capture or Any)
+     * @param captures The captures between the string parts (can be Capture, Any, or RawCode)
      */
     constructor(
         public readonly templateParts: TemplateStringsArray,
-        public readonly captures: (Capture | Any<any>)[]
+        public readonly captures: (Capture | Any<any> | RawCode)[]
     ) {
     }
 
@@ -194,10 +194,17 @@ export class Pattern {
         }
 
         // Generate cache key for global lookup
+        // Include raw code values in the key since they affect the generated AST
         const contextStatements = this._options.context || this._options.imports || [];
+        const capturesKey = this.captures.map(c => {
+            if (c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL])) {
+                return `raw:${(c as RawCode).code}`;
+            }
+            return c.getName();
+        }).join(',');
         const cacheKey = generateCacheKey(
             this.templateParts,
-            this.captures.map(c => c.getName()).join(','),
+            capturesKey,
             contextStatements,
             this._options.dependencies || {}
         );
@@ -476,7 +483,11 @@ class Matcher {
 
         // Find the original capture object to get capturing flag
         // Note: Constraints are now evaluated in PatternMatchingComparator where cursor is correctly positioned
-        const captureObj = this.pattern.captures.find(c => c.getName() === captureName);
+        // Filter out RawCode since it doesn't have getName()
+        const captureObj = this.pattern.captures.find(c =>
+            !(c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL])) &&
+            c.getName() === captureName
+        );
 
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
@@ -505,7 +516,11 @@ class Matcher {
 
         // Find the original capture object to get capturing flag
         // Note: Constraints are now evaluated in PatternMatchingComparator where cursor is correctly positioned
-        const captureObj = this.pattern.captures.find(c => c.getName() === captureName);
+        // Filter out RawCode since it doesn't have getName()
+        const captureObj = this.pattern.captures.find(c =>
+            !(c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL])) &&
+            c.getName() === captureName
+        );
 
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
@@ -526,7 +541,7 @@ class Matcher {
  * Tagged template function for creating patterns.
  *
  * @param strings The string parts of the template
- * @param captures The captures between the string parts (Capture, Any, or string names)
+ * @param captures The captures between the string parts (Capture, Any, RawCode, or string names)
  * @returns A Pattern object
  *
  * @example
@@ -537,15 +552,28 @@ class Matcher {
  * @example
  * // Using any() for non-capturing matches
  * const pat = pattern`foo(${any()})`;
+ *
+ * @example
+ * // Using raw() for dynamic pattern construction
+ * const operator = '===';
+ * const pat = pattern`x ${raw(operator)} y`;
  */
-export function pattern(strings: TemplateStringsArray, ...captures: (Capture | Any<any> | string)[]): Pattern {
+export function pattern(strings: TemplateStringsArray, ...captures: (Capture | Any<any> | RawCode | string)[]): Pattern {
     const capturesByName = captures.reduce((map, c) => {
+        // Skip raw code - it's not a capture
+        if (c instanceof RawCode || (typeof c === 'object' && c && (c as any)[RAW_CODE_SYMBOL])) {
+            return map;
+        }
         const capture = typeof c === "string" ? new CaptureImpl(c) : c;
         // Use symbol to get internal name without triggering Proxy
         const name = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
         return map.set(name, capture);
     }, new Map<string, Capture | Any<any>>());
     return new Pattern(strings, captures.map(c => {
+        // Return raw code as-is
+        if (c instanceof RawCode || (typeof c === 'object' && c && (c as any)[RAW_CODE_SYMBOL])) {
+            return c as RawCode;
+        }
         // Use symbol to get internal name without triggering Proxy
         const name = typeof c === "string" ? c : ((c as any)[CAPTURE_NAME_SYMBOL] || c.getName());
         return capturesByName.get(name)!;

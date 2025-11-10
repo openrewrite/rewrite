@@ -409,20 +409,25 @@ export class TemplateEngine {
      * functionality on top of the shared template tree generation.
      *
      * @param templateParts The string parts of the template
-     * @param captures The captures between the string parts
+     * @param captures The captures between the string parts (can include RawCode)
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
      * @returns A Promise resolving to the extracted pattern AST with capture markers
      */
     static async getPatternTree(
         templateParts: TemplateStringsArray,
-        captures: (Capture | Any)[],
+        captures: (Capture | Any | RawCode)[],
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
     ): Promise<J> {
-        // Generate type preamble for captures with types
+        // Generate type preamble for captures with types (skip RawCode)
         const preamble: string[] = [];
         for (const capture of captures) {
+            // Skip raw code - it's not a capture
+            if (capture instanceof RawCode || (capture && typeof capture === 'object' && (capture as any)[RAW_CODE_SYMBOL])) {
+                continue;
+            }
+
             const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
             const captureType = (capture as any)[CAPTURE_TYPE_SYMBOL];
             if (captureType) {
@@ -438,15 +443,21 @@ export class TemplateEngine {
             }
         }
 
-        // Build the template string with placeholders for captures
+        // Build the template string with placeholders for captures and raw code
         let result = '';
         for (let i = 0; i < templateParts.length; i++) {
             result += templateParts[i];
             if (i < captures.length) {
                 const capture = captures[i];
-                // Use symbol to access capture name without triggering Proxy
-                const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
-                result += PlaceholderUtils.createCapture(captureName, undefined);
+
+                // Check if this is a RawCode instance - splice directly
+                if (capture instanceof RawCode || (capture && typeof capture === 'object' && (capture as any)[RAW_CODE_SYMBOL])) {
+                    result += (capture as RawCode).code;
+                } else {
+                    // Use symbol to access capture name without triggering Proxy
+                    const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
+                    result += PlaceholderUtils.createCapture(captureName, undefined);
+                }
             }
         }
 
@@ -459,10 +470,15 @@ export class TemplateEngine {
             ? [...contextStatements, ...preamble]
             : contextStatements;
 
+        // Filter out RawCode from captures for cache and marker attachment
+        const actualCaptures = captures.filter(c =>
+            !(c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL]))
+        ) as (Capture | Any)[];
+
         // Use cache to get or parse the compilation unit
         const cu = await templateCache.getOrParse(
             templateString,
-            captures,
+            actualCaptures,
             contextWithPreamble,
             dependencies
         );
@@ -478,8 +494,8 @@ export class TemplateEngine {
         // Extract from wrapper using shared utility
         const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern');
 
-        // Attach CaptureMarkers to capture identifiers
-        const visitor = new MarkerAttachmentVisitor(captures);
+        // Attach CaptureMarkers to capture identifiers (only for actual captures, not raw code)
+        const visitor = new MarkerAttachmentVisitor(actualCaptures);
         return (await visitor.visit(extracted, undefined))!;
     }
 }
@@ -576,6 +592,33 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
         // No marker to move, just update with visited expression
         return updateIfChanged(expressionStatement, {
             expression: visitedExpression
+        });
+    }
+
+    /**
+     * Propagates markers from name identifier to BindingElement.
+     * This handles destructuring patterns like {${props}} where the capture marker
+     * is on the identifier but needs to be on the BindingElement for container matching.
+     */
+    protected override async visitBindingElement(bindingElement: JS.BindingElement, p: undefined): Promise<J | undefined> {
+        // Visit the name
+        const visitedName = await this.visit(bindingElement.name, p);
+
+        // Check if name has a CaptureMarker
+        const nameMarker = PlaceholderUtils.getCaptureMarker(visitedName as any);
+        if (nameMarker) {
+            return updateIfChanged(bindingElement, {
+                name: visitedName,
+                markers: {
+                    ...bindingElement.markers,
+                    markers: [...bindingElement.markers.markers, nameMarker]
+                },
+            });
+        }
+
+        // No marker to move, just update with visited name
+        return updateIfChanged(bindingElement, {
+            name: visitedName
         });
     }
 }
