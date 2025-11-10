@@ -31,6 +31,7 @@
 import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {fromVisitor, RecipeSpec} from "../../../src/test";
+import {Cursor} from "../../../src";
 
 describe('variadic pattern matching in containers', () => {
     const parser = new JavaScriptParser();
@@ -152,6 +153,48 @@ describe('variadic pattern matching in containers', () => {
         expect(await pat2.match(await parse('function foo({}) {}'))).toBeDefined();    // within max
         expect(await pat2.match(await parse('function foo({a, b}) {}'))).toBeDefined();    // exactly max
         expect(await pat2.match(await parse('function foo({a, b, c}) {}'))).toBeUndefined();  // exceeds max
+    });
+
+    test('variadic capture with custom constraint function in containers', async () => {
+        // This test verifies that constraint functions for variadic captures
+        // receive the full array of captured elements AND a cursor pointing to the common parent
+
+        let receivedCursor: any = null;
+
+        // Capture with constraint that checks the array length and verifies cursor is present
+        const props = capture({
+            variadic: true,
+            constraint: (nodes: J[], cursor: Cursor) => {
+                receivedCursor = cursor;
+                // For variadic captures, constraint receives:
+                // 1. The array of captured nodes
+                // 2. A cursor pointing to the parent context (the container holding these elements)
+                // The cursor parameter is optional to declare, but when declared it's always defined
+
+                // Only match if we captured exactly 2 elements
+                return Array.isArray(nodes) && nodes.length === 2;
+            }
+        });
+        const pat = pattern`function foo({${props}}) {}`;
+
+        // Should NOT match with 1 element - constraint requires exactly 2
+        expect(await pat.match(await parse('function foo({a}) {}'))).toBeUndefined();
+
+        // Should match with 2 elements - constraint satisfied
+        receivedCursor = null;
+        const result2 = await pat.match(await parse('function foo({a, b}) {}'));
+        expect(result2).toBeDefined();
+
+        // Verify cursor was provided
+        expect(receivedCursor).toBeTruthy();
+        expect(receivedCursor.constructor.name).toBe('Cursor');
+
+        const captured2 = result2!.get(props);
+        expect(Array.isArray(captured2)).toBe(true);
+        expect((captured2 as unknown as any[]).length).toBe(2);
+
+        // Should NOT match with 3 elements - constraint requires exactly 2
+        expect(await pat.match(await parse('function foo({a, b, c}) {}'))).toBeUndefined();
     });
 
     test('variadic replacement in object destructuring pattern', () => {

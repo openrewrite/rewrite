@@ -15,7 +15,7 @@
  */
 import {Cursor} from '../..';
 import {J, Type} from '../../java';
-import {Any, Capture, CaptureOptions, TemplateParam, VariadicOptions} from './types';
+import {Any, Capture, CaptureOptions, ConstraintFunction, TemplateParam, VariadicOptions} from './types';
 
 /**
  * Combines multiple constraints with AND logic.
@@ -80,7 +80,7 @@ export class CaptureImpl<T = any> implements Capture<T> {
     public readonly name: string;
     [CAPTURE_NAME_SYMBOL]: string;
     [CAPTURE_VARIADIC_SYMBOL]: VariadicOptions | undefined;
-    [CAPTURE_CONSTRAINT_SYMBOL]: ((node: T) => boolean) | undefined;
+    [CAPTURE_CONSTRAINT_SYMBOL]: ConstraintFunction<T> | undefined;
     [CAPTURE_CAPTURING_SYMBOL]: boolean;
     [CAPTURE_TYPE_SYMBOL]: string | Type | undefined;
 
@@ -124,7 +124,7 @@ export class CaptureImpl<T = any> implements Capture<T> {
         return this[CAPTURE_VARIADIC_SYMBOL];
     }
 
-    getConstraint(): ((node: T) => boolean) | undefined {
+    getConstraint(): ConstraintFunction<T> | undefined {
         return this[CAPTURE_CONSTRAINT_SYMBOL];
     }
 
@@ -358,7 +358,7 @@ export function capture<T = any>(
 
 // Overload 2: Options object with variadic
 export function capture<T = any>(
-    options: { name?: string; variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; min?: number; max?: number }
+    options: { name?: string; variadic: true | VariadicOptions; constraint?: ConstraintFunction<T[]>; min?: number; max?: number }
 ): Capture<T[]> & T[];
 
 // Overload 3: Just a string name (simple named capture)
@@ -440,12 +440,12 @@ capture.nextUnnamedId = 1;
  */
 // Overload 1: Regular any with constraint (most specific - no variadic property)
 export function any<T = any>(
-    options: { constraint: (node: T) => boolean } & { variadic?: never }
+    options: { constraint: ConstraintFunction<T> } & { variadic?: never }
 ): Any<T> & T;
 
 // Overload 2: Variadic any with constraint
 export function any<T = any>(
-    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; min?: number; max?: number }
+    options: { variadic: true | VariadicOptions; constraint?: ConstraintFunction<T[]>; min?: number; max?: number }
 ): Any<T[]> & T[];
 
 // Overload 3: Catch-all for simple any without special options

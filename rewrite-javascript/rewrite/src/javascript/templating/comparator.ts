@@ -50,11 +50,12 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             const savedTargetCursor = this.targetCursor;
             const cursorAtCapturedNode = this.targetCursor !== undefined
                 ? new Cursor(p, this.targetCursor)
-                : undefined;
+                : new Cursor(p);
             this.targetCursor = cursorAtCapturedNode;
             try {
-                // Evaluate constraint with cursor at the captured node
-                if (captureMarker.constraint && !captureMarker.constraint(p, cursorAtCapturedNode)) {
+                // Evaluate constraint with cursor at the captured node (always defined)
+                // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
+                if (captureMarker.constraint && !captureMarker.variadicOptions && !captureMarker.constraint(p, cursorAtCapturedNode)) {
                     return this.abort(j) as R;
                 }
 
@@ -100,15 +101,15 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             const targetElement = isRightPadded ? targetWrapper!.element : p;
 
             // Push targetCursor to position it at the captured element for constraint evaluation
-            // Only create cursor if targetCursor was initialized (meaning user provided one)
             const savedTargetCursor = this.targetCursor;
             const cursorAtCapturedNode = this.targetCursor !== undefined
                 ? (targetWrapper ? new Cursor(targetWrapper, this.targetCursor) : new Cursor(targetElement, this.targetCursor))
-                : undefined;
+                : (targetWrapper ? new Cursor(targetWrapper) : new Cursor(targetElement));
             this.targetCursor = cursorAtCapturedNode;
             try {
-                // Evaluate constraint with cursor at the captured node
-                if (captureMarker.constraint && !captureMarker.constraint(targetElement as J, cursorAtCapturedNode)) {
+                // Evaluate constraint with cursor at the captured node (always defined)
+                // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
+                if (captureMarker.constraint && !captureMarker.variadicOptions && !captureMarker.constraint(targetElement as J, cursorAtCapturedNode)) {
                     return this.abort(right);
                 }
 
@@ -432,9 +433,10 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
 
                 // Evaluate constraint for variadic capture
                 // For variadic captures, constraint receives the entire array of captured elements
-                // The targetCursor is positioned in the target tree (parent context)
+                // The targetCursor points to the parent container (always defined in container matching)
                 if (captureMarker.constraint) {
-                    if (!captureMarker.constraint(capturedElements as any, this.targetCursor)) {
+                    const cursor = this.targetCursor || new Cursor(targetElements[0]);
+                    if (!captureMarker.constraint(capturedElements as any, cursor)) {
                         continue; // Try next consumption amount
                     }
                 }
