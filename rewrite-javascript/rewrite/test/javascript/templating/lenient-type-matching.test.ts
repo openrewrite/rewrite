@@ -255,4 +255,228 @@ function greet(): string { return "hello"; }
         expect(capturedName).toBeDefined();
         expect((capturedName as J.Identifier).simpleName).toBe('greet');
     });
+
+    test('strict mode with aliased import should match based on type', async () => {
+        await withDir(async (repo) => {
+            const tempDir = repo.path;
+
+            // Pattern uses the original import name
+            const pat = pattern`isDate(${capture('arg')})`
+                .configure({
+                    context: [`import { isDate } from 'node:util/types'`],
+                    lenientTypeMatching: false, // Strict type matching
+                    dependencies: {'@types/node': '^20.0.0'}
+                });
+
+            let matchFound = false;
+            let capturedArg: any = undefined;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                    const m = await pat.match(methodInvocation);
+                    if (m) {
+                        matchFound = true;
+                        capturedArg = m.get('arg');
+                    }
+                    return methodInvocation;
+                }
+            });
+
+            await spec.rewriteRun(
+                npm(
+                    tempDir,
+                    //language=typescript
+                    typescript(
+                        `
+                        import { isDate as isDateFn } from 'node:util/types';
+
+                        const result = isDateFn(new Date());
+                        `
+                    ),
+                    //language=json
+                    packageJson(
+                        `
+                        {
+                          "name": "test",
+                          "version": "1.0.0",
+                          "dependencies": {
+                            "@types/node": "^20.0.0"
+                          }
+                        }
+                        `
+                    )
+                )
+            );
+
+            // With strict type matching, aliased imports should still match if types match
+            expect(matchFound).toBe(true);
+            expect(capturedArg).toBeDefined();
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+    test('lenient mode with aliased import also matches based on type', async () => {
+        await withDir(async (repo) => {
+            const tempDir = repo.path;
+
+            // Pattern uses the original import name, with lenient mode (default)
+            const pat = pattern`isDate(${capture('arg')})`
+                .configure({
+                    context: [`import { isDate } from 'node:util/types'`],
+                    // lenientTypeMatching defaults to true
+                    dependencies: {'@types/node': '^20.0.0'}
+                });
+
+            let matchFound = false;
+            let capturedArg: any = undefined;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                    const m = await pat.match(methodInvocation);
+                    if (m) {
+                        matchFound = true;
+                        capturedArg = m.get('arg');
+                    }
+                    return methodInvocation;
+                }
+            });
+
+            await spec.rewriteRun(
+                npm(
+                    tempDir,
+                    //language=typescript
+                    typescript(
+                        `
+                        import { isDate as checkDate } from 'node:util/types';
+
+                        const result = checkDate(new Date());
+                        `
+                    ),
+                    //language=json
+                    packageJson(
+                        `
+                        {
+                          "name": "test",
+                          "version": "1.0.0",
+                          "dependencies": {
+                            "@types/node": "^20.0.0"
+                          }
+                        }
+                        `
+                    )
+                )
+            );
+
+            // With lenient type matching, if types exist and match, aliased imports should also match
+            expect(matchFound).toBe(true);
+            expect(capturedArg).toBeDefined();
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+    test('aliased import matching without type attribution (import-based resolution)', async () => {
+        // Pattern uses the original import name
+        // Testing if parser tracks import origins (module + original name) without type attribution
+        const pat = pattern`isDate(${capture('arg')})`
+            .configure({
+                context: [`import { isDate } from 'node:util/types'`]
+                // Note: NO dependencies - pattern won't have type attribution
+            });
+
+        let matchFound = false;
+        let capturedArg: any = undefined;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                const m = await pat.match(methodInvocation);
+                if (m) {
+                    matchFound = true;
+                    capturedArg = m.get('arg');
+                }
+                return methodInvocation;
+            }
+        });
+
+        // Test code also has NO type attribution (plain typescript() without npm/dependencies)
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                import { isDate as checkDate } from 'node:util/types';
+
+                const result = checkDate(new Date());
+                `
+            )
+        );
+
+        // If this matches, it means the parser tracks import metadata (module + original export name)
+        // even without full type resolution, allowing import-based alias resolution
+        // If this fails, we currently require full type attribution for alias matching
+        expect(matchFound).toBe(true);
+        expect(capturedArg).toBeDefined();
+    });
+
+    test.skip('pattern matches both named and namespace imports (react vs React)', async () => {
+        await withDir(async (repo) => {
+            const tempDir = repo.path;
+
+            // Pattern uses named import: forwardRef()
+            const pat = pattern`forwardRef(${capture('fn')})`
+                .configure({
+                    context: [`import { forwardRef } from 'react'`],
+                    dependencies: {'@types/react': '^18.0.0'}
+                });
+
+            let namedImportMatched = false;
+            let namespaceImportMatched = false;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                    const m = await pat.match(methodInvocation);
+                    if (m) {
+                        const select = methodInvocation.select;
+                        if (!select) {
+                            namedImportMatched = true; // forwardRef(...)
+                        } else if (select.element.kind === J.Kind.Identifier) {
+                            namespaceImportMatched = true; // React.forwardRef(...)
+                        }
+                    }
+                    return methodInvocation;
+                }
+            });
+
+            await spec.rewriteRun(
+                npm(
+                    tempDir,
+                    //language=typescript
+                    typescript(
+                        `
+                        import { forwardRef } from 'react';
+                        import * as React from 'react';
+
+                        // Named import (module: 'react')
+                        const A = forwardRef(() => null);
+
+                        // Namespace import (class/interface: 'React')
+                        const B = React.forwardRef(() => null);
+                        `
+                    ),
+                    //language=json
+                    packageJson(
+                        `
+                        {
+                          "name": "test",
+                          "version": "1.0.0",
+                          "dependencies": {
+                            "@types/react": "^18.0.0"
+                          }
+                        }
+                        `
+                    )
+                )
+            );
+
+            // Pattern should match both forms (case-insensitive FQN: 'react' vs 'React')
+            expect(namedImportMatched).toBe(true);
+            expect(namespaceImportMatched).toBe(true);
+        }, {unsafeCleanup: true});
+    }, 60000);
 });
