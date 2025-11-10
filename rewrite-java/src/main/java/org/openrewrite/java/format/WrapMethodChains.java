@@ -78,7 +78,7 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                             while (cursor.getParentTreeCursor().getValue() instanceof J.MethodInvocation) {
                                 cursor = cursor.getParentTreeCursor();
                             }
-                            Cursor minimized = minimized(cursor);
+                            Cursor minimized = minimized(cursor, sourceFile);
                             // Not long enough to wrap
                             if (positionService.positionOf(minimized).getMaxColumn() <= style.getHardWrapAt()) {
                                 return m;

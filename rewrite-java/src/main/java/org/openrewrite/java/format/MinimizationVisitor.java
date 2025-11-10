@@ -15,41 +15,49 @@
  */
 package org.openrewrite.java.format;
 
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-@RequiredArgsConstructor
 public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
 
     private final SpacesStyle spacesStyle;
+    @Nullable
+    private final Tree stopAfter;
 
-    public static Cursor minimized(Cursor cursor) {
-        JavaSourceFile sourceFile = cursor.firstEnclosing(JavaSourceFile.class);
-        if (sourceFile == null) {
-            return minimized(cursor, IntelliJ.spaces());
-        }
-        return minimized(cursor, Style.from(SpacesStyle.class, sourceFile, IntelliJ::spaces));
+    public static Cursor minimized(Cursor cursor, JavaSourceFile sourceFile) {
+        return minimized(cursor, null, sourceFile.getMarkers().findAll(NamedStyles.class));
     }
 
-    public static Cursor minimized(Cursor cursor, SpacesStyle spacesStyle) {
+    public static Cursor minimized(Cursor cursor, @Nullable Tree stopAfter, List<NamedStyles> styles) {
         if (cursor.getValue() instanceof J) {
-            return new Cursor(cursor.getParent(), new MinimizationVisitor<Integer>(spacesStyle).visit((J) cursor.getValue(), -1, cursor.getParent()));
+            return new Cursor(cursor.getParent(), new MinimizationVisitor<Integer>(styles, stopAfter).visit(cursor.getValue(), -1, cursor.getParent()));
         }
         throw new IllegalArgumentException("Can only minimize J elements.");
+    }
+
+    public MinimizationVisitor(List<NamedStyles> styles) {
+        this(styles, null);
+    }
+
+    public MinimizationVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this.spacesStyle = getStyle(SpacesStyle.class, styles, IntelliJ::spaces);
+        this.stopAfter = stopAfter;
     }
 
     @Override
@@ -237,8 +245,7 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
             return super.visitSpace(null, loc, ctx);
         }
         if (getCursor().getValue() instanceof JContainer) {
-            Arrays.stream(JContainer.Location.values()).filter(l -> l.getBeforeLocation().equals(loc)).findFirst().ifPresent(l ->
-                    getCursor().computeMessageIfAbsent("location", __ -> l));
+            Arrays.stream(JContainer.Location.values()).filter(l -> l.getBeforeLocation().equals(loc)).findFirst().ifPresent(l -> getCursor().computeMessageIfAbsent("location", __ -> l));
         }
         String whitespace = null;
         String before = getCursor().pollNearestMessage("before");
@@ -533,6 +540,22 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
         return super.visitClassDeclaration(classDecl, p);
     }
 
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (J) tree;
+        }
+        return super.visit(tree, p);
+    }
+
+    @Override
+    public @Nullable J postVisit(J tree, P p) {
+        if (stopAfter != null && stopAfter.isScope(tree)) {
+            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
+        }
+        return super.postVisit(tree, p);
+    }
+
     private <T extends Expression> T minimized(T j, String whitespace) {
         return j.withPrefix(minimized(j.getPrefix(), whitespace));
     }
@@ -662,5 +685,14 @@ public class MinimizationVisitor<P> extends JavaIsoVisitor<P> {
 
     private enum ContainerPosition {
         OPEN, CLOSE, BEFORE_SEPARATOR, AFTER_SEPARATOR
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
     }
 }

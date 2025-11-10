@@ -21,7 +21,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
-import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -34,7 +33,6 @@ import static org.openrewrite.java.format.MinimizationVisitor.minimized;
 @EqualsAndHashCode(callSuper = false)
 public class WrapMethodInvocationArguments<P> extends JavaIsoVisitor<P> {
 
-    SpacesStyle spacesStyle;
     WrappingAndBracesStyle style;
 
     @Override
@@ -52,7 +50,7 @@ public class WrapMethodInvocationArguments<P> extends JavaIsoVisitor<P> {
                     if (sourceFile == null) {
                         return m;
                     }
-                    Cursor minimized = minimized(getCursor(), spacesStyle);
+                    Cursor minimized = minimized(getCursor(), sourceFile);
                     if (sourceFile.service(SourcePositionService.class).positionOf(minimized, ((J.MethodInvocation) minimized.getValue())).getMaxColumn() <= style.getHardWrapAt()) {
                         return m;
                     }
@@ -121,7 +119,7 @@ public class WrapMethodInvocationArguments<P> extends JavaIsoVisitor<P> {
                     if (sourceFile == null) {
                         return n;
                     }
-                    Cursor minimized = minimized(getCursor(), spacesStyle);
+                    Cursor minimized = minimized(getCursor(), sourceFile);
                     if (sourceFile.service(SourcePositionService.class).positionOf(minimized, ((J.NewClass) minimized.getValue()).getPadding().getArguments()).getMaxColumn() <= style.getHardWrapAt()) {
                         return n;
                     }

@@ -119,6 +119,14 @@ public class StyleHelper {
         return t;
     }
 
+    public static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
+    }
+
     public static <S extends Style, T extends SourceFile> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles, T sourceFile) {
         S projectStyle = Style.from(styleClass, sourceFile);
         S style = NamedStyles.merge(styleClass, styles);

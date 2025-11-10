@@ -17,7 +17,6 @@ package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -33,7 +32,7 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new WrapMethodInvocationArguments<>(IntelliJ.spaces(), new WrappingAndBracesStyle(
+        spec.recipe(toRecipe(() -> new WrapMethodInvocationArguments<>(new WrappingAndBracesStyle(
           120,
           new WrappingAndBracesStyle.IfStatement(false),
           new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),

@@ -18,10 +18,10 @@ package org.openrewrite.java.format;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -31,7 +31,7 @@ class MinimizationVisitorTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .parser(JavaParser.fromJavaVersion())
-          .recipe(toRecipe(() -> new MinimizationVisitor<>(IntelliJ.spaces())));
+          .recipe(toRecipe(() -> new MinimizationVisitor<>(emptyList())));
     }
 
     @DocumentExample
@@ -2448,6 +2448,40 @@ class MinimizationVisitorTest implements RewriteTest {
                     } else {
                         System.out.println("false");
                     }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void lambdaMethodsArgumentsHaveSpace() {
+        rewriteRun(
+          java(
+            """
+            import java.util.List;
+            
+            class Test {
+                Integer sum(List<Integer> numbers) {
+                    return numbers.stream().filter(n -> n > 0).reduce(  0,    (a, b) -> {
+                        int sum = a + b;
+                        System.out.println("Current sum: " + sum);
+                        return sum;
+                    }  );
+                }
+            }
+            """,
+            """
+            import java.util.List;
+            
+            class Test {
+                Integer sum(List<Integer> numbers) {
+                    return numbers.stream().filter(n -> n > 0).reduce(0, (a, b) -> {
+                        int sum = a + b;
+                        System.out.println("Current sum: " + sum);
+                        return sum;
+                    });
                 }
             }
             """
