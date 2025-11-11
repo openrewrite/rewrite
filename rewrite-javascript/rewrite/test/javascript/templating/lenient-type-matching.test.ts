@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, npm, packageJson, pattern, template, typescript} from "../../../src/javascript";
-import {J} from "../../../src/java";
+import {capture, JavaScriptVisitor, npm, packageJson, pattern, template, tsx, typescript} from "../../../src/javascript";
+import {J, Type} from "../../../src/java";
 import {withDir} from "tmp-promise";
 
 describe('lenient type matching in patterns', () => {
@@ -477,6 +477,70 @@ function greet(): string { return "hello"; }
             // Pattern should match both forms (case-insensitive FQN: 'react' vs 'React')
             expect(namedImportMatched).toBe(true);
             expect(namespaceImportMatched).toBe(true);
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+    test('namespace imports result in consistent type attribution FQN', async () => {
+        await withDir(async (repo) => {
+            const tempDir = repo.path;
+
+            let namedImportDeclaringType: string | undefined;
+            let namespaceImportDeclaringType: string | undefined;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                    const methodName = (methodInvocation.name as J.Identifier).simpleName;
+                    if (methodName === 'forwardRef' && methodInvocation.methodType) {
+                        const declaringType = methodInvocation.methodType.declaringType;
+                        if (declaringType && Type.isFullyQualified(declaringType)) {
+                            const fqn = Type.FullyQualified.getFullyQualifiedName(declaringType);
+
+                            const select = methodInvocation.select;
+                            if (!select) {
+                                // Named import: forwardRef(...)
+                                namedImportDeclaringType = fqn;
+                            } else if (select.element.kind === J.Kind.Identifier) {
+                                // Namespace import: React.forwardRef(...)
+                                namespaceImportDeclaringType = fqn;
+                            }
+                        }
+                    }
+                    return methodInvocation;
+                }
+            });
+
+            await spec.rewriteRun(
+                npm(
+                    tempDir,
+                    //language=tsx
+                    tsx(
+                        `
+                        import {forwardRef} from 'react';
+                        import * as React from 'react';
+
+                        const c1 = forwardRef((props, ref) => <div ref={ref} />);
+                        const c2 = React.forwardRef((props, ref) => <div ref={ref} />);
+                        `
+                    ),
+                    //language=json
+                    packageJson(
+                        `
+                        {
+                          "name": "test",
+                          "version": "1.0.0",
+                          "dependencies": {
+                            "@types/react": "^18.0.0"
+                          }
+                        }
+                        `
+                    )
+                )
+            );
+
+            // Both import forms should have the same declaring type FQN: 'React' (uppercase)
+            // This tests that the namespace-aware type mapping correctly identifies both as the React namespace
+            expect(namedImportDeclaringType).toBe('React');
+            expect(namespaceImportDeclaringType).toBe('React');
         }, {unsafeCleanup: true});
     }, 60000);
 });
