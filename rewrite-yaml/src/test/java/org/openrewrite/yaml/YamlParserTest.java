@@ -466,6 +466,18 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parseTagsCorrectlyOnFirstLineOfMappingEntry() {
+        rewriteRun(
+          yaml(
+            """
+              - !SOMETAG
+                a: b
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/customer-requests/issues/1471")
     @Test
     void yamlWithDocumentEndMarker() {
