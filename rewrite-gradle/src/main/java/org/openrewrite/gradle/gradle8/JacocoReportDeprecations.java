@@ -15,6 +15,11 @@
  */
 package org.openrewrite.gradle.gradle8;
 
+import static java.util.Collections.emptyList;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.EMPTY;
+import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
+
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -23,9 +28,15 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.J.Assignment;
+import org.openrewrite.java.tree.J.FieldAccess;
+import org.openrewrite.java.tree.J.Identifier;
+import org.openrewrite.java.tree.J.MethodInvocation;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.marker.Markers;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -46,7 +57,7 @@ public class JacocoReportDeprecations extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @Override
             public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                 Integer index = getCursor().getNearestMessage(JACOCO_SETTINGS_INDEX);
@@ -67,7 +78,7 @@ public class JacocoReportDeprecations extends Recipe {
             }
 
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 Integer parent = getCursor().getNearestMessage(JACOCO_SETTINGS_INDEX);
                 if (parent == null) {
                     parent = 0;
@@ -76,7 +87,7 @@ public class JacocoReportDeprecations extends Recipe {
                 }
 
                 // Handle method invocation syntax at various nesting levels
-                if (!method.getArguments().isEmpty()) {
+                if (method.getArguments().size() == 1) {
                     boolean shouldReplace = false;
 
                     // xml.enabled(false) or csv.enabled(false) - inside reports closure
@@ -99,7 +110,7 @@ public class JacocoReportDeprecations extends Recipe {
                     }
 
                     if (shouldReplace) {
-                        J.MethodInvocation replacement = replaceDeprecatedMethodName(method);
+                        J replacement = replaceDeprecatedMethodInvocation(method);
                         if (replacement != method) {
                             return replacement;
                         }
@@ -120,12 +131,12 @@ public class JacocoReportDeprecations extends Recipe {
                        "html".equalsIgnoreCase(name);
             }
 
-            private J.MethodInvocation replaceDeprecatedMethodName(J.MethodInvocation method) {
+            private J replaceDeprecatedMethodInvocation(J.MethodInvocation method) {
                 String methodName = method.getSimpleName();
                 if ("enabled".equalsIgnoreCase(methodName) || "isEnabled".equalsIgnoreCase(methodName) || "setEnabled".equalsIgnoreCase(methodName)) {
-                    return method.withName(method.getName().withSimpleName("required"));
+                    return replaceMethodInvocationWithAssignment(method, "required");
                 } else if ("destination".equalsIgnoreCase(methodName) || "setDestination".equalsIgnoreCase(methodName)) {
-                    return method.withName(method.getName().withSimpleName("outputLocation"));
+                    return replaceMethodInvocationWithAssignment(method, "outputLocation");
                 }
                 return method;
             }
@@ -197,5 +208,45 @@ public class JacocoReportDeprecations extends Recipe {
                 return fieldName;
             }
         });
+    }
+
+    private static Assignment replaceMethodInvocationWithAssignment(
+        MethodInvocation method,
+        String identifierName
+    ) {
+        Identifier id = new Identifier(randomId(),
+            EMPTY,
+            Markers.EMPTY,
+            emptyList(),
+            identifierName,
+            null,
+            null
+        );
+        Expression variable;
+        Expression select = method.getSelect();
+        if (select == null) {
+            variable = id;
+        } else {
+            variable = new FieldAccess(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                select,
+                new JLeftPadded<>(EMPTY, id, Markers.EMPTY),
+                null
+            );
+        }
+        return new Assignment(
+            randomId(),
+            method.getPrefix(),
+            Markers.EMPTY,
+            variable,
+            new JLeftPadded<>(
+                SINGLE_SPACE,
+                method.getArguments().get(0).withPrefix(SINGLE_SPACE),
+                Markers.EMPTY
+            ),
+            null
+        );
     }
 }

@@ -451,7 +451,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               tasks.jacocoTestReport {
                   reports {
                       xml.required = false
-                      html.required(true)
+                      html.required = true
                       html.outputLocation = layout.buildDirectory.dir("jacocoHtml")
                   }
               }
@@ -488,9 +488,9 @@ class JacocoReportDeprecationsTest implements RewriteTest {
 
                   jacocoTestReport {
                       reports {
-                          xml.required false
-                          csv.required true
-                          html.required false
+                          xml.required = false
+                          csv.required = true
+                          html.required = false
                       }
                   }
                   """
@@ -511,11 +511,17 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       reports {
                           xml {
                               enabled false
+                              enabled true
+                              enabled false
                           }
                           csv {
                               enabled true
+                              enabled false
+                              enabled true
                           }
                           html {
+                              enabled false
+                              enabled false
                               enabled false
                           }
                       }
@@ -529,13 +535,19 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   jacocoTestReport {
                       reports {
                           xml {
-                              required false
+                              required = false
+                              required = true
+                              required = false
                           }
                           csv {
-                              required true
+                              required = true
+                              required = false
+                              required = true
                           }
                           html {
-                              required false
+                              required = false
+                              required = false
+                              required = false
                           }
                       }
                   }
@@ -565,9 +577,9 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       id "jacoco"
                   }
                   jacocoTestReport {
-                      reports.xml.required false
-                      reports.csv.required true
-                      reports.html.required false
+                      reports.xml.required = false
+                      reports.csv.required = true
+                      reports.html.required = false
                   }
                   """
               )
@@ -598,9 +610,9 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   }
                   jacocoTestReport {
                       reports {
-                          xml.outputLocation layout.buildDirectory.dir('jacocoXml')
-                          csv.outputLocation layout.buildDirectory.dir('jacocoCsv')
-                          html.outputLocation layout.buildDirectory.dir('jacocoHtml')
+                          xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
+                          csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
+                          html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
                       }
                   }
                   """
@@ -621,12 +633,18 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       reports {
                           xml {
                               destination layout.buildDirectory.dir('jacocoXml')
+                              destination layout.buildDirectory.dir('jacocoXml1')
+                              destination layout.buildDirectory.dir('jacocoXml2')
                           }
                           csv {
                               destination layout.buildDirectory.dir('jacocoCsv')
+                              destination layout.buildDirectory.dir('jacocoCsv1')
+                              destination layout.buildDirectory.dir('jacocoCsv2')
                           }
                           html {
                               destination layout.buildDirectory.dir('jacocoHtml')
+                              destination layout.buildDirectory.dir('jacocoHtml1')
+                              destination layout.buildDirectory.dir('jacocoHtml2')
                           }
                       }
                   }
@@ -639,13 +657,19 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   jacocoTestReport {
                       reports {
                           xml {
-                              outputLocation layout.buildDirectory.dir('jacocoXml')
+                              outputLocation = layout.buildDirectory.dir('jacocoXml')
+                              outputLocation = layout.buildDirectory.dir('jacocoXml1')
+                              outputLocation = layout.buildDirectory.dir('jacocoXml2')
                           }
                           csv {
-                              outputLocation layout.buildDirectory.dir('jacocoCsv')
+                              outputLocation = layout.buildDirectory.dir('jacocoCsv')
+                              outputLocation = layout.buildDirectory.dir('jacocoCsv1')
+                              outputLocation = layout.buildDirectory.dir('jacocoCsv2')
                           }
                           html {
-                              outputLocation layout.buildDirectory.dir('jacocoHtml')
+                              outputLocation = layout.buildDirectory.dir('jacocoHtml')
+                              outputLocation = layout.buildDirectory.dir('jacocoHtml1')
+                              outputLocation = layout.buildDirectory.dir('jacocoHtml2')
                           }
                       }
                   }
@@ -686,12 +710,60 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               jacocoTestReport {
                   reports {
                       xml.required = true
-                      xml.required(false)
-                      xml.required(true)
-                      xml.required false
+                      xml.required = false
+                      xml.required = true
+                      xml.required = false
                       xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
-                      xml.outputLocation layout.buildDirectory.dir('jacocoXml2')
-                      xml.outputLocation(layout.buildDirectory.dir('jacocoXml3'))
+                      xml.outputLocation = layout.buildDirectory.dir('jacocoXml2')
+                      xml.outputLocation = layout.buildDirectory.dir('jacocoXml3')
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void allNotationsMixed2() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport {
+                  reports {
+                      xml {
+                          enabled = true
+                          setEnabled(false)
+                          enabled(true)
+                          enabled false
+                          destination = layout.buildDirectory.dir('jacocoXml')
+                          setDestination layout.buildDirectory.dir('jacocoXml2')
+                          destination(layout.buildDirectory.dir('jacocoXml3'))
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport {
+                  reports {
+                      xml {
+                          required = true
+                          required = false
+                          required = true
+                          required = false
+                          outputLocation = layout.buildDirectory.dir('jacocoXml')
+                          outputLocation = layout.buildDirectory.dir('jacocoXml2')
+                          outputLocation = layout.buildDirectory.dir('jacocoXml3')
+                      }
                   }
               }
               """
