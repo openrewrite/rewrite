@@ -15,7 +15,7 @@
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {capture, Capture, JavaScriptVisitor, Pattern, template, Template, typescript} from "../../../src/javascript";
-import {J} from "../../../src/java";
+import {Expression, J} from "../../../src/java";
 
 describe('Builder API', () => {
     const spec = new RecipeSpec();
@@ -190,8 +190,8 @@ describe('Builder API', () => {
         });
 
         test('creates pattern equivalent to pattern literal', async () => {
-            const left = capture('left');
-            const right = capture('right');
+            const left = capture<Expression>('left');
+            const right = capture<Expression>('right');
 
             // Using builder
             const builderPat = Pattern.builder()
@@ -204,7 +204,9 @@ describe('Builder API', () => {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                     const match = await builderPat.match(binary);
                     if (match) {
-                        return template`${match.get(right)!} + ${match.get(left)!}`.apply(this.cursor, binary, match);
+                        const leftExpr = match.get(left)!;
+                        const rightExpr = match.get(right)!;
+                        return template`${rightExpr} + ${leftExpr}`.apply(this.cursor, binary, match);
                     }
                     return binary;
                 }

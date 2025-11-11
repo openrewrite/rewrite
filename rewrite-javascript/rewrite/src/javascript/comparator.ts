@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaScriptVisitor} from './visitor';
-import {J, Type} from '../java';
+import {J, Type, Expression, Statement, isIdentifier} from '../java';
 import {JS, JSX} from './tree';
 import {Cursor, Tree} from "../tree";
 
@@ -72,7 +72,6 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         this.match = false;
         return t;
     }
-
 
     /**
      * Generic method to visit a property value using the appropriate visitor method.
@@ -1839,6 +1838,273 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
     }
 
     /**
+     * Unwraps parentheses from a tree node recursively.
+     * This allows comparing expressions with and without redundant parentheses.
+     *
+     * @param tree The tree to unwrap
+     * @returns The unwrapped tree
+     */
+    protected unwrap(tree: Tree | undefined): Tree | undefined {
+        if (!tree) {
+            return tree;
+        }
+
+        // Unwrap J.Parentheses nodes recursively
+        if ((tree as any).kind === J.Kind.Parentheses) {
+            const parens = tree as J.Parentheses<any>;
+            return this.unwrap(parens.tree.element as Tree);
+        }
+
+        // Unwrap J.ControlParentheses nodes recursively
+        if ((tree as any).kind === J.Kind.ControlParentheses) {
+            const controlParens = tree as J.ControlParentheses<any>;
+            return this.unwrap(controlParens.tree.element as Tree);
+        }
+
+        return tree;
+    }
+
+    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+        // If we've already found a mismatch, abort further processing
+        if (!this.match) {
+            return j as R;
+        }
+
+        // Unwrap parentheses from both trees before comparing
+        const unwrappedJ = this.unwrap(j) || j;
+        const unwrappedP = this.unwrap(p) || p;
+
+        // Skip the kind check that the base class does - semantic matching allows different kinds
+        // (e.g., undefined identifier matching void expression)
+        // Update targetCursor to track the target node in parallel with the pattern cursor
+        const savedTargetCursor = this.targetCursor;
+        this.targetCursor = new Cursor(unwrappedP, this.targetCursor);
+        try {
+            // Call the grandparent's visit to do actual visitation without the kind check
+            return await JavaScriptVisitor.prototype.visit.call(this, unwrappedJ, unwrappedP) as R | undefined;
+        } finally {
+            this.targetCursor = savedTargetCursor;
+        }
+    }
+
+    /**
+     * Override visitArrowFunction to allow semantic equivalence between expression body
+     * and block with single return statement forms.
+     *
+     * Examples:
+     * - `x => x + 1` matches `x => { return x + 1; }`
+     * - `(x, y) => x + y` matches `(x, y) => { return x + y; }`
+     */
+    override async visitArrowFunction(arrowFunction: JS.ArrowFunction, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return arrowFunction;
+        }
+
+        if (other.kind !== JS.Kind.ArrowFunction) {
+            return this.abort(arrowFunction);
+        }
+
+        const otherArrow = other as JS.ArrowFunction;
+
+        // Compare all properties reflectively except lambda (handled specially below)
+        for (const key of Object.keys(arrowFunction)) {
+            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'lambda') {
+                continue;
+            }
+
+            const jValue = (arrowFunction as any)[key];
+            const otherValue = (otherArrow as any)[key];
+
+            // Handle arrays
+            if (Array.isArray(jValue)) {
+                if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
+                    return this.abort(arrowFunction);
+                }
+                for (let i = 0; i < jValue.length; i++) {
+                    await this.visitProperty(jValue[i], otherValue[i]);
+                    if (!this.match) return arrowFunction;
+                }
+            } else {
+                await this.visitProperty(jValue, otherValue);
+                if (!this.match) return arrowFunction;
+            }
+        }
+
+        // Compare lambda parameters
+        const params1 = arrowFunction.lambda.parameters.parameters;
+        const params2 = otherArrow.lambda.parameters.parameters;
+        if (params1.length !== params2.length) {
+            return this.abort(arrowFunction);
+        }
+        for (let i = 0; i < params1.length; i++) {
+            await this.visitProperty(params1[i], params2[i]);
+            if (!this.match) return arrowFunction;
+        }
+
+        // Handle semantic equivalence for lambda bodies
+        const body1 = arrowFunction.lambda.body;
+        const body2 = otherArrow.lambda.body;
+
+        // Try to extract the expression from each body
+        const expr1 = this.extractExpression(body1);
+        const expr2 = this.extractExpression(body2);
+
+        if (expr1 && expr2) {
+            // Both have extractable expressions - compare them
+            await this.visit(expr1, expr2);
+        } else {
+            // At least one is not a simple expression or block-with-return
+            // Fall back to exact comparison
+            await this.visit(body1, body2);
+        }
+
+        return arrowFunction;
+    }
+
+    /**
+     * Override visitLambdaParameters to allow semantic equivalence between
+     * arrow functions with and without parentheses around single parameters.
+     *
+     * Examples:
+     * - `x => x + 1` matches `(x) => x + 1`
+     */
+    override async visitLambdaParameters(parameters: J.Lambda.Parameters, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return parameters;
+        }
+
+        if (other.kind !== J.Kind.LambdaParameters) {
+            return this.abort(parameters);
+        }
+
+        const otherParams = other as J.Lambda.Parameters;
+
+        // Compare all properties except 'parenthesized' using reflection
+        for (const key of Object.keys(parameters)) {
+            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'parenthesized') {
+                continue;
+            }
+
+            const jValue = (parameters as any)[key];
+            const otherValue = (otherParams as any)[key];
+
+            // Handle arrays
+            if (Array.isArray(jValue)) {
+                if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
+                    return this.abort(parameters);
+                }
+                for (let i = 0; i < jValue.length; i++) {
+                    await this.visitProperty(jValue[i], otherValue[i]);
+                    if (!this.match) return parameters;
+                }
+            } else {
+                await this.visitProperty(jValue, otherValue);
+                if (!this.match) return parameters;
+            }
+        }
+
+        return parameters;
+    }
+
+    /**
+     * Override visitPropertyAssignment to allow semantic equivalence between
+     * object property shorthand and longhand forms.
+     *
+     * Examples:
+     * - `{ x }` matches `{ x: x }`
+     * - `{ x: x, y: y }` matches `{ x, y }`
+     */
+    override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return propertyAssignment;
+        }
+
+        if (other.kind !== JS.Kind.PropertyAssignment) {
+            return this.abort(propertyAssignment);
+        }
+
+        const otherProp = other as JS.PropertyAssignment;
+
+        // Extract property names for semantic comparison
+        const propName = this.getPropertyName(propertyAssignment);
+        const otherPropName = this.getPropertyName(otherProp);
+
+        // Names must match
+        if (!propName || !otherPropName || propName !== otherPropName) {
+            // Can't do semantic comparison without identifiers, fall back to exact comparison
+            return await super.visitPropertyAssignment(propertyAssignment, other);
+        }
+
+        // Detect shorthand (no initializer) vs longhand (has initializer)
+        const isShorthand1 = !propertyAssignment.initializer;
+        const isShorthand2 = !otherProp.initializer;
+
+        if (isShorthand1 === isShorthand2) {
+            // Both shorthand or both longhand - use base comparison
+            return await super.visitPropertyAssignment(propertyAssignment, other);
+        }
+
+        // One is shorthand, one is longhand - check semantic equivalence
+        const longhandProp = isShorthand1 ? otherProp : propertyAssignment;
+
+        // Check if the longhand's initializer is an identifier with the same name as the property
+        if (this.isIdentifierWithName(longhandProp.initializer, propName)) {
+            // Semantically equivalent!
+            return propertyAssignment;
+        } else {
+            // Not equivalent (e.g., { x: y })
+            return this.abort(propertyAssignment);
+        }
+    }
+
+    /**
+     * Extracts the property name from a PropertyAssignment.
+     * Returns the simple name if the property is an identifier, undefined otherwise.
+     */
+    private getPropertyName(prop: JS.PropertyAssignment): string | undefined {
+        const nameExpr = prop.name.element;
+        return isIdentifier(nameExpr) ? nameExpr.simpleName : undefined;
+    }
+
+    /**
+     * Checks if an expression is an identifier with the given name.
+     */
+    private isIdentifierWithName(expr: Expression | undefined, name: string): boolean | undefined {
+        return expr && isIdentifier(expr) && expr.simpleName === name;
+    }
+
+    /**
+     * Extracts the expression from an arrow function body.
+     * Returns the expression if:
+     * - body is already an Expression, OR
+     * - body is a Block with exactly one Return statement
+     * Otherwise returns undefined.
+     */
+    private extractExpression(body: Statement | Expression): Expression | undefined {
+        // If it's already an expression, return it
+        if ((body as any).kind !== J.Kind.Block) {
+            return body as Expression;
+        }
+
+        // It's a block - check if it contains exactly one return statement
+        const block = body as J.Block;
+        if (block.statements.length !== 1) {
+            return undefined;
+        }
+
+        // Unwrap the RightPadded wrapper from the statement
+        const stmtWrapper = block.statements[0];
+        const stmt = stmtWrapper.element;
+
+        if ((stmt as any).kind !== J.Kind.Return) {
+            return undefined;
+        }
+
+        const returnStmt = stmt as J.Return;
+        return returnStmt.expression;
+    }
+
+    /**
      * Override visitProperty to allow lenient type matching.
      * When lenientTypeMatching is enabled, null vs Type comparisons are allowed
      * (where one value is null/undefined and the other is a Type object).
@@ -1957,54 +2223,93 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         const otherMethod = other as J.MethodInvocation;
 
-        // Check basic structural equality first
-        if (method.name.simpleName !== otherMethod.name.simpleName ||
-            method.arguments.elements.length !== otherMethod.arguments.elements.length) {
+        // Check argument length (always required)
+        if (method.arguments.elements.length !== otherMethod.arguments.elements.length) {
             return this.abort(method);
         }
 
-        // Check type attribution
-        // Both must have method types for semantic equality
-        if (!method.methodType || !otherMethod.methodType) {
-            // Lenient mode: if either has no type, allow structural matching
-            if (this.lenientTypeMatching) {
-                return super.visitMethodInvocation(method, other);
+        // Check if we can skip name checking based on type attribution
+        // We can only skip the name check if both have method types AND they represent the SAME method
+        // (not just type-compatible methods, but the actual same function with same FQN)
+        let canSkipNameCheck = false;
+        if (method.methodType && otherMethod.methodType) {
+            // Check if both method types have fully qualified declaring types with the same FQN
+            // This indicates they're the same method from the same module (possibly aliased)
+            const methodDeclaringType = method.methodType.declaringType;
+            const otherDeclaringType = otherMethod.methodType.declaringType;
+
+            if (methodDeclaringType && otherDeclaringType &&
+                Type.isFullyQualified(methodDeclaringType) && Type.isFullyQualified(otherDeclaringType)) {
+
+                const methodFQN = Type.FullyQualified.getFullyQualifiedName(methodDeclaringType as Type.FullyQualified);
+                const otherFQN = Type.FullyQualified.getFullyQualifiedName(otherDeclaringType as Type.FullyQualified);
+
+                // Same module/class AND same method name in the type = same method (can be aliased)
+                if (methodFQN === otherFQN && method.methodType.name === otherMethod.methodType.name) {
+                    canSkipNameCheck = true;
+                }
+                // If FQNs or method names don't match, we can't skip name check - fall through to name checking
             }
-            // Strict mode: if one has type but the other doesn't, they don't match
-            if (method.methodType || otherMethod.methodType) {
+            // If one or both don't have fully qualified types, we can't safely skip name checking
+            // Fall through to normal name comparison below
+        }
+
+        // Check names unless we determined we can skip based on type FQN matching
+        if (!canSkipNameCheck) {
+            if (method.name.simpleName !== otherMethod.name.simpleName) {
                 return this.abort(method);
             }
-            // If neither has type, fall through to structural comparison
-            return super.visitMethodInvocation(method, other);
+
+            // In strict mode, check type attribution requirements
+            if (!this.lenientTypeMatching) {
+                // Strict mode: if one has type but the other doesn't, they don't match
+                if ((method.methodType && !otherMethod.methodType) ||
+                    (!method.methodType && otherMethod.methodType)) {
+                    return this.abort(method);
+                }
+            }
+
+            // If neither has type, use structural comparison
+            if (!method.methodType && !otherMethod.methodType) {
+                return super.visitMethodInvocation(method, other);
+            }
+
+            // If both have types with FQ declaring types, verify they're compatible
+            // (This prevents matching completely different methods like util.isArray vs util.isBoolean)
+            if (method.methodType && otherMethod.methodType) {
+                const methodDeclaringType = method.methodType.declaringType;
+                const otherDeclaringType = otherMethod.methodType.declaringType;
+
+                if (methodDeclaringType && otherDeclaringType &&
+                    Type.isFullyQualified(methodDeclaringType) && Type.isFullyQualified(otherDeclaringType)) {
+
+                    const methodFQN = Type.FullyQualified.getFullyQualifiedName(methodDeclaringType as Type.FullyQualified);
+                    const otherFQN = Type.FullyQualified.getFullyQualifiedName(otherDeclaringType as Type.FullyQualified);
+
+                    // Different declaring types = different methods, even with same name
+                    if (methodFQN !== otherFQN) {
+                        return this.abort(method);
+                    }
+                }
+            }
         }
 
-        // Both have types - check they match semantically
-        const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
-        if (!typesMatch) {
-            // Types don't match - abort comparison
-            return this.abort(method);
-        }
-
-        // Types match! Now check if we can ignore receiver differences.
-        // We can only ignore receiver differences when one or both receivers are identifiers
-        // that represent module/namespace imports (e.g., `util` in `util.isDate()`).
-        // For other receivers (e.g., variables, expressions), we must compare them.
-
-        const canIgnoreReceiverDifference =
-            // Case 1: One has no select (direct call like `forwardRef()`), other has select (namespace like `React.forwardRef()`)
-            (!method.select && otherMethod.select) ||
-            (method.select && !otherMethod.select);
-
-        if (!canIgnoreReceiverDifference) {
-            // Both have selects or both don't - must compare them structurally
+        // When types match (canSkipNameCheck = true), we can skip select comparison entirely.
+        // This allows matching forwardRef() vs React.forwardRef() where types indicate same method.
+        if (!canSkipNameCheck) {
+            // Types didn't provide a match - must compare receivers structurally
             if ((method.select === undefined) !== (otherMethod.select === undefined)) {
                 return this.abort(method);
             }
 
             if (method.select && otherMethod.select) {
                 await this.visitRightPadded(method.select, otherMethod.select as any);
+                if (!this.match) {
+                    return this.abort(method);
+                }
             }
         }
+        // else: types matched, skip select comparison (allows namespace vs named imports)
 
         // Compare type parameters
         if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
@@ -2023,10 +2328,14 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             }
         }
 
-        // Compare name (already checked simpleName above, but visit for markers/prefix)
-        await this.visit(method.name, otherMethod.name);
-        if (!this.match) {
-            return this.abort(method);
+        // Compare name
+        // If we determined we can skip name check (same FQN method, possibly aliased), skip it
+        // This allows matching aliased imports where names differ but types are the same
+        if (!canSkipNameCheck) {
+            await this.visit(method.name, otherMethod.name);
+            if (!this.match) {
+                return this.abort(method);
+            }
         }
 
         // Compare arguments (visit RightPadded to check for markers)
@@ -2041,9 +2350,17 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
     }
 
     /**
-     * Override identifier comparison to include type checking for field access.
+     * Override identifier comparison to include:
+     * 1. Type checking for field access
+     * 2. Semantic equivalence between `undefined` identifier and void expressions
      */
     override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+        // Check if this identifier is "undefined" and the other is a void expression
+        if (identifier.simpleName === 'undefined' && (other as any).kind === JS.Kind.Void) {
+            // Both evaluate to undefined, so they match
+            return identifier;
+        }
+
         if (other.kind !== J.Kind.Identifier) {
             return this.abort(identifier);
         }
@@ -2223,5 +2540,64 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
 
         return methodDeclaration;
+    }
+
+    /**
+     * Override visitVoid to allow semantic equivalence with undefined identifier.
+     * This handles the reverse case where the pattern is a void expression
+     * and the source is the undefined identifier.
+     *
+     * Examples:
+     * - `void 0` matches `undefined`
+     * - `void(0)` matches `undefined`
+     * - `void 1` matches `undefined`
+     */
+    override async visitVoid(voidExpr: JS.Void, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return voidExpr;
+        }
+
+        // Check if the other is an undefined identifier
+        if ((other as any).kind === J.Kind.Identifier) {
+            const identifier = other as J.Identifier;
+            if (identifier.simpleName === 'undefined') {
+                // Both evaluate to undefined, so they match
+                return voidExpr;
+            }
+        }
+
+        // Otherwise delegate to parent
+        return super.visitVoid(voidExpr, other as any);
+    }
+
+    /**
+     * Override visitLiteral to allow semantic equivalence between
+     * different numeric literal formats.
+     *
+     * Examples:
+     * - `255` matches `0xFF`
+     * - `255` matches `0o377`
+     * - `255` matches `0b11111111`
+     * - `1000` matches `1e3`
+     */
+    override async visitLiteral(literal: J.Literal, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return literal;
+        }
+
+        if ((other as any).kind !== J.Kind.Literal) {
+            return await super.visitLiteral(literal, other);
+        }
+
+        const otherLiteral = other as J.Literal;
+
+        // Only compare value and type, ignoring valueSource (text representation) and unicodeEscapes
+        await this.visitProperty(literal.value, otherLiteral.value);
+        if (!this.match) return literal;
+
+        await this.visitProperty(literal.type, otherLiteral.type);
+        if (!this.match) return literal;
+
+        return literal;
     }
 }

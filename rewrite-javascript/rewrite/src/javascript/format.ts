@@ -335,6 +335,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
+    protected async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, p: P): Promise<J | undefined> {
+        const pa = await super.visitPropertyAssignment(propertyAssignment, p) as JS.PropertyAssignment;
+        return produceAsync(pa, draft => {
+            draft.name.after.whitespace = this.style.other.beforePropertyNameValueSeparator ? " " : "";
+        });
+    }
+
     protected async visitSwitch(switchNode: J.Switch, p: P): Promise<J | undefined> {
         const ret = await super.visitSwitch(switchNode, p) as J.Switch;
         return produceAsync(ret, async draft => {
