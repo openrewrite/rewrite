@@ -32,7 +32,6 @@ import org.openrewrite.style.LineWrapSetting;
 import java.util.List;
 
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.java.format.MinimizationVisitor.minimized;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -78,9 +77,8 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                             while (cursor.getParentTreeCursor().getValue() instanceof J.MethodInvocation) {
                                 cursor = cursor.getParentTreeCursor();
                             }
-                            Cursor minimized = minimized(cursor, sourceFile);
                             // Not long enough to wrap
-                            if (positionService.positionOf(minimized).getMaxColumn() <= style.getHardWrapAt()) {
+                            if (positionService.positionOf(cursor).getMaxColumn() <= style.getHardWrapAt()) {
                                 return m;
                             }
                         }
@@ -94,7 +92,12 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                     }
                     if (after != m.getPadding().getSelect().getAfter()) {
                         m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
-                                .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
+                                .withArguments(ListUtils.map(m.getArguments(), arg -> {
+                                    if (arg.getPrefix().getWhitespace().contains("\n")) {
+                                        return arg.withPrefix(Space.EMPTY);
+                                    }
+                                    return arg;
+                                }));
                     }
                 }
             }

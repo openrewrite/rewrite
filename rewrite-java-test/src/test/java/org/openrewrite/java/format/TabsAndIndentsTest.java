@@ -2108,28 +2108,6 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               public class Test {
 
-                  public void practiceA()
-                  {
-                      for (int i = 0; i < 10; ++i)
-                      {
-                          if (i % 2 == 0)
-                          {
-                              try
-                              {
-                                  Integer value = Integer.valueOf("100");
-                              }
-                              catch (Exception ex)
-                              {
-                                  throw new RuntimeException();
-                              }
-                              finally
-                              {
-                                  System.out.println("out");
-                              }
-                          }
-                      }
-                  }
-
                   public void practiceB() {
                       for (int i = 0; i < 10; ++i) {
                           if (i % 2 == 0) {
@@ -2511,7 +2489,7 @@ class TabsAndIndentsTest implements RewriteTest {
             class Test {
                 void method(String file1, String file2) {
                     try (
-                        FileInputStream fis1 = new FileInputStream(file1);
+                            FileInputStream fis1 = new FileInputStream(file1);
                     FileInputStream fis2 = new FileInputStream(file2);
                     BufferedInputStream bis = new BufferedInputStream(fis1)) {
                         // process files
@@ -2526,9 +2504,9 @@ class TabsAndIndentsTest implements RewriteTest {
             class Test {
                 void method(String file1, String file2) {
                     try (
-                        FileInputStream fis1 = new FileInputStream(file1);
-                        FileInputStream fis2 = new FileInputStream(file2);
-                        BufferedInputStream bis = new BufferedInputStream(fis1)) {
+                            FileInputStream fis1 = new FileInputStream(file1);
+                            FileInputStream fis2 = new FileInputStream(file2);
+                            BufferedInputStream bis = new BufferedInputStream(fis1)) {
                         // process files
                     } catch (IOException e) {
                         e.printStackTrace();

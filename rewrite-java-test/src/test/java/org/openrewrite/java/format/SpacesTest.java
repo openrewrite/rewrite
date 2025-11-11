@@ -97,14 +97,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void method1    /*comment*/() {
-                  }
+                  void method1    /*comment*/() {}
               }
               """,
             """
               class Test {
-                  void method1    /*comment*/ () {
-                  }
+                  void method1    /*comment*/ () {}
               }
               """
           )
@@ -117,12 +115,10 @@ class SpacesTest implements RewriteTest {
           spaces(),
           java(
             """
-              class Test{
-              }
+              class Test{}
               """,
             """
-              class Test {
-              }
+              class Test {}
               """
           )
         );
@@ -135,22 +131,16 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void method1 () {
-                  }
-                  void method2    () {
-                  }
-                  void method3  	() {
-                  }
+                  void method1 () {}
+                  void method2    () {}
+                  void method3  	() {}
               }
               """,
             """
               class Test {
-                  void method1() {
-                  }
-                  void method2() {
-                  }
-                  void method3() {
-                  }
+                  void method1() {}
+                  void method2() {}
+                  void method3() {}
               }
               """
           )
@@ -164,30 +154,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void method1    /*comment*/    () {
-                  }
+                  void method1    /*comment*/    () {}
               }
               """,
             """
               class Test {
-                  void method1    /*comment*/() {
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void beforeParensMethodDeclarationFalseWithLineBreakIgnored() {
-        rewriteRun(
-          spaces(style -> style.withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(false))),
-          java(
-            """
-              class Test {
-                  void method1
-                  () {
-                  }
+                  void method1    /*comment*/() {}
               }
               """
           )
@@ -481,8 +453,7 @@ class SpacesTest implements RewriteTest {
     SourceSpecs tryResource = java(
       """
         class MyResource implements AutoCloseable {
-            public void close() {
-            }
+            public void close() {}
         }
         """
     );
@@ -650,13 +621,11 @@ class SpacesTest implements RewriteTest {
           java(
             """
               @SuppressWarnings({"ALL"})
-              class Test {
-              }
+              class Test {}
               """,
             """
               @SuppressWarnings ({"ALL"})
-              class Test {
-              }
+              class Test {}
               """
           )
         );
@@ -669,13 +638,11 @@ class SpacesTest implements RewriteTest {
           java(
             """
               @SuppressWarnings ({"ALL"})
-              class Test {
-              }
+              class Test {}
               """,
             """
               @SuppressWarnings({"ALL"})
-              class Test {
-              }
+              class Test {}
               """
           )
         );
@@ -1126,8 +1093,8 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void foo() {
                       int x = 0;
-                      x ++;
-                      x --;
+                      x++;
+                      x--;
                       -- x;
                       ++ x;
                       x = - x;
@@ -1281,12 +1248,10 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withBeforeLeftBrace(style.getBeforeLeftBrace().withClassLeftBrace(false))),
           java(
             """
-              class Test {
-              }
+              class Test {}
               """,
             """
-              class Test{
-              }
+              class Test{}
               """
           )
         );
@@ -1298,12 +1263,10 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withBeforeLeftBrace(style.getBeforeLeftBrace().withClassLeftBrace(true))),
           java(
             """
-              class Test{
-              }
+              class Test{}
               """,
             """
-              class Test {
-              }
+              class Test {}
               """
           )
         );
@@ -1316,14 +1279,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test{
-                  public void foo() {
-                  }
+                  public void foo() {}
               }
               """,
             """
               class Test {
-                  public void foo(){
-                  }
+                  public void foo(){}
               }
               """
           )
@@ -1337,14 +1298,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test{
-                  public void foo(){
-                  }
+                  public void foo(){}
               }
               """,
             """
               class Test {
-                  public void foo() {
-                  }
+                  public void foo() {}
               }
               """
           )
@@ -1999,14 +1958,12 @@ class SpacesTest implements RewriteTest {
             """
               package abc;
               @MyAnno(names={"a","b"},counts={1,2})
-              class Test {
-              }
+              class Test {}
               """,
             """
               package abc;
               @MyAnno(names = {"a", "b"}, counts = {1, 2})
-              class Test {
-              }
+              class Test {}
               """
           )
         );
@@ -2019,13 +1976,11 @@ class SpacesTest implements RewriteTest {
           java(
             """
               @SuppressWarnings( {"ALL"})
-              class Test {
-              }
+              class Test {}
               """,
             """
               @SuppressWarnings({"ALL"})
-              class Test {
-              }
+              class Test {}
               """
           )
         );
@@ -2472,18 +2427,14 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  public void foo(int x) {
-                  }
-                  public void bar(    int y    ) {
-                  }
+                  public void foo(int x) {}
+                  public void bar(    int y    ) {}
               }
               """,
             """
               class Test {
-                  public void foo( int x ) {
-                  }
-                  public void bar( int y ) {
-                  }
+                  public void foo( int x ) {}
+                  public void bar( int y ) {}
               }
               """
           )
@@ -2499,14 +2450,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void  /*c1*/   foo  /*c2*/   (  /*c3*/   int x, int y  /*c4*/   ) {
-                  }
+                  void  /*c1*/   foo  /*c2*/   (  /*c3*/   int x, int y  /*c4*/   ) {}
               }
               """,
             """
               class Test {
-                  void  /*c1*/   foo  /*c2*/ (  /*c3*/   int x, int y  /*c4*/ ) {
-                  }
+                  void  /*c1*/   foo  /*c2*/ (  /*c3*/   int x, int y  /*c4*/ ) {}
               }
               """
           )
@@ -2520,22 +2469,16 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void foo(    /*c1*/    int x    ) {
-                  }
-                  void bar(    int y    /*c2*/    ) {
-                  }
-                  void baz(    /*c3*/    int z    /*c4*/    ) {
-                  }
+                  void foo(    /*c1*/    int x    ) {}
+                  void bar(    int y    /*c2*/    ) {}
+                  void baz(    /*c3*/    int z    /*c4*/    ) {}
               }
               """,
             """
               class Test {
-                  void foo(    /*c1*/    int x ) {
-                  }
-                  void bar( int y    /*c2*/ ) {
-                  }
-                  void baz(    /*c3*/    int z    /*c4*/ ) {
-                  }
+                  void foo(    /*c1*/    int x ) {}
+                  void bar( int y    /*c2*/ ) {}
+                  void baz(    /*c3*/    int z    /*c4*/ ) {}
               }
               """
           )
@@ -2566,14 +2509,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  public void foo( int x ) {
-                  }
+                  public void foo( int x ) {}
               }
               """,
             """
               class Test {
-                  public void foo(int x) {
-                  }
+                  public void foo(int x) {}
               }
               """
           )
@@ -2587,14 +2528,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  public void foo() {
-                  }
+                  public void foo() {}
               }
               """,
             """
               class Test {
-                  public void foo( ) {
-                  }
+                  public void foo( ) {}
               }
               """
           )
@@ -2608,14 +2547,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  public void foo( ) {
-                  }
+                  public void foo( ) {}
               }
               """,
             """
               class Test {
-                  public void foo() {
-                  }
+                  public void foo() {}
               }
               """
           )
@@ -2629,8 +2566,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  public void bar(int x) {
-                  }
+                  public void bar(int x) {}
                   public void foo() {
                       bar(1);
                   }
@@ -2638,8 +2574,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               class Test {
-                  public void bar(int x) {
-                  }
+                  public void bar(int x) {}
                   public void foo() {
                       bar( 1 );
                   }
@@ -2656,8 +2591,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  public void bar(int x) {
-                  }
+                  public void bar(int x) {}
                   public void foo() {
                       bar( 1 );
                   }
@@ -2665,8 +2599,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               class Test {
-                  public void bar(int x) {
-                  }
+                  public void bar(int x) {}
                   public void foo() {
                       bar(1);
                   }
@@ -2683,8 +2616,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  public void bar() {
-                  }
+                  public void bar() {}
                   public void foo() {
                       bar();
                   }
@@ -2692,8 +2624,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               class Test {
-                  public void bar() {
-                  }
+                  public void bar() {}
                   public void foo() {
                       bar( );
                   }
@@ -2710,8 +2641,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  public void bar() {
-                  }
+                  public void bar() {}
                   public void foo() {
                       bar( );
                   }
@@ -2719,8 +2649,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               class Test {
-                  public void bar() {
-                  }
+                  public void bar() {}
                   public void foo() {
                       bar();
                   }
@@ -3155,13 +3084,11 @@ class SpacesTest implements RewriteTest {
           java(
             """
               @SuppressWarnings({"ALL"})
-              class Test {
-              }
+              class Test {}
               """,
             """
               @SuppressWarnings( {"ALL"} )
-              class Test {
-              }
+              class Test {}
               """
           )
         );
@@ -3174,13 +3101,11 @@ class SpacesTest implements RewriteTest {
           java(
             """
               @SuppressWarnings( {"ALL"} )
-              class Test {
-              }
+              class Test {}
               """,
             """
               @SuppressWarnings({"ALL"})
-              class Test {
-              }
+              class Test {}
               """
           )
         );
@@ -3466,8 +3391,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer>bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """,
             """
@@ -3479,8 +3403,7 @@ class SpacesTest implements RewriteTest {
                       Map<String,String> m = new HashMap<String,String>();
                       Test.<String,Integer>bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """
           )
@@ -3501,8 +3424,7 @@ class SpacesTest implements RewriteTest {
                       Map<String,String> m = new HashMap<String,String>();
                       Test.<String,Integer>bar(1,2);
                   }
-                  static <A,B> void bar(int x,int y) {
-                  }
+                  static <A,B> void bar(int x,int y) {}
               }
               """,
             """
@@ -3514,8 +3436,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer>bar(1, 2);
                   }
-                  static <A, B> void bar(int x, int y) {
-                  }
+                  static <A, B> void bar(int x, int y) {}
               }
               """
           )
@@ -3536,8 +3457,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer>bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """,
             """
@@ -3549,8 +3469,7 @@ class SpacesTest implements RewriteTest {
                       Map <String, String> m = new HashMap <String, String>();
                       Test. <String, Integer>bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """
           )
@@ -3571,8 +3490,7 @@ class SpacesTest implements RewriteTest {
                       Map <String, String> m = new HashMap <String, String>();
                       Test. <String, Integer>bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """,
             """
@@ -3584,8 +3502,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer>bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """
           )
@@ -3606,8 +3523,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer>bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """,
             """
@@ -3619,8 +3535,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer> bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """
           )
@@ -3641,8 +3556,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer> bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """,
             """
@@ -3654,8 +3568,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer>bar();
                   }
-                  static <A, B> void bar() {
-                  }
+                  static <A, B> void bar() {}
               }
               """
           )
@@ -3761,14 +3674,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void bar(int x, int y) {
-                  }
+                  void bar(int x, int y) {}
               }
               """,
             """
               class Test {
-                  void bar(int x , int y) {
-                  }
+                  void bar(int x , int y) {}
               }
               """
           )
@@ -3782,14 +3693,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void bar(int x , int y) {
-                  }
+                  void bar(int x , int y) {}
               }
               """,
             """
               class Test {
-                  void bar(int x, int y) {
-                  }
+                  void bar(int x, int y) {}
               }
               """
           )
@@ -3803,14 +3712,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void bar(int x, int y) {
-                  }
+                  void bar(int x, int y) {}
               }
               """,
             """
               class Test {
-                  void bar(int x,int y) {
-                  }
+                  void bar(int x,int y) {}
               }
               """
           )
@@ -3824,14 +3731,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void bar(int x,int y) {
-                  }
+                  void bar(int x,int y) {}
               }
               """,
             """
               class Test {
-                  void bar(int x, int y) {
-                  }
+                  void bar(int x, int y) {}
               }
               """
           )
@@ -4270,8 +4175,7 @@ class SpacesTest implements RewriteTest {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
 
-                  Test(String str, int num) {
-                  }
+                  Test(String str, int num) {}
               }
               """,
             """
@@ -4279,8 +4183,7 @@ class SpacesTest implements RewriteTest {
                   TEST1("str1" , 1),
                   TEST2("str2" , 2);
 
-                  Test(String str , int num) {
-                  }
+                  Test(String str , int num) {}
               }
               """
           )
@@ -4297,8 +4200,7 @@ class SpacesTest implements RewriteTest {
                   TEST1("str1" , 1),
                   TEST2("str2" , 2);
 
-                  Test(String str , int num) {
-                  }
+                  Test(String str , int num) {}
               }
               """,
             """
@@ -4306,8 +4208,7 @@ class SpacesTest implements RewriteTest {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
 
-                  Test(String str, int num) {
-                  }
+                  Test(String str, int num) {}
               }
               """
           )
@@ -4324,8 +4225,7 @@ class SpacesTest implements RewriteTest {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
 
-                  Test(String str, int num) {
-                  }
+                  Test(String str, int num) {}
               }
               """,
             """
@@ -4333,8 +4233,7 @@ class SpacesTest implements RewriteTest {
                   TEST1("str1",1),
                   TEST2("str2",2);
 
-                  Test(String str,int num) {
-                  }
+                  Test(String str,int num) {}
               }
               """
           )
@@ -4351,8 +4250,7 @@ class SpacesTest implements RewriteTest {
                   TEST1("str1",1),
                   TEST2("str2",2);
 
-                  Test(String str,int num) {
-                  }
+                  Test(String str,int num) {}
               }
               """,
             """
@@ -4360,8 +4258,7 @@ class SpacesTest implements RewriteTest {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
 
-                  Test(String str, int num) {
-                  }
+                  Test(String str, int num) {}
               }
               """
           )
@@ -4600,12 +4497,10 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withTypeParameters(style.getTypeParameters().withBeforeOpeningAngleBracket(true))),
           java(
             """
-              class Test<T> {
-              }
+              class Test<T> {}
               """,
             """
-              class Test <T> {
-              }
+              class Test <T> {}
               """
           )
         );
@@ -4617,12 +4512,10 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withTypeParameters(style.getTypeParameters().withBeforeOpeningAngleBracket(false))),
           java(
             """
-              class Test <T> {
-              }
+              class Test <T> {}
               """,
             """
-              class Test<T> {
-              }
+              class Test<T> {}
               """
           )
         );
@@ -4634,12 +4527,10 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withTypeParameters(style.getTypeParameters().withAroundTypeBounds(false))),
           java(
             """
-              class Test<T extends Integer & Appendable> {
-              }
+              class Test<T extends Integer & Appendable> {}
               """,
             """
-              class Test<T extends Integer&Appendable> {
-              }
+              class Test<T extends Integer&Appendable> {}
               """
           )
         );
@@ -4651,12 +4542,10 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withTypeParameters(style.getTypeParameters().withAroundTypeBounds(true))),
           java(
             """
-              class Test<T extends Integer&Appendable> {
-              }
+              class Test<T extends Integer&Appendable> {}
               """,
             """
-              class Test<T extends Integer & Appendable> {
-              }
+              class Test<T extends Integer & Appendable> {}
               """
           )
         );
@@ -4809,8 +4698,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               @Deprecated("version" /* some comment */)
-              class Test {
-              }
+              class Test {}
               """
           )
         );
@@ -4844,14 +4732,12 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class A {
-                  void m(@Deprecated@SuppressWarnings("ALL") int a) {
-                  }
+                  void m(@Deprecated@SuppressWarnings("ALL") int a) {}
               }
               """,
             """
               class A {
-                  void m(@Deprecated @SuppressWarnings("ALL") int a) {
-                  }
+                  void m(@Deprecated @SuppressWarnings("ALL") int a) {}
               }
               """
           )

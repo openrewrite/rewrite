@@ -17,16 +17,22 @@ package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
@@ -41,13 +47,17 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     private final SpacesStyle spacesStyle;
     private final WrappingAndBracesStyle style;
 
-    public WrappingAndBracesVisitor(WrappingAndBracesStyle style) {
-        this(IntelliJ.spaces(), style, null);
+    public WrappingAndBracesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
     }
 
-    public WrappingAndBracesVisitor(SpacesStyle spacesStyle, WrappingAndBracesStyle style, @Nullable Tree stopAfter) {
+    public WrappingAndBracesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
+    }
+
+    public WrappingAndBracesVisitor(SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
         this.spacesStyle = spacesStyle;
-        this.style = style;
+        this.style = wrappingAndBracesStyle;
         this.stopAfter = stopAfter;
     }
 
@@ -184,10 +194,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
-        Tree parent = getCursor().getParentTreeCursor().getValue();
-        boolean isMethodOrClassBody = parent instanceof J.MethodDeclaration || parent instanceof J.ClassDeclaration;
-        if (!b.getEnd().getWhitespace().contains("\n") && (!isMethodOrClassBody || !b.getStatements().isEmpty())) {
-            b = b.withEnd(withNewline(b.getEnd()));
+        if (!b.getEnd().getWhitespace().contains("\n")) {
+            if (!b.getEnd().getWhitespace().contains("\n")) {
+                b = b.withEnd(withNewline(b.getEnd()));
+            }
         }
         return b;
     }
@@ -245,5 +255,23 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     private List<J.Modifier> withNewline(List<J.Modifier> modifiers, String whitespace, WrappingAndBracesStyle.@Nullable Annotations annotationsStyle) {
         return ListUtils.mapFirst(modifiers, mod -> requireNonNull(mod).withPrefix(wrapElement(mod.getPrefix(), whitespace, annotationsStyle)));
+    }
+
+    private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
     }
 }

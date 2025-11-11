@@ -25,7 +25,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.service.Span;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -352,7 +354,7 @@ class SourcePositionServiceTest implements RewriteTest {
                           break;
                       case "someVeryLongMethodNameThatIsAsLongAsTheMethodsAbove":
                           assertResult(22, 5, 25, 6, 75);
-                          assertMinimizedResult(22, 5, 24, 6, 77); // minimization moves the opening curly causing the end-line to shift by 1 and the maxColumn by 2
+                          assertMinimizedResult(22, 5, 23, 78, 78); // minimization collapses the block to start/end on same line
                           assertResult(method.getPadding().getParameters(), 23, 69, 23, 74, 74);
                           assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 23, 69, 23, 74, 74);
                           break;
@@ -560,65 +562,8 @@ class SourcePositionServiceTest implements RewriteTest {
     }
 
     private static  <T extends J> T minimize(T tree) {
-        J j = new JavaIsoVisitor<Integer>() {
-            @Override
-            public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
-                                                                  JRightPadded.Location loc,
-                                                                  Integer ctx) {
-                switch (loc) {
-                    case METHOD_DECLARATION_PARAMETER:
-                    case RECORD_STATE_VECTOR: {
-                        if (right != null && right.getElement() instanceof J) {
-                            //noinspection unchecked
-                            right = right
-                              .withAfter(minimized(right.getAfter()))
-                              .withElement(((J) right.getElement()).withPrefix(minimized(((J) right.getElement()).getPrefix())));
-                        }
-                        break;
-                    }
-                }
-                return super.visitRightPadded(right, loc, ctx);
-            }
-
-            @Override
-            public Space visitSpace(@Nullable Space space,
-                                    Space.Location loc,
-                                    Integer ctx) {
-                if (space == null) {
-                    return super.visitSpace(space, loc, ctx);
-                }
-                if (space == tree.getPrefix()) {
-                    return space;
-                }
-                switch (loc) {
-                    case BLOCK_PREFIX:
-                    case MODIFIER_PREFIX:
-                    case METHOD_DECLARATION_PARAMETER_SUFFIX:
-                    case METHOD_DECLARATION_PARAMETERS:
-                    case METHOD_SELECT_SUFFIX:
-                    case METHOD_INVOCATION_ARGUMENTS:
-                    case METHOD_INVOCATION_ARGUMENT_SUFFIX:
-                    case METHOD_INVOCATION_NAME:
-                    case RECORD_STATE_VECTOR_SUFFIX: {
-                        space = minimized(space);
-                        break;
-                    }
-                }
-                return super.visitSpace(space, loc, ctx);
-            }
-
-            //IntelliJ does not format when comments are present.
-            private Space minimized(Space space) {
-                if (space.getComments().isEmpty()) {
-                    return space.getWhitespace().isEmpty() ? space : Space.EMPTY;
-                }
-                return space;
-            }
-        }.visit(tree, -1);
-        if (j != tree) {
-            j = new MinimumViableSpacingVisitor<>(null).visit(j, -1);
-            j = new SpacesVisitor<>(IntelliJ.spaces(), null, null).visit(j, -1);
-        }
-        return (T) j;
+        tree = (T) new MinimumViableSpacingVisitor<>(null).visit(tree, -1);
+        tree = (T) new SpacesVisitor<>(IntelliJ.spaces(), null).visit(tree, -1);
+        return tree;
     }
 }

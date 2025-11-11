@@ -17,7 +17,6 @@ package org.openrewrite.java.format;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
@@ -26,8 +25,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.LineWrapSetting;
-
-import static org.openrewrite.java.format.MinimizationVisitor.minimized;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -50,8 +47,7 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
                     if (sourceFile == null) {
                         return m;
                     }
-                    Cursor minimized = minimized(getCursor(), sourceFile);
-                    if (sourceFile.service(SourcePositionService.class).positionOf(minimized, ((J.MethodDeclaration)minimized.getValue()).getPadding().getParameters()).getMaxColumn() <= style.getHardWrapAt()) {
+                    if (sourceFile.service(SourcePositionService.class).positionOf(getCursor(), method.getPadding().getParameters()).getMaxColumn() <= style.getHardWrapAt()) {
                         return m;
                     }
                 }

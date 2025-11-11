@@ -35,7 +35,7 @@ public class NoWhitespaceBefore extends Recipe {
     @Override
     public String getDescription() {
         return "Removes unnecessary whitespace preceding a token. " +
-               "A linebreak before a token will be removed unless `allowLineBreaks` is set to `true`.";
+                "A linebreak before a token will be removed unless `allowLineBreaks` is set to `true`.";
     }
 
     @Override
@@ -101,7 +101,7 @@ public class NoWhitespaceBefore extends Recipe {
                 }
             }
             if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getComma())) {
-                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(m, ctx);
+                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(m, ctx);
             }
             return m;
         }
@@ -110,7 +110,7 @@ public class NoWhitespaceBefore extends Recipe {
         public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
             J.ForLoop f = super.visitForLoop(forLoop, ctx);
             if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getSemi())) {
-                f = (J.ForLoop) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(f, ctx);
+                f = (J.ForLoop) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(f, ctx);
             }
             return f;
         }
@@ -134,11 +134,11 @@ public class NoWhitespaceBefore extends Recipe {
             J.Unary u = super.visitUnary(unary, ctx);
             J.Unary.Type op = u.getOperator();
             if ((Boolean.TRUE.equals(noWhitespaceBeforeStyle.getPostInc()) && op == J.Unary.Type.PostIncrement) ||
-                (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getPostDec() && op == J.Unary.Type.PostDecrement))) {
+                    (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getPostDec() && op == J.Unary.Type.PostDecrement))) {
                 if (Boolean.FALSE.equals(noWhitespaceBeforeStyle.getAllowLineBreaks()) && u.getPadding().getOperator().getBefore().getWhitespace().contains("\n")) {
                     u = u.getPadding().withOperator(u.getPadding().getOperator().withBefore(u.getPadding().getOperator().getBefore().withWhitespace("")));
                 }
-                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(u, ctx);
+                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(u, ctx);
             }
             return u;
         }

@@ -25,13 +25,13 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-class MinimizationVisitorTest implements RewriteTest {
+class SpacesVisitorTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec
           .parser(JavaParser.fromJavaVersion())
-          .recipe(toRecipe(() -> new MinimizationVisitor<>(emptyList())));
+          .recipe(toRecipe(() -> new SpacesVisitor<>(emptyList(), true, null)));
     }
 
     @DocumentExample
@@ -81,6 +81,11 @@ class MinimizationVisitorTest implements RewriteTest {
             class Test {
                 void method(String name  /* comment */  , int age) {}
             }
+            """,
+            """
+            class Test {
+                void method(String name  /* comment */, int age) {}
+            }
             """
           )
         );
@@ -121,6 +126,14 @@ class MinimizationVisitorTest implements RewriteTest {
                 }
                 void method(String s, int i) {}
             }
+            """,
+            """
+            class Test {
+                void test() {
+                    method("hello"  /* comment */, 42);
+                }
+                void method(String s, int i) {}
+            }
             """
           )
         );
@@ -146,6 +159,9 @@ class MinimizationVisitorTest implements RewriteTest {
           java(
             """
             record Person(String name  /* user's name */  , int age) {}
+            """,
+            """
+            record Person(String name  /* user's name */, int age) {}
             """
           )
         );
@@ -177,6 +193,11 @@ class MinimizationVisitorTest implements RewriteTest {
             """
             class Test {
                 public  /* important */  static void method() {}
+            }
+            """,
+            """
+            class Test {
+                public  /* important */ static void method() {}
             }
             """
           )
@@ -213,6 +234,13 @@ class MinimizationVisitorTest implements RewriteTest {
             class Test {
                 void test() {
                     String result = "hello"  /* to uppercase */  .toUpperCase().trim();
+                }
+            }
+            """,
+            """
+            class Test {
+                void test() {
+                    String result = "hello"  /* to uppercase */.toUpperCase().trim();
                 }
             }
             """
@@ -253,6 +281,11 @@ class MinimizationVisitorTest implements RewriteTest {
             """
             class Test {
                 void method()  /* comment */  {}
+            }
+            """,
+            """
+            class Test {
+                void method()  /* comment */ {}
             }
             """
           )

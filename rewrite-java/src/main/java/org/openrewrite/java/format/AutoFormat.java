@@ -44,6 +44,12 @@ public class AutoFormat extends Recipe {
     @Nullable
     String style;
 
+    @Option(displayName = "Remove custom line breaks",
+            description = "Do you want to remove custom line breaks? (default false)",
+            required = false)
+    @Nullable
+    Boolean removeCustomLineBreaks;
+
     @Override
     public String getDisplayName() {
         return "Format Java code";
@@ -56,7 +62,7 @@ public class AutoFormat extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AutoFormatVisitor<>(null, computeNamedStyles());
+        return new AutoFormatVisitor<>(null, Boolean.TRUE.equals(removeCustomLineBreaks), computeNamedStyles());
     }
 
     private NamedStyles[] computeNamedStyles() {
@@ -64,6 +70,8 @@ public class AutoFormat extends Recipe {
             return new NamedStyles[0];
         }
 
-        return new YamlResourceLoader(new ByteArrayInputStream(style.getBytes()), URI.create("AutoFormat$style"), new Properties()).listStyles().toArray(new NamedStyles[0]);
+        return new YamlResourceLoader(new ByteArrayInputStream(style.getBytes()),
+                URI.create("AutoFormat$style"),
+                new Properties()).listStyles().toArray(new NamedStyles[0]);
     }
 }
