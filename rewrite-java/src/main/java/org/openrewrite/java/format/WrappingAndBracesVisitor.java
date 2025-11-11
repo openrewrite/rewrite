@@ -257,15 +257,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return ListUtils.mapFirst(modifiers, mod -> requireNonNull(mod).withPrefix(wrapElement(mod.getPrefix(), whitespace, annotationsStyle)));
     }
 
-    private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {
-        try {
-            return supplier.get();
-        } catch (NoSuchMethodError e) {
-            // Handle newly introduced method calls on style that are not part of lst yet
-            return defaultValue;
-        }
-    }
-
     @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
         S style = NamedStyles.merge(styleClass, styles);
