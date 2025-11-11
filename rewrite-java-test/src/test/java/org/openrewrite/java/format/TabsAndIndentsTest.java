@@ -2108,6 +2108,28 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               public class Test {
 
+                  public void practiceA()
+                  {
+                      for (int i = 0; i < 10; ++i)
+                      {
+                          if (i % 2 == 0)
+                          {
+                              try
+                              {
+                                  Integer value = Integer.valueOf("100");
+                              }
+                              catch (Exception ex)
+                              {
+                                  throw new RuntimeException();
+                              }
+                              finally
+                              {
+                                  System.out.println("out");
+                              }
+                          }
+                      }
+                  }
+
                   public void practiceB() {
                       for (int i = 0; i < 10; ++i) {
                           if (i % 2 == 0) {
