@@ -150,7 +150,7 @@ public class SourcePositionService {
      * @param cursor the cursor to start searching from
      * @return the cursor pointing to the element with a newline prefix
      */
-    public Cursor computeNewLinedCursorElement(Cursor cursor) {
+    private Cursor computeNewLinedCursorElement(Cursor cursor) {
         Object cursorValue = cursor.getValue();
         while (cursorValue instanceof J.MethodInvocation && ((J.MethodInvocation) cursorValue).getSelect() instanceof J.MethodInvocation) {
             cursorValue = ((J.MethodInvocation) cursorValue).getSelect();
