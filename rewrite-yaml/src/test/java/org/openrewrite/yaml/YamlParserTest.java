@@ -473,7 +473,12 @@ class YamlParserTest implements RewriteTest {
             """
               - !SOMETAG
                 a: b
-              """
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Sequence sequence = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
+                Yaml.Mapping mapping = (Yaml.Mapping) sequence.getEntries().getFirst().getBlock();
+                assertThat(mapping.getTag().getName()).isEqualTo("SOMETAG");
+            })
           )
         );
     }
