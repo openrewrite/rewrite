@@ -371,7 +371,7 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-               package com.example;
+              package com.example;
               
               class Test {
                   void test() {
