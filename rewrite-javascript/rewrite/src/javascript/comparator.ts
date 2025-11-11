@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaScriptVisitor} from './visitor';
-import {J, Type} from '../java';
+import {J, Type, Expression, Statement, isIdentifier} from '../java';
 import {JS, JSX} from './tree';
 import {Cursor, Tree} from "../tree";
 
@@ -72,7 +72,6 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         this.match = false;
         return t;
     }
-
 
     /**
      * Generic method to visit a property value using the appropriate visitor method.
@@ -1836,6 +1835,259 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
     constructor(lenientTypeMatching: boolean = false) {
         super();
         this.lenientTypeMatching = lenientTypeMatching;
+    }
+
+    /**
+     * Unwraps parentheses from a tree node recursively.
+     * This allows comparing expressions with and without redundant parentheses.
+     *
+     * @param tree The tree to unwrap
+     * @returns The unwrapped tree
+     */
+    protected unwrap(tree: Tree | undefined): Tree | undefined {
+        if (!tree) {
+            return tree;
+        }
+
+        // Unwrap J.Parentheses nodes recursively
+        if ((tree as any).kind === J.Kind.Parentheses) {
+            const parens = tree as J.Parentheses<any>;
+            return this.unwrap(parens.tree.element as Tree);
+        }
+
+        // Unwrap J.ControlParentheses nodes recursively
+        if ((tree as any).kind === J.Kind.ControlParentheses) {
+            const controlParens = tree as J.ControlParentheses<any>;
+            return this.unwrap(controlParens.tree.element as Tree);
+        }
+
+        return tree;
+    }
+
+    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+        // Unwrap parentheses from both trees before comparing
+        const unwrappedJ = this.unwrap(j);
+        const unwrappedP = this.unwrap(p);
+
+        // Delegate to parent with unwrapped nodes
+        return await super.visit(unwrappedJ as Tree, unwrappedP as J, parent);
+    }
+
+    /**
+     * Override visitArrowFunction to allow semantic equivalence between expression body
+     * and block with single return statement forms.
+     *
+     * Examples:
+     * - `x => x + 1` matches `x => { return x + 1; }`
+     * - `(x, y) => x + y` matches `(x, y) => { return x + y; }`
+     */
+    override async visitArrowFunction(arrowFunction: JS.ArrowFunction, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return arrowFunction;
+        }
+
+        if (other.kind !== JS.Kind.ArrowFunction) {
+            return this.abort(arrowFunction);
+        }
+
+        const otherArrow = other as JS.ArrowFunction;
+
+        // Compare all properties reflectively except lambda (handled specially below)
+        for (const key of Object.keys(arrowFunction)) {
+            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'lambda') {
+                continue;
+            }
+
+            const jValue = (arrowFunction as any)[key];
+            const otherValue = (otherArrow as any)[key];
+
+            // Handle arrays
+            if (Array.isArray(jValue)) {
+                if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
+                    return this.abort(arrowFunction);
+                }
+                for (let i = 0; i < jValue.length; i++) {
+                    await this.visitProperty(jValue[i], otherValue[i]);
+                    if (!this.match) return arrowFunction;
+                }
+            } else {
+                await this.visitProperty(jValue, otherValue);
+                if (!this.match) return arrowFunction;
+            }
+        }
+
+        // Compare lambda parameters
+        const params1 = arrowFunction.lambda.parameters.parameters;
+        const params2 = otherArrow.lambda.parameters.parameters;
+        if (params1.length !== params2.length) {
+            return this.abort(arrowFunction);
+        }
+        for (let i = 0; i < params1.length; i++) {
+            await this.visitProperty(params1[i], params2[i]);
+            if (!this.match) return arrowFunction;
+        }
+
+        // Handle semantic equivalence for lambda bodies
+        const body1 = arrowFunction.lambda.body;
+        const body2 = otherArrow.lambda.body;
+
+        // Try to extract the expression from each body
+        const expr1 = this.extractExpression(body1);
+        const expr2 = this.extractExpression(body2);
+
+        if (expr1 && expr2) {
+            // Both have extractable expressions - compare them
+            await this.visit(expr1, expr2);
+        } else {
+            // At least one is not a simple expression or block-with-return
+            // Fall back to exact comparison
+            await this.visit(body1, body2);
+        }
+
+        return arrowFunction;
+    }
+
+    /**
+     * Override visitLambdaParameters to allow semantic equivalence between
+     * arrow functions with and without parentheses around single parameters.
+     *
+     * Examples:
+     * - `x => x + 1` matches `(x) => x + 1`
+     */
+    override async visitLambdaParameters(parameters: J.Lambda.Parameters, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return parameters;
+        }
+
+        if (other.kind !== J.Kind.LambdaParameters) {
+            return this.abort(parameters);
+        }
+
+        const otherParams = other as J.Lambda.Parameters;
+
+        // Compare all properties except 'parenthesized' using reflection
+        for (const key of Object.keys(parameters)) {
+            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'parenthesized') {
+                continue;
+            }
+
+            const jValue = (parameters as any)[key];
+            const otherValue = (otherParams as any)[key];
+
+            // Handle arrays
+            if (Array.isArray(jValue)) {
+                if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
+                    return this.abort(parameters);
+                }
+                for (let i = 0; i < jValue.length; i++) {
+                    await this.visitProperty(jValue[i], otherValue[i]);
+                    if (!this.match) return parameters;
+                }
+            } else {
+                await this.visitProperty(jValue, otherValue);
+                if (!this.match) return parameters;
+            }
+        }
+
+        return parameters;
+    }
+
+    /**
+     * Override visitPropertyAssignment to allow semantic equivalence between
+     * object property shorthand and longhand forms.
+     *
+     * Examples:
+     * - `{ x }` matches `{ x: x }`
+     * - `{ x: x, y: y }` matches `{ x, y }`
+     */
+    override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return propertyAssignment;
+        }
+
+        if (other.kind !== JS.Kind.PropertyAssignment) {
+            return this.abort(propertyAssignment);
+        }
+
+        const otherProp = other as JS.PropertyAssignment;
+
+        // Extract property names for semantic comparison
+        const propName = this.getPropertyName(propertyAssignment);
+        const otherPropName = this.getPropertyName(otherProp);
+
+        // Names must match
+        if (!propName || !otherPropName || propName !== otherPropName) {
+            // Can't do semantic comparison without identifiers, fall back to exact comparison
+            return await super.visitPropertyAssignment(propertyAssignment, other);
+        }
+
+        // Detect shorthand (no initializer) vs longhand (has initializer)
+        const isShorthand1 = !propertyAssignment.initializer;
+        const isShorthand2 = !otherProp.initializer;
+
+        if (isShorthand1 === isShorthand2) {
+            // Both shorthand or both longhand - use base comparison
+            return await super.visitPropertyAssignment(propertyAssignment, other);
+        }
+
+        // One is shorthand, one is longhand - check semantic equivalence
+        const longhandProp = isShorthand1 ? otherProp : propertyAssignment;
+
+        // Check if the longhand's initializer is an identifier with the same name as the property
+        if (this.isIdentifierWithName(longhandProp.initializer, propName)) {
+            // Semantically equivalent!
+            return propertyAssignment;
+        } else {
+            // Not equivalent (e.g., { x: y })
+            return this.abort(propertyAssignment);
+        }
+    }
+
+    /**
+     * Extracts the property name from a PropertyAssignment.
+     * Returns the simple name if the property is an identifier, undefined otherwise.
+     */
+    private getPropertyName(prop: JS.PropertyAssignment): string | undefined {
+        const nameExpr = prop.name.element;
+        return isIdentifier(nameExpr) ? nameExpr.simpleName : undefined;
+    }
+
+    /**
+     * Checks if an expression is an identifier with the given name.
+     */
+    private isIdentifierWithName(expr: Expression | undefined, name: string): boolean | undefined {
+        return expr && isIdentifier(expr) && expr.simpleName === name;
+    }
+
+    /**
+     * Extracts the expression from an arrow function body.
+     * Returns the expression if:
+     * - body is already an Expression, OR
+     * - body is a Block with exactly one Return statement
+     * Otherwise returns undefined.
+     */
+    private extractExpression(body: Statement | Expression): Expression | undefined {
+        // If it's already an expression, return it
+        if ((body as any).kind !== J.Kind.Block) {
+            return body as Expression;
+        }
+
+        // It's a block - check if it contains exactly one return statement
+        const block = body as J.Block;
+        if (block.statements.length !== 1) {
+            return undefined;
+        }
+
+        // Unwrap the RightPadded wrapper from the statement
+        const stmtWrapper = block.statements[0];
+        const stmt = stmtWrapper.element;
+
+        if ((stmt as any).kind !== J.Kind.Return) {
+            return undefined;
+        }
+
+        const returnStmt = stmt as J.Return;
+        return returnStmt.expression;
     }
 
     /**
