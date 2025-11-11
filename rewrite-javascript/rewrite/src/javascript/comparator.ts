@@ -1865,12 +1865,26 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
-        // Unwrap parentheses from both trees before comparing
-        const unwrappedJ = this.unwrap(j);
-        const unwrappedP = this.unwrap(p);
+        // If we've already found a mismatch, abort further processing
+        if (!this.match) {
+            return j as R;
+        }
 
-        // Delegate to parent with unwrapped nodes
-        return await super.visit(unwrappedJ as Tree, unwrappedP as J, parent);
+        // Unwrap parentheses from both trees before comparing
+        const unwrappedJ = this.unwrap(j) || j;
+        const unwrappedP = this.unwrap(p) || p;
+
+        // Skip the kind check that the base class does - semantic matching allows different kinds
+        // (e.g., undefined identifier matching void expression)
+        // Update targetCursor to track the target node in parallel with the pattern cursor
+        const savedTargetCursor = this.targetCursor;
+        this.targetCursor = new Cursor(unwrappedP, this.targetCursor);
+        try {
+            // Call the grandparent's visit to do actual visitation without the kind check
+            return await JavaScriptVisitor.prototype.visit.call(this, unwrappedJ, unwrappedP) as R | undefined;
+        } finally {
+            this.targetCursor = savedTargetCursor;
+        }
     }
 
     /**
@@ -2336,9 +2350,17 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
     }
 
     /**
-     * Override identifier comparison to include type checking for field access.
+     * Override identifier comparison to include:
+     * 1. Type checking for field access
+     * 2. Semantic equivalence between `undefined` identifier and void expressions
      */
     override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+        // Check if this identifier is "undefined" and the other is a void expression
+        if (identifier.simpleName === 'undefined' && (other as any).kind === JS.Kind.Void) {
+            // Both evaluate to undefined, so they match
+            return identifier;
+        }
+
         if (other.kind !== J.Kind.Identifier) {
             return this.abort(identifier);
         }
@@ -2518,5 +2540,64 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
 
         return methodDeclaration;
+    }
+
+    /**
+     * Override visitVoid to allow semantic equivalence with undefined identifier.
+     * This handles the reverse case where the pattern is a void expression
+     * and the source is the undefined identifier.
+     *
+     * Examples:
+     * - `void 0` matches `undefined`
+     * - `void(0)` matches `undefined`
+     * - `void 1` matches `undefined`
+     */
+    override async visitVoid(voidExpr: JS.Void, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return voidExpr;
+        }
+
+        // Check if the other is an undefined identifier
+        if ((other as any).kind === J.Kind.Identifier) {
+            const identifier = other as J.Identifier;
+            if (identifier.simpleName === 'undefined') {
+                // Both evaluate to undefined, so they match
+                return voidExpr;
+            }
+        }
+
+        // Otherwise delegate to parent
+        return super.visitVoid(voidExpr, other as any);
+    }
+
+    /**
+     * Override visitLiteral to allow semantic equivalence between
+     * different numeric literal formats.
+     *
+     * Examples:
+     * - `255` matches `0xFF`
+     * - `255` matches `0o377`
+     * - `255` matches `0b11111111`
+     * - `1000` matches `1e3`
+     */
+    override async visitLiteral(literal: J.Literal, other: J): Promise<J | undefined> {
+        if (!this.match) {
+            return literal;
+        }
+
+        if ((other as any).kind !== J.Kind.Literal) {
+            return await super.visitLiteral(literal, other);
+        }
+
+        const otherLiteral = other as J.Literal;
+
+        // Only compare value and type, ignoring valueSource (text representation) and unicodeEscapes
+        await this.visitProperty(literal.value, otherLiteral.value);
+        if (!this.match) return literal;
+
+        await this.visitProperty(literal.type, otherLiteral.type);
+        if (!this.match) return literal;
+
+        return literal;
     }
 }

@@ -519,4 +519,154 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
             expect(matchCount).toBe(1);
         });
     });
+
+    describe('void expression equivalence', () => {
+        test('matches undefined with void expressions', async () => {
+            // Pattern: undefined
+            const pat = pattern`undefined`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitIdentifier(identifier: J.Identifier, _p: any): Promise<J.Identifier | undefined> {
+                    if (identifier.simpleName === 'undefined') {
+                        const m = await pat.match(identifier);
+                        if (m) {
+                            matchCount++;
+                        }
+                    }
+                    return identifier;
+                }
+
+                protected async visitVoid(voidExpr: any, _p: any): Promise<any> {
+                    const m = await pat.match(voidExpr);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return voidExpr;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = undefined;
+                        const b = void 0;
+                        const c = void(0);
+                        const d = void 1;
+                    `
+                )
+            );
+
+            // All four should match
+            expect(matchCount).toBe(4);
+        });
+
+        test('matches void expression with undefined', async () => {
+            // Pattern: void 0
+            const pat = pattern`void 0`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitIdentifier(identifier: J.Identifier, _p: any): Promise<J.Identifier | undefined> {
+                    if (identifier.simpleName === 'undefined') {
+                        const m = await pat.match(identifier);
+                        if (m) {
+                            matchCount++;
+                        }
+                    }
+                    return identifier;
+                }
+
+                protected async visitVoid(voidExpr: any, _p: any): Promise<any> {
+                    const m = await pat.match(voidExpr);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return voidExpr;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = undefined;
+                        const b = void 0;
+                        const c = void(0);
+                    `
+                )
+            );
+
+            // All three should match
+            expect(matchCount).toBe(3);
+        });
+    });
+
+    describe('numeric literal equivalence', () => {
+        test('matches different representations of same numeric value', async () => {
+            // Pattern: 255
+            const pat = pattern`255`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitLiteral(literal: J.Literal, _p: any): Promise<J.Literal | undefined> {
+                    const m = await pat.match(literal);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return literal;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = 255;
+                        const b = 0xFF;
+                        const c = 0o377;
+                        const d = 0b11111111;
+                    `
+                )
+            );
+
+            // All four should match
+            expect(matchCount).toBe(4);
+        });
+
+        test('matches scientific notation with integer', async () => {
+            // Pattern: 1000
+            const pat = pattern`1000`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitLiteral(literal: J.Literal, _p: any): Promise<J.Literal | undefined> {
+                    const m = await pat.match(literal);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return literal;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = 1000;
+                        const b = 1e3;
+                        const c = 1E3;
+                    `
+                )
+            );
+
+            // All three should match
+            expect(matchCount).toBe(3);
+        });
+    });
 });
