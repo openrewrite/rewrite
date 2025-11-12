@@ -285,6 +285,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             if (index != size - 1 && right.getElement() instanceof J.Try.Resource) {
                 //noinspection unchecked, ConstantConditions
                 right = right.withElement((T) new JavaIsoVisitor<String>() {
+
                     @Override
                     public @Nullable <B> JRightPadded<B> visitRightPadded(@Nullable JRightPadded<B> right, JRightPadded.Location loc, String p) {
                         return right == null ? null : right.withAfter(minimizedLastComment(right.getAfter(), p));
@@ -320,6 +321,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         return (afterSpace == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ? right : new JRightPadded<>(t, afterSpace, markers);
     }
 
+    @Override
     public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
         if (left == null) {
             //noinspection ConstantConditions
@@ -370,7 +372,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             return super.visitSpace(null, loc, ctx);
         }
         if (getCursor().getValue() instanceof JContainer) {
-            Arrays.stream(JContainer.Location.values()).filter(l -> l.getBeforeLocation().equals(loc)).findFirst().ifPresent(l -> getCursor().computeMessageIfAbsent("location", __ -> l));
+            Arrays.stream(JContainer.Location.values()).filter(l -> l.getBeforeLocation() == loc).findFirst().ifPresent(l -> getCursor().computeMessageIfAbsent("location", __ -> l));
         }
         String whitespace = null;
         String before = getCursor().pollNearestMessage("before");
@@ -766,9 +768,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     JContainer<J.Try.Resource> resources = getCursor().getValue();
                     if (!resources.getElements().isEmpty() && resources.getElements().get(0).isTerminatedWithSemicolon()) {
                         return evaluate(() -> spacesStyle.getOther().getBeforeForSemicolon(), false) ? " " : "";
-                    } else {
-                        return "";
                     }
+                    return "";
                 }
                 return evaluate(() -> spacesStyle.getWithin().getTryParentheses(), false) ? " " : "";
             case NEW_ARRAY_INITIALIZER:

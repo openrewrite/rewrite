@@ -43,13 +43,14 @@ class NormalizeLineBreaksTest implements RewriteTest {
                      "}";
 
     @Language("groovy")
-    String linux = "" +
-                   "class Test {\n" +
-                   "    // some comment\n" +
-                   "    def test() {\n" +
-                   "        System.out.println()\n" +
-                   "    }\n" +
-                   "}";
+    String linux = """
+                   class Test {
+                       // some comment
+                       def test() {
+                           System.out.println()
+                       }
+                   }\
+                   """;
 
     @Language("groovy")
     String windowsJavadoc = "" +
@@ -60,12 +61,13 @@ class NormalizeLineBreaksTest implements RewriteTest {
                             "}";
 
     @Language("groovy")
-    String linuxJavadoc = "" +
-                          "/**\n" +
-                          " *\n" +
-                          " */\n" +
-                          "class Test {\n" +
-                          "}";
+    String linuxJavadoc = """
+                          /**
+                           *
+                           */
+                          class Test {
+                          }\
+                          """;
 
     @Test
     void windowsToLinux() {

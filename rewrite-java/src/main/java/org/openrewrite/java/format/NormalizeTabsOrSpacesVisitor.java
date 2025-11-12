@@ -65,11 +65,10 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
                             return lineBreak.withMargin(normalize(lineBreak.getMargin(), true));
                         }
                     }.visitNonNull((Javadoc) c, 0);
-                } else {
-                    TextComment textComment = (TextComment) c;
-                    if (textComment.getText().contains("\t")) {
-                        c = textComment.withText(normalize(textComment.getText(), true));
-                    }
+                }
+                TextComment textComment = (TextComment) c;
+                if (textComment.getText().contains("\t")) {
+                    c = textComment.withText(normalize(textComment.getText(), true));
                 }
             }
 

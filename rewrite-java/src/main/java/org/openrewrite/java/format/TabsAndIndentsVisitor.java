@@ -480,9 +480,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             int declPrefixLength = getLengthOfWhitespace(tree.getPrefix().getLastWhitespace());
 
             return declPrefixLength + style.getContinuationIndent();
-        } else {
-            return computeColumnPosition(tree, firstArg, getCursor());
         }
+        return computeColumnPosition(tree, firstArg, getCursor());
     }
 
     @Override

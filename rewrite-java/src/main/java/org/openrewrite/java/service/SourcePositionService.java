@@ -193,9 +193,8 @@ public class SourcePositionService {
                     if (!firstElement.getPrefix().getLastWhitespace().contains("\n")) {
                         if (firstElement == cursorValue || SemanticallyEqual.areEqual(firstElement, cursorValue)) {
                             return cursor;
-                        } else {
-                            return new Cursor(parent, firstElement);
                         }
+                        return new Cursor(parent, firstElement);
                     }
                     return null; //do no align when not needed
                 }
@@ -430,8 +429,7 @@ public class SourcePositionService {
                     .endColumn(col)
                     .maxColumn(maxColumn)
                     .build();
-        } else {
-            throw new IllegalArgumentException("The child was not found in the sourceFile. Are you sure the passed in cursor's value contains the child and you are not searching for a mutated element in a non-mutated Cursor value?");
         }
+        throw new IllegalArgumentException("The child was not found in the sourceFile. Are you sure the passed in cursor's value contains the child and you are not searching for a mutated element in a non-mutated Cursor value?");
     }
 }

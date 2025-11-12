@@ -26,9 +26,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
+import static java.util.stream.Collectors.joining;
 
 public class StyleHelper {
 
@@ -161,7 +161,7 @@ public class StyleHelper {
         return new NamedStyles(Tree.randomId(),
                 "MergedStyles",
                 "Merged styles",
-                "Merged styles from " + Arrays.stream(styles).map(Object::getClass).map(Class::getSimpleName).collect(Collectors.joining(", ")),
+                "Merged styles from " + Arrays.stream(styles).map(Object::getClass).map(Class::getSimpleName).collect(joining(", ")),
                 emptySet(),
                 Arrays.asList(styles));
     }

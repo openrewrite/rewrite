@@ -41,14 +41,17 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return "java";
     }
 
+    @Override
     public J visitExpression(Expression expression, Object ctx) {
         return expression;
     }
 
+    @Override
     public J visitStatement(Statement statement, Object ctx) {
         return statement;
     }
 
+    @Override
     @SuppressWarnings("unused")
     public Space visitSpace(@Nullable Space space, Space.Location loc, Object ctx) {
         Space newSpace = (Space) ctx;
@@ -66,6 +69,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return space.withComments(ListUtils.map(space.getComments(), (index, comment) -> comment.withSuffix(newSpace.getComments().get(index).getSuffix())));
     }
 
+    @Override
     public <N extends NameTree> N visitTypeName(N nameTree, Object ctx) {
         N newNameTree = (N) ctx;
         if (nameTree == newNameTree) {
@@ -103,6 +107,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return js == nameTrees.getPadding().getElements() ? nameTrees : JContainer.build(nameTrees.getBefore(), js, Markers.EMPTY);
     }
 
+    @Override
     public J visitAnnotatedType(J.AnnotatedType annotatedType, Object ctx) {
         if (annotatedType == ctx || !(ctx instanceof J.AnnotatedType)) {
             return annotatedType;
@@ -114,14 +119,14 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(a, newAnnotatedType);
         if (!(temp instanceof J.AnnotatedType)) {
             return temp;
-        } else {
-            a = (J.AnnotatedType) temp;
         }
+        a = (J.AnnotatedType) temp;
         a = a.withAnnotations(ListUtils.map(a.getAnnotations(), (index, e) -> visitAndCast(e, newAnnotatedType.getAnnotations().get(index))));
         a = a.withTypeExpression(visitAndCast(a.getTypeExpression(), newAnnotatedType.getTypeExpression()));
         return a.withTypeExpression(visitTypeName(a.getTypeExpression(), newAnnotatedType.getTypeExpression()));
     }
 
+    @Override
     public J visitAnnotation(J.Annotation annotation, Object ctx) {
         if (annotation == ctx || !(ctx instanceof J.Annotation)) {
             return annotation;
@@ -133,9 +138,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(a, newAnnotation);
         if (!(temp instanceof J.Annotation)) {
             return temp;
-        } else {
-            a = (J.Annotation) temp;
         }
+        a = (J.Annotation) temp;
         if (a.getPadding().getArguments() != null && newAnnotation.getPadding().getArguments() != null) {
             a = a.getPadding().withArguments(visitContainer(a.getPadding().getArguments(), JContainer.Location.ANNOTATION_ARGUMENTS, newAnnotation.getPadding().getArguments()));
         }
@@ -143,6 +147,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return a.withAnnotationType(visitTypeName(a.getAnnotationType(), newAnnotation.getAnnotationType()));
     }
 
+    @Override
     public J visitArrayAccess(J.ArrayAccess arrayAccess, Object ctx) {
         if (arrayAccess == ctx || !(ctx instanceof J.ArrayAccess)) {
             return arrayAccess;
@@ -154,14 +159,14 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(a, newArrayAccess);
         if (!(temp instanceof J.ArrayAccess)) {
             return temp;
-        } else {
-            a = (J.ArrayAccess) temp;
         }
+        a = (J.ArrayAccess) temp;
         a = a.withIndexed(visitAndCast(a.getIndexed(), newArrayAccess.getIndexed()));
         a = a.withDimension(visitAndCast(a.getDimension(), newArrayAccess.getDimension()));
         return a.withType(visitType(a.getType(), newArrayAccess.getType()));
     }
 
+    @Override
     public J visitArrayDimension(J.ArrayDimension arrayDimension, Object ctx) {
         if (arrayDimension == ctx || !(ctx instanceof J.ArrayDimension)) {
             return arrayDimension;
@@ -173,6 +178,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return a.getPadding().withIndex(visitRightPadded(a.getPadding().getIndex(), JRightPadded.Location.ARRAY_INDEX, newArrayDimension.getPadding().getIndex()));
     }
 
+    @Override
     public J visitArrayType(J.ArrayType arrayType, Object ctx) {
         if (arrayType == ctx || !(ctx instanceof J.ArrayType)) {
             return arrayType;
@@ -184,9 +190,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(a, newArrayType);
         if (!(temp instanceof J.ArrayType)) {
             return temp;
-        } else {
-            a = (J.ArrayType) temp;
         }
+        a = (J.ArrayType) temp;
         a = a.withElementType(visitAndCast(a.getElementType(), newArrayType.getElementType()));
         a = a.withElementType(visitTypeName(a.getElementType(), newArrayType.getElementType()));
         a = a.withAnnotations(ListUtils.map(a.getAnnotations(), (index, ann) -> visitAndCast(ann, newArrayType.getAnnotations().get(index))));
@@ -198,6 +203,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return a.withType(visitType(a.getType(), newArrayType.getType()));
     }
 
+    @Override
     public J visitAssert(J.Assert assert_, Object ctx) {
         if (assert_ == ctx || !(ctx instanceof J.Assert)) {
             return assert_;
@@ -209,9 +215,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(a, newAssert);
         if (!(temp instanceof J.Assert)) {
             return temp;
-        } else {
-            a = (J.Assert) temp;
         }
+        a = (J.Assert) temp;
         a = a.withCondition(visitAndCast(a.getCondition(), newAssert.getCondition()));
         if (a.getDetail() != null && newAssert.getDetail() != null) {
             a = a.withDetail(visitLeftPadded(a.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, newAssert.getDetail()));
@@ -219,6 +224,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return a;
     }
 
+    @Override
     public J visitAssignment(J.Assignment assignment, Object ctx) {
         if (assignment == ctx || !(ctx instanceof J.Assignment)) {
             return assignment;
@@ -230,20 +236,19 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(a, newAssignment);
         if (!(temp instanceof J.Assignment)) {
             return temp;
-        } else {
-            a = (J.Assignment) temp;
         }
+        a = (J.Assignment) temp;
         Expression temp2 = (Expression) visitExpression(a, newAssignment);
         if (!(temp2 instanceof J.Assignment)) {
             return temp2;
-        } else {
-            a = (J.Assignment) temp2;
         }
+        a = (J.Assignment) temp2;
         a = a.withVariable(visitAndCast(a.getVariable(), newAssignment.getVariable()));
         a = a.getPadding().withAssignment(visitLeftPadded(a.getPadding().getAssignment(), JLeftPadded.Location.ASSIGNMENT, newAssignment.getPadding().getAssignment()));
         return a.withType(visitType(a.getType(), newAssignment.getType()));
     }
 
+    @Override
     public J visitAssignmentOperation(J.AssignmentOperation assignOp, Object ctx) {
         if (assignOp == ctx || !(ctx instanceof J.AssignmentOperation)) {
             return assignOp;
@@ -255,21 +260,20 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(a, newAssignOp);
         if (!(temp instanceof J.AssignmentOperation)) {
             return temp;
-        } else {
-            a = (J.AssignmentOperation) temp;
         }
+        a = (J.AssignmentOperation) temp;
         Expression temp2 = (Expression) visitExpression(a, newAssignOp);
         if (!(temp2 instanceof J.AssignmentOperation)) {
             return temp2;
-        } else {
-            a = (J.AssignmentOperation) temp2;
         }
+        a = (J.AssignmentOperation) temp2;
         a = a.withVariable(visitAndCast(a.getVariable(), newAssignOp.getVariable()));
         a = a.getPadding().withOperator(visitLeftPadded(a.getPadding().getOperator(), JLeftPadded.Location.ASSIGNMENT_OPERATION_OPERATOR, newAssignOp.getPadding().getOperator()));
         a = a.withAssignment(visitAndCast(a.getAssignment(), newAssignOp.getAssignment()));
         return a.withType(visitType(a.getType(), newAssignOp.getType()));
     }
 
+    @Override
     public J visitBinary(J.Binary binary, Object ctx) {
         if (binary == ctx || !(ctx instanceof J.Binary)) {
             return binary;
@@ -281,15 +285,15 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(b, newBinary);
         if (!(temp instanceof J.Binary)) {
             return temp;
-        } else {
-            b = (J.Binary) temp;
         }
+        b = (J.Binary) temp;
         b = b.withLeft(visitAndCast(b.getLeft(), newBinary.getLeft()));
         b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), JLeftPadded.Location.BINARY_OPERATOR, newBinary.getPadding().getOperator()));
         b = b.withRight(visitAndCast(b.getRight(), newBinary.getRight()));
         return b.withType(visitType(b.getType(), newBinary.getType()));
     }
 
+    @Override
     public J visitBlock(J.Block block, Object ctx) {
         if (block == ctx || !(ctx instanceof J.Block)) {
             return block;
@@ -301,15 +305,15 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(b, newBlock);
         if (!(temp instanceof J.Block)) {
             return temp;
-        } else {
-            b = (J.Block) temp;
         }
+        b = (J.Block) temp;
         b = b.getPadding().withStatic(visitRightPadded(b.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, newBlock.getPadding().getStatic()));
         b = b.getPadding().withStatements(ListUtils.map(b.getPadding().getStatements(), (index, t) ->
                 visitRightPadded(t, JRightPadded.Location.BLOCK_STATEMENT, newBlock.getPadding().getStatements().get(index))));
         return b.withEnd(visitSpace(b.getEnd(), Space.Location.BLOCK_END, newBlock.getEnd()));
     }
 
+    @Override
     public J visitBreak(J.Break breakStatement, Object ctx) {
         if (breakStatement == ctx || !(ctx instanceof J.Break)) {
             return breakStatement;
@@ -321,12 +325,12 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(b, newBreakStatement);
         if (!(temp instanceof J.Break)) {
             return temp;
-        } else {
-            b = (J.Break) temp;
         }
+        b = (J.Break) temp;
         return b.withLabel(visitAndCast(b.getLabel(), newBreakStatement.getLabel()));
     }
 
+    @Override
     public J visitCase(J.Case case_, Object ctx) {
         if (case_ == ctx || !(ctx instanceof J.Case)) {
             return case_;
@@ -338,15 +342,15 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(c, newCase);
         if (!(temp instanceof J.Case)) {
             return temp;
-        } else {
-            c = (J.Case) temp;
         }
+        c = (J.Case) temp;
         c = c.getPadding().withCaseLabels(visitContainer(c.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, newCase.getPadding().getCaseLabels()));
         c = c.withGuard(visitAndCast(c.getGuard(), newCase.getGuard()));
         c = c.getPadding().withBody(visitRightPadded(c.getPadding().getBody(), JRightPadded.Location.CASE_BODY, newCase.getPadding().getBody()));
         return c.getPadding().withStatements(visitContainer(c.getPadding().getStatements(), JContainer.Location.CASE, newCase.getPadding().getStatements()));
     }
 
+    @Override
     public J visitCatch(J.Try.Catch catch_, Object ctx) {
         if (catch_ == ctx || !(ctx instanceof J.Try.Catch)) {
             return catch_;
@@ -359,6 +363,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return c.withBody(visitAndCast(c.getBody(), newCatch.getBody()));
     }
 
+    @Override
     public J visitClassDeclaration(J.ClassDeclaration classDecl, Object ctx) {
         if (classDecl == ctx || !(ctx instanceof J.ClassDeclaration)) {
             return classDecl;
@@ -370,9 +375,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(c, newClassDecl);
         if (!(temp instanceof J.ClassDeclaration)) {
             return temp;
-        } else {
-            c = (J.ClassDeclaration) temp;
         }
+        c = (J.ClassDeclaration) temp;
         c = c.withLeadingAnnotations(ListUtils.map(c.getLeadingAnnotations(), (index, a) -> visitAndCast(a, newClassDecl.getLeadingAnnotations().get(index))));
         c = c.withModifiers(ListUtils.map(c.getModifiers(), (index, m) -> visitAndCast(m, newClassDecl.getModifiers().get(index))));
         //Kind can have annotations associated with it, need to visit those.
@@ -408,6 +412,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return c.withType(visitType(c.getType(), newClassDecl.getType()));
     }
 
+    @Override
     public J visitCompilationUnit(J.CompilationUnit cu, Object ctx) {
         if (cu == ctx || !(ctx instanceof J.CompilationUnit)) {
             return cu;
@@ -424,6 +429,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, newCu.getEof()));
     }
 
+    @Override
     public J visitContinue(J.Continue continueStatement, Object ctx) {
         if (continueStatement == ctx || !(ctx instanceof J.Continue)) {
             return continueStatement;
@@ -435,12 +441,12 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(c, newContinueStatement);
         if (!(temp instanceof J.Continue)) {
             return temp;
-        } else {
-            c = (J.Continue) temp;
         }
+        c = (J.Continue) temp;
         return c.withLabel(visitAndCast(c.getLabel(), newContinueStatement.getLabel()));
     }
 
+    @Override
     public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, Object ctx) {
         J.ControlParentheses<T> newControlParens = (J.ControlParentheses<T>) ctx;
         if (controlParens == newControlParens) {
@@ -451,14 +457,14 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(cp, newControlParens);
         if (!(temp instanceof J.ControlParentheses)) {
             return temp;
-        } else {
-            //noinspection unchecked
-            cp = (J.ControlParentheses<T>) temp;
         }
+        //noinspection unchecked
+        cp = (J.ControlParentheses<T>) temp;
         cp = cp.getPadding().withTree(visitRightPadded(cp.getPadding().getTree(), JRightPadded.Location.PARENTHESES, newControlParens.getPadding().getTree()));
         return cp.withMarkers(visitMarkers(cp.getMarkers(), newControlParens.getMarkers()));
     }
 
+    @Override
     public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, Object ctx) {
         if (doWhileLoop == ctx || !(ctx instanceof J.DoWhileLoop)) {
             return doWhileLoop;
@@ -470,13 +476,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(d, newDoWhileLoop);
         if (!(temp instanceof J.DoWhileLoop)) {
             return temp;
-        } else {
-            d = (J.DoWhileLoop) temp;
         }
+        d = (J.DoWhileLoop) temp;
         d = d.getPadding().withWhileCondition(visitLeftPadded(d.getPadding().getWhileCondition(), JLeftPadded.Location.WHILE_CONDITION, newDoWhileLoop.getPadding().getWhileCondition()));
         return d.getPadding().withBody(visitRightPadded(d.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, newDoWhileLoop.getPadding().getBody()));
     }
 
+    @Override
     public J visitEmpty(J.Empty empty, Object ctx) {
         if (empty == ctx || !(ctx instanceof J.Empty)) {
             return empty;
@@ -488,18 +494,17 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(e, newEmpty);
         if (!(temp instanceof J.Empty)) {
             return temp;
-        } else {
-            e = (J.Empty) temp;
         }
+        e = (J.Empty) temp;
         Expression temp2 = (Expression) visitExpression(e, newEmpty);
         if (!(temp2 instanceof J.Empty)) {
             return temp2;
-        } else {
-            e = (J.Empty) temp2;
         }
+        e = (J.Empty) temp2;
         return e;
     }
 
+    @Override
     public J visitEnumValue(J.EnumValue enum_, Object ctx) {
         if (enum_ == ctx || !(ctx instanceof J.EnumValue)) {
             return enum_;
@@ -513,6 +518,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return e.withInitializer(visitAndCast(e.getInitializer(), newEnum.getInitializer()));
     }
 
+    @Override
     public J visitEnumValueSet(J.EnumValueSet enums, Object ctx) {
         if (enums == ctx || !(ctx instanceof J.EnumValueSet)) {
             return enums;
@@ -524,12 +530,12 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(e, newEnums);
         if (!(temp instanceof J.EnumValueSet)) {
             return temp;
-        } else {
-            e = (J.EnumValueSet) temp;
         }
+        e = (J.EnumValueSet) temp;
         return e.getPadding().withEnums(ListUtils.map(e.getPadding().getEnums(), (index, t) -> visitRightPadded(t, JRightPadded.Location.ENUM_VALUE, newEnums.getPadding().getEnums().get(index))));
     }
 
+    @Override
     public J visitFieldAccess(J.FieldAccess fieldAccess, Object ctx) {
         if (fieldAccess == ctx || !(ctx instanceof J.FieldAccess)) {
             return fieldAccess;
@@ -542,20 +548,19 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(f, newFieldAccess);
         if (!(temp instanceof J.FieldAccess)) {
             return temp;
-        } else {
-            f = (J.FieldAccess) temp;
         }
+        f = (J.FieldAccess) temp;
         Statement tempStat = (Statement) visitStatement(f, newFieldAccess);
         if (!(tempStat instanceof J.FieldAccess)) {
             return tempStat;
-        } else {
-            f = (J.FieldAccess) tempStat;
         }
+        f = (J.FieldAccess) tempStat;
         f = f.withTarget(visitAndCast(f.getTarget(), newFieldAccess.getTarget()));
         f = f.getPadding().withName(visitLeftPadded(f.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, newFieldAccess.getPadding().getName()));
         return f.withType(visitType(f.getType(), newFieldAccess.getType()));
     }
 
+    @Override
     public J visitForEachLoop(J.ForEachLoop forLoop, Object ctx) {
         if (forLoop == ctx || !(ctx instanceof J.ForEachLoop)) {
             return forLoop;
@@ -567,13 +572,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(f, newForLoop);
         if (!(temp instanceof J.ForEachLoop)) {
             return temp;
-        } else {
-            f = (J.ForEachLoop) temp;
         }
+        f = (J.ForEachLoop) temp;
         f = f.withControl(visitAndCast(f.getControl(), newForLoop.getControl()));
         return f.getPadding().withBody(visitRightPadded(f.getPadding().getBody(), JRightPadded.Location.FOR_BODY, newForLoop.getPadding().getBody()));
     }
 
+    @Override
     public J visitForEachControl(J.ForEachLoop.Control control, Object ctx) {
         if (control == ctx || !(ctx instanceof J.ForEachLoop.Control)) {
             return control;
@@ -586,6 +591,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return c.getPadding().withIterable(visitRightPadded(c.getPadding().getIterable(), JRightPadded.Location.FOREACH_ITERABLE, newControl.getPadding().getIterable()));
     }
 
+    @Override
     public J visitForLoop(J.ForLoop forLoop, Object ctx) {
         if (forLoop == ctx || !(ctx instanceof J.ForLoop)) {
             return forLoop;
@@ -597,13 +603,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(f, newForLoop);
         if (!(temp instanceof J.ForLoop)) {
             return temp;
-        } else {
-            f = (J.ForLoop) temp;
         }
+        f = (J.ForLoop) temp;
         f = f.withControl(visitAndCast(f.getControl(), newForLoop.getControl()));
         return f.getPadding().withBody(visitRightPadded(f.getPadding().getBody(), JRightPadded.Location.FOR_BODY, newForLoop.getPadding().getBody()));
     }
 
+    @Override
     public J visitForControl(J.ForLoop.Control control, Object ctx) {
         if (control == ctx || !(ctx instanceof J.ForLoop.Control)) {
             return control;
@@ -617,6 +623,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return c.getPadding().withUpdate(ListUtils.map(c.getPadding().getUpdate(), (index, t) -> visitRightPadded(t, JRightPadded.Location.FOR_UPDATE, newControl.getPadding().getUpdate().get(index))));
     }
 
+    @Override
     public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, Object ctx) {
         if (parTree == ctx || !(ctx instanceof J.ParenthesizedTypeTree)) {
             return parTree;
@@ -632,13 +639,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         J temp = visitParentheses(t.getParenthesizedType(), newParTree.getParenthesizedType());
         if (!(temp instanceof J.Parentheses)) {
             return temp;
-        } else {
-            //noinspection unchecked
-            t = t.withParenthesizedType((J.Parentheses<TypeTree>) temp);
         }
+        //noinspection unchecked
+        t = t.withParenthesizedType((J.Parentheses<TypeTree>) temp);
         return t;
     }
 
+    @Override
     public J visitIdentifier(J.Identifier ident, Object ctx) {
         if (ident == ctx || !(ctx instanceof J.Identifier)) {
             return ident;
@@ -654,13 +661,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(i, newIdent);
         if (!(temp instanceof J.Identifier)) {
             return temp;
-        } else {
-            i = (J.Identifier) temp;
         }
+        i = (J.Identifier) temp;
         i = i.withType(visitType(i.getType(), newIdent.getType()));
         return i.withFieldType((JavaType.Variable) visitType(i.getFieldType(), newIdent.getFieldType()));
     }
 
+    @Override
     public J visitElse(J.If.Else else_, Object ctx) {
         if (else_ == ctx || !(ctx instanceof J.If.Else)) {
             return else_;
@@ -672,6 +679,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return e.getPadding().withBody(visitRightPadded(e.getPadding().getBody(), JRightPadded.Location.IF_ELSE, newElse.getPadding().getBody()));
     }
 
+    @Override
     public J visitIf(J.If iff, Object ctx) {
         if (iff == ctx || !(ctx instanceof J.If)) {
             return iff;
@@ -683,14 +691,14 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(i, newIff);
         if (!(temp instanceof J.If)) {
             return temp;
-        } else {
-            i = (J.If) temp;
         }
+        i = (J.If) temp;
         i = i.withIfCondition(visitAndCast(i.getIfCondition(), newIff.getIfCondition()));
         i = i.getPadding().withThenPart(visitRightPadded(i.getPadding().getThenPart(), JRightPadded.Location.IF_THEN, newIff.getPadding().getThenPart()));
         return i.withElsePart(visitAndCast(i.getElsePart(), newIff.getElsePart()));
     }
 
+    @Override
     public J visitImport(J.Import import_, Object ctx) {
         if (import_ == ctx || !(ctx instanceof J.Import)) {
             return import_;
@@ -704,6 +712,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return i.getPadding().withAlias(visitLeftPadded(i.getPadding().getAlias(), JLeftPadded.Location.IMPORT_ALIAS_PREFIX, newImport.getPadding().getAlias()));
     }
 
+    @Override
     public J visitInstanceOf(J.InstanceOf instanceOf, Object ctx) {
         if (instanceOf == ctx || !(ctx instanceof J.InstanceOf)) {
             return instanceOf;
@@ -715,15 +724,15 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(i, newInstanceOf);
         if (!(temp instanceof J.InstanceOf)) {
             return temp;
-        } else {
-            i = (J.InstanceOf) temp;
         }
+        i = (J.InstanceOf) temp;
         i = i.getPadding().withExpression(visitRightPadded(i.getPadding().getExpression(), JRightPadded.Location.INSTANCEOF, newInstanceOf.getPadding().getExpression()));
         i = i.withClazz(visitAndCast(i.getClazz(), newInstanceOf.getClazz()));
         i = i.withPattern(visitAndCast(i.getPattern(), newInstanceOf.getPattern()));
         return i.withType(visitType(i.getType(), newInstanceOf.getType()));
     }
 
+    @Override
     public J visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, Object ctx) {
         if (deconstructionPattern == ctx || !(ctx instanceof J.DeconstructionPattern)) {
             return deconstructionPattern;
@@ -738,6 +747,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
 
     }
 
+    @Override
     public J visitIntersectionType(J.IntersectionType intersectionType, Object ctx) {
         if (intersectionType == ctx || !(ctx instanceof J.IntersectionType)) {
             return intersectionType;
@@ -750,6 +760,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return i.withType(visitType(i.getType(), newIntersectionType.getType()));
     }
 
+    @Override
     public J visitLabel(J.Label label, Object ctx) {
         if (label == ctx || !(ctx instanceof J.Label)) {
             return label;
@@ -761,13 +772,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(l, newLabel);
         if (!(temp instanceof J.Label)) {
             return temp;
-        } else {
-            l = (J.Label) temp;
         }
+        l = (J.Label) temp;
         l = l.getPadding().withLabel(visitRightPadded(l.getPadding().getLabel(), JRightPadded.Location.LABEL, newLabel.getPadding().getLabel()));
         return l.withStatement(visitAndCast(l.getStatement(), newLabel.getStatement()));
     }
 
+    @Override
     public J visitLambda(J.Lambda lambda, Object ctx) {
         if (lambda == ctx || !(ctx instanceof J.Lambda)) {
             return lambda;
@@ -779,15 +790,15 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(l, newLambda);
         if (!(temp instanceof J.Lambda)) {
             return temp;
-        } else {
-            l = (J.Lambda) temp;
         }
+        l = (J.Lambda) temp;
         l = l.withParameters(visitAndCast(l.getParameters(), newLambda.getParameters()));
         l = l.withArrow(visitSpace(l.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, newLambda.getArrow()));
         l = l.withBody(visitAndCast(l.getBody(), newLambda.getBody()));
         return l.withType(visitType(l.getType(), newLambda.getType()));
     }
 
+    @Override
     public J visitLambdaParameters(J.Lambda.Parameters parameters, Object ctx) {
         if (parameters == ctx || !(ctx instanceof J.Lambda.Parameters)) {
             return parameters;
@@ -803,6 +814,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         );
     }
 
+    @Override
     public J visitLiteral(J.Literal literal, Object ctx) {
         if (literal == ctx || !(ctx instanceof J.Literal)) {
             return literal;
@@ -814,12 +826,12 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(l, newLiteral);
         if (!(temp instanceof J.Literal)) {
             return temp;
-        } else {
-            l = (J.Literal) temp;
         }
+        l = (J.Literal) temp;
         return l.withType(visitType(l.getType(), newLiteral.getType()));
     }
 
+    @Override
     public J visitMemberReference(J.MemberReference memberRef, Object ctx) {
         if (memberRef == ctx || !(ctx instanceof J.MemberReference)) {
             return memberRef;
@@ -831,9 +843,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(m, newMemberRef);
         if (!(temp instanceof J.MemberReference)) {
             return temp;
-        } else {
-            m = (J.MemberReference) temp;
         }
+        m = (J.MemberReference) temp;
         m = m.getPadding().withContaining(visitRightPadded(m.getPadding().getContaining(), JRightPadded.Location.MEMBER_REFERENCE_CONTAINING, newMemberRef.getPadding().getContaining()));
         if (m.getPadding().getTypeParameters() != null && newMemberRef.getPadding().getTypeParameters() != null) {
             m = m.getPadding().withTypeParameters(visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, newMemberRef.getPadding().getTypeParameters()));
@@ -844,6 +855,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return m.withVariableType((JavaType.Variable) visitType(m.getVariableType(), newMemberRef.getVariableType()));
     }
 
+    @Override
     public J visitMethodDeclaration(J.MethodDeclaration method, Object ctx) {
         if (method == ctx || !(ctx instanceof J.MethodDeclaration)) {
             return method;
@@ -855,9 +867,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(m, newMethod);
         if (!(temp instanceof J.MethodDeclaration)) {
             return temp;
-        } else {
-            m = (J.MethodDeclaration) temp;
         }
+        m = (J.MethodDeclaration) temp;
         m = m.withLeadingAnnotations(ListUtils.map(m.getLeadingAnnotations(), (index, a) -> visitAndCast(a, newMethod.getLeadingAnnotations().get(index))));
         m = m.withModifiers(ListUtils.map(m.getModifiers(), (index, e) -> visitAndCast(e, newMethod.getModifiers().get(index))));
         m = m.getAnnotations().withTypeParameters((J.TypeParameters) visit(m.getAnnotations().getTypeParameters(), newMethod.getAnnotations().getTypeParameters()));
@@ -880,6 +891,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return m.withMethodType((JavaType.Method) visitType(m.getMethodType(), newMethod.getMethodType()));
     }
 
+    @Override
     public J visitMethodInvocation(J.MethodInvocation method, Object ctx) {
         if (method == ctx || !(ctx instanceof J.MethodInvocation)) {
             return method;
@@ -891,17 +903,15 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(m, newMethod);
         if (!(temp instanceof J.MethodInvocation)) {
             return temp;
-        } else {
-            m = (J.MethodInvocation) temp;
         }
+        m = (J.MethodInvocation) temp;
         Expression temp2 = (Expression) visitExpression(m, newMethod);
         if (!(temp2 instanceof J.MethodInvocation)) {
             return temp2;
-        } else {
-            m = (J.MethodInvocation) temp2;
         }
+        m = (J.MethodInvocation) temp2;
         if (m.getPadding().getSelect() != null && m.getPadding().getSelect().getElement() instanceof NameTree &&
-            method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
+                method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
             //noinspection unchecked
             m = m.getPadding().withSelect(
                     (JRightPadded<Expression>) (JRightPadded<?>)
@@ -919,6 +929,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return m.withMethodType((JavaType.Method) visitType(m.getMethodType(), newMethod.getMethodType()));
     }
 
+    @Override
     public J visitModifier(J.Modifier modifer, Object ctx) {
         if (modifer == ctx || !(ctx instanceof J.Modifier)) {
             return modifer;
@@ -930,6 +941,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return m.withAnnotations(ListUtils.map(m.getAnnotations(), (index, a) -> visitAndCast(a, newModifer.getAnnotations().get(index))));
     }
 
+    @Override
     public J visitMultiCatch(J.MultiCatch multiCatch, Object ctx) {
         if (multiCatch == ctx || !(ctx instanceof J.MultiCatch)) {
             return multiCatch;
@@ -942,6 +954,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
                 visitTypeName(visitRightPadded(t, JRightPadded.Location.CATCH_ALTERNATIVE, newMultiCatch.getPadding().getAlternatives().get(index)), newMultiCatch.getPadding().getAlternatives().get(index))));
     }
 
+    @Override
     public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Object ctx) {
         if (multiVariable == ctx || !(ctx instanceof J.VariableDeclarations)) {
             return multiVariable;
@@ -953,9 +966,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(m, newMultiVariable);
         if (!(temp instanceof J.VariableDeclarations)) {
             return temp;
-        } else {
-            m = (J.VariableDeclarations) temp;
         }
+        m = (J.VariableDeclarations) temp;
         m = m.withLeadingAnnotations(ListUtils.map(m.getLeadingAnnotations(), (index, a) -> visitAndCast(a, newMultiVariable.getLeadingAnnotations().get(index))));
         m = m.withModifiers(Objects.requireNonNull(ListUtils.map(m.getModifiers(), (index, e) -> visitAndCast(e, newMultiVariable.getModifiers().get(index)))));
         m = m.withTypeExpression(visitAndCast(m.getTypeExpression(), newMultiVariable.getTypeExpression()));
@@ -968,6 +980,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return m.getPadding().withVariables(ListUtils.map(m.getPadding().getVariables(), (index, t) -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, newMultiVariable.getPadding().getVariables().get(index))));
     }
 
+    @Override
     public J visitNewArray(J.NewArray newArray, Object ctx) {
         if (newArray == ctx || !(ctx instanceof J.NewArray)) {
             return newArray;
@@ -979,9 +992,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(n, newNewArray);
         if (!(temp instanceof J.NewArray)) {
             return temp;
-        } else {
-            n = (J.NewArray) temp;
         }
+        n = (J.NewArray) temp;
         n = n.withTypeExpression(visitAndCast(n.getTypeExpression(), newNewArray.getTypeExpression()));
         n = n.withTypeExpression(n.getTypeExpression() == null ?
                 null :
@@ -993,6 +1005,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return n.withType(visitType(n.getType(), newNewArray.getType()));
     }
 
+    @Override
     public J visitNewClass(J.NewClass newClass, Object ctx) {
         if (newClass == ctx || !(ctx instanceof J.NewClass)) {
             return newClass;
@@ -1007,15 +1020,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(n, newNewClass);
         if (!(temp instanceof J.NewClass)) {
             return temp;
-        } else {
-            n = (J.NewClass) temp;
         }
+        n = (J.NewClass) temp;
         Expression temp2 = (Expression) visitExpression(n, newNewClass);
         if (!(temp2 instanceof J.NewClass)) {
             return temp2;
-        } else {
-            n = (J.NewClass) temp2;
         }
+        n = (J.NewClass) temp2;
         n = n.withNew(visitSpace(n.getNew(), Space.Location.NEW_PREFIX, newNewClass.getNew()));
         n = n.withClazz(visitAndCast(n.getClazz(), newNewClass.getClazz()));
         n = n.withClazz(n.getClazz() == null ? null : visitTypeName(n.getClazz(), newNewClass.getClazz()));
@@ -1024,6 +1035,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return n.withConstructorType((JavaType.Method) visitType(n.getConstructorType(), newNewClass.getConstructorType()));
     }
 
+    @Override
     public J visitNullableType(J.NullableType nullableType, Object ctx) {
         if (nullableType == ctx || !(ctx instanceof J.NullableType)) {
             return nullableType;
@@ -1037,14 +1049,14 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(nt, newNullableType);
         if (!(temp instanceof J.NullableType)) {
             return temp;
-        } else {
-            nt = (J.NullableType) temp;
         }
+        nt = (J.NullableType) temp;
 
         nt = nt.getPadding().withTypeTree(visitRightPadded(nt.getPadding().getTypeTree(), JRightPadded.Location.NULLABLE, newNullableType.getPadding().getTypeTree()));
         return nt.withType(visitType(nt.getType(), newNullableType.getType()));
     }
 
+    @Override
     public J visitPackage(J.Package pkg, Object ctx) {
         if (pkg == ctx || !(ctx instanceof J.Package)) {
             return pkg;
@@ -1057,6 +1069,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return pa.withAnnotations(ListUtils.map(pa.getAnnotations(), (index, a) -> visitAndCast(a, newPkg.getAnnotations().get(index))));
     }
 
+    @Override
     public J visitParameterizedType(J.ParameterizedType type, Object ctx) {
         if (type == ctx || !(ctx instanceof J.ParameterizedType)) {
             return type;
@@ -1068,9 +1081,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(pt, newType);
         if (!(temp instanceof J.ParameterizedType)) {
             return temp;
-        } else {
-            pt = (J.ParameterizedType) temp;
         }
+        pt = (J.ParameterizedType) temp;
         pt = pt.withClazz(visitAndCast(pt.getClazz(), newType.getClazz()));
         if (pt.getPadding().getTypeParameters() != null) {
             pt = pt.getPadding().withTypeParameters(visitContainer(pt.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, newType.getPadding().getTypeParameters()));
@@ -1079,6 +1091,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return pt.withType(visitType(pt.getType(), newType.getType()));
     }
 
+    @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, Object ctx) {
         J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
         if (parens == newParens) {
@@ -1090,13 +1103,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(pa, newParens);
         if (!(temp instanceof J.Parentheses)) {
             return temp;
-        } else {
-            //noinspection unchecked
-            pa = (J.Parentheses<T>) temp;
         }
+        //noinspection unchecked
+        pa = (J.Parentheses<T>) temp;
         return pa.getPadding().withTree(visitRightPadded(pa.getPadding().getTree(), JRightPadded.Location.PARENTHESES, newParens.getPadding().getTree()));
     }
 
+    @Override
     public J visitPrimitive(J.Primitive primitive, Object ctx) {
         if (primitive == ctx || !(ctx instanceof J.Primitive)) {
             return primitive;
@@ -1108,12 +1121,12 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(pr, newPrimitive);
         if (!(temp instanceof J.Primitive)) {
             return temp;
-        } else {
-            pr = (J.Primitive) temp;
         }
+        pr = (J.Primitive) temp;
         return pr.withType(visitType(pr.getType(), newPrimitive.getType()));
     }
 
+    @Override
     public J visitReturn(J.Return return_, Object ctx) {
         if (return_ == ctx || !(ctx instanceof J.Return)) {
             return return_;
@@ -1125,12 +1138,12 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(r, newReturn);
         if (!(temp instanceof J.Return)) {
             return temp;
-        } else {
-            r = (J.Return) temp;
         }
+        r = (J.Return) temp;
         return r.withExpression(visitAndCast(r.getExpression(), newReturn.getExpression()));
     }
 
+    @Override
     public J visitSwitch(J.Switch switch_, Object ctx) {
         if (switch_ == ctx || !(ctx instanceof J.Switch)) {
             return switch_;
@@ -1142,13 +1155,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(s, newSwitch);
         if (!(temp instanceof J.Switch)) {
             return temp;
-        } else {
-            s = (J.Switch) temp;
         }
+        s = (J.Switch) temp;
         s = s.withSelector(visitAndCast(s.getSelector(), newSwitch.getSelector()));
         return s.withCases(visitAndCast(s.getCases(), newSwitch.getCases()));
     }
 
+    @Override
     public J visitSwitchExpression(J.SwitchExpression switch_, Object ctx) {
         if (switch_ == ctx || !(ctx instanceof J.SwitchExpression)) {
             return switch_;
@@ -1160,13 +1173,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(s, newSwitch);
         if (!(temp instanceof J.SwitchExpression)) {
             return temp;
-        } else {
-            s = (J.SwitchExpression) temp;
         }
+        s = (J.SwitchExpression) temp;
         s = s.withSelector(visitAndCast(s.getSelector(), newSwitch.getSelector()));
         return s.withCases(visitAndCast(s.getCases(), newSwitch.getCases()));
     }
 
+    @Override
     public J visitSynchronized(J.Synchronized synch, Object ctx) {
         if (synch == ctx || !(ctx instanceof J.Synchronized)) {
             return synch;
@@ -1178,13 +1191,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(s, newSynch);
         if (!(temp instanceof J.Synchronized)) {
             return temp;
-        } else {
-            s = (J.Synchronized) temp;
         }
+        s = (J.Synchronized) temp;
         s = s.withLock(visitAndCast(s.getLock(), newSynch.getLock()));
         return s.withBody(visitAndCast(s.getBody(), newSynch.getBody()));
     }
 
+    @Override
     public J visitTernary(J.Ternary ternary, Object ctx) {
         if (ternary == ctx || !(ctx instanceof J.Ternary)) {
             return ternary;
@@ -1196,21 +1209,20 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(t, newTernary);
         if (!(temp instanceof J.Ternary)) {
             return temp;
-        } else {
-            t = (J.Ternary) temp;
         }
+        t = (J.Ternary) temp;
         Statement tempStat = (Statement) visitStatement(t, newTernary);
         if (!(tempStat instanceof J.Ternary)) {
             return tempStat;
-        } else {
-            t = (J.Ternary) tempStat;
         }
+        t = (J.Ternary) tempStat;
         t = t.withCondition(visitAndCast(t.getCondition(), newTernary.getCondition()));
         t = t.getPadding().withTruePart(visitLeftPadded(t.getPadding().getTruePart(), JLeftPadded.Location.TERNARY_TRUE, newTernary.getPadding().getTruePart()));
         t = t.getPadding().withFalsePart(visitLeftPadded(t.getPadding().getFalsePart(), JLeftPadded.Location.TERNARY_FALSE, newTernary.getPadding().getFalsePart()));
         return t.withType(visitType(t.getType(), newTernary.getType()));
     }
 
+    @Override
     public J visitThrow(J.Throw thrown, Object ctx) {
         if (thrown == ctx || !(ctx instanceof J.Throw)) {
             return thrown;
@@ -1222,12 +1234,12 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(t, newThrown);
         if (!(temp instanceof J.Throw)) {
             return temp;
-        } else {
-            t = (J.Throw) temp;
         }
+        t = (J.Throw) temp;
         return t.withException(visitAndCast(t.getException(), newThrown.getException()));
     }
 
+    @Override
     public J visitTry(J.Try tryable, Object ctx) {
         if (tryable == ctx || !(ctx instanceof J.Try)) {
             return tryable;
@@ -1239,9 +1251,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(t, newTryable);
         if (!(temp instanceof J.Try)) {
             return temp;
-        } else {
-            t = (J.Try) temp;
         }
+        t = (J.Try) temp;
         if (t.getPadding().getResources() != null) {
             t = t.getPadding().withResources(visitContainer(t.getPadding().getResources(), JContainer.Location.TRY_RESOURCES, newTryable.getPadding().getResources()));
         }
@@ -1253,6 +1264,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return t;
     }
 
+    @Override
     public J visitTryResource(J.Try.Resource tryResource, Object ctx) {
         if (tryResource == ctx || !(ctx instanceof J.Try.Resource)) {
             return tryResource;
@@ -1264,6 +1276,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return r.withVariableDeclarations(visitAndCast(r.getVariableDeclarations(), newTryResource.getVariableDeclarations()));
     }
 
+    @Override
     public J visitTypeCast(J.TypeCast typeCast, Object ctx) {
         if (typeCast == ctx || !(ctx instanceof J.TypeCast)) {
             return typeCast;
@@ -1275,14 +1288,14 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(t, newTypeCast);
         if (!(temp instanceof J.TypeCast)) {
             return temp;
-        } else {
-            t = (J.TypeCast) temp;
         }
+        t = (J.TypeCast) temp;
         t = t.withClazz(visitAndCast(t.getClazz(), newTypeCast.getClazz()));
         t = t.withClazz(t.getClazz().withTree(visitTypeName(t.getClazz().getTree(), newTypeCast.getClazz().getTree())));
         return t.withExpression(visitAndCast(t.getExpression(), newTypeCast.getExpression()));
     }
 
+    @Override
     public J visitTypeParameter(J.TypeParameter typeParam, Object ctx) {
         if (typeParam == ctx || !(ctx instanceof J.TypeParameter)) {
             return typeParam;
@@ -1307,6 +1320,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return t.getPadding().withBounds(visitTypeNames(t.getPadding().getBounds(), newTypeParam.getPadding().getBounds()));
     }
 
+    @Override
     public J visitTypeParameters(J.TypeParameters typeParameters, Object ctx) {
         if (typeParameters == ctx || !(ctx instanceof J.TypeParameters)) {
             return typeParameters;
@@ -1323,6 +1337,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         );
     }
 
+    @Override
     public J visitUnary(J.Unary unary, Object ctx) {
         if (unary == ctx || !(ctx instanceof J.Unary)) {
             return unary;
@@ -1334,20 +1349,19 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(u, newUnary);
         if (!(temp instanceof J.Unary)) {
             return temp;
-        } else {
-            u = (J.Unary) temp;
         }
+        u = (J.Unary) temp;
         Expression temp2 = (Expression) visitExpression(u, newUnary);
         if (!(temp2 instanceof J.Unary)) {
             return temp2;
-        } else {
-            u = (J.Unary) temp2;
         }
+        u = (J.Unary) temp2;
         u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.UNARY_OPERATOR, newUnary.getPadding().getOperator()));
         u = u.withExpression(visitAndCast(u.getExpression(), newUnary.getExpression()));
         return u.withType(visitType(u.getType(), newUnary.getType()));
     }
 
+    @Override
     public J visitUnknown(J.Unknown unknown, Object ctx) {
         if (unknown == ctx || !(ctx instanceof J.Unknown)) {
             return unknown;
@@ -1359,6 +1373,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return u.withSource(visitAndCast(u.getSource(), newUnknown.getSource()));
     }
 
+    @Override
     public J visitUnknownSource(J.Unknown.Source source, Object ctx) {
         if (source == ctx || !(ctx instanceof J.Unknown.Source)) {
             return source;
@@ -1369,6 +1384,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return s.withMarkers(visitMarkers(s.getMarkers(), newSource.getMarkers()));
     }
 
+    @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, Object ctx) {
         if (variable == ctx || !(ctx instanceof J.VariableDeclarations.NamedVariable)) {
             return variable;
@@ -1391,6 +1407,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return v.withVariableType((JavaType.Variable) visitType(v.getVariableType(), newVariable.getVariableType()));
     }
 
+    @Override
     public J visitWhileLoop(J.WhileLoop whileLoop, Object ctx) {
         if (whileLoop == ctx || !(ctx instanceof J.WhileLoop)) {
             return whileLoop;
@@ -1402,13 +1419,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(w, newWhileLoop);
         if (!(temp instanceof J.WhileLoop)) {
             return temp;
-        } else {
-            w = (J.WhileLoop) temp;
         }
+        w = (J.WhileLoop) temp;
         w = w.withCondition(visitAndCast(w.getCondition(), newWhileLoop.getCondition()));
         return w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, newWhileLoop.getPadding().getBody()));
     }
 
+    @Override
     public J visitWildcard(J.Wildcard wildcard, Object ctx) {
         if (wildcard == ctx || !(ctx instanceof J.Wildcard)) {
             return wildcard;
@@ -1420,9 +1437,8 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Expression temp = (Expression) visitExpression(w, newWildcard);
         if (!(temp instanceof J.Wildcard)) {
             return temp;
-        } else {
-            w = (J.Wildcard) temp;
         }
+        w = (J.Wildcard) temp;
         w = w.getPadding().withBound(visitLeftPadded(w.getPadding().getBound(), JLeftPadded.Location.WILDCARD_BOUND, newWildcard.getPadding().getBound()));
         w = w.withBoundedType(visitAndCast(w.getBoundedType(), newWildcard.getBoundedType()));
         if (w.getBoundedType() != null) {
@@ -1432,6 +1448,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return w;
     }
 
+    @Override
     public J visitYield(J.Yield yield, Object ctx) {
         if (yield == ctx || !(ctx instanceof J.Yield)) {
             return yield;
@@ -1443,12 +1460,12 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Statement temp = (Statement) visitStatement(y, newYield);
         if (!(temp instanceof J.Yield)) {
             return temp;
-        } else {
-            y = (J.Yield) temp;
         }
+        y = (J.Yield) temp;
         return y.withValue(visitAndCast(y.getValue(), newYield.getValue()));
     }
 
+    @Override
     public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, Object ctx) {
         JRightPadded<T> newRight = (JRightPadded<T>) ctx;
         if (right == newRight) {
@@ -1479,6 +1496,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
                 right : new JRightPadded<>(t, after, markers);
     }
 
+    @Override
     public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, Object ctx) {
         JLeftPadded<T> newLeft = (JLeftPadded<T>) ctx;
         if (left == newLeft) {
@@ -1509,6 +1527,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         return t == null ? null : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
+    @Override
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
                                                                   JContainer.Location loc, Object ctx) {
         JContainer<J2> newContainer = (JContainer<J2>) ctx;
@@ -1531,6 +1550,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
                 JContainer.build(before, js, container.getMarkers());
     }
 
+    @Override
     public J visitErroneous(J.Erroneous erroneous, Object ctx) {
         if (erroneous == ctx || !(ctx instanceof J.Erroneous)) {
             return erroneous;
