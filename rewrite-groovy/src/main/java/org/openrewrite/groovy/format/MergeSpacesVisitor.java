@@ -210,7 +210,7 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
         if (space.getComments().isEmpty() || space.getComments().size() != newSpace.getComments().size()) {
             return space;
         }
-        return space.withComments(ListUtils.map(space.getComments(), (index, comment) -> comment.withSuffix(newSpace.getComments().get(index).getSuffix())));
+        return space.withComments(ListUtils.map(space.getComments(), (index, comment) -> newSpace.getComments().get(index)));
     }
 
     @Override

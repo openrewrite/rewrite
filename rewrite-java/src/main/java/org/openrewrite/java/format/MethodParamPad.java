@@ -24,7 +24,9 @@ import org.openrewrite.java.style.MethodParamPadStyle;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import static java.util.Objects.requireNonNull;
 
@@ -62,7 +64,16 @@ public class MethodParamPad extends Recipe {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
                 spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
-                methodParamPadStyle = Style.from(MethodParamPadStyle.class, cu, Checkstyle::methodParamPadStyle);
+                methodParamPadStyle = StyleHelper.getStyle(MethodParamPadStyle.class, cu.getMarkers().findAll(NamedStyles.class));
+                if (methodParamPadStyle != null) {
+                    spacesStyle = spacesStyle.withBeforeParentheses(
+                            spacesStyle.getBeforeParentheses()
+                                    .withMethodDeclaration(methodParamPadStyle.getSpace())
+                                    .withMethodCall(methodParamPadStyle.getSpace())
+                    );
+                } else {
+                    methodParamPadStyle = Checkstyle.methodParamPadStyle();
+                }
 
                 return super.visit(cu, ctx);
             }

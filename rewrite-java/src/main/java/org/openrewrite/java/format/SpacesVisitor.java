@@ -106,7 +106,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     before = evaluate(() -> spacesStyle.getWithin().getIfParentheses(), false) ? " " : "";
                 } else if (parent instanceof J.WhileLoop || parent instanceof J.DoWhileLoop) {
                     before = evaluate(() -> spacesStyle.getWithin().getWhileParentheses(), false) ? " " : "";
-                } else if (parent instanceof J.Switch) {
+                } else if (parent instanceof J.Switch || parent instanceof J.SwitchExpression) {
                     before = evaluate(() -> spacesStyle.getWithin().getSwitchParentheses(), false) ? " " : "";
                 } else if (parent instanceof J.Try.Catch) {
                     before = evaluate(() -> spacesStyle.getWithin().getCatchParentheses(), false) ? " " : "";
@@ -118,8 +118,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     before = evaluate(() -> spacesStyle.getWithin().getBrackets(), false) ? " " : "";
                 } else if (parent instanceof J.NewArray) {
                     before = evaluate(() -> spacesStyle.getWithin().getBrackets(), false) ? " " : "";
-                } else if (((J.Parentheses<?>) getCursor().getValue()).getTree() instanceof J.Binary) {
+                } else if (getCursor().getValue() instanceof J.Parentheses && ((J.Parentheses<?>) getCursor().getValue()).getTree() instanceof J.Binary) {
                     before = evaluate(() -> spacesStyle.getWithin().getGroupingParentheses(), false) ? " " : "";
+                } else {
+                    break;
                 }
                 after = before;
                 break;
@@ -631,6 +633,12 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.Lambda visitLambda(J.Lambda lambda, P p) {
+        String afterArrow = evaluate(() -> spacesStyle.getAroundOperators().getLambdaArrow(), true) ? " " : "";
+        return super.visitLambda(lambda.withBody(minimized(lambda.getBody(), afterArrow)), p);
+    }
+
+    @Override
     public J.Unary visitUnary(J.Unary unary, P p) {
         switch (unary.getOperator()) {
             case PreIncrement:
@@ -710,6 +718,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private <T extends Expression> T minimized(T j, String whitespace) {
+        return j.withPrefix(minimizedSkipComments(j.getPrefix(), whitespace));
+    }
+
+    private J minimized(J j, String whitespace) {
         return j.withPrefix(minimizedSkipComments(j.getPrefix(), whitespace));
     }
 
