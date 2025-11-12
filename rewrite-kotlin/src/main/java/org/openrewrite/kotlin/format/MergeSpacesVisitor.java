@@ -1049,13 +1049,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         if (!(temp instanceof J.Empty)) {
             return temp;
         }
-        e = (J.Empty) temp;
-        Expression temp2 = (Expression) visitExpression(e, newEmpty);
-        if (!(temp2 instanceof J.Empty)) {
-            return temp2;
-        }
-        e = (J.Empty) temp2;
-        return e;
+        return visitExpression((J.Empty) temp, newEmpty);
     }
 
     @Override
@@ -1195,8 +1189,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             return temp;
         }
         //noinspection unchecked
-        t = t.withParenthesizedType((J.Parentheses<TypeTree>) temp);
-        return t;
+        return t.withParenthesizedType((J.Parentheses<TypeTree>) temp);
     }
 
     @Override
