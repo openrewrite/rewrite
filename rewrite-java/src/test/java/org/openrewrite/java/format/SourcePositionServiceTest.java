@@ -563,6 +563,6 @@ class SourcePositionServiceTest implements RewriteTest {
 
     private static  <T extends J> T minimize(T tree) {
         tree = (T) new MinimumViableSpacingVisitor<>(null).visit(tree, -1);
-        return (T) new SpacesVisitor<>(IntelliJ.spaces(), null).visit(tree, -1);
+        return (T) new SpacesVisitor<>(IntelliJ.spaces(), true, null).visit(tree, -1);
     }
 }

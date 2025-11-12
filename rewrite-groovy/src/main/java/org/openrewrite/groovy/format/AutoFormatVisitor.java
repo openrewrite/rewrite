@@ -47,10 +47,10 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
         t = new BlankLinesVisitor<>(cu, stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new WrappingAndBracesVisitor<>(cu, stopAfter)
+        t = new SpacesVisitor<>(cu, false, stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new SpacesVisitor<>(cu, false, stopAfter)
+        t = new WrappingAndBracesVisitor<>(cu, stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new NormalizeTabsOrSpacesVisitor<>(cu, stopAfter)
