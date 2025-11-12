@@ -147,6 +147,29 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.Case visitCase(J.Case case_, P p) {
+        case_ = super.visitCase(case_, p);
+        case_ = case_.withStatements(ListUtils.mapFirst(case_.getStatements(), statement -> {
+            if (!(statement instanceof J.Block)) {
+                if (statement.getComments().isEmpty()) {
+                    if (!hasLineBreak(statement.getPrefix().getWhitespace())) {
+                        statement = statement.withPrefix(statement.getPrefix().withWhitespace("\n"));
+                    }
+                } else {
+                    statement = statement.withComments(ListUtils.mapLast(statement.getComments(), comment -> {
+                        if (comment != null && !hasLineBreak(comment.getSuffix())) {
+                            comment = comment.withSuffix("\n");
+                        }
+                        return comment;
+                    }));
+                }
+            }
+            return statement;
+        }));
+        return case_;
+    }
+
+    @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         method = (J.MethodInvocation) new WrapMethodChains<>(style).visit(method, p, getCursor().getParentTreeCursor());
         method = super.visitMethodInvocation(method, p);

@@ -413,6 +413,85 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
+    @Test
+    void retainTrailingCommentsInIf() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  void test() {
+                      int i;
+                      if (1 < 3) { /* multiline comment */
+                          i = 1;
+                      }
+                      if (1 < 3) /* multiline comment */
+                          i = 1;
+                      if (1 < 3) /* multiline comment */ i = 1;
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void test() {
+                      int i;
+                      if (1 < 3) { /* multiline comment */
+                          i = 1;
+                      }
+                      if (1 < 3) /* multiline comment */ i = 1;
+                      if (1 < 3) /* multiline comment */ i = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainTrailingCommentsInSwitchCase() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  int test(int i) {
+                      switch (i) {
+                          case 1: /* multiline comment */ return 1;
+                          case 2: /* multiline comment */
+                              return 2;
+                          case 3: /* multiline comment */
+                          case 4:
+                              return -1;
+                          case 5: /* multiline comment */
+                          case 6: /* multiline comment */ return -2;
+                          default:
+                              return 0;
+                      }
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  int test(int i) {
+                      switch (i) {
+                          case 1: /* multiline comment */
+                              return 1;
+                          case 2: /* multiline comment */
+                              return 2;
+                          case 3: /* multiline comment */
+                          case 4:
+                              return -1;
+                          case 5: /* multiline comment */
+                          case 6: /* multiline comment */
+                              return -2;
+                          default:
+                              return 0;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3191")
     @Test
     void emptyLineBeforeEnumConstants() {

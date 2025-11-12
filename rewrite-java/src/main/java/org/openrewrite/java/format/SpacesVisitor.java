@@ -743,10 +743,18 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         //IntelliJ only formats last comments suffix.
         return minimizedSkipComments(space, whitespace).withComments(
                 ListUtils.mapLast(space.getComments(), comment -> {
-                    if (comment != null && comment.isMultiline()) {
-                        if (removeCustomLineBreaks || !StringUtils.hasLineBreak(comment.getSuffix())) {
-                            return comment.withSuffix(whitespace);
+                    if (!StringUtils.hasLineBreak(comment.getSuffix())) {
+                        return comment.withSuffix(whitespace);
+                    }
+                    if (removeCustomLineBreaks) {
+                        if (comment.isMultiline()) {
+                            Object parent = getCursor().getParentTreeCursor().getValue();
+                            if (!(parent instanceof J.Block || parent instanceof J.Case)) {
+                                return comment.withSuffix(whitespace);
+                            }
                         }
+                        //Reduce to single new line
+                        return comment.withSuffix(comment.getSuffix().substring(comment.getSuffix().lastIndexOf('\n')));
                     }
                     return comment;
                 })

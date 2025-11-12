@@ -210,7 +210,22 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
         if (space.getComments().isEmpty() || space.getComments().size() != newSpace.getComments().size()) {
             return space;
         }
-        return space.withComments(ListUtils.map(space.getComments(), (index, comment) -> newSpace.getComments().get(index)));
+        return space.withComments(ListUtils.map(space.getComments(), (index, comment) -> {
+            if (comment instanceof Javadoc.DocComment) {
+                Javadoc.DocComment docComment = (Javadoc.DocComment) comment;
+                if (!(newSpace.getComments().get(index) instanceof Javadoc.DocComment)) {
+                    return docComment;
+                }
+                Javadoc.DocComment replaceWith = (Javadoc.DocComment) newSpace.getComments().get(index);
+                return docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
+                    if(!(jdoc instanceof Javadoc.LineBreak && replaceWith.getBody().get(i) instanceof Javadoc.LineBreak)) {
+                        return jdoc;
+                    }
+                    return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin());
+                }));
+            }
+            return comment.withSuffix(newSpace.getComments().get(index).getSuffix());
+        }));
     }
 
     @Override
