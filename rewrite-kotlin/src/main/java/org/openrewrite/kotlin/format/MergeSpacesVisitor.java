@@ -55,6 +55,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, newCu.getEof()));
     }
 
+    @Override
     public J visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, Object ctx) {
         if (annotatedExpression == ctx || !(ctx instanceof K.AnnotatedExpression)) {
             return annotatedExpression;
@@ -73,6 +74,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return ae;
     }
 
+    @Override
     public J visitAnnotationType(K.AnnotationType annotationType, Object ctx) {
         if (annotationType == ctx || !(ctx instanceof K.AnnotationType)) {
             return annotationType;
@@ -86,6 +88,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return a.withCallee(visitAndCast(a.getCallee(), newAnnotationType.getCallee()));
     }
 
+    @Override
     public J visitBinary(K.Binary binary, Object ctx) {
         if (binary == ctx || !(ctx instanceof K.Binary)) {
             return binary;
@@ -107,6 +110,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return b.withType(visitType(b.getType(), newBinary.getType()));
     }
 
+    @Override
     public J visitClassDeclaration(K.ClassDeclaration classDeclaration, Object ctx) {
         if (classDeclaration == ctx || !(ctx instanceof K.ClassDeclaration)) {
             return classDeclaration;
@@ -119,6 +123,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return c.withTypeConstraints(visitAndCast(c.getTypeConstraints(), newClassDeclaration.getTypeConstraints()));
     }
 
+    @Override
     public J visitConstructor(K.Constructor constructor, Object ctx) {
         if (constructor == ctx || !(ctx instanceof K.Constructor)) {
             return constructor;
@@ -131,6 +136,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return c.getPadding().withInvocation(visitLeftPadded(c.getPadding().getInvocation(), newConstructor.getPadding().getInvocation()));
     }
 
+    @Override
     public J visitConstructorInvocation(K.ConstructorInvocation constructorInvocation, Object ctx) {
         if (constructorInvocation == ctx || !(ctx instanceof K.ConstructorInvocation)) {
             return constructorInvocation;
@@ -144,6 +150,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return d.getPadding().withArguments(visitContainer(d.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, newConstructorInvocation.getPadding().getArguments()));
     }
 
+    @Override
     public J visitDelegatedSuperType(K.DelegatedSuperType delegatedSuperType, Object ctx) {
         if (delegatedSuperType == ctx || !(ctx instanceof K.DelegatedSuperType)) {
             return delegatedSuperType;
@@ -157,6 +164,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return d.withDelegate(visitAndCast(d.getDelegate(), newDelegatedSuperType.getDelegate()));
     }
 
+    @Override
     public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, Object ctx) {
         if (destructuringDeclaration == ctx || !(ctx instanceof K.DestructuringDeclaration)) {
             return destructuringDeclaration;
@@ -176,6 +184,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return d.getPadding().withDestructAssignments(visitContainer(d.getPadding().getDestructAssignments(), KContainer.Location.DESTRUCT_ASSIGNMENTS, newDestructuringDeclaration.getPadding().getDestructAssignments()));
     }
 
+    @Override
     public J visitFunctionType(K.FunctionType functionType, Object ctx) {
         if (functionType == ctx || !(ctx instanceof K.FunctionType)) {
             return functionType;
@@ -194,6 +203,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return f.withReturnType(visitRightPadded(f.getReturnType(), newFunctionType.getReturnType()));
     }
 
+    @Override
     public J visitFunctionTypeParameter(K.FunctionType.Parameter parameter, Object ctx) {
         if (parameter == ctx || !(ctx instanceof K.FunctionType.Parameter)) {
             return parameter;
@@ -208,6 +218,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return pa.withParameterType(visitAndCast(pa.getParameterType(), newParameter.getParameterType()));
     }
 
+    @Override
     public J visitListLiteral(K.ListLiteral listLiteral, Object ctx) {
         if (listLiteral == ctx || !(ctx instanceof K.ListLiteral)) {
             return listLiteral;
@@ -227,6 +238,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return l.withType(visitType(l.getType(), newListLiteral.getType()));
     }
 
+    @Override
     public J visitMethodDeclaration(K.MethodDeclaration methodDeclaration, Object ctx) {
         if (methodDeclaration == ctx || !(ctx instanceof K.MethodDeclaration)) {
             return methodDeclaration;
@@ -239,6 +251,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return m.withTypeConstraints(visitAndCast(m.getTypeConstraints(), newMethodDeclaration.getTypeConstraints()));
     }
 
+    @Override
     public J visitMultiAnnotationType(K.MultiAnnotationType multiAnnotationType, Object ctx) {
         if (multiAnnotationType == ctx || !(ctx instanceof K.MultiAnnotationType)) {
             return multiAnnotationType;
@@ -274,6 +287,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return pr.withAccessors(visitContainer(pr.getAccessors(), newProperty.getAccessors()));
     }
 
+    @Override
     public J visitReturn(K.Return return_, Object ctx) {
         if (return_ == ctx || !(ctx instanceof K.Return)) {
             return return_;
@@ -299,6 +313,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return r.withLabel(visitAndCast(r.getLabel(), newReturn_.getLabel()));
     }
 
+    @Override
     public J visitSpreadArgument(K.SpreadArgument spreadArgument, Object ctx) {
         if (spreadArgument == ctx || !(ctx instanceof K.SpreadArgument)) {
             return spreadArgument;
@@ -317,6 +332,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return s.withExpression(visitAndCast(s.getExpression(), newSpreadArgument.getExpression()));
     }
 
+    @Override
     public J visitStringTemplate(K.StringTemplate stringTemplate, Object ctx) {
         if (stringTemplate == ctx || !(ctx instanceof K.StringTemplate)) {
             return stringTemplate;
@@ -336,6 +352,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return k.withType(visitType(k.getType(), newStringTemplate.getType()));
     }
 
+    @Override
     public J visitStringTemplateExpression(K.StringTemplate.Expression expression, Object ctx) {
         if (expression == ctx || !(ctx instanceof K.StringTemplate.Expression)) {
             return expression;
@@ -349,6 +366,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return v.withAfter(visitSpace(v.getAfter(), KSpace.Location.STRING_TEMPLATE_EXPRESSION_AFTER, newExpression.getAfter()));
     }
 
+    @Override
     public J visitThis(K.This aThis, Object ctx) {
         if (aThis == ctx || !(ctx instanceof K.This)) {
             return aThis;
@@ -367,6 +385,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return k.withType(visitType(k.getType(), newAThis.getType()));
     }
 
+    @Override
     public J visitTypeAlias(K.TypeAlias typeAlias, Object ctx) {
         if (typeAlias == ctx || !(ctx instanceof K.TypeAlias)) {
             return typeAlias;
@@ -396,6 +415,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return t.withType(visitType(t.getType(), newTypeAlias.getType()));
     }
 
+    @Override
     public J visitTypeConstraints(K.TypeConstraints typeConstraints, Object ctx) {
         if (typeConstraints == ctx || !(ctx instanceof K.TypeConstraints)) {
             return typeConstraints;
@@ -408,6 +428,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return t.getPadding().withConstraints(visitContainer(t.getPadding().getConstraints(), newTypeConstraints.getPadding().getConstraints()));
     }
 
+    @Override
     public J visitUnary(K.Unary unary, Object ctx) {
         if (unary == ctx || !(ctx instanceof K.Unary)) {
             return unary;
@@ -434,6 +455,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return u.withType(visitType(u.getType(), newUnary.getType()));
     }
 
+    @Override
     public J visitWhen(K.When when, Object ctx) {
         if (when == ctx || !(ctx instanceof K.When)) {
             return when;
@@ -454,6 +476,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return w.withType(visitType(w.getType(), newWhen.getType()));
     }
 
+    @Override
     public J visitWhenBranch(K.WhenBranch whenBranch, Object ctx) {
         if (whenBranch == ctx || !(ctx instanceof K.WhenBranch)) {
             return whenBranch;
@@ -473,6 +496,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, newWhenBranch.getPadding().getBody()));
     }
 
+    @Override
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, Object ctx) {
         if (right == ctx || !(ctx instanceof JRightPadded)) {
             return right;
@@ -482,6 +506,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, newRight);
     }
 
+    @Override
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, Object ctx) {
         if (left == ctx || !(ctx instanceof JLeftPadded)) {
             return left;
@@ -491,10 +516,12 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return super.visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, newLeft);
     }
 
+    @Override
     public Space visitSpace(Space space, KSpace.Location loc, Object ctx) {
         return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, ctx);
     }
 
+    @Override
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, Object ctx) {
         if (container == ctx || !(ctx instanceof JContainer)) {
             return container;
@@ -504,6 +531,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, newContainer);
     }
 
+    @Override
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
                                                                   KContainer.Location loc, Object ctx) {
         if (container == ctx || !(ctx instanceof JContainer)) {
@@ -527,6 +555,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
                 JContainer.build(before, js, container.getMarkers());
     }
 
+    @Override
     public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, KLeftPadded.Location loc, Object ctx) {
         if (left == ctx || !(ctx instanceof JLeftPadded)) {
             return left;
@@ -561,6 +590,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
+    @Override
     public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, Object ctx) {
         if (right == ctx || !(ctx instanceof JRightPadded)) {
             return right;
