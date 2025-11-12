@@ -254,11 +254,6 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 after = "";
                 break;
             case CASE_LABEL:
-                if (!removeCustomLineBreaks && hasLineBreakInSpace(right.getAfter())) {
-                    after = right.getAfter().getWhitespace();
-                    break;
-                }
-                after = " ";
                 break;
             default:
                 if (hasLineBreakInSpace(right.getAfter())) {
