@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,30 +13,596 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.format;
+package org.openrewrite.kotlin.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.marker.TypeReferencePrefix;
+import org.openrewrite.kotlin.tree.*;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
 import java.util.Objects;
 
-@SuppressWarnings({"unused", "unchecked"})
-public class MergeSpacesVisitor extends JavaVisitor<Object> {
+/**
+ * Visit K types.
+ */
+public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, Object ctx) {
-        return sourceFile instanceof JavaSourceFile;
+    public J visitCompilationUnit(K.CompilationUnit cu, Object ctx) {
+        if (cu == ctx || !(ctx instanceof K.CompilationUnit)) {
+            return cu;
+        }
+
+        K.CompilationUnit newCu = (K.CompilationUnit) ctx;
+        K.CompilationUnit c = cu;
+        c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, newCu.getPrefix()));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), newCu.getMarkers()));
+        c = c.withAnnotations(ListUtils.map(c.getAnnotations(), (index, e) -> visitAndCast(e, newCu.getAnnotations().get(index))));
+        if (c.getPadding().getPackageDeclaration() != null) {
+            c = c.getPadding().withPackageDeclaration(visitRightPadded(c.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, newCu.getPadding().getPackageDeclaration()));
+        }
+        c = c.getPadding().withImports(ListUtils.map(c.getPadding().getImports(), (index, t) -> visitRightPadded(t, JRightPadded.Location.IMPORT, newCu.getPadding().getImports().get(index))));
+        c = c.getPadding().withStatements(ListUtils.map(c.getPadding().getStatements(), (index, rp) ->
+                rp.withElement(Objects.requireNonNull(visitAndCast(rp.getElement(), newCu.getPadding().getStatements().get(index).getElement())))
+                        .withAfter(visitSpace(rp.getAfter(), Space.Location.BLOCK_STATEMENT_SUFFIX, newCu.getPadding().getStatements().get(index).getAfter()))
+        ));
+        return c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, newCu.getEof()));
+    }
+
+    public J visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, Object ctx) {
+        if (annotatedExpression == ctx || !(ctx instanceof K.AnnotatedExpression)) {
+            return annotatedExpression;
+        }
+
+        K.AnnotatedExpression newAnnotatedExpression = (K.AnnotatedExpression) ctx;
+        K.AnnotatedExpression ae = annotatedExpression;
+        ae = ae.withMarkers(visitMarkers(ae.getMarkers(), newAnnotatedExpression.getMarkers()));
+        ae = ae.withAnnotations(ListUtils.map(ae.getAnnotations(), (index, a) -> visitAndCast(a, newAnnotatedExpression.getAnnotations().get(index))));
+        Expression temp = (Expression) visitExpression(ae, newAnnotatedExpression);
+        if (!(temp instanceof K.AnnotatedExpression)) {
+            return temp;
+        } else {
+            ae = (K.AnnotatedExpression) temp;
+        }
+        return ae;
+    }
+
+    public J visitAnnotationType(K.AnnotationType annotationType, Object ctx) {
+        if (annotationType == ctx || !(ctx instanceof K.AnnotationType)) {
+            return annotationType;
+        }
+
+        K.AnnotationType newAnnotationType = (K.AnnotationType) ctx;
+        K.AnnotationType a = annotationType;
+        a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.ANNOTATION_PREFIX, newAnnotationType.getPrefix()));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), newAnnotationType.getMarkers()));
+        a = a.getPadding().withUseSite(visitRightPadded(a.getPadding().getUseSite(), JRightPadded.Location.ANNOTATION_ARGUMENT, newAnnotationType.getPadding().getUseSite()));
+        return a.withCallee(visitAndCast(a.getCallee(), newAnnotationType.getCallee()));
+    }
+
+    public J visitBinary(K.Binary binary, Object ctx) {
+        if (binary == ctx || !(ctx instanceof K.Binary)) {
+            return binary;
+        }
+
+        K.Binary newBinary = (K.Binary) ctx;
+        K.Binary b = binary;
+        b = b.withPrefix(visitSpace(b.getPrefix(), KSpace.Location.BINARY_PREFIX, newBinary.getPrefix()));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), newBinary.getMarkers()));
+        Expression temp = (Expression) visitExpression(b, newBinary);
+        if (!(temp instanceof K.Binary)) {
+            return temp;
+        } else {
+            b = (K.Binary) temp;
+        }
+        b = b.withLeft(visitAndCast(b.getLeft(), newBinary.getLeft()));
+        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), KLeftPadded.Location.BINARY_OPERATOR, newBinary.getPadding().getOperator()));
+        b = b.withRight(visitAndCast(b.getRight(), newBinary.getRight()));
+        return b.withType(visitType(b.getType(), newBinary.getType()));
+    }
+
+    public J visitClassDeclaration(K.ClassDeclaration classDeclaration, Object ctx) {
+        if (classDeclaration == ctx || !(ctx instanceof K.ClassDeclaration)) {
+            return classDeclaration;
+        }
+
+        K.ClassDeclaration newClassDeclaration = (K.ClassDeclaration) ctx;
+        K.ClassDeclaration c = classDeclaration;
+        c = c.withMarkers(visitMarkers(c.getMarkers(), newClassDeclaration.getMarkers()));
+        c = c.withClassDeclaration(visitAndCast(c.getClassDeclaration(), newClassDeclaration.getClassDeclaration()));
+        return c.withTypeConstraints(visitAndCast(c.getTypeConstraints(), newClassDeclaration.getTypeConstraints()));
+    }
+
+    public J visitConstructor(K.Constructor constructor, Object ctx) {
+        if (constructor == ctx || !(ctx instanceof K.Constructor)) {
+            return constructor;
+        }
+
+        K.Constructor newConstructor = (K.Constructor) ctx;
+        K.Constructor c = constructor;
+        c = c.withMarkers(visitMarkers(c.getMarkers(), newConstructor.getMarkers()));
+        c = c.withMethodDeclaration(visitAndCast(c.getMethodDeclaration(), newConstructor.getMethodDeclaration()));
+        return c.getPadding().withInvocation(visitLeftPadded(c.getPadding().getInvocation(), newConstructor.getPadding().getInvocation()));
+    }
+
+    public J visitConstructorInvocation(K.ConstructorInvocation constructorInvocation, Object ctx) {
+        if (constructorInvocation == ctx || !(ctx instanceof K.ConstructorInvocation)) {
+            return constructorInvocation;
+        }
+
+        K.ConstructorInvocation newConstructorInvocation = (K.ConstructorInvocation) ctx;
+        K.ConstructorInvocation d = constructorInvocation;
+        d = d.withPrefix(visitSpace(d.getPrefix(), KSpace.Location.CONSTRUCTOR_INVOCATION_PREFIX, newConstructorInvocation.getPrefix()));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), newConstructorInvocation.getMarkers()));
+        d = d.withTypeTree(visitAndCast(d.getTypeTree(), newConstructorInvocation.getTypeTree()));
+        return d.getPadding().withArguments(visitContainer(d.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, newConstructorInvocation.getPadding().getArguments()));
+    }
+
+    public J visitDelegatedSuperType(K.DelegatedSuperType delegatedSuperType, Object ctx) {
+        if (delegatedSuperType == ctx || !(ctx instanceof K.DelegatedSuperType)) {
+            return delegatedSuperType;
+        }
+
+        K.DelegatedSuperType newDelegatedSuperType = (K.DelegatedSuperType) ctx;
+        K.DelegatedSuperType d = delegatedSuperType;
+        d = d.withBy(visitSpace(d.getBy(), KSpace.Location.DELEGATED_SUPER_TYPE_BY, newDelegatedSuperType.getBy()));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), newDelegatedSuperType.getMarkers()));
+        d = d.withTypeTree(visitAndCast(d.getTypeTree(), newDelegatedSuperType.getTypeTree()));
+        return d.withDelegate(visitAndCast(d.getDelegate(), newDelegatedSuperType.getDelegate()));
+    }
+
+    public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, Object ctx) {
+        if (destructuringDeclaration == ctx || !(ctx instanceof K.DestructuringDeclaration)) {
+            return destructuringDeclaration;
+        }
+
+        K.DestructuringDeclaration newDestructuringDeclaration = (K.DestructuringDeclaration) ctx;
+        K.DestructuringDeclaration d = destructuringDeclaration;
+        d = d.withPrefix(visitSpace(d.getPrefix(), KSpace.Location.DESTRUCTURING_DECLARATION_PREFIX, newDestructuringDeclaration.getPrefix()));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), newDestructuringDeclaration.getMarkers()));
+        Statement temp = (Statement) visitStatement(d, newDestructuringDeclaration);
+        if (!(temp instanceof K.DestructuringDeclaration)) {
+            return temp;
+        } else {
+            d = (K.DestructuringDeclaration) temp;
+        }
+        d = d.withInitializer(visitAndCast(d.getInitializer(), newDestructuringDeclaration.getInitializer()));
+        return d.getPadding().withDestructAssignments(visitContainer(d.getPadding().getDestructAssignments(), KContainer.Location.DESTRUCT_ASSIGNMENTS, newDestructuringDeclaration.getPadding().getDestructAssignments()));
+    }
+
+    public J visitFunctionType(K.FunctionType functionType, Object ctx) {
+        if (functionType == ctx || !(ctx instanceof K.FunctionType)) {
+            return functionType;
+        }
+
+        K.FunctionType newFunctionType = (K.FunctionType) ctx;
+        K.FunctionType f = functionType;
+        f = f.withPrefix(visitSpace(f.getPrefix(), KSpace.Location.FUNCTION_TYPE_PREFIX, newFunctionType.getPrefix()));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), newFunctionType.getMarkers()));
+        f = f.withLeadingAnnotations(ListUtils.map(f.getLeadingAnnotations(), (index, a) -> visitAndCast(a, newFunctionType.getLeadingAnnotations().get(index))));
+        f = f.withModifiers(ListUtils.map(f.getModifiers(), (index, e) -> visitAndCast(e, newFunctionType.getModifiers().get(index))));
+        f = f.withReceiver(visitRightPadded(f.getReceiver(), newFunctionType.getReceiver()));
+        if (f.getPadding().getParameters() != null) {
+            f = f.getPadding().withParameters(visitContainer(f.getPadding().getParameters(), KContainer.Location.FUNCTION_TYPE_PARAMETERS, newFunctionType.getPadding().getParameters()));
+        }
+        return f.withReturnType(visitRightPadded(f.getReturnType(), newFunctionType.getReturnType()));
+    }
+
+    public J visitFunctionTypeParameter(K.FunctionType.Parameter parameter, Object ctx) {
+        if (parameter == ctx || !(ctx instanceof K.FunctionType.Parameter)) {
+            return parameter;
+        }
+
+        K.FunctionType.Parameter newParameter = (K.FunctionType.Parameter) ctx;
+        K.FunctionType.Parameter pa = parameter;
+        pa = pa.withMarkers(visitMarkers(pa.getMarkers(), newParameter.getMarkers()));
+        if (pa.getName() != null) {
+            pa = pa.withName(visitAndCast(pa.getName(), newParameter.getName()));
+        }
+        return pa.withParameterType(visitAndCast(pa.getParameterType(), newParameter.getParameterType()));
+    }
+
+    public J visitListLiteral(K.ListLiteral listLiteral, Object ctx) {
+        if (listLiteral == ctx || !(ctx instanceof K.ListLiteral)) {
+            return listLiteral;
+        }
+
+        K.ListLiteral newListLiteral = (K.ListLiteral) ctx;
+        K.ListLiteral l = listLiteral;
+        l = l.withPrefix(visitSpace(l.getPrefix(), KSpace.Location.LIST_LITERAL_PREFIX, newListLiteral.getPrefix()));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), newListLiteral.getMarkers()));
+        Expression temp = (Expression) visitExpression(l, newListLiteral);
+        if (!(temp instanceof K.ListLiteral)) {
+            return temp;
+        } else {
+            l = (K.ListLiteral) temp;
+        }
+        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), KContainer.Location.LIST_LITERAL_ELEMENTS, newListLiteral.getPadding().getElements()));
+        return l.withType(visitType(l.getType(), newListLiteral.getType()));
+    }
+
+    public J visitMethodDeclaration(K.MethodDeclaration methodDeclaration, Object ctx) {
+        if (methodDeclaration == ctx || !(ctx instanceof K.MethodDeclaration)) {
+            return methodDeclaration;
+        }
+
+        K.MethodDeclaration newMethodDeclaration = (K.MethodDeclaration) ctx;
+        K.MethodDeclaration m = methodDeclaration;
+        m = m.withMarkers(visitMarkers(m.getMarkers(), newMethodDeclaration.getMarkers()));
+        m = m.withMethodDeclaration(visitAndCast(m.getMethodDeclaration(), newMethodDeclaration.getMethodDeclaration()));
+        return m.withTypeConstraints(visitAndCast(m.getTypeConstraints(), newMethodDeclaration.getTypeConstraints()));
+    }
+
+    public J visitMultiAnnotationType(K.MultiAnnotationType multiAnnotationType, Object ctx) {
+        if (multiAnnotationType == ctx || !(ctx instanceof K.MultiAnnotationType)) {
+            return multiAnnotationType;
+        }
+
+        K.MultiAnnotationType newMultiAnnotationType = (K.MultiAnnotationType) ctx;
+        K.MultiAnnotationType m = multiAnnotationType;
+        m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.ANNOTATION_PREFIX, newMultiAnnotationType.getPrefix()));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), newMultiAnnotationType.getMarkers()));
+        m = m.getPadding().withUseSite(visitRightPadded(m.getPadding().getUseSite(), JRightPadded.Location.ANNOTATION_ARGUMENT, newMultiAnnotationType.getPadding().getUseSite()));
+        return m.withAnnotations(visitContainer(m.getAnnotations(), newMultiAnnotationType.getAnnotations()));
+    }
+
+    @SuppressWarnings("DataFlowIssue")
+    public J visitProperty(K.Property property, Object ctx) {
+        if (property == ctx || !(ctx instanceof K.Property)) {
+            return property;
+        }
+
+        K.Property newProperty = (K.Property) ctx;
+        K.Property pr = property;
+        pr = pr.withPrefix(visitSpace(pr.getPrefix(), KSpace.Location.PROPERTY_PREFIX, newProperty.getPrefix()));
+        pr = pr.withMarkers(visitMarkers(pr.getMarkers(), newProperty.getMarkers()));
+        Statement temp = (Statement) visitStatement(pr, newProperty);
+        if (!(temp instanceof K.Property)) {
+            return temp;
+        } else {
+            pr = (K.Property) temp;
+        }
+
+        pr = pr.getPadding().withVariableDeclarations(visitRightPadded(pr.getPadding().getVariableDeclarations(), newProperty.getPadding().getVariableDeclarations()));
+        pr = pr.getPadding().withReceiver(visitRightPadded(pr.getPadding().getReceiver(), newProperty.getPadding().getReceiver()));
+        return pr.withAccessors(visitContainer(pr.getAccessors(), newProperty.getAccessors()));
+    }
+
+    public J visitReturn(K.Return return_, Object ctx) {
+        if (return_ == ctx || !(ctx instanceof K.Return)) {
+            return return_;
+        }
+
+        K.Return newReturn_ = (K.Return) ctx;
+        K.Return r = return_;
+        r = r.withPrefix(visitSpace(r.getPrefix(), KSpace.Location.RETURN_PREFIX, newReturn_.getPrefix()));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), newReturn_.getMarkers()));
+        Statement temp = (Statement) visitStatement(r, newReturn_);
+        if (!(temp instanceof K.Return)) {
+            return temp;
+        } else {
+            r = (K.Return) temp;
+        }
+        Expression temp2 = (Expression) visitExpression(r, newReturn_);
+        if (!(temp2 instanceof K.Return)) {
+            return temp2;
+        } else {
+            r = (K.Return) temp2;
+        }
+        r = r.withExpression(visitAndCast(r.getExpression(), newReturn_.getExpression()));
+        return r.withLabel(visitAndCast(r.getLabel(), newReturn_.getLabel()));
+    }
+
+    public J visitSpreadArgument(K.SpreadArgument spreadArgument, Object ctx) {
+        if (spreadArgument == ctx || !(ctx instanceof K.SpreadArgument)) {
+            return spreadArgument;
+        }
+
+        K.SpreadArgument newSpreadArgument = (K.SpreadArgument) ctx;
+        K.SpreadArgument s = spreadArgument;
+        s = s.withPrefix(visitSpace(s.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, newSpreadArgument.getPrefix()));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), newSpreadArgument.getMarkers()));
+        Expression temp = (Expression) visitExpression(s, newSpreadArgument);
+        if (!(temp instanceof K.SpreadArgument)) {
+            return temp;
+        } else {
+            s = (K.SpreadArgument) temp;
+        }
+        return s.withExpression(visitAndCast(s.getExpression(), newSpreadArgument.getExpression()));
+    }
+
+    public J visitStringTemplate(K.StringTemplate stringTemplate, Object ctx) {
+        if (stringTemplate == ctx || !(ctx instanceof K.StringTemplate)) {
+            return stringTemplate;
+        }
+
+        K.StringTemplate newStringTemplate = (K.StringTemplate) ctx;
+        K.StringTemplate k = stringTemplate;
+        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.STRING_TEMPLATE_PREFIX, newStringTemplate.getPrefix()));
+        k = k.withMarkers(visitMarkers(k.getMarkers(), newStringTemplate.getMarkers()));
+        Expression temp = (Expression) visitExpression(k, newStringTemplate);
+        if (!(temp instanceof K.StringTemplate)) {
+            return temp;
+        } else {
+            k = (K.StringTemplate) temp;
+        }
+        k = k.withStrings(ListUtils.map(k.getStrings(), (index, s) -> visit(s, newStringTemplate.getStrings().get(index))));
+        return k.withType(visitType(k.getType(), newStringTemplate.getType()));
+    }
+
+    public J visitStringTemplateExpression(K.StringTemplate.Expression expression, Object ctx) {
+        if (expression == ctx || !(ctx instanceof K.StringTemplate.Expression)) {
+            return expression;
+        }
+
+        K.StringTemplate.Expression newExpression = (K.StringTemplate.Expression) ctx;
+        K.StringTemplate.Expression v = expression;
+        v = v.withPrefix(visitSpace(v.getPrefix(), KSpace.Location.STRING_TEMPLATE_EXPRESSION_PREFIX, newExpression.getPrefix()));
+        v = v.withMarkers(visitMarkers(v.getMarkers(), newExpression.getMarkers()));
+        v = v.withTree(visit(v.getTree(), newExpression.getTree()));
+        return v.withAfter(visitSpace(v.getAfter(), KSpace.Location.STRING_TEMPLATE_EXPRESSION_AFTER, newExpression.getAfter()));
+    }
+
+    public J visitThis(K.This aThis, Object ctx) {
+        if (aThis == ctx || !(ctx instanceof K.This)) {
+            return aThis;
+        }
+
+        K.This newAThis = (K.This) ctx;
+        K.This k = aThis;
+        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.THIS_PREFIX, newAThis.getPrefix()));
+        k = k.withMarkers(visitMarkers(k.getMarkers(), newAThis.getMarkers()));
+        Expression temp = (Expression) visitExpression(k, newAThis);
+        if (!(temp instanceof K.This)) {
+            return temp;
+        } else {
+            k = (K.This) temp;
+        }
+        return k.withType(visitType(k.getType(), newAThis.getType()));
+    }
+
+    public J visitTypeAlias(K.TypeAlias typeAlias, Object ctx) {
+        if (typeAlias == ctx || !(ctx instanceof K.TypeAlias)) {
+            return typeAlias;
+        }
+
+        K.TypeAlias newTypeAlias = (K.TypeAlias) ctx;
+        K.TypeAlias t = typeAlias;
+        t = t.withPrefix(visitSpace(t.getPrefix(), KSpace.Location.TYPE_ALIAS_PREFIX, newTypeAlias.getPrefix()));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), newTypeAlias.getMarkers()));
+        Statement temp = (Statement) visitStatement(t, newTypeAlias);
+        if (!(temp instanceof K.TypeAlias)) {
+            return temp;
+        } else {
+            t = (K.TypeAlias) temp;
+        }
+        t = t.withLeadingAnnotations(ListUtils.map(t.getLeadingAnnotations(), (index, a) -> visitAndCast(a, newTypeAlias.getLeadingAnnotations().get(index))));
+        t = t.withModifiers(ListUtils.map(t.getModifiers(),
+                (index, mod) -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, newTypeAlias.getModifiers().get(index).getPrefix()))));
+        t = t.withModifiers(ListUtils.map(t.getModifiers(), (index, m) -> visitAndCast(m, newTypeAlias.getModifiers().get(index))));
+        t = t.withName(visitAndCast(t.getName(), newTypeAlias.getName()));
+        if (t.getPadding().getTypeParameters() != null) {
+            t = t.getPadding().withTypeParameters(visitContainer(t.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, newTypeAlias.getPadding().getTypeParameters()));
+        }
+        if (t.getPadding().getInitializer() != null) {
+            t = t.getPadding().withInitializer(visitLeftPadded(t.getPadding().getInitializer(), KLeftPadded.Location.TYPE_ALIAS_INITIALIZER, newTypeAlias.getPadding().getInitializer()));
+        }
+        return t.withType(visitType(t.getType(), newTypeAlias.getType()));
+    }
+
+    public J visitTypeConstraints(K.TypeConstraints typeConstraints, Object ctx) {
+        if (typeConstraints == ctx || !(ctx instanceof K.TypeConstraints)) {
+            return typeConstraints;
+        }
+
+        K.TypeConstraints newTypeConstraints = (K.TypeConstraints) ctx;
+        K.TypeConstraints t = typeConstraints;
+        t = t.withPrefix(visitSpace(t.getPrefix(), KSpace.Location.TYPE_CONSTRAINT_PREFIX, newTypeConstraints.getPrefix()));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), newTypeConstraints.getMarkers()));
+        return t.getPadding().withConstraints(visitContainer(t.getPadding().getConstraints(), newTypeConstraints.getPadding().getConstraints()));
+    }
+
+    public J visitUnary(K.Unary unary, Object ctx) {
+        if (unary == ctx || !(ctx instanceof K.Unary)) {
+            return unary;
+        }
+
+        K.Unary newUnary = (K.Unary) ctx;
+        K.Unary u = unary;
+        u = u.withPrefix(visitSpace(u.getPrefix(), KSpace.Location.UNARY_PREFIX, newUnary.getPrefix()));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), newUnary.getMarkers()));
+        Statement temp = (Statement) visitStatement(u, newUnary);
+        if (!(temp instanceof K.Unary)) {
+            return temp;
+        } else {
+            u = (K.Unary) temp;
+        }
+        Expression temp2 = (Expression) visitExpression(u, newUnary);
+        if (!(temp2 instanceof K.Unary)) {
+            return temp2;
+        } else {
+            u = (K.Unary) temp2;
+        }
+        u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.UNARY_OPERATOR, newUnary.getPadding().getOperator()));
+        u = u.withExpression(visitAndCast(u.getExpression(), newUnary.getExpression()));
+        return u.withType(visitType(u.getType(), newUnary.getType()));
+    }
+
+    public J visitWhen(K.When when, Object ctx) {
+        if (when == ctx || !(ctx instanceof K.When)) {
+            return when;
+        }
+
+        K.When newWhen = (K.When) ctx;
+        K.When w = when;
+        w = w.withPrefix(visitSpace(w.getPrefix(), KSpace.Location.WHEN_PREFIX, newWhen.getPrefix()));
+        w = w.withMarkers(visitMarkers(w.getMarkers(), newWhen.getMarkers()));
+        Statement temp = (Statement) visitStatement(w, newWhen);
+        if (!(temp instanceof K.When)) {
+            return temp;
+        } else {
+            w = (K.When) temp;
+        }
+        w = w.withSelector(visitAndCast(w.getSelector(), newWhen.getSelector()));
+        w = w.withBranches(visitAndCast(w.getBranches(), newWhen.getBranches()));
+        return w.withType(visitType(w.getType(), newWhen.getType()));
+    }
+
+    public J visitWhenBranch(K.WhenBranch whenBranch, Object ctx) {
+        if (whenBranch == ctx || !(ctx instanceof K.WhenBranch)) {
+            return whenBranch;
+        }
+
+        K.WhenBranch newWhenBranch = (K.WhenBranch) ctx;
+        K.WhenBranch w = whenBranch;
+        w = w.withPrefix(visitSpace(w.getPrefix(), KSpace.Location.WHEN_BRANCH_PREFIX, newWhenBranch.getPrefix()));
+        w = w.withMarkers(visitMarkers(w.getMarkers(), newWhenBranch.getMarkers()));
+        Statement temp = (Statement) visitStatement(w, newWhenBranch);
+        if (!(temp instanceof K.WhenBranch)) {
+            return temp;
+        } else {
+            w = (K.WhenBranch) temp;
+        }
+        w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, newWhenBranch.getPadding().getExpressions()));
+        return w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, newWhenBranch.getPadding().getBody()));
+    }
+
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, Object ctx) {
+        if (right == ctx || !(ctx instanceof JRightPadded)) {
+            return right;
+        }
+
+        JRightPadded<T> newRight = (JRightPadded<T>) ctx;
+        return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, newRight);
+    }
+
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, Object ctx) {
+        if (left == ctx || !(ctx instanceof JLeftPadded)) {
+            return left;
+        }
+
+        JLeftPadded<T> newLeft = (JLeftPadded<T>) ctx;
+        return super.visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, newLeft);
+    }
+
+    public Space visitSpace(Space space, KSpace.Location loc, Object ctx) {
+        return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, ctx);
+    }
+
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, Object ctx) {
+        if (container == ctx || !(ctx instanceof JContainer)) {
+            return container;
+        }
+
+        JContainer<J2> newContainer = (JContainer<J2>) ctx;
+        return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, newContainer);
+    }
+
+    public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
+                                                                  KContainer.Location loc, Object ctx) {
+        if (container == ctx || !(ctx instanceof JContainer)) {
+            return container;
+        }
+
+        JContainer<J2> newContainer = (JContainer<J2>) ctx;
+        if (container == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        setCursor(new Cursor(getCursor(), container));
+
+        Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), newContainer.getBefore());
+        List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), (index, t) -> visitRightPadded(t, loc.getElementLocation(), newContainer.getPadding().getElements().get(index)));
+
+        setCursor(getCursor().getParent());
+
+        return js == container.getPadding().getElements() && before == container.getBefore() ?
+                container :
+                JContainer.build(before, js, container.getMarkers());
+    }
+
+    public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, KLeftPadded.Location loc, Object ctx) {
+        if (left == ctx || !(ctx instanceof JLeftPadded)) {
+            return left;
+        }
+
+        JLeftPadded<T> newLeft = (JLeftPadded<T>) ctx;
+        if (left == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        setCursor(new Cursor(getCursor(), left));
+
+        Space before = visitSpace(left.getBefore(), loc.getBeforeLocation(), newLeft.getBefore());
+        T t = left.getElement();
+
+        if (t instanceof J) {
+            //noinspection unchecked
+            t = visitAndCast((J) left.getElement(), newLeft.getElement());
+        }
+
+        setCursor(getCursor().getParent());
+        if (t == null) {
+            // If nothing changed leave AST node the same
+            if (left.getElement() == null && before == left.getBefore()) {
+                return left;
+            }
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
+    }
+
+    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, Object ctx) {
+        if (right == ctx || !(ctx instanceof JRightPadded)) {
+            return right;
+        }
+
+        JRightPadded<T> newRight = (JRightPadded<T>) ctx;
+        if (right == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        setCursor(new Cursor(getCursor(), right));
+
+        T t = right.getElement();
+        if (t instanceof J) {
+            //noinspection unchecked
+            t = visitAndCast((J) right.getElement(), newRight.getElement());
+        }
+
+        setCursor(getCursor().getParent());
+        if (t == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), newRight.getAfter());
+        Markers markers = visitMarkers(right.getMarkers(), newRight.getMarkers());
+        return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
+                right : new JRightPadded<>(t, after, markers);
     }
 
     @Override
-    public String getLanguage() {
-        return "java";
+    public <M extends Marker> M visitMarker(Marker marker, Object ctx) {
+        if (marker == ctx || !(ctx instanceof Marker)) {
+            return (M) marker;
+        }
+
+        Marker newMarker = (Marker) ctx;
+        if (marker instanceof TypeReferencePrefix && newMarker instanceof TypeReferencePrefix) {
+            return super.visitMarker(newMarker, ((TypeReferencePrefix) newMarker).getPrefix());
+        }
+        return super.visitMarker(marker, newMarker);
     }
 
     @Override

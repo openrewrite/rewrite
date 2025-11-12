@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,30 +13,186 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.format;
+package org.openrewrite.groovy.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
+import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
 import java.util.Objects;
 
-@SuppressWarnings({"unused", "unchecked"})
-public class MergeSpacesVisitor extends JavaVisitor<Object> {
+public class MergeSpacesVisitor extends GroovyVisitor<Object> {
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, Object ctx) {
-        return sourceFile instanceof JavaSourceFile;
+    public J visitCompilationUnit(G.CompilationUnit cu, Object ctx) {
+        if (cu == ctx || !(ctx instanceof G.CompilationUnit)) {
+            return cu;
+        }
+        G.CompilationUnit newCu = (G.CompilationUnit) ctx;
+        G.CompilationUnit c = cu;
+        c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, newCu.getPrefix()));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), newCu.getMarkers()));
+        if (c.getPackageDeclaration() != null && newCu.getPackageDeclaration() != null) {
+            c = c.withPackageDeclaration((G.Package) visitNonNull(c.getPackageDeclaration(), newCu.getPackageDeclaration()));
+        }
+        c = c.withStatements(ListUtils.map(c.getStatements(), (index, e) -> visitAndCast(e, newCu.getStatements().get(index))));
+        return c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, newCu.getEof()));
     }
 
     @Override
-    public String getLanguage() {
-        return "java";
+    public J visitGString(G.GString gString, Object ctx) {
+        if (gString == ctx || !(ctx instanceof G.GString)) {
+            return gString;
+        }
+        G.GString newGString = (G.GString) ctx;
+        G.GString g = gString;
+        g = g.withPrefix(visitSpace(g.getPrefix(), GSpace.Location.GSTRING, newGString.getPrefix()));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), newGString.getMarkers()));
+        Expression temp = (Expression) visitExpression(g, newGString);
+        if (!(temp instanceof G.GString)) {
+            return temp;
+        } else {
+            g = (G.GString) temp;
+        }
+        g = g.withStrings(ListUtils.map(g.getStrings(), (index, s) -> visit(s, newGString.getStrings().get(index))));
+        return g.withType(visitType(gString.getType(), newGString.getType()));
+    }
+
+    @Override
+    public J visitGStringValue(G.GString.Value value, Object ctx) {
+        if (value == ctx || !(ctx instanceof G.GString.Value)) {
+            return value;
+        }
+        G.GString.Value newValue = (G.GString.Value) ctx;
+        G.GString.Value v = value;
+        v = v.withMarkers(visitMarkers(v.getMarkers(), newValue.getMarkers()));
+        v = v.withTree(visit(v.getTree(), newValue.getTree()));
+        return v.withAfter(visitSpace(v.getAfter(), GSpace.Location.GSTRING, newValue.getAfter()));
+    }
+
+    @Override
+    public J visitListLiteral(G.ListLiteral listLiteral, Object ctx) {
+        if (listLiteral == ctx || !(ctx instanceof G.ListLiteral)) {
+            return listLiteral;
+        }
+        G.ListLiteral newListLiteral = (G.ListLiteral) ctx;
+        G.ListLiteral l = listLiteral;
+        l = l.withPrefix(visitSpace(l.getPrefix(), GSpace.Location.LIST_LITERAL, newListLiteral.getPrefix()));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), newListLiteral.getMarkers()));
+        Expression temp = (Expression) visitExpression(l, newListLiteral);
+        if (!(temp instanceof G.ListLiteral)) {
+            return temp;
+        } else {
+            l = (G.ListLiteral) temp;
+        }
+        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS, newListLiteral.getPadding().getElements()));
+        return l.withType(visitType(l.getType(), newListLiteral.getType()));
+    }
+
+    @Override
+    public J visitMapEntry(G.MapEntry mapEntry, Object ctx) {
+        if (mapEntry == ctx || !(ctx instanceof G.MapEntry)) {
+            return mapEntry;
+        }
+        G.MapEntry newMapEntry = (G.MapEntry) ctx;
+        G.MapEntry m = mapEntry;
+        m = m.withPrefix(visitSpace(m.getPrefix(), GSpace.Location.MAP_ENTRY, newMapEntry.getPrefix()));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), newMapEntry.getMarkers()));
+        Expression temp = (Expression) visitExpression(m, newMapEntry);
+        if (!(temp instanceof G.MapEntry)) {
+            return temp;
+        } else {
+            m = (G.MapEntry) temp;
+        }
+        m = m.getPadding().withKey(visitRightPadded(m.getPadding().getKey(), GRightPadded.Location.MAP_ENTRY_KEY, newMapEntry.getPadding().getKey()));
+        m = m.withValue((Expression) visit(m.getValue(), newMapEntry.getValue()));
+        return m.withType(visitType(m.getType(), newMapEntry.getType()));
+    }
+
+    @Override
+    public J visitMapLiteral(G.MapLiteral mapLiteral, Object ctx) {
+        if (mapLiteral == ctx || !(ctx instanceof G.MapLiteral)) {
+            return mapLiteral;
+        }
+        G.MapLiteral newMapLiteral = (G.MapLiteral) ctx;
+        G.MapLiteral m = mapLiteral;
+        m = m.withPrefix(visitSpace(m.getPrefix(), GSpace.Location.MAP_LITERAL, newMapLiteral.getPrefix()));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), newMapLiteral.getMarkers()));
+        Expression temp = (Expression) visitExpression(m, newMapLiteral);
+        if (!(temp instanceof G.MapLiteral)) {
+            return temp;
+        } else {
+            m = (G.MapLiteral) temp;
+        }
+        m = m.getPadding().withElements(visitContainer(m.getPadding().getElements(), GContainer.Location.MAP_LITERAL_ELEMENTS, newMapLiteral.getPadding().getElements()));
+        return m.withType(visitType(m.getType(), newMapLiteral.getType()));
+    }
+
+    @Override
+    public J visitUnary(G.Unary unary, Object ctx) {
+        if (unary == ctx || !(ctx instanceof G.Unary)) {
+            return unary;
+        }
+        G.Unary newUnary = (G.Unary) ctx;
+        G.Unary u = unary;
+        u = u.withPrefix(visitSpace(u.getPrefix(), GSpace.Location.UNARY_PREFIX, newUnary.getPrefix()));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), newUnary.getMarkers()));
+        Expression temp = (Expression) visitExpression(u, newUnary);
+        if (!(temp instanceof G.Unary)) {
+            return temp;
+        } else {
+            u = (G.Unary) temp;
+        }
+        u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), GLeftPadded.Location.UNARY_OPERATOR, newUnary.getPadding().getOperator()));
+        u = u.withExpression(visitAndCast(u.getExpression(), newUnary.getExpression()));
+        return u.withType(visitType(u.getType(), newUnary.getType()));
+    }
+
+    @Override
+    public J visitBinary(G.Binary binary, Object ctx) {
+        if (binary == ctx || !(ctx instanceof G.Binary)) {
+            return binary;
+        }
+        G.Binary newBinary = (G.Binary) ctx;
+        G.Binary b = binary;
+        b = b.withPrefix(visitSpace(b.getPrefix(), GSpace.Location.BINARY_PREFIX, newBinary.getPrefix()));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), newBinary.getMarkers()));
+        Expression temp = (Expression) visitExpression(b, newBinary);
+        if (!(temp instanceof G.Binary)) {
+            return temp;
+        } else {
+            b = (G.Binary) temp;
+        }
+        b = b.withLeft(visitAndCast(b.getLeft(), newBinary.getLeft()));
+        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), GLeftPadded.Location.BINARY_OPERATOR, newBinary.getPadding().getOperator()));
+        b = b.withRight(visitAndCast(b.getRight(), newBinary.getRight()));
+        return b.withType(visitType(b.getType(), newBinary.getType()));
+    }
+
+    @Override
+    public J visitRange(G.Range range, Object ctx) {
+        if (range == ctx || !(ctx instanceof G.Range)) {
+            return range;
+        }
+        G.Range newRange = (G.Range) ctx;
+        G.Range r = range;
+        r = r.withPrefix(visitSpace(r.getPrefix(), GSpace.Location.RANGE_PREFIX, newRange.getPrefix()));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), newRange.getMarkers()));
+        Expression temp = (Expression) visitExpression(r, newRange);
+        if (!(temp instanceof G.Range)) {
+            return temp;
+        } else {
+            r = (G.Range) temp;
+        }
+        r = r.withFrom(visitAndCast(r.getFrom(), newRange.getFrom()));
+        r = r.getPadding().withInclusive(visitLeftPadded(r.getPadding().getInclusive(), GLeftPadded.Location.RANGE_INCLUSION, newRange.getPadding().getInclusive()));
+        r = r.withTo(visitAndCast(r.getTo(), newRange.getTo()));
+        return r.withType(visitType(r.getType(), newRange.getType()));
     }
 
     @Override
@@ -398,23 +554,6 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         c = c.getPadding().withImplements(visitTypeNames(c.getPadding().getImplements(), newClassDecl.getPadding().getImplements()));
         c = c.withBody(visitAndCast(c.getBody(), newClassDecl.getBody()));
         return c.withType(visitType(c.getType(), newClassDecl.getType()));
-    }
-
-    @Override
-    public J visitCompilationUnit(J.CompilationUnit cu, Object ctx) {
-        if (cu == ctx || !(ctx instanceof J.CompilationUnit)) {
-            return cu;
-        }
-        J.CompilationUnit newCu = (J.CompilationUnit) ctx;
-        J.CompilationUnit c = cu;
-        c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, newCu.getPrefix()));
-        c = c.withMarkers(visitMarkers(c.getMarkers(), newCu.getMarkers()));
-        if (c.getPadding().getPackageDeclaration() != null && newCu.getPadding().getPackageDeclaration() != null) {
-            c = c.getPadding().withPackageDeclaration(visitRightPadded(c.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, newCu.getPadding().getPackageDeclaration()));
-        }
-        c = c.getPadding().withImports(ListUtils.map(c.getPadding().getImports(), (index, t) -> visitRightPadded(t, JRightPadded.Location.IMPORT, newCu.getPadding().getImports().get(index))));
-        c = c.withClasses(ListUtils.map(c.getClasses(), (index, e) -> visitAndCast(e, newCu.getClasses().get(index))));
-        return c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, newCu.getEof()));
     }
 
     @Override
