@@ -284,6 +284,49 @@ export interface PatternOptions {
      * @default true (lenient matching enabled for backward compatibility)
      */
     lenientTypeMatching?: boolean;
+
+    /**
+     * Enable debug logging for this pattern.
+     * When enabled, all match attempts will log detailed information to stderr,
+     * including the AST path traversed, mismatches encountered, and captured values.
+     *
+     * Can be overridden at the match() call level.
+     * Global debug can be enabled via PATTERN_DEBUG=true environment variable.
+     *
+     * Precedence: match() call > pattern configure() > PATTERN_DEBUG env var
+     *
+     * @default undefined (inherits from environment or match() call)
+     *
+     * @example
+     * ```typescript
+     * // Pattern-level debug
+     * const pat = pattern({ debug: true })`console.log(${value})`;
+     *
+     * // Disable debug for a noisy pattern when global debug is on
+     * const noisyPat = pattern({ debug: false })`import ${x} from ${y}`;
+     * ```
+     */
+    debug?: boolean;
+}
+
+/**
+ * Options for individual match() calls.
+ */
+export interface MatchOptions {
+    /**
+     * Enable debug logging for this specific match() call.
+     * Overrides pattern-level debug setting and global PATTERN_DEBUG env var.
+     *
+     * @example
+     * ```typescript
+     * // Debug just this call
+     * const match = await pattern.match(node, cursor, { debug: true });
+     *
+     * // Disable debug for this call even if pattern or global debug is on
+     * const match = await pattern.match(node, cursor, { debug: false });
+     * ```
+     */
+    debug?: boolean;
 }
 
 /**

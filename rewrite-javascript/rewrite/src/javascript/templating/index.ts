@@ -22,6 +22,7 @@ export type {
     Any,
     TemplateParam,
     PatternOptions,
+    MatchOptions,
     TemplateParameter,
     TemplateOptions,
     RewriteRule,

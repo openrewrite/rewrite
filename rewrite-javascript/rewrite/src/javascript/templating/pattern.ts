@@ -15,7 +15,7 @@
  */
 import {Cursor} from '../..';
 import {J} from '../../java';
-import {Any, Capture, DebugLogEntry, DebugOptions, MatchAttemptResult, MatchExplanation, PatternOptions, MatchResult as IMatchResult} from './types';
+import {Any, Capture, DebugLogEntry, DebugOptions, MatchAttemptResult, MatchExplanation, MatchOptions, PatternOptions, MatchResult as IMatchResult} from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {DebugPatternMatchingComparator, PatternMatchingComparator} from './comparator';
 import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
@@ -119,6 +119,8 @@ export class PatternBuilder {
 export class Pattern {
     private _options: PatternOptions = {};
     private _cachedAstPattern?: J;
+    private static nextPatternId = 1;
+    private readonly patternId: number;
 
     /**
      * Gets the configuration options for this pattern.
@@ -156,6 +158,7 @@ export class Pattern {
         public readonly templateParts: TemplateStringsArray,
         public readonly captures: (Capture | Any<any> | RawCode)[]
     ) {
+        this.patternId = Pattern.nextPatternId++;
     }
 
     /**
@@ -238,9 +241,41 @@ export class Pattern {
      * @param cursor Optional cursor at the node's position in a larger tree. Used for context-aware
      *               capture constraints to navigate to parent nodes. If omitted, a cursor will be
      *               created at the ast root, allowing constraints to navigate within the matched subtree.
+     * @param options Optional match options (e.g., debug flag)
      * @returns A MatchResult if the pattern matches, undefined otherwise
+     *
+     * @example
+     * ```typescript
+     * // Normal match
+     * const match = await pattern.match(node);
+     *
+     * // Debug this specific call
+     * const match = await pattern.match(node, cursor, { debug: true });
+     * ```
      */
-    async match(ast: J, cursor?: Cursor): Promise<MatchResult | undefined> {
+    async match(ast: J, cursor?: Cursor, options?: MatchOptions): Promise<MatchResult | undefined> {
+        // Three-level precedence: call > pattern > global
+        const debugEnabled =
+            options?.debug !== undefined
+                ? options.debug  // 1. Explicit call-level (true OR false)
+                : (this._options.debug !== undefined
+                    ? this._options.debug  // 2. Explicit pattern-level
+                    : process.env.PATTERN_DEBUG === 'true');  // 3. Global
+
+        if (debugEnabled) {
+            // Use matchWithExplanation and log the result
+            const result = await this.matchWithExplanation(ast, cursor);
+            this.logMatchResult(ast, result);
+
+            if (result.matched) {
+                // result.result is the MatchResult class instance
+                return result.result as MatchResult | undefined;
+            } else {
+                return undefined;
+            }
+        }
+
+        // Fast path - no debug
         const matcher = new Matcher(this, ast, cursor);
         const success = await matcher.matches();
         if (!success) {
@@ -249,6 +284,136 @@ export class Pattern {
         // Create MatchResult with unified storage
         const storage = (matcher as any).storage;
         return new MatchResult(new Map(storage));
+    }
+
+    /**
+     * Formats and logs the match result to stderr.
+     * @private
+     */
+    private logMatchResult(ast: J, result: MatchAttemptResult): void {
+        const patternSource = this.getPatternSource();
+        const patternId = `Pattern #${this.patternId}`;
+        const nodeKind = (ast as any).kind || 'unknown';
+
+        // First, log the pattern source
+        console.error(`[${patternId}] ${patternSource}`);
+
+        if (result.matched) {
+            // Success case
+            console.error(`[${patternId}] ✅ Match SUCCESS against ${nodeKind}`);
+
+            // Log captured values
+            if (result.result) {
+                // Access the private storage field through any cast
+                const storage = (result.result as any).storage as Map<string, CaptureStorageValue>;
+                if (storage && storage.size > 0) {
+                    for (const [name, value] of storage) {
+                        // Extract elements from storage value for display
+                        const extractedValue = (result.result as any).extractElements(value);
+                        const valueStr = this.formatCapturedValue(extractedValue);
+                        console.error(`[${patternId}]    Captured '${name}': ${valueStr}`);
+                    }
+                }
+            }
+        } else {
+            // Failure case
+            console.error(`[${patternId}] ❌ Match FAILED against ${nodeKind}`);
+
+            const explanation = result.explanation;
+            if (explanation) {
+                if (explanation.path && explanation.path.length > 0) {
+                    console.error(`[${patternId}]    At path: [${explanation.path.join(' → ')}]`);
+                }
+
+                console.error(`[${patternId}]    Reason: ${explanation.reason}`);
+                console.error(`[${patternId}]    Expected: ${explanation.expected}`);
+                console.error(`[${patternId}]    Actual: ${explanation.actual}`);
+
+                if (explanation.details) {
+                    console.error(`[${patternId}]    Details: ${explanation.details}`);
+                }
+            }
+        }
+    }
+
+    /**
+     * Gets the source code representation of this pattern for logging.
+     * @private
+     */
+    private getPatternSource(): string {
+        // Reconstruct pattern source from template parts
+        let source = '';
+        for (let i = 0; i < this.templateParts.length; i++) {
+            source += this.templateParts[i];
+            if (i < this.captures.length) {
+                const cap = this.captures[i];
+                // Skip raw code
+                if (cap instanceof RawCode || (cap && typeof cap === 'object' && (cap as any)[RAW_CODE_SYMBOL])) {
+                    source += '${raw(...)}';
+                    continue;
+                }
+                // Show capture name or placeholder
+                const name = (cap as any)[CAPTURE_NAME_SYMBOL];
+                if (cap && typeof cap === 'object' && name) {
+                    source += `\${${name}}`;
+                } else {
+                    source += '${...}';
+                }
+            }
+        }
+
+        return source;
+    }
+
+    /**
+     * Formats a captured value for logging.
+     * @private
+     */
+    private formatCapturedValue(value: any): string {
+        if (value === null) return 'null';
+        if (value === undefined) return 'undefined';
+
+        // Check if it's an array (variadic capture)
+        if (Array.isArray(value)) {
+            if (value.length === 0) return '[]';
+            const items = value.slice(0, 3).map(v => this.formatSingleValue(v));
+            const suffix = value.length > 3 ? `, ... (${value.length} total)` : '';
+            return `[${items.join(', ')}${suffix}]`;
+        }
+
+        return this.formatSingleValue(value);
+    }
+
+    /**
+     * Formats a single AST node for logging.
+     * @private
+     */
+    private formatSingleValue(value: any): string {
+        if (!value || typeof value !== 'object') {
+            return String(value);
+        }
+
+        const kind = (value as any).kind;
+        if (!kind) return String(value);
+
+        // Extract simple kind name (last segment)
+        const kindStr = kind.split('.').pop();
+
+        // For literals, show the value
+        if (kindStr === 'Literal' && value.value !== undefined) {
+            const litValue = typeof value.value === 'string'
+                ? `"${value.value}"`
+                : String(value.value);
+            return `${kindStr}(${litValue})`;
+        }
+
+        // For identifiers, show the name
+        if (kindStr === 'Identifier' && value.simpleName) {
+            return `${kindStr}(${value.simpleName})`;
+        }
+
+        // Default: just the kind
+        return kindStr;
     }
 
     /**
@@ -605,7 +770,21 @@ class Matcher {
             : new PatternMatchingComparator(matcherCallbacks, lenientTypeMatching);
         // Pass cursors to allow constraints to navigate to root
         // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
-        return await comparator.compare(pattern, target, undefined, this.cursor);
+        const result = await comparator.compare(pattern, target, undefined, this.cursor);
+
+        // If match failed and no explanation was set, provide a generic one
+        if (!result && this.debugOptions.enabled && !this.explanation) {
+            const patternKind = (pattern as any).kind?.split('.').pop() || 'unknown';
+            const targetKind = (target as any).kind?.split('.').pop() || 'unknown';
+            this.setExplanation(
+                'structural-mismatch',
+                `Pattern node of type ${patternKind}`,
+                `Target node of type ${targetKind}`,
+                'Nodes did not match structurally'
+            );
+        }
+
+        return result;
     }
 
     /**
@@ -739,7 +918,53 @@ class Matcher {
  * const operator = '===';
  * const pat = pattern`x ${raw(operator)} y`;
  */
-export function pattern(strings: TemplateStringsArray, ...captures: (Capture | Any<any> | RawCode | string)[]): Pattern {
+/**
+ * Creates a pattern from a template literal (direct usage).
+ *
+ * @example
+ * ```typescript
+ * const pat = pattern`console.log(${x})`;
+ * ```
+ */
+export function pattern(strings: TemplateStringsArray, ...captures: (Capture | Any<any> | RawCode | string)[]): Pattern;
+
+/**
+ * Creates a pattern factory with options that returns a tagged template function.
+ *
+ * @example
+ * ```typescript
+ * const pat = pattern({ debug: true })`console.log(${x})`;
+ * ```
+ */
+export function pattern(options: PatternOptions): (strings: TemplateStringsArray, ...captures: (Capture | Any<any> | RawCode | string)[]) => Pattern;
+
+// Implementation
+export function pattern(
+    stringsOrOptions: TemplateStringsArray | PatternOptions,
+    ...captures: (Capture | Any<any> | RawCode | string)[]
+): Pattern | ((strings: TemplateStringsArray, ...captures: (Capture | Any<any> | RawCode | string)[]) => Pattern) {
+    // Check if first arg is TemplateStringsArray (direct usage)
+    if (Array.isArray(stringsOrOptions) && 'raw' in stringsOrOptions) {
+        // Direct usage: pattern`...`
+        return createPattern(stringsOrOptions as TemplateStringsArray, captures, {});
+    }
+
+    // Options usage: pattern({ ... })`...`
+    const options = stringsOrOptions as PatternOptions;
+    return (strings: TemplateStringsArray, ...caps: (Capture | Any<any> | RawCode | string)[]): Pattern => {
+        return createPattern(strings, caps, options);
+    };
+}
+
+/**
+ * Internal helper to create a Pattern instance.
+ * @private
+ */
+function createPattern(
+    strings: TemplateStringsArray,
+    captures: (Capture | Any<any> | RawCode | string)[],
+    options: PatternOptions
+): Pattern {
     const capturesByName = captures.reduce((map, c) => {
         // Skip raw code - it's not a capture
         if (c instanceof RawCode || (typeof c === 'object' && c && (c as any)[RAW_CODE_SYMBOL])) {
@@ -750,7 +975,8 @@ export function pattern(strings: TemplateStringsArray, ...captures: (Capture | A
         const name = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
         return map.set(name, capture);
     }, new Map<string, Capture | Any<any>>());
-    return new Pattern(strings, captures.map(c => {
+
+    const pat = new Pattern(strings, captures.map(c => {
         // Return raw code as-is
         if (c instanceof RawCode || (typeof c === 'object' && c && (c as any)[RAW_CODE_SYMBOL])) {
             return c as RawCode;
@@ -759,4 +985,11 @@ export function pattern(strings: TemplateStringsArray, ...captures: (Capture | A
         const name = typeof c === "string" ? c : ((c as any)[CAPTURE_NAME_SYMBOL] || c.getName());
         return capturesByName.get(name)!;
     }));
+
+    // Apply options if provided
+    if (options && Object.keys(options).length > 0) {
+        pat.configure(options);
+    }
+
+    return pat;
 }
