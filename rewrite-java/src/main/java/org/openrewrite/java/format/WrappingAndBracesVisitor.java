@@ -149,7 +149,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Case visitCase(J.Case case_, P p) {
         case_ = super.visitCase(case_, p);
-        case_ = case_.withStatements(ListUtils.mapFirst(case_.getStatements(), statement -> {
+        return case_.withStatements(ListUtils.mapFirst(case_.getStatements(), statement -> {
             if (!(statement instanceof J.Block)) {
                 if (statement.getComments().isEmpty()) {
                     if (!hasLineBreak(statement.getPrefix().getWhitespace())) {
@@ -166,7 +166,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             }
             return statement;
         }));
-        return case_;
     }
 
     @Override
