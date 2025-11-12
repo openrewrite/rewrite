@@ -282,7 +282,8 @@ class MinimumViableSpacingTest implements RewriteTest {
               class Test {
                   String yielded(int i) {
                       return switch (i) {
-                          default: yield "value";
+                          default:
+                              yield "value";
                       };
                   }
               }

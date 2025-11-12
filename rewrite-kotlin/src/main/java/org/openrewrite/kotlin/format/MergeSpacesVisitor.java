@@ -657,7 +657,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
                     return docComment;
                 }
                 Javadoc.DocComment replaceWith = (Javadoc.DocComment) newSpace.getComments().get(index);
-                return docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
+                comment = docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
                     if(!(jdoc instanceof Javadoc.LineBreak && replaceWith.getBody().get(i) instanceof Javadoc.LineBreak)) {
                         return jdoc;
                     }
