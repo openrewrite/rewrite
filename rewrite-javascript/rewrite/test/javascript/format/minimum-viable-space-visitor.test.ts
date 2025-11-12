@@ -54,7 +54,7 @@ describe('MinimumViableSpacingVisitor', () => {
         });
     }
 
-    test.skip('basic', () => {
+    test('basic', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -86,7 +86,7 @@ describe('MinimumViableSpacingVisitor', () => {
         ))
     });
 
-    test.skip('throw new', () => {
+    test('throw new', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
