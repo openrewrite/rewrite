@@ -47,7 +47,7 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        expect(calls.some(c => c.includes('✅ Match SUCCESS'))).toBe(true);
+        expect(calls.some(c => c.includes('✅ SUCCESS matching against'))).toBe(true);
         expect(calls.some(c => c.includes("Captured 'value'"))).toBe(true);
     });
 
@@ -62,7 +62,7 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        expect(calls.some(c => c.includes('✅ Match SUCCESS'))).toBe(true);
+        expect(calls.some(c => c.includes('✅ SUCCESS matching against'))).toBe(true);
     });
 
     test('global debug: PATTERN_DEBUG=true', async () => {
@@ -78,7 +78,7 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        expect(calls.some(c => c.includes('✅ Match SUCCESS'))).toBe(true);
+        expect(calls.some(c => c.includes('✅ SUCCESS matching against'))).toBe(true);
     });
 
     test('precedence: call > pattern > global', async () => {
@@ -122,7 +122,10 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        expect(calls.some(c => c.includes('❌ Match FAILED'))).toBe(true);
+        console.log('===== UPDATED OUTPUT =====');
+        calls.forEach((call, i) => console.log(`${i}: ${call}`));
+        console.log('==========================');
+        expect(calls.some(c => c.includes('❌ FAILED matching against'))).toBe(true);
         // At path may or may not appear depending on where mismatch occurred
         expect(calls.some(c => c.includes('Reason:'))).toBe(true);
         expect(calls.some(c => c.includes('Expected:'))).toBe(true);
@@ -155,5 +158,27 @@ describe('Pattern Debug Logging', () => {
         const capturedLine = calls.find(c => c.includes("Captured"));
         expect(capturedLine).toContain('[');
         expect(capturedLine).toContain(']');
+    });
+
+    test('shows path for nested mismatch', async () => {
+        const x = capture('x');
+        const y = capture('y');
+        const pat = pattern({ debug: true })`${x} + ${y}`;
+        // Pattern expects addition, but we provide subtraction
+        const node = await parseExpression('a - b');
+
+        const match = await pat.match(node);
+
+        expect(match).toBeUndefined();
+        expect(consoleErrorSpy).toHaveBeenCalled();
+
+        const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
+        console.log('===== PATH EXAMPLE =====');
+        calls.forEach((call, i) => console.log(`${i}: ${call}`));
+        console.log('==========================');
+
+        // Should show path and operator mismatch
+        expect(calls.some(c => c.includes('At path:'))).toBe(true);
+        expect(calls.some(c => c.includes('Reason:'))).toBe(true);
     });
 });

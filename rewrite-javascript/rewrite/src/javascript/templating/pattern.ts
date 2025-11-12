@@ -17,9 +17,11 @@ import {Cursor} from '../..';
 import {J} from '../../java';
 import {Any, Capture, DebugLogEntry, DebugOptions, MatchAttemptResult, MatchExplanation, MatchOptions, PatternOptions, MatchResult as IMatchResult} from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
-import {DebugPatternMatchingComparator, PatternMatchingComparator} from './comparator';
+import {DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
 import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {TemplateEngine} from './engine';
+import {TreePrinters} from '../../print';
+import {JS} from '../index';
 
 
 /**
@@ -265,7 +267,7 @@ export class Pattern {
         if (debugEnabled) {
             // Use matchWithExplanation and log the result
             const result = await this.matchWithExplanation(ast, cursor);
-            this.logMatchResult(ast, result);
+            await this.logMatchResult(ast, cursor, result);
 
             if (result.matched) {
                 // result.result is the MatchResult class instance
@@ -290,50 +292,64 @@ export class Pattern {
      * Formats and logs the match result to stderr.
      * @private
      */
-    private logMatchResult(ast: J, result: MatchAttemptResult): void {
+    private async logMatchResult(ast: J, cursor: Cursor | undefined, result: MatchAttemptResult): Promise<void> {
         const patternSource = this.getPatternSource();
         const patternId = `Pattern #${this.patternId}`;
         const nodeKind = (ast as any).kind || 'unknown';
+        // Format kind: extract short name (e.g., "org.openrewrite.java.tree.J$Binary" -> "J$Binary")
+        const shortKind = typeof nodeKind === 'string'
+            ? nodeKind.split('.').pop() || nodeKind
+            : nodeKind;
 
         // First, log the pattern source
         console.error(`[${patternId}] ${patternSource}`);
 
+        // Build the complete match result message
+        const lines: string[] = [];
+
+        // Print the target tree being matched
+        let treeStr: string;
+        try {
+            const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+            treeStr = await printer.print(ast);
+        } catch (e) {
+            treeStr = '(tree printing unavailable)';
+        }
+
         if (result.matched) {
-            // Success case
-            console.error(`[${patternId}] ✅ Match SUCCESS against ${nodeKind}`);
+            // Success case - result first, then tree, then captures
+            lines.push(`[${patternId}] ✅ SUCCESS matching against ${shortKind}:`);
+            treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
 
             // Log captured values
             if (result.result) {
-                // Access the private storage field through any cast
                 const storage = (result.result as any).storage as Map<string, CaptureStorageValue>;
                 if (storage && storage.size > 0) {
                     for (const [name, value] of storage) {
-                        // Extract elements from storage value for display
                         const extractedValue = (result.result as any).extractElements(value);
                         const valueStr = this.formatCapturedValue(extractedValue);
-                        console.error(`[${patternId}]    Captured '${name}': ${valueStr}`);
+                        lines.push(`[${patternId}]    Captured '${name}': ${valueStr}`);
                     }
                 }
             }
         } else {
-            // Failure case
-            console.error(`[${patternId}] ❌ Match FAILED against ${nodeKind}`);
+            // Failure case - result first, then tree, then explanation
+            lines.push(`[${patternId}] ❌ FAILED matching against ${shortKind}:`);
+            treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
 
             const explanation = result.explanation;
             if (explanation) {
-                if (explanation.path && explanation.path.length > 0) {
-                    console.error(`[${patternId}]    At path: [${explanation.path.join(' → ')}]`);
-                }
-
-                console.error(`[${patternId}]    Reason: ${explanation.reason}`);
-                console.error(`[${patternId}]    Expected: ${explanation.expected}`);
-                console.error(`[${patternId}]    Actual: ${explanation.actual}`);
-
-                if (explanation.details) {
-                    console.error(`[${patternId}]    Details: ${explanation.details}`);
-                }
+                // Always show path, even if empty, to make it clear where the mismatch occurred
+                const pathStr = explanation.path.length > 0 ? explanation.path.join(' → ') : '';
+                lines.push(`[${patternId}]    At path:  [${pathStr}]`);
+                lines.push(`[${patternId}]    Reason:   ${explanation.reason}`);
+                lines.push(`[${patternId}]    Expected: ${explanation.expected}`);
+                lines.push(`[${patternId}]    Actual:   ${explanation.actual}`);
             }
         }
+
+        // Single console.error call with all lines joined
+        console.error(lines.join('\n'));
     }
 
     /**
@@ -751,15 +767,18 @@ class Matcher {
 
         // Factory pattern: instantiate debug or production comparator
         // Zero cost in production - DebugPatternMatchingComparator is never instantiated
-        const matcherCallbacks = {
+        const matcherCallbacks: MatcherCallbacks = {
             handleCapture: (capture: CaptureMarker, t: J, w?: J.RightPadded<J>) => this.handleCapture(capture, t, w),
             handleVariadicCapture: (capture: CaptureMarker, ts: J[], ws?: J.RightPadded<J>[]) => this.handleVariadicCapture(capture, ts, ws),
             saveState: () => this.saveState(),
-            restoreState: (state: Map<string, CaptureStorageValue>) => this.restoreState(state),
+            restoreState: (state) => this.restoreState(state),
             // Debug callbacks (Layer 1) - grouped together, always present or absent
             debug: this.debugOptions.enabled ? {
                 log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => this.log(level, scope, message, data),
                 setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string) => this.setExplanation(reason, expected, actual, details),
+                getExplanation: () => this.explanation,
+                restoreExplanation: (explanation: MatchExplanation) => { this.explanation = explanation; },
+                clearExplanation: () => { this.explanation = undefined; },
                 pushPath: (name: string) => this.pushPath(name),
                 popPath: () => this.popPath()
             } : undefined
@@ -788,22 +807,44 @@ class Matcher {
     }
 
     /**
-     * Saves the current state of storage for backtracking.
+     * Saves the current state for backtracking.
+     * Includes both capture storage AND debug state (explanation, log, path).
      *
      * @returns A snapshot of the current state
      */
-    private saveState(): Map<string, CaptureStorageValue> {
-        return new Map(this.storage);
+    private saveState(): MatcherState {
+        return {
+            storage: new Map(this.storage),
+            debugState: this.debugOptions.enabled ? {
+                explanation: this.explanation,
+                logLength: this.debugLog.length,
+                path: [...this.currentPath]
+            } : undefined
+        };
     }
 
     /**
      * Restores a previously saved state for backtracking.
+     * Restores both capture storage AND debug state.
      *
      * @param state The state to restore
      */
-    private restoreState(state: Map<string, CaptureStorageValue>): void {
+    private restoreState(state: MatcherState): void {
+        // Restore capture storage
         this.storage.clear();
-        state.forEach((value, key) => this.storage.set(key, value));
+        state.storage.forEach((value, key) => this.storage.set(key, value));
+
+        // Restore debug state if it was saved
+        if (state.debugState) {
+            // Restore explanation to the saved state
+            // This clears any explanations set during failed exploratory attempts (like pivot detection)
+            this.explanation = state.debugState.explanation;
+            // Truncate debug log to saved length (remove entries added during failed attempt)
+            this.debugLog.length = state.debugState.logLength;
+            // Restore path
+            this.currentPath.length = 0;
+            this.currentPath.push(...state.debugState.path);
+        }
     }
 
     /**

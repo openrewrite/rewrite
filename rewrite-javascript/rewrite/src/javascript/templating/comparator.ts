@@ -28,8 +28,24 @@ import {DebugLogEntry, MatchExplanation} from './types';
 export interface DebugCallbacks {
     log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => void;
     setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string) => void;
+    getExplanation: () => MatchExplanation | undefined;
+    restoreExplanation: (explanation: MatchExplanation) => void;
+    clearExplanation: () => void;
     pushPath: (name: string) => void;
     popPath: () => void;
+}
+
+/**
+ * Snapshot of matcher state for backtracking.
+ * Includes both capture storage and debug state.
+ */
+export interface MatcherState {
+    storage: Map<string, CaptureStorageValue>;
+    debugState?: {
+        explanation?: MatchExplanation;
+        logLength: number;
+        path: string[];
+    };
 }
 
 /**
@@ -39,8 +55,8 @@ export interface DebugCallbacks {
 export interface MatcherCallbacks {
     handleCapture: (capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>) => boolean;
     handleVariadicCapture: (capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
-    saveState: () => Map<string, CaptureStorageValue>;
-    restoreState: (state: Map<string, CaptureStorageValue>) => void;
+    saveState: () => MatcherState;
+    restoreState: (state: MatcherState) => void;
 
     // Debug callbacks - either all present (when debugging enabled) or absent
     debug?: DebugCallbacks;
@@ -78,12 +94,15 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 // Evaluate constraint with cursor at the captured node (always defined)
                 // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
                 if (captureMarker.constraint && !captureMarker.variadicOptions && !captureMarker.constraint(p, cursorAtCapturedNode)) {
-                    return this.abort(j) as R;
+                    const captureName = captureMarker.captureName || 'unnamed';
+                    const targetKind = (p as any).kind || 'unknown';
+                    return this.constraintFailed(captureName, targetKind) as R;
                 }
 
                 const success = this.matcher.handleCapture(captureMarker, p, undefined);
                 if (!success) {
-                    return this.abort(j) as R;
+                    const captureName = captureMarker.captureName || 'unnamed';
+                    return this.captureConflict(captureName) as R;
                 }
                 return j as R;
             } finally {
@@ -102,6 +121,20 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     protected hasSameKind(j: J, other: J): boolean {
         return super.hasSameKind(j, other) ||
             (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));
+    }
+
+    /**
+     * Additional specialized abort methods for pattern matching scenarios.
+     */
+
+    protected constraintFailed(captureName: string, targetKind: string) {
+        const pattern = this.cursor?.value as any;
+        return this.abort(pattern, 'constraint-failed', `capture[${captureName}]`, 'constraint satisfied', `constraint failed for ${targetKind}`);
+    }
+
+    protected captureConflict(captureName: string) {
+        const pattern = this.cursor?.value as any;
+        return this.abort(pattern, 'capture-conflict', `capture[${captureName}]`, 'compatible binding', 'conflicting binding');
     }
 
     /**
@@ -132,13 +165,16 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 // Evaluate constraint with cursor at the captured node (always defined)
                 // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
                 if (captureMarker.constraint && !captureMarker.variadicOptions && !captureMarker.constraint(targetElement as J, cursorAtCapturedNode)) {
-                    return this.abort(right);
+                    const captureName = captureMarker.captureName || 'unnamed';
+                    const targetKind = (targetElement as any).kind || 'unknown';
+                    return this.constraintFailed(captureName, targetKind);
                 }
 
                 // Handle the capture with the wrapper - use the element for pattern matching
                 const success = this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
                 if (!success) {
-                    return this.abort(right);
+                    const captureName = captureMarker.captureName || 'unnamed';
+                    return this.captureConflict(captureName);
                 }
                 return right;
             } finally {
@@ -169,7 +205,17 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         // Extract the other container
         const isContainer = (p as any).kind === J.Kind.Container;
         if (!isContainer) {
-            return this.abort(container);
+            // Set up cursors temporarily for kindMismatch to use
+            const savedCursor = this.cursor;
+            const savedTargetCursor = this.targetCursor;
+            this.cursor = new Cursor(container, this.cursor);
+            this.targetCursor = new Cursor(p, this.targetCursor);
+            try {
+                return this.kindMismatch();
+            } finally {
+                this.cursor = savedCursor;
+                this.targetCursor = savedTargetCursor;
+            }
         }
         const otherContainer = p as unknown as J.Container<T>;
 
@@ -182,7 +228,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             // Use matchSequence for variadic matching
             // filterEmpty=true to skip J.Empty elements (they represent missing elements in destructuring)
             if (!await this.matchSequence(container.elements as J.RightPadded<J>[], otherContainer.elements as J.RightPadded<J>[], true)) {
-                return this.abort(container);
+                return this.structuralMismatch('elements');
             }
         } finally {
             this.cursor = savedCursor;
@@ -222,51 +268,77 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         }
 
         // Otherwise, handle variadic captures ourselves
-        if (!this.match || other.kind !== J.Kind.MethodInvocation) {
+        if (!this.match) {
             return this.abort(methodInvocation);
+        }
+
+        if (other.kind !== J.Kind.MethodInvocation) {
+            // Set up cursors for kindMismatch
+            const savedCursor = this.cursor;
+            const savedTargetCursor = this.targetCursor;
+            this.cursor = new Cursor(methodInvocation, this.cursor);
+            this.targetCursor = new Cursor(other, this.targetCursor);
+            try {
+                return this.kindMismatch();
+            } finally {
+                this.cursor = savedCursor;
+                this.targetCursor = savedTargetCursor;
+            }
         }
 
         const otherMethodInvocation = other as J.MethodInvocation;
 
-        // Compare select
-        if ((methodInvocation.select === undefined) !== (otherMethodInvocation.select === undefined)) {
-            return this.abort(methodInvocation);
-        }
-
-        // Visit select if present
-        if (methodInvocation.select && otherMethodInvocation.select) {
-            await this.visit(methodInvocation.select.element, otherMethodInvocation.select.element);
-            if (!this.match) return methodInvocation;
-        }
-
-        // Compare typeParameters
-        if ((methodInvocation.typeParameters === undefined) !== (otherMethodInvocation.typeParameters === undefined)) {
-            return this.abort(methodInvocation);
-        }
-
-        // Visit typeParameters if present
-        if (methodInvocation.typeParameters && otherMethodInvocation.typeParameters) {
-            if (methodInvocation.typeParameters.elements.length !== otherMethodInvocation.typeParameters.elements.length) {
-                return this.abort(methodInvocation);
+        // Set up cursors for the entire method
+        const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
+        this.cursor = new Cursor(methodInvocation, this.cursor);
+        this.targetCursor = new Cursor(otherMethodInvocation, this.targetCursor);
+        try {
+            // Compare select
+            if ((methodInvocation.select === undefined) !== (otherMethodInvocation.select === undefined)) {
+                return this.structuralMismatch('select');
             }
 
-            // Visit each type parameter in lock step (visit RightPadded to check for markers)
-            for (let i = 0; i < methodInvocation.typeParameters.elements.length; i++) {
-                await this.visitRightPadded(methodInvocation.typeParameters.elements[i], otherMethodInvocation.typeParameters.elements[i] as any);
+            // Visit select if present
+            if (methodInvocation.select && otherMethodInvocation.select) {
+                await this.visit(methodInvocation.select.element, otherMethodInvocation.select.element);
                 if (!this.match) return methodInvocation;
             }
+
+            // Compare typeParameters
+            if ((methodInvocation.typeParameters === undefined) !== (otherMethodInvocation.typeParameters === undefined)) {
+                return this.structuralMismatch('typeParameters');
+            }
+
+            // Visit typeParameters if present
+            if (methodInvocation.typeParameters && otherMethodInvocation.typeParameters) {
+                if (methodInvocation.typeParameters.elements.length !== otherMethodInvocation.typeParameters.elements.length) {
+                    return this.arrayLengthMismatch('typeParameters.elements');
+                }
+
+                // Visit each type parameter in lock step (visit RightPadded to check for markers)
+                for (let i = 0; i < methodInvocation.typeParameters.elements.length; i++) {
+                    await this.visitRightPadded(methodInvocation.typeParameters.elements[i], otherMethodInvocation.typeParameters.elements[i] as any);
+                    if (!this.match) return methodInvocation;
+                }
+            }
+
+            // Visit name
+            await this.visit(methodInvocation.name, otherMethodInvocation.name);
+            if (!this.match) {
+                return methodInvocation;
+            }
+
+            // Special handling for variadic captures in arguments
+            if (!await this.matchArguments(methodInvocation.arguments.elements, otherMethodInvocation.arguments.elements)) {
+                return this.structuralMismatch('arguments');
+            }
+
+            return methodInvocation;
+        } finally {
+            this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
         }
-
-        // Visit name
-        await this.visit(methodInvocation.name, otherMethodInvocation.name);
-        if (!this.match) return methodInvocation;
-
-        // Special handling for variadic captures in arguments
-        if (!await this.matchArguments(methodInvocation.arguments.elements, otherMethodInvocation.arguments.elements)) {
-            return this.abort(methodInvocation);
-        }
-
-        return methodInvocation;
     }
 
     override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
@@ -282,18 +354,42 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         }
 
         // Otherwise, handle variadic captures ourselves
-        if (!this.match || other.kind !== J.Kind.Block) {
+        if (!this.match) {
             return this.abort(block);
+        }
+
+        if (other.kind !== J.Kind.Block) {
+            // Set up cursors for kindMismatch
+            const savedCursor = this.cursor;
+            const savedTargetCursor = this.targetCursor;
+            this.cursor = new Cursor(block, this.cursor);
+            this.targetCursor = new Cursor(other, this.targetCursor);
+            try {
+                return this.kindMismatch();
+            } finally {
+                this.cursor = savedCursor;
+                this.targetCursor = savedTargetCursor;
+            }
         }
 
         const otherBlock = other as J.Block;
 
-        // Special handling for variadic captures in statements
-        if (!await this.matchSequence(block.statements, otherBlock.statements, false)) {
-            return this.abort(block);
-        }
+        // Set up cursors for structural comparison
+        const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
+        this.cursor = new Cursor(block, this.cursor);
+        this.targetCursor = new Cursor(otherBlock, this.targetCursor);
+        try {
+            // Special handling for variadic captures in statements
+            if (!await this.matchSequence(block.statements, otherBlock.statements, false)) {
+                return this.structuralMismatch('statements');
+            }
 
-        return block;
+            return block;
+        } finally {
+            this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
+        }
     }
 
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): Promise<J | undefined> {
@@ -308,18 +404,42 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         }
 
         // Otherwise, handle variadic captures ourselves
-        if (!this.match || other.kind !== JS.Kind.CompilationUnit) {
+        if (!this.match) {
             return this.abort(compilationUnit);
+        }
+
+        if (other.kind !== JS.Kind.CompilationUnit) {
+            // Set up cursors for kindMismatch
+            const savedCursor = this.cursor;
+            const savedTargetCursor = this.targetCursor;
+            this.cursor = new Cursor(compilationUnit, this.cursor);
+            this.targetCursor = new Cursor(other, this.targetCursor);
+            try {
+                return this.kindMismatch();
+            } finally {
+                this.cursor = savedCursor;
+                this.targetCursor = savedTargetCursor;
+            }
         }
 
         const otherCompilationUnit = other as JS.CompilationUnit;
 
-        // Special handling for variadic captures in top-level statements
-        if (!await this.matchSequence(compilationUnit.statements, otherCompilationUnit.statements, false)) {
-            return this.abort(compilationUnit);
-        }
+        // Set up cursors for structural comparison
+        const savedCursor = this.cursor;
+        const savedTargetCursor = this.targetCursor;
+        this.cursor = new Cursor(compilationUnit, this.cursor);
+        this.targetCursor = new Cursor(otherCompilationUnit, this.targetCursor);
+        try {
+            // Special handling for variadic captures in top-level statements
+            if (!await this.matchSequence(compilationUnit.statements, otherCompilationUnit.statements, false)) {
+                return this.structuralMismatch('statements');
+            }
 
-        return compilationUnit;
+            return compilationUnit;
+        } finally {
+            this.cursor = savedCursor;
+            this.targetCursor = savedTargetCursor;
+        }
     }
 
     /**
@@ -327,7 +447,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
      * A variadic capture can match zero or more consecutive arguments.
      */
     private async matchArguments(patternArgs: J.RightPadded<J>[], targetArgs: J.RightPadded<J>[]): Promise<boolean> {
-        return this.matchSequence(patternArgs, targetArgs, true);
+        return await this.matchSequence(patternArgs, targetArgs, true);
     }
 
     /**
@@ -381,13 +501,19 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             const min = variadicOptions?.min ?? 0;
             const max = variadicOptions?.max ?? Infinity;
 
-            // Calculate maximum possible consumption
+            // Calculate maximum possible consumption and check if remaining patterns are deterministic
             let nonVariadicRemainingPatterns = 0;
+            let allRemainingPatternsAreDeterministic = true;
             for (let i = patternIdx + 1; i < patternElements.length; i++) {
                 const nextCaptureMarker = PlaceholderUtils.getCaptureMarker(patternElements[i]);
                 const nextIsVariadic = nextCaptureMarker?.variadicOptions !== undefined;
                 if (!nextIsVariadic) {
                     nonVariadicRemainingPatterns++;
+                }
+                // A pattern is deterministic if it's not a capture at all (i.e., a literal/fixed structure)
+                // Variadic captures and non-variadic captures are both non-deterministic
+                if (nextCaptureMarker) {
+                    allRemainingPatternsAreDeterministic = false;
                 }
             }
             const remainingTargetElements = targetElements.length - targetIdx;
@@ -398,7 +524,11 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             let pivotDetected = false;
             let pivotAt = -1;
 
-            if (patternIdx + 1 < patternElements.length && min <= maxPossible) {
+            // Skip pivot detection if we're using deterministic optimization
+            // (when all remaining patterns are literals, there's only ONE valid consumption amount)
+            const useDeterministicOptimization = allRemainingPatternsAreDeterministic && maxPossible >= min && maxPossible <= max;
+
+            if (!useDeterministicOptimization && patternIdx + 1 < patternElements.length && min <= maxPossible) {
                 const nextPattern = patternElements[patternIdx + 1];
 
                 // Scan through possible consumption amounts starting from min
@@ -432,10 +562,15 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 }
             }
 
-            // Try different consumption amounts
-            // If pivot detected, try that first; otherwise use greedy approach (max to min)
+            // Determine consumption order
             const consumptionOrder: number[] = [];
-            if (pivotDetected && pivotAt >= 0) {
+
+            // OPTIMIZATION: If all remaining patterns are deterministic (literals, not captures),
+            // there's only ONE mathematically valid consumption amount. Skip backtracking entirely.
+            // Example: foo(${args}, 999) matching foo(1,2,42) -> args MUST be [1,2], only try consume=2
+            if (useDeterministicOptimization) {
+                consumptionOrder.push(maxPossible);
+            } else if (pivotDetected && pivotAt >= 0) {
                 // Try pivot first, then others as fallback
                 consumptionOrder.push(pivotAt);
                 for (let c = maxPossible; c >= min; c--) {
@@ -452,23 +587,16 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
 
             for (const consume of consumptionOrder) {
                 // Capture elements for this consumption amount
-                const capturedWrappers: J.RightPadded<J>[] = [];
-                for (let i = 0; i < consume; i++) {
-                    const wrapped = targetElements[targetIdx + i];
-                    const element = wrapped.element;
-                    // For arguments, filter out J.Empty as it represents an empty argument list
-                    // For statements, include all elements
-                    if (!filterEmpty || element.kind !== J.Kind.Empty) {
-                        capturedWrappers.push(wrapped);
-                    }
-                }
-
-                // Extract just the elements for the constraint check
+                // For empty argument lists, there will be a single J.Empty element that we need to filter out
+                const rawWrappers = targetElements.slice(targetIdx, targetIdx + consume);
+                const capturedWrappers = filterEmpty
+                    ? rawWrappers.filter(w => w.element.kind !== J.Kind.Empty)
+                    : rawWrappers;
                 const capturedElements: J[] = capturedWrappers.map(w => w.element);
 
-                // Re-check min/max constraints against actual captured elements (after filtering if applicable)
+                // Check min/max constraints against filtered elements
                 if (capturedElements.length < min || capturedElements.length > max) {
-                    continue; // Try next consumption amount
+                    continue;
                 }
 
                 // Evaluate constraint for variadic capture
@@ -588,6 +716,91 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         return kind.substring(kind.lastIndexOf('.') + 1);
     }
 
+    /**
+     * Formats a value for display in error messages.
+     */
+    private formatValue(value: any): string {
+        if (value === null) return 'null';
+        if (value === undefined) return 'undefined';
+        if (typeof value === 'string') return `"${value}"`;
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+        // For objects with a kind property (LST nodes)
+        if (value && typeof value === 'object' && value.kind) {
+            const kind = this.formatKind(value.kind);
+
+            // Show key identifying properties for common node types
+            if (value.simpleName) return `${kind}("${value.simpleName}")`;
+            if (value.value !== undefined) return `${kind}(${this.formatValue(value.value)})`;
+
+            return kind;
+        }
+
+        return String(value);
+    }
+
+    /**
+     * Override abort to capture explanation when debug is enabled.
+     */
+    protected override abort<T>(t: T, reason?: string, propertyName?: string, expected?: any, actual?: any): T {
+        // If we have context about the mismatch, capture it
+        if (reason && propertyName && this.debug) {
+            const expectedStr = this.formatValue(expected);
+            const actualStr = this.formatValue(actual);
+
+            this.debug.setExplanation(
+                reason as any,
+                expectedStr,
+                actualStr,
+                'Property values do not match'
+            );
+        }
+
+        return super.abort(t, reason, propertyName, expected, actual);
+    }
+
+    /**
+     * Override helper methods to extract detailed context from cursors.
+     */
+
+    protected override kindMismatch() {
+        const pattern = this.cursor?.value as any;
+        const target = this.targetCursor?.value as any;
+        return this.abort(pattern, 'kind-mismatch', 'kind', pattern?.kind, target?.kind);
+    }
+
+    protected override structuralMismatch(propertyName: string) {
+        const pattern = this.cursor?.value as any;
+        const target = this.targetCursor?.value as any;
+        const expectedValue = pattern?.[propertyName];
+        const actualValue = target?.[propertyName];
+        return this.abort(pattern, 'structural-mismatch', propertyName, expectedValue, actualValue);
+    }
+
+    protected override arrayLengthMismatch(propertyName: string) {
+        const pattern = this.cursor?.value as any;
+        const target = this.targetCursor?.value as any;
+        const expectedArray = pattern?.[propertyName];
+        const actualArray = target?.[propertyName];
+        const expectedLen = Array.isArray(expectedArray) ? expectedArray.length : 'not an array';
+        const actualLen = Array.isArray(actualArray) ? actualArray.length : 'not an array';
+        return this.abort(pattern, 'array-length-mismatch', propertyName, expectedLen, actualLen);
+    }
+
+    protected override valueMismatch(propertyName: string) {
+        const pattern = this.cursor?.value as any;
+        const target = this.targetCursor?.value as any;
+
+        // Navigate dotted property paths (e.g., "name.simpleName")
+        const getNestedValue = (obj: any, path: string) => {
+            return path.split('.').reduce((current, prop) => current?.[prop], obj);
+        };
+
+        const expectedValue = getNestedValue(pattern, propertyName);
+        const actualValue = getNestedValue(target, propertyName);
+        return this.abort(pattern, 'value-mismatch', propertyName, expectedValue, actualValue);
+    }
+
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
         const captureMarker = PlaceholderUtils.getCaptureMarker(j)!;
         if (captureMarker) {
@@ -621,7 +834,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         return await super.visit(j, p, parent);
     }
 
-    protected override async visitProperty(j: any, other: any): Promise<any> {
+    protected override async visitProperty(j: any, other: any, propertyName?: string): Promise<any> {
         if (j == null || other == null) {
             if (j !== other) {
                 this.debug.setExplanation(
@@ -645,9 +858,9 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             const otherStr = typeof other === 'string' ? `"${other}"` : String(other);
             this.debug.setExplanation(
                 'structural-mismatch',
-                `${typeof j} ${jStr}`,
-                `${typeof other} ${otherStr}`,
-                'Primitive value mismatch'
+                jStr,
+                otherStr,
+                'Property values do not match'
             );
             return this.abort(j);
         }
@@ -672,7 +885,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const kindStr = this.formatKind(j.kind);
 
         for (const key of Object.keys(j)) {
-            if (key.startsWith('_') || key === 'id' || key === 'markers') {
+            if (key.startsWith('_') || key === 'kind' || key === 'id' || key === 'markers' || key === 'prefix') {
                 continue;
             }
 
@@ -819,6 +1032,35 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
     }
 
+    protected override async matchSequence(
+        patternElements: J.RightPadded<J>[],
+        targetElements: J.RightPadded<J>[],
+        filterEmpty: boolean
+    ): Promise<boolean> {
+        // Push path component for the container
+        // Extract kind from cursors if available
+        const pattern = this.cursor?.value as any;
+        if (pattern && pattern.kind) {
+            const kindStr = this.formatKind(pattern.kind);
+            // Determine property name based on the kind
+            let propertyName = 'elements';
+            if (pattern.kind.includes('MethodInvocation')) {
+                propertyName = 'arguments';
+            } else if (pattern.kind.includes('Block')) {
+                propertyName = 'statements';
+            }
+            this.debug.pushPath(`${kindStr}#${propertyName}`);
+        }
+
+        try {
+            return await super.matchSequence(patternElements, targetElements, filterEmpty);
+        } finally {
+            if (this.cursor?.value) {
+                this.debug.popPath();
+            }
+        }
+    }
+
     protected override async visitSequenceElement(
         patternWrapper: J.RightPadded<J>,
         targetWrapper: J.RightPadded<J>,
@@ -826,7 +1068,26 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     ): Promise<boolean> {
         this.debug.pushPath(targetIdx.toString());
         try {
-            return await super.visitSequenceElement(patternWrapper, targetWrapper, targetIdx);
+            // Save current state for backtracking (both match state and capture bindings)
+            const savedMatch = this.match;
+            const savedState = this.matcher.saveState();
+
+            await this.visitRightPadded(patternWrapper, targetWrapper as any);
+
+            if (!this.match) {
+                // Preserve explanation before restoring state
+                const explanation = this.debug.getExplanation();
+                // Restore state on match failure
+                this.match = savedMatch;
+                this.matcher.restoreState(savedState);
+                // Restore the explanation if one was set during matching
+                if (explanation) {
+                    this.debug.restoreExplanation(explanation);
+                }
+                return false;
+            }
+
+            return true;
         } finally {
             this.debug.popPath();
         }
@@ -853,11 +1114,15 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             const max = variadicOptions?.max ?? Infinity;
 
             let nonVariadicRemainingPatterns = 0;
+            let allRemainingPatternsAreDeterministic = true;
             for (let i = patternIdx + 1; i < patternElements.length; i++) {
                 const nextCaptureMarker = PlaceholderUtils.getCaptureMarker(patternElements[i]);
                 const nextIsVariadic = nextCaptureMarker?.variadicOptions !== undefined;
                 if (!nextIsVariadic) {
                     nonVariadicRemainingPatterns++;
+                }
+                if (nextCaptureMarker) {
+                    allRemainingPatternsAreDeterministic = false;
                 }
             }
             const remainingTargetElements = targetElements.length - targetIdx;
@@ -866,7 +1131,11 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             let pivotDetected = false;
             let pivotAt = -1;
 
-            if (patternIdx + 1 < patternElements.length && min <= maxPossible) {
+            // Skip pivot detection if we're using deterministic optimization
+            // (when all remaining patterns are literals, there's only ONE valid consumption amount)
+            const useDeterministicOptimization = allRemainingPatternsAreDeterministic && maxPossible >= min && maxPossible <= max;
+
+            if (!useDeterministicOptimization && patternIdx + 1 < patternElements.length && min <= maxPossible) {
                 const nextPattern = patternElements[patternIdx + 1];
 
                 for (let tryConsume = min; tryConsume <= maxPossible; tryConsume++) {
@@ -896,7 +1165,12 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             }
 
             const consumptionOrder: number[] = [];
-            if (pivotDetected && pivotAt >= 0) {
+            // OPTIMIZATION: If all remaining patterns are deterministic (literals, not captures),
+            // there's only ONE mathematically valid consumption amount. Skip backtracking entirely.
+            // Example: foo(${args}, 999) matching foo(1,2,42) -> args MUST be [1,2], only try consume=2
+            if (useDeterministicOptimization) {
+                consumptionOrder.push(maxPossible);
+            } else if (pivotDetected && pivotAt >= 0) {
                 consumptionOrder.push(pivotAt);
                 for (let c = maxPossible; c >= min; c--) {
                     if (c !== pivotAt) {
@@ -910,17 +1184,15 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             }
 
             for (const consume of consumptionOrder) {
-                const capturedWrappers: J.RightPadded<J>[] = [];
-                for (let i = 0; i < consume; i++) {
-                    const wrapped = targetElements[targetIdx + i];
-                    const element = wrapped.element;
-                    if (!filterEmpty || element.kind !== J.Kind.Empty) {
-                        capturedWrappers.push(wrapped);
-                    }
-                }
-
+                // Capture elements for this consumption amount
+                // For empty argument lists, there will be a single J.Empty element that we need to filter out
+                const rawWrappers = targetElements.slice(targetIdx, targetIdx + consume);
+                const capturedWrappers = filterEmpty
+                    ? rawWrappers.filter(w => w.element.kind !== J.Kind.Empty)
+                    : rawWrappers;
                 const capturedElements: J[] = capturedWrappers.map(w => w.element);
 
+                // Check min/max constraints against filtered elements
                 if (capturedElements.length < min || capturedElements.length > max) {
                     continue;
                 }
@@ -956,7 +1228,14 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     return true;
                 }
 
+                // Preserve explanation from this failed attempt before restoring state
+                // This is especially important when using deterministic optimization (only one attempt)
+                const currentExplanation = this.debug.getExplanation();
                 this.matcher.restoreState(savedState);
+                // Restore the explanation if one was set during this attempt
+                if (currentExplanation) {
+                    this.debug.restoreExplanation(currentExplanation);
+                }
             }
 
             return false;

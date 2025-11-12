@@ -67,10 +67,42 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
     /**
      * Aborts the visit operation by setting the match flag to false.
+     *
+     * @param t The node being compared
+     * @param reason Optional reason for the mismatch (e.g., 'kind-mismatch', 'property-mismatch')
+     * @param propertyName Optional property name where mismatch occurred
+     * @param expected Optional expected value
+     * @param actual Optional actual value
      */
-    protected abort<T>(t: T): T {
+    protected abort<T>(t: T, reason?: string, propertyName?: string, expected?: any, actual?: any): T {
         this.match = false;
         return t;
+    }
+
+    /**
+     * Specialized abort methods for common mismatch scenarios.
+     * These provide a cleaner API at call sites.
+     * Can be overridden in subclasses to extract values from cursors and provide richer error messages.
+     */
+
+    protected kindMismatch() {
+        const pattern = this.cursor?.value as any;
+        return this.abort(pattern, 'kind-mismatch');
+    }
+
+    protected structuralMismatch(propertyName: string) {
+        const pattern = this.cursor?.value as any;
+        return this.abort(pattern, 'structural-mismatch', propertyName);
+    }
+
+    protected arrayLengthMismatch(propertyName: string) {
+        const pattern = this.cursor?.value as any;
+        return this.abort(pattern, 'array-length-mismatch', propertyName);
+    }
+
+    protected valueMismatch(propertyName: string) {
+        const pattern = this.cursor?.value as any;
+        return this.abort(pattern, 'value-mismatch', propertyName);
     }
 
     /**
@@ -79,13 +111,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      *
      * @param j The property value from the first tree
      * @param other The corresponding property value from the second tree
+     * @param propertyName Optional property name for error reporting
      * @returns The visited property value from the first tree
      */
-    protected async visitProperty(j: any, other: any): Promise<any> {
+    protected async visitProperty(j: any, other: any, propertyName?: string): Promise<any> {
         // Handle null/undefined (but not other falsy values like 0, false, '')
         if (j == null || other == null) {
             if (j !== other) {
-                this.abort(j);
+                this.abort(j, 'null-mismatch', propertyName, j, other);
             }
             return j;
         }
@@ -121,7 +154,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // For primitive values, compare directly
         if (j !== other) {
-            this.abort(j);
+            this.abort(j, 'value-mismatch', propertyName, j, other);
         }
         return j;
     }
@@ -142,13 +175,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Check if kinds match
         if (j.kind !== other.kind) {
-            return this.abort(j);
+            return this.abort(j, 'kind-mismatch', 'kind', j.kind, other.kind);
         }
 
         // Iterate over all properties
         for (const key of Object.keys(j)) {
             // Skip internal/private properties, id property, and markers property
-            if (key.startsWith('_') || key === 'id' || key === 'markers') {
+            if (key.startsWith('_') || key === 'kind'  || key === 'id' || key === 'markers') {
                 continue;
             }
 
@@ -158,18 +191,20 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             // Handle arrays - compare element by element
             if (Array.isArray(jValue)) {
                 if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
-                    return this.abort(j);
+                    const expectedLen = Array.isArray(jValue) ? jValue.length : 'not an array';
+                    const actualLen = Array.isArray(otherValue) ? otherValue.length : 'not an array';
+                    return this.abort(j, 'array-length-mismatch', key, expectedLen, actualLen);
                 }
 
                 for (let i = 0; i < jValue.length; i++) {
-                    await this.visitProperty(jValue[i], otherValue[i]);
+                    await this.visitProperty(jValue[i], otherValue[i], `${key}[${i}]`);
                     if (!this.match) {
                         return j;
                     }
                 }
             } else {
                 // Visit the property (which will handle wrappers, trees, primitives, etc.)
-                await this.visitProperty(jValue, otherValue);
+                await this.visitProperty(jValue, otherValue, key);
 
                 if (!this.match) {
                     return j;
@@ -225,7 +260,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         this.cursor = new Cursor(right, this.cursor);
         this.targetCursor = otherWrapper ? new Cursor(otherWrapper, this.targetCursor) : this.targetCursor;
         try {
-            await this.visitProperty(right.element, otherElement);
+            await this.visitProperty(right.element, otherElement, 'element');
         } finally {
             this.cursor = savedCursor;
             this.targetCursor = savedTargetCursor;
@@ -256,7 +291,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         this.cursor = new Cursor(left, this.cursor);
         this.targetCursor = otherWrapper ? new Cursor(otherWrapper, this.targetCursor) : this.targetCursor;
         try {
-            await this.visitProperty(left.element, otherElement);
+            await this.visitProperty(left.element, otherElement, 'element');
         } finally {
             this.cursor = savedCursor;
             this.targetCursor = savedTargetCursor;
@@ -2109,7 +2144,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * When lenientTypeMatching is enabled, null vs Type comparisons are allowed
      * (where one value is null/undefined and the other is a Type object).
      */
-    protected override async visitProperty(j: any, other: any): Promise<any> {
+    protected override async visitProperty(j: any, other: any, propertyName?: string): Promise<any> {
         // Handle null/undefined with lenient type matching
         if (this.lenientTypeMatching && (j == null || other == null)) {
             if (j !== other) {
@@ -2257,7 +2292,17 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         // Check names unless we determined we can skip based on type FQN matching
         if (!canSkipNameCheck) {
             if (method.name.simpleName !== otherMethod.name.simpleName) {
-                return this.abort(method);
+                // Set up cursors for detailed error reporting
+                const savedCursor = this.cursor;
+                const savedTargetCursor = this.targetCursor;
+                this.cursor = new Cursor(method, this.cursor);
+                this.targetCursor = new Cursor(otherMethod, this.targetCursor);
+                try {
+                    return this.valueMismatch('name.simpleName');
+                } finally {
+                    this.cursor = savedCursor;
+                    this.targetCursor = savedTargetCursor;
+                }
             }
 
             // In strict mode, check type attribution requirements
@@ -2592,10 +2637,10 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         const otherLiteral = other as J.Literal;
 
         // Only compare value and type, ignoring valueSource (text representation) and unicodeEscapes
-        await this.visitProperty(literal.value, otherLiteral.value);
+        await this.visitProperty(literal.value, otherLiteral.value, 'value');
         if (!this.match) return literal;
 
-        await this.visitProperty(literal.type, otherLiteral.type);
+        await this.visitProperty(literal.type, otherLiteral.type, 'type');
         if (!this.match) return literal;
 
         return literal;
