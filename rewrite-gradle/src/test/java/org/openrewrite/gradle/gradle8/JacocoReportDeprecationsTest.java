@@ -41,13 +41,13 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml.enabled = false
                       csv.enabled = true
                       html.enabled = false
-
+              
                       xml.destination = layout.buildDirectory.dir('jacocoXml')
                       csv.destination = layout.buildDirectory.dir('jacocoCsv')
                       html.destination = layout.buildDirectory.dir('jacocoHtml')
@@ -59,13 +59,13 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml.required = false
                       csv.required = true
                       html.required = false
-
+              
                       xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
                       csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
                       html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
@@ -85,22 +85,22 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport.reports.xml.enabled = false
               jacocoTestReport.reports.csv.enabled = true
               jacocoTestReport.reports.html.enabled = false
-
+              
               """,
             """
               plugins {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport.reports.xml.required = false
               jacocoTestReport.reports.csv.required = true
               jacocoTestReport.reports.html.required = false
-
+              
               """
           )
         );
@@ -115,7 +115,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml {
@@ -129,14 +129,14 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
+              
               """,
             """
               plugins {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml {
@@ -150,7 +150,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
+              
               """
           )
         );
@@ -165,7 +165,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml.enabled = false
@@ -175,14 +175,14 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
+              
               """,
             """
               plugins {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml.required = false
@@ -192,7 +192,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
+              
               """
           )
         );
@@ -207,26 +207,26 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports.xml.enabled = false
                   reports.csv.enabled = false
                   reports.html.enabled = false
               }
-
+              
               """,
             """
               plugins {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports.xml.required = false
                   reports.csv.required = false
                   reports.html.required = false
               }
-
+              
               """
           )
         );
@@ -240,12 +240,12 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-
+              
               tasks.register("example", JavaCompile) {
                    xml.enabled = false
                    jacocoTestReport.reports.html.enabled = false
               }
-
+              
               """
           )
         );
@@ -260,22 +260,22 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport.reports.xml.destination = layout.buildDirectory.dir('jacocoXml')
               jacocoTestReport.reports.csv.destination = layout.buildDirectory.dir('jacocoCsv')
               jacocoTestReport.reports.html.destination = layout.buildDirectory.dir('jacocoHtml')
-
+              
               """,
             """
               plugins {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport.reports.xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
               jacocoTestReport.reports.csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
               jacocoTestReport.reports.html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
-
+              
               """
           )
         );
@@ -290,7 +290,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml {
@@ -310,7 +310,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml {
@@ -338,7 +338,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml.destination = layout.buildDirectory.dir('jacocoXml')
@@ -348,14 +348,14 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
+              
               """,
             """
               plugins {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
@@ -365,7 +365,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
+              
               """
           )
         );
@@ -380,26 +380,26 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports.xml.destination = layout.buildDirectory.dir('jacocoXml')
                   reports.csv.destination = layout.buildDirectory.dir('jacocoCsv')
                   reports.html.destination = layout.buildDirectory.dir('jacocoHtml')
               }
-
+              
               """,
             """
               plugins {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports.xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
                   reports.csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
                   reports.html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
               }
-
+              
               """
           )
         );
@@ -413,12 +413,12 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-
+              
               tasks.register("example", JavaCompile) {
                    xml.destination = false
                    jacocoTestReport.reports.html.destination = layout.buildDirectory.dir('jacocoHtml')
               }
-
+              
               """
           )
         );
@@ -433,7 +433,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   java
                   jacoco
               }
-
+              
               tasks.jacocoTestReport {
                   reports {
                       xml.isEnabled = false
@@ -447,7 +447,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   java
                   jacoco
               }
-
+              
               tasks.jacocoTestReport {
                   reports {
                       xml.required = false
@@ -471,7 +471,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       id "java"
                       id "jacoco"
                   }
-
+                  
                   jacocoTestReport {
                       reports {
                           xml.enabled false
@@ -485,7 +485,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       id "java"
                       id "jacoco"
                   }
-
+                  
                   jacocoTestReport {
                       reports {
                           xml.required = false
@@ -688,7 +688,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml.enabled = true
@@ -706,7 +706,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml.required = true
@@ -732,7 +732,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml {
@@ -752,7 +752,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   id "java"
                   id "jacoco"
               }
-
+              
               jacocoTestReport {
                   reports {
                       xml {

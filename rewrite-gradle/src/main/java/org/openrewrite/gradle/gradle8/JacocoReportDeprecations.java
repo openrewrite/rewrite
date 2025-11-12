@@ -15,11 +15,6 @@
  */
 package org.openrewrite.gradle.gradle8;
 
-import static java.util.Collections.emptyList;
-import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.tree.Space.EMPTY;
-import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
-
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -37,6 +32,11 @@ import org.openrewrite.java.tree.J.Identifier;
 import org.openrewrite.java.tree.J.MethodInvocation;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.marker.Markers;
+
+import static java.util.Collections.emptyList;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.EMPTY;
+import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -101,7 +101,7 @@ public class JacocoReportDeprecations extends Recipe {
                         if (selectField.getTarget() instanceof J.Identifier) {
                             J.Identifier target = (J.Identifier) selectField.getTarget();
                             shouldReplace = "reports".equalsIgnoreCase(target.getSimpleName()) &&
-                                          isReportType(selectField.getSimpleName());
+                                    isReportType(selectField.getSimpleName());
                         }
                     }
                     // enabled(false) - inside xml/csv/html closure
@@ -210,17 +210,15 @@ public class JacocoReportDeprecations extends Recipe {
         });
     }
 
-    private static Assignment replaceMethodInvocationWithAssignment(
-        MethodInvocation method,
-        String identifierName
-    ) {
-        Identifier id = new Identifier(randomId(),
-            EMPTY,
-            Markers.EMPTY,
-            emptyList(),
-            identifierName,
-            null,
-            null
+    private static Assignment replaceMethodInvocationWithAssignment(MethodInvocation method, String identifierName) {
+        Identifier id = new Identifier(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                emptyList(),
+                identifierName,
+                null,
+                null
         );
         Expression variable;
         Expression select = method.getSelect();
@@ -228,25 +226,25 @@ public class JacocoReportDeprecations extends Recipe {
             variable = id;
         } else {
             variable = new FieldAccess(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                select,
-                new JLeftPadded<>(EMPTY, id, Markers.EMPTY),
-                null
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    select,
+                    new JLeftPadded<>(EMPTY, id, Markers.EMPTY),
+                    null
             );
         }
         return new Assignment(
-            randomId(),
-            method.getPrefix(),
-            Markers.EMPTY,
-            variable,
-            new JLeftPadded<>(
-                SINGLE_SPACE,
-                method.getArguments().get(0).withPrefix(SINGLE_SPACE),
-                Markers.EMPTY
-            ),
-            null
+                randomId(),
+                method.getPrefix(),
+                Markers.EMPTY,
+                variable,
+                new JLeftPadded<>(
+                        SINGLE_SPACE,
+                        method.getArguments().get(0).withPrefix(SINGLE_SPACE),
+                        Markers.EMPTY
+                ),
+                null
         );
     }
 }
