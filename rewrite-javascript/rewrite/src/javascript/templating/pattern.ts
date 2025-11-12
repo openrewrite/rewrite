@@ -15,9 +15,9 @@
  */
 import {Cursor} from '../..';
 import {J} from '../../java';
-import {Any, Capture, PatternOptions} from './types';
+import {Any, Capture, DebugLogEntry, DebugOptions, MatchAttemptResult, MatchExplanation, PatternOptions, MatchResult as IMatchResult} from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
-import {PatternMatchingComparator} from './comparator';
+import {DebugPatternMatchingComparator, PatternMatchingComparator} from './comparator';
 import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {TemplateEngine} from './engine';
 
@@ -250,6 +250,69 @@ export class Pattern {
         const storage = (matcher as any).storage;
         return new MatchResult(new Map(storage));
     }
+
+    /**
+     * Matches a pattern against an AST node with detailed debug information.
+     * Part of Layer 2 (Public API).
+     *
+     * This method always enables debug logging and returns detailed information about
+     * the match attempt, including:
+     * - Whether the pattern matched
+     * - Captured nodes (if matched)
+     * - Explanation of failure (if not matched)
+     * - Debug log entries showing the matching process
+     *
+     * @param ast The AST node to match against
+     * @param cursor Optional cursor at the node's position in a larger tree
+     * @param debugOptions Optional debug options (defaults to all logging enabled)
+     * @returns Detailed result with debug information
+     *
+     * @example
+     * const x = capture('x');
+     * const pat = pattern`console.log(${x})`;
+     * const attempt = await pat.matchWithExplanation(node);
+     * if (attempt.matched) {
+     *     console.log('Matched!');
+     *     console.log('Captured x:', attempt.result.get('x'));
+     * } else {
+     *     console.log('Failed:', attempt.explanation);
+     *     console.log('Debug log:', attempt.debugLog);
+     * }
+     */
+    async matchWithExplanation(
+        ast: J,
+        cursor?: Cursor,
+        debugOptions?: DebugOptions
+    ): Promise<MatchAttemptResult> {
+        // Default to full debug logging if not specified
+        const options: DebugOptions = {
+            enabled: true,
+            logComparison: true,
+            logConstraints: true,
+            ...debugOptions
+        };
+
+        const matcher = new Matcher(this, ast, cursor, options);
+        const success = await matcher.matches();
+
+        if (success) {
+            // Match succeeded - return MatchResult with debug info
+            const storage = (matcher as any).storage;
+            const matchResult = new MatchResult(new Map(storage));
+            return {
+                matched: true,
+                result: matchResult,
+                debugLog: matcher.getDebugLog()
+            };
+        } else {
+            // Match failed - return explanation
+            return {
+                matched: false,
+                explanation: matcher.getExplanation(),
+                debugLog: matcher.getDebugLog()
+            };
+        }
+    }
 }
 
 /**
@@ -277,18 +340,16 @@ export class Pattern {
  *     const capturedArgs = match.get(args);  // Returns J[] for variadic captures
  * }
  */
-export class MatchResult {
+export class MatchResult implements IMatchResult {
     constructor(
         private readonly storage: Map<string, CaptureStorageValue> = new Map()
     ) {
     }
 
-    // Overload: get with variadic Capture (array type) returns array
-    get<T>(capture: Capture<T[]>): T[] | undefined;
-    // Overload: get with regular Capture returns single value
+    // Overload: get with Capture returns value
     get<T>(capture: Capture<T>): T | undefined;
-    // Overload: get with string returns J
-    get(capture: string): J | undefined;
+    // Overload: get with string returns value
+    get(capture: string): any;
     // Implementation
     get(capture: Capture<any> | string): J | J[] | undefined {
         // Use symbol to get internal name without triggering Proxy
@@ -353,20 +414,29 @@ class Matcher {
     private readonly storage = new Map<string, CaptureStorageValue>();
     private patternAst?: J;
 
+    // Debug tracking (Layer 1: Core Instrumentation)
+    private readonly debugOptions: DebugOptions;
+    private readonly debugLog: DebugLogEntry[] = [];
+    private explanation?: MatchExplanation;
+    private readonly currentPath: string[] = [];
+
     /**
      * Creates a new matcher for a pattern against an AST node.
      *
      * @param pattern The pattern to match
      * @param ast The AST node to match against
      * @param cursor Optional cursor at the AST node's position
+     * @param debugOptions Optional debug options for instrumentation
      */
     constructor(
         private readonly pattern: Pattern,
         private readonly ast: J,
-        cursor?: Cursor
+        cursor?: Cursor,
+        debugOptions?: DebugOptions
     ) {
         // If no cursor provided, create one at the ast root so constraints can navigate up
         this.cursor = cursor ?? new Cursor(ast, undefined);
+        this.debugOptions = debugOptions ?? {};
     }
 
     private readonly cursor: Cursor;
@@ -423,6 +493,83 @@ class Matcher {
     }
 
     /**
+     * Logs a debug message if debugging is enabled.
+     * Part of Layer 1 (Core Instrumentation).
+     *
+     * @param level The severity level
+     * @param scope The scope/category
+     * @param message The message to log
+     * @param data Optional data to include
+     */
+    private log(
+        level: DebugLogEntry['level'],
+        scope: DebugLogEntry['scope'],
+        message: string,
+        data?: any
+    ): void {
+        if (!this.debugOptions.enabled) return;
+
+        // Filter by scope if specific logging is requested
+        if (scope === 'comparison' && !this.debugOptions.logComparison) return;
+        if (scope === 'constraint' && !this.debugOptions.logConstraints) return;
+
+        this.debugLog.push({
+            level,
+            scope,
+            path: [...this.currentPath],
+            message,
+            data
+        });
+    }
+
+    /**
+     * Sets the explanation for why the pattern match failed.
+     * Only sets the first failure (most relevant).
+     * Part of Layer 1 (Core Instrumentation).
+     *
+     * @param reason The reason for failure
+     * @param expected Human-readable description of what was expected
+     * @param actual Human-readable description of what was found
+     * @param details Optional additional context
+     */
+    private setExplanation(
+        reason: MatchExplanation['reason'],
+        expected: string,
+        actual: string,
+        details?: string
+    ): void {
+        // Only set the first failure (most relevant)
+        if (this.explanation) return;
+
+        this.explanation = {
+            reason,
+            path: [...this.currentPath],
+            expected,
+            actual,
+            details
+        };
+    }
+
+    /**
+     * Pushes a path component onto the current path.
+     * Used to track where in the AST tree we are during matching.
+     * Part of Layer 1 (Core Instrumentation).
+     *
+     * @param name The path component to push
+     */
+    private pushPath(name: string): void {
+        this.currentPath.push(name);
+    }
+
+    /**
+     * Pops the last path component from the current path.
+     * Part of Layer 1 (Core Instrumentation).
+     */
+    private popPath(): void {
+        this.currentPath.pop();
+    }
+
+    /**
      * Matches a pattern node against a target node.
      *
      * @param pattern The pattern node
@@ -436,12 +583,26 @@ class Matcher {
         // - Deep structural comparison
         // This centralizes all matching logic in one place
         const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
-        const comparator = new PatternMatchingComparator({
-            handleCapture: (capture, t, w) => this.handleCapture(capture, t, w),
-            handleVariadicCapture: (capture, ts, ws) => this.handleVariadicCapture(capture, ts, ws),
+
+        // Factory pattern: instantiate debug or production comparator
+        // Zero cost in production - DebugPatternMatchingComparator is never instantiated
+        const matcherCallbacks = {
+            handleCapture: (capture: CaptureMarker, t: J, w?: J.RightPadded<J>) => this.handleCapture(capture, t, w),
+            handleVariadicCapture: (capture: CaptureMarker, ts: J[], ws?: J.RightPadded<J>[]) => this.handleVariadicCapture(capture, ts, ws),
             saveState: () => this.saveState(),
-            restoreState: (state) => this.restoreState(state)
-        }, lenientTypeMatching);
+            restoreState: (state: Map<string, CaptureStorageValue>) => this.restoreState(state),
+            // Debug callbacks (Layer 1) - grouped together, always present or absent
+            debug: this.debugOptions.enabled ? {
+                log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => this.log(level, scope, message, data),
+                setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string) => this.setExplanation(reason, expected, actual, details),
+                pushPath: (name: string) => this.pushPath(name),
+                popPath: () => this.popPath()
+            } : undefined
+        };
+
+        const comparator = this.debugOptions.enabled
+            ? new DebugPatternMatchingComparator(matcherCallbacks, lenientTypeMatching)
+            : new PatternMatchingComparator(matcherCallbacks, lenientTypeMatching);
         // Pass cursors to allow constraints to navigate to root
         // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
         return await comparator.compare(pattern, target, undefined, this.cursor);
@@ -534,6 +695,26 @@ class Matcher {
         }
 
         return true;
+    }
+
+    /**
+     * Gets the debug log entries collected during matching.
+     * Part of Layer 2 (Public API).
+     *
+     * @returns The debug log entries, or undefined if debug wasn't enabled
+     */
+    getDebugLog(): DebugLogEntry[] | undefined {
+        return this.debugOptions.enabled ? [...this.debugLog] : undefined;
+    }
+
+    /**
+     * Gets the explanation for why the match failed.
+     * Part of Layer 2 (Public API).
+     *
+     * @returns The match explanation, or undefined if match succeeded or no explanation available
+     */
+    getExplanation(): MatchExplanation | undefined {
+        return this.explanation;
     }
 }
 

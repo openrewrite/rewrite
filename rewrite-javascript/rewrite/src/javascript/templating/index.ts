@@ -25,7 +25,11 @@ export type {
     TemplateParameter,
     TemplateOptions,
     RewriteRule,
-    RewriteConfig
+    RewriteConfig,
+    DebugOptions,
+    DebugLogEntry,
+    MatchExplanation,
+    MatchAttemptResult
 } from './types';
 
 // Export capture functionality
