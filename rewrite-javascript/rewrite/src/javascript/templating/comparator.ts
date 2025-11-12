@@ -741,10 +741,18 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
 
     /**
      * Override abort to capture explanation when debug is enabled.
+     * Only sets explanation on the first abort call (when this.match is still true).
+     * This preserves the most specific explanation closest to the actual mismatch.
      */
     protected override abort<T>(t: T, reason?: string, propertyName?: string, expected?: any, actual?: any): T {
+        // If already aborted, don't overwrite the explanation
+        // The first abort is typically the most specific
+        if (!this.match) {
+            return t;
+        }
+
         // If we have context about the mismatch, capture it
-        if (reason && propertyName && this.debug) {
+        if (reason && this.debug && (expected !== undefined || actual !== undefined)) {
             const expectedStr = this.formatValue(expected);
             const actualStr = this.formatValue(actual);
 
@@ -756,6 +764,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             );
         }
 
+        // Set `this.match = false`
         return super.abort(t, reason, propertyName, expected, actual);
     }
 
@@ -766,7 +775,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     protected override kindMismatch() {
         const pattern = this.cursor?.value as any;
         const target = this.targetCursor?.value as any;
-        return this.abort(pattern, 'kind-mismatch', 'kind', pattern?.kind, target?.kind);
+        // Pass the full kind strings - formatValue() will detect and format them
+        return this.abort(pattern, 'kind-mismatch', 'kind', this.formatKind(pattern?.kind), this.formatKind(target?.kind));
     }
 
     protected override structuralMismatch(propertyName: string) {
@@ -787,18 +797,64 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         return this.abort(pattern, 'array-length-mismatch', propertyName, expectedLen, actualLen);
     }
 
-    protected override valueMismatch(propertyName: string) {
+    protected override valueMismatch(propertyName?: string, expected?: any, actual?: any) {
         const pattern = this.cursor?.value as any;
         const target = this.targetCursor?.value as any;
 
-        // Navigate dotted property paths (e.g., "name.simpleName")
-        const getNestedValue = (obj: any, path: string) => {
-            return path.split('.').reduce((current, prop) => current?.[prop], obj);
-        };
+        // Track number of paths pushed for cleanup
+        let pathsPushed = 0;
 
-        const expectedValue = getNestedValue(pattern, propertyName);
-        const actualValue = getNestedValue(target, propertyName);
-        return this.abort(pattern, 'value-mismatch', propertyName, expectedValue, actualValue);
+        // Handle path tracking only if propertyName is provided
+        if (propertyName) {
+            // Split dotted property paths (e.g., "name.simpleName" → ["name", "simpleName"])
+            const pathParts = propertyName.split('.');
+            pathsPushed = pathParts.length;
+
+            // Add each property to path with kind information for nested objects
+            const kindStr = this.formatKind(pattern?.kind);
+            this.debug.pushPath(`${kindStr}#${pathParts[0]}`);
+
+            // For nested properties, try to get the kind of intermediate objects
+            let currentObj = pattern?.[pathParts[0]];
+            for (let i = 1; i < pathParts.length; i++) {
+                if (currentObj && typeof currentObj === 'object' && currentObj.kind) {
+                    // Include the kind of the nested object
+                    const nestedKind = this.formatKind(currentObj.kind);
+                    this.debug.pushPath(`${nestedKind}#${pathParts[i]}`);
+                } else {
+                    // Fallback to just the property name if no kind available
+                    this.debug.pushPath(pathParts[i]);
+                }
+                currentObj = currentObj?.[pathParts[i]];
+            }
+        }
+
+        try {
+            // If expected/actual provided, use them directly
+            if (expected !== undefined || actual !== undefined) {
+                return this.abort(pattern, 'value-mismatch', propertyName, expected, actual);
+            }
+
+            // Otherwise, try to extract from cursors (fallback for older code)
+            if (propertyName) {
+                // Navigate dotted property paths
+                const getNestedValue = (obj: any, path: string) => {
+                    return path.split('.').reduce((current, prop) => current?.[prop], obj);
+                };
+
+                const expectedValue = getNestedValue(pattern, propertyName);
+                const actualValue = getNestedValue(target, propertyName);
+                return this.abort(pattern, 'value-mismatch', propertyName, expectedValue, actualValue);
+            } else {
+                // No property name - compare whole objects
+                return this.abort(pattern, 'value-mismatch', propertyName, pattern, target);
+            }
+        } finally {
+            // Pop all the path components we pushed
+            for (let i = 0; i < pathsPushed; i++) {
+                this.debug.popPath();
+            }
+        }
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
@@ -834,55 +890,15 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         return await super.visit(j, p, parent);
     }
 
-    protected override async visitProperty(j: any, other: any, propertyName?: string): Promise<any> {
-        if (j == null || other == null) {
-            if (j !== other) {
-                this.debug.setExplanation(
-                    'structural-mismatch',
-                    j === null ? 'null' : 'undefined',
-                    other === null ? 'null' : 'undefined',
-                    'Null/undefined mismatch'
-                );
-                return this.abort(j);
-            }
-            return j;
-        }
-
-        const kind = (j as any).kind;
-        if (kind !== undefined) {
-            return await super.visitProperty(j, other);
-        }
-
-        if (j !== other) {
-            const jStr = typeof j === 'string' ? `"${j}"` : String(j);
-            const otherStr = typeof other === 'string' ? `"${other}"` : String(other);
-            this.debug.setExplanation(
-                'structural-mismatch',
-                jStr,
-                otherStr,
-                'Property values do not match'
-            );
-            return this.abort(j);
-        }
-        return j;
-    }
-
     protected override async visitElement<T extends J>(j: T, other: T): Promise<T> {
         if (!this.match) {
             return j;
         }
 
-        if (j.kind !== other.kind) {
-            this.debug.setExplanation(
-                'kind-mismatch',
-                `Kind ${j.kind}`,
-                `Kind ${other.kind}`,
-                `Expected ${j.kind} but found ${other.kind}`
-            );
-            return this.abort(j);
-        }
-
         const kindStr = this.formatKind(j.kind);
+        if (j.kind !== other.kind) {
+            return this.abort(j, 'kind-mismatch', 'kind', kindStr, this.formatKind(other.kind));
+        }
 
         for (const key of Object.keys(j)) {
             if (key.startsWith('_') || key === 'kind' || key === 'id' || key === 'markers' || key === 'prefix') {
@@ -895,14 +911,10 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             if (Array.isArray(jValue)) {
                 if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
                     this.debug.pushPath(`${kindStr}#${key}`);
-                    this.debug.setExplanation(
-                        'structural-mismatch',
-                        `Array[${jValue.length}]`,
-                        Array.isArray(otherValue) ? `Array[${otherValue.length}]` : typeof otherValue,
-                        `Array length mismatch or not an array`
-                    );
+                    const result = this.abort(j, 'array-length-mismatch', key, jValue.length,
+                        Array.isArray(otherValue) ? otherValue.length : otherValue);
                     this.debug.popPath();
-                    return this.abort(j);
+                    return result;
                 }
 
                 for (let i = 0; i < jValue.length; i++) {
@@ -997,17 +1009,22 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         try {
             if (hasVariadicCapture) {
                 if (!await this.matchSequence(container.elements as J.RightPadded<J>[], otherContainer.elements as J.RightPadded<J>[], true)) {
-                    return this.abort(container);
+                    return this.arrayLengthMismatch('elements');
                 }
             } else {
-                // Non-variadic path - use helper method with path tracking
+                // Non-variadic path - track indices
                 if (container.elements.length !== otherContainer.elements.length) {
-                    return this.abort(container);
+                    return this.arrayLengthMismatch('elements');
                 }
 
                 for (let i = 0; i < container.elements.length; i++) {
-                    if (!await this.visitContainerElement(container.elements[i], otherContainer.elements[i], i)) {
-                        return container;
+                    this.debug.pushPath(i.toString());
+                    try {
+                        if (!await this.visitContainerElement(container.elements[i], otherContainer.elements[i], i)) {
+                            return container;
+                        }
+                    } finally {
+                        this.debug.popPath();
                     }
                 }
             }
@@ -1019,14 +1036,113 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         return container;
     }
 
+    /**
+     * Override visitContainerProperty to add path tracking with property context.
+     */
+    protected override async visitContainerProperty<T extends J>(
+        propertyName: string,
+        container: J.Container<T>,
+        otherContainer: J.Container<T>
+    ): Promise<J.Container<T>> {
+        // Get parent from cursor
+        const parent = this.cursor.value as J;
+
+        // Push path for the property
+        const kindStr = this.formatKind((parent as any).kind);
+        this.debug.pushPath(`${kindStr}#${propertyName}`);
+
+        try {
+            await this.visitContainer(container, otherContainer as any);
+            return container;
+        } finally {
+            this.debug.popPath();
+        }
+    }
+
+    /**
+     * Override visitRightPaddedProperty to add path tracking with property context.
+     */
+    protected override async visitRightPaddedProperty<T extends J | boolean>(
+        propertyName: string,
+        rightPadded: J.RightPadded<T>,
+        otherRightPadded: J.RightPadded<T>
+    ): Promise<J.RightPadded<T>> {
+        // Get parent from cursor
+        const parent = this.cursor.value as J;
+
+        // Push path for the property
+        const kindStr = this.formatKind((parent as any).kind);
+        this.debug.pushPath(`${kindStr}#${propertyName}`);
+
+        try {
+            return await this.visitRightPadded(rightPadded, otherRightPadded as any);
+        } finally {
+            this.debug.popPath();
+        }
+    }
+
+    /**
+     * Override visitLeftPaddedProperty to add path tracking with property context.
+     */
+    protected override async visitLeftPaddedProperty<T extends J | J.Space | number | string | boolean>(
+        propertyName: string,
+        leftPadded: J.LeftPadded<T>,
+        otherLeftPadded: J.LeftPadded<T>
+    ): Promise<J.LeftPadded<T>> {
+        // Get parent from cursor
+        const parent = this.cursor.value as J;
+
+        // Push path for the property
+        const kindStr = this.formatKind((parent as any).kind);
+        this.debug.pushPath(`${kindStr}#${propertyName}`);
+
+        try {
+            return await this.visitLeftPadded(leftPadded, otherLeftPadded as any);
+        } finally {
+            this.debug.popPath();
+        }
+    }
+
+
     protected override async visitContainerElement<T extends J>(
         element: J.RightPadded<T>,
         otherElement: J.RightPadded<T>,
         index: number
     ): Promise<boolean> {
-        this.debug.pushPath(index.toString());
+        // Don't push index here - it should be handled by the caller with proper context
+        return await super.visitContainerElement(element, otherElement, index);
+    }
+
+    protected override async visitArrayProperty<T>(
+        parent: J,
+        propertyName: string,
+        array1: T[],
+        array2: T[],
+        visitor: (item1: T, item2: T, index: number) => Promise<void>
+    ): Promise<void> {
+        // Push path for the property
+        const kindStr = this.formatKind((parent as any).kind);
+        this.debug.pushPath(`${kindStr}#${propertyName}`);
+
         try {
-            return await super.visitContainerElement(element, otherElement, index);
+            // Check length mismatch (will have path context)
+            if (array1.length !== array2.length) {
+                this.arrayLengthMismatch(propertyName);
+                return;
+            }
+
+            // Visit each element with index tracking
+            for (let i = 0; i < array1.length; i++) {
+                this.debug.pushPath(i.toString());
+                try {
+                    await visitor(array1[i], array2[i], i);
+                    if (!this.match) {
+                        return;
+                    }
+                } finally {
+                    this.debug.popPath();
+                }
+            }
         } finally {
             this.debug.popPath();
         }

@@ -59,7 +59,7 @@ describe('Pattern Debugging', () => {
         expect(attempt.result).toBeUndefined();
         expect(attempt.explanation).toBeDefined();
         // Both are Literal nodes, but with different primitive values
-        expect(attempt.explanation!.reason).toBe('structural-mismatch');
+        expect(attempt.explanation!.reason).toBe('value-mismatch');
         expect(attempt.debugLog).toBeDefined();
     });
 
@@ -188,11 +188,11 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation!.path).toBeDefined();
 
         // Path should have multiple levels showing the traversal through:
-        // arguments -> [0] -> object body -> statements -> property index -> nested object -> value
-        // Expected path: ["arguments","0","body","statements","1","initializer","body","statements","0","initializer"]
+        // arguments[0] -> object body -> statements[1] -> property initializer -> nested object -> value
         expect(attempt.explanation!.path.length).toBeGreaterThan(5);
 
         // Path should include key elements showing the nested traversal
+        // Note: Array indices are now compacted into the previous element during rendering
         expect(attempt.explanation!.path).toEqual([
             "J$MethodInvocation#arguments",
             "0",
@@ -242,6 +242,56 @@ describe('Pattern Debugging', () => {
 
         expect(comparisonLogs.length).toBe(0);
         expect(constraintLogs.length).toBe(0);
+    });
+
+    test('path tracking includes intermediate steps for object destructuring', async () => {
+        const name = capture();
+        const pat = pattern`const {${name}} = obj;`;
+
+        // Target has two variables, pattern expects one
+        const gen = parser.parse({
+            text: 'const {a, b} = obj;',
+            sourcePath: 'test.ts'
+        });
+        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const statement = cu.statements[0].element;
+
+        const attempt = await pat.matchWithExplanation(statement);
+
+        expect(attempt.matched).toBe(false);
+        expect(attempt.explanation).toBeDefined();
+
+        // The path should show the full navigation through:
+        // J$VariableDeclarations#variables → 0 → J$VariableDeclarations$NamedVariable#name → JS$ObjectBindingPattern#bindings
+        expect(attempt.explanation!.path).toEqual([
+            'J$VariableDeclarations#variables',
+            '0',
+            'J$VariableDeclarations$NamedVariable#name',
+            'JS$ObjectBindingPattern#bindings'
+        ]);
+
+        // Should be an array length mismatch
+        expect(attempt.explanation!.reason).toBe('array-length-mismatch');
+        expect(attempt.explanation!.expected).toBe('1');
+        expect(attempt.explanation!.actual).toBe('2');
+    });
+
+    test('path tracking includes property name for value mismatch', async () => {
+        const pat = pattern`console.log(42)`;
+        const node = await parseExpression('console.error(42)');
+
+        const attempt = await pat.matchWithExplanation(node);
+
+        expect(attempt.matched).toBe(false);
+        expect(attempt.explanation).toBeDefined();
+
+        // The path should show the property that mismatched with kind information for nested objects
+        expect(attempt.explanation!.path).toEqual(['J$MethodInvocation#name', 'J$Identifier#simpleName']);
+
+        // Should be a value mismatch
+        expect(attempt.explanation!.reason).toBe('value-mismatch');
+        expect(attempt.explanation!.expected).toBe('"log"');
+        expect(attempt.explanation!.actual).toBe('"error"');
     });
 
 });

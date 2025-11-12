@@ -599,7 +599,7 @@ export interface MatchExplanation {
     /**
      * The reason for the match failure.
      */
-    reason: 'structural-mismatch' | 'constraint-failed' | 'type-mismatch' | 'kind-mismatch';
+    reason: 'structural-mismatch' | 'constraint-failed' | 'type-mismatch' | 'kind-mismatch' | 'value-mismatch' | 'array-length-mismatch';
 
     /**
      * Path in the AST where the failure occurred (e.g., ['select', 'name']).

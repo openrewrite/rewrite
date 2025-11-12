@@ -123,6 +123,7 @@ export class Pattern {
     private _cachedAstPattern?: J;
     private static nextPatternId = 1;
     private readonly patternId: number;
+    private readonly unnamedCaptureMapping = new Map<string, string>();
 
     /**
      * Gets the configuration options for this pattern.
@@ -161,6 +162,18 @@ export class Pattern {
         public readonly captures: (Capture | Any<any> | RawCode)[]
     ) {
         this.patternId = Pattern.nextPatternId++;
+
+        // Build mapping for unnamed captures (unnamed_N -> _X)
+        let unnamedIndex = 1;
+        for (const cap of captures) {
+            if (cap && typeof cap === 'object' && 'getName' in cap) {
+                const name = (cap as Capture<any> | Any<any>).getName();
+                if (name && name.startsWith('unnamed_')) {
+                    this.unnamedCaptureMapping.set(name, `_${unnamedIndex}`);
+                    unnamedIndex++;
+                }
+            }
+        }
     }
 
     /**
@@ -328,7 +341,8 @@ export class Pattern {
                     for (const [name, value] of storage) {
                         const extractedValue = (result.result as any).extractElements(value);
                         const valueStr = this.formatCapturedValue(extractedValue);
-                        lines.push(`[${patternId}]    Captured '${name}': ${valueStr}`);
+                        const displayName = this.unnamedCaptureMapping.get(name) || name;
+                        lines.push(`[${patternId}]    Captured '${displayName}': ${valueStr}`);
                     }
                 }
             }
@@ -340,7 +354,8 @@ export class Pattern {
             const explanation = result.explanation;
             if (explanation) {
                 // Always show path, even if empty, to make it clear where the mismatch occurred
-                const pathStr = explanation.path.length > 0 ? explanation.path.join(' → ') : '';
+                const compactedPath = this.compactPath(explanation.path);
+                const pathStr = compactedPath.length > 0 ? compactedPath.join(' → ') : '';
                 lines.push(`[${patternId}]    At path:  [${pathStr}]`);
                 lines.push(`[${patternId}]    Reason:   ${explanation.reason}`);
                 lines.push(`[${patternId}]    Expected: ${explanation.expected}`);
@@ -350,6 +365,54 @@ export class Pattern {
 
         // Single console.error call with all lines joined
         console.error(lines.join('\n'));
+    }
+
+    /**
+     * Compacts array index navigations into the previous path element.
+     * For example: ['J$VariableDeclarations#variables', '0'] → ['J$VariableDeclarations#variables[0]']
+     * @private
+     */
+    private compactPath(path: string[]): string[] {
+        const compacted: string[] = [];
+        let i = 0;
+
+        while (i < path.length) {
+            const current = path[i];
+
+            // Check if current element is itself a numeric index
+            if (/^\d+$/.test(current)) {
+                // This is a bare numeric index - shouldn't normally happen
+                // If we have a previous element, append to it
+                if (compacted.length > 0) {
+                    compacted[compacted.length - 1] += `[${current}]`;
+                } else {
+                    // No previous element to attach to - this is an error in path construction
+                    // Skip it to avoid bare [0] in output
+                    console.warn(`Warning: Path starts with numeric index '${current}' - skipping`);
+                }
+                i++;
+                continue;
+            }
+
+            // Look ahead to collect consecutive numeric indices
+            let j = i + 1;
+            const indices: string[] = [];
+            while (j < path.length && /^\d+$/.test(path[j])) {
+                indices.push(path[j]);
+                j++;
+            }
+
+            // If we found numeric indices, append them to current element
+            if (indices.length > 0) {
+                compacted.push(current + indices.map(idx => `[${idx}]`).join(''));
+                i = j; // Skip the indices we just processed
+            } else {
+                compacted.push(current);
+                i++;
+            }
+        }
+
+        return compacted;
     }
 
     /**
@@ -371,7 +434,9 @@ export class Pattern {
                 // Show capture name or placeholder
                 const name = (cap as any)[CAPTURE_NAME_SYMBOL];
                 if (cap && typeof cap === 'object' && name) {
-                    source += `\${${name}}`;
+                    // Use mapped name for unnamed captures, or original name
+                    const displayName = this.unnamedCaptureMapping.get(name) || name;
+                    source += `\${${displayName}}`;
                 } else {
                     source += '${...}';
                 }
