@@ -461,7 +461,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
     }
 
     @Nested
-    class AsMethodInvocation {
+    class MethodInvocationToAssignments {
         @Test
         void deprecationsInMethodInvocationSyntax() {
             rewriteRun(
@@ -511,17 +511,11 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       reports {
                           xml {
                               enabled false
-                              enabled true
-                              enabled false
                           }
                           csv {
                               enabled true
-                              enabled false
-                              enabled true
                           }
                           html {
-                              enabled false
-                              enabled false
                               enabled false
                           }
                       }
@@ -536,17 +530,11 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       reports {
                           xml {
                               required = false
-                              required = true
-                              required = false
                           }
                           csv {
                               required = true
-                              required = false
-                              required = true
                           }
                           html {
-                              required = false
-                              required = false
                               required = false
                           }
                       }
@@ -633,18 +621,12 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       reports {
                           xml {
                               destination layout.buildDirectory.dir('jacocoXml')
-                              destination layout.buildDirectory.dir('jacocoXml1')
-                              destination layout.buildDirectory.dir('jacocoXml2')
                           }
                           csv {
                               destination layout.buildDirectory.dir('jacocoCsv')
-                              destination layout.buildDirectory.dir('jacocoCsv1')
-                              destination layout.buildDirectory.dir('jacocoCsv2')
                           }
                           html {
                               destination layout.buildDirectory.dir('jacocoHtml')
-                              destination layout.buildDirectory.dir('jacocoHtml1')
-                              destination layout.buildDirectory.dir('jacocoHtml2')
                           }
                       }
                   }
@@ -658,18 +640,12 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       reports {
                           xml {
                               outputLocation = layout.buildDirectory.dir('jacocoXml')
-                              outputLocation = layout.buildDirectory.dir('jacocoXml1')
-                              outputLocation = layout.buildDirectory.dir('jacocoXml2')
                           }
                           csv {
                               outputLocation = layout.buildDirectory.dir('jacocoCsv')
-                              outputLocation = layout.buildDirectory.dir('jacocoCsv1')
-                              outputLocation = layout.buildDirectory.dir('jacocoCsv2')
                           }
                           html {
                               outputLocation = layout.buildDirectory.dir('jacocoHtml')
-                              outputLocation = layout.buildDirectory.dir('jacocoHtml1')
-                              outputLocation = layout.buildDirectory.dir('jacocoHtml2')
                           }
                       }
                   }
@@ -680,7 +656,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
     }
 
     @Test
-    void allNotationsMixed() {
+    void allNotationsMixedFromReports() {
         rewriteRun(
           buildGradle(
             """
@@ -724,7 +700,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
     }
 
     @Test
-    void allNotationsMixed2() {
+    void allNotationsMixedFromReportsXml() {
         rewriteRun(
           buildGradle(
             """
