@@ -41,14 +41,14 @@ import java.util.function.Supplier;
 
 public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
-    private final SpacesStyle spacesStyle;
+    protected final SpacesStyle spacesStyle;
     @Nullable
-    EmptyForInitializerPadStyle emptyForInitializerPadStyle;
+    protected final EmptyForInitializerPadStyle emptyForInitializerPadStyle;
     @Nullable
-    EmptyForIteratorPadStyle emptyForIteratorPadStyle;
+    protected final EmptyForIteratorPadStyle emptyForIteratorPadStyle;
     @Nullable
-    private final Tree stopAfter;
-    private final boolean removeCustomLineBreaks;
+    protected final Tree stopAfter;
+    protected final boolean removeCustomLineBreaks;
 
     public SpacesVisitor(SourceFile sourceFile, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
         this(sourceFile.getMarkers().findAll(NamedStyles.class), removeCustomLineBreaks, stopAfter);
@@ -94,6 +94,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         boolean emptyContainer = false;
 
         switch (loc) {
+            case LANGUAGE_EXTENSION:
+            case CASE_LABEL:
+                break;
             case MEMBER_REFERENCE_CONTAINING:
                 after = evaluate(() -> spacesStyle.getAroundOperators().getMethodReferenceDoubleColon(), false) ? " " : "";
                 break;
@@ -253,8 +256,6 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             case METHOD_SELECT:
                 after = "";
                 break;
-            case CASE_LABEL:
-                break;
             default:
                 if (hasLineBreakInSpace(right.getAfter())) {
                     after = right.getAfter().getWhitespace();
@@ -335,6 +336,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         String before = null;
         String beforeElem = null;
         switch (loc) {
+            case LANGUAGE_EXTENSION:
+                break;
             case TERNARY_TRUE:
                 before = evaluate(() -> spacesStyle.getTernaryOperator().getBeforeQuestionMark(), true) ? " " : "";
                 beforeElem = evaluate(() -> spacesStyle.getTernaryOperator().getAfterQuestionMark(), true) ? " " : "";
@@ -385,6 +388,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         J parent;
         BiFunction<Space, String, Space> minimized = this::minimizedLastComment;
         switch (loc) {
+            case LANGUAGE_EXTENSION:
+                break;
             case BLOCK_PREFIX:
                 parentTreeCursor = getCursor().getParentTreeCursor();
                 if (parentTreeCursor.getValue() instanceof J) {
