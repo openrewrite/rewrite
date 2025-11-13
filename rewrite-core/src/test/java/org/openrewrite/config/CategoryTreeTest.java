@@ -29,6 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.config.CategoryTreeTest.Group.Group1;
 import static org.openrewrite.config.CategoryTreeTest.Group.Group2;
 
+@SuppressWarnings("DataFlowIssue")
+@Deprecated
 class CategoryTreeTest {
     private final Environment env = Environment.builder()
       .scanRuntimeClasspath()
@@ -81,10 +83,10 @@ class CategoryTreeTest {
         CategoryTree<Integer> categoryTree = CategoryTree.<Integer>build()
           .putRecipes(0, recipeDescriptor("org.openrewrite.test"))
           .putCategories(1, descriptor)
-          .putCategories(2, descriptor.withDisplayName("new display name"));
+          .putCategories(2, descriptor.withDisplayName("New display name"));
 
         CategoryTree<Integer> found = requireNonNull(categoryTree.getCategory("org.openrewrite.test"));
-        assertThat(found.getDescriptor().getDisplayName()).isEqualTo("new display name");
+        assertThat(found.getDescriptor().getDisplayName()).isEqualTo("New display name");
         assertThat(found.getRecipes()).hasSize(1);
 
         categoryTree.removeAll(2);
@@ -112,7 +114,7 @@ class CategoryTreeTest {
     private static RecipeDescriptor recipeDescriptor(String packageName) {
         return new RecipeDescriptor(packageName + ".MyRecipe",
           "My recipe", "", "", emptySet(), null, emptyList(),
-          emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), null);
+          emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
     }
 
     @Test

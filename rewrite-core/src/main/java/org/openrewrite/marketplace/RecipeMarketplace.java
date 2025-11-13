@@ -20,10 +20,12 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Incubating;
 import org.openrewrite.NlsRewrite;
 
 import java.util.*;
 
+@Incubating(since = "8.66.0")
 public class RecipeMarketplace {
     private final @Getter(AccessLevel.PACKAGE) Category root = new Category("Root");
     private final @Getter List<RecipeBundleResolver> resolvers = new ArrayList<>();
@@ -46,8 +48,14 @@ public class RecipeMarketplace {
         return root.getCategories();
     }
 
-    public void install(RecipeListing recipe, String... categoryPath) {
+    public void install(RecipeListing recipe, List<String> categoryPath) {
         root.install(recipe, categoryPath);
+    }
+
+    public void install(RecipeBundleReader bundleReader) {
+        RecipeMarketplace marketplace = bundleReader.read();
+        getRoot().merge(marketplace.getRoot());
+        getRoot().updateBundle(marketplace.getAllRecipes(), bundleReader.getBundle());
     }
 
     @Getter
@@ -62,6 +70,39 @@ public class RecipeMarketplace {
 
         private final List<Category> categories = new ArrayList<>();
         private final List<RecipeListing> recipes = new ArrayList<>();
+
+        public void merge(Category category) {
+            for (RecipeListing recipe : category.recipes) {
+                recipes.remove(recipe);
+                recipes.add(recipe.withMarketplace(RecipeMarketplace.this));
+            }
+            for (Category subCategory : category.categories) {
+                Category existingSubCategory = null;
+                for (Category c : categories) {
+                    if (c.getDisplayName().equals(subCategory.getDisplayName())) {
+                        existingSubCategory = c;
+                        break;
+                    }
+                }
+                if (existingSubCategory != null) {
+                    existingSubCategory.merge(subCategory);
+                } else {
+                    categories.add(subCategory);
+                }
+            }
+        }
+
+        void updateBundle(Collection<RecipeListing> recipes, RecipeBundle bundle) {
+            for (RecipeListing recipe : recipes) {
+                if (this.recipes.contains(recipe)) {
+                    this.recipes.remove(recipe);
+                    this.recipes.add(recipe.withBundle(bundle));
+                }
+            }
+            for (Category category : categories) {
+                category.updateBundle(recipes, bundle);
+            }
+        }
 
         public @Nullable RecipeListing findRecipe(String name) {
             for (RecipeListing recipe : recipes) {
@@ -99,24 +140,20 @@ public class RecipeMarketplace {
          * @param recipe       The recipe to add
          * @param categoryPath Category path from shallowest to deepest (e.g., "Java", "Search")
          */
-        public void install(RecipeListing recipe, String... categoryPath) {
+        public void install(RecipeListing recipe, List<String> categoryPath) {
             recipe = recipe.withMarketplace(RecipeMarketplace.this);
 
-            if (categoryPath.length == 0) {
+            if (categoryPath.isEmpty()) {
                 recipes.add(recipe);
                 return;
             }
 
             // Get the first category in the path
-            String firstCategory = categoryPath[0];
+            String firstCategory = categoryPath.get(0);
             Category targetCategory = findOrCreateCategory(firstCategory);
 
-            // Build remaining path
-            String[] remainingPath = new String[categoryPath.length - 1];
-            System.arraycopy(categoryPath, 1, remainingPath, 0, remainingPath.length);
-
             // Recursively add to the child category
-            targetCategory.install(recipe, remainingPath);
+            targetCategory.install(recipe, categoryPath.subList(1, categoryPath.size()));
         }
 
         private Category findOrCreateCategory(String categoryName) {

@@ -41,6 +41,8 @@ public class RecipeListing implements Comparable<RecipeListing> {
     private final @NlsRewrite.Description String description;
     private final @Nullable Duration estimatedEffortPerOccurrence;
     private final List<? extends Option> options;
+
+    @With(AccessLevel.PACKAGE)
     private final RecipeBundle bundle;
 
     public RecipeBundleReader resolve() {

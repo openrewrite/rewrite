@@ -18,12 +18,12 @@ package org.openrewrite.marketplace;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
 
-import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
 public interface RecipeBundleReader {
-    Collection<RecipeListing> listRecipes();
+    RecipeBundle getBundle();
+
+    RecipeMarketplace read();
 
     RecipeDescriptor describe(RecipeListing listing);
 

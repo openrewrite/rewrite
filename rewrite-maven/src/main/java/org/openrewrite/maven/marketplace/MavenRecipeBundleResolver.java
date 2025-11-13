@@ -48,13 +48,13 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
         if (StringUtils.isBlank(bundle.getVersion())) {
-            return new ThrowingRecipeBundleReader(new IllegalStateException("Unable to read a Maven recipe bundle that has no version"));
+            return new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to read a Maven recipe bundle that has no version"));
         }
         String[] ga = bundle.getPackageName().split(":");
         GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
         return resolveDependencies(gav)
-                .map(mrr -> (RecipeBundleReader) new MavenRecipeBundleReader(gav, mrr, downloader, classLoaderFactory))
-                .orElseGet(() -> new ThrowingRecipeBundleReader(new IllegalStateException("Unable to resolve recipe " + gav)));
+                .map(mrr -> (RecipeBundleReader) new MavenRecipeBundleReader(bundle, mrr, downloader, classLoaderFactory))
+                .orElseGet(() -> new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to resolve recipe " + gav)));
     }
 
     private Optional<MavenResolutionResult> resolveDependencies(GroupArtifactVersion gav) {

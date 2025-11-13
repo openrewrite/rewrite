@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
@@ -29,10 +30,7 @@ import org.openrewrite.config.ClasspathScanningLoader;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.marketplace.RecipeBundle;
-import org.openrewrite.marketplace.RecipeBundleReader;
-import org.openrewrite.marketplace.RecipeListing;
-import org.openrewrite.marketplace.RecipeMarketplaceReader;
+import org.openrewrite.marketplace.*;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
@@ -53,7 +51,7 @@ import static java.util.Objects.requireNonNull;
 public class MavenRecipeBundleReader implements RecipeBundleReader {
     private static final Map<ResolvedGroupArtifactVersion, Lock> DEPENDENCY_LOCKS = new ConcurrentHashMap<>();
 
-    private final GroupArtifactVersion gav;
+    private final @Getter RecipeBundle bundle;
     private final MavenResolutionResult mrr;
     private final MavenArtifactDownloader downloader;
     private final RecipeClassLoaderFactory classLoaderFactory;
@@ -64,7 +62,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private transient @Nullable ClassLoader classLoader;
 
     @Override
-    public Collection<RecipeListing> listRecipes() {
+    public RecipeMarketplace read() {
         if (recipeJar == null) {
             for (ResolvedDependency resolvedDependency : mrr.getDependencies().get(Scope.Runtime)) {
                 if (resolvedDependency.isDirect() && recipeJar != null) {
@@ -76,7 +74,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                     JarEntry entry = jarFile.getJarEntry("META-INF/rewrite/recipes.csv");
                     if (entry != null) {
                         try (InputStream recipesCsv = jarFile.getInputStream(entry)) {
-                            return new RecipeMarketplaceReader().fromCsv(recipesCsv).getAllRecipes();
+                            return new RecipeMarketplaceReader().fromCsv(recipesCsv);
                         }
                     }
                 } catch (IOException e) {
@@ -85,13 +83,28 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
             }
         }
 
-        List<RecipeListing> recipes = new ArrayList<>();
-        for (RecipeDescriptor descriptor : environment().listRecipeDescriptors()) {
-            recipes.add(RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
-                    "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                    requireNonNull(gav.getVersion()), null)));
+        return marketplaceFromClasspathScan();
+    }
+
+    /**
+     * @return Build a marketplace that consists of just the recipes found via classpath scanning
+     * in the resolved recipe JAR (not including its dependencies)
+     */
+    private RecipeMarketplace marketplaceFromClasspathScan() {
+        String[] ga = bundle.getPackageName().split(":");
+        GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
+
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        Environment env = environment();
+        for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
+            marketplace.install(
+                    RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
+                            "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
+                            requireNonNull(gav.getVersion()), null)),
+                    descriptor.inferCategoriesFromName(env)
+            );
         }
-        return recipes;
+        return marketplace;
     }
 
     @Override

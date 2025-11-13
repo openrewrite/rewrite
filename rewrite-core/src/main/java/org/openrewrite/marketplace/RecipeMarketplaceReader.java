@@ -223,7 +223,7 @@ public class RecipeMarketplaceReader {
         );
 
         Collections.reverse(categories);
-        marketplace.getRoot().install(listing, categories.toArray(new String[0]));
+        marketplace.install(listing, categories);
     }
 
     @Getter

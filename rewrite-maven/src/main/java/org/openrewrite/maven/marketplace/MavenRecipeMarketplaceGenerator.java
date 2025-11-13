@@ -81,9 +81,12 @@ public class MavenRecipeMarketplaceGenerator {
                 if (!targetRecipeNames.contains(descriptor.getName())) {
                     continue;
                 }
-                marketplace.install(RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
-                        "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                        requireNonNull(gav.getVersion()), null)));
+                marketplace.install(
+                        RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
+                                "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
+                                requireNonNull(gav.getVersion()), null)),
+                        descriptor.inferCategoriesFromName(env2)
+                );
             }
             return marketplace;
         } catch (Exception e) {

@@ -15,19 +15,20 @@
  */
 package org.openrewrite.marketplace;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
 
-import java.util.List;
 import java.util.Map;
 
 @RequiredArgsConstructor
 public class ThrowingRecipeBundleReader implements RecipeBundleReader {
+    private final @Getter RecipeBundle bundle;
     private final RuntimeException t;
 
     @Override
-    public List<RecipeListing> listRecipes() {
+    public RecipeMarketplace read() {
         throw t;
     }
 
