@@ -23,6 +23,7 @@ import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
 import org.openrewrite.NlsRewrite;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,6 +67,9 @@ public class RecipeDescriptor {
     List<Contributor> contributors;
 
     List<RecipeExample> examples;
+
+    @Deprecated
+    URI source;
 
     /**
      * @param env Provides a source of category descriptors to build category names from more

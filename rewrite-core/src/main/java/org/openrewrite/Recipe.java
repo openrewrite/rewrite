@@ -37,6 +37,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
 
@@ -223,9 +225,16 @@ public abstract class Recipe implements Cloneable {
         }
         recipeList1.trimToSize();
 
+        URI recipeSource;
+        try {
+            recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), getExamples());
+                getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
     private List<OptionDescriptor> getOptionDescriptors() {
