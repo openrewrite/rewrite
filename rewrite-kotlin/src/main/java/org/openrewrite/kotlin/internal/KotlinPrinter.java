@@ -21,6 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.tree.*;
@@ -599,7 +600,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append("=");
             }
 
-            boolean omitBraces = block.getMarkers().findFirst(OmitBraces.class).isPresent();
+            boolean omitBraces = block.getMarkers().findFirst(OmitBraces.class).isPresent() ||
+                                 block.getMarkers().findFirst(org.openrewrite.kotlin.marker.OmitBraces.class).isPresent();
             if (!omitBraces) {
                 p.append("{");
             }
