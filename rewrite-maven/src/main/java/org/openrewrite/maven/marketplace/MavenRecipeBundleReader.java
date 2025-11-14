@@ -86,6 +86,15 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         return marketplaceFromClasspathScan();
     }
 
+    public ResolvedDependency getResolvedGroupArtifactVersion() {
+        for (ResolvedDependency resolvedDependency : mrr.getDependencies().get(Scope.Runtime)) {
+            if (resolvedDependency.isDirect()) {
+                return resolvedDependency;
+            }
+        }
+        throw new IllegalStateException("Expected the resolved Maven recipe bundle to contain at least one direct dependency");
+    }
+
     /**
      * @return Build a marketplace that consists of just the recipes found via classpath scanning
      * in the resolved recipe JAR (not including its dependencies)
