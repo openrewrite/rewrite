@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
@@ -29,8 +30,12 @@ public class DeclaresType<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
-        if (classDecl.getType() != null && TypeUtils.isOfClassType(classDecl.getType(), type)) {
-            return SearchResult.found(classDecl);
+        if (classDecl.getType() != null) {
+            JavaType targetType = JavaType.ShallowClass.build(type);
+
+            if (TypeUtils.isAssignableTo(targetType, classDecl.getType())) {
+                return SearchResult.found(classDecl);
+            }
         }
         return super.visitClassDeclaration(classDecl, p);
     }

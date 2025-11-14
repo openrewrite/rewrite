@@ -97,7 +97,7 @@ public class AddMethodParameter extends Recipe {
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             method = super.visitMethodDeclaration(method, ctx);
             J.ClassDeclaration enclosing = getCursor().firstEnclosing(J.ClassDeclaration.class);
-            if (enclosing != null && methodMatcher.matches(method, enclosing)) {
+            if (enclosing != null && (methodMatcher.matches(method, enclosing) || methodMatcher.matchesWithInheritance(method, enclosing))) {
                 for (Statement parameter : method.getParameters()) {
                     if (parameter instanceof J.VariableDeclarations && ((J.VariableDeclarations) parameter).getVariables().get(0).getSimpleName().equals(parameterName)) {
                         return method;
@@ -263,7 +263,7 @@ public class AddMethodParameter extends Recipe {
         private final TypeMatcher typeMatcher;
 
         public DeclaresMatchingType(String type) {
-            this.typeMatcher = new TypeMatcher(type);
+            this.typeMatcher = new TypeMatcher(type,true);
         }
 
         @Override

@@ -305,4 +305,91 @@ class AddMethodParameterTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void matchesMethodsInClassesThatImplementInterface() {
+        rewriteRun(
+          spec -> spec.recipe(new AddMethodParameter("foo.A count(foo.Sheep)", "Wolf", "wolf", null)),
+          java(
+            """
+            package foo;
+            
+            public interface A {
+                int count(Sheep flock);
+            }
+            """,
+            """
+            package foo;
+            
+            public interface A {
+                int count(Sheep flock, Wolf wolf);
+            }
+            """
+          ),
+          java(
+            """
+            package foo;
+            
+            public class Sheep {
+                public int size() {
+                                return 0;
+                            }
+            }
+            """
+          ),
+          java(
+            """
+            package foo;
+            
+            public class Wolf {
+            }
+            """
+          ),
+          java(
+            """
+            package foo;
+            
+            public class Sleep implements A {
+                @Override
+                public int count(Sheep flock) {
+                    return flock.size();
+                }
+            }
+            """,
+            """
+            package foo;
+            
+            public class Sleep implements A {
+                @Override
+                public int count(Sheep flock, Wolf wolf) {
+                    return flock.size();
+                }
+            }
+            """
+          ),
+          java(
+            """
+            package foo;
+            
+            public class Awake implements A {
+                @Override
+                public int count(Sheep flock) {
+                    return 0;
+                }
+            }
+            """,
+            """
+            package foo;
+            
+            public class Awake implements A {
+                @Override
+                public int count(Sheep flock, Wolf wolf) {
+                    return 0;
+                }
+            }
+            """
+          )
+        );
+    }
+
 }
