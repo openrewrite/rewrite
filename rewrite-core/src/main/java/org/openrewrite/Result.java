@@ -25,7 +25,6 @@ import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.remote.Remote;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -209,6 +208,11 @@ public class Result {
 
     @Incubating(since = "7.34.0")
     public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
+        return diff(relativeTo, markerPrinter, ignoreAllWhitespace, false);
+    }
+
+    @Incubating(since = "7.34.0")
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace, boolean binaryPatch) {
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
         if (before == null && after == null) {
@@ -235,12 +239,12 @@ public class Result {
                 beforePath,
                 afterPath,
                 relativeTo,
-                before == null ? "" : before.printAll(out),
-                after == null ? "" : after.printAll(out.clone()),
+                before == null ? new byte[0] : before.printAllAsBytes(out),
+                after == null ? new byte[0] : after.printAllAsBytes(out.clone()),
                 recipeSet,
                 beforeMode,
                 afterMode,
-                (after instanceof Remote) ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8
+                binaryPatch
         )) {
             return diffEntry.getDiff(ignoreAllWhitespace);
         }

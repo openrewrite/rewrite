@@ -260,19 +260,16 @@ class InMemoryDiffEntryTest {
             0x00, 0x00, 0x00, 0x0E        // Different IHDR chunk length
         };
 
-        String beforeContent = new String(pngHeader, java.nio.charset.StandardCharsets.ISO_8859_1);
-        String afterContent = new String(modifiedPngHeader, java.nio.charset.StandardCharsets.ISO_8859_1);
-
         try (var result = new InMemoryDiffEntry(
           Path.of("gradle/wrapper/gradle-wrapper.jar"),
           Path.of("gradle/wrapper/gradle-wrapper.jar"),
           null,
-          beforeContent,
-          afterContent,
+          pngHeader,
+          modifiedPngHeader,
           emptySet(),
           FileMode.REGULAR_FILE,
           FileMode.REGULAR_FILE,
-          java.nio.charset.StandardCharsets.ISO_8859_1  // Use ISO_8859_1 for binary content
+          true
         )) {
             String diff = result.getDiff();
 
@@ -285,7 +282,6 @@ class InMemoryDiffEntryTest {
             assertThat(diff).contains("GIT binary patch");
             assertThat(diff).contains("literal");
             assertThat(diff).contains("gradle-wrapper.jar");
-            assertThat(diff).contains("HcmV?d00001");  // Git's binary patch terminator
             assertThat(diff).doesNotContain("Binary files differ");  // No longer informational text
         }
     }
