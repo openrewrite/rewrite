@@ -25,6 +25,8 @@ import org.openrewrite.NlsRewrite;
 
 import java.util.*;
 
+import static java.util.Collections.addAll;
+
 @Incubating(since = "8.66.0")
 public class RecipeMarketplace {
     private final @Getter(AccessLevel.PACKAGE) Category root = new Category("Root");
@@ -32,7 +34,7 @@ public class RecipeMarketplace {
 
     public RecipeMarketplace setResolvers(RecipeBundleResolver... resolvers) {
         this.resolvers.clear();
-        Collections.addAll(this.resolvers, resolvers);
+        addAll(this.resolvers, resolvers);
         return this;
     }
 

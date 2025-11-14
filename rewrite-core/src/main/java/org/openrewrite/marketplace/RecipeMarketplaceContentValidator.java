@@ -19,7 +19,8 @@ import org.openrewrite.Validated;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 /**
  * Validates the content quality and format of recipe marketplace entries.
@@ -45,7 +46,7 @@ public class RecipeMarketplaceContentValidator {
                                                   List<String> categoryPath) {
         for (RecipeListing recipe : category.getRecipes()) {
             String value = recipe.getName() + (categoryPath.isEmpty() ? "" : categoryPath.stream()
-                    .collect(Collectors.joining(" > ", "[", "]")));
+                    .collect(joining(" > ", "[", "]")));
             validation = validation.and(validateDisplayName(validation, recipe.getDisplayName(), value));
             validation = validation.and(validateDescription(validation, recipe.getDescription(), value));
         }
