@@ -470,18 +470,18 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     private async spaceBeforeLeftPaddedElement<T extends J>(left: J.LeftPadded<T>, spaceBeforePadding: boolean, spaceBeforeElement: boolean): Promise<J.LeftPadded<T>> {
-        return produceAsync(left, async draft => {
+        return (await produceAsync(left, async draft => {
             if (draft.before.comments.length == 0) {
                 draft.before.whitespace = spaceBeforePadding ? " " : "";
             }
             draft.element = await this.spaceBefore(left.element, spaceBeforeElement) as Draft<T>;
-        });
+        }))!;
     }
 
     private async spaceBeforeRightPaddedElement<T extends J>(right: J.RightPadded<T>, spaceBefore: boolean): Promise<J.RightPadded<T>> {
-        return produceAsync(right, async draft => {
+        return (await produceAsync(right, async draft => {
             draft.element = await this.spaceBefore(right.element, spaceBefore) as Draft<T>;
-        });
+        }))!;
     }
 
     private async spaceBefore<T extends J>(j: T, spaceBefore: boolean): Promise<T> {
@@ -1209,7 +1209,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         return await super.visit(tree, p) as R;
     }
 
-    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
+    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T> | undefined> {
         const ret = await super.visitLeftPadded(left, p);
         if (ret == undefined) {
             return ret;

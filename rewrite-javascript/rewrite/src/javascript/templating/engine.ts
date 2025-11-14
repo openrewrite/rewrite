@@ -557,14 +557,14 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
     /**
      * Propagates markers from element to RightPadded wrapper.
      */
-    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): Promise<J.RightPadded<T>> {
+    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): Promise<J.RightPadded<T> | undefined> {
         if (!isTree(right.element)) {
             return right;
         }
 
         const visitedElement = await this.visit(right.element as J, p);
         if (visitedElement && visitedElement !== right.element as Tree) {
-            return produceAsync<J.RightPadded<T>>(right, async (draft: any) => {
+            const result = await produceAsync<J.RightPadded<T>>(right, async (draft: any) => {
                 // Visit element first
                 if (right.element && (right.element as any).kind) {
                     // Check if element has a CaptureMarker
@@ -576,6 +576,7 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
                     }
                 }
             });
+            return result!;
         }
 
         return right;
