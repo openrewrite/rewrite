@@ -25,10 +25,10 @@ class RecipeMarketplaceReaderTest {
     @Test
     void readMinimalMarketplace() {
         @Language("csv") String csv = """
-          name,category1,category2
-          org.openrewrite.java.cleanup.UnnecessaryParentheses,Cleanup,Java
-          org.openrewrite.java.format.AutoFormat,Formatting,Java
-          org.openrewrite.maven.UpgradeDependencyVersion,Dependencies,Maven
+          name,category1,category2,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Cleanup,Java,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.format.AutoFormat,Formatting,Java,maven,org.openrewrite:rewrite-java
+          org.openrewrite.maven.UpgradeDependencyVersion,Dependencies,Maven,maven,org.openrewrite:rewrite-maven
           """;
 
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
@@ -39,8 +39,8 @@ class RecipeMarketplaceReaderTest {
         RecipeMarketplace.Category cleanup = findCategory(java, "Cleanup");
         assertThat(cleanup.getRecipes())
           .singleElement()
-          .extracting("name", "bundle")
-          .containsExactly("org.openrewrite.java.cleanup.UnnecessaryParentheses", null);
+          .extracting("name")
+          .isEqualTo("org.openrewrite.java.cleanup.UnnecessaryParentheses");
 
         RecipeMarketplace.Category formatting = findCategory(java, "Formatting");
         assertThat(formatting.getRecipes())
@@ -64,10 +64,9 @@ class RecipeMarketplaceReaderTest {
         assertThat(listing.getDisplayName()).isEqualTo("Remove Unnecessary Parentheses");
         assertThat(listing.getDescription()).isEqualTo("Removes unnecessary parentheses");
 
-        // Bundle should be created if a RecipeBundleLoader is registered for Maven
-        // In test environment without ServiceLoader, bundle will be null
+        // Bundle is created from CSV data containing ecosystem and packageName
         RecipeBundle bundle = listing.getBundle();
-        assertThat(bundle.getPackageEcosystem()).isEqualTo("Maven");
+        assertThat(bundle.getPackageEcosystem()).isEqualTo("maven");
         assertThat(bundle.getPackageName()).isEqualTo("org.openrewrite:rewrite-java");
         assertThat(bundle.getVersion()).isEqualTo("8.0.0");
         assertThat(bundle.getTeam()).isEqualTo("java-team");
@@ -76,8 +75,8 @@ class RecipeMarketplaceReaderTest {
     @Test
     void readMarketplaceWithOptions() {
         @Language("csv") String csv = """
-          name,displayName,option1Name,option1DisplayName,option1Description,option2Name,option2DisplayName,option2Description,category
-          org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,groupId,Group ID,The group ID of the dependency,artifactId,Artifact ID,The artifact ID of the dependency,Maven
+          name,displayName,option1Name,option1DisplayName,option1Description,option2Name,option2DisplayName,option2Description,category,ecosystem,packageName
+          org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,groupId,Group ID,The group ID of the dependency,artifactId,Artifact ID,The artifact ID of the dependency,Maven,maven,org.openrewrite:rewrite-maven
           """;
 
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
@@ -99,10 +98,10 @@ class RecipeMarketplaceReaderTest {
     @Test
     void readMarketplaceWithMultipleLevelCategories() {
         @Language("csv") String csv = """
-          name,category1,category2,category3
-          org.openrewrite.java.cleanup.UnnecessaryParentheses,Cleanup,Java,Best Practices
-          org.openrewrite.java.cleanup.RemoveUnusedImports,Cleanup,Java,Best Practices
-          org.openrewrite.java.format.AutoFormat,Formatting,Java,Best Practices
+          name,category1,category2,category3,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Cleanup,Java,Best Practices,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.cleanup.RemoveUnusedImports,Cleanup,Java,Best Practices,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.format.AutoFormat,Formatting,Java,Best Practices,maven,org.openrewrite:rewrite-java
           """;
 
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
@@ -122,9 +121,9 @@ class RecipeMarketplaceReaderTest {
     @Test
     void readMarketplaceWithoutCategories() {
         @Language("csv") String csv = """
-          name,displayName,description
-          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Parentheses,Remove unnecessary parentheses
-          org.openrewrite.java.format.AutoFormat,Auto Format,Automatically format code
+          name,displayName,description,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Parentheses,Remove unnecessary parentheses,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.format.AutoFormat,Auto Format,Automatically format code,maven,org.openrewrite:rewrite-java
           """;
 
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
