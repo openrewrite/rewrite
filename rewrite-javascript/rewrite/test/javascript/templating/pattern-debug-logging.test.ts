@@ -160,7 +160,7 @@ describe('Pattern Debug Logging', () => {
         expect(capturedLine).toContain(']');
     });
 
-    test('shows path for nested mismatch', async () => {
+    test('shows matched tree with mismatch highlighted', async () => {
         const x = capture('x');
         const y = capture('y');
         const pat = pattern({ debug: true })`${x} + ${y}`;
@@ -173,12 +173,11 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        console.log('===== PATH EXAMPLE =====');
-        calls.forEach((call, i) => console.log(`${i}: ${call}`));
-        console.log('==========================');
 
-        // Should show path and operator mismatch
-        expect(calls.some(c => c.includes('At path:'))).toBe(true);
+        // Should show matched tree and mismatch reason
+        expect(calls.some(c => c.includes('Matched tree'))).toBe(true);
         expect(calls.some(c => c.includes('Reason:'))).toBe(true);
+        expect(calls.some(c => c.includes('Expected:'))).toBe(true);
+        expect(calls.some(c => c.includes('Actual:'))).toBe(true);
     });
 });

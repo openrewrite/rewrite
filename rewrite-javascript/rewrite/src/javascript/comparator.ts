@@ -2371,7 +2371,10 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         // Check names unless we determined we can skip based on type FQN matching
         if (!canSkipNameCheck) {
             if (method.name.simpleName !== otherMethod.name.simpleName) {
-                return this.valueMismatch('name.simpleName', method.name.simpleName, otherMethod.name.simpleName);
+                // Visit the name elements to push them onto the cursor stack
+                // This ensures the cursor contains the J$Identifier when we abort
+                await this.visit(method.name, otherMethod.name);
+                return method;
             }
 
             // In strict mode, check type attribution requirements
@@ -2600,7 +2603,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         if (!this.match) return methodDeclaration;
 
         // Compare parameters
-        await this.visitContainer(methodDeclaration.parameters, otherMethodDeclaration.parameters as any);
+        await this.visitContainerProperty('parameters', methodDeclaration.parameters, otherMethodDeclaration.parameters);
         if (!this.match) return methodDeclaration;
 
         // Visit throws if present
@@ -2609,7 +2612,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
 
         if (methodDeclaration.throws && otherMethodDeclaration.throws) {
-            await this.visitContainer(methodDeclaration.throws, otherMethodDeclaration.throws as any);
+            await this.visitContainerProperty('throws', methodDeclaration.throws, otherMethodDeclaration.throws);
             if (!this.match) return methodDeclaration;
         }
 

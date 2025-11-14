@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor} from '../..';
+import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {Any, Capture, DebugLogEntry, DebugOptions, MatchAttemptResult, MatchExplanation, MatchOptions, PatternOptions, MatchResult as IMatchResult} from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
 import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {TemplateEngine} from './engine';
-import {TreePrinters} from '../../print';
-import {JS} from '../index';
+import {TreePrinters, PrintOutputCapture} from '../../print';
+import {JS, JavaScriptVisitor} from '../index';
+import {withPatternMismatchMarker} from './debug-marker';
+import {PATTERN_DEBUG_MARKER_PRINTER} from './debug-printer';
 
 
 /**
@@ -320,18 +322,21 @@ export class Pattern {
         // Build the complete match result message
         const lines: string[] = [];
 
-        // Print the target tree being matched
-        let treeStr: string;
-        try {
-            const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-            treeStr = await printer.print(ast);
-        } catch (e) {
-            treeStr = '(tree printing unavailable)';
-        }
-
         if (result.matched) {
             // Success case - result first, then tree, then captures
             lines.push(`[${patternId}] ✅ SUCCESS matching against ${shortKind}:`);
+
+            // Print the matched tree
+            let treeStr: string;
+            try {
+                const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+                const output = new PrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                treeStr = await printer.print(ast, output);
+                // Replace placeholder names with clean display names
+                treeStr = this.replacePlaceholderNames(treeStr);
+            } catch (e) {
+                treeStr = '(tree printing unavailable)';
+            }
             treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
 
             // Log captured values
@@ -347,17 +352,81 @@ export class Pattern {
                 }
             }
         } else {
-            // Failure case - result first, then tree, then explanation
+            // Failure case - show both pattern tree and matched tree with markers
             lines.push(`[${patternId}] ❌ FAILED matching against ${shortKind}:`);
-            treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
+            lines.push(`[${patternId}]`);
 
+            // Get both cursors and explanation from the result
+            const patternCursor = result.patternCursor;
+            const targetCursor = result.targetCursor || cursor;
             const explanation = result.explanation;
+
+            // Print pattern tree with marker - use the actual pattern AST from matching
+            const patternAst = result.patternAst || await this.getAstPattern();
+            let patternTreeStr: string;
+            try {
+                let markedPattern: J | undefined;
+                // Use explanation's patternElement if available, otherwise fall back to cursor
+                if (explanation?.patternElement || (patternCursor && (patternCursor.value as any)?.id)) {
+                    try {
+                        markedPattern = await this.markElementWithSearchResult(patternAst, patternCursor, explanation, true);
+                    } catch (markError) {
+                        // If marking fails, continue without the marker
+                        console.warn(`Failed to mark pattern tree: ${markError}`);
+                    }
+                }
+                const patternToPrint = markedPattern || patternAst;
+                const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+                const output = new PrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                patternTreeStr = await printer.print(patternToPrint, output);
+                // Replace placeholder names with clean display names
+                patternTreeStr = this.replacePlaceholderNames(patternTreeStr);
+            } catch (e) {
+                patternTreeStr = `(tree printing unavailable: ${e})`;
+            }
+
+            lines.push(`[${patternId}]    Pattern tree:`);
+            patternTreeStr.split('\n').forEach(line => lines.push(`[${patternId}]       ${line}`));
+
+            // Print matched tree with marker
+            let matchedTreeStr: string;
+            try {
+                let markedTree: J | undefined;
+                // Use explanation's targetElement if available, otherwise fall back to cursor
+                if (explanation?.targetElement || (targetCursor && (targetCursor.value as any)?.id)) {
+                    try {
+                        markedTree = await this.markElementWithSearchResult(ast, targetCursor, explanation, false);
+                    } catch (markError) {
+                        // If marking fails, continue without the marker
+                        console.warn(`Failed to mark matched tree: ${markError}`);
+                    }
+                }
+                const treeToPrint = markedTree || ast;
+                const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+                const output = new PrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                matchedTreeStr = await printer.print(treeToPrint, output);
+                // Replace placeholder names with clean display names
+                matchedTreeStr = this.replacePlaceholderNames(matchedTreeStr);
+            } catch (e) {
+                matchedTreeStr = `(tree printing unavailable: ${e})`;
+            }
+
+            const sourcePath = this.getSourcePathFromCursor(targetCursor, ast);
+            const sourcePathStr = sourcePath ? ` (${sourcePath})` : '';
+            lines.push(`[${patternId}]`);
+            lines.push(`[${patternId}]    Matched tree${sourcePathStr}:`);
+            matchedTreeStr.split('\n').forEach(line => lines.push(`[${patternId}]       ${line}`));
             if (explanation) {
-                // Always show path, even if empty, to make it clear where the mismatch occurred
-                const compactedPath = this.compactPath(explanation.path);
-                const pathStr = compactedPath.length > 0 ? compactedPath.join(' → ') : '';
-                lines.push(`[${patternId}]    At path:  [${pathStr}]`);
                 lines.push(`[${patternId}]    Reason:   ${explanation.reason}`);
+
+                // For array-length-mismatch, extract and show the property name
+                if (explanation.reason === 'array-length-mismatch' && explanation.path.length > 0) {
+                    const propertyName = this.extractPropertyName(explanation.path);
+                    if (propertyName) {
+                        lines.push(`[${patternId}]    Property: ${propertyName}`);
+                    }
+                }
+
                 lines.push(`[${patternId}]    Expected: ${explanation.expected}`);
                 lines.push(`[${patternId}]    Actual:   ${explanation.actual}`);
             }
@@ -413,6 +482,98 @@ export class Pattern {
         }
 
         return compacted;
+    }
+
+    /**
+     * Extracts the property name from a path for display in error messages.
+     * For example, ['J$MethodInvocation#arguments', '0', 'J$MethodDeclaration#parameters'] -> 'parameters'
+     * @private
+     */
+    private extractPropertyName(path: string[]): string | undefined {
+        if (path.length === 0) return undefined;
+
+        // Get the last element in the path
+        const lastElement = path[path.length - 1];
+
+        // Extract property name after '#'
+        const hashIndex = lastElement.indexOf('#');
+        if (hashIndex >= 0 && hashIndex < lastElement.length - 1) {
+            return lastElement.substring(hashIndex + 1);
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Walks up the cursor to find the source file and extract its source path.
+     * @private
+     */
+    private getSourcePathFromCursor(cursor: Cursor | undefined, ast?: J): string | undefined {
+        // First check if the ast node itself is a SourceFile
+        if (ast && typeof ast === 'object' && 'sourcePath' in ast) {
+            return (ast as any).sourcePath;
+        }
+        // Then try walking up the cursor
+        if (!cursor) return undefined;
+        let current: Cursor | undefined = cursor;
+        while (current) {
+            const value = current.value;
+            if (value && typeof value === 'object' && 'sourcePath' in value) {
+                return (value as any).sourcePath;
+            }
+            current = current.parent;
+        }
+        return undefined;
+    }
+
+    /**
+     * Replaces placeholder names in tree strings with clean display names.
+     * @private
+     */
+    private replacePlaceholderNames(treeStr: string): string {
+        let result = treeStr;
+        // Replace unnamed captures with their short forms (_1, _2, etc.)
+        for (const [originalName, displayName] of this.unnamedCaptureMapping.entries()) {
+            const placeholder = `__capt_${originalName}__`;
+            result = result.split(placeholder).join(displayName);
+        }
+        // Replace all remaining __capt_XXX__ with just XXX (for named captures)
+        result = result.replace(/__capt_([^_]+(?:_[^_]+)*)__/g, '$1');
+        return result;
+    }
+
+    /**
+     * Marks the element at the current cursor position with a SearchResult marker (🟡).
+     * If an explanation with pattern/target elements is provided, marks those specific elements.
+     * @param ast The AST tree to mark
+     * @param cursor The cursor position (used as fallback if no explanation element)
+     * @param explanation The match explanation containing the actual elements to mark
+     * @param isPattern Whether this is the pattern tree (true) or target tree (false)
+     * @private
+     */
+    private async markElementWithSearchResult(ast: J, cursor: Cursor | undefined, explanation?: MatchExplanation, isPattern: boolean = false): Promise<J> {
+        // If we have an explanation, use the specific element from it
+        if (explanation) {
+            const element = isPattern ? explanation.patternElement : explanation.targetElement;
+            if (element) {
+                // Use object identity for elements without IDs (like Containers)
+                const useIdentity = !(element as any).id;
+                const visitor = new ElementMarkerVisitor(
+                    useIdentity ? element : (element as any).id,
+                    useIdentity
+                );
+                return await visitor.visit(ast, undefined) as J;
+            }
+        }
+
+        // Fallback: mark the element at the cursor (if cursor exists)
+        if (!cursor) return ast;
+        const element = cursor.value;
+        const elementId = (element as any).id;
+        if (!elementId) return ast;
+
+        const visitor = new ElementMarkerVisitor(elementId, false);
+        return await visitor.visit(ast, undefined) as J;
     }
 
     /**
@@ -548,14 +709,20 @@ export class Pattern {
             return {
                 matched: true,
                 result: matchResult,
-                debugLog: matcher.getDebugLog()
+                debugLog: matcher.getDebugLog(),
+                patternCursor: matcher.getPatternCursor(),
+                targetCursor: matcher.getTargetCursor(),
+                patternAst: matcher.getPatternAst()
             };
         } else {
             // Match failed - return explanation
             return {
                 matched: false,
                 explanation: matcher.getExplanation(),
-                debugLog: matcher.getDebugLog()
+                debugLog: matcher.getDebugLog(),
+                patternCursor: matcher.getPatternCursor(),
+                targetCursor: matcher.getTargetCursor(),
+                patternAst: matcher.getPatternAst()
             };
         }
     }
@@ -665,6 +832,7 @@ class Matcher {
     private readonly debugLog: DebugLogEntry[] = [];
     private explanation?: MatchExplanation;
     private readonly currentPath: string[] = [];
+    private lastComparator?: PatternMatchingComparator;
 
     /**
      * Creates a new matcher for a pattern against an AST node.
@@ -777,12 +945,16 @@ class Matcher {
      * @param expected Human-readable description of what was expected
      * @param actual Human-readable description of what was found
      * @param details Optional additional context
+     * @param patternElement The actual pattern element that failed to match
+     * @param targetElement The actual target element that failed to match
      */
     private setExplanation(
         reason: MatchExplanation['reason'],
         expected: string,
         actual: string,
-        details?: string
+        details?: string,
+        patternElement?: any,
+        targetElement?: any
     ): void {
         // Only set the first failure (most relevant)
         if (this.explanation) return;
@@ -792,7 +964,9 @@ class Matcher {
             path: [...this.currentPath],
             expected,
             actual,
-            details
+            details,
+            patternElement,
+            targetElement
         };
     }
 
@@ -840,7 +1014,7 @@ class Matcher {
             // Debug callbacks (Layer 1) - grouped together, always present or absent
             debug: this.debugOptions.enabled ? {
                 log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => this.log(level, scope, message, data),
-                setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string) => this.setExplanation(reason, expected, actual, details),
+                setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string, patternElement?: any, targetElement?: any) => this.setExplanation(reason, expected, actual, details, patternElement, targetElement),
                 getExplanation: () => this.explanation,
                 restoreExplanation: (explanation: MatchExplanation) => { this.explanation = explanation; },
                 clearExplanation: () => { this.explanation = undefined; },
@@ -849,12 +1023,12 @@ class Matcher {
             } : undefined
         };
 
-        const comparator = this.debugOptions.enabled
+        this.lastComparator = this.debugOptions.enabled
             ? new DebugPatternMatchingComparator(matcherCallbacks, lenientTypeMatching)
             : new PatternMatchingComparator(matcherCallbacks, lenientTypeMatching);
         // Pass cursors to allow constraints to navigate to root
         // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
-        const result = await comparator.compare(pattern, target, undefined, this.cursor);
+        const result = await this.lastComparator.compare(pattern, target, undefined, this.cursor);
 
         // If match failed and no explanation was set, provide a generic one
         if (!result && this.debugOptions.enabled && !this.explanation) {
@@ -1001,6 +1175,30 @@ class Matcher {
     getExplanation(): MatchExplanation | undefined {
         return this.explanation;
     }
+
+    /**
+     * Gets the pattern cursor from the comparator (for debug visualization).
+     * @internal
+     */
+    getPatternCursor(): Cursor | undefined {
+        return (this.lastComparator as any)?.cursor;
+    }
+
+    /**
+     * Gets the target cursor from the comparator (for debug visualization).
+     * @internal
+     */
+    getTargetCursor(): Cursor | undefined {
+        return (this.lastComparator as any)?.targetCursor;
+    }
+
+    /**
+     * Gets the pattern AST that was used during matching (for debug visualization).
+     * @internal
+     */
+    getPatternAst(): J | undefined {
+        return this.patternAst;
+    }
 }
 
 /**
@@ -1098,4 +1296,44 @@ function createPattern(
     }
 
     return pat;
+}
+
+/**
+ * Visitor that marks an element with a SearchResult marker for highlighting in debug output.
+ * Supports marking J elements and J.Container.
+ */
+class ElementMarkerVisitor extends JavaScriptVisitor<undefined> {
+    constructor(
+        private readonly targetElement: any,
+        private readonly useIdentity: boolean = false
+    ) {
+        super();
+    }
+
+    override async visit<R extends J>(tree: Tree | null | undefined, p: undefined): Promise<R | undefined> {
+        if (!tree) return tree as any;
+
+        // Check if this is the element we're looking for (by ID or object identity)
+        const isMatch = this.useIdentity
+            ? tree === this.targetElement
+            : (tree as any).id === this.targetElement;
+
+        if (isMatch) {
+            return withPatternMismatchMarker(tree as any) as R;
+        }
+
+        return await super.visit(tree, p);
+    }
+
+    override async visitContainer<T extends J>(container: J.Container<T>, p: undefined): Promise<J.Container<T>> {
+        // Check if this is the container we're looking for (by object identity)
+        const isMatch = this.useIdentity
+            ? container === this.targetElement
+            : (container as any).id === this.targetElement;
+
+        if (isMatch) {
+            return withPatternMismatchMarker(container as any);
+        }
+        return await super.visitContainer(container, p);
+    }
 }

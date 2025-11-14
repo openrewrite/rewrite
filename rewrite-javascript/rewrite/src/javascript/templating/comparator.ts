@@ -27,7 +27,7 @@ import {DebugLogEntry, MatchExplanation} from './types';
  */
 export interface DebugCallbacks {
     log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => void;
-    setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string) => void;
+    setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string, patternElement?: any, targetElement?: any) => void;
     getExplanation: () => MatchExplanation | undefined;
     restoreExplanation: (explanation: MatchExplanation) => void;
     clearExplanation: () => void;
@@ -712,7 +712,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
      * Extracts the last segment of a kind string (after the last dot).
      * For example: "org.openrewrite.java.tree.J.MethodInvocation" -> "MethodInvocation"
      */
-    private formatKind(kind: string): string {
+    private formatKind(kind: string | undefined): string {
+        if (!kind) return 'unknown';
         return kind.substring(kind.lastIndexOf('.') + 1);
     }
 
@@ -760,7 +761,9 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                 reason as any,
                 expectedStr,
                 actualStr,
-                'Property values do not match'
+                'Property values do not match',
+                this.cursor?.value,  // pattern element
+                this.targetCursor?.value  // target element
             );
         }
 
@@ -794,7 +797,25 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const actualArray = target?.[propertyName];
         const expectedLen = Array.isArray(expectedArray) ? expectedArray.length : 'not an array';
         const actualLen = Array.isArray(actualArray) ? actualArray.length : 'not an array';
-        return this.abort(pattern, 'array-length-mismatch', propertyName, expectedLen, actualLen);
+
+        // For container mismatches, we want to mark the Container itself
+        // Containers have a markers property and can be marked using object identity
+        const patternElement = pattern;
+        const targetElement = target;
+
+        // Store the parent elements in the explanation for precise marker placement
+        this.debug.setExplanation(
+            'array-length-mismatch',
+            String(expectedLen),
+            String(actualLen),
+            `Array length mismatch in ${propertyName}`,
+            patternElement,
+            targetElement
+        );
+
+        // Mark this as a match failure
+        this.match = false;
+        return pattern;
     }
 
     protected override valueMismatch(propertyName?: string, expected?: any, actual?: any) {
@@ -803,6 +824,18 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
 
         // Track number of paths pushed for cleanup
         let pathsPushed = 0;
+
+        // Helper to navigate nested property paths
+        const getNestedValue = (obj: any, path: string) => {
+            return path.split('.').reduce((current, prop) => current?.[prop], obj);
+        };
+
+        // Helper to get the parent object (all but last property in path)
+        const getParentObject = (obj: any, path: string) => {
+            const parts = path.split('.');
+            if (parts.length === 1) return obj;
+            return parts.slice(0, -1).reduce((current, prop) => current?.[prop], obj);
+        };
 
         // Handle path tracking only if propertyName is provided
         if (propertyName) {
@@ -830,21 +863,42 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
 
         try {
-            // If expected/actual provided, use them directly
-            if (expected !== undefined || actual !== undefined) {
-                return this.abort(pattern, 'value-mismatch', propertyName, expected, actual);
-            }
-
-            // Otherwise, try to extract from cursors (fallback for older code)
+            // If propertyName is provided, navigate to the parent object containing the mismatched property
+            // This gives us the most specific element to mark in debug output
             if (propertyName) {
-                // Navigate dotted property paths
-                const getNestedValue = (obj: any, path: string) => {
-                    return path.split('.').reduce((current, prop) => current?.[prop], obj);
-                };
+                let patternParent = getParentObject(pattern, propertyName);
+                let targetParent = getParentObject(target, propertyName);
 
-                const expectedValue = getNestedValue(pattern, propertyName);
-                const actualValue = getNestedValue(target, propertyName);
-                return this.abort(pattern, 'value-mismatch', propertyName, expectedValue, actualValue);
+                // Unwrap padded elements (JLeftPadded/JRightPadded) to get the actual element with an id
+                // These wrappers don't have ids and can't be marked
+                const patternKind = (patternParent as any)?.kind;
+                const targetKind = (targetParent as any)?.kind;
+                const isPatternPadded = patternKind === 'org.openrewrite.java.tree.JLeftPadded' ||
+                                        patternKind === 'org.openrewrite.java.tree.JRightPadded';
+                const isTargetPadded = targetKind === 'org.openrewrite.java.tree.JLeftPadded' ||
+                                       targetKind === 'org.openrewrite.java.tree.JRightPadded';
+
+                if (isPatternPadded) {
+                    patternParent = (patternParent as any).element;
+                }
+                if (isTargetPadded) {
+                    targetParent = (targetParent as any).element;
+                }
+
+                // Store the parent objects (which contain the mismatched property) in the explanation
+                // This allows precise marker placement on the container of the mismatched value
+                this.debug.setExplanation(
+                    'value-mismatch',
+                    this.formatValue(expected !== undefined ? expected : getNestedValue(pattern, propertyName)),
+                    this.formatValue(actual !== undefined ? actual : getNestedValue(target, propertyName)),
+                    'Property values do not match',
+                    patternParent,
+                    targetParent
+                );
+
+                // Mark this as a match failure
+                this.match = false;
+                return pattern;
             } else {
                 // No property name - compare whole objects
                 return this.abort(pattern, 'value-mismatch', propertyName, pattern, target);
@@ -1045,16 +1099,24 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         otherContainer: J.Container<T>
     ): Promise<J.Container<T>> {
         // Get parent from cursor
-        const parent = this.cursor.value as J;
+        const parent = this.cursor?.value as J;
 
         // Push path for the property
-        const kindStr = this.formatKind((parent as any).kind);
+        const kindStr = this.formatKind((parent as any)?.kind);
         this.debug.pushPath(`${kindStr}#${propertyName}`);
+
+        // Update targetCursor to point to the container so that if there's a mismatch,
+        // the cursor will be on the container itself (for proper marker placement)
+        const savedTargetCursor = this.targetCursor;
+        if (this.targetCursor !== undefined) {
+            this.targetCursor = new Cursor(otherContainer, this.targetCursor);
+        }
 
         try {
             await this.visitContainer(container, otherContainer as any);
             return container;
         } finally {
+            this.targetCursor = savedTargetCursor;
             this.debug.popPath();
         }
     }

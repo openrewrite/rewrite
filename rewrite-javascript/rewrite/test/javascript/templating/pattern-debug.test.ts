@@ -286,7 +286,8 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation).toBeDefined();
 
         // The path should show the property that mismatched with kind information for nested objects
-        expect(attempt.explanation!.path).toEqual(['J$MethodInvocation#name', 'J$Identifier#simpleName']);
+        // Since we visit the name element directly, the path only includes the Identifier
+        expect(attempt.explanation!.path).toEqual(['J$Identifier#simpleName']);
 
         // Should be a value mismatch
         expect(attempt.explanation!.reason).toBe('value-mismatch');

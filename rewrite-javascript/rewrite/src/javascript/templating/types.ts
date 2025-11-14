@@ -617,6 +617,18 @@ export interface MatchExplanation {
     actual: string;
 
     /**
+     * The actual pattern element that failed to match.
+     * Used for debug visualization - attach markers to this element.
+     */
+    patternElement?: any;
+
+    /**
+     * The actual target element that failed to match.
+     * Used for debug visualization - attach markers to this element.
+     */
+    targetElement?: any;
+
+    /**
      * For constraint failures, details about which constraints failed.
      */
     constraintFailures?: Array<{
@@ -671,4 +683,17 @@ export interface MatchAttemptResult {
      * Debug log entries collected during matching (if debug was enabled).
      */
     debugLog?: DebugLogEntry[];
+
+    /**
+     * Cursors from the comparator (for debug visualization).
+     * @internal
+     */
+    patternCursor?: Cursor;
+    targetCursor?: Cursor;
+
+    /**
+     * The actual pattern AST that was used during matching (for debug visualization).
+     * @internal
+     */
+    patternAst?: any;
 }
