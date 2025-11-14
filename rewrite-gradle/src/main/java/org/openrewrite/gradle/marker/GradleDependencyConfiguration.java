@@ -162,14 +162,11 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         return this;
     }
     private class LazyResolutionContext {
-        @Getter
-        private boolean resolveRequired;
-        @Nullable
-        private List<MavenRepository> repositories;
-        @Nullable
-        private ExecutionContext ctx;
-        @Nullable
-        private List<ResolvedDependency> resolved;
+        private @Getter boolean resolveRequired;
+        private @Nullable List<MavenRepository> repositories;
+        private @Nullable ExecutionContext ctx;
+        private @Nullable List<ResolvedDependency> resolved;
+
         public void markForReResolution(List<MavenRepository> repositories, ExecutionContext ctx) {
             this.repositories = repositories;
             this.resolveRequired = true;
