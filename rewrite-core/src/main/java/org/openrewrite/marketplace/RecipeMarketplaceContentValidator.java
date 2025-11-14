@@ -20,6 +20,8 @@ import org.openrewrite.Validated;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.stream.Collectors.joining;
+
 /**
  * Validates the content quality and format of recipe marketplace entries.
  * Checks that descriptions and display names follow proper formatting rules.
@@ -35,82 +37,57 @@ public class RecipeMarketplaceContentValidator {
     public Validated<RecipeMarketplace> validate(RecipeMarketplace marketplace) {
         Validated<RecipeMarketplace> validation = Validated.none();
         List<String> categoryPath = new ArrayList<>();
-        return validateRecursive(marketplace, validation, categoryPath);
+        validation = validate(marketplace.getRoot(), validation, categoryPath);
+        return validation;
     }
 
-    private Validated<RecipeMarketplace> validateRecursive(RecipeMarketplace marketplace,
-                                                            Validated<RecipeMarketplace> validation,
-                                                            List<String> categoryPath) {
-        // Validate category itself (if not root)
-        if (!marketplace.isRoot()) {
-            validation = validation.and(validateDisplayName(marketplace.getDisplayName(), "category: " + marketplace.getDisplayName()));
-            if (!marketplace.getDescription().isEmpty()) {
-                validation = validation.and(validateDescription(marketplace.getDescription(), "category: " + marketplace.getDisplayName()));
-            }
+    private Validated<RecipeMarketplace> validate(RecipeMarketplace.Category category,
+                                                  Validated<RecipeMarketplace> validation,
+                                                  List<String> categoryPath) {
+        for (RecipeListing recipe : category.getRecipes()) {
+            String value = recipe.getName() + (categoryPath.isEmpty() ? "" : categoryPath.stream()
+                    .collect(joining(" > ", "[", "]")));
+            validation = validation.and(validateDisplayName(validation, recipe.getDisplayName(), value));
+            validation = validation.and(validateDescription(validation, recipe.getDescription(), value));
         }
 
-        // Validate recipes in this category
-        for (RecipeListing recipe : marketplace.getRecipes()) {
-            String categoryContext = categoryPath.isEmpty() ? "root" : String.join(" > ", categoryPath);
-            validation = validation.and(validateDisplayName(recipe.getDisplayName(), "displayName in " + categoryContext));
-            validation = validation.and(validateDescription(recipe.getDescription(), "description in " + categoryContext));
-        }
-
-        // Recursively validate subcategories
-        List<String> newPath = new ArrayList<>(categoryPath);
-        if (!marketplace.isRoot()) {
-            newPath.add(marketplace.getDisplayName());
-        }
-        for (RecipeMarketplace category : marketplace.getCategories()) {
-            validation = validateRecursive(category, validation, newPath);
+        for (RecipeMarketplace.Category child : category.getCategories()) {
+            List<String> nextCategoryPath = new ArrayList<>(categoryPath);
+            nextCategoryPath.add(category.getDisplayName());
+            validation = validate(child, validation, nextCategoryPath);
         }
 
         return validation;
     }
 
-    private Validated<RecipeMarketplace> validateDisplayName(String displayName, String context) {
+    private Validated<RecipeMarketplace> validateDisplayName(Validated<RecipeMarketplace> validation,
+                                                             String displayName,
+                                                             String recipe) {
+        String property = recipe + ".displayName";
         if (displayName.isEmpty()) {
-            return Validated.invalid("displayName", displayName, "Display name is empty [" + context + "]");
+            validation = validation.and(Validated.invalid(property, displayName, "Display must not be empty"));
         }
-
-        Validated<RecipeMarketplace> validation = Validated.none();
-
-        // Display names should start with uppercase
         if (!Character.isUpperCase(displayName.charAt(0))) {
-            validation = validation.and(Validated.invalid(
-                    "displayName",
-                    displayName,
-                    "Display name must start with an uppercase letter: '" + displayName + "' [" + context + "]"
-            ));
+            validation = validation.and(Validated.invalid(property, displayName, "Display name must be sentence cased"));
         }
-
-        // Display names should NOT end with a period
         if (displayName.endsWith(".")) {
-            validation = validation.and(Validated.invalid(
-                    "displayName",
-                    displayName,
-                    "Display name must not end with a period: '" + displayName + "' [" + context + "]"
-            ));
+            validation = validation.and(Validated.invalid(property, displayName, "Display name must not end with a period"));
         }
-
         return validation;
     }
 
-    private Validated<RecipeMarketplace> validateDescription(String description, String context) {
+    private Validated<RecipeMarketplace> validateDescription(Validated<RecipeMarketplace> validation,
+                                                             String description,
+                                                             String recipe) {
         if (description.isEmpty()) {
-            // Empty descriptions are allowed (they may be optional)
-            return Validated.none();
+            return validation;
         }
-
-        Validated<RecipeMarketplace> validation = Validated.none();
-
-        // Descriptions should end with a period
+        String property = recipe + ".description";
+        if (!Character.isUpperCase(description.charAt(0))) {
+            validation = validation.and(Validated.invalid(property, description, "Description must be sentence cased"));
+        }
         if (!description.endsWith(".")) {
-            validation = validation.and(Validated.invalid(
-                    "description",
-                    description,
-                    "Description must end with a period: '" + description + "' [" + context + "]"
-            ));
+            validation = validation.and(Validated.invalid(property, description, "Description must end with a period."));
         }
 
         return validation;
