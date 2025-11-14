@@ -25,6 +25,8 @@ import org.openrewrite.marketplace.ThrowingRecipeBundleReader;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
 import java.util.Optional;
@@ -53,7 +55,12 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
         String[] ga = bundle.getPackageName().split(":");
         GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
         return resolveDependencies(gav)
-                .map(mrr -> (RecipeBundleReader) new MavenRecipeBundleReader(bundle, mrr, downloader, classLoaderFactory))
+                .map(mrr -> {
+                    ResolvedDependency resolvedDependency = mrr.getDependencies().get(Scope.Runtime).stream().filter(ResolvedDependency::isDirect)
+                            .findFirst().orElseThrow(() -> new IllegalStateException("Failed to find direct dependency for " + gav));
+                    bundle.setVersion(resolvedDependency.getVersion());
+                    return (RecipeBundleReader) new MavenRecipeBundleReader(bundle, mrr, downloader, classLoaderFactory);
+                })
                 .orElseGet(() -> new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to resolve recipe " + gav)));
     }
 

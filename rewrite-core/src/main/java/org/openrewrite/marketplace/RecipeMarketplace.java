@@ -52,10 +52,11 @@ public class RecipeMarketplace {
         root.install(recipe, categoryPath);
     }
 
-    public void install(RecipeBundleReader bundleReader) {
+    public Set<RecipeListing> install(RecipeBundleReader bundleReader) {
         RecipeMarketplace marketplace = bundleReader.read();
         getRoot().merge(marketplace.getRoot());
         getRoot().updateBundle(marketplace.getAllRecipes(), bundleReader.getBundle());
+        return marketplace.getAllRecipes();
     }
 
     @Getter
