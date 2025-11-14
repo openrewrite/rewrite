@@ -930,15 +930,18 @@ export class JavaScriptParserVisitor {
         let annotationType: NameTree | TypeTree;
         let _arguments: J.Container<Expression> | undefined = undefined;
 
-        if (ts.isCallExpression(node.expression)) {
+        if (ts.isCallExpression(node.expression) && node.expression.typeArguments) {
             annotationType = {
                 kind: JS.Kind.ExpressionWithTypeArguments,
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
                 clazz: this.convert<J>(node.expression.expression) as Expression,
-                typeArguments: node.expression.typeArguments && this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments)
+                typeArguments: this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments)
             } satisfies JS.ExpressionWithTypeArguments as JS.ExpressionWithTypeArguments;
+            _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
+        } else if (ts.isCallExpression(node.expression)) {
+            annotationType = this.convert<J>(node.expression.expression) as Expression;
             _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
         } else if (ts.isIdentifier(node.expression)) {
             annotationType = this.convert(node.expression);
