@@ -15,7 +15,6 @@
  */
 package org.openrewrite.marketplace;
 
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -29,7 +28,7 @@ import static java.util.Collections.addAll;
 
 @Incubating(since = "8.66.0")
 public class RecipeMarketplace {
-    private final @Getter(AccessLevel.PACKAGE) Category root = new Category("Root");
+    private final @Getter Category root = new Category("Root");
     private final @Getter List<RecipeBundleResolver> resolvers = new ArrayList<>();
 
     public RecipeMarketplace setResolvers(RecipeBundleResolver... resolvers) {
