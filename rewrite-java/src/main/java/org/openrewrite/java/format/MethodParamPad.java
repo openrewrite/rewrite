@@ -109,7 +109,6 @@ public class MethodParamPad extends Recipe {
         public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
             J.NewClass nc = super.visitNewClass(newClass, ctx);
             if (!methodParamPadStyle.getAllowLineBreaks()) {
-                nc.getPadding().getArguments();
                 if (nc.getPadding().getArguments().getBefore().getWhitespace().contains("\n")) {
                     nc = nc.getPadding().withArguments(
                             nc.getPadding().getArguments().withBefore(
