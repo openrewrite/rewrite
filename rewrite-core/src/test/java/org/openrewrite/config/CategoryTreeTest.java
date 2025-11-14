@@ -26,8 +26,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.config.CategoryTreeTest.Group.Group1;
-import static org.openrewrite.config.CategoryTreeTest.Group.Group2;
 
 @SuppressWarnings("DataFlowIssue")
 @Deprecated
@@ -46,8 +44,8 @@ class CategoryTreeTest {
 
     private CategoryTree.Root<Group> categoryTree() {
         return CategoryTree.<Group>build()
-          .putAll(Group1, env)
-          .putAll(Group2, custom);
+          .putAll(Group.Group1, env)
+          .putAll(Group.Group2, custom);
     }
 
     /**
@@ -114,13 +112,13 @@ class CategoryTreeTest {
     private static RecipeDescriptor recipeDescriptor(String packageName) {
         return new RecipeDescriptor(packageName + ".MyRecipe",
           "My recipe", "", "", emptySet(), null, emptyList(),
-          emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+          emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), null);
     }
 
     @Test
     void removeCategory() {
         CategoryTree.Root<Group> ct = categoryTree();
-        ct.removeAll(Group2);
+        ct.removeAll(Group.Group2);
         assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
           .doesNotContain("io.moderne.rewrite", "io.moderne.cloud", "io.moderne");
     }
@@ -170,7 +168,7 @@ class CategoryTreeTest {
     @Test
     void getRecipeGroup() {
         assertThat(categoryTree().getRecipeGroup("org.openrewrite.DeleteSourceFiles"))
-          .isEqualTo(Group1);
+          .isEqualTo(Group.Group1);
     }
 
     private static CategoryDescriptor categoryDescriptor(String packageName) {
