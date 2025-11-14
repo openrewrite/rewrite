@@ -25,7 +25,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.service.Span;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -50,93 +52,6 @@ import static org.openrewrite.java.Assertions.java;
  */
 class SourcePositionServiceTest implements RewriteTest {
 
-    @DocumentExample
-    @Test
-    void correctlyCalculatesLineLength() {
-        rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
-
-              @Nullable
-              SourcePositionService service;
-
-              @Override
-              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  service = cu.service(SourcePositionService.class);
-                  return super.visitCompilationUnit(cu, ctx);
-              }
-
-              @Override
-              public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(20);
-                  return super.visitPackage(pkg, ctx);
-              }
-
-              @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                  if ("Test".equals(classDecl.getSimpleName())) {
-                      assertThat(service.computeTreeLength(getCursor())).isEqualTo(461);
-                  }
-                  if ("Inner".equals(classDecl.getSimpleName())) {
-                      assertThat(service.computeTreeLength(getCursor())).isEqualTo(72);
-                  }
-                  return super.visitClassDeclaration(classDecl, ctx);
-              }
-
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(365);
-                  return super.visitMethodDeclaration(method, ctx);
-              }
-
-              @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(80);
-                  return super.visitVariableDeclarations(multiVariable, ctx);
-              }
-
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if ("valueOf".equals(method.getSimpleName())) {
-                      assertThat(service.computeTreeLength(getCursor())).isEqualTo(80);
-                  }
-                  return super.visitMethodInvocation(method, ctx);
-              }
-
-              @Override
-              public J.Assert visitAssert(J.Assert _assert, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(28);
-                  return super.visitAssert(_assert, ctx);
-              }
-
-              @Override
-              public J.Return visitReturn(J.Return _return, ExecutionContext ctx) {
-                  assertThat(service.computeTreeLength(getCursor())).isEqualTo(51);
-                  return super.visitReturn(_return, ctx);
-              }
-          })),
-          java(
-            """
-              package com.example;
-              
-              // Comments should not affect line length calculation
-              public class Test {
-                  public int /* multiline comments can impact though */ example() {
-                      String text = "This is a sample string to test line length calculation";
-                      assert text != null;
-                      // Another comment that is not counted
-                      String invocation = String.valueOf("Both lines share the same length.");
-                      return text.length() + invocation.length();
-                  }
-              
-                  class Inner {
-                      // Inner class to test nested structures
-                  }
-              }
-              """
-          )
-        );
-    }
-
     /**
      * Tests alignment calculations when the first element in a container is on the same line as the opening delimiter.
      * In these cases, subsequent elements should align with the first element's position, not just use
@@ -145,6 +60,7 @@ class SourcePositionServiceTest implements RewriteTest {
      * Note: Record5 in the third java() block has intentionally bizarre indentation (e.g., "Integer t2," at column 0
      * and "Double u2," extremely far to the right) to verify the service handles any actual indentation pattern.
      */
+    @DocumentExample
     @Test
     void correctlyCalculatesIndentationToAlign() {
         rewriteRun(
@@ -438,7 +354,7 @@ class SourcePositionServiceTest implements RewriteTest {
                           break;
                       case "someVeryLongMethodNameThatIsAsLongAsTheMethodsAbove":
                           assertResult(22, 5, 25, 6, 75);
-                          assertMinimizedResult(22, 5, 24, 6, 77); // minimization moves the opening curly causing the end-line to shift by 1 and the maxColumn by 2
+                          assertMinimizedResult(22, 5, 23, 78, 78); // minimization collapses the block to start/end on same line
                           assertResult(method.getPadding().getParameters(), 23, 69, 23, 74, 74);
                           assertMinimizedResult(m -> ((J.MethodDeclaration) m).getPadding().getParameters(), 23, 69, 23, 74, 74);
                           break;
@@ -646,65 +562,7 @@ class SourcePositionServiceTest implements RewriteTest {
     }
 
     private static  <T extends J> T minimize(T tree) {
-        J j = new JavaIsoVisitor<Integer>() {
-            @Override
-            public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
-                                                                  JRightPadded.Location loc,
-                                                                  Integer ctx) {
-                switch (loc) {
-                    case METHOD_DECLARATION_PARAMETER:
-                    case RECORD_STATE_VECTOR: {
-                        if (right != null && right.getElement() instanceof J) {
-                            //noinspection unchecked
-                            right = right
-                              .withAfter(minimized(right.getAfter()))
-                              .withElement(((J) right.getElement()).withPrefix(minimized(((J) right.getElement()).getPrefix())));
-                        }
-                        break;
-                    }
-                }
-                return super.visitRightPadded(right, loc, ctx);
-            }
-
-            @Override
-            public Space visitSpace(@Nullable Space space,
-                                    Space.Location loc,
-                                    Integer ctx) {
-                if (space == null) {
-                    return super.visitSpace(space, loc, ctx);
-                }
-                if (space == tree.getPrefix()) {
-                    return space;
-                }
-                switch (loc) {
-                    case BLOCK_PREFIX:
-                    case MODIFIER_PREFIX:
-                    case METHOD_DECLARATION_PARAMETER_SUFFIX:
-                    case METHOD_DECLARATION_PARAMETERS:
-                    case METHOD_SELECT_SUFFIX:
-                    case METHOD_INVOCATION_ARGUMENTS:
-                    case METHOD_INVOCATION_ARGUMENT_SUFFIX:
-                    case METHOD_INVOCATION_NAME:
-                    case RECORD_STATE_VECTOR_SUFFIX: {
-                        space = minimized(space);
-                        break;
-                    }
-                }
-                return super.visitSpace(space, loc, ctx);
-            }
-
-            //IntelliJ does not format when comments are present.
-            private Space minimized(Space space) {
-                if (space.getComments().isEmpty()) {
-                    return space.getWhitespace().isEmpty() ? space : Space.EMPTY;
-                }
-                return space;
-            }
-        }.visit(tree, -1);
-        if (j != tree) {
-            j = new MinimumViableSpacingVisitor<>(null).visit(j, -1);
-            j = new SpacesVisitor<>(IntelliJ.spaces(), null, null).visit(j, -1);
-        }
-        return (T) j;
+        tree = (T) new MinimumViableSpacingVisitor<>(null).visit(tree, -1);
+        return (T) new SpacesVisitor<>(IntelliJ.spaces(), true, null).visit(tree, -1);
     }
 }

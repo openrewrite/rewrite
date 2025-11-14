@@ -412,7 +412,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               """,
             """
               abstract class Test {
-                  void test(){
+                  void test() {
                   }
               }
               """

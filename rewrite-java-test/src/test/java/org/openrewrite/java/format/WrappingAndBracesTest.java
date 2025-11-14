@@ -43,17 +43,21 @@ class WrappingAndBracesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
-          120,
-          new WrappingAndBracesStyle.IfStatement(false),
-          new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
-          new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-          new WrappingAndBracesStyle.Annotations(WrapAlways),
-          new WrappingAndBracesStyle.Annotations(WrapAlways),
-          new WrappingAndBracesStyle.Annotations(WrapAlways),
-          new WrappingAndBracesStyle.Annotations(DoNotWrap),
-          new WrappingAndBracesStyle.Annotations(DoNotWrap),
-          new WrappingAndBracesStyle.Annotations(DoNotWrap)))));
+        spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
+          IntelliJ.spaces(),
+          new WrappingAndBracesStyle(
+            120,
+            new WrappingAndBracesStyle.IfStatement(false),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
+            new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
+            new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap)),
+          null)));
     }
 
     @DocumentExample
@@ -526,7 +530,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.Repeatable;
-
+              
               @Repeatable(Foo.Foos.class)
               @interface Foo {
                   @interface Foos {
@@ -539,7 +543,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               @Foo @Foo class Test {
                   @Foo @Foo int field;
-
+              
                   @Foo @Foo void method(
                           @Foo
                           @Foo
@@ -549,13 +553,13 @@ class WrappingAndBracesTest implements RewriteTest {
                       int localVar;
                   }
               }
-
+              
               enum MyEnum {
                   @Foo
                   @Foo
                   VALUE
               }
-
+              
               record someRecord(
                       @Foo
                       @Foo
@@ -569,7 +573,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
-
+              
                   @Foo
                   @Foo
                   void method(
@@ -577,11 +581,11 @@ class WrappingAndBracesTest implements RewriteTest {
                       @Foo @Foo int localVar;
                   }
               }
-
+              
               enum MyEnum {
                   @Foo @Foo VALUE
               }
-
+              
               record someRecord(
                       @Foo @Foo String name) {
               }
@@ -596,7 +600,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.Repeatable;
-
+              
               @Repeatable(Foo.Foos.class)
               @interface Foo {
                   @interface Foos {
@@ -613,18 +617,18 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
-
+              
                   @Foo
                   @Foo
                   void method(@Foo @Foo int param) {
                       @Foo @Foo int localVar;
                   }
               }
-
+              
               enum MyEnum {
                   @Foo @Foo VALUE
               }
-
+              
               record someRecord(
                       @Foo @Foo String name) {
               }
@@ -639,7 +643,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.Repeatable;
-
+              
               @Repeatable(Foo.Foos.class)
               @interface Foo {
                   @interface Foos {
@@ -652,7 +656,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               @Foo @Foo final class Test {
                   @Foo @Foo private int field;
-
+              
                   @Foo @Foo public void method(
                           @Foo
                           @Foo
@@ -670,7 +674,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-
+              
                   @Foo
                   @Foo
                   public void method(
@@ -689,7 +693,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.Repeatable;
-
+              
               @Repeatable(Foo.Foos.class)
               @interface Foo {
                   @interface Foos {
@@ -707,7 +711,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-
+              
                   @Foo
                   @Foo
                   public void method(
@@ -726,7 +730,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.Repeatable;
-
+              
               @Repeatable(Foo.Foos.class)
               @interface Foo {
                   @interface Foos {
@@ -739,11 +743,11 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               @Foo @Foo class Test<T> {
                   @Foo @Foo private int field;
-
+              
                   @Foo @Foo Test(int field) {
                       this.field = field;
                   }
-
+              
                   @Foo @Foo T method(
                           @Foo
                           @Foo
@@ -762,13 +766,13 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-
+              
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
-
+              
                   @Foo
                   @Foo
                   T method(
@@ -788,7 +792,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.Repeatable;
-
+              
               @Repeatable(Foo.Foos.class)
               @interface Foo {
                   @interface Foos {
@@ -805,13 +809,13 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-
+              
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
-
+              
                   @Foo
                   @Foo
                   T method(
@@ -831,7 +835,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.Repeatable;
-
+              
               @Repeatable(Foo.Foos.class)
               @interface Foo {
                   @interface Foos {
@@ -847,20 +851,20 @@ class WrappingAndBracesTest implements RewriteTest {
                   String method1(){
                       return "test";
                   }
-
+              
                   @Foo /* comment
                   on multiple
                   lines */
                   String method2(){
                       return "test";
                   }
-
+              
                   @Foo
                   //comment
                   String method3(){
                       return "test";
                   }
-
+              
                   @Foo
                   /* comment
                   on multiple
@@ -880,7 +884,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.Repeatable;
-
+              
               @Repeatable(Foo.Foos.class)
               @interface Foo {
                   @interface Foos {
@@ -896,20 +900,20 @@ class WrappingAndBracesTest implements RewriteTest {
                   final String method1(){
                       return "test";
                   }
-
+              
                   @Foo /* comment
                   on multiple
                   lines */
                   final String method2(){
                       return "test";
                   }
-
+              
                   @Foo
                   //comment
                   final String method3(){
                       return "test";
                   }
-
+              
                   @Foo
                   /* comment
                   on multiple
@@ -926,21 +930,25 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationWrappingWithNulls() {
         rewriteRun(spec ->
-            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
-              120,
-              new WrappingAndBracesStyle.IfStatement(false),
-              new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList(), false),
-              new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-              null,
-              null,
-              null,
-              null,
-              null,
-              null)))),
+            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
+              IntelliJ.spaces(),
+              new WrappingAndBracesStyle(
+                120,
+                new WrappingAndBracesStyle.IfStatement(false),
+                new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList(), false),
+                new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
+                new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
+              null))),
           java(
             """
               import java.lang.annotation.Repeatable;
-
+              
               @Repeatable(Foo.Foos.class)
               @interface Foo {
                   @interface Foos {
@@ -956,20 +964,20 @@ class WrappingAndBracesTest implements RewriteTest {
                   final String method1(){
                       return "test";
                   }
-
+              
                   @Foo /* comment
                   on multiple
                   lines */
                   final String method2(){
                       return "test";
                   }
-
+              
                   @Foo
                   //comment
                   final String method3(){
                       return "test";
                   }
-
+              
                   @Foo
                   /* comment
                   on multiple

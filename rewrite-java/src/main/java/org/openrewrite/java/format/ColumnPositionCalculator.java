@@ -33,9 +33,9 @@ class ColumnPositionCalculator {
      * Computes the column position of a target element within a tree by printing the tree
      * up to the target element and counting characters from the last newline.
      *
-     * @param tree The tree to print
+     * @param tree          The tree to print
      * @param targetElement The element whose column position we want to find
-     * @param cursor The cursor context
+     * @param cursor        The cursor context
      * @return The column position of the target element
      */
     public static int computeColumnPosition(J tree, J targetElement, Cursor cursor) {
