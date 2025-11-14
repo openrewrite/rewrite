@@ -63,7 +63,7 @@ export class OrderImports extends Recipe {
                 const cuWithImportsSorted = await produceAsync(cu, async draft => {
                     draft.statements = [...sortedImports, ...restStatements];
                 });
-                return produce(cuWithImportsSorted, draft => {
+                return produce(cuWithImportsSorted!, draft => {
                     for (let i = 0; i < importCount; i++) {
                        draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
                     }
