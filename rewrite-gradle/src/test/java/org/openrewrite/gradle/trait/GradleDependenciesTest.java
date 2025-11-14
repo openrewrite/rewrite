@@ -38,10 +38,10 @@ class GradleDependenciesTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                  Optional<GradleDependencies> meybeDependenciesBlock = new GradleDependencies.Matcher().get(mi, getCursor().getParent());
+                  Optional<GradleDependencies> maybeDependenciesBlock = new GradleDependencies.Matcher().get(mi, getCursor().getParent());
 
-                  if (meybeDependenciesBlock.isPresent()) {
-                      return meybeDependenciesBlock
+                  if (maybeDependenciesBlock.isPresent()) {
+                      return maybeDependenciesBlock
                         .map(deps -> deps.removeDependency("javax.validation", "validation-api"))
                         .map(Trait::getTree)
                         .orElse(null);
