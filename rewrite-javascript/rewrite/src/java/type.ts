@@ -260,6 +260,14 @@ export namespace Type {
         return type?.kind === Type.Kind.GenericTypeVariable;
     }
 
+    export function isUnion(type?: Type): type is Type.Union {
+        return type?.kind === Type.Kind.Union;
+    }
+
+    export function isIntersection(type?: Type): type is Type.Intersection {
+        return type?.kind === Type.Kind.Intersection;
+    }
+
     export function isFullyQualified(type?: Type): type is Type.FullyQualified {
         return type != null && (
             type.kind === Type.Kind.Class ||

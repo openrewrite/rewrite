@@ -969,6 +969,45 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('should handle circular references through parameterized types', async () => {
+            const spec = new RecipeSpec();
+            let foundCircularRef = false;
+
+            spec.recipe = markTypes((node, type) => {
+                // Check Array<Node> usage in the children field
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'children') {
+                    if (Type.isParameterized(type)) {
+                        const paramType = type as Type.Parameterized;
+                        // Verify it's Array with a type argument
+                        if (Type.isClass(paramType.type) && paramType.type.fullyQualifiedName === 'Array') {
+                            const typeArg = paramType.typeParameters[0];
+                            if (Type.isClass(typeArg) && typeArg.fullyQualifiedName === 'Node') {
+                                foundCircularRef = true;
+                                // Don't mark - just track that we found it
+                            }
+                        }
+                    }
+                }
+                return null;
+            });
+
+            // This should not cause an infinite loop despite the circular reference
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        class Node {
+                            value: string;
+                            children: Array<Node>;
+                        }
+                    `
+                )
+            );
+
+            // Verify we found the circular Array<Node> reference
+            expect(foundCircularRef).toBe(true);
+        });
+
         test('should share base class between different parameterizations', async () => {
             const spec = new RecipeSpec();
             let baseClassFromStringArray: Type.Class | undefined;

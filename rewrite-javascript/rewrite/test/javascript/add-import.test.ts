@@ -336,7 +336,7 @@ describe('AddImport visitor', () => {
                     `
                         // Copyright 2025
                         // File header comment
-                        
+
                         import {readFile} from 'fs';
 
                         function example() {

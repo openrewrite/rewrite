@@ -84,7 +84,7 @@ export class JavaScriptTypeMapping {
             if (symbol.flags & ts.SymbolFlags.Function) {
                 const callSignatures = type.getCallSignatures();
                 if (callSignatures.length > 0) {
-                    // Create and cache shell first to handle circular references
+                    // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     const functionType = this.createEmptyFunctionType();
                     this.typeCache.set(signature, functionType);
                     this.populateFunctionType(functionType, callSignatures[0]);
@@ -96,7 +96,7 @@ export class JavaScriptTypeMapping {
             if (symbol.flags & (ts.SymbolFlags.FunctionScopedVariable | ts.SymbolFlags.BlockScopedVariable)) {
                 const callSignatures = type.getCallSignatures();
                 if (callSignatures.length > 0) {
-                    // Create and cache shell first to handle circular references
+                    // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     const functionType = this.createEmptyFunctionType();
                     this.typeCache.set(signature, functionType);
                     this.populateFunctionType(functionType, callSignatures[0]);
@@ -113,38 +113,57 @@ export class JavaScriptTypeMapping {
                 let classType = this.typeCache.get(declaredSignature) as Type.Class | undefined;
 
                 if (!classType) {
-                    // Create and cache the base class shell first to handle circular references
+                    // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     classType = this.createEmptyClassType(declaredType);
                     this.typeCache.set(declaredSignature, classType);
                     this.populateClassType(classType, declaredType);
                 }
 
-                // Check if this is a type reference with type arguments (like Array<String>)
-                const typeRef = type as ts.TypeReference;
-                if (typeRef.typeArguments && typeRef.typeArguments.length > 0) {
-                    // Create a Type.Parameterized wrapper for this specific type reference
-                    let parameterized = this.typeCache.get(signature) as Type.Parameterized | undefined;
-                    if (!parameterized) {
-                        // Map the type arguments to Type[]
-                        const typeParameters: Type[] = [];
-                        for (const typeArg of typeRef.typeArguments) {
-                            typeParameters.push(this.getType(typeArg as ts.Type));
-                        }
+                // Check if this is a type reference with type arguments
+                // Both Array<T> and T[] syntax are represented as TypeReferences with type arguments
+                // Only TypeReferences (not plain class types) have a target property
+                const objectType = type as ts.ObjectType;
+                const isTypeReference = objectType.objectFlags & ts.ObjectFlags.Reference;
 
-                        // Create the parameterized type
-                        parameterized = Object.assign(new NonDraftableType(), {
-                            kind: Type.Kind.Parameterized,
-                            type: classType,
-                            typeParameters: typeParameters,
-                            fullyQualifiedName: classType.fullyQualifiedName,
-                            toJSON: function() {
-                                return Type.signature(this);
+                if (isTypeReference) {
+                    const typeRef = type as ts.TypeReference;
+                    const target = typeRef.target; // Get the generic type declaration
+                    const hasTypeArgs = typeRef.typeArguments && typeRef.typeArguments.length > 0;
+                    // In rare cases, type arguments may be on the target instead of the typeRef
+                    const hasTargetTypeArgs = target && target.typeArguments && target.typeArguments.length > 0;
+
+                    if (hasTypeArgs || hasTargetTypeArgs) {
+                        const typeArgs = typeRef.typeArguments || (target as any).typeArguments;
+                        if (typeArgs && typeArgs.length > 0) {
+                            // Create a Type.Parameterized wrapper for this specific type reference
+                            let parameterized = this.typeCache.get(signature) as Type.Parameterized | undefined;
+                            if (!parameterized) {
+                                // Shell-cache: Create stub, cache it, then populate (prevents cycles)
+                                // Example cycle: class Node { children: Array<Node>; }
+                                parameterized = Object.assign(new NonDraftableType(), {
+                                    kind: Type.Kind.Parameterized,
+                                    type: classType,
+                                    typeParameters: [], // Populated below
+                                    fullyQualifiedName: classType.fullyQualifiedName,
+                                    toJSON: function() {
+                                        return Type.signature(this);
+                                    }
+                                }) as Type.Parameterized;
+
+                                this.typeCache.set(signature, parameterized);
+
+                                // Now resolve type arguments (may recursively reference this type)
+                                const typeParameters: Type[] = [];
+                                for (const typeArg of typeArgs) {
+                                    typeParameters.push(this.getType(typeArg as ts.Type));
+                                }
+
+                                // Update the type parameters
+                                (parameterized as any).typeParameters = typeParameters;
                             }
-                        }) as Type.Parameterized;
-
-                        this.typeCache.set(signature, parameterized);
+                            return parameterized;
+                        }
                     }
-                    return parameterized;
                 }
 
                 // No type arguments - return the base class type
@@ -173,7 +192,7 @@ export class JavaScriptTypeMapping {
         // Check for function types without symbols (anonymous functions, function types)
         const callSignatures = type.getCallSignatures();
         if (callSignatures.length > 0) {
-            // Function type - create and cache shell first to handle circular references
+            // Shell-cache: Create stub, cache it, then populate (prevents cycles)
             const functionType = this.createEmptyFunctionType();
             this.typeCache.set(signature, functionType);
             this.populateFunctionType(functionType, callSignatures[0]);
@@ -184,7 +203,7 @@ export class JavaScriptTypeMapping {
         if (type.flags & ts.TypeFlags.Object) {
             const objectFlags = (type as ts.ObjectType).objectFlags;
             if (objectFlags & ts.ObjectFlags.Anonymous) {
-                // Anonymous object type - create and cache shell, then populate
+                // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                 const classType = this.createEmptyClassType(type);
                 this.typeCache.set(signature, classType);
                 this.populateClassType(classType, type);
@@ -418,6 +437,9 @@ export class JavaScriptTypeMapping {
                     } else {
                         declaringType = mappedType as Type.FullyQualified;
                     }
+                } else if (mappedType && mappedType.kind === Type.Kind.Parameterized) {
+                    // For parameterized types (e.g., Array<string>, number[]), use the base class type
+                    declaringType = (mappedType as Type.Parameterized).type;
                 } else if (mappedType && mappedType.kind === Type.Kind.Primitive) {
                     // Box the primitive to its wrapper type
                     declaringType = this.wrapperType(mappedType as Type.Primitive);
@@ -801,8 +823,12 @@ export class JavaScriptTypeMapping {
                 // Additional base types are interfaces
                 if (classType.classKind === Type.Class.Kind.Class) {
                     const firstBase = this.getType(baseTypes[0]);
+                    // Handle both Class and Parameterized (e.g., Component<Props>)
                     if (Type.isClass(firstBase)) {
                         (classType as any).supertype = firstBase;
+                    } else if (Type.isParameterized(firstBase)) {
+                        // For parameterized types, use the base class as the supertype
+                        (classType as any).supertype = (firstBase as Type.Parameterized).type;
                     }
                     // Rest are interfaces
                     for (let i = 1; i < baseTypes.length; i++) {
@@ -951,7 +977,7 @@ export class JavaScriptTypeMapping {
             return existing;
         }
 
-        // Create the shell first to handle circular references
+        // Shell-cache: Create stub, cache it, then populate (prevents cycles)
         const union = Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Union,
             bounds: []
@@ -978,7 +1004,7 @@ export class JavaScriptTypeMapping {
             return existing;
         }
 
-        // Create the shell first to handle circular references
+        // Shell-cache: Create stub, cache it, then populate (prevents cycles)
         const intersection = Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Intersection,
             bounds: []
@@ -1009,7 +1035,7 @@ export class JavaScriptTypeMapping {
         const symbol = typeParam.getSymbol();
         const name = symbol ? symbol.getName() : '?';
 
-        // Create the shell first to handle circular references
+        // Shell-cache: Create stub, cache it, then populate (prevents cycles)
         const gtv = Object.assign(new NonDraftableType(), {
             kind: Type.Kind.GenericTypeVariable,
             name: name,
