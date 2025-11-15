@@ -49,7 +49,7 @@ describe('Pattern Debug Logging', () => {
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
         expect(calls.some(c => c.includes('✅ SUCCESS matching against'))).toBe(true);
         expect(calls.some(c => c.includes("Captures:"))).toBe(true);
-        expect(calls.some(c => c.includes("= value"))).toBe(true);
+        expect(calls.some(c => c.includes("= 🪝value"))).toBe(true);
     });
 
     test('pattern-level debug: pattern({ debug: true })', async () => {
@@ -142,8 +142,8 @@ describe('Pattern Debug Logging', () => {
         await pat.match(node);
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        // First line should show pattern source with ID
-        expect(calls.some(c => c.match(/\[Pattern #\d+\] foo\(\$\{x\}, \$\{y\}\)/))).toBe(true);
+        // First line should show pattern source with ID (captures prefixed with 🪝)
+        expect(calls.some(c => c.match(/\[Pattern #\d+\] foo\(\$\{🪝x\}, \$\{🪝y\}\)/))).toBe(true);
     });
 
     test('variadic captures show array format', async () => {

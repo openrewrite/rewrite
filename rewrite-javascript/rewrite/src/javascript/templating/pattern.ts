@@ -175,13 +175,13 @@ export class Pattern {
     ) {
         this.patternId = Pattern.nextPatternId++;
 
-        // Build mapping for unnamed captures (unnamed_N -> _X)
+        // Build mapping for unnamed captures (unnamed_N -> X, which will be displayed as 🪝X)
         let unnamedIndex = 1;
         for (const cap of captures) {
             if (cap && typeof cap === 'object' && 'getName' in cap) {
                 const name = (cap as Capture<any> | Any<any>).getName();
                 if (name && name.startsWith('unnamed_')) {
-                    this.unnamedCaptureMapping.set(name, `_${unnamedIndex}`);
+                    this.unnamedCaptureMapping.set(name, `${unnamedIndex}`);
                     unnamedIndex++;
                 }
             }
@@ -389,7 +389,7 @@ export class Pattern {
                         if (captureIndex <= 10) {
                             const displayName = this.unnamedCaptureMapping.get(name) || name;
                             const emoji = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][captureIndex + 1];
-                            lines.push(`[${patternId}]     ${emoji} = ${displayName}`);
+                            lines.push(`[${patternId}]     ${emoji} = 🪝${displayName}`);
                             captureIndex++;
                         }
                     }
@@ -558,17 +558,18 @@ export class Pattern {
 
     /**
      * Replaces placeholder names in tree strings with clean display names.
+     * Uses 🪝 prefix to make captures easily identifiable.
      * @private
      */
     private replacePlaceholderNames(treeStr: string): string {
         let result = treeStr;
-        // Replace unnamed captures with their short forms (_1, _2, etc.)
+        // Replace unnamed captures with their short forms (🪝1, 🪝2, etc.)
         for (const [originalName, displayName] of this.unnamedCaptureMapping.entries()) {
             const placeholder = `__capt_${originalName}__`;
-            result = result.split(placeholder).join(displayName);
+            result = result.split(placeholder).join(`🪝${displayName}`);
         }
-        // Replace all remaining __capt_XXX__ with just XXX (for named captures)
-        result = result.replace(/__capt_([^_]+(?:_[^_]+)*)__/g, '$1');
+        // Replace all remaining __capt_XXX__ with 🪝XXX (for named captures)
+        result = result.replace(/__capt_([^_]+(?:_[^_]+)*)__/g, '🪝$1');
         return result;
     }
 
@@ -619,9 +620,9 @@ export class Pattern {
                 // Show capture name or placeholder
                 const name = (cap as any)[CAPTURE_NAME_SYMBOL];
                 if (cap && typeof cap === 'object' && name) {
-                    // Use mapped name for unnamed captures, or original name
+                    // Use mapped name for unnamed captures, or original name (with 🪝 prefix)
                     const displayName = this.unnamedCaptureMapping.get(name) || name;
-                    source += `\${${displayName}}`;
+                    source += `\${🪝${displayName}}`;
                 } else {
                     source += '${...}';
                 }
