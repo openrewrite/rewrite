@@ -27,8 +27,6 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.Validated;
-import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
