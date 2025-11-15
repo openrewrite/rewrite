@@ -45,6 +45,8 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
     private final InMemoryRepository repo;
     private final Set<Recipe> recipesThatMadeChanges;
 
+    private final boolean binaryPatch;
+
     public InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
                              String newSource, Set<Recipe> recipesThatMadeChanges) {
         this(originalFilePath, filePath, relativeTo, oldSource, newSource, recipesThatMadeChanges, FileMode.REGULAR_FILE, FileMode.REGULAR_FILE);
@@ -52,8 +54,23 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
 
     public InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
                              String newSource, Set<Recipe> recipesThatMadeChanges, FileMode oldMode, FileMode newMode) {
+        this(originalFilePath, filePath, relativeTo, oldSource.getBytes(StandardCharsets.UTF_8), newSource.getBytes(StandardCharsets.UTF_8), recipesThatMadeChanges, oldMode, newMode, false);
+    }
+
+    public InMemoryDiffEntry(
+            @Nullable Path originalFilePath,
+            @Nullable Path filePath,
+            @Nullable Path relativeTo,
+            byte[] oldSource,
+            byte[] newSource,
+            Set<Recipe> recipesThatMadeChanges,
+            FileMode oldMode,
+            FileMode newMode,
+            boolean binaryPatch
+    ) {
 
         this.recipesThatMadeChanges = recipesThatMadeChanges;
+        this.binaryPatch = binaryPatch;
 
         try {
             this.repo = new InMemoryRepository.Builder()
@@ -63,7 +80,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
             try (ObjectInserter inserter = repo.getObjectDatabase().newInserter()) {
 
                 if (originalFilePath != null) {
-                    this.oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
+                    this.oldId = inserter.insert(Constants.OBJ_BLOB, oldSource).abbreviate(40);
                     this.oldMode = oldMode;
                     this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString().replace("\\", "/");
                 } else {
@@ -73,7 +90,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
                 }
 
                 if (filePath != null) {
-                    this.newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
+                    this.newId = inserter.insert(Constants.OBJ_BLOB, newSource).abbreviate(40);
                     this.newMode = newMode;
                     this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString().replace("\\", "/");
                 } else {
@@ -115,6 +132,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
         try (DiffFormatter formatter = new DiffFormatter(patch)) {
             formatter.setDiffComparator(ignoreAllWhitespace ? RawTextComparator.WS_IGNORE_ALL : RawTextComparator.DEFAULT);
             formatter.setRepository(repo);
+            formatter.setBinary(binaryPatch);
             formatter.format(this);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -124,7 +142,8 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
 
         AtomicBoolean addedComment = new AtomicBoolean(false);
         // NOTE: String.lines() would remove empty lines which we don't want
-        return Arrays.stream(diff.split("\n"))
+        // Use split with limit -1 to preserve trailing empty strings (important for binary patches)
+        return Arrays.stream(diff.split("\n", -1))
                        .map(l -> {
                            if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
                                addedComment.set(true);
@@ -142,7 +161,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
                            }
                            return l;
                        })
-                       .collect(joining("\n")) + "\n";
+                       .collect(joining("\n"));
     }
 
     @Override
