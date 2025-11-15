@@ -48,7 +48,8 @@ describe('Pattern Debug Logging', () => {
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
         expect(calls.some(c => c.includes('✅ SUCCESS matching against'))).toBe(true);
-        expect(calls.some(c => c.includes("Captured 'value'"))).toBe(true);
+        expect(calls.some(c => c.includes("Captures:"))).toBe(true);
+        expect(calls.some(c => c.includes("= value"))).toBe(true);
     });
 
     test('pattern-level debug: pattern({ debug: true })', async () => {
@@ -155,9 +156,8 @@ describe('Pattern Debug Logging', () => {
         expect(match).toBeDefined();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        const capturedLine = calls.find(c => c.includes("Captured"));
-        expect(capturedLine).toContain('[');
-        expect(capturedLine).toContain(']');
+        // With the new format, variadic captures are shown in the legend
+        expect(calls.some(c => c.includes("Captures:"))).toBe(true);
     });
 
     test('shows matched tree with mismatch highlighted', async () => {

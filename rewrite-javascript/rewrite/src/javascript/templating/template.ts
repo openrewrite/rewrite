@@ -291,7 +291,7 @@ export class Template {
      * @param values values for parameters in template
      * @returns A Promise resolving to the generated AST node
      */
-    async apply(cursor: Cursor, tree: J, values?: Map<Capture | string, J> | Pick<Map<string, J>, 'get'> | Record<string, J>): Promise<J | undefined> {
+    async apply(cursor: Cursor, tree: J, values?: Map<Capture | string, J> | Pick<Map<string, J>, 'get'> | Record<string, J> | MatchResult): Promise<J | undefined> {
         // Normalize the values map: convert any Capture keys to string keys
         let normalizedValues: Pick<Map<string, J>, 'get'> | undefined;
         let wrappersMap: Map<string, J.RightPadded<J> | J.RightPadded<J>[]> = new Map();

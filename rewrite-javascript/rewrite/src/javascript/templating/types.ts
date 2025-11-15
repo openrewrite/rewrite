@@ -576,11 +576,6 @@ export interface DebugLogEntry {
     scope: 'matching' | 'comparison' | 'constraint';
 
     /**
-     * Path in the AST where this log entry was generated.
-     */
-    path: string[];
-
-    /**
      * Human-readable message.
      */
     message: string;
@@ -600,11 +595,6 @@ export interface MatchExplanation {
      * The reason for the match failure.
      */
     reason: 'structural-mismatch' | 'constraint-failed' | 'type-mismatch' | 'kind-mismatch' | 'value-mismatch' | 'array-length-mismatch';
-
-    /**
-     * Path in the AST where the failure occurred (e.g., ['select', 'name']).
-     */
-    path: string[];
 
     /**
      * Human-readable description of what was expected.
