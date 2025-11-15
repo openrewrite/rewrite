@@ -158,6 +158,18 @@ export class JavaScriptTypeMapping {
             //TODO
         }
 
+        // Check for union types (e.g., string | number)
+        if (type.flags & ts.TypeFlags.Union) {
+            const unionType = type as ts.UnionType;
+            return this.createUnionType(unionType, signature);
+        }
+
+        // Check for intersection types (e.g., A & B)
+        if (type.flags & ts.TypeFlags.Intersection) {
+            const intersectionType = type as ts.IntersectionType;
+            return this.createIntersectionType(intersectionType, signature);
+        }
+
         // Check for function types without symbols (anonymous functions, function types)
         const callSignatures = type.getCallSignatures();
         if (callSignatures.length > 0) {
@@ -928,6 +940,60 @@ export class JavaScriptTypeMapping {
         }
 
         return Type.unknownType;
+    }
+
+    /**
+     * Create a union type from TypeScript union type (e.g., string | number)
+     */
+    private createUnionType(unionType: ts.UnionType, signature: string | number): Type.Union {
+        const existing = this.typeCache.get(signature) as Type.Union | undefined;
+        if (existing) {
+            return existing;
+        }
+
+        // Create the shell first to handle circular references
+        const union = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Union,
+            bounds: []
+        }) as Type.Union;
+
+        this.typeCache.set(signature, union);
+
+        // Map all constituent types
+        const bounds: Type[] = [];
+        for (const constituentType of unionType.types) {
+            bounds.push(this.getType(constituentType));
+        }
+
+        (union as any).bounds = bounds;
+        return union;
+    }
+
+    /**
+     * Create an intersection type from TypeScript intersection type (e.g., A & B)
+     */
+    private createIntersectionType(intersectionType: ts.IntersectionType, signature: string | number): Type.Intersection {
+        const existing = this.typeCache.get(signature) as Type.Intersection | undefined;
+        if (existing) {
+            return existing;
+        }
+
+        // Create the shell first to handle circular references
+        const intersection = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Intersection,
+            bounds: []
+        }) as Type.Intersection;
+
+        this.typeCache.set(signature, intersection);
+
+        // Map all constituent types
+        const bounds: Type[] = [];
+        for (const constituentType of intersectionType.types) {
+            bounds.push(this.getType(constituentType));
+        }
+
+        (intersection as any).bounds = bounds;
+        return intersection;
     }
 
     /**

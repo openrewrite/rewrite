@@ -1128,6 +1128,124 @@ describe('JavaScript type mapping', () => {
         });
     });
 
+    describe('union and intersection types', () => {
+        test('should map union type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'value') {
+                    if (Type.isUnion(type)) {
+                        // Check bounds - should be string and number primitives
+                        const boundTypes = type.bounds.map(b =>
+                            Type.isPrimitive(b) ? b.keyword : Type.isClass(b) ? (b as Type.Class).fullyQualifiedName : 'OTHER'
+                        );
+                        return `Union[${boundTypes.join(', ')}]`;
+                    }
+                    return 'NOT_UNION';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        let value: string | number = "hello";
+                    `,
+                    `
+                        let /*~~(Union[String, double])~~>*/value: string | number = "hello";
+                    `
+                )
+            );
+        });
+
+        test('should map intersection type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'obj') {
+                    if (Type.isIntersection(type)) {
+                        // Check bounds count
+                        return `Intersection[${type.bounds.length} types]`;
+                    }
+                    return 'NOT_INTERSECTION';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        interface A { a: string; }
+                        interface B { b: number; }
+                        let obj: A & B = { a: "test", b: 42 };
+                    `,
+                    `
+                        interface A { a: string; }
+                        interface B { b: number; }
+                        let /*~~(Intersection[2 types])~~>*/obj: A & B = { a: "test", b: 42 };
+                    `
+                )
+            );
+        });
+
+        test('should map complex union with multiple types', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'mixed') {
+                    if (Type.isUnion(type)) {
+                        return `Union[${type.bounds.length} types]`;
+                    }
+                    return 'NOT_UNION';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        let mixed: string | number | boolean | null = "test";
+                    `,
+                    `
+                        let /*~~(Union[4 types])~~>*/mixed: string | number | boolean | null = "test";
+                    `
+                )
+            );
+        });
+
+        test('should handle union of primitives and class types', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'mixed') {
+                    if (Type.isUnion(type)) {
+                        // Check if we have both primitives and classes
+                        const hasPrimitive = type.bounds.some(b => Type.isPrimitive(b));
+                        const hasClass = type.bounds.some(b => Type.isClass(b));
+                        if (hasPrimitive && hasClass) {
+                            return 'Union[primitive+class]';
+                        }
+                    }
+                    return 'OTHER';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        class MyClass {}
+                        let mixed: string | MyClass = "test";
+                    `,
+                    `
+                        class MyClass {}
+                        let /*~~(Union[primitive+class])~~>*/mixed: string | MyClass = "test";
+                    `
+                )
+            );
+        });
+    });
+
     describe('type aliases', () => {
         test('should map plain type alias to underlying type', async () => {
             const spec = new RecipeSpec();
