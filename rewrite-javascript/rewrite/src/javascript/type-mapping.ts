@@ -105,12 +105,57 @@ export class JavaScriptTypeMapping {
             }
 
             if (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias)) {
-                // Create and cache shell first to handle circular references
-                const classType = this.createEmptyClassType(type);
-                this.typeCache.set(signature, classType);
-                this.populateClassType(classType, type);
+                // Get the declared type from the symbol (analogous to symType = sym.type in Java)
+                // This is the base class type without specific type arguments
+                const declaredType = this.checker.getDeclaredTypeOfSymbol(symbol);
+                const declaredSignature = this.getSignature(declaredType);
+
+                let classType = this.typeCache.get(declaredSignature) as Type.Class | undefined;
+
+                if (!classType) {
+                    // Create and cache the base class shell first to handle circular references
+                    classType = this.createEmptyClassType(declaredType);
+                    this.typeCache.set(declaredSignature, classType);
+                    this.populateClassType(classType, declaredType);
+                }
+
+                // Check if this is a type reference with type arguments (like Array<String>)
+                const typeRef = type as ts.TypeReference;
+                if (typeRef.typeArguments && typeRef.typeArguments.length > 0) {
+                    // Create a Type.Parameterized wrapper for this specific type reference
+                    let parameterized = this.typeCache.get(signature) as Type.Parameterized | undefined;
+                    if (!parameterized) {
+                        // Map the type arguments to Type[]
+                        const typeParameters: Type[] = [];
+                        for (const typeArg of typeRef.typeArguments) {
+                            typeParameters.push(this.getType(typeArg as ts.Type));
+                        }
+
+                        // Create the parameterized type
+                        parameterized = Object.assign(new NonDraftableType(), {
+                            kind: Type.Kind.Parameterized,
+                            type: classType,
+                            typeParameters: typeParameters,
+                            fullyQualifiedName: classType.fullyQualifiedName,
+                            toJSON: function() {
+                                return Type.signature(this);
+                            }
+                        }) as Type.Parameterized;
+
+                        this.typeCache.set(signature, parameterized);
+                    }
+                    return parameterized;
+                }
+
+                // No type arguments - return the base class type
                 return classType;
             }
+
+            if (symbol.flags & ts.SymbolFlags.TypeParameter) {
+                return this.createGenericTypeVariable(type as ts.TypeParameter, signature);
+            }
+        } else if (type.aliasSymbol) {
+            //TODO
         }
 
         // Check for function types without symbols (anonymous functions, function types)
@@ -883,6 +928,50 @@ export class JavaScriptTypeMapping {
         }
 
         return Type.unknownType;
+    }
+
+    /**
+     * Create a generic type variable from a TypeScript type parameter.
+     * Examples: T, K extends string, V extends keyof T
+     */
+    private createGenericTypeVariable(typeParam: ts.TypeParameter, signature: string | number): Type.GenericTypeVariable {
+        const existing = this.typeCache.get(signature) as Type.GenericTypeVariable | undefined;
+        if (existing) {
+            return existing;
+        }
+
+        const symbol = typeParam.getSymbol();
+        const name = symbol ? symbol.getName() : '?';
+
+        // Create the shell first to handle circular references
+        const gtv = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.GenericTypeVariable,
+            name: name,
+            variance: Type.GenericTypeVariable.Variance.Invariant,
+            bounds: []
+        }) as Type.GenericTypeVariable;
+
+        this.typeCache.set(signature, gtv);
+
+        // Get the constraint (upper bound) if it exists
+        const constraint = typeParam.getConstraint();
+        let bounds: Type[] = [];
+        let variance = Type.GenericTypeVariable.Variance.Invariant;
+
+        if (constraint) {
+            const boundType = this.getType(constraint);
+            // Only add bounds if it's not just "object" (the default constraint)
+            if (!(Type.isClass(boundType) && boundType.fullyQualifiedName === 'object')) {
+                bounds = [boundType];
+                variance = Type.GenericTypeVariable.Variance.Covariant;
+            }
+        }
+
+        // Update the variance and bounds
+        (gtv as any).variance = variance;
+        (gtv as any).bounds = bounds;
+
+        return gtv;
     }
 
     /**

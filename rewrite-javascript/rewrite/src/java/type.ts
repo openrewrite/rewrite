@@ -256,6 +256,10 @@ export namespace Type {
         return type?.kind === Type.Kind.Parameterized;
     }
 
+    export function isGenericTypeVariable(type?: Type): type is Type.GenericTypeVariable {
+        return type?.kind === Type.Kind.GenericTypeVariable;
+    }
+
     export function isFullyQualified(type?: Type): type is Type.FullyQualified {
         return type != null && (
             type.kind === Type.Kind.Class ||
