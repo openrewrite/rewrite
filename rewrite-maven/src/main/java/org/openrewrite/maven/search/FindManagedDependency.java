@@ -21,12 +21,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -68,7 +70,7 @@ public class FindManagedDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
+                    versionIsValid(version, versionPattern, () -> findManagedDependency(tag, null))) {
                     ds.add(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -99,7 +101,7 @@ public class FindManagedDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
+                    versionIsValid(version, versionPattern, () -> findManagedDependency(tag, null))) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -107,20 +109,21 @@ public class FindManagedDependency extends Recipe {
         };
     }
 
-    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String actualVersion,
-                                          @Nullable String versionPattern) {
+    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern,
+                                          Supplier<@Nullable ResolvedManagedDependency> resolvedDependencySupplier) {
         if (desiredVersion == null) {
             return true;
         }
-        if (actualVersion == null) {
-            // rare but technically valid for a dependencyManagement entry to have no version; bail if so
+        ResolvedManagedDependency resolvedDependency = resolvedDependencySupplier.get();
+        if (resolvedDependency == null) {
+            // shouldn't happen, but if it does, fail the condition
             return false;
         }
+        String actualVersion = resolvedDependency.getVersion();
         Validated<VersionComparator> validate = Semver.validate(desiredVersion, versionPattern);
-        if (validate.isInvalid()) {
-            return false;
-        }
-        assert validate.getValue() != null;
-        return validate.getValue().isValid(actualVersion, actualVersion);
+        return actualVersion != null &&
+                validate.isValid() &&
+                validate.getValue() != null &&
+                validate.getValue().isValid(actualVersion, actualVersion);
     }
 }
