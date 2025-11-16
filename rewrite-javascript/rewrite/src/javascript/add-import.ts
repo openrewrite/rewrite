@@ -17,10 +17,14 @@ export interface AddImportOptions {
     target: string;
 
     /** Optionally, the specific member to import from the module.
-     * If not specified, adds a default import or namespace import */
+     * If not specified, adds a default import or namespace import.
+     * Special values:
+     * - 'default': Adds a default import from the target module.
+     *   When using 'default', the `alias` parameter is required. */
     member?: string;
 
-    /** Optional alias for the imported member */
+    /** Optional alias for the imported member.
+     * Required when member is 'default'. */
     alias?: string;
 
     /** If true, only add the import if the member is actually used in the file. Default: true */
@@ -34,6 +38,18 @@ export interface AddImportOptions {
  * Register an AddImport visitor to add an import statement to a JavaScript/TypeScript file
  * @param visitor The visitor to add the import addition to
  * @param options Configuration options for the import to add
+ *
+ * @example
+ * // Add a named import
+ * maybeAddImport(visitor, { target: 'fs', member: 'readFile' });
+ *
+ * @example
+ * // Add a default import using the 'default' member specifier
+ * maybeAddImport(visitor, { target: 'react', member: 'default', alias: 'React' });
+ *
+ * @example
+ * // Add a default import (legacy way, without specifying member)
+ * maybeAddImport(visitor, { target: 'react', alias: 'React' });
  */
 export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,
@@ -59,6 +75,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
     constructor(options: AddImportOptions) {
         super();
+
+        // Validate that alias is provided when member is 'default'
+        if (options.member === 'default' && !options.alias) {
+            throw new Error("When member is 'default', the alias parameter is required");
+        }
+
         this.target = options.target;
         this.member = options.member;
         this.alias = options.alias;
@@ -114,8 +136,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         // For .mjs or TypeScript, prefer ES6
         if (sourcePath.endsWith('.mjs') || isTypeScript) {
-            // If we're importing a member, use named imports
-            if (this.member !== undefined) {
+            // If we're importing a member (but not 'default'), use named imports
+            if (this.member !== undefined && this.member !== 'default') {
                 return ImportStyle.ES6Named;
             }
             // Otherwise default import
@@ -175,8 +197,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return ImportStyle.CommonJS;
         }
 
-        // If importing a member, prefer named imports if they exist in the file
-        if (this.member !== undefined) {
+        // If importing a member (but not 'default'), prefer named imports if they exist in the file
+        if (this.member !== undefined && this.member !== 'default') {
             if (hasNamedImports) {
                 return ImportStyle.ES6Named;
             }
@@ -186,7 +208,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // For default/whole module imports
-        if (this.member === undefined) {
+        if (this.member === undefined || this.member === 'default') {
             if (hasNamespaceImports) {
                 return ImportStyle.ES6Namespace;
             }
@@ -195,8 +217,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        // Default to named imports for members, default imports for modules
-        return this.member !== undefined ? ImportStyle.ES6Named : ImportStyle.ES6Default;
+        // Default to named imports for members (except 'default'), default imports for modules
+        return (this.member !== undefined && this.member !== 'default')
+            ? ImportStyle.ES6Named
+            : ImportStyle.ES6Default;
     }
 
     /**
@@ -270,7 +294,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const importStyle = this.determineImportStyle(compilationUnit);
 
         // For ES6 named imports, check if we can merge into an existing import from the same module
-        if (importStyle === ImportStyle.ES6Named && this.member !== undefined) {
+        // Don't try to merge default imports (member === 'default')
+        if (importStyle === ImportStyle.ES6Named && this.member !== undefined && this.member !== 'default') {
             const mergedCu = await this.tryMergeIntoExistingImport(compilationUnit, p);
             if (mergedCu !== compilationUnit) {
                 return mergedCu;
@@ -472,9 +497,18 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Check if the specific member or default import already exists
-        if (this.member === undefined) {
+        if (this.member === undefined || this.member === 'default') {
             // We're adding a default import, check if one exists
-            return importClause.name !== undefined;
+            // For member === 'default', also verify the alias matches if specified
+            if (importClause.name === undefined) {
+                return false;
+            }
+            // If we have an alias, check that it matches
+            if (this.alias && importClause.name.element?.kind === J.Kind.Identifier) {
+                const existingName = (importClause.name.element as J.Identifier).simpleName;
+                return existingName === this.alias;
+            }
+            return true;
         } else {
             // We're adding a named import, check if it exists
             const namedBindings = importClause.namedBindings;
@@ -531,10 +565,15 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         // Check if the variable name matches what we're trying to add
         const pattern = namedVar.name;
-        if (this.member === undefined && pattern?.kind === J.Kind.Identifier) {
+        if ((this.member === undefined || this.member === 'default') && pattern?.kind === J.Kind.Identifier) {
             // Default import style: const fs = require('fs')
+            // For member === 'default', also check the alias matches if specified
+            if (this.alias) {
+                const varName = (pattern as J.Identifier).simpleName;
+                return varName === this.alias;
+            }
             return true;
-        } else if (this.member !== undefined && pattern?.kind === JS.Kind.ObjectBindingPattern) {
+        } else if (this.member !== undefined && this.member !== 'default' && pattern?.kind === JS.Kind.ObjectBindingPattern) {
             // Destructured import: const { member } = require('module')
             const objectPattern = pattern as JS.ObjectBindingPattern;
             for (const elem of objectPattern.bindings.elements) {
@@ -636,8 +675,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         let importClause: JS.ImportClause | undefined;
 
-        if (this.member === undefined) {
+        if (this.member === undefined || this.member === 'default') {
             // Default import: import target from 'module'
+            // or: import alias from 'module' (when member === 'default')
             const defaultName: J.Identifier = {
                 id: randomId(),
                 kind: J.Kind.Identifier,
