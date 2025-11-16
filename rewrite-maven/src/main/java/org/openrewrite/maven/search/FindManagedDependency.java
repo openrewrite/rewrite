@@ -121,10 +121,9 @@ public class FindManagedDependency extends Recipe {
         }
         String actualVersion = resolvedDependency.getVersion();
         Validated<VersionComparator> validate = Semver.validate(desiredVersion, versionPattern);
-        if (validate.isInvalid()) {
-            return false;
-        }
-        assert validate.getValue() != null;
-        return validate.getValue().isValid(actualVersion, actualVersion);
+        return actualVersion != null &&
+                validate.isValid() &&
+                validate.getValue() != null &&
+                validate.getValue().isValid(actualVersion, actualVersion);
     }
 }
