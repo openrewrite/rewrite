@@ -88,7 +88,7 @@ export abstract class Recipe {
     }
 
     async descriptor(): Promise<RecipeDescriptor> {
-        const optionsRecord: Record<string, OptionDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
+        const optionsRecord: Record<string, OptionAnnotationDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
         return {
             name: this.name,
             displayName: this.displayName,
@@ -101,6 +101,7 @@ export abstract class Recipe {
                 name: key,
                 value: (this as any)[key],
                 required: descriptor.required ?? true,
+                type: `${this.hasOwnProperty(key) ? typeof (this as any)[key] : ""}`,
                 ...descriptor
             }))
         }
@@ -231,19 +232,9 @@ export function Option(descriptor: OptionAnnotationDescriptor) {
                 configurable: true,
             });
         }
-        var updatedDescriptor: OptionDescriptor = {
-            ...descriptor,
-            type: ""
-        };
-        if (target.hasOwnProperty(propertyKey)) {
-            updatedDescriptor = {
-                ...updatedDescriptor,
-                type: `${typeof target[propertyKey]}`
-            }
-        }
 
         // Register the option metadata under the property key.
-        target.constructor[OPTIONS_KEY][propertyKey] = updatedDescriptor;
+        target.constructor[OPTIONS_KEY][propertyKey] = descriptor;
     };
 }
 
