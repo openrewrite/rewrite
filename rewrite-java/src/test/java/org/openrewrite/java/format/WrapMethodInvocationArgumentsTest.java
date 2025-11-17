@@ -55,8 +55,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method("hello", 42, true);
@@ -66,8 +64,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method(
@@ -89,8 +85,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method("name", 25);
@@ -100,8 +94,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method(
@@ -122,8 +114,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method(
@@ -145,8 +135,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               import java.util.Arrays;
               
               class Test {
@@ -158,8 +146,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.Arrays;
               
               class Test {
@@ -185,8 +171,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       String result = getString().substring(0, 5).toUpperCase();
@@ -198,8 +182,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       String result = getString().substring(
@@ -222,8 +204,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Person {
                   Person(String name, int age, boolean active) {}
               }
@@ -235,8 +215,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Person {
                   Person(String name, int age, boolean active) {}
               }
@@ -260,8 +238,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       staticMethod("hello", 42, true);
@@ -271,8 +247,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       staticMethod(
@@ -294,8 +268,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method("prefix", 1, 2, 3);
@@ -305,8 +277,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method(
@@ -329,8 +299,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method("hello", /* age */ 42, true);
@@ -340,8 +308,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method(
@@ -363,8 +329,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       outer(inner("value", 10), 42);
@@ -375,8 +339,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       outer(
@@ -400,8 +362,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method(new String[]{"a", "b"}, new int[]{1, 2});
@@ -411,8 +371,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method(
@@ -433,8 +391,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               import java.util.function.Function;
               
               class Test {
@@ -446,8 +402,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.function.Function;
               
               class Test {
@@ -470,8 +424,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method();
@@ -490,8 +442,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method("hello");
@@ -510,8 +460,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test1() {
                       method("hello", 42);
@@ -525,8 +473,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test1() {
                       method(
@@ -569,8 +515,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       shortMethod("a", 1);
@@ -582,8 +526,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       shortMethod("a", 1);
@@ -625,8 +567,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method("name", 25);
@@ -662,8 +602,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method("hello", 42, true);
@@ -674,8 +612,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method("hello",
@@ -698,8 +634,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method(
@@ -720,8 +654,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method("hello",
@@ -732,8 +664,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       method(
@@ -755,8 +685,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               import java.util.List;
               
               class Test {
@@ -768,8 +696,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.List;
               
               class Test {
@@ -792,8 +718,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Base {
                   void method(String s, int i) {}
               }
@@ -805,8 +729,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Base {
                   void method(String s, int i) {}
               }
@@ -829,8 +751,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               import java.util.function.Function;
               
               class Test {
@@ -842,8 +762,6 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.function.Function;
               
               class Test {
