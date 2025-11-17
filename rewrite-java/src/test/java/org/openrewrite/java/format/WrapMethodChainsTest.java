@@ -41,8 +41,6 @@ class WrapMethodChainsTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .parser(JavaParser.fromJavaVersion().dependsOn("""
-            package com.example;
-            
             public class MyObject {
                 public static Builder builder() { return new Builder(); }
                 public static Builder newBuilder() { return new Builder(); }
@@ -79,8 +77,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder().name("test").age(25).build();
@@ -88,8 +84,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
@@ -108,8 +102,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.newBuilder().name("test").age(25).build();
@@ -117,8 +109,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.newBuilder()
@@ -137,8 +127,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
@@ -157,8 +145,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
@@ -177,8 +163,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
@@ -197,8 +181,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder().name("test").nested(MyObject.builder().name("nested").build()).build();
@@ -206,8 +188,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
@@ -228,15 +208,11 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   private final MyObject value = MyObject.builder().name("hello").age(30).build();
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   private final MyObject value = MyObject.builder()
               .name("hello")
@@ -253,8 +229,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   MyObject test() {
                       return MyObject.builder().name("hello").age(30).build();
@@ -262,8 +236,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   MyObject test() {
                       return MyObject.builder()
@@ -282,8 +254,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder().build();
@@ -291,8 +261,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
@@ -309,8 +277,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder().name("hello") /* comment */ .age(30).build();
@@ -318,8 +284,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
@@ -338,8 +302,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               import java.util.function.Supplier;
               
               class Test {
@@ -349,8 +311,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.function.Supplier;
               
               class Test {
@@ -371,8 +331,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       String result = "hello".toUpperCase()
@@ -393,8 +351,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject s1 = MyObject.builder().name("a").age(1).build();
@@ -403,8 +359,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject s1 = MyObject.builder()
@@ -427,8 +381,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               import java.util.Arrays;
               
               class Test {
@@ -438,8 +390,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.Arrays;
               
               class Test {
@@ -460,8 +410,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder().name("test").nested(MyObject.builder().build()).age(30).build();
@@ -469,8 +417,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
@@ -507,8 +453,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -521,8 +465,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -545,8 +487,6 @@ class WrapMethodChainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject root = MyObject.builder().name("root").nested(
@@ -563,8 +503,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       MyObject root = MyObject.builder()
@@ -610,8 +548,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.Collection;
               import java.util.Optional;
               
@@ -634,8 +570,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.Collection;
               import java.util.Optional;
               
@@ -689,8 +623,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -715,8 +647,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -770,8 +700,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -788,8 +716,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -835,8 +761,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -862,8 +786,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -917,8 +839,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -935,8 +855,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -985,8 +903,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -1002,8 +918,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -1047,8 +961,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.Collection;
               import java.util.Optional;
               
@@ -1073,8 +985,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.Collection;
               import java.util.Optional;
               
@@ -1128,8 +1038,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.List;
               
               class Test {
@@ -1143,8 +1051,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.List;
               
               class Test {
@@ -1184,8 +1090,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -1196,8 +1100,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               import java.util.List;
               import java.util.stream.Collectors;
               
@@ -1244,8 +1146,6 @@ class WrapMethodChainsTest implements RewriteTest {
           })),
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       String ob1 = new StringBuilder().append("test").append("25").toString();
@@ -1255,8 +1155,6 @@ class WrapMethodChainsTest implements RewriteTest {
               }
               """,
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       String ob1 = new StringBuilder().append("test")
@@ -1294,8 +1192,6 @@ class WrapMethodChainsTest implements RewriteTest {
             null))),
           java(
             """
-              package com.example;
-              
               class Test {
                   void test() {
                       String obj = new StringBuilder().append("test").append("25").toString();
