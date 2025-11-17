@@ -231,10 +231,19 @@ export function Option(descriptor: OptionAnnotationDescriptor) {
                 configurable: true,
             });
         }
-        target.constructor[OPTIONS_KEY]["type"] = `${typeof target}`;
+        var updatedDescriptor: OptionDescriptor = {
+            ...descriptor,
+            type: ""
+        };
+        if (target.hasOwnProperty(propertyKey)) {
+            updatedDescriptor = {
+                ...updatedDescriptor,
+                type: `${typeof target[propertyKey]}`
+            }
+        }
 
         // Register the option metadata under the property key.
-        target.constructor[OPTIONS_KEY][propertyKey] = descriptor;
+        target.constructor[OPTIONS_KEY][propertyKey] = updatedDescriptor;
     };
 }
 
