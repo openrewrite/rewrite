@@ -55,14 +55,15 @@ public class RecipeMarketplaceCompletenessValidator {
         // Find recipes in CSV that don't exist in the environment (phantom recipes)
         for (String csvRecipeName : csvRecipeNames) {
             if (!jarRecipeNames.contains(csvRecipeName)) {
-                validation = validation.and(Validated.invalid(csvRecipeName, csvRecipeName, "Recipe listed in CSV must exist in the environment"));
+                validation = validation.and(Validated.invalid(csvRecipeName, csvRecipeName, "Recipe '" + csvRecipeName + "' listed in CSV must exist in the environment"));
+
             }
         }
 
         // Find recipes in the environment that aren't in CSV (missing recipes)
         for (String envRecipeName : jarRecipeNames) {
             if (!csvRecipeNames.contains(envRecipeName)) {
-                validation = validation.and(Validated.invalid(envRecipeName, envRecipeName, "Recipe exists in environment but is not listed in CSV"));
+                validation = validation.and(Validated.invalid(envRecipeName, envRecipeName, "Recipe '" + envRecipeName + "' exists in environment but is not listed in CSV"));
             }
         }
 
