@@ -217,9 +217,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
         if (!b.getEnd().getWhitespace().contains("\n")) {
-            if (!b.getEnd().getWhitespace().contains("\n")) {
-                b = b.withEnd(withNewline(b.getEnd()));
-            }
+            b = b.withEnd(withNewline(b.getEnd()));
         }
         return b;
     }
