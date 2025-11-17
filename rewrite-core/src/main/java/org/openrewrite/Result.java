@@ -211,7 +211,7 @@ public class Result {
         return diff(relativeTo, markerPrinter, ignoreAllWhitespace, false);
     }
 
-    @Incubating(since = "7.34.0")
+    @Incubating(since = "8.67.0")
     public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace, boolean binaryPatch) {
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
