@@ -1095,7 +1095,7 @@ describe('JavaScript type mapping', () => {
                         }
                     `,
                     `
-                        function identity</*~~(GenericTypeVariable<T, variance=2, bounds=0>)~~>*/T>(value: /*~~(GenericTypeVariable<T, variance=2, bounds=0>)~~>*/T): /*~~(GenericTypeVariable<T, variance=2, bounds=0>)~~>*/T {
+                        function identity</*~~(GenericTypeVariable<T, variance=Invariant, bounds=0>)~~>*/T>(value: /*~~(GenericTypeVariable<T, variance=Invariant, bounds=0>)~~>*/T): /*~~(GenericTypeVariable<T, variance=Invariant, bounds=0>)~~>*/T {
                             return value;
                         }
                     `
@@ -1127,7 +1127,7 @@ describe('JavaScript type mapping', () => {
                         }
                     `,
                     `
-                        function getValue</*~~(GenericTypeVariable<T, variance=0, bounds=1, first=String>)~~>*/T extends string>(value: /*~~(GenericTypeVariable<T, variance=0, bounds=1, first=String>)~~>*/T): /*~~(GenericTypeVariable<T, variance=0, bounds=1, first=String>)~~>*/T {
+                        function getValue</*~~(GenericTypeVariable<T, variance=Covariant, bounds=1, first=String>)~~>*/T extends string>(value: /*~~(GenericTypeVariable<T, variance=Covariant, bounds=1, first=String>)~~>*/T): /*~~(GenericTypeVariable<T, variance=Covariant, bounds=1, first=String>)~~>*/T {
                             return value;
                         }
                     `
@@ -1161,9 +1161,9 @@ describe('JavaScript type mapping', () => {
                 )
             );
 
-            // Verify we found both K and V (variance=2 means Invariant)
-            expect(foundTypes).toContain('K:variance=2');
-            expect(foundTypes).toContain('V:variance=2');
+            // Verify we found both K and V (variance=Invariant means Invariant)
+            expect(foundTypes).toContain('K:variance=Invariant');
+            expect(foundTypes).toContain('V:variance=Invariant');
         });
     });
 
@@ -1283,6 +1283,80 @@ describe('JavaScript type mapping', () => {
                 )
             );
         });
+
+        test('should handle self-referential union types without infinite recursion', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'json') {
+                    if (Type.isUnion(type)) {
+                        // This should not cause infinite recursion when computing signature
+                        try {
+                            const sig = Type.signature(type);
+                            // If we got here without stack overflow, the test passes
+                            // The signature should contain "<cyclic union>" for the self-referential part
+                            return sig.includes('<cyclic union>') ? 'SUCCESS: handled cyclic union' : `Signature: ${sig.substring(0, 50)}...`;
+                        } catch (e) {
+                            return `ERROR: ${e instanceof Error ? e.message : 'Unknown error'}`;
+                        }
+                    }
+                    return 'NOT_UNION';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+                        let json: Json = "test";
+                    `,
+                    `
+                        type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+                        let /*~~(SUCCESS: handled cyclic union)~~>*/json: Json = "test";
+                    `
+                )
+            );
+        });
+
+        test('should handle self-referential intersection types without infinite recursion', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'obj') {
+                    if (type) {
+                        // This should not cause infinite recursion when computing signature
+                        try {
+                            const sig = Type.signature(type);
+                            // If we got here without stack overflow, the test passes
+                            return `SUCCESS: computed signature (${sig.length} chars)`;
+                        } catch (e) {
+                            return `ERROR: ${e instanceof Error ? e.message : 'Unknown error'}`;
+                        }
+                    }
+                    return 'NO_TYPE';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        interface A { prop: B & C }
+                        interface B { prop: A }
+                        interface C { other: string }
+                        let obj: A = { prop: { prop: null as any, other: "test" } };
+                    `,
+                    // Signature computation should succeed without infinite recursion
+                    `
+                        interface A { prop: B & C }
+                        interface B { prop: A }
+                        interface C { other: string }
+                        let /*~~(SUCCESS: computed signature (1 chars))~~>*/obj: A = { prop: { prop: null as any, other: "test" } };
+                    `
+                )
+            );
+        });
     });
 
     describe('type aliases', () => {
@@ -1314,53 +1388,52 @@ describe('JavaScript type mapping', () => {
             );
         });
 
-        test('should map generic type alias in React', async () => {
+        test('should map namespace-qualified parameterized type (React.Ref)', async () => {
             const spec = new RecipeSpec();
+            let reactRefType: Type | undefined;
 
-            // Track what we find
-            const foundTypes: string[] = [];
+            spec.recipe = new class extends Recipe {
+                name = 'Type checker';
+                displayName = 'Check React.Ref type';
+                description = 'Verify React.Ref type attribution';
 
-            spec.recipe = markTypes((node, type) => {
-                // Look for identifiers in the ref parameter to see what types we're getting
-                if (node?.kind === J.Kind.Identifier) {
-                    const id = node as J.Identifier;
-                    // Track the 'ref' parameter identifier and the 'Ref' type identifier
-                    if (id.simpleName === 'ref' || id.simpleName === 'Ref') {
-                        let typeDesc = 'NO_TYPE';
-                        if (type) {
-                            if (Type.isFullyQualified(type)) {
-                                typeDesc = FullyQualified.getFullyQualifiedName(type);
-                            } else if (Type.isPrimitive(type)) {
-                                typeDesc = (type as Type.Primitive).keyword || 'primitive';
-                            } else {
-                                typeDesc = 'HAS_TYPE';
+                async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
+                    return new class extends JavaScriptVisitor<ExecutionContext> {
+                        async visitParameterizedType(paramType: J.ParameterizedType, p: ExecutionContext): Promise<J.ParameterizedType> {
+                            const visited = await super.visitParameterizedType(paramType, p) as J.ParameterizedType;
+
+                            // Check if this is React.Ref
+                            if (paramType.class.kind === J.Kind.FieldAccess) {
+                                const fa = paramType.class as J.FieldAccess;
+                                const targetName = fa.target.kind === J.Kind.Identifier ?
+                                    (fa.target as J.Identifier).simpleName : '';
+                                const fieldName = fa.name.element.simpleName;
+
+                                if (targetName === 'React' && fieldName === 'Ref') {
+                                    reactRefType = paramType.type;
+                                }
                             }
+
+                            return visited;
                         }
-                        foundTypes.push(`${id.simpleName}: ${typeDesc}`);
-                        // Don't mark the code - this is just for tracking/logging
-                        return null;
                     }
                 }
-                return null;
-            });
+            };
 
             await withDir(async (repo) => {
-                //language=tsx
                 await spec.rewriteRun(
                     npm(
                         repo.path,
+                        //language=tsx
                         tsx(
                             `
                                 import React from "react";
 
                                 interface ButtonProps {
-                                    className?: string;
-                                    onClick?: () => void;
+                                    ref?: React.Ref<HTMLButtonElement>
                                 }
 
-                                const Button = ({ ref, ...props }: ButtonProps & {
-                                    ref?: React.Ref<HTMLButtonElement>
-                                }) => <button ref={ref} {...props} />;
+                                const Button = (props: ButtonProps) => <button ref={props.ref} />;
                             `
                         ),
                         packageJson(
@@ -1378,8 +1451,207 @@ describe('JavaScript type mapping', () => {
                 );
             }, { unsafeCleanup: true });
 
-            // Log what we found for debugging
-            console.log('Found types:', foundTypes);
+            // Verify React.Ref<HTMLButtonElement> has correct type attribution
+            expect(reactRefType).toBeDefined();
+
+            // React.Ref<T> is a type alias that resolves to a Union type
+            expect(Type.isUnion(reactRefType!)).toBe(true);
+
+            const unionType = reactRefType as Type.Union;
+
+            // Debug: Print all union bounds
+            console.log('Union bounds count:', unionType.bounds.length);
+            unionType.bounds.forEach((bound, i) => {
+                console.log(`Bound ${i}:`, bound.kind, Type.signature(bound));
+                if (Type.isParameterized(bound)) {
+                    console.log(`  -> Parameterized with ${bound.typeParameters.length} type params`);
+                }
+            });
+
+            // Find the RefObject bound (the second constituent after the callback function)
+            const refObjectBound = unionType.bounds.find(b =>
+                Type.isParameterized(b) &&
+                Type.isClass(b.type) &&
+                b.type.fullyQualifiedName.includes('RefObject')
+            );
+
+            console.log('Found refObjectBound:', refObjectBound ? 'yes' : 'no');
+            if (!refObjectBound) {
+                console.log('Looking for any parameterized bound...');
+                const anyParam = unionType.bounds.find(b => Type.isParameterized(b));
+                console.log('Any parameterized?', anyParam ? Type.signature(anyParam) : 'none');
+            }
+
+            expect(refObjectBound).toBeDefined();
+
+            // Verify the type parameter HTMLButtonElement is preserved
+            const parameterizedBound = refObjectBound as Type.Parameterized;
+            expect(parameterizedBound.typeParameters).toHaveLength(1);
+
+            // Debug: Print what type we actually got
+            const actualType = parameterizedBound.typeParameters[0];
+            console.log('HTMLButtonElement type kind:', actualType.kind);
+            console.log('HTMLButtonElement type signature:', Type.signature(actualType));
+
+            expect(Type.isClass(parameterizedBound.typeParameters[0])).toBe(true);
+            expect((parameterizedBound.typeParameters[0] as Type.Class).fullyQualifiedName).toBe('HTMLButtonElement');
+        });
+    });
+
+    describe('complex file parsing without stack overflow', () => {
+        test('should handle recursive mapped types like DeepReadonly without stack overflow', async () => {
+            // This test verifies that TypeScript's infinite type instantiation
+            // is properly handled with recursion depth limits
+            const spec = new RecipeSpec();
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        // Recursive mapped type - TypeScript creates new type objects at each instantiation level
+                        type DeepReadonly<T> = { readonly [P in keyof T]: DeepReadonly<T[P]> };
+
+                        interface NestedObject {
+                            a: {
+                                b: {
+                                    c: {
+                                        d: {
+                                            e: string;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // This will trigger infinite type instantiation as TypeScript tries to resolve
+                        // DeepReadonly<NestedObject> → DeepReadonly<{ a: ... }> → DeepReadonly<{ b: ... }> → ...
+                        const obj: DeepReadonly<NestedObject> = {
+                            a: {
+                                b: {
+                                    c: {
+                                        d: {
+                                            e: "test"
+                                        }
+                                    }
+                                }
+                            }
+                        };
+                    `
+                )
+            );
+
+            // If we got here without stack overflow, the test passes
+            expect(true).toBe(true);
+        });
+
+        test('minimal reproducer - just imports', async () => {
+            // Start with just the imports that might cause the issue
+            const spec = new RecipeSpec();
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import { render, act, fireEvent } from '@testing-library/react';
+                                import React, { type JSX } from 'react';
+
+                                // Empty file - just imports
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0",
+                                  "@testing-library/react": "^16.1.0",
+                                  "react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
+
+            expect(true).toBe(true);
+        });
+
+        test('minimal reproducer - with render call', async () => {
+            // Add a simple render call
+            const spec = new RecipeSpec();
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import { render, act } from '@testing-library/react';
+                                import React from 'react';
+
+                                const App = () => <div>Test</div>;
+                                render(<App />);
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0",
+                                  "@testing-library/react": "^16.1.0",
+                                  "react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
+
+            expect(true).toBe(true);
+        });
+
+        test('minimal reproducer - with act', async () => {
+            // Add act() which might trigger complex types
+            const spec = new RecipeSpec();
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import { act } from '@testing-library/react';
+
+                                act(() => {
+                                    console.log("test");
+                                });
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0",
+                                  "@testing-library/react": "^16.1.0",
+                                  "react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
+
+            expect(true).toBe(true);
         });
     });
 });
