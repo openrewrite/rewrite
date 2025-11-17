@@ -128,7 +128,7 @@ public class WrapMethodInvocationArguments<P> extends JavaIsoVisitor<P> {
                 if (style.getMethodCallArguments().getCloseNewLine()) {
                     n = n.getPadding().withArguments(n.getPadding().getArguments().getPadding().withElements(ListUtils.mapLast(n.getPadding().getArguments().getPadding().getElements(), rightPaddedParam -> {
                         Space after = rightPaddedParam.getAfter();
-                        if (after.getWhitespace().contains("\n")) {
+                        if (after.getLastWhitespace().contains("\n")) {
                             return rightPaddedParam;
                         }
                         if (after.getComments().isEmpty()) {

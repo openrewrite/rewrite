@@ -36,7 +36,7 @@ class SpacesVisitorTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void minimizeMethodDeclarationParameters() {
+    void normalizeMethodDeclarationParameters() {
         rewriteRun(
           java(
             """
@@ -55,7 +55,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeMethodDeclarationParametersWithMultipleSpaces() {
+    void normalizeMethodDeclarationParametersWithMultipleSpaces() {
         rewriteRun(
           java(
             """
@@ -92,7 +92,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeMethodInvocationArguments() {
+    void normalizeMethodInvocationArguments() {
         rewriteRun(
           java(
             """
@@ -140,7 +140,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeRecordStateVector() {
+    void normalizeRecordStateVector() {
         rewriteRun(
           java(
             """
@@ -168,7 +168,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeModifierPrefix() {
+    void normalizeModifierPrefix() {
         rewriteRun(
           java(
             """
@@ -205,7 +205,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeChainedMethodCalls() {
+    void normalizeChainedMethodCalls() {
         rewriteRun(
           java(
             """
@@ -249,7 +249,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBlockPrefix() {
+    void normalizeBlockPrefix() {
         rewriteRun(
           java(
             """
@@ -293,7 +293,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeComplexMethodDeclaration() {
+    void normalizeComplexMethodDeclaration() {
         rewriteRun(
           java(
             """
@@ -312,7 +312,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeConstructorParameters() {
+    void normalizeConstructorParameters() {
         rewriteRun(
           java(
             """
@@ -331,7 +331,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAnnotatedParameters() {
+    void normalizeAnnotatedParameters() {
         rewriteRun(
           java(
             """
@@ -362,7 +362,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeVarargsParameter() {
+    void normalizeVarargsParameter() {
         rewriteRun(
           java(
             """
@@ -381,7 +381,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeMethodDeclarationParameterSuffix() {
+    void normalizeMethodDeclarationParameterSuffix() {
         rewriteRun(
           java(
             """
@@ -400,7 +400,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeMethodInvocationArgumentSuffix() {
+    void normalizeMethodInvocationArgumentSuffix() {
         rewriteRun(
           java(
             """
@@ -424,7 +424,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeNestedMethodCalls() {
+    void normalizeNestedMethodCalls() {
         rewriteRun(
           java(
             """
@@ -450,7 +450,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeEmptyParameters() {
+    void normalizeEmptyParameters() {
         rewriteRun(
           java(
             """
@@ -469,7 +469,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeMultipleConsecutiveSpaces() {
+    void normalizeMultipleConsecutiveSpaces() {
         rewriteRun(
           java(
             """
@@ -488,7 +488,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeInterfaceMethodParameters() {
+    void normalizeInterfaceMethodParameters() {
         rewriteRun(
           java(
             """
@@ -506,7 +506,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAbstractMethodParameters() {
+    void normalizeAbstractMethodParameters() {
         rewriteRun(
           java(
             """
@@ -524,7 +524,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeLambdaParameters() {
+    void normalizeLambdaParameters() {
         rewriteRun(
           java(
             """
@@ -554,7 +554,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeRecordWithMultipleComponents() {
+    void normalizeRecordWithMultipleComponents() {
         rewriteRun(
           java(
             """
@@ -568,7 +568,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeRecordWithGenericComponents() {
+    void normalizeRecordWithGenericComponents() {
         rewriteRun(
           java(
             """
@@ -601,7 +601,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeMixedSpacesAndNewlines() {
+    void normalizeMixedSpacesAndNewlines() {
         rewriteRun(
           java(
             """
@@ -628,7 +628,7 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
 
     @Test
-    void minimizeBeforeIfParentheses() {
+    void normalizeBeforeIfParentheses() {
         rewriteRun(
           java(
             """
@@ -654,7 +654,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeForParentheses() {
+    void normalizeBeforeForParentheses() {
         rewriteRun(
           java(
             """
@@ -680,7 +680,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeWhileParentheses() {
+    void normalizeBeforeWhileParentheses() {
         rewriteRun(
           java(
             """
@@ -706,7 +706,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeSwitchParentheses() {
+    void normalizeBeforeSwitchParentheses() {
         rewriteRun(
           java(
             """
@@ -734,7 +734,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeTryParentheses() {
+    void normalizeBeforeTryParentheses() {
         rewriteRun(
           java(
             """
@@ -766,7 +766,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeCatchParentheses() {
+    void normalizeBeforeCatchParentheses() {
         rewriteRun(
           java(
             """
@@ -796,7 +796,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeSynchronizedParentheses() {
+    void normalizeBeforeSynchronizedParentheses() {
         rewriteRun(
           java(
             """
@@ -824,7 +824,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeAnnotationParameters() {
+    void normalizeBeforeAnnotationParameters() {
         rewriteRun(
           java(
             """
@@ -864,7 +864,7 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
 
     @Test
-    void minimizeAroundAssignmentOperators() {
+    void normalizeAroundAssignmentOperators() {
         rewriteRun(
           java(
             """
@@ -896,7 +896,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundLogicalOperators() {
+    void normalizeAroundLogicalOperators() {
         rewriteRun(
           java(
             """
@@ -918,7 +918,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundEqualityOperators() {
+    void normalizeAroundEqualityOperators() {
         rewriteRun(
           java(
             """
@@ -942,7 +942,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundRelationalOperators() {
+    void normalizeAroundRelationalOperators() {
         rewriteRun(
           java(
             """
@@ -970,7 +970,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundBitwiseOperators() {
+    void normalizeAroundBitwiseOperators() {
         rewriteRun(
           java(
             """
@@ -996,7 +996,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundAdditiveOperators() {
+    void normalizeAroundAdditiveOperators() {
         rewriteRun(
           java(
             """
@@ -1020,7 +1020,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundMultiplicativeOperators() {
+    void normalizeAroundMultiplicativeOperators() {
         rewriteRun(
           java(
             """
@@ -1046,7 +1046,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundShiftOperators() {
+    void normalizeAroundShiftOperators() {
         rewriteRun(
           java(
             """
@@ -1072,7 +1072,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundUnaryOperators() {
+    void normalizeAroundUnaryOperators() {
         rewriteRun(
           java(
             """
@@ -1102,7 +1102,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundMethodReferenceDoubleColon() {
+    void normalizeAroundMethodReferenceDoubleColon() {
         rewriteRun(
           java(
             """
@@ -1132,7 +1132,7 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
 
     @Test
-    void minimizeBeforeElseKeyword() {
+    void normalizeBeforeElseKeyword() {
         rewriteRun(
           java(
             """
@@ -1162,7 +1162,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeWhileKeywordInDoWhile() {
+    void normalizeBeforeWhileKeywordInDoWhile() {
         rewriteRun(
           java(
             """
@@ -1188,7 +1188,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeCatchKeyword() {
+    void normalizeBeforeCatchKeyword() {
         rewriteRun(
           java(
             """
@@ -1218,7 +1218,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeFinallyKeyword() {
+    void normalizeBeforeFinallyKeyword() {
         rewriteRun(
           java(
             """
@@ -1252,7 +1252,7 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
 
     @Test
-    void minimizeWithinCodeBraces() {
+    void normalizeWithinCodeBraces() {
         rewriteRun(
           java(
             """
@@ -1268,7 +1268,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinBrackets() {
+    void normalizeWithinBrackets() {
         rewriteRun(
           java(
             """
@@ -1292,7 +1292,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinArrayInitializerBraces() {
+    void normalizeWithinArrayInitializerBraces() {
         rewriteRun(
           java(
             """
@@ -1314,7 +1314,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinEmptyArrayInitializerBraces() {
+    void normalizeWithinEmptyArrayInitializerBraces() {
         rewriteRun(
           java(
             """
@@ -1336,7 +1336,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinGroupingParentheses() {
+    void normalizeWithinGroupingParentheses() {
         rewriteRun(
           java(
             """
@@ -1360,7 +1360,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinEmptyMethodCallParentheses() {
+    void normalizeWithinEmptyMethodCallParentheses() {
         rewriteRun(
           java(
             """
@@ -1384,7 +1384,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinIfParentheses() {
+    void normalizeWithinIfParentheses() {
         rewriteRun(
           java(
             """
@@ -1410,7 +1410,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinForParentheses() {
+    void normalizeWithinForParentheses() {
         rewriteRun(
           java(
             """
@@ -1436,7 +1436,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinWhileParentheses() {
+    void normalizeWithinWhileParentheses() {
         rewriteRun(
           java(
             """
@@ -1462,7 +1462,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinSwitchParentheses() {
+    void normalizeWithinSwitchParentheses() {
         rewriteRun(
           java(
             """
@@ -1490,7 +1490,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinTryParentheses() {
+    void normalizeWithinTryParentheses() {
         rewriteRun(
           java(
             """
@@ -1522,7 +1522,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinCatchParentheses() {
+    void normalizeWithinCatchParentheses() {
         rewriteRun(
           java(
             """
@@ -1552,7 +1552,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinSynchronizedParentheses() {
+    void normalizeWithinSynchronizedParentheses() {
         rewriteRun(
           java(
             """
@@ -1580,7 +1580,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinTypeCastParentheses() {
+    void normalizeWithinTypeCastParentheses() {
         rewriteRun(
           java(
             """
@@ -1604,7 +1604,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinAnnotationParentheses() {
+    void normalizeWithinAnnotationParentheses() {
         rewriteRun(
           java(
             """
@@ -1640,7 +1640,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinAngleBrackets() {
+    void normalizeWithinAngleBrackets() {
         rewriteRun(
           java(
             """
@@ -1670,7 +1670,7 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
 
     @Test
-    void minimizeBeforeQuestionMarkInTernary() {
+    void normalizeBeforeQuestionMarkInTernary() {
         rewriteRun(
           java(
             """
@@ -1692,7 +1692,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAfterQuestionMarkInTernary() {
+    void normalizeAfterQuestionMarkInTernary() {
         rewriteRun(
           java(
             """
@@ -1714,7 +1714,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeColonInTernary() {
+    void normalizeBeforeColonInTernary() {
         rewriteRun(
           java(
             """
@@ -1736,7 +1736,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAfterColonInTernary() {
+    void normalizeAfterColonInTernary() {
         rewriteRun(
           java(
             """
@@ -1758,7 +1758,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeTernaryOperatorCompletely() {
+    void normalizeTernaryOperatorCompletely() {
         rewriteRun(
           java(
             """
@@ -1784,7 +1784,7 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
 
     @Test
-    void minimizeAfterCommaInTypeArguments() {
+    void normalizeAfterCommaInTypeArguments() {
         rewriteRun(
           java(
             """
@@ -1810,7 +1810,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeOpeningAngleBracketInTypeArguments() {
+    void normalizeBeforeOpeningAngleBracketInTypeArguments() {
         rewriteRun(
           java(
             """
@@ -1836,7 +1836,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAfterClosingAngleBracketInTypeArguments() {
+    void normalizeAfterClosingAngleBracketInTypeArguments() {
         rewriteRun(
           java(
             """
@@ -1866,7 +1866,7 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
 
     @Test
-    void minimizeBeforeForSemicolon() {
+    void normalizeBeforeForSemicolon() {
         rewriteRun(
           java(
             """
@@ -1892,7 +1892,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeForSemicolon() {
+    void normalizeForSemicolon() {
         rewriteRun(
           java(
             """
@@ -1918,7 +1918,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAfterTypeCast() {
+    void normalizeAfterTypeCast() {
         rewriteRun(
           java(
             """
@@ -1942,7 +1942,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeBeforeColonInForEach() {
+    void normalizeBeforeColonInForEach() {
         rewriteRun(
           java(
             """
@@ -1970,7 +1970,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeInsideOneLineEnumBraces() {
+    void normalizeInsideOneLineEnumBraces() {
         rewriteRun(
           java(
             """
@@ -1988,7 +1988,7 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
 
     @Test
-    void minimizeBeforeOpeningAngleBracketInTypeParameters() {
+    void normalizeBeforeOpeningAngleBracketInTypeParameters() {
         rewriteRun(
           java(
             """
@@ -2006,7 +2006,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundTypeBounds() {
+    void normalizeAroundTypeBounds() {
         rewriteRun(
           java(
             """
@@ -2028,7 +2028,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeMethodTypeParameters() {
+    void normalizeMethodTypeParameters() {
         rewriteRun(
           java(
             """
@@ -2054,7 +2054,7 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
 
     @Test
-    void minimizeBeforeAnnotationArrayInitializerLeftBrace() {
+    void normalizeBeforeAnnotationArrayInitializerLeftBrace() {
         rewriteRun(
           java(
             """
@@ -2082,7 +2082,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeWithinAnnotationArrayValueBraces() {
+    void normalizeWithinAnnotationArrayValueBraces() {
         rewriteRun(
           java(
             """
@@ -2112,7 +2112,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeAroundEqualsInAnnotationAssignment() {
+    void normalizeAroundEqualsInAnnotationAssignment() {
         rewriteRun(
           java(
             """
@@ -2142,7 +2142,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeComplexNestedStructures() {
+    void normalizeComplexNestedStructures() {
         rewriteRun(
           java(
             """
@@ -2186,7 +2186,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeComplexExpressions() {
+    void normalizeComplexExpressions() {
         rewriteRun(
           java(
             """
@@ -2210,7 +2210,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeForEachWithComplexTypes() {
+    void normalizeForEachWithComplexTypes() {
         rewriteRun(
           java(
             """
@@ -2244,7 +2244,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeTryWithMultipleResourcesAndMultipleCatches() {
+    void normalizeTryWithMultipleResourcesAndMultipleCatches() {
         rewriteRun(
           java(
             """
@@ -2288,7 +2288,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeComplexGenericDeclarations() {
+    void normalizeComplexGenericDeclarations() {
         rewriteRun(
           java(
             """
@@ -2316,7 +2316,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeForLoopWithOnlyCondition() {
+    void normalizeForLoopWithOnlyCondition() {
         rewriteRun(
           java(
             """
@@ -2342,7 +2342,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeLambdaWithSingleParameterWithoutParentheses() {
+    void normalizeLambdaWithSingleParameterWithoutParentheses() {
         rewriteRun(
           java(
             """
@@ -2368,7 +2368,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizePackagePrivateClassAndMethods() {
+    void normalizePackagePrivateClassAndMethods() {
         rewriteRun(
           java(
             """
@@ -2387,7 +2387,7 @@ class SpacesVisitorTest implements RewriteTest {
     }
 
     @Test
-    void minimizeMethodInvocationWithExplicitTypeArguments() {
+    void normalizeMethodInvocationWithExplicitTypeArguments() {
         rewriteRun(
           java(
             """
