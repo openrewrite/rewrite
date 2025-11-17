@@ -55,7 +55,7 @@ public class WrapMethodInvocationArguments<P> extends JavaIsoVisitor<P> {
                 if (style.getMethodCallArguments().getCloseNewLine()) {
                     m = m.getPadding().withArguments(m.getPadding().getArguments().getPadding().withElements(ListUtils.mapLast(m.getPadding().getArguments().getPadding().getElements(), rightPaddedParam -> {
                         Space after = rightPaddedParam.getAfter();
-                        if (after.getWhitespace().contains("\n")) {
+                        if (after.getLastWhitespace().contains("\n")) {
                             return rightPaddedParam;
                         }
                         if (after.getComments().isEmpty()) {
@@ -85,8 +85,13 @@ public class WrapMethodInvocationArguments<P> extends JavaIsoVisitor<P> {
                             }
                         }
                         if (index == -1 && (paramIndex != 0 || style.getMethodCallArguments().getOpenNewLine())) {
-                            if (!prefix.getWhitespace().contains("\n")) {
-                                prefix = prefix.withWhitespace("\n");
+                            if (prefix.getComments().isEmpty()) {
+                                if (!prefix.getWhitespace().contains("\n")) {
+                                    prefix = prefix.withWhitespace("\n");
+                                }
+                            } else {
+                                prefix = prefix.withComments(ListUtils.mapLast(prefix.getComments(),
+                                        comment -> comment.withSuffix("\n")));
                             }
                         }
                     }
@@ -153,8 +158,13 @@ public class WrapMethodInvocationArguments<P> extends JavaIsoVisitor<P> {
                             }
                         }
                         if (index == -1 && (paramIndex != 0 || style.getMethodCallArguments().getOpenNewLine())) {
-                            if (!prefix.getWhitespace().contains("\n")) {
-                                prefix = prefix.withWhitespace("\n");
+                            if (prefix.getComments().isEmpty()) {
+                                if (!prefix.getWhitespace().contains("\n")) {
+                                    prefix = prefix.withWhitespace("\n");
+                                }
+                            } else {
+                                prefix = prefix.withComments(ListUtils.mapLast(prefix.getComments(),
+                                        comment -> comment.withSuffix("\n")));
                             }
                         }
                     }

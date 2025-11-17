@@ -55,7 +55,7 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
                 if (style.getMethodDeclarationParameters().getCloseNewLine()) {
                     m = m.getPadding().withParameters(m.getPadding().getParameters().getPadding().withElements(ListUtils.mapLast(m.getPadding().getParameters().getPadding().getElements(), rightPaddedParam -> {
                         Space after = rightPaddedParam.getAfter();
-                        if (after.getWhitespace().contains("\n")) {
+                        if (after.getLastWhitespace().contains("\n")) {
                             return rightPaddedParam;
                         }
                         if (after.getComments().isEmpty()) {
@@ -85,8 +85,13 @@ public class WrapMethodDeclarationParameters<P> extends JavaIsoVisitor<P> {
                             }
                         }
                         if (index == -1 && (paramIndex != 0 || style.getMethodDeclarationParameters().getOpenNewLine())) {
-                            if (!prefix.getWhitespace().contains("\n")) {
-                                prefix = prefix.withWhitespace("\n");
+                            if (prefix.getComments().isEmpty()) {
+                                if (!prefix.getWhitespace().contains("\n")) {
+                                    prefix = prefix.withWhitespace("\n");
+                                }
+                            } else {
+                                prefix = prefix.withComments(ListUtils.mapLast(prefix.getComments(),
+                                        comment -> comment.withSuffix("\n")));
                             }
                         }
                     }

@@ -47,7 +47,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         this(stopAfter, false, style);
     }
 
-    public AutoFormatVisitor(@Nullable Tree stopAfter, boolean removeCustomLineBreaks, NamedStyles ... style) {
+    public AutoFormatVisitor( @Nullable Tree stopAfter, boolean removeCustomLineBreaks, NamedStyles ... style ) {
         this.stopAfter = stopAfter;
         this.styles = Arrays.stream(style).collect(toList());
         this.removeCustomLineBreaks = removeCustomLineBreaks;
@@ -81,7 +81,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         // With the updated tree, overwrite the original space with the newly computed space
         tree = new MergeSpacesVisitor().visit(tree, t);
 
-        if (tree instanceof J.CompilationUnit) {
+        if (tree instanceof JavaSourceFile) {
             return addStyleMarker((JavaSourceFile) tree, styles);
         }
 

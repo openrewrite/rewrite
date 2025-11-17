@@ -319,8 +319,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               
               class Test {
                   void method(
-              String name,
-              /* age parameter */ int age,
+              String name, /* age parameter */
+              int age,
               boolean active) {
                   }
               }

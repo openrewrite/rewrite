@@ -2509,8 +2509,8 @@ class AutoFormatTest implements RewriteTest {
                   package com.example;
 
                   class Test {
-                      void method(String name,
-                                  /* age parameter */ int age,
+                      void method(String name, /* age parameter */
+                                  int age,
                                   boolean active) {
                       }
                   }
@@ -3187,8 +3187,8 @@ class AutoFormatTest implements RewriteTest {
 
                   class Test {
                       void test() {
-                          MyObject.outerMethod("arg1",
-                                  /* comment */ "arg2",
+                          MyObject.outerMethod("arg1", /* comment */
+                                  "arg2",
                                   "arg3");
                       }
                   }

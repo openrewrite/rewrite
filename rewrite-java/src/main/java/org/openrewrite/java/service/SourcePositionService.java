@@ -306,7 +306,7 @@ public class SourcePositionService {
                     stopAfterPreVisit();
                 }
 
-                if (tree != cursor.getValue() && tree.getId().equals(((J) cursor.getValue()).getId())) {
+                if (tree != cursor.getValue() && cursor.getValue() instanceof J && tree.getId().equals(((J) cursor.getValue()).getId())) {
                     setCursor(cursor);
                     tree = cursor.getValue();
                 }

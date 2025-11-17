@@ -345,8 +345,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               class Test {
                   void test() {
                       method(
-              "hello",
-              /* age */ 42,
+              "hello", /* age */
+              42,
               true);
                   }
               
