@@ -34,7 +34,7 @@ import java.util.Objects;
 public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
     @Override
-    public J visitCompilationUnit(K.CompilationUnit cu, Object ctx) {
+    public J visitCompilationUnit(K.CompilationUnit cu, @Nullable Object ctx) {
         if (cu == ctx || !(ctx instanceof K.CompilationUnit)) {
             return cu;
         }
@@ -56,7 +56,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, Object ctx) {
+    public J visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, @Nullable Object ctx) {
         if (annotatedExpression == ctx || !(ctx instanceof K.AnnotatedExpression)) {
             return annotatedExpression;
         }
@@ -75,7 +75,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitAnnotationType(K.AnnotationType annotationType, Object ctx) {
+    public J visitAnnotationType(K.AnnotationType annotationType, @Nullable Object ctx) {
         if (annotationType == ctx || !(ctx instanceof K.AnnotationType)) {
             return annotationType;
         }
@@ -89,7 +89,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitBinary(K.Binary binary, Object ctx) {
+    public J visitBinary(K.Binary binary, @Nullable Object ctx) {
         if (binary == ctx || !(ctx instanceof K.Binary)) {
             return binary;
         }
@@ -111,7 +111,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitClassDeclaration(K.ClassDeclaration classDeclaration, Object ctx) {
+    public J visitClassDeclaration(K.ClassDeclaration classDeclaration, @Nullable Object ctx) {
         if (classDeclaration == ctx || !(ctx instanceof K.ClassDeclaration)) {
             return classDeclaration;
         }
@@ -124,7 +124,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitConstructor(K.Constructor constructor, Object ctx) {
+    public J visitConstructor(K.Constructor constructor, @Nullable Object ctx) {
         if (constructor == ctx || !(ctx instanceof K.Constructor)) {
             return constructor;
         }
@@ -137,7 +137,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitConstructorInvocation(K.ConstructorInvocation constructorInvocation, Object ctx) {
+    public J visitConstructorInvocation(K.ConstructorInvocation constructorInvocation, @Nullable Object ctx) {
         if (constructorInvocation == ctx || !(ctx instanceof K.ConstructorInvocation)) {
             return constructorInvocation;
         }
@@ -151,7 +151,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitDelegatedSuperType(K.DelegatedSuperType delegatedSuperType, Object ctx) {
+    public J visitDelegatedSuperType(K.DelegatedSuperType delegatedSuperType, @Nullable Object ctx) {
         if (delegatedSuperType == ctx || !(ctx instanceof K.DelegatedSuperType)) {
             return delegatedSuperType;
         }
@@ -165,7 +165,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, Object ctx) {
+    public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, @Nullable Object ctx) {
         if (destructuringDeclaration == ctx || !(ctx instanceof K.DestructuringDeclaration)) {
             return destructuringDeclaration;
         }
@@ -185,7 +185,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitFunctionType(K.FunctionType functionType, Object ctx) {
+    public J visitFunctionType(K.FunctionType functionType, @Nullable Object ctx) {
         if (functionType == ctx || !(ctx instanceof K.FunctionType)) {
             return functionType;
         }
@@ -204,7 +204,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitFunctionTypeParameter(K.FunctionType.Parameter parameter, Object ctx) {
+    public J visitFunctionTypeParameter(K.FunctionType.Parameter parameter, @Nullable Object ctx) {
         if (parameter == ctx || !(ctx instanceof K.FunctionType.Parameter)) {
             return parameter;
         }
@@ -219,7 +219,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitListLiteral(K.ListLiteral listLiteral, Object ctx) {
+    public J visitListLiteral(K.ListLiteral listLiteral, @Nullable Object ctx) {
         if (listLiteral == ctx || !(ctx instanceof K.ListLiteral)) {
             return listLiteral;
         }
@@ -239,7 +239,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitMethodDeclaration(K.MethodDeclaration methodDeclaration, Object ctx) {
+    public J visitMethodDeclaration(K.MethodDeclaration methodDeclaration, @Nullable Object ctx) {
         if (methodDeclaration == ctx || !(ctx instanceof K.MethodDeclaration)) {
             return methodDeclaration;
         }
@@ -252,7 +252,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitMultiAnnotationType(K.MultiAnnotationType multiAnnotationType, Object ctx) {
+    public J visitMultiAnnotationType(K.MultiAnnotationType multiAnnotationType, @Nullable Object ctx) {
         if (multiAnnotationType == ctx || !(ctx instanceof K.MultiAnnotationType)) {
             return multiAnnotationType;
         }
@@ -266,7 +266,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @SuppressWarnings("DataFlowIssue")
-    public J visitProperty(K.Property property, Object ctx) {
+    public J visitProperty(K.Property property, @Nullable Object ctx) {
         if (property == ctx || !(ctx instanceof K.Property)) {
             return property;
         }
@@ -288,7 +288,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitReturn(K.Return return_, Object ctx) {
+    public J visitReturn(K.Return return_, @Nullable Object ctx) {
         if (return_ == ctx || !(ctx instanceof K.Return)) {
             return return_;
         }
@@ -314,7 +314,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitSpreadArgument(K.SpreadArgument spreadArgument, Object ctx) {
+    public J visitSpreadArgument(K.SpreadArgument spreadArgument, @Nullable Object ctx) {
         if (spreadArgument == ctx || !(ctx instanceof K.SpreadArgument)) {
             return spreadArgument;
         }
@@ -333,7 +333,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitStringTemplate(K.StringTemplate stringTemplate, Object ctx) {
+    public J visitStringTemplate(K.StringTemplate stringTemplate, @Nullable Object ctx) {
         if (stringTemplate == ctx || !(ctx instanceof K.StringTemplate)) {
             return stringTemplate;
         }
@@ -353,7 +353,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitStringTemplateExpression(K.StringTemplate.Expression expression, Object ctx) {
+    public J visitStringTemplateExpression(K.StringTemplate.Expression expression, @Nullable Object ctx) {
         if (expression == ctx || !(ctx instanceof K.StringTemplate.Expression)) {
             return expression;
         }
@@ -367,7 +367,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitThis(K.This aThis, Object ctx) {
+    public J visitThis(K.This aThis, @Nullable Object ctx) {
         if (aThis == ctx || !(ctx instanceof K.This)) {
             return aThis;
         }
@@ -386,7 +386,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitTypeAlias(K.TypeAlias typeAlias, Object ctx) {
+    public J visitTypeAlias(K.TypeAlias typeAlias, @Nullable Object ctx) {
         if (typeAlias == ctx || !(ctx instanceof K.TypeAlias)) {
             return typeAlias;
         }
@@ -416,7 +416,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitTypeConstraints(K.TypeConstraints typeConstraints, Object ctx) {
+    public J visitTypeConstraints(K.TypeConstraints typeConstraints, @Nullable Object ctx) {
         if (typeConstraints == ctx || !(ctx instanceof K.TypeConstraints)) {
             return typeConstraints;
         }
@@ -429,7 +429,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitUnary(K.Unary unary, Object ctx) {
+    public J visitUnary(K.Unary unary, @Nullable Object ctx) {
         if (unary == ctx || !(ctx instanceof K.Unary)) {
             return unary;
         }
@@ -456,7 +456,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitWhen(K.When when, Object ctx) {
+    public J visitWhen(K.When when, @Nullable Object ctx) {
         if (when == ctx || !(ctx instanceof K.When)) {
             return when;
         }
@@ -477,7 +477,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitWhenBranch(K.WhenBranch whenBranch, Object ctx) {
+    public J visitWhenBranch(K.WhenBranch whenBranch, @Nullable Object ctx) {
         if (whenBranch == ctx || !(ctx instanceof K.WhenBranch)) {
             return whenBranch;
         }
@@ -497,7 +497,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, Object ctx) {
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, @Nullable Object ctx) {
         if (right == ctx || !(ctx instanceof JRightPadded)) {
             return right;
         }
@@ -507,7 +507,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, Object ctx) {
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, @Nullable Object ctx) {
         if (left == ctx || !(ctx instanceof JLeftPadded)) {
             return left;
         }
@@ -517,12 +517,12 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public Space visitSpace(Space space, KSpace.Location loc, Object ctx) {
+    public Space visitSpace(Space space, KSpace.Location loc, @Nullable Object ctx) {
         return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, ctx);
     }
 
     @Override
-    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, Object ctx) {
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, @Nullable Object ctx) {
         if (container == ctx || !(ctx instanceof JContainer)) {
             return container;
         }
@@ -533,7 +533,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
     @Override
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
-                                                                  KContainer.Location loc, Object ctx) {
+                                                                  KContainer.Location loc, @Nullable Object ctx) {
         if (container == ctx || !(ctx instanceof JContainer)) {
             return container;
         }
@@ -556,7 +556,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, KLeftPadded.Location loc, Object ctx) {
+    public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, KLeftPadded.Location loc, @Nullable Object ctx) {
         if (left == ctx || !(ctx instanceof JLeftPadded)) {
             return left;
         }
@@ -591,7 +591,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, Object ctx) {
+    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, @Nullable Object ctx) {
         if (right == ctx || !(ctx instanceof JRightPadded)) {
             return right;
         }
@@ -623,7 +623,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, Object ctx) {
+    public <M extends Marker> M visitMarker(Marker marker, @Nullable Object ctx) {
         if (marker == ctx || !(ctx instanceof Marker)) {
             return (M) marker;
         }
@@ -637,7 +637,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
     @Override
     @SuppressWarnings("unused")
-    public Space visitSpace(@Nullable Space space, Space.Location loc, Object ctx) {
+    public Space visitSpace(@Nullable Space space, Space.Location loc, @Nullable Object ctx) {
         if (space == ctx || !(ctx instanceof Space)) {
             return space;
         }
@@ -669,7 +669,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <N extends NameTree> N visitTypeName(N nameTree, Object ctx) {
+    public <N extends NameTree> N visitTypeName(N nameTree, @Nullable Object ctx) {
         N newNameTree = (N) ctx;
         if (nameTree == newNameTree) {
             return nameTree;
@@ -677,7 +677,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return nameTree;
     }
 
-    private <N extends NameTree> @Nullable JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, Object ctx) {
+    private <N extends NameTree> @Nullable JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, @Nullable Object ctx) {
         JLeftPadded<N> newNameTree = (JLeftPadded<N>) ctx;
         if (nameTree == newNameTree) {
             return nameTree;
@@ -685,7 +685,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return nameTree == null ? null : nameTree.withElement(visitTypeName(nameTree.getElement(), newNameTree == null ? null : newNameTree.getElement()));
     }
 
-    private <N extends NameTree> @Nullable JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, Object ctx) {
+    private <N extends NameTree> @Nullable JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, @Nullable Object ctx) {
         JRightPadded<N> newNameTree = (JRightPadded<N>) ctx;
         if (nameTree == newNameTree) {
             return nameTree;
@@ -693,7 +693,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return nameTree == null ? null : nameTree.withElement(visitTypeName(nameTree.getElement(), newNameTree == null ? null : newNameTree.getElement()));
     }
 
-    private <J2 extends J> @Nullable JContainer<J2> visitTypeNames(@Nullable JContainer<J2> nameTrees, Object ctx) {
+    private <J2 extends J> @Nullable JContainer<J2> visitTypeNames(@Nullable JContainer<J2> nameTrees, @Nullable Object ctx) {
         JContainer<J2> newNameTrees = (JContainer<J2>) ctx;
         if (nameTrees == newNameTrees) {
             return nameTrees;
@@ -707,7 +707,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitAnnotatedType(J.AnnotatedType annotatedType, Object ctx) {
+    public J visitAnnotatedType(J.AnnotatedType annotatedType, @Nullable Object ctx) {
         if (annotatedType == ctx || !(ctx instanceof J.AnnotatedType)) {
             return annotatedType;
         }
@@ -726,7 +726,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitAnnotation(J.Annotation annotation, Object ctx) {
+    public J visitAnnotation(J.Annotation annotation, @Nullable Object ctx) {
         if (annotation == ctx || !(ctx instanceof J.Annotation)) {
             return annotation;
         }
@@ -747,7 +747,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitArrayAccess(J.ArrayAccess arrayAccess, Object ctx) {
+    public J visitArrayAccess(J.ArrayAccess arrayAccess, @Nullable Object ctx) {
         if (arrayAccess == ctx || !(ctx instanceof J.ArrayAccess)) {
             return arrayAccess;
         }
@@ -766,7 +766,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitArrayDimension(J.ArrayDimension arrayDimension, Object ctx) {
+    public J visitArrayDimension(J.ArrayDimension arrayDimension, @Nullable Object ctx) {
         if (arrayDimension == ctx || !(ctx instanceof J.ArrayDimension)) {
             return arrayDimension;
         }
@@ -778,7 +778,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitArrayType(J.ArrayType arrayType, Object ctx) {
+    public J visitArrayType(J.ArrayType arrayType, @Nullable Object ctx) {
         if (arrayType == ctx || !(ctx instanceof J.ArrayType)) {
             return arrayType;
         }
@@ -803,7 +803,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitAssert(J.Assert assert_, Object ctx) {
+    public J visitAssert(J.Assert assert_, @Nullable Object ctx) {
         if (assert_ == ctx || !(ctx instanceof J.Assert)) {
             return assert_;
         }
@@ -824,7 +824,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitAssignment(J.Assignment assignment, Object ctx) {
+    public J visitAssignment(J.Assignment assignment, @Nullable Object ctx) {
         if (assignment == ctx || !(ctx instanceof J.Assignment)) {
             return assignment;
         }
@@ -848,7 +848,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitAssignmentOperation(J.AssignmentOperation assignOp, Object ctx) {
+    public J visitAssignmentOperation(J.AssignmentOperation assignOp, @Nullable Object ctx) {
         if (assignOp == ctx || !(ctx instanceof J.AssignmentOperation)) {
             return assignOp;
         }
@@ -873,7 +873,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitBinary(J.Binary binary, Object ctx) {
+    public J visitBinary(J.Binary binary, @Nullable Object ctx) {
         if (binary == ctx || !(ctx instanceof J.Binary)) {
             return binary;
         }
@@ -893,7 +893,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitBlock(J.Block block, Object ctx) {
+    public J visitBlock(J.Block block, @Nullable Object ctx) {
         if (block == ctx || !(ctx instanceof J.Block)) {
             return block;
         }
@@ -913,7 +913,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitBreak(J.Break breakStatement, Object ctx) {
+    public J visitBreak(J.Break breakStatement, @Nullable Object ctx) {
         if (breakStatement == ctx || !(ctx instanceof J.Break)) {
             return breakStatement;
         }
@@ -930,7 +930,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitCase(J.Case case_, Object ctx) {
+    public J visitCase(J.Case case_, @Nullable Object ctx) {
         if (case_ == ctx || !(ctx instanceof J.Case)) {
             return case_;
         }
@@ -950,7 +950,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitCatch(J.Try.Catch catch_, Object ctx) {
+    public J visitCatch(J.Try.Catch catch_, @Nullable Object ctx) {
         if (catch_ == ctx || !(ctx instanceof J.Try.Catch)) {
             return catch_;
         }
@@ -963,7 +963,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitClassDeclaration(J.ClassDeclaration classDecl, Object ctx) {
+    public J visitClassDeclaration(J.ClassDeclaration classDecl, @Nullable Object ctx) {
         if (classDecl == ctx || !(ctx instanceof J.ClassDeclaration)) {
             return classDecl;
         }
@@ -1012,7 +1012,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu, Object ctx) {
+    public J visitCompilationUnit(J.CompilationUnit cu, @Nullable Object ctx) {
         if (cu == ctx || !(ctx instanceof J.CompilationUnit)) {
             return cu;
         }
@@ -1029,7 +1029,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitContinue(J.Continue continueStatement, Object ctx) {
+    public J visitContinue(J.Continue continueStatement, @Nullable Object ctx) {
         if (continueStatement == ctx || !(ctx instanceof J.Continue)) {
             return continueStatement;
         }
@@ -1046,7 +1046,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, Object ctx) {
+    public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, @Nullable Object ctx) {
         J.ControlParentheses<T> newControlParens = (J.ControlParentheses<T>) ctx;
         if (controlParens == newControlParens) {
             return controlParens;
@@ -1064,7 +1064,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, Object ctx) {
+    public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, @Nullable Object ctx) {
         if (doWhileLoop == ctx || !(ctx instanceof J.DoWhileLoop)) {
             return doWhileLoop;
         }
@@ -1082,7 +1082,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitEmpty(J.Empty empty, Object ctx) {
+    public J visitEmpty(J.Empty empty, @Nullable Object ctx) {
         if (empty == ctx || !(ctx instanceof J.Empty)) {
             return empty;
         }
@@ -1098,7 +1098,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitEnumValue(J.EnumValue enum_, Object ctx) {
+    public J visitEnumValue(J.EnumValue enum_, @Nullable Object ctx) {
         if (enum_ == ctx || !(ctx instanceof J.EnumValue)) {
             return enum_;
         }
@@ -1112,7 +1112,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitEnumValueSet(J.EnumValueSet enums, Object ctx) {
+    public J visitEnumValueSet(J.EnumValueSet enums, @Nullable Object ctx) {
         if (enums == ctx || !(ctx instanceof J.EnumValueSet)) {
             return enums;
         }
@@ -1129,7 +1129,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitFieldAccess(J.FieldAccess fieldAccess, Object ctx) {
+    public J visitFieldAccess(J.FieldAccess fieldAccess, @Nullable Object ctx) {
         if (fieldAccess == ctx || !(ctx instanceof J.FieldAccess)) {
             return fieldAccess;
         }
@@ -1154,7 +1154,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitForEachLoop(J.ForEachLoop forLoop, Object ctx) {
+    public J visitForEachLoop(J.ForEachLoop forLoop, @Nullable Object ctx) {
         if (forLoop == ctx || !(ctx instanceof J.ForEachLoop)) {
             return forLoop;
         }
@@ -1172,7 +1172,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitForEachControl(J.ForEachLoop.Control control, Object ctx) {
+    public J visitForEachControl(J.ForEachLoop.Control control, @Nullable Object ctx) {
         if (control == ctx || !(ctx instanceof J.ForEachLoop.Control)) {
             return control;
         }
@@ -1185,7 +1185,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitForLoop(J.ForLoop forLoop, Object ctx) {
+    public J visitForLoop(J.ForLoop forLoop, @Nullable Object ctx) {
         if (forLoop == ctx || !(ctx instanceof J.ForLoop)) {
             return forLoop;
         }
@@ -1203,7 +1203,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitForControl(J.ForLoop.Control control, Object ctx) {
+    public J visitForControl(J.ForLoop.Control control, @Nullable Object ctx) {
         if (control == ctx || !(ctx instanceof J.ForLoop.Control)) {
             return control;
         }
@@ -1217,7 +1217,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, Object ctx) {
+    public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, @Nullable Object ctx) {
         if (parTree == ctx || !(ctx instanceof J.ParenthesizedTypeTree)) {
             return parTree;
         }
@@ -1238,7 +1238,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitIdentifier(J.Identifier ident, Object ctx) {
+    public J visitIdentifier(J.Identifier ident, @Nullable Object ctx) {
         if (ident == ctx || !(ctx instanceof J.Identifier)) {
             return ident;
         }
@@ -1260,7 +1260,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitElse(J.If.Else else_, Object ctx) {
+    public J visitElse(J.If.Else else_, @Nullable Object ctx) {
         if (else_ == ctx || !(ctx instanceof J.If.Else)) {
             return else_;
         }
@@ -1272,7 +1272,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitIf(J.If iff, Object ctx) {
+    public J visitIf(J.If iff, @Nullable Object ctx) {
         if (iff == ctx || !(ctx instanceof J.If)) {
             return iff;
         }
@@ -1291,7 +1291,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitImport(J.Import import_, Object ctx) {
+    public J visitImport(J.Import import_, @Nullable Object ctx) {
         if (import_ == ctx || !(ctx instanceof J.Import)) {
             return import_;
         }
@@ -1305,7 +1305,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitInstanceOf(J.InstanceOf instanceOf, Object ctx) {
+    public J visitInstanceOf(J.InstanceOf instanceOf, @Nullable Object ctx) {
         if (instanceOf == ctx || !(ctx instanceof J.InstanceOf)) {
             return instanceOf;
         }
@@ -1325,7 +1325,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, Object ctx) {
+    public J visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, @Nullable Object ctx) {
         if (deconstructionPattern == ctx || !(ctx instanceof J.DeconstructionPattern)) {
             return deconstructionPattern;
         }
@@ -1340,7 +1340,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitIntersectionType(J.IntersectionType intersectionType, Object ctx) {
+    public J visitIntersectionType(J.IntersectionType intersectionType, @Nullable Object ctx) {
         if (intersectionType == ctx || !(ctx instanceof J.IntersectionType)) {
             return intersectionType;
         }
@@ -1353,7 +1353,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitLabel(J.Label label, Object ctx) {
+    public J visitLabel(J.Label label, @Nullable Object ctx) {
         if (label == ctx || !(ctx instanceof J.Label)) {
             return label;
         }
@@ -1371,7 +1371,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitLambda(J.Lambda lambda, Object ctx) {
+    public J visitLambda(J.Lambda lambda, @Nullable Object ctx) {
         if (lambda == ctx || !(ctx instanceof J.Lambda)) {
             return lambda;
         }
@@ -1391,7 +1391,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitLambdaParameters(J.Lambda.Parameters parameters, Object ctx) {
+    public J visitLambdaParameters(J.Lambda.Parameters parameters, @Nullable Object ctx) {
         if (parameters == ctx || !(ctx instanceof J.Lambda.Parameters)) {
             return parameters;
         }
@@ -1407,7 +1407,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitLiteral(J.Literal literal, Object ctx) {
+    public J visitLiteral(J.Literal literal, @Nullable Object ctx) {
         if (literal == ctx || !(ctx instanceof J.Literal)) {
             return literal;
         }
@@ -1424,7 +1424,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitMemberReference(J.MemberReference memberRef, Object ctx) {
+    public J visitMemberReference(J.MemberReference memberRef, @Nullable Object ctx) {
         if (memberRef == ctx || !(ctx instanceof J.MemberReference)) {
             return memberRef;
         }
@@ -1448,7 +1448,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitMethodDeclaration(J.MethodDeclaration method, Object ctx) {
+    public J visitMethodDeclaration(J.MethodDeclaration method, @Nullable Object ctx) {
         if (method == ctx || !(ctx instanceof J.MethodDeclaration)) {
             return method;
         }
@@ -1484,7 +1484,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method, Object ctx) {
+    public J visitMethodInvocation(J.MethodInvocation method, @Nullable Object ctx) {
         if (method == ctx || !(ctx instanceof J.MethodInvocation)) {
             return method;
         }
@@ -1522,7 +1522,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitModifier(J.Modifier modifer, Object ctx) {
+    public J visitModifier(J.Modifier modifer, @Nullable Object ctx) {
         if (modifer == ctx || !(ctx instanceof J.Modifier)) {
             return modifer;
         }
@@ -1534,7 +1534,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitMultiCatch(J.MultiCatch multiCatch, Object ctx) {
+    public J visitMultiCatch(J.MultiCatch multiCatch, @Nullable Object ctx) {
         if (multiCatch == ctx || !(ctx instanceof J.MultiCatch)) {
             return multiCatch;
         }
@@ -1547,7 +1547,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Object ctx) {
+    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, @Nullable Object ctx) {
         if (multiVariable == ctx || !(ctx instanceof J.VariableDeclarations)) {
             return multiVariable;
         }
@@ -1573,7 +1573,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitNewArray(J.NewArray newArray, Object ctx) {
+    public J visitNewArray(J.NewArray newArray, @Nullable Object ctx) {
         if (newArray == ctx || !(ctx instanceof J.NewArray)) {
             return newArray;
         }
@@ -1598,7 +1598,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitNewClass(J.NewClass newClass, Object ctx) {
+    public J visitNewClass(J.NewClass newClass, @Nullable Object ctx) {
         if (newClass == ctx || !(ctx instanceof J.NewClass)) {
             return newClass;
         }
@@ -1628,7 +1628,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitNullableType(J.NullableType nullableType, Object ctx) {
+    public J visitNullableType(J.NullableType nullableType, @Nullable Object ctx) {
         if (nullableType == ctx || !(ctx instanceof J.NullableType)) {
             return nullableType;
         }
@@ -1649,7 +1649,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitPackage(J.Package pkg, Object ctx) {
+    public J visitPackage(J.Package pkg, @Nullable Object ctx) {
         if (pkg == ctx || !(ctx instanceof J.Package)) {
             return pkg;
         }
@@ -1662,7 +1662,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitParameterizedType(J.ParameterizedType type, Object ctx) {
+    public J visitParameterizedType(J.ParameterizedType type, @Nullable Object ctx) {
         if (type == ctx || !(ctx instanceof J.ParameterizedType)) {
             return type;
         }
@@ -1684,7 +1684,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <T extends J> J visitParentheses(J.Parentheses<T> parens, Object ctx) {
+    public <T extends J> J visitParentheses(J.Parentheses<T> parens, @Nullable Object ctx) {
         J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
         if (parens == newParens) {
             return parens;
@@ -1702,7 +1702,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitPrimitive(J.Primitive primitive, Object ctx) {
+    public J visitPrimitive(J.Primitive primitive, @Nullable Object ctx) {
         if (primitive == ctx || !(ctx instanceof J.Primitive)) {
             return primitive;
         }
@@ -1719,7 +1719,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitReturn(J.Return return_, Object ctx) {
+    public J visitReturn(J.Return return_, @Nullable Object ctx) {
         if (return_ == ctx || !(ctx instanceof J.Return)) {
             return return_;
         }
@@ -1736,7 +1736,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitSwitch(J.Switch switch_, Object ctx) {
+    public J visitSwitch(J.Switch switch_, @Nullable Object ctx) {
         if (switch_ == ctx || !(ctx instanceof J.Switch)) {
             return switch_;
         }
@@ -1754,7 +1754,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitSwitchExpression(J.SwitchExpression switch_, Object ctx) {
+    public J visitSwitchExpression(J.SwitchExpression switch_, @Nullable Object ctx) {
         if (switch_ == ctx || !(ctx instanceof J.SwitchExpression)) {
             return switch_;
         }
@@ -1772,7 +1772,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitSynchronized(J.Synchronized synch, Object ctx) {
+    public J visitSynchronized(J.Synchronized synch, @Nullable Object ctx) {
         if (synch == ctx || !(ctx instanceof J.Synchronized)) {
             return synch;
         }
@@ -1790,7 +1790,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitTernary(J.Ternary ternary, Object ctx) {
+    public J visitTernary(J.Ternary ternary, @Nullable Object ctx) {
         if (ternary == ctx || !(ctx instanceof J.Ternary)) {
             return ternary;
         }
@@ -1815,7 +1815,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitThrow(J.Throw thrown, Object ctx) {
+    public J visitThrow(J.Throw thrown, @Nullable Object ctx) {
         if (thrown == ctx || !(ctx instanceof J.Throw)) {
             return thrown;
         }
@@ -1832,7 +1832,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitTry(J.Try tryable, Object ctx) {
+    public J visitTry(J.Try tryable, @Nullable Object ctx) {
         if (tryable == ctx || !(ctx instanceof J.Try)) {
             return tryable;
         }
@@ -1857,7 +1857,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitTryResource(J.Try.Resource tryResource, Object ctx) {
+    public J visitTryResource(J.Try.Resource tryResource, @Nullable Object ctx) {
         if (tryResource == ctx || !(ctx instanceof J.Try.Resource)) {
             return tryResource;
         }
@@ -1869,7 +1869,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitTypeCast(J.TypeCast typeCast, Object ctx) {
+    public J visitTypeCast(J.TypeCast typeCast, @Nullable Object ctx) {
         if (typeCast == ctx || !(ctx instanceof J.TypeCast)) {
             return typeCast;
         }
@@ -1888,7 +1888,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitTypeParameter(J.TypeParameter typeParam, Object ctx) {
+    public J visitTypeParameter(J.TypeParameter typeParam, @Nullable Object ctx) {
         if (typeParam == ctx || !(ctx instanceof J.TypeParameter)) {
             return typeParam;
         }
@@ -1913,7 +1913,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitTypeParameters(J.TypeParameters typeParameters, Object ctx) {
+    public J visitTypeParameters(J.TypeParameters typeParameters, @Nullable Object ctx) {
         if (typeParameters == ctx || !(ctx instanceof J.TypeParameters)) {
             return typeParameters;
         }
@@ -1930,7 +1930,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitUnary(J.Unary unary, Object ctx) {
+    public J visitUnary(J.Unary unary, @Nullable Object ctx) {
         if (unary == ctx || !(ctx instanceof J.Unary)) {
             return unary;
         }
@@ -1954,7 +1954,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitUnknown(J.Unknown unknown, Object ctx) {
+    public J visitUnknown(J.Unknown unknown, @Nullable Object ctx) {
         if (unknown == ctx || !(ctx instanceof J.Unknown)) {
             return unknown;
         }
@@ -1966,7 +1966,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitUnknownSource(J.Unknown.Source source, Object ctx) {
+    public J visitUnknownSource(J.Unknown.Source source, @Nullable Object ctx) {
         if (source == ctx || !(ctx instanceof J.Unknown.Source)) {
             return source;
         }
@@ -1977,7 +1977,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitVariable(J.VariableDeclarations.NamedVariable variable, Object ctx) {
+    public J visitVariable(J.VariableDeclarations.NamedVariable variable, @Nullable Object ctx) {
         if (variable == ctx || !(ctx instanceof J.VariableDeclarations.NamedVariable)) {
             return variable;
         }
@@ -2000,7 +2000,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitWhileLoop(J.WhileLoop whileLoop, Object ctx) {
+    public J visitWhileLoop(J.WhileLoop whileLoop, @Nullable Object ctx) {
         if (whileLoop == ctx || !(ctx instanceof J.WhileLoop)) {
             return whileLoop;
         }
@@ -2018,7 +2018,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitWildcard(J.Wildcard wildcard, Object ctx) {
+    public J visitWildcard(J.Wildcard wildcard, @Nullable Object ctx) {
         if (wildcard == ctx || !(ctx instanceof J.Wildcard)) {
             return wildcard;
         }
@@ -2041,7 +2041,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitYield(J.Yield yield, Object ctx) {
+    public J visitYield(J.Yield yield, @Nullable Object ctx) {
         if (yield == ctx || !(ctx instanceof J.Yield)) {
             return yield;
         }
@@ -2058,7 +2058,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, Object ctx) {
+    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, @Nullable Object ctx) {
         JRightPadded<T> newRight = (JRightPadded<T>) ctx;
         if (right == newRight) {
             return right;
@@ -2089,7 +2089,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, Object ctx) {
+    public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, @Nullable Object ctx) {
         JLeftPadded<T> newLeft = (JLeftPadded<T>) ctx;
         if (left == newLeft) {
             return left;
@@ -2121,7 +2121,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
     @Override
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
-                                                                  JContainer.Location loc, Object ctx) {
+                                                                  JContainer.Location loc, @Nullable Object ctx) {
         JContainer<J2> newContainer = (JContainer<J2>) ctx;
         if (container == newContainer) {
             return container;
@@ -2143,7 +2143,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public J visitErroneous(J.Erroneous erroneous, Object ctx) {
+    public J visitErroneous(J.Erroneous erroneous, @Nullable Object ctx) {
         if (erroneous == ctx || !(ctx instanceof J.Erroneous)) {
             return erroneous;
         }
