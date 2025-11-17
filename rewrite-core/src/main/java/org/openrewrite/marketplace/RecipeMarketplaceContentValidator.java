@@ -68,10 +68,10 @@ public class RecipeMarketplaceContentValidator {
             validation = validation.and(Validated.invalid(property, displayName, "Display must not be empty"));
         }
         if (!Character.isUpperCase(displayName.charAt(0))) {
-            validation = validation.and(Validated.invalid(property, displayName, "Display name must be sentence cased"));
+            validation = validation.and(Validated.invalid(property, displayName, "Display name '" + displayName + "' must be sentence cased"));
         }
         if (displayName.endsWith(".")) {
-            validation = validation.and(Validated.invalid(property, displayName, "Display name must not end with a period"));
+            validation = validation.and(Validated.invalid(property, displayName, "Display name '" + displayName + "' must not end with a period"));
         }
         return validation;
     }
@@ -84,10 +84,10 @@ public class RecipeMarketplaceContentValidator {
         }
         String property = recipe + ".description";
         if (!Character.isUpperCase(description.charAt(0))) {
-            validation = validation.and(Validated.invalid(property, description, "Description must be sentence cased"));
+            validation = validation.and(Validated.invalid(property, description, "Description '" + description + "' must be sentence cased"));
         }
         if (!description.endsWith(".")) {
-            validation = validation.and(Validated.invalid(property, description, "Description must end with a period."));
+            validation = validation.and(Validated.invalid(property, description, "Description '" + description + "' must end with a period"));
         }
 
         return validation;
