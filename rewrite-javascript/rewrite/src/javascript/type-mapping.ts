@@ -402,19 +402,28 @@ export class JavaScriptTypeMapping {
                     // If getAliasedSymbol returns something different, it's an import
                     if (aliasedSymbol && aliasedSymbol !== symbol) {
                         // This is definitely an imported symbol
-                        // Now find the import declaration to get the module specifier
-                        if (symbol.declarations && symbol.declarations.length > 0) {
-                            let importNode: ts.Node = symbol.declarations[0];
+                        const aliasedParentSymbol = (aliasedSymbol as any).parent as ts.Symbol | undefined;
 
-                            // Traverse up to find the ImportDeclaration
-                            while (importNode && !ts.isImportDeclaration(importNode)) {
-                                importNode = importNode.parent;
-                            }
+                        if (aliasedParentSymbol && aliasedParentSymbol.declarations?.[0] &&
+                            ts.isModuleDeclaration(aliasedParentSymbol.declarations[0]) &&
+                            ts.isIdentifier(aliasedParentSymbol.declarations[0].name)) {
+                            // For namespace imports, use the namespace symbol's `name` as the module specifier (e.g. `React` instead of `react`)
+                            moduleSpecifier = aliasedParentSymbol.name;
+                        } else {
+                            // Now find the import declaration to get the module specifier
+                            if (symbol.declarations && symbol.declarations.length > 0) {
+                                let importNode: ts.Node = symbol.declarations[0];
 
-                            if (importNode && ts.isImportDeclaration(importNode)) {
-                                const importDeclNode = importNode as ts.ImportDeclaration;
-                                if (ts.isStringLiteral(importDeclNode.moduleSpecifier)) {
-                                    moduleSpecifier = importDeclNode.moduleSpecifier.text;
+                                // Traverse up to find the ImportDeclaration
+                                while (importNode && !ts.isImportDeclaration(importNode)) {
+                                    importNode = importNode.parent;
+                                }
+
+                                if (importNode && ts.isImportDeclaration(importNode)) {
+                                    const importDeclNode = importNode as ts.ImportDeclaration;
+                                    if (ts.isStringLiteral(importDeclNode.moduleSpecifier)) {
+                                        moduleSpecifier = importDeclNode.moduleSpecifier.text;
+                                    }
                                 }
                             }
                         }

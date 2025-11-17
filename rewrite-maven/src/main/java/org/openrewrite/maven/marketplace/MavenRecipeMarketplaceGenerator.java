@@ -15,43 +15,35 @@
  */
 package org.openrewrite.maven.marketplace;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.Recipe;
-import org.openrewrite.config.CategoryDescriptor;
-import org.openrewrite.config.DeclarativeRecipe;
+import org.openrewrite.config.ClasspathScanningLoader;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.marketplace.RecipeMarketplaceWriter;
-import org.openrewrite.marketplace.YamlRecipeBundle;
 import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
-import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 public class MavenRecipeMarketplaceGenerator {
-    private final ResolvedGroupArtifactVersion gav;
+    private final GroupArtifactVersion gav;
     private final Path recipeJar;
     private final List<Path> classpath;
 
     public MavenRecipeMarketplaceGenerator(GroupArtifact ga, Path recipeJar, List<Path> classpath) {
-        //noinspection DataFlowIssue
-        this.gav = new ResolvedGroupArtifactVersion(null, ga.getGroupId(), ga.getArtifactId(),
-                null, null);
+        this.gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), "");
         this.recipeJar = recipeJar;
         this.classpath = classpath;
     }
@@ -64,132 +56,42 @@ public class MavenRecipeMarketplaceGenerator {
 
             // First pass: Scan only the target jar for recipes (using scanJar with jar name filter)
             // This gives us the correct set of recipes but without root categories
-            Environment firstPassEnv = Environment.builder().scanJar(
-                    recipeJar.toAbsolutePath(),
-                    classpath.stream().map(Path::toAbsolutePath).collect(toList()),
-                    RecipeClassLoader.forScanning(recipeJar, classpath)
-            ).build();
+            Environment env1 = Environment.builder()
+                    .scanJar(
+                            recipeJar.toAbsolutePath(),
+                            classpath.stream().map(Path::toAbsolutePath).collect(toList()),
+                            RecipeClassLoader.forScanning(recipeJar, classpath)
+                    )
+                    .build();
 
             // Collect recipe names from first pass
-            List<String> targetRecipeNames = firstPassEnv.listRecipeDescriptors().stream()
+            List<String> targetRecipeNames = env1.listRecipeDescriptors().stream()
                     .map(RecipeDescriptor::getName)
                     .collect(toList());
 
             // Second pass: Scan all jars in classpath for recipes and categories
-            // This gives us proper root categories from core-categories.yml
-            ResolvedMavenRecipeBundle bundle = new ResolvedMavenRecipeBundle(gav, recipeJar, classpath,
-                    RecipeClassLoader::new, null);
-            Environment env = bundle.getEnvironment();
+            // This gives us proper root categories from category YAMLs.
+            Environment env2 = Environment.builder()
+                    .load(new ClasspathScanningLoader(new Properties(), new RecipeClassLoader(recipeJar, classpath)))
+                    .build();
 
-            RecipeMarketplace root = RecipeMarketplace.newEmpty();
-            for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
+            RecipeMarketplace marketplace = new RecipeMarketplace();
+            for (RecipeDescriptor descriptor : env2.listRecipeDescriptors()) {
                 // Only include recipes that were found in the first pass (i.e., from target jar)
                 if (!targetRecipeNames.contains(descriptor.getName())) {
                     continue;
                 }
-                RecipeDescriptor bundledDescriptor = descriptor.withBundle(createBundle(descriptor, env));
-                List<String> categories = extractCategories(descriptor.getName(), env);
-                root.addRecipe(bundledDescriptor, categories.toArray(new String[0]));
+                marketplace.install(
+                        RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
+                                "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
+                                requireNonNull(gav.getVersion()), null)),
+                        descriptor.inferCategoriesFromName(env2)
+                );
             }
-            return root;
+            return marketplace;
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate marketplace for " + gav, e);
         }
-    }
-
-    private RecipeBundle createBundle(RecipeDescriptor descriptor, Environment env) {
-        Recipe recipe = env.activateRecipes(descriptor.getName());
-        if (recipe instanceof DeclarativeRecipe) {
-            DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
-            URI source = getDeclarativeSource(declarativeRecipe);
-            if (source != null && isYamlSource(source)) {
-                return new YamlRecipeBundle(
-                        URI.create("maven-rewrite-yaml:" + gav.getGroupId() + ":" +
-                                   gav.getArtifactId() + ":" + "!/" +
-                                   extractPathFromJarUri(source.toString())),
-                        gav.getVersion(),
-                        new Properties(),
-                        null
-                ) {
-                    @Override
-                    public String getVersion() {
-                        return gav.getDatedSnapshotVersion() == null ?
-                                gav.getVersion() :
-                                gav.getDatedSnapshotVersion();
-                    }
-                };
-            }
-        }
-        return new ResolvedMavenRecipeBundle(gav, recipeJar, classpath,
-                RecipeClassLoader::new, null);
-    }
-
-    private @Nullable URI getDeclarativeSource(DeclarativeRecipe recipe) {
-        try {
-            Field sourceField = DeclarativeRecipe.class.getDeclaredField("source");
-            sourceField.setAccessible(true);
-            return (URI) sourceField.get(recipe);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private boolean isYamlSource(URI source) {
-        String path = source.toString();
-        return path.contains("META-INF/rewrite") &&
-               (path.endsWith(".yml") || path.endsWith(".yaml"));
-    }
-
-    private String extractPathFromJarUri(String uriString) {
-        // Handle jar:file:/path/to/jar.jar!/META-INF/rewrite/file.yml
-        int bangIndex = uriString.indexOf("!");
-        if (bangIndex != -1) {
-            // Skip "!/"
-            return uriString.substring(bangIndex + 2);
-        }
-        // Fallback: try to find META-INF/rewrite
-        int metaInfIndex = uriString.indexOf("META-INF/rewrite");
-        if (metaInfIndex != -1) {
-            return uriString.substring(metaInfIndex);
-        }
-        return uriString;
-    }
-
-    private List<String> extractCategories(String recipeName, Environment env) {
-        // Extract package from recipe name (everything before the last dot)
-        int lastDot = recipeName.lastIndexOf('.');
-        if (lastDot == -1) {
-            return emptyList();
-        }
-
-        String packageName = recipeName.substring(0, lastDot);
-
-        String[] parts = packageName.split("\\.");
-        List<String> categories = new ArrayList<>(parts.length);
-
-        nextPart:
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
-
-            String partialPackage = String.join(".", Arrays.copyOfRange(parts, 0, i + 1));
-            for (CategoryDescriptor categoryDescriptor : env.listCategoryDescriptors()) {
-                String categoryPackageName = categoryDescriptor.getPackageName();
-                if (categoryPackageName.equals(partialPackage)) {
-                    if (categoryDescriptor.isRoot()) {
-                        continue nextPart;
-                    }
-                    categories.add(categoryDescriptor.getDisplayName());
-                    continue nextPart;
-                }
-            }
-
-            if (!part.isEmpty()) {
-                String capitalized = Character.toUpperCase(part.charAt(0)) + part.substring(1);
-                categories.add(capitalized);
-            }
-        }
-
-        return categories;
     }
 
     /**
@@ -220,7 +122,6 @@ public class MavenRecipeMarketplaceGenerator {
         }
 
         GroupArtifact ga = new GroupArtifact(groupId, artifactId);
-
         RecipeMarketplace marketplace = new MavenRecipeMarketplaceGenerator(ga, recipeJar, classpath).generate();
 
         String csv = new RecipeMarketplaceWriter().toCsv(marketplace);

@@ -890,18 +890,14 @@ public class GroovyParserVisitor {
                     }
 
                     Space after = EMPTY;
+                    Space trailingCommaSuffix = null;
                     if (i == unparsedArgs.size() - 1) {
                         if (hasParentheses) {
                             saveCursor = cursor;
-                            Space before = whitespace();
+                            after = whitespace();
                             if (source.charAt(cursor) == ',') {
                                 skip(",");
-                                JRightPadded<Expression> arg = JRightPadded.build(exp)
-                                        .withMarkers(exp.getMarkers().add(new TrailingComma(randomId(), sourceBefore(")"))))
-                                        .withAfter(before);
-
-                                args.add(arg);
-                                continue;
+                                trailingCommaSuffix = sourceBefore(")");
                             } else {
                                 cursor = saveCursor;
                                 after = sourceBefore(")");
@@ -909,14 +905,24 @@ public class GroovyParserVisitor {
                         }
                     } else if (!(exp instanceof J.Lambda && lastArgumentsAreAllClosures && !hasParentheses)) {
                         after = whitespace();
+                        saveCursor = cursor;
+                        if (source.charAt(cursor) == ',') {
+                            // we might have a trailing comma
+                            skip(",");
+                            trailingCommaSuffix = whitespace();
+                        }
                         if (source.charAt(cursor) == ')') {
                             // next argument(s), if they exists, are trailing closures and will have an OmitParentheses marker
                             hasParentheses = false;
+                        } else if (trailingCommaSuffix != null) {
+                            // we don't have a trailing comma, just a regular comma
+                            trailingCommaSuffix = null;
+                            cursor = saveCursor;
                         }
                         cursor++;
                     }
 
-                    args.add(JRightPadded.build(exp).withAfter(after));
+                  args.add(newRightPadded(exp, after, trailingCommaSuffix));
                 }
             }
 
@@ -2148,9 +2154,18 @@ public class GroovyParserVisitor {
                     }
 
                     Space after = EMPTY;
+                    Space trailingCommaSuffix = null;
                     if (i == mapEntryExpressions.size() - 1) {
                         if (omitParentheses == null) {
-                            after = sourceBefore(")");
+                            saveCursor = cursor;
+                            after = whitespace();
+                            if (source.charAt(cursor) == ',') {
+                                skip(",");
+                                trailingCommaSuffix = sourceBefore(")");
+                            } else {
+                                cursor = saveCursor;
+                                after = sourceBefore(")");
+                            }
                         }
                     } else {
                         after = whitespace();
@@ -2161,7 +2176,7 @@ public class GroovyParserVisitor {
                         cursor++;
                     }
 
-                    args.add(JRightPadded.build(arg).withAfter(after));
+                  args.add(newRightPadded(arg, after, trailingCommaSuffix));
                 }
             }
 
@@ -2363,7 +2378,19 @@ public class GroovyParserVisitor {
         }
     }
 
-    // handle the obscure case where there are empty parens ahead of a closure
+    private static JRightPadded<Expression> newRightPadded(
+        Expression exp,
+        Space after,
+        @Nullable Space trailingCommaSuffix
+    ) {
+        JRightPadded<Expression> arg = JRightPadded.build(exp).withAfter(after);
+        if (trailingCommaSuffix != null) {
+            arg = arg.withMarkers(exp.getMarkers().add(new TrailingComma(randomId(), trailingCommaSuffix)));
+        }
+        return arg;
+    }
+
+  // handle the obscure case where there are empty parens ahead of a closure
     private Markers handlesCaseWhereEmptyParensAheadOfClosure(ArgumentListExpression args, Markers markers) {
         if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
             int saveCursor = cursor;

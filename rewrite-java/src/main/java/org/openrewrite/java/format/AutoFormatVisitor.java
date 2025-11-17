@@ -80,7 +80,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         SpacesStyle spacesStyle = getStyle(SpacesStyle.class, styles, cu, IntelliJ::spaces);
         TabsAndIndentsStyle tabsAndIndentsStyle = getStyle(TabsAndIndentsStyle.class, styles, cu, IntelliJ::tabsAndIndents);
 
-        t = new WrappingAndBracesVisitor<>(wrappingAndBracesStyle, stopAfter)
+        t = new WrappingAndBracesVisitor<>(spacesStyle, wrappingAndBracesStyle, stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
         t = new SpacesVisitor<>(spacesStyle, getStyle(EmptyForInitializerPadStyle.class, styles, cu), getStyle(EmptyForIteratorPadStyle.class, styles, cu), stopAfter)
@@ -128,7 +128,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             t = (JavaSourceFile) new SpacesVisitor<P>(spacesStyle, getStyle(EmptyForInitializerPadStyle.class, styles, cu), getStyle(EmptyForIteratorPadStyle.class, styles, cu), stopAfter)
                     .visitNonNull(t, p);
 
-            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(wrappingAndBracesStyle, stopAfter)
+            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(spacesStyle, wrappingAndBracesStyle, stopAfter)
                     .visitNonNull(t, p);
 
             t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(tabsAndIndentsStyle, stopAfter)

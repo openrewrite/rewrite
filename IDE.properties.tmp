@@ -27,7 +27,6 @@ rewrite-java-25
 
 # Other language modules
 
-rewrite-docker
 rewrite-gradle
 rewrite-groovy
 rewrite-hcl

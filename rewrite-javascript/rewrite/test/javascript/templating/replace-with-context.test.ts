@@ -13,85 +13,70 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JS, pattern, rewrite, template} from '../../../src/javascript';
+import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from '../../../src/javascript';
+import {RecipeSpec, fromVisitor} from '../../../src/test';
 import {J} from '../../../src/java';
 
 describe('replace with context', () => {
-    let parser: JavaScriptParser;
-
-    beforeEach(() => {
-        parser = new JavaScriptParser();
-    });
-
-    async function parseExpression(source: string): Promise<J> {
-        const parseGenerator = parser.parse({text: source, sourcePath: 'test.ts'});
-        const cu: JS.CompilationUnit = (await parseGenerator.next()).value as JS.CompilationUnit;        const stmt = cu.statements[0].element as JS.ExpressionStatement;
-        return stmt.expression;
-    }
+    const spec = new RecipeSpec();
 
     describe('new replace API', () => {
-        test('multiple patterns replacement', async () => {
-            const normalizeComparisons = rewrite<J.Binary>(() => ({
-                before: [
-                    pattern`${"left"} == ${"right"}`,
-                    pattern`${"left"} != ${"right"}`
-                ],
-                after: template`${"left"} === ${"right"}`
-            }));
-
-            // Test with == operator
-            const equalityAst = await parseExpression('a == b');
-            const equalityResult = await normalizeComparisons.tryOn({} as any, equalityAst);
-
-            expect(equalityResult).toBeDefined();
-            const binaryEquality = equalityResult as J.Binary;
-            expect(binaryEquality.operator.element).toBe(JS.Binary.Type.IdentityEquals);
-
-            // Test with != operator
-            const inequalityAst = await parseExpression('a != b');
-            const inequalityResult = await normalizeComparisons.tryOn({} as any, inequalityAst);
-
-            expect(inequalityResult).toBeDefined();
-            const binaryInequality = inequalityResult as J.Binary;
-            expect(binaryInequality.operator.element).toBe(JS.Binary.Type.IdentityEquals);
-
-            // Test with unmatched operator (should return undefined)
-            const additionAst = await parseExpression('a + b');
-            const additionResult = await normalizeComparisons.tryOn({} as any, additionAst);
-
-            expect(additionResult).toBeUndefined();
-        });
-
-        test('captures work across patterns and template', async () => {
-            const rule = rewrite<J.Binary>(() => {
-                const {expr} = {expr: capture()};
-                return {
-                    before: [
-                        pattern`${expr} || false`,
-                        pattern`false || ${expr}`
-                    ],
-                    after: template`${expr}`
-                };
+        test('multiple patterns replacement', () => {
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    const rule = rewrite(() => {
+                        const left = capture("left");
+                        const right = capture("right");
+                        return {
+                            before: [
+                                pattern`${left} == ${right}`,
+                                pattern`${left} != ${right}`
+                            ],
+                            after: template`${left} === ${right}`
+                        };
+                    });
+                    return await rule.tryOn(this.cursor, binary) || binary;
+                }
             });
 
-            // Test first pattern: expr || false
-            const pattern1Ast = await parseExpression('someCondition || false');
-            const pattern1Result = await rule.tryOn({} as any, pattern1Ast);
+            return spec.rewriteRun(
+                // Test with == operator
+                typescript('a == b', 'a === b'),
+                // Test with != operator
+                typescript('a != b', 'a === b'),
+                // Test with unmatched operator (should not change)
+                typescript('a + b')
+            );
+        });
 
-            expect(pattern1Result).toBeDefined();
-            expect((pattern1Result as J.Identifier).simpleName).toBe('someCondition');
+        test('captures work across patterns and template', () => {
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    const rule = rewrite(() => {
+                        const expr = capture();
+                        return {
+                            before: [
+                                pattern`${expr} || false`,
+                                pattern`false || ${expr}`
+                            ],
+                            after: template`${expr}`
+                        };
+                    });
+                    return await rule.tryOn(this.cursor, binary) || binary;
+                }
+            });
 
-            // Test second pattern: false || expr
-            const pattern2Ast = await parseExpression('false || someCondition');
-            const pattern2Result = await rule.tryOn({} as any, pattern2Ast);
-
-            expect(pattern2Result).toBeDefined();
-            expect((pattern2Result as J.Identifier).simpleName).toBe('someCondition');
+            return spec.rewriteRun(
+                // Test first pattern: expr || false
+                typescript('someCondition || false', 'someCondition'),
+                // Test second pattern: false || expr
+                typescript('false || someCondition', 'someCondition')
+            );
         });
 
         test('error handling for missing properties', () => {
             expect(() => {
-                rewrite<J.Binary>(() => {
+                rewrite(() => {
                     return {} as any;
                 });
             }).toThrow('Builder function must return an object with before and after properties');

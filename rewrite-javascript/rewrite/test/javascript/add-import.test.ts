@@ -17,8 +17,17 @@
  */
 import {describe, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
-import {AddImport, ImportStyle, javascript, JavaScriptVisitor, maybeAddImport, template, typescript} from "../../src/javascript";
-import {RemoveImport} from "../../src/javascript/remove-import";
+import {
+    AddImport,
+    ImportStyle,
+    javascript,
+    JavaScriptVisitor,
+    maybeAddImport,
+    RemoveImport,
+    Template,
+    template,
+    typescript
+} from "../../src/javascript";
 import {J} from "../../src/java";
 
 /**
@@ -92,9 +101,11 @@ function createAddImportWithTemplateVisitor(
         override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
             if (methodInvocation.name?.kind === J.Kind.Identifier &&
                 (methodInvocation.name as J.Identifier).simpleName === 'placeholder') {
-                // Use template with import context so TypeScript can type-attribute the call
-                return template`${templateCode}`
-                    .configure({ imports: [importStatement] })
+                // Use builder API for string code with import context so TypeScript can type-attribute the call
+                return Template.builder()
+                    .code(templateCode)
+                    .build()
+                    .configure({ context: [importStatement] })
                     .apply(this.cursor, methodInvocation);
             }
             return super.visitMethodInvocation(methodInvocation, p);
@@ -647,7 +658,8 @@ describe('AddImport visitor', () => {
                         import {readFile} from 'fs';
 
                         const example = () => {
-                            readFile('test.txt', (err, data) => {});
+                            readFile('test.txt', (err, data) => {
+                            });
                         };
                     `
                 )
@@ -677,7 +689,8 @@ describe('AddImport visitor', () => {
 
                         function example() {
                             if (true) {
-                                readFile('test.txt', (err, data) => {});
+                                readFile('test.txt', (err, data) => {
+                                });
                             }
                         }
                     `
