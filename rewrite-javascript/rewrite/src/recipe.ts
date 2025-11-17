@@ -138,12 +138,16 @@ export interface RecipeDescriptor {
     readonly options: ({ name: string, value?: any } & OptionDescriptor)[]
 }
 
-export interface OptionDescriptor {
+export interface OptionAnnotationDescriptor {
     readonly displayName: string
     readonly description: string
     readonly required?: boolean
     readonly example?: string
     readonly valid?: string[]
+}
+
+export interface OptionDescriptor extends OptionAnnotationDescriptor {
+    readonly type: string;
 }
 
 export abstract class ScanningRecipe<P> extends Recipe {
@@ -217,7 +221,7 @@ export class RecipeRegistry {
     }
 }
 
-export function Option(descriptor: OptionDescriptor) {
+export function Option(descriptor: OptionAnnotationDescriptor) {
     return function (target: any, propertyKey: string) {
         // Ensure the constructor has options storage.
         if (!target.constructor.hasOwnProperty(OPTIONS_KEY)) {
@@ -227,6 +231,7 @@ export function Option(descriptor: OptionDescriptor) {
                 configurable: true,
             });
         }
+        target.constructor[OPTIONS_KEY]["type"] = `${typeof target}`;
 
         // Register the option metadata under the property key.
         target.constructor[OPTIONS_KEY][propertyKey] = descriptor;
