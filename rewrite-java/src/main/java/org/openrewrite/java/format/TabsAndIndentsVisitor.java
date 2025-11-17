@@ -136,7 +136,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
         }
 
-        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null) {
+        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null || loc == Space.Location.TRY_RESOURCE) {
             return space;
         }
 
