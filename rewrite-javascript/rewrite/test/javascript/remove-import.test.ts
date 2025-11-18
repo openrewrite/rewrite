@@ -17,7 +17,7 @@
  */
 import {describe, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
-import {npm, packageJson, RemoveImport, typescript} from "../../src/javascript";
+import {npm, packageJson, RemoveImport, tsx, typescript} from "../../src/javascript";
 import {withDir} from "tmp-promise";
 
 describe('RemoveImport visitor', () => {
@@ -249,6 +249,166 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+
+        test('should remove default import using "default" specifier (simple)', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "default"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import fs from 'fs';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not remove default import using "default" specifier if used (simple)', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "default"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import fs from 'fs';
+
+                        function example() {
+                            fs.readFileSync('test.txt');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should remove default import using "default" specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "default"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import React from 'react';
+
+                                function example() {
+                                    console.log('test');
+                                }
+                            `,
+                            `
+                                function example() {
+                                    console.log('test');
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test('should not remove default import using "default" specifier if used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "default"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import React from 'react';
+
+                                function example() {
+                                    return <div>{React.version}</div>;
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test('should remove default import but keep named imports using "default" specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "default"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import React, {useState} from 'react';
+
+                                function example() {
+                                    const [count, setCount] = useState(0);
+                                    return <div>{count}</div>;
+                                }
+                            `,
+                            `
+                                import {useState} from 'react';
+
+                                function example() {
+                                    const [count, setCount] = useState(0);
+                                    return <div>{count}</div>;
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
     });
 
     describe('namespace imports', () => {
@@ -359,6 +519,46 @@ describe('RemoveImport visitor', () => {
                     `
                 )
             );
+        });
+
+        test('should not remove React import when used in generic type reference', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "React"));
+
+            await withDir(async (repo) => {
+                //language=typescript
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import {React} from "react";
+
+                                interface ButtonProps {
+                                    className?: string;
+                                    onClick?: () => void;
+                                }
+
+                                const Button = ({ ref, ...props }: ButtonProps & {
+                                    ref?: React.Ref<HTMLButtonElement>
+                                }) => <button ref={ref} {...props} />;
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
         });
     });
 

@@ -42,9 +42,9 @@ describe('JavaScript visitor formatting', () => {
                 });
 
                 if (formatMethod == 'maybeAutoFormat') {
-                    return maybeAutoFormat(original, altered, ctx);
+                    return maybeAutoFormat(original, altered!, ctx);
                 } else {
-                    return autoFormat(altered, ctx);
+                    return autoFormat(altered!, ctx);
                 }
             }
         }

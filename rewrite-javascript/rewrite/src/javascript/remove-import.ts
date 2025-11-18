@@ -1,6 +1,6 @@
 import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
-import {JS} from "./tree";
+import {JS, JSX} from "./tree";
 import {mapAsync} from "../util";
 import {ElementRemovalFormatter} from "../java/formatting-utils";
 
@@ -9,7 +9,22 @@ import {ElementRemovalFormatter} from "../java/formatting-utils";
  * @param target Either the module name (e.g., 'fs') to remove specific members from,
  *               or the name of the import to remove entirely
  * @param member Optionally, the specific member to remove from the import.
- *               If not specified, removes the import matching `target`
+ *               If not specified, removes the import matching `target`.
+ *               Special values:
+ *               - 'default': Removes the default import from the target module if unused,
+ *                 regardless of its local name (e.g., `import React from 'react'`)
+ *
+ * @example
+ * // Remove a named import if unused
+ * maybeRemoveImport(visitor, 'fs', 'readFile');
+ *
+ * @example
+ * // Remove the default import from 'react' if unused (regardless of local name)
+ * maybeRemoveImport(visitor, 'react', 'default');
+ *
+ * @example
+ * // Remove an import by name if unused (no module specified)
+ * maybeRemoveImport(visitor, 'fs');
  */
 export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, target: string, member?: string) {
     for (const v of visitor.afterVisit || []) {
@@ -33,7 +48,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
      * @param target Either the module name (e.g., 'fs') to remove specific members from,
      *               or the name of the import to remove entirely
      * @param member Optionally, the specific member to remove from the import.
-     *               If not specified, removes the import matching `target`
+     *               If not specified, removes the import matching `target`.
+     *               Special values:
+     *               - 'default': Removes the default import from the target module if unused,
+     *                 regardless of its local name
      */
     constructor(readonly target: string,
                 readonly member?: string) {
@@ -88,13 +106,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     private async updateImportClause(
         jsImport: JS.Import,
         importClause: JS.ImportClause,
-        updateFn: (draft: any) => void,
+        updateFn: (draft: any) => void | Promise<void>,
         p: P
     ): Promise<JS.Import> {
         return this.produceJavaScript<JS.Import>(jsImport, p, async draft => {
             if (draft.importClause) {
                 draft.importClause = await this.produceJavaScript<JS.ImportClause>(
-                    importClause, p, async (clauseDraft: any) => updateFn(clauseDraft)
+                    importClause, p, async (clauseDraft: any) => await updateFn(clauseDraft)
                 );
             }
         });
@@ -226,14 +244,34 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const identifier = defaultName as J.Identifier;
                 const name = identifier.simpleName;
 
-                if (this.shouldRemoveImport(name, usedIdentifiers, usedTypes)) {
+                // Check if we should remove this default import
+                let shouldRemove = false;
+                if (this.member === 'default') {
+                    // Special case: member 'default' means remove any default import from the target module if unused
+                    shouldRemove = !usedIdentifiers.has(name) && !usedTypes.has(name);
+                } else {
+                    // Regular case: check if the import name matches the removal criteria
+                    shouldRemove = this.shouldRemoveImport(name, usedIdentifiers, usedTypes);
+                }
+
+                if (shouldRemove) {
                     // If there are no named imports, remove the entire import
                     if (!importClause.namedBindings) {
                         return undefined;
                     }
-                    // Otherwise, just remove the default import
-                    return this.updateImportClause(jsImport, importClause, draft => {
+                    // Otherwise, just remove the default import and fix spacing
+                    return this.updateImportClause(jsImport, importClause, async draft => {
                         draft.name = undefined;
+                        // When removing the default import, we need to transfer its prefix to namedBindings
+                        // to maintain proper spacing (the default import's prefix is typically empty)
+                        if (draft.namedBindings && importClause.name?.element) {
+                            const updatedBindings = await this.produceJavaScript(
+                                importClause.namedBindings, p, async bindingsDraft => {
+                                    bindingsDraft.prefix = importClause.name!.element!.prefix;
+                                }
+                            );
+                            draft.namedBindings = updatedBindings;
+                        }
                     }, p);
                 }
             }
@@ -691,7 +729,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
         if (Array.isArray(params)) {
             for (const p of params) {
-                await this.collectUsedIdentifiers(p, usedIdentifiers, usedTypes);
+                // Array elements might be RightPadded, so unwrap them
+                const elem = (p as any).element || p;
+                await this.collectUsedIdentifiers(elem, usedIdentifiers, usedTypes);
             }
         } else if (params.elements) {
             for (const p of params.elements) {
@@ -913,6 +953,39 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             if (lambda.body) {
                 await this.collectUsedIdentifiers(lambda.body, usedIdentifiers, usedTypes);
             }
+        } else if (node.kind === JS.Kind.JsxTag) {
+            // Handle JSX tags like <div>content</div>
+            const jsxTag = node as JSX.Tag;
+            // Check attributes
+            if (jsxTag.attributes) {
+                for (const attr of jsxTag.attributes) {
+                    if (attr.element) {
+                        await this.collectUsedIdentifiers(attr.element, usedIdentifiers, usedTypes);
+                    }
+                }
+            }
+            // Check children
+            if (jsxTag.children) {
+                for (const child of jsxTag.children) {
+                    if (child) {
+                        await this.collectUsedIdentifiers(child, usedIdentifiers, usedTypes);
+                    }
+                }
+            }
+        } else if (node.kind === JS.Kind.JsxEmbeddedExpression) {
+            // Handle JSX embedded expressions like {React.version}
+            const embedded = node as JSX.EmbeddedExpression;
+            // The expression is wrapped in RightPadded, so unwrap it
+            const expr = embedded.expression?.element || embedded.expression;
+            if (expr) {
+                await this.collectUsedIdentifiers(expr, usedIdentifiers, usedTypes);
+            }
+        } else if (node.kind === JS.Kind.JsxAttribute) {
+            // Handle JSX attributes like onClick={handler}
+            const jsxAttr = node as any;
+            if (jsxAttr.value) {
+                await this.collectUsedIdentifiers(jsxAttr.value, usedIdentifiers, usedTypes);
+            }
         } else if ((node as any).statements) {
             // Generic handler for nodes with statements
             await this.traverseStatements((node as any).statements, usedIdentifiers, usedTypes);
@@ -934,13 +1007,43 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             usedTypes.add((typeExpr as J.Identifier).simpleName);
         } else if (typeExpr.kind === J.Kind.ParameterizedType) {
             const paramType = typeExpr as J.ParameterizedType;
-            // In TypeScript AST, ParameterizedType might have a different structure
-            // We'll need to handle the type parameters appropriately
+            // First, collect usage from the base type (e.g., React.Ref from React.Ref<T>)
+            if (paramType.class) {
+                await this.collectTypeUsage(paramType.class, usedTypes);
+            }
+            // Then collect usage from type parameters (e.g., HTMLButtonElement from React.Ref<HTMLButtonElement>)
             if (paramType.typeParameters) {
                 for (const typeParam of paramType.typeParameters.elements) {
                     if (typeParam.element) {
                         await this.collectTypeUsage(typeParam.element, usedTypes);
                     }
+                }
+            }
+        } else if (typeExpr.kind === J.Kind.FieldAccess) {
+            // Handle qualified names in type positions like React.Ref
+            const fieldAccess = typeExpr as J.FieldAccess;
+            if (fieldAccess.target?.kind === J.Kind.Identifier) {
+                usedTypes.add((fieldAccess.target as J.Identifier).simpleName);
+            } else if (fieldAccess.target) {
+                // Recursively handle nested field accesses
+                await this.collectTypeUsage(fieldAccess.target, usedTypes);
+            }
+        } else if (typeExpr.kind === JS.Kind.Intersection) {
+            // Handle intersection types like ButtonProps & { ref?: React.Ref<HTMLButtonElement> }
+            const intersection = typeExpr as JS.Intersection;
+            for (const typeElem of intersection.types) {
+                if (typeElem.element) {
+                    await this.collectTypeUsage(typeElem.element, usedTypes);
+                }
+            }
+        } else if (typeExpr.kind === JS.Kind.TypeLiteral) {
+            // Handle type literals like { ref?: React.Ref<HTMLButtonElement> }
+            const typeLiteral = typeExpr as JS.TypeLiteral;
+            // TypeLiteral members are in a Block, which contains statements
+            for (const stmt of typeLiteral.members.statements) {
+                if (stmt.element) {
+                    // Each statement is typically a VariableDeclarations representing a property
+                    await this.collectUsedIdentifiers(stmt.element, new Set(), usedTypes);
                 }
             }
         } else if (typeExpr.kind === JS.Kind.TypeQuery) {

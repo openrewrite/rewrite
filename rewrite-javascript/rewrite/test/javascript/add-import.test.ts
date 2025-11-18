@@ -25,7 +25,6 @@ import {
     maybeAddImport,
     RemoveImport,
     Template,
-    template,
     typescript
 } from "../../src/javascript";
 import {J} from "../../src/java";
@@ -284,6 +283,48 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('should add default import using "default" member specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ target: "react", member: "default", alias: "React" }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import React from 'react';
+
+                        function example() {
+                            return React.version;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not duplicate default import when using "default" member specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ target: "react", member: "default", alias: "React" }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import React from 'react';
+
+                        function example() {
+                            return React.version;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should throw error when member is "default" without alias', async () => {
+            expect(() => {
+                new AddImport({ target: "react", member: "default" });
+            }).toThrow("When member is 'default', the alias parameter is required");
+        });
     });
 
     describe('import positioning', () => {
@@ -336,7 +377,7 @@ describe('AddImport visitor', () => {
                     `
                         // Copyright 2025
                         // File header comment
-                        
+
                         import {readFile} from 'fs';
 
                         function example() {
