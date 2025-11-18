@@ -48,6 +48,7 @@ import {
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
 import {produce} from "immer";
+import {createNodeProjectMarker, NodeProject} from "./node-project-marker";
 import Kind = JS.Kind;
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
@@ -110,6 +111,37 @@ export class JavaScriptParser extends Parser {
         this.sourceFileCache && this.sourceFileCache.clear();
         this.oldProgram = undefined;
         return this;
+    }
+
+    /**
+     * Finds and parses package.json if relativeTo is provided.
+     * Only searches in the relativeTo directory (typically the Git repo root).
+     * Returns null if relativeTo is not set or package.json doesn't exist/is invalid.
+     */
+    private findAndParsePackageJson(): NodeProject | null {
+        // Only search if relativeTo is provided (indicates Git repo root)
+        if (!this.relativeTo) {
+            return null;
+        }
+
+        const packageJsonPath = path.join(this.relativeTo, 'package.json');
+
+        if (!ts.sys.fileExists(packageJsonPath)) {
+            return null;
+        }
+
+        try {
+            const content = ts.sys.readFile(packageJsonPath);
+            if (content) {
+                const packageJson = JSON.parse(content);
+                return createNodeProjectMarker(packageJsonPath, packageJson);
+            }
+        } catch (error) {
+            console.warn(`Failed to parse package.json at ${packageJsonPath}:`, error);
+            return null;
+        }
+
+        return null;
     }
 
     override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
@@ -262,6 +294,10 @@ export class JavaScriptParser extends Parser {
         // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
         const typeMapping = new JavaScriptTypeMapping(typeChecker);
 
+        // Find and parse package.json once for this batch.
+        // All compilation units in this batch will share the same NodeProject marker instance.
+        const nodeProject = this.findAndParsePackageJson();
+
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
             const sourceFile = program.getSourceFile(filePath);
@@ -287,6 +323,10 @@ export class JavaScriptParser extends Parser {
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
                         .visit(sourceFile) as SourceFile,
                     draft => {
+                        // Attach the shared NodeProject marker to this compilation unit
+                        if (nodeProject) {
+                            draft.markers.markers.push(nodeProject);
+                        }
                         if (this.styles) {
                             draft.markers.markers = draft.markers.markers.concat(this.styles);
                         }

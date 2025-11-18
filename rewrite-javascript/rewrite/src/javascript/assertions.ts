@@ -31,6 +31,14 @@ export const sourceFileCache: Map<string, ts.SourceFile> = new Map();
 setTemplateSourceFileCache(sourceFileCache);
 
 export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): AsyncGenerator<SourceSpec<any>, void, unknown> {
+    const fs = require('fs');
+    const path = require('path');
+
+    // Ensure the target directory exists
+    if (!fs.existsSync(relativeTo)) {
+        fs.mkdirSync(relativeTo, { recursive: true });
+    }
+
     for (const spec of sourceSpecs) {
         if (spec.path === 'package.json') {
             // Parse package.json to extract dependencies
@@ -40,11 +48,28 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
                 ...packageJsonContent.devDependencies
             };
 
-            // Use DependencyWorkspace to create workspace in relativeTo directory
-            // This will check if it's already valid and skip npm install if so
+            // Get or create cached workspace with node_modules (don't pass targetDir to use caching)
             if (Object.keys(dependencies).length > 0) {
-                await DependencyWorkspace.getOrCreateWorkspace(dependencies, relativeTo);
+                const cachedWorkspace = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+
+                // Symlink node_modules from cached workspace to test directory
+                const cachedNodeModules = path.join(cachedWorkspace, 'node_modules');
+                const testNodeModules = path.join(relativeTo, 'node_modules');
+
+                // Remove existing node_modules if present
+                if (fs.existsSync(testNodeModules)) {
+                    fs.rmSync(testNodeModules, { recursive: true, force: true });
+                }
+
+                // Create symlink
+                fs.symlinkSync(cachedNodeModules, testNodeModules, 'junction');
             }
+
+            // Write the actual package.json from the test spec
+            fs.writeFileSync(
+                path.join(relativeTo, 'package.json'),
+                spec.before
+            );
 
             yield spec;
         }
