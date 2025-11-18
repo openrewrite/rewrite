@@ -20,6 +20,7 @@ import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {createDraft, finishDraft} from "immer";
 
 export const NodeProjectMarkerKind = "org.openrewrite.javascript.marker.NodeProject" as const;
+export const NodeDependencyKind = "org.openrewrite.javascript.marker.NodeProject$NodeDependency" as const;
 
 /**
  * Scope/section of package.json where a dependency is declared.
@@ -40,6 +41,7 @@ export enum DependencyScope {
  * Use asRef() when creating instances to enable reference deduplication during RPC serialization.
  */
 export interface NodeDependency {
+    readonly kind: typeof NodeDependencyKind;
     readonly name: string;           // Package name (e.g., "react")
     readonly version: string;         // Version constraint (e.g., "^18.2.0")
     readonly resolved?: string;       // Actual resolved version (from package-lock.json if available)
@@ -111,6 +113,7 @@ export function createNodeProjectMarker(
     ): NodeDependency[] {
         if (!deps) return [];
         return Object.entries(deps).map(([name, version]) => asRef({
+            kind: NodeDependencyKind,
             name,
             version,
             scope,
@@ -235,6 +238,44 @@ export namespace NodeProjectQueries {
 }
 
 /**
+ * Register RPC codec for NodeDependency.
+ * This must be registered before NodeProject since NodeProject contains NodeDependencies.
+ */
+RpcCodecs.registerCodec(NodeDependencyKind, {
+    async rpcReceive(before: NodeDependency, q: RpcReceiveQueue): Promise<NodeDependency> {
+        const draft = createDraft(before);
+        draft.kind = NodeDependencyKind;
+        draft.name = await q.receive(before.name);
+        draft.version = await q.receive(before.version);
+        draft.resolved = await q.receive(before.resolved);
+        draft.scope = await q.receive(before.scope);
+        draft.depth = await q.receive(before.depth);
+
+        // Future: receive transitive dependencies
+        draft.dependencies = (await q.receiveList(before.dependencies)) || undefined;
+
+        draft.requestedBy = await q.receive(before.requestedBy);
+
+        return finishDraft(draft) as NodeDependency;
+    },
+
+    async rpcSend(after: NodeDependency, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.name);
+        await q.getAndSend(after, a => a.version);
+        await q.getAndSend(after, a => a.resolved);
+        await q.getAndSend(after, a => a.scope);
+        await q.getAndSend(after, a => a.depth);
+
+        // Future: send transitive dependencies
+        await q.getAndSendList(after, a => (a.dependencies || []).map(d => asRef(d)),
+            dep => `${dep.name}@${dep.version}:${dep.scope}`,
+            undefined); // Let RPC system use NodeDependency codec
+
+        await q.getAndSend(after, a => a.requestedBy);
+    }
+});
+
+/**
  * Register RPC codec for NodeProject marker.
  * This handles serialization/deserialization for communication between JS and Java.
  */
@@ -247,22 +288,12 @@ RpcCodecs.registerCodec(NodeProjectMarkerKind, {
         draft.description = await q.receive(before.description);
         draft.packageJsonPath = await q.receive(before.packageJsonPath);
 
-        // Receive dependency arrays with asRef support
-        draft.dependencies = (await q.receiveList(before.dependencies, async (dep) => {
-            return asRef(await receiveNodeDependency(dep, q));
-        })) || [];
-        draft.devDependencies = (await q.receiveList(before.devDependencies, async (dep) => {
-            return asRef(await receiveNodeDependency(dep, q));
-        })) || [];
-        draft.peerDependencies = (await q.receiveList(before.peerDependencies, async (dep) => {
-            return asRef(await receiveNodeDependency(dep, q));
-        })) || [];
-        draft.optionalDependencies = (await q.receiveList(before.optionalDependencies, async (dep) => {
-            return asRef(await receiveNodeDependency(dep, q));
-        })) || [];
-        draft.bundledDependencies = (await q.receiveList(before.bundledDependencies, async (dep) => {
-            return asRef(await receiveNodeDependency(dep, q));
-        })) || [];
+        // Receive dependency arrays - RPC system will use NodeDependency codec automatically
+        draft.dependencies = (await q.receiveList(before.dependencies)) || [];
+        draft.devDependencies = (await q.receiveList(before.devDependencies)) || [];
+        draft.peerDependencies = (await q.receiveList(before.peerDependencies)) || [];
+        draft.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || [];
+        draft.bundledDependencies = (await q.receiveList(before.bundledDependencies)) || [];
 
         draft.scripts = await q.receive(before.scripts);
         draft.engines = await q.receive(before.engines);
@@ -279,67 +310,20 @@ RpcCodecs.registerCodec(NodeProjectMarkerKind, {
         await q.getAndSend(after, a => a.packageJsonPath);
 
         // Send dependency arrays with asRef to enable deduplication
+        // RPC system will use NodeDependency codec automatically for each item
         await q.getAndSendList(after, a => a.dependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`,
-            async (dep) => await sendNodeDependency(dep, q));
+            dep => `${dep.name}@${dep.version}:${dep.scope}`);
         await q.getAndSendList(after, a => a.devDependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`,
-            async (dep) => await sendNodeDependency(dep, q));
+            dep => `${dep.name}@${dep.version}:${dep.scope}`);
         await q.getAndSendList(after, a => a.peerDependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`,
-            async (dep) => await sendNodeDependency(dep, q));
+            dep => `${dep.name}@${dep.version}:${dep.scope}`);
         await q.getAndSendList(after, a => a.optionalDependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`,
-            async (dep) => await sendNodeDependency(dep, q));
+            dep => `${dep.name}@${dep.version}:${dep.scope}`);
         await q.getAndSendList(after, a => a.bundledDependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`,
-            async (dep) => await sendNodeDependency(dep, q));
+            dep => `${dep.name}@${dep.version}:${dep.scope}`);
 
         await q.getAndSend(after, a => a.scripts);
         await q.getAndSend(after, a => a.engines);
         await q.getAndSend(after, a => a.repository);
     }
 });
-
-/**
- * Helper function to receive a NodeDependency from RPC.
- */
-async function receiveNodeDependency(before: NodeDependency, q: RpcReceiveQueue): Promise<NodeDependency> {
-    const draft = createDraft(before);
-    draft.name = await q.receive(before.name);
-    draft.version = await q.receive(before.version);
-    draft.resolved = await q.receive(before.resolved);
-    draft.scope = await q.receive(before.scope);
-    draft.depth = await q.receive(before.depth);
-
-    // Future: receive transitive dependencies
-    draft.dependencies = before.dependencies ? (await q.receiveList(before.dependencies, async (dep) => {
-        return asRef(await receiveNodeDependency(dep, q));
-    })) || [] : undefined;
-
-    draft.requestedBy = await q.receive(before.requestedBy);
-
-    return finishDraft(draft) as NodeDependency;
-}
-
-/**
- * Helper function to send a NodeDependency via RPC.
- */
-async function sendNodeDependency(after: NodeDependency, q: RpcSendQueue): Promise<void> {
-    await q.getAndSend(after, a => a.name);
-    await q.getAndSend(after, a => a.version);
-    await q.getAndSend(after, a => a.resolved);
-    await q.getAndSend(after, a => a.scope);
-    await q.getAndSend(after, a => a.depth);
-
-    // Future: send transitive dependencies
-    if (after.dependencies) {
-        await q.getAndSendList(after, a => (a.dependencies || []).map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`,
-            async (dep) => await sendNodeDependency(dep, q));
-    } else {
-        await q.getAndSend(after, () => undefined);
-    }
-
-    await q.getAndSend(after, a => a.requestedBy);
-}
