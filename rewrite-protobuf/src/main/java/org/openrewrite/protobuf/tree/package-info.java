@@ -20,4 +20,3 @@ package org.openrewrite.protobuf.tree;
 import org.jspecify.annotations.NullMarked;
 
 import javax.annotation.CheckReturnValue;
-import javax.annotation.CheckReturnValue;
