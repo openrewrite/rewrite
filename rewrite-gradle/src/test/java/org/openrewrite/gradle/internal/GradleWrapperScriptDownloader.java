@@ -142,7 +142,7 @@ public class GradleWrapperScriptDownloader {
 
             // verify non-collision
             if ((unixChecksums.containsKey(gradlewChecksum) && !unixChecksums.get(gradlewChecksum).equals(gradlew)) ||
-              (batChecksums.containsKey(gradlewBatChecksum) && !batChecksums.get(gradlewBatChecksum).equals(gradlewBat))) {
+              (batChecksums.containsKey(gradlewBatChecksum) && !batChecksums.get(gradlewBatChecksum).replaceAll("\\R", "\r\n").equals(gradlewBat))) {
                 throw new IllegalStateException(String.format("Checksum collision [gradlew=%s, gradlew.bat=%s]", gradlewChecksum, gradlewBatChecksum));
             }
 
