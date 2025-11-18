@@ -257,6 +257,10 @@ export class JavaScriptParser extends Parser {
 
         const typeChecker = program.getTypeChecker();
 
+        // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
+        // This ensures that TypeScript types with the same type.id map to the same Type instance,
+        // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
+        const typeMapping = new JavaScriptTypeMapping(typeChecker);
 
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
@@ -280,7 +284,7 @@ export class JavaScriptParser extends Parser {
 
             try {
                 yield produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
+                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
@@ -310,8 +314,8 @@ export class JavaScriptParserVisitor {
     constructor(
         private readonly sourceFile: ts.SourceFile,
         private readonly sourcePath: string,
-        typeChecker: ts.TypeChecker) {
-        this.typeMapping = new JavaScriptTypeMapping(typeChecker);
+        typeMapping: JavaScriptTypeMapping) {
+        this.typeMapping = typeMapping;
     }
 
     visit = (node: ts.Node): any => {
