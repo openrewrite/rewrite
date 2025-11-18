@@ -137,7 +137,7 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
                     for (ResolvedDependency rmd : maxVersionByGroupArtifact.values()) {
                         doAfterVisit(new AddManagedDependencyVisitor(rmd.getGroupId(),
                                 rmd.getArtifactId(), rmd.getVersion(), null,
-                                null, rmd.getRequested().getClassifier()));
+                                null, rmd.getRequested().getClassifier(), null));
                         if (!Boolean.TRUE.equals(skipModelUpdate)) {
                             maybeUpdateModel();
                         }

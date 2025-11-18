@@ -19,12 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.RpcCodec;
-import org.openrewrite.rpc.RpcReceiveQueue;
-import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
 import java.util.function.UnaryOperator;
@@ -39,9 +34,7 @@ import static java.util.Collections.emptyList;
 @Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
-public class JRightPadded<T> implements RpcCodec<JRightPadded<T>> {
-    private static JavaSender RPC_SENDER = new JavaSender();
-    private static JavaReceiver RPC_RECEIVER = new JavaReceiver();
+public class JRightPadded<T> {
 
     T element;
     Space after;
@@ -135,27 +128,29 @@ public class JRightPadded<T> implements RpcCodec<JRightPadded<T>> {
     }
 
     public static <J2 extends J> List<JRightPadded<J2>> withElements(List<JRightPadded<J2>> before, List<J2> elements) {
-        // a cheaper check for the most common case when there are no changes
-        if (elements.size() == before.size()) {
-            boolean hasChanges = false;
-            for (int i = 0; i < before.size(); i++) {
-                if (before.get(i).getElement() != elements.get(i)) {
-                    hasChanges = true;
-                    break;
-                }
-            }
-            if (!hasChanges) {
-                return before;
-            }
-        } else if (elements.isEmpty()) {
-            return emptyList();
-        }
-
-        List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
         Map<UUID, JRightPadded<J2>> beforeById = new HashMap<>((int) Math.ceil(elements.size() / 0.75));
-        for (JRightPadded<J2> j : before) {
-            if (beforeById.put(j.getElement().getId(), j) != null) {
-                throw new IllegalStateException("Duplicate key");
+        List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
+        if (before != null) {
+            // a cheaper check for the most common case when there are no changes
+            if (elements.size() == before.size()) {
+                boolean hasChanges = false;
+                for (int i = 0; i < before.size(); i++) {
+                    if (before.get(i).getElement() != elements.get(i)) {
+                        hasChanges = true;
+                        break;
+                    }
+                }
+                if (!hasChanges) {
+                    return before;
+                }
+            } else if (elements.isEmpty()) {
+                return emptyList();
+            }
+
+            for (JRightPadded<J2> j : before) {
+                if (beforeById.put(j.getElement().getId(), j) != null) {
+                    throw new IllegalStateException("Duplicate key");
+                }
             }
         }
 
@@ -178,15 +173,5 @@ public class JRightPadded<T> implements RpcCodec<JRightPadded<T>> {
     @Override
     public String toString() {
         return "JRightPadded(element=" + element + ", after=" + after + ')';
-    }
-
-    @Override
-    public void rpcSend(JRightPadded<T> after, RpcSendQueue q) {
-        RPC_SENDER.visitRightPadded(after, q);
-    }
-
-    @Override
-    public JRightPadded<T> rpcReceive(JRightPadded<T> before, RpcReceiveQueue q) {
-        return RPC_RECEIVER.visitRightPadded(before, q);
     }
 }

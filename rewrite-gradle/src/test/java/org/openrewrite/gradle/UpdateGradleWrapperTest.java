@@ -955,7 +955,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
                     } ],
                     "uri" : "https://company.com/artifactory/api/storage/gradle-distributions"
                   }
-                  """.getBytes(StandardCharsets.UTF_8)), () -> {});
+                  """.getBytes(StandardCharsets.UTF_8)), () -> {
+                });
             } else if ("https://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip".equals(url)) {
                 return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.8-all.zip"), () -> {
                 });
@@ -1018,7 +1019,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
                     } ],
                     "uri" : "https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions"
                   }
-                  """.getBytes(StandardCharsets.UTF_8)), () -> {});
+                  """.getBytes(StandardCharsets.UTF_8)), () -> {
+                });
             } else if ("https://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip".equals(url)) {
                 return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
                 });
@@ -1060,28 +1062,28 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("8.14", null, null, null, null))
             .expectedCyclesThatMakeChanges(1).afterRecipe(run -> {
-              assertThat(run.getChangeset().getAllResults()).hasSize(4);
+                assertThat(run.getChangeset().getAllResults()).hasSize(4);
 
-              var gradleSh = result(run, PlainText.class, "gradlew");
-              assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
-              assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT_8_14);
-              //noinspection DataFlowIssue
-              assertThat(gradleSh.getFileAttributes()).isNotNull();
-              assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
-              assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
+                var gradleSh = result(run, PlainText.class, "gradlew");
+                assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+                assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT_8_14);
+                //noinspection DataFlowIssue
+                assertThat(gradleSh.getFileAttributes()).isNotNull();
+                assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
+                assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
 
-              var gradleBat = result(run, PlainText.class, "gradlew.bat");
-              assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
-              assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT_8_14);
+                var gradleBat = result(run, PlainText.class, "gradlew.bat");
+                assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
+                assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT_8_14);
 
-              var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
-              assertThat(gradleWrapperProperties.getSourcePath()).isEqualTo(WRAPPER_PROPERTIES_LOCATION);
+                var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
+                assertThat(gradleWrapperProperties.getSourcePath()).isEqualTo(WRAPPER_PROPERTIES_LOCATION);
 
-              var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
-              assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-              assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-8.14-bin.zip"));
-              assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
-          }),
+                var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
+                assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-8.14-bin.zip"));
+                assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
           buildGradle(
             """
               plugins {

@@ -16,26 +16,22 @@
 import ts from "typescript";
 import {Type} from "../java";
 import {immerable} from "immer";
+import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 
 // Helper class to create Type objects that immer won't traverse
 class NonDraftableType {
     [immerable] = false;
 }
 
-const builtInTypes = new Set([
-    'Array', 'Object', 'Function', 'String', 'Number', 'Boolean',
-    'Date', 'RegExp', 'Error', 'Promise', 'Map', 'Set', 'WeakMap',
-    'WeakSet', 'Symbol', 'BigInt', 'HTMLElement', 'Document',
-    'Window', 'Console', 'JSON', 'Math', 'Reflect', 'Proxy'
-]);
-
 export class JavaScriptTypeMapping {
     private readonly typeCache: Map<string | number, Type> = new Map();
     private readonly regExpSymbol: ts.Symbol | undefined;
+    private readonly stringWrapperType: ts.Type | undefined;
+    private readonly numberWrapperType: ts.Type | undefined;
+    private readonly booleanWrapperType: ts.Type | undefined;
 
     constructor(
-        private readonly checker: ts.TypeChecker,
-        private readonly projectRoot: string = process.cwd()
+        private readonly checker: ts.TypeChecker
     ) {
         this.regExpSymbol = checker.resolveName(
             "RegExp",
@@ -43,6 +39,24 @@ export class JavaScriptTypeMapping {
             ts.SymbolFlags.Type,
             false
         );
+
+        // Resolve global wrapper types for primitives from TypeScript's lib
+        const stringSymbol = checker.resolveName("String", undefined, ts.SymbolFlags.Type, false);
+        const numberSymbol = checker.resolveName("Number", undefined, ts.SymbolFlags.Type, false);
+        const booleanSymbol = checker.resolveName("Boolean", undefined, ts.SymbolFlags.Type, false);
+
+        // Store the TypeScript types; conversion to Type happens on-demand
+        if (stringSymbol) {
+            this.stringWrapperType = checker.getDeclaredTypeOfSymbol(stringSymbol);
+        }
+
+        if (numberSymbol) {
+            this.numberWrapperType = checker.getDeclaredTypeOfSymbol(numberSymbol);
+        }
+
+        if (booleanSymbol) {
+            this.booleanWrapperType = checker.getDeclaredTypeOfSymbol(booleanSymbol);
+        }
     }
 
     type(node: ts.Node): Type | undefined {
@@ -62,17 +76,34 @@ export class JavaScriptTypeMapping {
             return existing;
         }
 
-        // Check if this is an array type BEFORE checking for classes
-        // TypeScript represents Array<T> as a reference to the Array interface
-        if (this.checker.isArrayType(type)) {
-            const arrayType = this.createArrayType(type as ts.TypeReference);
-            this.typeCache.set(signature, arrayType);
-            return arrayType;
-        }
-
-        // Check for class/interface/enum types (but not arrays)
+        // Check for class/interface/enum types (including arrays)
+        // Arrays in JavaScript are objects with methods, so we treat them as class types
         const symbol = type.getSymbol?.();
         if (symbol) {
+            // Check for function symbols
+            if (symbol.flags & ts.SymbolFlags.Function) {
+                const callSignatures = type.getCallSignatures();
+                if (callSignatures.length > 0) {
+                    // Create and cache shell first to handle circular references
+                    const functionType = this.createEmptyFunctionType();
+                    this.typeCache.set(signature, functionType);
+                    this.populateFunctionType(functionType, callSignatures[0]);
+                    return functionType;
+                }
+            }
+
+            // Check for function-scoped or block-scoped variables that might be functions
+            if (symbol.flags & (ts.SymbolFlags.FunctionScopedVariable | ts.SymbolFlags.BlockScopedVariable)) {
+                const callSignatures = type.getCallSignatures();
+                if (callSignatures.length > 0) {
+                    // Create and cache shell first to handle circular references
+                    const functionType = this.createEmptyFunctionType();
+                    this.typeCache.set(signature, functionType);
+                    this.populateFunctionType(functionType, callSignatures[0]);
+                    return functionType;
+                }
+            }
+
             if (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias)) {
                 // Create and cache shell first to handle circular references
                 const classType = this.createEmptyClassType(type);
@@ -80,6 +111,16 @@ export class JavaScriptTypeMapping {
                 this.populateClassType(classType, type);
                 return classType;
             }
+        }
+
+        // Check for function types without symbols (anonymous functions, function types)
+        const callSignatures = type.getCallSignatures();
+        if (callSignatures.length > 0) {
+            // Function type - create and cache shell first to handle circular references
+            const functionType = this.createEmptyFunctionType();
+            this.typeCache.set(signature, functionType);
+            this.populateFunctionType(functionType, callSignatures[0]);
+            return functionType;
         }
 
         // For anonymous object types that could have circular references
@@ -129,7 +170,7 @@ export class JavaScriptTypeMapping {
 
     primitiveType(node: ts.Node): Type.Primitive {
         const type = this.type(node);
-        if (Type.isClass(type) && type.fullyQualifiedName === 'lib.RegExp') {
+        if (Type.isClass(type) && type.fullyQualifiedName === 'RegExp') {
             return Type.Primitive.String;
         }
         return Type.isPrimitive(type) ? type : Type.Primitive.None;
@@ -147,21 +188,137 @@ export class JavaScriptTypeMapping {
         return undefined;
     }
 
+    /**
+     * Helper to create a Type.Method object from common parameters
+     */
+    private createMethodType(
+        signature: ts.Signature,
+        node: ts.Node,
+        declaringType: Type.FullyQualified,
+        name: string,
+        declaredFormalTypeNames: string[] = []
+    ): Type.Method {
+        const returnType = signature.getReturnType();
+        const parameters = signature.getParameters();
+        const parameterTypes: Type[] = [];
+        const parameterNames: string[] = [];
+
+        for (const param of parameters) {
+            parameterNames.push(param.getName());
+            const paramType = this.checker.getTypeOfSymbolAtLocation(param, node);
+            parameterTypes.push(this.getType(paramType));
+        }
+
+        // Create the Type.Method object
+        return Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Method,
+            flags: 0, // FIXME - determine flags
+            declaringType: declaringType,
+            name: name,
+            returnType: this.getType(returnType),
+            parameterNames: parameterNames,
+            parameterTypes: parameterTypes,
+            thrownExceptions: [], // JavaScript doesn't have checked exceptions
+            annotations: [],
+            defaultValue: undefined,
+            declaredFormalTypeNames: declaredFormalTypeNames,
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        }) as Type.Method;
+    }
+
+    private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
+        if (declaringType == Type.Primitive.String && this.stringWrapperType) {
+            return this.getType(this.stringWrapperType) as Type.FullyQualified;
+        } else if ((declaringType == Type.Primitive.Double || declaringType == Type.Primitive.BigInt) && this.numberWrapperType) {
+            return this.getType(this.numberWrapperType) as Type.FullyQualified;
+        } else if (declaringType == Type.Primitive.Boolean && this.booleanWrapperType) {
+            return this.getType(this.booleanWrapperType) as Type.FullyQualified;
+        } else {
+            // This should not really happen, but we'll fallback to unknown if needed
+            return Type.unknownType as Type.FullyQualified;
+        }
+    }
+
     methodType(node: ts.Node): Type.Method | undefined {
+
         let signature: ts.Signature | undefined;
         let methodName: string;
         let declaringType: Type.FullyQualified;
         let declaredFormalTypeNames: string[] = [];
 
         // Handle different kinds of nodes that represent methods or method invocations
-        if (ts.isCallExpression(node)) {
+        if (ts.isCallOrNewExpression(node)) {
             // For method invocations (e.g., _.map(...))
             signature = this.checker.getResolvedSignature(node);
             if (!signature) {
                 return undefined;
             }
 
-            const symbol = this.checker.getSymbolAtLocation(node.expression);
+            let symbol = this.checker.getSymbolAtLocation(node.expression);
+
+
+            if (!symbol && ts.isPropertyAccessExpression(node.expression)) {
+                // For property access expressions where we couldn't get a symbol,
+                // try to get the symbol from the signature's declaration
+                const declaration = signature?.getDeclaration();
+                if (declaration) {
+                    symbol = this.checker.getSymbolAtLocation(declaration);
+                }
+
+                // If still no symbol but we have a signature, we can proceed with limited info
+                if (!symbol && signature) {
+                    // For cases like util.isArray where the module is 'any' type
+                    // We'll construct a basic method type from the signature
+                    methodName = node.expression.name.getText();
+
+                    // When there's no symbol but we have a signature, we need to work harder
+                    // to find the declaring type. This happens with CommonJS require() calls
+                    // where the module is typed as 'any' but methods still have signatures
+
+                    // Try to trace back through the AST to find the require() call
+                    let inferredDeclaringType: Type.FullyQualified | undefined;
+                    const objExpr = node.expression.expression;
+
+                    if (ts.isIdentifier(objExpr)) {
+                        // Look for the variable declaration that assigns the require() result
+                        const objSymbol = this.checker.getSymbolAtLocation(objExpr);
+
+                        if (objSymbol && objSymbol.valueDeclaration) {
+                            const valueDecl = objSymbol.valueDeclaration;
+                            if (ts.isVariableDeclaration(valueDecl) && valueDecl.initializer) {
+                                // Check if it's a require() call
+                                if (ts.isCallExpression(valueDecl.initializer)) {
+                                    const callExpr = valueDecl.initializer;
+                                    if (ts.isIdentifier(callExpr.expression) &&
+                                        callExpr.expression.getText() === 'require' &&
+                                        callExpr.arguments.length > 0) {
+                                        // Extract the module name from require('module-name')
+                                        const moduleArg = callExpr.arguments[0];
+                                        if (ts.isStringLiteral(moduleArg)) {
+                                            const moduleName = moduleArg.text;
+
+                                            inferredDeclaringType = {
+                                                kind: Type.Kind.Class,
+                                                flags: 0, // TODO - determine flags
+                                                fullyQualifiedName: moduleName
+                                            } as Type.FullyQualified;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Use the inferred type or fall back to unknown
+                    declaringType = inferredDeclaringType || Type.unknownType as Type.FullyQualified;
+
+                    // Create the method type using the helper
+                    return this.createMethodType(signature, node, declaringType, methodName);
+                }
+            }
+
             if (!symbol) {
                 return undefined;
             }
@@ -169,63 +326,163 @@ export class JavaScriptTypeMapping {
             // Get the method name
             if (ts.isPropertyAccessExpression(node.expression)) {
                 methodName = node.expression.name.getText();
+
+                // Check if the object is an imported symbol
+                const objSymbol = this.checker.getSymbolAtLocation(node.expression.expression);
+                let isImport = false;
+                if (objSymbol) {
+                    // Only call getAliasedSymbol if the symbol is actually an alias
+                    if (objSymbol.flags & ts.SymbolFlags.Alias) {
+                        const aliasedSymbol = this.checker.getAliasedSymbol(objSymbol);
+                        isImport = aliasedSymbol && aliasedSymbol !== objSymbol;
+                    }
+                }
+
                 const exprType = this.checker.getTypeAtLocation(node.expression.expression);
                 const mappedType = this.getType(exprType);
 
-                // For string methods like 'hello'.split(), ensure we have a proper declaring type
-                if (!mappedType || mappedType.kind !== Type.Kind.Class) {
-                    // If the expression type is a primitive string, use lib.String as declaring type
+                // Handle different types
+                if (mappedType && mappedType.kind === Type.Kind.Class) {
+                    // Update the declaring type with the corrected FQN
+                    if (isImport && objSymbol) {
+                        const importName = objSymbol.getName();
+                        const origFqn = (mappedType as Type.Class).fullyQualifiedName;
+                        const lastDot = origFqn.lastIndexOf('.');
+                        if (lastDot > 0) {
+                            const typeName = origFqn.substring(lastDot + 1);
+                            declaringType = {
+                                kind: Type.Kind.Class,
+                                flags: 0, // TODO - determine flags
+                                fullyQualifiedName: `${importName}.${typeName}`
+                            } as Type.FullyQualified;
+                        } else {
+                            declaringType = mappedType as Type.FullyQualified;
+                        }
+                    } else {
+                        declaringType = mappedType as Type.FullyQualified;
+                    }
+                } else if (mappedType && mappedType.kind === Type.Kind.Primitive) {
+                    // Box the primitive to its wrapper type
+                    declaringType = this.wrapperType(mappedType as Type.Primitive);
+                } else {
+                    // Default to unknown if we can't determine the type
+                    declaringType = Type.unknownType as Type.FullyQualified;
+                }
+
+                // For string methods like 'hello'.split(), ensure we have a proper declaring type for primitives
+                if (!isImport && declaringType === Type.unknownType) {
+                    // If the expression type is a primitive string, use String as declaring type
                     const typeString = this.checker.typeToString(exprType);
                     if (typeString === 'string' || exprType.flags & ts.TypeFlags.String || exprType.flags & ts.TypeFlags.StringLiteral) {
-                        declaringType = {
-                            kind: Type.Kind.Class,
-                            fullyQualifiedName: 'lib.String'
-                        } as Type.FullyQualified;
+                        declaringType = this.wrapperType(Type.Primitive.String);
                     } else if (typeString === 'number' || exprType.flags & ts.TypeFlags.Number || exprType.flags & ts.TypeFlags.NumberLiteral) {
-                        declaringType = {
-                            kind: Type.Kind.Class,
-                            fullyQualifiedName: 'lib.Number'
-                        } as Type.FullyQualified;
+                        declaringType = this.wrapperType(Type.Primitive.Double);
+                    } else if (typeString === 'boolean' || exprType.flags & ts.TypeFlags.Boolean || exprType.flags & ts.TypeFlags.BooleanLiteral) {
+                        declaringType = this.wrapperType(Type.Primitive.Boolean);
                     } else {
                         // Fallback for other primitive types or unknown
                         declaringType = Type.unknownType as Type.FullyQualified;
                     }
-                } else {
-                    declaringType = mappedType as Type.FullyQualified;
                 }
+
             } else if (ts.isIdentifier(node.expression)) {
                 methodName = node.expression.getText();
-                // For standalone functions, we need to determine the appropriate declaring type
-                const exprType = this.checker.getTypeAtLocation(node.expression);
-                const funcType = this.getType(exprType);
 
-                if (funcType && funcType.kind === Type.Kind.Class) {
-                    const fqn = (funcType as Type.Class).fullyQualifiedName;
-                    const lastDot = fqn.lastIndexOf('.');
+                // Check if this is an import first
+                const symbol = this.checker.getSymbolAtLocation(node.expression);
+                let moduleSpecifier: string | undefined;
+                let aliasedSymbol: ts.Symbol | undefined;
 
-                    if (lastDot > 0) {
-                        // For functions from modules, use the module part as declaring type
-                        // Examples:
-                        // - "node.assert" -> declaring type: "node"
-                        // - "@types/lodash.map" -> declaring type: "@types/lodash"
-                        // - "@types/express.express" -> declaring type: "@types/express"
+                if (symbol) {
+                    // Check if this is an aliased symbol (i.e., an import)
+                    if (symbol.flags & ts.SymbolFlags.Alias) {
+                        aliasedSymbol = this.checker.getAliasedSymbol(symbol);
+                    }
+
+                    // If getAliasedSymbol returns something different, it's an import
+                    if (aliasedSymbol && aliasedSymbol !== symbol) {
+                        // This is definitely an imported symbol
+                        const aliasedParentSymbol = (aliasedSymbol as any).parent as ts.Symbol | undefined;
+
+                        if (aliasedParentSymbol && aliasedParentSymbol.declarations?.[0] &&
+                            ts.isModuleDeclaration(aliasedParentSymbol.declarations[0]) &&
+                            ts.isIdentifier(aliasedParentSymbol.declarations[0].name)) {
+                            // For namespace imports, use the namespace symbol's `name` as the module specifier (e.g. `React` instead of `react`)
+                            moduleSpecifier = aliasedParentSymbol.name;
+                        } else {
+                            // Now find the import declaration to get the module specifier
+                            if (symbol.declarations && symbol.declarations.length > 0) {
+                                let importNode: ts.Node = symbol.declarations[0];
+
+                                // Traverse up to find the ImportDeclaration
+                                while (importNode && !ts.isImportDeclaration(importNode)) {
+                                    importNode = importNode.parent;
+                                }
+
+                                if (importNode && ts.isImportDeclaration(importNode)) {
+                                    const importDeclNode = importNode as ts.ImportDeclaration;
+                                    if (ts.isStringLiteral(importDeclNode.moduleSpecifier)) {
+                                        moduleSpecifier = importDeclNode.moduleSpecifier.text;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (moduleSpecifier) {
+                    // This is an imported function - use the module specifier as declaring type
+                    if (moduleSpecifier.startsWith('node:')) {
+                        // Node.js built-in module
                         declaringType = {
                             kind: Type.Kind.Class,
-                            fullyQualifiedName: fqn.substring(0, lastDot)
+                            flags: 0, // TODO - determine flags
+                            fullyQualifiedName: 'node'
                         } as Type.FullyQualified;
+                        methodName = moduleSpecifier.substring(5); // Remove 'node:' prefix
                     } else {
-                        // No dots in the name - the type IS the module itself
-                        // This handles single-name modules like "axios", "lodash" etc.
-                        declaringType = funcType as Type.FullyQualified;
+                        // Regular module import
+                        declaringType = {
+                            kind: Type.Kind.Class,
+                            flags: 0, // TODO - determine flags
+                            fullyQualifiedName: moduleSpecifier
+                        } as Type.FullyQualified;
+                        // For aliased imports, use the original function name from the aliased symbol
+                        if (aliasedSymbol && aliasedSymbol.name) {
+                            methodName = aliasedSymbol.name;
+                        } else {
+                            methodName = '<default>';
+                        }
                     }
                 } else {
-                    // Try to use the symbol's parent or module
-                    const parent = (symbol as any).parent;
-                    if (parent) {
-                        const parentType = this.checker.getDeclaredTypeOfSymbol(parent);
-                        declaringType = this.getType(parentType) as Type.FullyQualified;
+                    // Fall back to the original logic for non-imported functions
+                    const exprType = this.checker.getTypeAtLocation(node.expression);
+                    const funcType = this.getType(exprType);
+
+                    if (funcType && funcType.kind === Type.Kind.Class) {
+                        const fqn = (funcType as Type.Class).fullyQualifiedName;
+                        const lastDot = fqn.lastIndexOf('.');
+
+                        if (lastDot > 0) {
+                            // For functions from modules, use the module part as declaring type
+                            declaringType = {
+                                kind: Type.Kind.Class,
+                                flags: 0, // TODO - determine flags
+                                fullyQualifiedName: fqn.substring(0, lastDot)
+                            } as Type.FullyQualified;
+                        } else {
+                            // No dots in the name - the type IS the module itself
+                            declaringType = funcType as Type.FullyQualified;
+                        }
                     } else {
-                        declaringType = Type.unknownType as Type.FullyQualified;
+                        // Try to use the symbol's parent or module
+                        const parent = (symbol as any).parent;
+                        if (parent) {
+                            const parentType = this.checker.getDeclaredTypeOfSymbol(parent);
+                            declaringType = this.getType(parentType) as Type.FullyQualified;
+                        } else {
+                            declaringType = Type.unknownType as Type.FullyQualified;
+                        }
                     }
                 }
             } else {
@@ -290,57 +547,16 @@ export class JavaScriptTypeMapping {
             return undefined;
         }
 
-        // Common logic for all method types
-        const returnType = signature.getReturnType();
-        const parameters = signature.getParameters();
-        const parameterTypes: Type[] = [];
-        const parameterNames: string[] = [];
-
-        for (const param of parameters) {
-            parameterNames.push(param.getName());
-            const paramType = this.checker.getTypeOfSymbolAtLocation(param, node);
-            parameterTypes.push(this.getType(paramType));
-        }
-
-        // Create the Type.Method object
-        return Object.assign(new NonDraftableType(), {
-            kind: Type.Kind.Method,
-            declaringType: declaringType,
-            name: methodName,
-            returnType: this.getType(returnType),
-            parameterNames: parameterNames,
-            parameterTypes: parameterTypes,
-            thrownExceptions: [], // JavaScript doesn't have checked exceptions
-            annotations: [],
-            defaultValue: undefined,
-            declaredFormalTypeNames: declaredFormalTypeNames,
-            toJSON: function () {
-                return Type.signature(this);
-            }
-        }) as Type.Method;
+        // Create the method type using the helper
+        return this.createMethodType(signature, node, declaringType, methodName, declaredFormalTypeNames);
     }
 
-    /**
-     * Create a JavaType.Array from a TypeScript array type
-     */
-    private createArrayType(type: ts.TypeReference): Type.Array {
-        // Get the element type (type argument of Array<T>)
-        const typeArgs = this.checker.getTypeArguments(type);
-        const elemType = typeArgs.length > 0 ? this.getType(typeArgs[0]) : Type.unknownType;
-        
-        return Object.assign(new NonDraftableType(), {
-            kind: Type.Kind.Array,
-            elemType: elemType,
-            annotations: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
-        }) as Type.Array;
-    }
 
     /**
      * Get the fully qualified name for a TypeScript type.
-     * Format: "module-specifier.TypeName" (e.g., "@mui/material.Button", "src/components/Button.Button")
+     * Uses TypeScript's built-in resolution which properly handles things like:
+     * - React.Component (not @types/react.Component)
+     * - _.LoDashStatic (not @types/lodash.LoDashStatic)
      */
     private getFullyQualifiedName(type: ts.Type): string {
         const symbol = type.getSymbol?.();
@@ -348,140 +564,100 @@ export class JavaScriptTypeMapping {
             return "unknown";
         }
 
-        const typeName = symbol.getName();
-        const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
-        if (!declaration) {
-            // No declaration - might be a built-in or synthetic type
-            if (builtInTypes.has(typeName)) {
-                return `lib.${typeName}`;
-            }
-            return typeName;
-        }
+        // First, check if this symbol is an import/alias
+        // For imported types, we want to use the module specifier instead of the file path
+        if (symbol.flags & ts.SymbolFlags.Alias) {
+            const aliasedSymbol = this.checker.getAliasedSymbol(symbol);
+            if (aliasedSymbol && aliasedSymbol !== symbol && symbol.declarations && symbol.declarations.length > 0) {
+                // Try to find the import declaration to get the module specifier
+                let importNode: ts.Node | undefined = symbol.declarations[0];
 
-        const sourceFile = declaration.getSourceFile();
-        const fileName = sourceFile.fileName;
-
-        // Check if this is a test file (snowflake ID as filename)
-        // Test files are generated with numeric IDs like "672087069480189952.ts"
-        if (/^\d+\.(ts|tsx|js|jsx)$/.test(fileName)) {
-            // For test files, just return the type name without module prefix
-            return typeName;
-        }
-
-        // Check if this is from TypeScript's lib files (lib.d.ts, lib.dom.d.ts, etc.)
-        if (fileName.includes("/typescript/lib/lib.") || fileName.includes("\\typescript\\lib\\lib.")) {
-            return `lib.${typeName}`;
-        }
-
-        // Check if this is from an external module (node_modules or .d.ts)
-        if (sourceFile.isDeclarationFile || fileName.includes("node_modules")) {
-            const packageName = this.extractPackageName(fileName);
-            if (packageName) {
-                // Special handling for @types/node - these are Node.js built-in modules
-                // and should be mapped to "node.*" instead of "@types/node.*"
-                if (packageName === "@types/node") {
-                    // Extract the module name from the file path
-                    // e.g., /node_modules/@types/node/assert.d.ts -> assert
-                    // e.g., /node_modules/@types/node/fs/promises.d.ts -> fs/promises
-                    const nodeMatch = fileName.match(/node_modules\/@types\/node\/([^.]+)\.d\.ts/);
-                    if (nodeMatch) {
-                        const modulePath = nodeMatch[1];
-                        // For default exports from Node modules, we want the module to be the "class"
-                        // But we still need to include the type name for proper identification
-                        if (typeName === "default" || typeName === modulePath) {
-                            // This is likely the default export, just use the module name
-                            return `node.${modulePath}`;
-                        }
-                        // For named exports, include both module and type name
-                        if (modulePath.includes('/')) {
-                            return `node.${modulePath.replace(/\//g, '.')}.${typeName}`;
-                        }
-                        return `node.${modulePath}.${typeName}`;
-                    }
-                    // Fallback for @types/node types that don't match the pattern
-                    return `node.${typeName}`;
+                // Traverse up to find the ImportDeclaration or ImportSpecifier
+                while (importNode && importNode.parent && !ts.isImportDeclaration(importNode) && !ts.isImportSpecifier(importNode)) {
+                    importNode = importNode.parent;
                 }
-                return `${packageName}.${typeName}`;
+
+                let moduleSpecifier: string | undefined;
+
+                if (importNode && ts.isImportSpecifier(importNode)) {
+                    // Named import like: import { ClipLoader } from 'react-spinners'
+                    // ImportSpecifier -> NamedImports -> ImportClause -> ImportDeclaration
+                    const namedImports = importNode.parent; // NamedImports
+                    if (namedImports && ts.isNamedImports(namedImports)) {
+                        const importClause = namedImports.parent; // ImportClause
+                        if (importClause && ts.isImportClause(importClause)) {
+                            const importDecl = importClause.parent; // ImportDeclaration
+                            if (importDecl && ts.isImportDeclaration(importDecl) && ts.isStringLiteral(importDecl.moduleSpecifier)) {
+                                moduleSpecifier = importDecl.moduleSpecifier.text;
+                            }
+                        }
+                    }
+                } else if (importNode && ts.isImportDeclaration(importNode)) {
+                    // Default or namespace import
+                    if (ts.isStringLiteral(importNode.moduleSpecifier)) {
+                        moduleSpecifier = importNode.moduleSpecifier.text;
+                    }
+                }
+
+                if (moduleSpecifier) {
+                    // Build the fully qualified name from module specifier + symbol name
+                    const symbolName = symbol.getName();
+                    return `${moduleSpecifier}.${symbolName}`;
+                }
             }
         }
 
-        // For local files, use relative path from project root
-        const relativePath = this.getRelativeModulePath(fileName);
-        return `${relativePath}.${typeName}`;
-    }
+        // Fall back to TypeScript's built-in getFullyQualifiedName
+        // This returns names with quotes that we need to clean up
+        // e.g., '"React"."Component"' -> 'React.Component'
+        const tsQualifiedName = this.checker.getFullyQualifiedName(symbol);
+        let cleanedName = tsQualifiedName.replace(/"/g, '');
 
-    /**
-     * Extract package name from a node_modules path.
-     * Examples:
-     * - /path/to/project/node_modules/react/index.d.ts -> "react"
-     * - /path/to/project/node_modules/@mui/material/Button/index.d.ts -> "@mui/material"
-     */
-    private extractPackageName(fileName: string): string | null {
-        const match = fileName.match(/node_modules\/(@[^\/]+\/[^\/]+|[^\/]+)/);
-        return match ? match[1] : null;
-    }
+        // Check if this is a file path from node_modules (happens with some packages)
+        // TypeScript sometimes returns full paths instead of module names
+        if (cleanedName.includes('node_modules/')) {
+            // Extract the module name from the path
+            // Example: /private/var/.../node_modules/react-spinners/src/index.ClipLoader
+            // Should become: react-spinners.ClipLoader
+            const nodeModulesIndex = cleanedName.indexOf('node_modules/');
+            const afterNodeModules = cleanedName.substring(nodeModulesIndex + 'node_modules/'.length);
 
-    /**
-     * Get relative module path from project root.
-     * Removes file extension and uses forward slashes.
-     */
-    private getRelativeModulePath(fileName: string): string {
-        // Remove project root and normalize path
-        let relativePath = fileName;
-        if (fileName.startsWith(this.projectRoot)) {
-            relativePath = fileName.slice(this.projectRoot.length);
+            // Split by '/' to get parts of the path
+            const pathParts = afterNodeModules.split('/');
+
+            if (pathParts.length > 0) {
+                // First part is the package name (might be scoped like @types)
+                let packageName = pathParts[0];
+
+                // Handle scoped packages
+                if (packageName.startsWith('@') && pathParts.length > 1) {
+                    packageName = `${packageName}/${pathParts[1]}`;
+                }
+
+                // Find the symbol name (everything after the last dot in the original cleaned name)
+                const lastDotIndex = cleanedName.lastIndexOf('.');
+                if (lastDotIndex > 0) {
+                    const symbolName = cleanedName.substring(lastDotIndex + 1);
+                    cleanedName = `${packageName}.${symbolName}`;
+                } else {
+                    cleanedName = packageName;
+                }
+            }
         }
 
-        // Remove leading slash and file extension
-        relativePath = relativePath.replace(/^\//, '').replace(/\.[^/.]+$/, '');
-
-        // Convert backslashes to forward slashes (for Windows)
-        relativePath = relativePath.replace(/\\/g, '/');
-
-        return relativePath;
+        return cleanedName.endsWith('Constructor') ?
+            cleanedName.substring(0, cleanedName.length - 'Constructor'.length) :
+            cleanedName;
     }
+
 
     /**
      * Create an empty JavaType.Class shell from a TypeScript type.
      * The shell will be populated later to handle circular references.
      */
     private createEmptyClassType(type: ts.Type): Type.Class {
-        // Use our custom getFullyQualifiedName method for consistent naming
-        let fullyQualifiedName = this.getFullyQualifiedName(type);
-
-        // If getFullyQualifiedName returned unknown, fall back to TypeScript's method
-        if (fullyQualifiedName === "unknown") {
-            const symbol = type.symbol;
-            fullyQualifiedName = symbol ? this.checker.getFullyQualifiedName(symbol) : `<anonymous>${this.checker.typeToString(type)}`;
-
-            // Fix FQN for types from @types packages
-            // TypeScript returns "_.LoDashStatic" but we want "@types/lodash.LoDashStatic"
-            if (symbol && symbol.declarations && symbol.declarations.length > 0) {
-                const sourceFile = symbol.declarations[0].getSourceFile();
-                const fileName = sourceFile.fileName;
-                // Check if this is from @types package
-                const typesMatch = fileName.match(/node_modules\/@types\/([^/]+)/);
-                if (typesMatch) {
-                    const packageName = typesMatch[1];
-                    // Special handling for @types/node - use "node" prefix instead
-                    if (packageName === "node") {
-                        // Extract the module name from the file path if possible
-                        const nodeMatch = fileName.match(/node_modules\/@types\/node\/([^.]+)\.d\.ts/);
-                        if (nodeMatch) {
-                            const modulePath = nodeMatch[1];
-                            // Replace the module specifier with node.module
-                            fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `node.${modulePath}.`);
-                        } else {
-                            // Fallback: just use "node" prefix
-                            fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `node.`);
-                        }
-                    } else {
-                        // Replace the module specifier part with @types/package
-                        fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `@types/${packageName}.`);
-                    }
-                }
-            }
-        }
+        // Use our getFullyQualifiedName method which uses TypeScript's built-in resolution
+        const fullyQualifiedName = this.getFullyQualifiedName(type);
 
         // Determine the class kind based on symbol flags
         let classKind = Type.Class.Kind.Interface; // Default to interface
@@ -499,6 +675,7 @@ export class JavaScriptTypeMapping {
         // Create empty class type shell (no members yet to avoid recursion)
         return Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Class,
+            flags: 0, // TODO - determine flags
             classKind: classKind,
             fullyQualifiedName: fullyQualifiedName,
             typeParameters: [],
@@ -675,7 +852,7 @@ export class JavaScriptTypeMapping {
             type.flags === ts.TypeFlags.BigIntLiteral ||
             type.flags === ts.TypeFlags.BigIntLike
         ) {
-            return Type.Primitive.Long;
+            return Type.Primitive.BigInt;
         } else if (
             (type.symbol !== undefined && type.symbol === this.regExpSymbol) ||
             this.checker.typeToString(type) === "RegExp"
@@ -706,5 +883,95 @@ export class JavaScriptTypeMapping {
         }
 
         return Type.unknownType;
+    }
+
+    /**
+     * Create an empty function type shell with FQN 𝑓.
+     * The shell will be populated later to handle circular references.
+     */
+    private createEmptyFunctionType(): Type.Class {
+        return Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind: Type.Class.Kind.Interface,
+            fullyQualifiedName: FUNCTION_TYPE_NAME,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        }) as Type.Class;
+    }
+
+    /**
+     * Populate a function type with signature information.
+     * The function type has generic type parameters for return type (first) and parameter types (subsequent),
+     * and contains an apply() method with the matching signature.
+     * Since the shell is already in the cache, any recursive references will find it.
+     */
+    private populateFunctionType(functionClass: Type.Class, signature: ts.Signature): void {
+        const returnType = this.getType(signature.getReturnType());
+        const parameters = signature.getParameters();
+        const parameterTypes: Type[] = [];
+        const parameterNames: string[] = [];
+
+        // Get parameter types
+        for (const param of parameters) {
+            const declaration = param.valueDeclaration || param.declarations?.[0];
+            if (declaration) {
+                const paramType = this.checker.getTypeOfSymbolAtLocation(param, declaration);
+                parameterTypes.push(this.getType(paramType));
+                parameterNames.push(param.getName());
+            }
+        }
+
+        // Build the type parameters list with proper variance:
+        // - Return type is covariant (R)
+        // - Parameter types are contravariant (P1, P2, ...)
+        const typeParameters: Type[] = [];
+
+        // Return type parameter (covariant)
+        typeParameters.push(Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.GenericTypeVariable,
+            name: 'R',
+            variance: Type.GenericTypeVariable.Variance.Covariant,
+            bounds: [returnType]
+        }) as Type.GenericTypeVariable);
+
+        // Parameter type variables (contravariant)
+        parameterTypes.forEach((paramType, index) => {
+            typeParameters.push(Object.assign(new NonDraftableType(), {
+                kind: Type.Kind.GenericTypeVariable,
+                name: `P${index + 1}`,
+                variance: Type.GenericTypeVariable.Variance.Contravariant,
+                bounds: [paramType]
+            }) as Type.GenericTypeVariable);
+        });
+
+        functionClass.typeParameters = typeParameters;
+
+        // Create the apply() method
+        const applyMethod = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Method,
+            flags: 0,
+            declaringType: functionClass,
+            name: 'apply',
+            returnType: returnType,
+            parameterNames: parameterNames,
+            parameterTypes: parameterTypes,
+            thrownExceptions: [],
+            annotations: [],
+            defaultValue: undefined,
+            declaredFormalTypeNames: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        }) as Type.Method;
+
+        // Add the apply method to the function class
+        functionClass.methods.push(applyMethod);
     }
 }

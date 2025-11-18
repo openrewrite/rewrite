@@ -20,6 +20,7 @@ import {javascript, JavaScriptVisitor, npm, packageJson, tsx, typescript} from "
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
+import FullyQualified = Type.FullyQualified;
 
 describe('JavaScript type mapping', () => {
     describe('primitive types', () => {
@@ -128,7 +129,7 @@ describe('JavaScript type mapping', () => {
         test('should map bigint literal', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                if (node?.kind === J.Kind.Literal && typeof (node as J.Literal).value === 'bigint') {
+                if (node?.kind === J.Kind.Literal && typeof (node as J.Literal).value === 'string') {
                     return formatPrimitiveType(type);
                 }
                 return null;
@@ -195,7 +196,7 @@ describe('JavaScript type mapping', () => {
         // TODO: These will be implemented in Phase 2/3
         test.skip('should map type annotations', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((_node, _type) => {
                 // Will mark type reference nodes when implemented
                 return null;
             });
@@ -293,7 +294,7 @@ describe('JavaScript type mapping', () => {
                         element = div;
                     `,
                     `
-                        let element: /*~~(lib.HTMLElement (235 members))~~>*/HTMLElement;
+                        let element: /*~~(HTMLElement (235 members))~~>*/HTMLElement;
                         const div = document.createElement('div');
                         element = div;
                     `
@@ -305,7 +306,7 @@ describe('JavaScript type mapping', () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((_, type) => {
                 // Mark any node that has a lodash-related type
-                return Type.isClass(type) && type.fullyQualifiedName.includes('lodash') ?
+                return Type.isClass(type) && type.fullyQualifiedName.includes('LoDash') ?
                     type.fullyQualifiedName : null;
             });
 
@@ -323,11 +324,11 @@ describe('JavaScript type mapping', () => {
                                 const sum = _.reduce(doubled, (a, b) => a + b, 0);
                             `,
                             `
-                                import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
+                                import /*~~(_.LoDashStatic)~~>*/_ from 'lodash';
 
                                 const numbers = [1, 2, 3, 4, 5];
-                                const doubled = /*~~(@types/lodash.LoDashStatic)~~>*/_.map(numbers, n => n * 2);
-                                const sum = /*~~(@types/lodash.LoDashStatic)~~>*/_.reduce(doubled, (a, b) => a + b, 0);
+                                const doubled = /*~~(_.LoDashStatic)~~>*/_.map(numbers, n => n * 2);
+                                const sum = /*~~(_.LoDashStatic)~~>*/_.reduce(doubled, (a, b) => a + b, 0);
                             `
                         ),
                         //language=json
@@ -341,6 +342,210 @@ describe('JavaScript type mapping', () => {
                                 },
                                 "devDependencies": {
                                   "@types/lodash": "^4.14.195"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('deprecated node methods with CommonJS', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                return Type.isMethod(type) && type.name === 'isArray' ? FullyQualified.getFullyQualifiedName(type.declaringType) : null;
+            });
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                const util = require('util');
+                                util.isArray([])
+                            `,
+                            //@formatter:off
+                            `
+                                const util = require('util');
+                                /*~~(util)~~>*/util.isArray([])
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        });
+
+        test('Promise not PromiseConstructor', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                return Type.isClass(type) ? type.fullyQualifiedName : null;
+            });
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `Promise.resolve("data")`,
+                    //@formatter:off
+                    `/*~~(Promise)~~>*/Promise.resolve("data")`
+                    //@formatter:on
+                )
+            )
+        })
+
+        test('aliased destructured ES6 import has correct method name', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (Type.isMethod(type)) {
+                    const method = type as Type.Method;
+                    if (FullyQualified.getFullyQualifiedName(method.declaringType) === 'fs') {
+                        return method.name;
+                    }
+                }
+                return null;
+            });
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {readFile as rf} from 'fs';
+
+                                rf('test.txt', (err, data) => {
+                                    console.log(data);
+                                });
+                            `,
+                            //@formatter:off
+                            `
+                                import {readFile as rf} from 'fs';
+
+                                /*~~(readFile)~~>*/rf('test.txt', (err, data) => {
+                                    console.log(data);
+                                });
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        })
+
+        test('deprecated node methods with ES6 imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                return Type.isMethod(type) && type.name === 'isArray' ? FullyQualified.getFullyQualifiedName(type.declaringType) : null;
+            });
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import * as util from 'util';
+
+                                util.isArray([])
+                            `,
+                            //@formatter:off
+                            `
+                                import * as util from 'util';
+
+                                /*~~(util)~~>*/util.isArray([])
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        });
+
+        test('should map tsx types', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                // Mark any node that has a lodash-related type
+                if (Type.isClass(type) && type.fullyQualifiedName.includes('react-spinners')) {
+                    expect(type.supertype?.fullyQualifiedName).toBe('React.Component');
+                    return type.fullyQualifiedName;
+                } else {
+                    return null;
+                }
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=tsx
+                        tsx(
+                            `
+                                import {ClipLoader} from 'react-spinners';
+
+                                const App = () => {
+                                    return <ClipLoader color="#36d7b7"/>;
+                                };
+                            `,
+                            `
+                                import {/*~~(react-spinners.ClipLoader)~~>*/ClipLoader} from 'react-spinners';
+
+                                const App = () => {
+                                    return </*~~(react-spinners.ClipLoader)~~>*/ClipLoader color="#36d7b7"/>;
+                                };
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "react": "^16.8.0",
+                                  "react-spinners": "^0.5.0"
+                                },
+                                "devDependencies": {
+                                  "@types/react": "^16.8.0"
                                 }
                               }
                             `
@@ -412,16 +617,14 @@ describe('JavaScript type mapping', () => {
             );
         });
 
-        test('should map array types', async () => {
+        test('should map array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark array literals
                 if (node?.kind === J.Kind.NewArray) {
-                    if (Type.isArray(type)) {
-                        const elemTypeName = Type.isPrimitive(type.elemType)
-                            ? type.elemType.keyword || 'unknown'
-                            : 'unknown';
-                        return `Array<${elemTypeName}>`;
+                    if (Type.isClass(type)) {
+                        if (type.fullyQualifiedName === 'Array') {
+                            return 'Array';
+                        }
                     }
                     return null;
                 }
@@ -436,8 +639,8 @@ describe('JavaScript type mapping', () => {
                         let strings: Array<string> = ["a", "b"];
                     `,
                     `
-                        let numbers: number[] = /*~~(Array<double>)~~>*/[1, 2, 3];
-                        let strings: Array<string> = /*~~(Array<String>)~~>*/["a", "b"];
+                        let numbers: number[] = /*~~(Array)~~>*/[1, 2, 3];
+                        let strings: Array<string> = /*~~(Array)~~>*/["a", "b"];
                     `
                 )
             );
@@ -454,8 +657,8 @@ describe('JavaScript type mapping', () => {
                         const elemTypeName = Type.isPrimitive(type.elemType)
                             ? type.elemType.keyword || 'unknown'
                             : Type.isClass(type.elemType)
-                            ? 'union'  // Tuples often have union element types
-                            : 'unknown';
+                                ? 'union'  // Tuples often have union element types
+                                : 'unknown';
                         return `Array<${elemTypeName}>`;
                     }
                     // Debug what we get for tuples
@@ -482,16 +685,16 @@ describe('JavaScript type mapping', () => {
             );
         });
 
-        test('should map readonly array types', async () => {
+        test('should map readonly array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark array literals assigned to readonly arrays
+                // Mark array literals assigned to readonly arrays - arrays are now class types
                 if (node?.kind === J.Kind.NewArray) {
-                    if (Type.isArray(type)) {
-                        const elemTypeName = Type.isPrimitive(type.elemType)
-                            ? type.elemType.keyword || 'unknown'
-                            : 'unknown';
-                        return `Array<${elemTypeName}>`;
+                    if (Type.isClass(type)) {
+                        // Both readonly and regular arrays should be mapped as Array
+                        if (type.fullyQualifiedName === 'Array') {
+                            return 'Array';
+                        }
                     }
                     return null;
                 }
@@ -507,9 +710,9 @@ describe('JavaScript type mapping', () => {
                         const frozenArray = Object.freeze([1, 2, 3]);
                     `,
                     `
-                        const readonlyNumbers: readonly number[] = /*~~(Array<double>)~~>*/[1, 2, 3];
-                        const readonlyStrings: ReadonlyArray<string> = /*~~(Array<String>)~~>*/["a", "b"];
-                        const frozenArray = Object.freeze(/*~~(Array<double>)~~>*/[1, 2, 3]);
+                        const readonlyNumbers: readonly number[] = /*~~(Array)~~>*/[1, 2, 3];
+                        const readonlyStrings: ReadonlyArray<string> = /*~~(Array)~~>*/["a", "b"];
+                        const frozenArray = Object.freeze(/*~~(Array)~~>*/[1, 2, 3]);
                     `
                 )
             );
@@ -532,7 +735,7 @@ describe('JavaScript type mapping', () => {
                     const methodType = type as Type.Method;
                     if (methodType.name === 'add') {
                         const params = methodType.parameterNames.join(', ');
-                        const returnTypeName = Type.isPrimitive(methodType.returnType) 
+                        const returnTypeName = Type.isPrimitive(methodType.returnType)
                             ? methodType.returnType.keyword || 'unknown'
                             : 'unknown';
                         return `(${params}) => ${returnTypeName}`;
@@ -550,7 +753,8 @@ describe('JavaScript type mapping', () => {
                         }
                     `,
                     `
-                        /*~~((a, b) => double)~~>*/function add(a: number, b: number): number {
+                        /*~~((a, b) => double)~~>*/
+                        function add(a: number, b: number): number {
                             return a + b;
                         }
                     `
@@ -561,7 +765,7 @@ describe('JavaScript type mapping', () => {
         test.skip('should map arrow function types', async () => {
             // TODO: Arrow functions need special handling - methodType might not be attached to Lambda
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((node, _type) => {
                 // Mark arrow functions with their method type
                 if (node?.kind === J.Kind.Lambda) {
                     const lambda = node as J.Lambda;
@@ -594,7 +798,7 @@ describe('JavaScript type mapping', () => {
 
         test('should map method invocation types', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((node, _type) => {
                 // Mark method invocations with their method type
                 if (node?.kind === J.Kind.MethodInvocation) {
                     const invocation = node as J.MethodInvocation;
@@ -624,6 +828,42 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('should auto-box primitives when methods are called on them', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, _type) => {
+                // Mark toString() invocations and verify the declaring type is boxed
+                if (node?.kind === J.Kind.MethodInvocation) {
+                    const invocation = node as J.MethodInvocation;
+                    const methodType = invocation.methodType;
+                    if (methodType && methodType.name === 'toString') {
+                        // Verify that declaringType is NOT a primitive
+                        const isPrimitive = Type.isPrimitive(methodType.declaringType);
+                        const declaringTypeName = Type.isClass(methodType.declaringType) ?
+                            methodType.declaringType.fullyQualifiedName :
+                            'PRIMITIVE';
+
+                        return `toString on ${declaringTypeName} (isPrimitive: ${isPrimitive})`;
+                    }
+                    return null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = "test";
+                        const hex = a.charCodeAt(0).toString(16);
+                    `,
+                    `
+                        const a = "test";
+                        const hex = /*~~(toString on Number (isPrimitive: false))~~>*/a.charCodeAt(0).toString(16);
+                    `
+                )
+            );
+        });
+
         test.skip('should map generic types', async () => {
             // TODO: Implement in Phase 5
             const spec = new RecipeSpec();
@@ -647,35 +887,6 @@ describe('JavaScript type mapping', () => {
                         function /*~~(<T>(T) => T)~~>*/identity<T>(value: T): T {
                             return value;
                         }
-                    `
-                )
-            );
-        });
-
-        test.skip('should map JSX element types', async () => {
-            // TODO: Implement in Phase 7
-            const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
-                // Mark JSX elements with their component type
-                if (node?.kind === J.Kind.NewClass && type) {
-                    // JSX elements are typically mapped as NewClass in the J model
-                    return Type.isClass(type) ? type.fullyQualifiedName : null;
-                }
-                return null;
-            });
-
-            await spec.rewriteRun(
-                //language=tsx
-                tsx(
-                    `
-                        import React from 'react';
-
-                        const element = <div className="test">Hello</div>;
-                    `,
-                    `
-                        import React from 'react';
-
-                        const element = /*~~(JSX.IntrinsicElements.div)~~>*/<div className="test">Hello</div>;
                     `
                 )
             );

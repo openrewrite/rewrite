@@ -29,11 +29,13 @@ import org.openrewrite.table.SourcesFileResults;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 @Value
 public class Visit implements RpcRequest {
     String visitor;
+
+    @Nullable String sourceFileType;
 
     @Nullable
     Map<String, Object> visitorOptions;
@@ -55,19 +57,18 @@ public class Visit implements RpcRequest {
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Visit> {
         private final Map<String, Object> localObjects;
-
         private final PreparedRecipeCache preparedRecipes;
-
-        private final Function<String, ?> getObject;
-        private final Function<@Nullable List<String>, Cursor> getCursor;
+        private final BiFunction<String, @Nullable String, ?> getObject;
+        private final BiFunction<@Nullable List<String>, @Nullable String, Cursor> getCursor;
 
         @Override
         protected Object handle(Visit request) throws Exception {
-            Tree before = (Tree) getObject.apply(request.getTreeId());
+            Tree before = (Tree) getObject.apply(request.getTreeId(), request.getSourceFileType());
             Object p = getVisitorP(request);
             TreeVisitor<?, Object> visitor = preparedRecipes.instantiateVisitor(request.getVisitor(),
                     request.getVisitorOptions());
-            Tree after = visitor.visit(before, p, getCursor.apply(request.getCursor()));
+            Tree after = visitor.visit(before, p, getCursor.apply(request.getCursor(),
+                    request.getSourceFileType()));
             if (after == null) {
                 localObjects.remove(before.getId().toString());
             } else {
@@ -78,7 +79,7 @@ public class Visit implements RpcRequest {
         }
 
         private Object getVisitorP(Visit request) {
-            Object p = getObject.apply(request.getP());
+            Object p = getObject.apply(request.getP(), request.getSourceFileType());
             if (p instanceof ExecutionContext) {
                 String visitorName = request.getVisitor();
 

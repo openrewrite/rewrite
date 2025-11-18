@@ -456,110 +456,24 @@ public class GroovyParserVisitor {
             if (sourceStartsWith("(")) {
                 Space prefixNewClass = whitespace();
                 skip("(");
-
-                // The Groovy AST does not list the enum constructor arguments anywhere, thus first get the arguments as string
-                int start = cursor;
-                int argCount = 0;
-                int depth = 0;
-                cursor = indexOfNextNonWhitespace(cursor, source);
-                // Check if there are any arguments at all
-                if (source.charAt(cursor) != ')') {
-                    argCount = 1; // Start with 1 since there's at least one argument
-                }
-                while (!(source.charAt(cursor) == ')' && depth == 0)) {
-                    int cursorBeforeIteration = cursor;
-
-                    Delimiter delimiter = getDelimiter(null, cursor);
-                    if (delimiter != null) {
-                        cursor += delimiter.open.length();
-                        if ("\"".equals(delimiter.close)) {
-                            // This is to prevent sourceBefore interpreting // in strings as comments
-                            cursor = source.indexOf("\"", cursor) + 1;
-                            while (source.charAt(cursor - 2) == '\\') {
-                                cursor = source.indexOf("\"", cursor) + 1;
-                            }
-                        } else {
-                            sourceBefore(delimiter.close);
-                        }
-                    } else {
-                        name();
-                        // Check for named argument syntax (colon after name)
-                        cursor = indexOfNextNonWhitespace(cursor, source);
-                        if (source.charAt(cursor) == ':') {
-                            cursor++; // Skip the colon
-                            cursor = indexOfNextNonWhitespace(cursor, source);
-                            // Parse the value after the colon
-                            delimiter = getDelimiter(null, cursor);
-                            if (delimiter != null) {
-                                cursor += delimiter.open.length();
-                                if ("\"".equals(delimiter.close)) {
-                                    cursor = source.indexOf("\"", cursor) + 1;
-                                    while (source.charAt(cursor - 2) == '\\') {
-                                        cursor = source.indexOf("\"", cursor) + 1;
-                                    }
-                                } else {
-                                    sourceBefore(delimiter.close);
-                                }
-                            } else {
-                                name();
-                            }
-                        }
-                    }
-                    cursor = indexOfNextNonWhitespace(cursor, source);
-                    skip(",");
-                    cursor = indexOfNextNonWhitespace(cursor, source);
-                    if (source.charAt(cursor) == '(') {
-                        depth++;
+                RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
+                ListExpression arguments = (ListExpression) field.getInitialExpression();
+                List<JRightPadded<Expression>> list = visitor.convertAll(arguments.getExpressions(), n -> sourceBefore(","), n -> whitespace(), n -> {
+                    if (n == arguments.getExpression(arguments.getExpressions().size() - 1) && source.charAt(cursor) == ',') {
                         cursor++;
-                    } else if (depth > 0 && source.charAt(cursor) == ')') {
-                        depth--;
-                        cursor++;
+                        return Markers.build(singleton(new TrailingComma(randomId(), whitespace())));
                     }
-                    argCount++;
-                    // Safety check: if cursor didn't advance, throw an exception to avoid infinite loop
-                    if (cursor == cursorBeforeIteration) {
-                        throw new IllegalStateException(
-                                "Parser error: unable to parse enum constructor arguments at position " + cursor +
-                                        " near '" + source.substring(Math.max(0, cursor - 20), Math.min(source.length(), cursor + 20)) + "'"
-                        );
-                    }
-                }
-                String argsAsString = source.substring(start, cursor);
+                    return Markers.EMPTY;
+                });
                 skip(")");
 
-                // ... then grab the constructor arguments ...
-                StringBuilder constructorDeclarationArgs = new StringBuilder();
-                ConstructorNode ctor = null;
-                for (ConstructorNode node : field.getDeclaringClass().getDeclaredConstructors()) {
-                    if ((node.getParameters().length - 2) == argCount) {
-                        ctor = node;
-                        break;
+                MethodNode ctor = null;
+                for (ConstructorNode constructor : field.getOwner().getDeclaredConstructors()) {
+                    if (constructor.getParameters().length == arguments.getExpressions().size()) {
+                        ctor = constructor;
                     }
                 }
-                if (ctor != null) {
-                    for (int i = 2; i < ctor.getParameters().length; i++) {
-                        Parameter param = ctor.getParameters()[i];
-                        if (i != 2) {
-                            constructorDeclarationArgs.append(", ");
-                        }
-                        constructorDeclarationArgs.append(param.getType().getName()).append(" ").append(param.getName());
-                    }
-                }
-
-                // ... and use the information in a small class to get the constructor invocation arguments anyway
-                G.CompilationUnit cu = (G.CompilationUnit) GroovyParser.builder().build()
-                        .parse("class A {\n" +
-                                "  A(" + constructorDeclarationArgs + ") {}\n" +
-                                "  def use() {\n" +
-                                "    new A(" + argsAsString + ")\n" +
-                                "  }\n" +
-                                "}")
-                        .findFirst().get();
-
-                JContainer<Expression> args = ((J.NewClass) (((J.Return) ((J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().get(0)).getBody().getStatements().get(1)).getBody().getStatements().get(0)).getExpression()))
-                        .getPadding().getArguments();
-
-                initializer = new J.NewClass(randomId(), prefixNewClass, Markers.EMPTY, null, EMPTY, null, args, null, typeMapping.methodType(ctor));
+                initializer = new J.NewClass(randomId(), prefixNewClass, Markers.EMPTY, null, EMPTY, null, JContainer.build(list), null, typeMapping.methodType(ctor));
             }
 
             return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, initializer);
@@ -976,18 +890,14 @@ public class GroovyParserVisitor {
                     }
 
                     Space after = EMPTY;
+                    Space trailingCommaSuffix = null;
                     if (i == unparsedArgs.size() - 1) {
                         if (hasParentheses) {
                             saveCursor = cursor;
-                            Space before = whitespace();
+                            after = whitespace();
                             if (source.charAt(cursor) == ',') {
                                 skip(",");
-                                JRightPadded<Expression> arg = JRightPadded.build(exp)
-                                        .withMarkers(exp.getMarkers().add(new TrailingComma(randomId(), sourceBefore(")"))))
-                                        .withAfter(before);
-
-                                args.add(arg);
-                                continue;
+                                trailingCommaSuffix = sourceBefore(")");
                             } else {
                                 cursor = saveCursor;
                                 after = sourceBefore(")");
@@ -995,14 +905,24 @@ public class GroovyParserVisitor {
                         }
                     } else if (!(exp instanceof J.Lambda && lastArgumentsAreAllClosures && !hasParentheses)) {
                         after = whitespace();
+                        saveCursor = cursor;
+                        if (source.charAt(cursor) == ',') {
+                            // we might have a trailing comma
+                            skip(",");
+                            trailingCommaSuffix = whitespace();
+                        }
                         if (source.charAt(cursor) == ')') {
                             // next argument(s), if they exists, are trailing closures and will have an OmitParentheses marker
                             hasParentheses = false;
+                        } else if (trailingCommaSuffix != null) {
+                            // we don't have a trailing comma, just a regular comma
+                            trailingCommaSuffix = null;
+                            cursor = saveCursor;
                         }
                         cursor++;
                     }
 
-                    args.add(JRightPadded.build(exp).withAfter(after));
+                  args.add(newRightPadded(exp, after, trailingCommaSuffix));
                 }
             }
 
@@ -2249,9 +2169,18 @@ public class GroovyParserVisitor {
                     }
 
                     Space after = EMPTY;
+                    Space trailingCommaSuffix = null;
                     if (i == mapEntryExpressions.size() - 1) {
                         if (omitParentheses == null) {
-                            after = sourceBefore(")");
+                            saveCursor = cursor;
+                            after = whitespace();
+                            if (source.charAt(cursor) == ',') {
+                                skip(",");
+                                trailingCommaSuffix = sourceBefore(")");
+                            } else {
+                                cursor = saveCursor;
+                                after = sourceBefore(")");
+                            }
                         }
                     } else {
                         after = whitespace();
@@ -2262,7 +2191,7 @@ public class GroovyParserVisitor {
                         cursor++;
                     }
 
-                    args.add(JRightPadded.build(arg).withAfter(after));
+                  args.add(newRightPadded(arg, after, trailingCommaSuffix));
                 }
             }
 
@@ -2411,7 +2340,7 @@ public class GroovyParserVisitor {
 
             if (!expression.isDynamicTyped() && sourceStartsWith(expression.getOriginType().getUnresolvedName())) {
                 if (cursor + expression.getOriginType().getUnresolvedName().length() < source.length() &&
-                        !Character.isJavaIdentifierPart(source.charAt(cursor + expression.getOriginType().getUnresolvedName().length()))) {
+                        !isJavaIdentifierPart(source.charAt(cursor + expression.getOriginType().getUnresolvedName().length()))) {
                     typeName = expression.getOriginType().getUnresolvedName();
                     skip(typeName);
                 }
@@ -2508,7 +2437,19 @@ public class GroovyParserVisitor {
         }
     }
 
-    // handle the obscure case where there are empty parens ahead of a closure
+    private static JRightPadded<Expression> newRightPadded(
+        Expression exp,
+        Space after,
+        @Nullable Space trailingCommaSuffix
+    ) {
+        JRightPadded<Expression> arg = JRightPadded.build(exp).withAfter(after);
+        if (trailingCommaSuffix != null) {
+            arg = arg.withMarkers(exp.getMarkers().add(new TrailingComma(randomId(), trailingCommaSuffix)));
+        }
+        return arg;
+    }
+
+  // handle the obscure case where there are empty parens ahead of a closure
     private Markers handlesCaseWhereEmptyParensAheadOfClosure(ArgumentListExpression args, Markers markers) {
         if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
             int saveCursor = cursor;

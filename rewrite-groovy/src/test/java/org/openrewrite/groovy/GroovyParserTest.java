@@ -139,6 +139,88 @@ class GroovyParserTest implements RewriteTest {
               System.out.println("Hello World with space before comma" ,)
               System.out.println("Hello World with space after comma", )
               System.out.println("Hello World with space before & after comma" , )
+              System.out.println("Hello World with space before and new line after comma" ,
+              )
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInMethodCallAndClosures() {
+        rewriteRun(
+          groovy(
+            """
+              foo('bar',) {}
+              foo('bar', {} , )
+              foo('bar', {} , ) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInMethodCallWithNamedParametersAndClosures() {
+        rewriteRun(
+          groovy(
+            """
+              foo(a: 'bar',) {}
+              foo(a: 'bar', {} , )
+              foo(a: 'bar', b: {} , )
+              foo('bar', b: {} , )
+              foo(a: 'bar', {} , ) {}
+              foo(a: 'bar', b: {} , ) {}
+              foo('bar', b: {} , ) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void noTrailingCommaInMethodCallWithNamedParametersAndClosures() {
+        rewriteRun(
+          groovy(
+            """
+              foo(a: 'bar') {}
+              foo(a: 'bar', {})
+              foo(a: 'bar', b: {})
+              foo('bar', b: {})
+              foo(a: 'bar', {} )
+              foo(a: 'bar', b: {} )
+              foo('bar', b: {} )
+              foo(a: 'bar', {} ) {}
+              foo(a: 'bar', b: {} ) {}
+              foo('bar', b: {} ) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInMethodCallWithNamedParameters() {
+        rewriteRun(
+          groovy(
+            """
+              foo(a: "Hello World with no extra space",)
+              foo(a: "Hello World with space before comma" ,)
+              foo(a: "Hello World with space after comma", )
+              foo(a: "Hello World with space before & after comma" , )
+              foo(a: "Hello World with space before and new line after comma" ,
+              )
+              """
+          )
+        );
+    }
+
+    @Test
+    void noTrailingCommaInMethodCallWithNamedParameters() {
+        rewriteRun(
+          groovy(
+            """
+              foo(a: "Hello World with no extra space")
+              foo(a: "Hello World with space after parameter" )
+              foo(a: "Hello World with new line after parameter"
+              )
               """
           )
         );

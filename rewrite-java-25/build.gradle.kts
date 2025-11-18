@@ -34,7 +34,6 @@ java {
 tasks.named("licenseFormat") { enabled = false }
 
 tasks.withType<JavaCompile>().configureEach {
-    // allows --add-exports to in spite of the JDK's restrictions on this
     sourceCompatibility = JavaVersion.VERSION_25.toString()
     targetCompatibility = JavaVersion.VERSION_25.toString()
 

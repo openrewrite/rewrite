@@ -15,6 +15,8 @@
  */
 package org.openrewrite.semver;
 
+import lombok.Getter;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
@@ -22,26 +24,17 @@ import org.openrewrite.internal.StringUtils;
 import java.util.Collection;
 import java.util.Optional;
 
+@With
+@Getter
 public class DependencyMatcher {
 
-    public static final String STANDARD_OPTION_DESCRIPTION =
-            "Dependency patterns are a concise way of describing which dependencies are applicable to a recipe. " +
-                    "Valid dependency patterns take one of these forms:\n\n" +
-                    "* groupId:artifactId\n" +
-                    "* groupId:artifactId:versionSelector\n" +
-                    "* groupId:artifactId:versionSelector/versionPattern\n\n" +
-                    "\"groupId\" and \"artifactId\" accept glob patterns.\n" +
-                    "\"versionSelector\" accepts both literal version numbers and semver selectors.\n" +
-                    "\"versionPattern\" is used for artifacts that encode variant/platform information in their version." +
-                    "Guava is a common example of such a library. Guava appends \"-jre\" or \"-android\" to its version to indicate platform compatibility.";
-
-    private final String groupPattern;
-    private final String artifactPattern;
+    private final @Nullable String groupPattern;
+    private final @Nullable String artifactPattern;
 
     @Nullable
     private final VersionComparator versionComparator;
 
-    public DependencyMatcher(String groupPattern, String artifactPattern, @Nullable VersionComparator versionComparator) {
+    public DependencyMatcher(@Nullable String groupPattern, @Nullable String artifactPattern, @Nullable VersionComparator versionComparator) {
         this.groupPattern = groupPattern;
         this.artifactPattern = artifactPattern;
         this.versionComparator = versionComparator;
@@ -74,13 +67,13 @@ public class DependencyMatcher {
         return Validated.valid("pattern", new DependencyMatcher(patternPieces[0], patternPieces[1], validatedVersion.getValue()));
     }
 
-    public boolean matches(@Nullable String groupId, String artifactId, String version) {
+    public boolean matches(@Nullable String groupId, @Nullable String artifactId, String version) {
         return StringUtils.matchesGlob(groupId, groupPattern) &&
                 StringUtils.matchesGlob(artifactId, artifactPattern) &&
                 (versionComparator == null || versionComparator.isValid(null, version));
     }
 
-    public boolean matches(@Nullable String groupId, String artifactId) {
+    public boolean matches(@Nullable String groupId, @Nullable String artifactId) {
         return StringUtils.matchesGlob(groupId, groupPattern) && StringUtils.matchesGlob(artifactId, artifactPattern);
     }
 

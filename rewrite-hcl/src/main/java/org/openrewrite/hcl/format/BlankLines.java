@@ -18,6 +18,7 @@ package org.openrewrite.hcl.format;
 import org.openrewrite.*;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.tree.Hcl;
+import org.openrewrite.style.Style;
 
 public class BlankLines extends Recipe {
 
@@ -39,17 +40,13 @@ public class BlankLines extends Recipe {
     private static class BlankLinesFromCompilationUnitStyle extends HclIsoVisitor<ExecutionContext> {
         @Override
         public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile configFile, ExecutionContext ctx) {
-            BlankLinesStyle style = configFile.getStyle(BlankLinesStyle.class);
-            if (style == null) {
-                style = BlankLinesStyle.DEFAULT;
-            }
+            BlankLinesStyle style = Style.from(BlankLinesStyle.class, configFile, () -> BlankLinesStyle.DEFAULT);
             return (Hcl.ConfigFile) new BlankLinesVisitor<>(style).visitNonNull(configFile, ctx);
         }
     }
 
     public static <H extends Hcl> H formatBlankLines(Hcl j, Cursor cursor) {
-        BlankLinesStyle style = cursor.firstEnclosingOrThrow(SourceFile.class)
-                .getStyle(BlankLinesStyle.class);
+        BlankLinesStyle style = Style.from(BlankLinesStyle.class, cursor.firstEnclosingOrThrow(SourceFile.class));
         //noinspection unchecked
         return (H) new BlankLinesVisitor<>(style == null ? BlankLinesStyle.DEFAULT : style)
                 .visitNonNull(j, 0, cursor);

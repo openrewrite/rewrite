@@ -32,7 +32,6 @@ java {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    // allows --add-exports to in spite of the JDK's restrictions on this
     sourceCompatibility = JavaVersion.VERSION_21.toString()
     targetCompatibility = JavaVersion.VERSION_21.toString()
 

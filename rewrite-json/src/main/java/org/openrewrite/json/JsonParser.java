@@ -64,7 +64,7 @@ public class JsonParser implements Parser {
     }
 
     @Override
-    public Stream<SourceFile> parse(@Language("Json") String... sources) {
+    public Stream<SourceFile> parse(@Language("json") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 

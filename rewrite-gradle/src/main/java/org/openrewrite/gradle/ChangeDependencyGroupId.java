@@ -19,22 +19,17 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -90,6 +85,7 @@ public class ChangeDependencyGroupId extends Recipe {
         return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
 
+            @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
             @Override
@@ -112,143 +108,12 @@ public class ChangeDependencyGroupId extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
-                        .configuration(configuration)
+                return GradleMultiDependency.matcher()
                         .groupId(groupId)
-                        .artifactId(artifactId);
-
-                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
-                    return m;
-                }
-
-                List<Expression> depArgs = m.getArguments();
-                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral) {
-                    m = updateDependency(m);
-                } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                        ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
-                                "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
-                    m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform)));
-                }
-
-                return m;
-            }
-
-            private J.MethodInvocation updateDependency(J.MethodInvocation m) {
-                List<Expression> depArgs = m.getArguments();
-                if (depArgs.get(0) instanceof J.Literal) {
-                    String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
-                    if (gav != null) {
-                        Dependency dependency = DependencyStringNotationConverter.parse(gav);
-                        if (dependency != null && !newGroupId.equals(dependency.getGroupId())) {
-                            Dependency newDependency = dependency.withGroupId(newGroupId);
-                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
-                        }
-                    }
-                } else if (depArgs.get(0) instanceof G.GString) {
-                    List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
-                    if (strings.size() >= 2 &&
-                            strings.get(0) instanceof J.Literal) {
-                        Dependency dependency = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) strings.get(0)).getValue()));
-                        if (dependency != null && !newGroupId.equals(dependency.getGroupId())) {
-                            Dependency newDependency = dependency.withGroupId(newGroupId);
-                            String replacement = newDependency.toStringNotation();
-                            m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
-                                G.GString gString = (G.GString) arg;
-                                return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
-                            }));
-                        }
-                    }
-                } else if (depArgs.get(0) instanceof G.MapEntry) {
-                    G.MapEntry groupEntry = null;
-                    String groupId = null;
-                    String artifactId = null;
-
-                    String versionStringDelimiter = "'";
-                    for (Expression e : depArgs) {
-                        if (!(e instanceof G.MapEntry)) {
-                            continue;
-                        }
-                        G.MapEntry arg = (G.MapEntry) e;
-                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                            continue;
-                        }
-                        J.Literal key = (J.Literal) arg.getKey();
-                        J.Literal value = (J.Literal) arg.getValue();
-                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                            continue;
-                        }
-                        String keyValue = (String) key.getValue();
-                        String valueValue = (String) value.getValue();
-                        if ("group".equals(keyValue) && !newGroupId.equals(valueValue)) {
-                            if (value.getValueSource() != null) {
-                                versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
-                            groupEntry = arg;
-                            groupId = valueValue;
-                        } else if ("name".equals(keyValue)) {
-                            artifactId = valueValue;
-                        }
-                    }
-                    if (groupId == null || artifactId == null) {
-                        return m;
-                    }
-                    String delimiter = versionStringDelimiter;
-                    G.MapEntry finalGroup = groupEntry;
-                    m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                        if (arg == finalGroup) {
-                            return finalGroup.withValue(((J.Literal) finalGroup.getValue())
-                                    .withValue(newGroupId)
-                                    .withValueSource(delimiter + newGroupId + delimiter));
-                        }
-                        return arg;
-                    }));
-                } else if (depArgs.get(0) instanceof G.MapLiteral) {
-                    G.MapLiteral map = (G.MapLiteral) depArgs.get(0);
-                    G.MapEntry groupEntry = null;
-                    String groupId = null;
-                    String artifactId = null;
-
-                    String versionStringDelimiter = "'";
-                    for (G.MapEntry arg : map.getElements()) {
-                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                            continue;
-                        }
-                        J.Literal key = (J.Literal) arg.getKey();
-                        J.Literal value = (J.Literal) arg.getValue();
-                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                            continue;
-                        }
-                        String keyValue = (String) key.getValue();
-                        String valueValue = (String) value.getValue();
-                        if ("group".equals(keyValue) && !newGroupId.equals(valueValue)) {
-                            if (value.getValueSource() != null) {
-                                versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
-                            groupEntry = arg;
-                            groupId = valueValue;
-                        } else if ("name".equals(keyValue)) {
-                            artifactId = valueValue;
-                        }
-                    }
-                    if (groupId == null || artifactId == null) {
-                        return m;
-                    }
-                    String delimiter = versionStringDelimiter;
-                    G.MapEntry finalGroup = groupEntry;
-                    m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                        G.MapLiteral mapLiteral = (G.MapLiteral) arg;
-                        return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> {
-                            if (e == finalGroup) {
-                                return finalGroup.withValue(((J.Literal) finalGroup.getValue())
-                                        .withValue(newGroupId)
-                                        .withValueSource(delimiter + newGroupId + delimiter));
-                            }
-                            return e;
-                        }));
-                    }));
-                }
-
-                return m;
+                        .artifactId(artifactId)
+                        .get(getCursor())
+                        .map(gmd -> gmd.map(gd -> gd.withDeclaredGroupId(newGroupId).getTree()))
+                        .orElse(m);
             }
 
             private GradleProject updateGradleModel(GradleProject gp) {

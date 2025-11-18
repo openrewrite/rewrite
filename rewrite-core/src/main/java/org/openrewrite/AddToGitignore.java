@@ -69,9 +69,9 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
         String pattern = getEffectiveFilePattern();
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visit(Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
-                    String sourcePath = ((SourceFile) tree).getSourcePath().toString();
+                    String sourcePath = PathUtils.separatorsToUnix(((SourceFile) tree).getSourcePath().toString());
                     // Check if this source file matches our target pattern
                     if (sourcePath.endsWith(".gitignore") && shouldNotCreate(sourcePath, pattern)) {
                         shouldCreate.set(false);
@@ -90,10 +90,9 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
     public Collection<? extends SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
             String pattern = getEffectiveFilePattern();
-            // Extract the path from the pattern for simple cases
             String path = patternToPathToCreate(pattern);
             return PlainTextParser.builder().build()
-                    .parse(entries)
+                    .parse("")
                     .map(text -> (SourceFile) text.withSourcePath(Paths.get(path)))
                     .collect(toList());
         }
@@ -123,9 +122,8 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean shouldCreate) {
         String pattern = getEffectiveFilePattern();
-        // Use the pattern directly for FindSourceFiles
         return Preconditions.check(new FindSourceFiles(pattern), new PlainTextVisitor<ExecutionContext>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
@@ -209,9 +207,8 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
             }
 
             private boolean isRedundantEntry(String entry, Set<String> existingWildcardPatterns) {
-                // Check if this entry would be redundant given existing wildcard patterns
                 for (String pattern : existingWildcardPatterns) {
-                    if (PathUtils.matchesGlob(Paths.get(entry), pattern)) {
+                    if (PathUtils.matchesGlob(entry, pattern)) {
                         return true;
                     }
                 }

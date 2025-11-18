@@ -224,6 +224,7 @@ public abstract class Recipe implements Cloneable {
             recipeList1.add(next.getDescriptor());
         }
         recipeList1.trimToSize();
+
         URI recipeSource;
         try {
             recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
@@ -253,7 +254,6 @@ public abstract class Recipe implements Cloneable {
                 value = null;
             }
             Option option = field.getAnnotation(Option.class);
-            //noinspection ConstantValue
             if (option != null) {
                 options.add(new OptionDescriptor(field.getName(),
                         field.getType().getSimpleName(),
@@ -269,7 +269,6 @@ public abstract class Recipe implements Cloneable {
         for (Method method : recipe.getClass().getDeclaredMethods()) {
             if (method.getName().startsWith("get") && method.getParameterCount() == 0) {
                 Option option = method.getAnnotation(Option.class);
-                //noinspection ConstantValue
                 if (option != null) {
                     options.add(new OptionDescriptor(StringUtils.uncapitalize(method.getName().substring(3)),
                             method.getReturnType().getSimpleName(),
@@ -286,7 +285,6 @@ public abstract class Recipe implements Cloneable {
             Constructor<?> c = RecipeIntrospectionUtils.getPrimaryConstructor(getClass());
             for (Parameter parameter : c.getParameters()) {
                 Option option = parameter.getAnnotation(Option.class);
-                //noinspection ConstantValue
                 if (option != null) {
                     options.add(new OptionDescriptor(parameter.getName(),
                             parameter.getType().getSimpleName(),
@@ -510,9 +508,9 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Override
-    public Object clone() {
+    public Recipe clone() {
         try {
-            return super.clone();
+            return (Recipe) super.clone();
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }

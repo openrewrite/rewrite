@@ -16,13 +16,13 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.Arrays;
 import java.util.Collection;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
@@ -72,7 +72,7 @@ public class IntelliJ extends NamedStyles {
 
     public static TabsAndIndentsStyle tabsAndIndents() {
         return new TabsAndIndentsStyle(false, 4, 4, 8, false,
-                new TabsAndIndentsStyle.MethodDeclarationParameters(true));
+                new TabsAndIndentsStyle.MethodDeclarationParameters(true), new TabsAndIndentsStyle.RecordComponents(true));
     }
 
     public static BlankLinesStyle blankLines() {
@@ -98,13 +98,18 @@ public class IntelliJ extends NamedStyles {
     }
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
-        return new WrappingAndBracesStyle(new WrappingAndBracesStyle.IfStatement(false),
+        return new WrappingAndBracesStyle(
+                120,
+                new WrappingAndBracesStyle.IfStatement(false),
+                new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList(), false),
+                new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),
                 new WrappingAndBracesStyle.Annotations(DoNotWrap),
                 new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                new WrappingAndBracesStyle.Annotations(DoNotWrap));
+                new WrappingAndBracesStyle.Annotations(DoNotWrap)
+        );
     }
 
 }

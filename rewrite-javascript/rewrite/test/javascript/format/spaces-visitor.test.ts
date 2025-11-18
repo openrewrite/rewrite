@@ -21,8 +21,10 @@ import {MarkersKind, NamedStyles, randomId, Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
 
-function spaces(customizer: StyleCustomizer<SpacesStyle>): SpacesStyle {
-    return produce(IntelliJ.TypeScript.spaces(), draft => customizer(draft));
+function spaces(customizer?: StyleCustomizer<SpacesStyle>): SpacesStyle {
+    return customizer
+        ? produce(IntelliJ.TypeScript.spaces(), draft => customizer(draft))
+        : IntelliJ.TypeScript.spaces();
 }
 
 describe('SpacesVisitor', () => {
@@ -50,8 +52,7 @@ describe('SpacesVisitor', () => {
     });
 
     test('spaces after export or import', () => {
-        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
-        })));
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -101,8 +102,7 @@ describe('SpacesVisitor', () => {
     });
 
     test('await', () => {
-        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
-        })));
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -117,8 +117,7 @@ describe('SpacesVisitor', () => {
     });
 
     test('types', () => {
-        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
-        })));
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript

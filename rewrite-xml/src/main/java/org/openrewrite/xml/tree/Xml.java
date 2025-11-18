@@ -878,4 +878,152 @@ public interface Xml extends Tree {
                     .collect(joining("")) + "%>";
         }
     }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    class JspScriptlet implements Xml, Content {
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @With
+        String prefixUnsafe;
+
+        @Override
+        public JspScriptlet withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        @Override
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
+
+        @With
+        Markers markers;
+
+        @With
+        String content;
+
+        @Override
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+            return v.visitJspScriptlet(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "<% " + content + " %>";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    class JspExpression implements Xml, Content {
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @With
+        String prefixUnsafe;
+
+        @Override
+        public JspExpression withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        @Override
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
+
+        @With
+        Markers markers;
+
+        @With
+        String content;
+
+        @Override
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+            return v.visitJspExpression(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "<%= " + content + " %>";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    class JspDeclaration implements Xml, Content, Misc {
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @With
+        String prefixUnsafe;
+
+        @Override
+        public JspDeclaration withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        @Override
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
+
+        @With
+        Markers markers;
+
+        @With
+        String content;
+
+        @Override
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+            return v.visitJspDeclaration(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "<%! " + content + " %>";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    class JspComment implements Xml, Content, Misc {
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @With
+        String prefixUnsafe;
+
+        @Override
+        public JspComment withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        @Override
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
+
+        @With
+        Markers markers;
+
+        @With
+        String content;
+
+        @Override
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+            return v.visitJspComment(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "<%-- " + content + " --%>";
+        }
+    }
 }

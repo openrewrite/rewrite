@@ -159,24 +159,6 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
         return types.toArray(new JavaType.FullyQualified[0]);
     }
 
-    private JavaType.@Nullable FullyQualified[] mapAnnotations(Type type) {
-        if (!type.isAnnotated()) {
-            return null;
-        }
-        List<JavaType.FullyQualified> annotations = new ArrayList<>();
-        for (TypeMetadata metadata : type.getMetadata()) {
-            if (metadata instanceof TypeMetadata.Annotations) {
-                for (Attribute.Compound annotation : ((TypeMetadata.Annotations) metadata).annotationBuffer().toArray(Attribute.Compound[]::new)) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(annotation.type));
-                    if (fq != null) {
-                        annotations.add(fq);
-                    }
-                }
-            }
-        }
-        return annotations.toArray(new JavaType.FullyQualified[0]);
-    }
-
     private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
         typeCache.put(signature, gtv);
@@ -475,7 +457,7 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             try {
                 // Ugly reflection solution, because AttrRecover$RecoveryErrorType is private inner class
                 for (Class<?> targetClass : Class.forName(AttrRecover.class.getCanonicalName()).getDeclaredClasses()) {
-                    if ("RecoveryErrorType".equals(targetClass.getSimpleName())) {
+                    if ("RecoveryErrorType".equals(targetClass.getSimpleName()) && targetClass.isInstance(selectType)) {
                         Field field = targetClass.getDeclaredField("candidateSymbol");
                         field.setAccessible(true);
                         return methodInvocationType(selectType.getOriginalType(), (Symbol) field.get(selectType));

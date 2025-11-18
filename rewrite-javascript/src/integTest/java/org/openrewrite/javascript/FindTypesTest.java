@@ -16,39 +16,25 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
-import org.openrewrite.javascript.tree.JSX;
 import org.openrewrite.test.RewriteTest;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
 class FindTypesTest implements RewriteTest {
-    //    @TempDir Path projectDir;
-    Path projectDir = Paths.get(".working-dir");
-
-    @BeforeEach
-    void before() {
-        if (!Files.exists(projectDir)) {
-            assertThat(projectDir.toFile().mkdirs()).isTrue();
-        }
-    }
-
     @AfterEach
     void after() {
         JavaScriptRewriteRpc.shutdownCurrent();
     }
 
     @Test
-    void findTypes() {
+    void findTypes(@TempDir Path projectDir) {
         rewriteRun(
           spec -> spec.recipe(new FindTypes("React.Component", true)),
           npm(
@@ -62,20 +48,12 @@ class FindTypesTest implements RewriteTest {
                 };
                 """,
               """
-                import { ClipLoader } from 'react-spinners';
+                import { /*~~>*/ClipLoader } from 'react-spinners';
                 
                 const App = () => {
                   return </*~~>*/ClipLoader color="#36d7b7" />;
                 };
-                """,
-              spec -> spec.beforeRecipe(cu -> {
-                  new JavaScriptIsoVisitor<Integer>() {
-                      @Override
-                      public JSX.Tag visitJsxTag(JSX.Tag tag, Integer p) {
-                          return super.visitJsxTag(tag, p);
-                      }
-                  }.visit(cu, 0);
-              })
+                """
             ),
             packageJson(
               """
@@ -83,7 +61,11 @@ class FindTypesTest implements RewriteTest {
                   "name": "test-project",
                   "version": "1.0.0",
                   "dependencies": {
-                    "react-spinners": "^0.13.8"
+                    "react": "^16.8.0",
+                    "react-spinners": "^0.5.0"
+                  },
+                  "devDependencies": {
+                    "@types/react": "^16.8.0"
                   }
                 }
                 """

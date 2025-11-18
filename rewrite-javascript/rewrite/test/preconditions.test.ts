@@ -20,6 +20,7 @@ import {FindIdentifierWithPathPrecondition, ConditionalFindIdentifier} from "../
 describe('Preconditions', () => {
     test('visitor precondition - should only mark identifiers in matching path', async () => {
         const spec = new RecipeSpec();
+        // @ts-expect-error Fixtures import from dist while types are from src, causing expected type mismatch
         spec.recipe = new FindIdentifierWithPathPrecondition({
             requiredPath: 'test.js',
             identifier: 'foo'
@@ -39,6 +40,7 @@ describe('Preconditions', () => {
 
     test('boolean precondition - should mark when true', async () => {
         const spec = new RecipeSpec();
+        // @ts-expect-error Fixtures import from dist while types are from src, causing expected type mismatch
         spec.recipe = new ConditionalFindIdentifier({
             shouldSearch: true,
             identifier: 'bar'
@@ -51,6 +53,7 @@ describe('Preconditions', () => {
 
     test('boolean precondition - should not mark when false', async () => {
         const spec = new RecipeSpec();
+        // @ts-expect-error Fixtures import from dist while types are from src, causing expected type mismatch
         spec.recipe = new ConditionalFindIdentifier({
             shouldSearch: false,
             identifier: 'bar'

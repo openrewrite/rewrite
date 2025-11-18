@@ -383,4 +383,175 @@ class GradleParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingCommaWithClosures() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+            foo('bar',) {}
+            foo('bar' , {} , )
+            foo('bar' , {} , ) {}
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void noTrailingCommaWithClosures() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+            foo('bar') {}
+            foo('bar' , {} )
+            foo('bar' , {} ) {}
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void trailingCommaWithNamedParameters() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+          // lang=groovy
+          """
+              foo(a: "Hello World with no extra space",)
+              foo(a: "Hello World with space before comma" ,)
+              foo(a: "Hello World with space after comma", )
+              foo(a: "Hello World with space before & after comma" , )
+              foo(a: "Hello World with space before and new line after comma" ,
+              )
+          """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void noTrailingCommaWithNamedParameters() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+          // lang=groovy
+          """
+              foo(a: "Hello World with no extra space")
+              foo(a: "Hello World with space after parameter" )
+              foo(a: "Hello World with new line after parameter"
+              )
+          """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void trailingCommaWithNamedParametersAndClosures() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+              foo(a: 'bar',) {}
+              foo(a: 'bar', {} , )
+              foo(a: 'bar', b: {} , )
+              foo('bar', b: {} , )
+              foo(a: 'bar', {} , ) {}
+              foo(a: 'bar', {} , {} , )
+              foo(a: 'bar', b: {} , ) {}
+              foo(a: 'bar', b: {} , {} , )
+              foo('bar', b: {} , ) {}
+              foo('bar', b: {} , {} , )
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void noTrailingCommaWithNamedParametersAndClosures() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+              foo(a: 'bar') {}
+              foo(a: 'bar', {})
+              foo(a: 'bar', b: {})
+              foo('bar', b: {})
+              foo(a: 'bar', {} )
+              foo(a: 'bar', b: {} )
+              foo('bar', b: {} )
+              foo(a: 'bar', {} ) {}
+              foo(a: 'bar', {} , {} )
+              foo(a: 'bar', b: {} ) {}
+              foo(a: 'bar', b: {} , {} )
+              foo('bar', b: {} ) {}
+              foo('bar', b: {} , {} )
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void trailingCommaWithNamedParametersComplicated() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+            task foo {
+              doLast {
+                bar.baz(
+                  a: 'fizbuz',
+                  b: 'buzfiz',
+                ) {
+                  c('d')
+                }
+              }
+            }
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void noTrailingCommaWithNamedParametersComplicated() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+            task foo {
+              doLast {
+                bar.baz(
+                  a: 'fizbuz',
+                  b: 'buzfiz'
+                ) {
+                  c('d')
+                }
+              }
+            }
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
 }

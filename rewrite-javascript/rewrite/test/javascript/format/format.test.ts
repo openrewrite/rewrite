@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
-import {AutoformatVisitor} from "../../../src/javascript/format";
+import {autoFormat, AutoformatVisitor, JavaScriptVisitor, typescript} from "../../../src/javascript";
 
 
 describe('AutoformatVisitor', () => {
@@ -100,7 +99,6 @@ describe('AutoformatVisitor', () => {
                     if (1 > 0) {
                         console.log("four", "three", "six");
                     }
-
                     let i = 1;
                     while (i < 4) {
                         i++;
@@ -112,7 +110,6 @@ describe('AutoformatVisitor', () => {
                     } finally {
                         console.log("finally");
                     }
-
                     const isTypeScriptFun = i > 3 ? "yes" : "hell yeah!";
                     for (let j = 1; j <= 5; j++) {
                         console.log(\`Number: \` + j);
@@ -135,10 +132,10 @@ describe('AutoformatVisitor', () => {
             }
             `)
             // @formatter:on
-        )});
+        )
+    });
 
     test('a statement following an if', () => {
-        // TODO not sure if there should be a newline after the if
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -150,11 +147,11 @@ describe('AutoformatVisitor', () => {
             `
             if (1 > 0) {
             }
-
             let i = 1;
             `)
             // @formatter:on
-        )});
+        )
+    });
 
     test('try catch-all', () => {
         return spec.rewriteRun(
@@ -175,7 +172,8 @@ describe('AutoformatVisitor', () => {
             }
             `)
             // @formatter:on
-        )});
+        )
+    });
 
     test('import', () => {
         return spec.rewriteRun(
@@ -184,5 +182,145 @@ describe('AutoformatVisitor', () => {
             typescript(`import { delta,gamma} from 'delta.js'`,
                  `import {delta, gamma} from 'delta.js'`)
             // @formatter:on
-        )});
+        )
+    });
+
+    test('object literal in a single line', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript("const x = { a: 1 };",
+                // TODO the leading space before `a` seems excessive
+                "const x = { a: 1};"
+                    // @formatter:on
+            ))
+    });
+
+    test('after unary not operator', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const b = ! true`,
+                `const b = !true`,
+            )
+            // @formatter:on
+        )
+    });
+
+    test('nested method invocation preserves indentation when formatting subtree', () => {
+        // This test simulates what happens when the templating system replaces a node
+        // and calls maybeAutoFormat() on just that subtree
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+                // Only format the logger.info() call, simulating a template replacement
+                if (methodInvocation.name?.simpleName === 'info') {
+                    // Format just this subtree (this is what causes the bug)
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent);
+                }
+                return super.visitMethodInvocation(methodInvocation, p);
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                function normalFunction() {
+                    logger.info("normal");
+                }
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('honor original lack of newline before function expression', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                "const x = function () { return 136; };",
+                `
+                const x = function () {
+                    return 136;
+                };
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('honor original newline before function expression', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const x =
+                    function () { return 136; };`,
+                `
+                const x =
+                    function () {
+                        return 136;
+                    };
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('class method', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                class A {
+                    m(): number {
+                        return 136;
+                    }
+                }`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('empty braces', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                "const c = typeof {} === 'object';"
+            )
+            // @formatter:on
+        )
+    });
+
+    test('empty class', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                "abstract class L {}",
+                `abstract class L {
+                }
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test.each([
+        // @formatter:off
+        `const short = {name: "Ivan Almeida", age: 36};`,
+        `const long = {make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true};`,
+        // @formatter:on
+        ])('do not wrap object literals - %s', async (code) => {
+        // TODO we might eventually implement the "Chop down if long" setting for this
+        return spec.rewriteRun(typescript(code));
+    });
 });

@@ -15,7 +15,12 @@
  */
 package org.openrewrite.rpc.request;
 
-import java.util.ArrayList;
+import lombok.Value;
 
-public class GenerateResponse extends ArrayList<String> {
+import java.util.List;
+
+@Value
+public class GenerateResponse {
+    List<String> ids;
+    List<String> sourceFileTypes;
 }

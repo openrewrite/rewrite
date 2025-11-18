@@ -21,16 +21,17 @@ import {Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
 
-function tabsAndIndents(customizer: StyleCustomizer<TabsAndIndentsStyle>): TabsAndIndentsStyle {
-    return produce(IntelliJ.TypeScript.tabsAndIndents(), draft => customizer(draft));
+function tabsAndIndents(customizer?: StyleCustomizer<TabsAndIndentsStyle>): TabsAndIndentsStyle {
+    return customizer
+        ? produce(IntelliJ.TypeScript.tabsAndIndents(), draft => customizer(draft))
+        : IntelliJ.TypeScript.tabsAndIndents();
 }
 
 describe('TabsAndIndentsVisitor', () => {
 
     test('simple', () => {
         const spec = new RecipeSpec()
-        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-        })));
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -48,7 +49,7 @@ describe('TabsAndIndentsVisitor', () => {
                     m() {
                         const z = 5;
                     }
-                }    
+                }
                 `)
             // @formatter:on
         )
@@ -56,8 +57,7 @@ describe('TabsAndIndentsVisitor', () => {
 
     test('indent', () => {
         const spec = new RecipeSpec()
-        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-        })));
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -77,7 +77,7 @@ describe('TabsAndIndentsVisitor', () => {
                 }
 
                 const alice = new Person("Alice", 30);
-                alice.greet();                
+                alice.greet();
                 `,
                 `
                 class Person {
@@ -95,7 +95,7 @@ describe('TabsAndIndentsVisitor', () => {
                 }
 
                 const alice = new Person("Alice", 30);
-                alice.greet();                    
+                alice.greet();
                 `)
             // @formatter:on
         )
@@ -103,8 +103,7 @@ describe('TabsAndIndentsVisitor', () => {
 
     test("not so simple", () => {
         const spec = new RecipeSpec()
-        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-        })));
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -184,8 +183,7 @@ describe('TabsAndIndentsVisitor', () => {
 
     test('lambda', () => {
         const spec = new RecipeSpec()
-        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-        })));
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -219,8 +217,7 @@ describe('TabsAndIndentsVisitor', () => {
 
     test("type", () => {
         const spec = new RecipeSpec()
-        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-        })));
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -241,8 +238,7 @@ describe('TabsAndIndentsVisitor', () => {
 
     test("multi-line callback", () => {
         const spec = new RecipeSpec()
-        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-        })));
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -263,8 +259,7 @@ describe('TabsAndIndentsVisitor', () => {
 
     test("single-line callback with braces", () => {
         const spec = new RecipeSpec()
-        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-        })));
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -275,8 +270,7 @@ describe('TabsAndIndentsVisitor', () => {
 
     test("single-line callback without braces", () => {
         const spec = new RecipeSpec()
-        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-        })));
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -284,4 +278,68 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     })
+
+    test("collapsed if/while", () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+               `
+                if (504 == 436)
+                console.log("That's practically true!");
+                if (407 == 501)
+                    console.log("Also true!");
+                while (!areWeThereYet())
+                 wait();
+                if (116 == 119) console.log("Close, but false. No changes");
+                function m(): void {
+                    if (condition())
+                        doSomething();
+                     else {
+                        doSomethingElse();
+                    }
+                }
+                `,
+                `
+                if (504 == 436)
+                    console.log("That's practically true!");
+                if (407 == 501)
+                    console.log("Also true!");
+                while (!areWeThereYet())
+                    wait();
+                if (116 == 119) console.log("Close, but false. No changes");
+                function m(): void {
+                    if (condition())
+                        doSomething();
+                    else {
+                        doSomethingElse();
+                    }
+                }
+                `,
+                )
+            // @formatter:on
+        )
+    })
+
+    test('unify indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                const good = 136;
+                 const great = 436;
+                  const ideal = 504;
+                `,
+                `
+                const good = 136;
+                const great = 436;
+                const ideal = 504;
+                `)
+            // @formatter:on
+        )
+    });
 });

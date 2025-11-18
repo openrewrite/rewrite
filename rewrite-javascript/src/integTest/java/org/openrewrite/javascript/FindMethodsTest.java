@@ -16,16 +16,14 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,31 +31,15 @@ import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
 class FindMethodsTest implements RewriteTest {
-    @TempDir
-    Path tempDir;
-
-    @BeforeEach
-    void before() {
-        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-            .recipeInstallDir(tempDir)
-            .log(tempDir.resolve("rpc.log"))
-            .verboseLogging()
-//          .inspectBrk()
-        );
-    }
-
     @AfterEach
-    void after() throws IOException {
+    void after() {
         JavaScriptRewriteRpc.shutdownCurrent();
-        if (Files.exists(tempDir.resolve("rpc.log"))) {
-            System.out.println(Files.readString(tempDir.resolve("rpc.log")));
-        }
     }
 
     @Test
     void findMethods(@TempDir Path projectDir) {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("@types/lodash..* max(..)", false))
+          spec -> spec.recipe(new FindMethods("_.LoDashStatic max(..)", false))
             .dataTable(MethodCalls.Row.class, rows ->
               assertThat(rows.stream().map(MethodCalls.Row::getMethod)).containsExactly("_.max(1, 2)")),
           npm(
@@ -102,6 +84,20 @@ class FindMethodsTest implements RewriteTest {
     }
 
     @Test
+    void splitWithTemplateString() {
+//        JavaScriptRewriteRpc.getOrStart().traceGetObject(false, true);
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.none())
+            .recipe(new FindMethods("*..* split(..)", false)),
+          javascript(
+            "'hello'.split(`; ${cookieName}=`)",
+            "/*~~>*/'hello'.split(`; ${cookieName}=`)"
+          )
+        );
+    }
+
+    @Test
     void insideRightPaddedStatement() {
         rewriteRun(
           spec -> spec.recipe(new FindMethods("node *(..)", false))
@@ -127,7 +123,7 @@ class FindMethodsTest implements RewriteTest {
     }
 
     @Test
-    void functionsAsDefaultExports() {
+    void nodeBuiltinModules() {
         rewriteRun(
           spec -> spec.recipe(new FindMethods("node assert(..)", false)),
           typescript(
@@ -139,6 +135,42 @@ class FindMethodsTest implements RewriteTest {
               import assert from 'node:assert';
               /*~~>*/assert('hello', 'world');
               """
+          )
+        );
+    }
+
+    @Test
+    void defaultExportFunctions(@TempDir Path projectDir) {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("express <default>(..)", false))
+            .dataTable(MethodCalls.Row.class, rows ->
+              assertThat(rows.stream().map(MethodCalls.Row::getMethod)).containsExactly("express()")),
+          npm(
+            projectDir,
+            typescript(
+              """
+                import express from 'express';
+                const app = express();
+                """,
+              """
+                import express from 'express';
+                const app = /*~~>*/express();
+                """
+            ),
+            packageJson(
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "express": "^4.18.2"
+                  },
+                  "devDependencies": {
+                    "@types/express": "^4.17.21"
+                  }
+                }
+                """
+            )
           )
         );
     }

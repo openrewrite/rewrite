@@ -19,7 +19,13 @@ export * from "./assertions";
 export * from "./parser";
 export * from "./style";
 export * from "./markers";
-export * from "./templating";
+export * from "./preconditions";
+export * from "./templating/index";
+export * from "./method-matcher";
+export * from "./format";
+
+export * from "./add-import";
+export * from "./remove-import";
 
 import "./print";
 import "./rpc";

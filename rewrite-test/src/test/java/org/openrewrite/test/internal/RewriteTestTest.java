@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.SourceSpecs.text;
 
 @SuppressWarnings("UnnecessarySemicolon")
@@ -139,21 +138,6 @@ class RewriteTestTest implements RewriteTest {
             .typeValidationOptions(TypeValidation.builder().immutableScanning(false).build())
             .recipe(new ScannerEdit()),
           text("foo")
-        );
-    }
-
-    @Test
-    void allowNonWhitespaceInWhitespace() {
-        rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
-          java(
-            """
-              import java.util.List;;
-              interface A {
-                  List<String> getList();
-              }
-              """
-          )
         );
     }
 }

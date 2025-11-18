@@ -28,13 +28,8 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.internal.TypesInUse;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.RpcCodec;
-import org.openrewrite.rpc.RpcReceiveQueue;
-import org.openrewrite.rpc.RpcSendQueue;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -52,7 +47,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
-public interface J extends Tree, RpcCodec<J> {
+public interface J extends Tree {
 
     @SuppressWarnings("unchecked")
     @Override
@@ -103,16 +98,6 @@ public interface J extends Tree, RpcCodec<J> {
         return StringUtils.trimIndent(print());
     }
 
-    @Override
-    default void rpcSend(J after, RpcSendQueue q) {
-        new JavaSender().visit(after, q);
-    }
-
-    @Override
-    default J rpcReceive(J before, RpcReceiveQueue q) {
-        return new JavaReceiver().visitNonNull(before, q);
-    }
-
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -152,7 +137,7 @@ public interface J extends Tree, RpcCodec<J> {
             List<J.Annotation> allAnnotations = annotations;
             List<J.Annotation> moreAnnotations;
             if (typeExpression instanceof FieldAccess &&
-                    !(moreAnnotations = ((FieldAccess) typeExpression).getName().getAnnotations()).isEmpty()) {
+                !(moreAnnotations = ((FieldAccess) typeExpression).getName().getAnnotations()).isEmpty()) {
                 if (allAnnotations.isEmpty()) {
                     allAnnotations = moreAnnotations;
                 } else {
@@ -2141,8 +2126,8 @@ public interface J extends Tree, RpcCodec<J> {
 
         public boolean isFullyQualifiedClassReference(String className) {
             if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
-                    !(getName().getType() instanceof JavaType.Unknown) &&
-                    TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
+                !(getName().getType() instanceof JavaType.Unknown) &&
+                TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
                 return true;
             } else if (!className.contains(".")) {
                 return false;
@@ -2982,7 +2967,7 @@ public interface J extends Tree, RpcCodec<J> {
                 String name = part.getSimpleName();
                 if (part.getTarget() instanceof J.Identifier) {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
-                            "." + name);
+                                       "." + name);
                     break;
                 } else if (part.getTarget() instanceof J.FieldAccess) {
                     part = (FieldAccess) part.getTarget();
@@ -4081,8 +4066,8 @@ public interface J extends Tree, RpcCodec<J> {
         @Override
         public String toString() {
             return "MethodDeclaration{" +
-                    (getMethodType() == null ? "unknown" : getMethodType()) +
-                    "}";
+                   (getMethodType() == null ? "unknown" : getMethodType()) +
+                   "}";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -5779,7 +5764,7 @@ public interface J extends Tree, RpcCodec<J> {
         Expression expression;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return clazz.getType();
         }
 
@@ -6298,15 +6283,15 @@ public interface J extends Tree, RpcCodec<J> {
             public Cursor getDeclaringScope(Cursor cursor) {
                 return cursor.dropParentUntil(it ->
                         it instanceof J.Block ||
-                                it instanceof J.Lambda ||
-                                it instanceof J.MethodDeclaration ||
-                                it == Cursor.ROOT_VALUE);
+                        it instanceof J.Lambda ||
+                        it instanceof J.MethodDeclaration ||
+                        it == Cursor.ROOT_VALUE);
             }
 
             public boolean isField(Cursor cursor) {
                 Cursor declaringScope = getDeclaringScope(cursor);
                 return declaringScope.getValue() instanceof J.Block &&
-                        declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                       declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {

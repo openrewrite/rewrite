@@ -38,7 +38,7 @@ class ChangeMethodNameTest implements RewriteTest {
     void changeMethodName(@TempDir Path projectDir) {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodName(
-            "@types/lodash..* max(..)", "maximum",
+            "_.LoDashStatic max(..)", "maximum",
             false, false)),
           npm(
             projectDir,

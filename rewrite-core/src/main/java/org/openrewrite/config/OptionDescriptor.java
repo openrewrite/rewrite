@@ -32,11 +32,9 @@ public class OptionDescriptor {
     @EqualsAndHashCode.Include
     String type;
 
-    @Nullable
     @NlsRewrite.DisplayName
     String displayName;
 
-    @Nullable
     @NlsRewrite.Description
     String description;
 

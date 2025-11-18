@@ -338,6 +338,155 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5972")
+    @Test
+    void insertAtRootMultiDocumentYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "spec: 0",
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              ---
+              configuration: prod
+              """,
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              spec: 0
+              ---
+              configuration: prod
+              spec: 0
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5972")
+    @Test
+    void insertAtRootMultiDocumentYamlWithExplicitEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "spec: 0",
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              configuration: prod
+              ...
+              """,
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              configuration: prod
+              spec: 0
+              ...
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5972")
+    @Test
+    void insertAtRootMultiDocumentYamlWithExplicitStartAndEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "spec: 0",
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              ---
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              configuration: prod
+              ...
+              """,
+            """
+              ---
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              configuration: prod
+              spec: 0
+              ...
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5972")
+    @Test
+    void insertAtRootMultipleDocumentsYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "newKey: newValue",
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              ---
+              doc1: first
+              ...
+              ---
+              doc2: second
+              ...
+              
+              ---
+              doc3: third
+              ...
+              """,
+            """
+              ---
+              doc1: first
+              newKey: newValue
+              ...
+              ---
+              doc2: second
+              newKey: newValue
+              ...
+              
+              ---
+              doc3: third
+              newKey: newValue
+              ...
+              """
+          )
+        );
+    }
+
     @Test
     void insertInSequenceEntries() {
         rewriteRun(
