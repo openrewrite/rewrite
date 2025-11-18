@@ -89,7 +89,7 @@ export abstract class Recipe {
     }
 
     async descriptor(): Promise<RecipeDescriptor> {
-        const optionsRecord: Record<string, OptionDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
+        const optionsRecord: Record<string, OptionAnnotationDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
         return {
             name: this.name,
             displayName: this.displayName,
@@ -98,12 +98,39 @@ export abstract class Recipe {
             tags: this.tags,
             estimatedEffortPerOccurrence: this.estimatedEffortPerOccurrence,
             recipeList: await mapAsync(await this.recipeList(), async r => r.descriptor()),
-            options: Object.entries(optionsRecord).map(([key, descriptor]) => ({
-                name: key,
-                value: (this as any)[key],
-                required: descriptor.required ?? true,
-                ...descriptor
-            }))
+            options: Object.entries(optionsRecord).map(([key, descriptor]) => {
+                var t = Reflect.getMetadata("design:type", this, key);
+                var simplifiedType = t?.name ?? "string";
+                switch(t.name) {
+                    case "String": {
+                        simplifiedType = "string";
+                        break;
+                    }
+                    case "Boolean": {
+                        simplifiedType = "boolean";
+                        break;
+                    }
+                    case "Number": {
+                        simplifiedType = "number";
+                        break;
+                    }
+                    case "Symbol": {
+                        simplifiedType = "symbol";
+                        break;
+                    }
+                    case "Object": {
+                        simplifiedType = "object";
+                        break;
+                    }
+                }
+                return {
+                    name: key,
+                    value: (this as any)[key],
+                    required: descriptor.required ?? true,
+                    type: simplifiedType,
+                    ...descriptor
+                };
+            })
         }
     }
 
@@ -224,30 +251,6 @@ export class RecipeRegistry {
 
 export function Option(descriptor: OptionAnnotationDescriptor) {
     return function (target: any, propertyKey: string) {
-        var t = Reflect.getMetadata("design:type", target, propertyKey);
-        var simplifiedType = t.name;
-        switch(t.name) {
-            case "String": {
-                simplifiedType = "string";
-                break;
-            }
-            case "Boolean": {
-                simplifiedType = "boolean";
-                break;
-            }
-            case "Number": {
-                simplifiedType = "number";
-                break;
-            }
-            case "Symbol": {
-                simplifiedType = "symbol";
-                break;
-            }
-            case "Object": {
-                simplifiedType = "object";
-                break;
-            }
-        }
         // Ensure the constructor has options storage.
         if (!target.constructor.hasOwnProperty(OPTIONS_KEY)) {
             Object.defineProperty(target.constructor, OPTIONS_KEY, {
@@ -258,10 +261,7 @@ export function Option(descriptor: OptionAnnotationDescriptor) {
         }
 
         // Register the option metadata under the property key.
-        target.constructor[OPTIONS_KEY][propertyKey] = {
-            ...descriptor,
-            type: simplifiedType
-        } as OptionDescriptor;
+        target.constructor[OPTIONS_KEY][propertyKey] = descriptor;
     };
 }
 
