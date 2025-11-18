@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isJavaScript, JS} from "./tree";
+import {isJavaScript, JS, JSX} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {Comment, isJava, J, Statement} from "../java";
 import {Draft, produce} from "immer";
@@ -60,6 +60,7 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
                 return undefined;
             }
         }
+
         return t;
     }
 }
@@ -1122,7 +1123,9 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         let indentShouldIncrease =
             tree.kind === J.Kind.Block
             || this.cursor.parent?.parent?.parent?.value.kind == J.Kind.Case
-            || (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration && tree.prefix.whitespace.includes("\n"));
+            || (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration && tree.prefix.whitespace.includes("\n"))
+            || tree.kind === JS.Kind.JsxTag;
+
 
         const previousIndent = this.currentIndent;
 
@@ -1130,6 +1133,10 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             this.cursor.messages.set("indentToUse", this.cursor.getNearestMessage("else-indent"));
         } else if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
+        }
+
+        if (tree.kind === JS.Kind.JsxTag) {
+            this.cursor.messages.set("jsxTagIndent", this.currentIndent);
         }
 
         if (tree.kind === J.Kind.IfElse && this.cursor.messages.get("else-indent") !== undefined) {
@@ -1170,11 +1177,27 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             if (forLoop.body.element.kind !== J.Kind.Block) {
                 indentShouldIncrease = true;
             }
+        } else if (tree.kind === JS.Kind.JsxTag) {
+            indentShouldIncrease = true;
         }
         if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
         }
 
+        return ret;
+    }
+
+    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+        const ret = await super.visitSpace(space, p);
+        if (space.whitespace.includes("\n")) {
+            let parentCursor = this.cursor.parent;
+            while (parentCursor != null && parentCursor.value.kind !== JS.Kind.JsxTag) {
+                parentCursor = parentCursor.parent;
+            }
+            if (parentCursor && parentCursor.value.kind === JS.Kind.JsxTag) {
+                parentCursor.messages.set("jsxTagWithNewline", true)
+            }
+        }
         return ret;
     }
 
@@ -1233,6 +1256,24 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
             this.cursor?.root.messages.set("stop", true);
         }
-        return super.postVisit(tree, p);
+        let treeChanged = tree;
+        if (tree.kind == JS.Kind.JsxTag) {
+            const tag = tree as JSX.Tag;
+            if (this.cursor.messages.get("jsxTagWithNewline")) {
+                const jsxTagIndent = this.cursor.messages.get("jsxTagIndent");
+                if (jsxTagIndent) {
+                    this.cursor.messages.delete("jsxTagWithNewline");
+                    treeChanged = produce(tag, draft => {
+                        if (draft.children) {
+                            const lastChild = draft.children[draft.children.length - 1];
+                            if (lastChild.kind === J.Kind.Literal) {
+                                lastChild.prefix.whitespace = this.combineIndent(lastChild.prefix.whitespace, jsxTagIndent);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        return super.postVisit(treeChanged, p);
     }
 }
