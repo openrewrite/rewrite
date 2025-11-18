@@ -85,7 +85,7 @@ export class RewriteRpc {
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
-            this.localRefs, options?.batchSize || 2000, traceGetObject, options.metricsCsv);
+            this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
         GetRecipes.handle(this.connection, registry, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes, options.metricsCsv);

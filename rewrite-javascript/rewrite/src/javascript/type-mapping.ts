@@ -25,7 +25,8 @@ class NonDraftableType {
 
 export class JavaScriptTypeMapping {
     // Use TypeScript type objects as cache keys - relies on TypeScript's own reuse strategy
-    private readonly typeCache: Map<ts.Type | string | number, Type> = new Map();
+    private readonly typeCache: Map<ts.Type, Type> = new Map();
+    private readonly methodCache: Map<ts.Signature, Type.Method> = new Map();
     private readonly regExpSymbol: ts.Symbol | undefined;
     private readonly stringWrapperType: ts.Type | undefined;
     private readonly numberWrapperType: ts.Type | undefined;
@@ -72,10 +73,6 @@ export class JavaScriptTypeMapping {
     }
 
     private getType(type: ts.Type): Type {
-        return this.getTypeImpl(type);
-    }
-
-    private getTypeImpl(type: ts.Type): Type {
         // Check for error types first - these indicate type-checking failures
         // and should not be processed further
         if (type.flags & ts.TypeFlags.Any) {
@@ -115,57 +112,58 @@ export class JavaScriptTypeMapping {
 
         // IMPORTANT: Check if this is a type reference to a parameterized type FIRST
         // This needs to happen AFTER alias symbol cache check to properly extract type arguments
-        const objectType = type as ts.ObjectType;
-        const isTypeReference = objectType.objectFlags & ts.ObjectFlags.Reference;
+        if (type.flags & ts.TypeFlags.Object) {
+            const objectType = type as ts.ObjectType;
+            const isTypeReference = objectType.objectFlags & ts.ObjectFlags.Reference;
 
-        if (isTypeReference) {
-            const typeRef = type as ts.TypeReference;
-            const hasTypeArgs = typeRef.typeArguments && typeRef.typeArguments.length > 0;
+            if (isTypeReference) {
+                const typeRef = type as ts.TypeReference;
+                const hasTypeArgs = typeRef.typeArguments && typeRef.typeArguments.length > 0;
 
-            if (hasTypeArgs) {
-                // This is a parameterized type reference (e.g., RefObject<HTMLButtonElement>)
-                // Extract the base class type and type arguments to create a Parameterized type
+                if (hasTypeArgs) {
+                    // This is a parameterized type reference (e.g., RefObject<HTMLButtonElement>)
+                    // Extract the base class type and type arguments to create a Parameterized type
 
-                // IMPORTANT: Check if the type arguments are actually type parameters (unsubstituted)
-                // This happens when TypeScript expands type aliases but doesn't substitute the type parameters
-                // For example, React.Ref<HTMLButtonElement> expands to RefObject<T> | RefCallback<T> | null
-                // instead of RefObject<HTMLButtonElement> | RefCallback<HTMLButtonElement> | null
-                const hasUnsubstitutedTypeParams = typeRef.typeArguments!.some((arg: any) =>
-                    (arg as ts.Type).flags & ts.TypeFlags.TypeParameter
-                );
+                    // IMPORTANT: Check if the type arguments are actually type parameters (unsubstituted)
+                    // This happens when TypeScript expands type aliases but doesn't substitute the type parameters
+                    // For example, React.Ref<HTMLButtonElement> expands to RefObject<T> | RefCallback<T> | null
+                    // instead of RefObject<HTMLButtonElement> | RefCallback<HTMLButtonElement> | null
+                    const hasUnsubstitutedTypeParams = typeRef.typeArguments!.some((arg: any) =>
+                        (arg as ts.Type).flags & ts.TypeFlags.TypeParameter
+                    );
 
-                if (!hasUnsubstitutedTypeParams) {
-                    // Only create parameterized type if type arguments are actual types, not type parameters
-                    // Reuse symbol from line 76
+                    if (!hasUnsubstitutedTypeParams) {
+                        // Only create parameterized type if type arguments are actual types, not type parameters
 
-                    if (symbol && (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias))) {
-                        const declaredType = this.checker.getDeclaredTypeOfSymbol(symbol);
+                        if (symbol && (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias))) {
+                            const declaredType = this.checker.getDeclaredTypeOfSymbol(symbol);
 
-                        // Get or create the base class type (this gets cached)
-                        let classType = this.typeCache.get(declaredType) as Type.Class | undefined;
-                        if (!classType) {
-                            classType = this.createEmptyClassType(declaredType);
-                            this.typeCache.set(declaredType, classType);
-                            this.populateClassType(classType, declaredType);
-                        }
-
-                        // Create the parameterized type wrapper - DON'T cache it
-                        // Each type reference is unique, so create fresh Parameterized wrappers
-                        const typeParameters: Type[] = [];
-                        for (const typeArg of typeRef.typeArguments!) {
-                            const resolvedArg = this.getType(typeArg as ts.Type);
-                            typeParameters.push(resolvedArg);
-                        }
-
-                        return Object.assign(new NonDraftableType(), {
-                            kind: Type.Kind.Parameterized,
-                            type: classType,
-                            typeParameters: typeParameters,
-                            fullyQualifiedName: classType.fullyQualifiedName,
-                            toJSON: function () {
-                                return Type.signature(this);
+                            // Get or create the base class type (this gets cached)
+                            let classType = this.typeCache.get(declaredType) as Type.Class | undefined;
+                            if (!classType) {
+                                classType = this.createEmptyClassType(declaredType);
+                                this.typeCache.set(declaredType, classType);
+                                this.populateClassType(classType, declaredType);
                             }
-                        }) as Type.Parameterized;
+
+                            // Create the parameterized type wrapper - DON'T cache it
+                            // Each type reference is unique, so create fresh Parameterized wrappers
+                            const typeParameters: Type[] = [];
+                            for (const typeArg of typeRef.typeArguments!) {
+                                const resolvedArg = this.getType(typeArg as ts.Type);
+                                typeParameters.push(resolvedArg);
+                            }
+
+                            return Object.assign(new NonDraftableType(), {
+                                kind: Type.Kind.Parameterized,
+                                type: classType,
+                                typeParameters: typeParameters,
+                                fullyQualifiedName: classType.fullyQualifiedName,
+                                toJSON: function () {
+                                    return Type.signature(this);
+                                }
+                            }) as Type.Parameterized;
+                        }
                     }
                 }
             }
@@ -307,20 +305,9 @@ export class JavaScriptTypeMapping {
         name: string,
         declaredFormalTypeNames: string[] = []
     ): Type.Method {
-        // Use TypeScript's internal signature ID for caching if available
-        // This avoids calling getParameters() or other operations that might trigger recursion
-        let methodCacheKey: string | number;
-        if ("id" in signature && signature.id !== undefined) {
-            methodCacheKey = `method:${signature.id as number}`;
-        } else {
-            // Fallback: use declaring type + name (less precise but safer)
-            const declaringTypeName = Type.isFullyQualified(declaringType)
-                ? (declaringType.kind === Type.Kind.Class ? (declaringType as Type.Class).fullyQualifiedName : '<unknown>')
-                : 'unknown';
-            methodCacheKey = `method:${declaringTypeName}.${name}`;
-        }
-
-        const cached = this.typeCache.get(methodCacheKey) as Type.Method | undefined;
+        // Use signature object directly as cache key
+        // TypeScript's Compiler API reuses signature objects, giving us ~74% cache hit rate
+        const cached = this.methodCache.get(signature);
         if (cached) {
             return cached;
         }
@@ -354,16 +341,16 @@ export class JavaScriptTypeMapping {
             }
         }) as Type.Method;
 
-        this.typeCache.set(methodCacheKey, method);
+        this.methodCache.set(signature, method);
         return method;
     }
 
     private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
-        if (declaringType == Type.Primitive.String && this.stringWrapperType) {
+        if (declaringType === Type.Primitive.String && this.stringWrapperType) {
             return this.getType(this.stringWrapperType) as Type.FullyQualified;
-        } else if ((declaringType == Type.Primitive.Double || declaringType == Type.Primitive.BigInt) && this.numberWrapperType) {
+        } else if ((declaringType === Type.Primitive.Double || declaringType === Type.Primitive.BigInt) && this.numberWrapperType) {
             return this.getType(this.numberWrapperType) as Type.FullyQualified;
-        } else if (declaringType == Type.Primitive.Boolean && this.booleanWrapperType) {
+        } else if (declaringType === Type.Primitive.Boolean && this.booleanWrapperType) {
             return this.getType(this.booleanWrapperType) as Type.FullyQualified;
         } else {
             // This should not really happen, but we'll fallback to unknown if needed
@@ -522,18 +509,18 @@ export class JavaScriptTypeMapping {
                 methodName = node.expression.getText();
 
                 // Check if this is an import first
-                const symbol = this.checker.getSymbolAtLocation(node.expression);
+                const exprSymbol = this.checker.getSymbolAtLocation(node.expression);
                 let moduleSpecifier: string | undefined;
                 let aliasedSymbol: ts.Symbol | undefined;
 
-                if (symbol) {
+                if (exprSymbol) {
                     // Check if this is an aliased symbol (i.e., an import)
-                    if (symbol.flags & ts.SymbolFlags.Alias) {
-                        aliasedSymbol = this.checker.getAliasedSymbol(symbol);
+                    if (exprSymbol.flags & ts.SymbolFlags.Alias) {
+                        aliasedSymbol = this.checker.getAliasedSymbol(exprSymbol);
                     }
 
                     // If getAliasedSymbol returns something different, it's an import
-                    if (aliasedSymbol && aliasedSymbol !== symbol) {
+                    if (aliasedSymbol && aliasedSymbol !== exprSymbol) {
                         // This is definitely an imported symbol
                         const aliasedParentSymbol = (aliasedSymbol as any).parent as ts.Symbol | undefined;
 
@@ -544,8 +531,8 @@ export class JavaScriptTypeMapping {
                             moduleSpecifier = aliasedParentSymbol.name;
                         } else {
                             // Now find the import declaration to get the module specifier
-                            if (symbol.declarations && symbol.declarations.length > 0) {
-                                let importNode: ts.Node = symbol.declarations[0];
+                            if (exprSymbol.declarations && exprSymbol.declarations.length > 0) {
+                                let importNode: ts.Node = exprSymbol.declarations[0];
 
                                 // Traverse up to find the ImportDeclaration
                                 while (importNode && !ts.isImportDeclaration(importNode)) {
@@ -966,43 +953,23 @@ export class JavaScriptTypeMapping {
         }
 
         // Check for primitive types
-        if (type.flags === ts.TypeFlags.Null) {
+        // Note: Using bitwise & instead of === for robustness, as TypeScript may assign
+        // multiple flags to a single type (e.g., Boolean + Union)
+        if (type.flags & ts.TypeFlags.Null) {
             return Type.Primitive.Null;
-        } else if (type.flags === ts.TypeFlags.Undefined) {
+        } else if (type.flags & ts.TypeFlags.Undefined) {
             return Type.Primitive.None;
-        } else if (
-            type.flags === ts.TypeFlags.Number ||
-            type.flags === ts.TypeFlags.NumberLiteral ||
-            type.flags === ts.TypeFlags.NumberLike
-        ) {
+        } else if (type.flags & (ts.TypeFlags.Number | ts.TypeFlags.NumberLiteral | ts.TypeFlags.NumberLike)) {
             return Type.Primitive.Double;
-        } else if (
-            type.flags === ts.TypeFlags.String ||
-            type.flags === ts.TypeFlags.StringLiteral ||
-            type.flags === ts.TypeFlags.StringLike
-        ) {
+        } else if (type.flags & (ts.TypeFlags.String | ts.TypeFlags.StringLiteral | ts.TypeFlags.StringLike)) {
             return Type.Primitive.String;
-        } else if (type.flags === ts.TypeFlags.Void) {
+        } else if (type.flags & ts.TypeFlags.Void) {
             return Type.Primitive.Void;
-        } else if (
-            type.flags === ts.TypeFlags.BigInt ||
-            type.flags === ts.TypeFlags.BigIntLiteral ||
-            type.flags === ts.TypeFlags.BigIntLike
-        ) {
+        } else if (type.flags & (ts.TypeFlags.BigInt | ts.TypeFlags.BigIntLiteral | ts.TypeFlags.BigIntLike)) {
             return Type.Primitive.BigInt;
         } else if (type.symbol !== undefined && type.symbol === this.regExpSymbol) {
             return Type.Primitive.String;
-        }
-
-        /**
-         * TypeScript may assign multiple flags to a single type (e.g., Boolean + Union).
-         * Using a bitwise check ensures we detect Boolean even if other flags are set.
-         */
-        if (
-            type.flags & ts.TypeFlags.Boolean ||
-            type.flags & ts.TypeFlags.BooleanLiteral ||
-            type.flags & ts.TypeFlags.BooleanLike
-        ) {
+        } else if (type.flags & (ts.TypeFlags.Boolean | ts.TypeFlags.BooleanLiteral | ts.TypeFlags.BooleanLike)) {
             return Type.Primitive.Boolean;
         }
 
