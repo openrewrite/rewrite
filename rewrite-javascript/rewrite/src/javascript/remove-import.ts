@@ -6,16 +6,16 @@ import {ElementRemovalFormatter} from "../java/formatting-utils";
 
 /**
  * @param visitor The visitor to add the import removal to
- * @param target Either the module name (e.g., 'fs') to remove specific members from,
- *               or the name of the import to remove entirely
+ * @param module The module name (e.g., 'fs', 'react') to remove imports from
  * @param member Optionally, the specific member to remove from the import.
- *               If not specified, removes the import matching `target`.
+ *               If not specified, removes all unused imports from the module.
  *               Special values:
- *               - 'default': Removes the default import from the target module if unused,
+ *               - 'default': Removes the default import from the module if unused,
  *                 regardless of its local name (e.g., `import React from 'react'`)
+ *               - '*': Removes the namespace import if unused (e.g., `import * as fs from 'fs'`)
  *
  * @example
- * // Remove a named import if unused
+ * // Remove a specific named import if unused
  * maybeRemoveImport(visitor, 'fs', 'readFile');
  *
  * @example
@@ -23,16 +23,20 @@ import {ElementRemovalFormatter} from "../java/formatting-utils";
  * maybeRemoveImport(visitor, 'react', 'default');
  *
  * @example
- * // Remove an import by name if unused (no module specified)
- * maybeRemoveImport(visitor, 'fs');
+ * // Remove all unused imports from 'react' module
+ * maybeRemoveImport(visitor, 'react');
+ *
+ * @example
+ * // Remove namespace import if unused
+ * maybeRemoveImport(visitor, 'fs', '*');
  */
-export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, target: string, member?: string) {
+export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: string, member?: string) {
     for (const v of visitor.afterVisit || []) {
-        if (v instanceof RemoveImport && v.target === target && v.member === member) {
+        if (v instanceof RemoveImport && v.module === module && v.member === member) {
             return;
         }
     }
-    visitor.afterVisit.push(new RemoveImport(target, member));
+    visitor.afterVisit.push(new RemoveImport(module, member));
 }
 
 // Type alias for RightPadded elements to simplify type signatures
@@ -45,15 +49,15 @@ type RightPaddedElement<T extends J> = {
 
 export class RemoveImport<P> extends JavaScriptVisitor<P> {
     /**
-     * @param target Either the module name (e.g., 'fs') to remove specific members from,
-     *               or the name of the import to remove entirely
+     * @param module The module name (e.g., 'fs', 'react') to remove imports from
      * @param member Optionally, the specific member to remove from the import.
-     *               If not specified, removes the import matching `target`.
+     *               If not specified, removes all unused imports from the module.
      *               Special values:
-     *               - 'default': Removes the default import from the target module if unused,
+     *               - 'default': Removes the default import from the module if unused,
      *                 regardless of its local name
+     *               - '*': Removes the namespace import if unused
      */
-    constructor(readonly target: string,
+    constructor(readonly module: string,
                 readonly member?: string) {
         super();
     }
@@ -245,7 +249,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const name = identifier.simpleName;
 
                 // Check if we should remove this default import
-                let shouldRemove = false;
+                let shouldRemove: boolean;
                 if (this.member === 'default') {
                     // Special case: member 'default' means remove any default import from the target module if unused
                     shouldRemove = !usedIdentifiers.has(name) && !usedTypes.has(name);
@@ -425,22 +429,17 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
      * Check if the module name matches the target module
      */
     private matchesTargetModule(moduleName: string): boolean {
-        return this.member === undefined ? moduleName === this.target : moduleName === this.target;
+        return moduleName === this.module;
     }
 
     /**
      * Check if an identifier should be removed based on usage
      */
     private shouldRemoveIdentifier(name: string, usedIdentifiers: Set<string>, usedTypes: Set<string>): boolean {
-        // If member is specified, we're removing a specific member
-        if (this.member !== undefined) {
-            // Only remove if the identifier is not used
-            return !usedIdentifiers.has(name) && !usedTypes.has(name);
-        } else {
-            // We're removing based on the target name
-            // Check if the name matches and is not used
-            return this.target === name && !usedIdentifiers.has(name) && !usedTypes.has(name);
-        }
+        // For CommonJS and import-equals-require, we're removing the entire import
+        // if the identifier is not used (member is typically undefined for these cases,
+        // or we're checking if a specific binding is used)
+        return !usedIdentifiers.has(name) && !usedTypes.has(name);
     }
 
     private async processNamedImports(
@@ -681,40 +680,32 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         usedIdentifiers: Set<string>,
         usedTypes: Set<string>
     ): boolean {
-        // If member is specified, we're removing a specific member from a module
+        // If member is specified, we're removing a specific member from the module
         if (this.member !== undefined) {
             // Only remove if this is the specific member we're looking for
             if (this.member !== name) {
                 return false;
             }
-        } else {
-            // If no member specified, we're removing based on the import name itself
-            if (this.target !== name) {
-                return false;
-            }
         }
+        // If no member specified, we're removing all unused imports from the module
+        // So we check if this particular import is unused
 
         // Check if it's used
         return !(usedIdentifiers.has(name) || usedTypes.has(name));
     }
 
     private isTargetModule(jsImport: JS.Import): boolean {
-        // If member is specified, we're looking for imports from a specific module
-        if (this.member !== undefined) {
-            const moduleSpecifier = jsImport.moduleSpecifier?.element;
-            if (!moduleSpecifier || moduleSpecifier.kind !== J.Kind.Literal) {
-                return false;
-            }
-
-            const literal = moduleSpecifier as J.Literal;
-            const moduleName = literal.value?.toString().replace(/['"`]/g, '');
-
-            // Match the module name
-            return moduleName === this.target;
+        // Always check if the import is from the specified module
+        const moduleSpecifier = jsImport.moduleSpecifier?.element;
+        if (!moduleSpecifier || moduleSpecifier.kind !== J.Kind.Literal) {
+            return false;
         }
 
-        // If no member specified, we process all imports to check their names
-        return true;
+        const literal = moduleSpecifier as J.Literal;
+        const moduleName = literal.value?.toString().replace(/['"`]/g, '');
+
+        // Match the module name
+        return moduleName === this.module;
     }
 
     /**

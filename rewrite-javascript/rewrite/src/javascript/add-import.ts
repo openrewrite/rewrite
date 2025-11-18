@@ -13,13 +13,13 @@ export enum ImportStyle {
 }
 
 export interface AddImportOptions {
-    /** The module name (e.g., 'fs') to import from */
-    target: string;
+    /** The module name (e.g., 'fs', 'react') to import from */
+    module: string;
 
     /** Optionally, the specific member to import from the module.
      * If not specified, adds a default import or namespace import.
      * Special values:
-     * - 'default': Adds a default import from the target module.
+     * - 'default': Adds a default import from the module.
      *   When using 'default', the `alias` parameter is required. */
     member?: string;
 
@@ -41,15 +41,15 @@ export interface AddImportOptions {
  *
  * @example
  * // Add a named import
- * maybeAddImport(visitor, { target: 'fs', member: 'readFile' });
+ * maybeAddImport(visitor, { module: 'fs', member: 'readFile' });
  *
  * @example
  * // Add a default import using the 'default' member specifier
- * maybeAddImport(visitor, { target: 'react', member: 'default', alias: 'React' });
+ * maybeAddImport(visitor, { module: 'react', member: 'default', alias: 'React' });
  *
  * @example
  * // Add a default import (legacy way, without specifying member)
- * maybeAddImport(visitor, { target: 'react', alias: 'React' });
+ * maybeAddImport(visitor, { module: 'react', alias: 'React' });
  */
 export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,
@@ -57,7 +57,7 @@ export function maybeAddImport(
 ) {
     for (const v of visitor.afterVisit || []) {
         if (v instanceof AddImport &&
-            v.target === options.target &&
+            v.module === options.module &&
             v.member === options.member &&
             v.alias === options.alias) {
             return;
@@ -67,7 +67,7 @@ export function maybeAddImport(
 }
 
 export class AddImport<P> extends JavaScriptVisitor<P> {
-    readonly target: string;
+    readonly module: string;
     readonly member?: string;
     readonly alias?: string;
     readonly onlyIfReferenced: boolean;
@@ -81,7 +81,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             throw new Error("When member is 'default', the alias parameter is required");
         }
 
-        this.target = options.target;
+        this.module = options.module;
         this.member = options.member;
         this.alias = options.alias;
         this.onlyIfReferenced = options.onlyIfReferenced ?? true;
@@ -238,7 +238,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 if (moduleSpecifier) {
                     const moduleName = this.getModuleName(moduleSpecifier);
 
-                    if (moduleName === this.target) {
+                    if (moduleName === this.module) {
                         const importClause = jsImport.importClause;
                         if (importClause?.namedBindings) {
                             if (importClause.namedBindings.kind === JS.Kind.NamedImports) {
@@ -264,7 +264,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     if (initializer?.kind === J.Kind.MethodInvocation &&
                         this.isRequireCall(initializer as J.MethodInvocation)) {
                         const moduleName = this.getModuleNameFromRequire(initializer as J.MethodInvocation);
-                        if (moduleName === this.target) {
+                        if (moduleName === this.module) {
                             return ImportStyle.CommonJS;
                         }
                     }
@@ -393,7 +393,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 const moduleName = this.getModuleName(moduleSpecifier);
 
                 // Check if this is an import from our target module
-                if (moduleName !== this.target) {
+                if (moduleName !== this.module) {
                     continue;
                 }
 
@@ -487,7 +487,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         const moduleName = this.getModuleName(moduleSpecifier);
-        if (moduleName !== this.target) {
+        if (moduleName !== this.module) {
             return false;
         }
 
@@ -559,7 +559,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         const moduleName = this.getModuleNameFromRequire(methodInv);
-        if (moduleName !== this.target) {
+        if (moduleName !== this.module) {
             return false;
         }
 
@@ -645,7 +645,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         await collector.visit(compilationUnit, new ExecutionContext());
 
         // Check if our target import is used based on type attribution
-        const moduleMembers = usedImports.get(this.target);
+        const moduleMembers = usedImports.get(this.module);
         if (!moduleMembers) {
             return false;
         }
@@ -667,8 +667,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             kind: J.Kind.Literal,
             prefix: singleSpace,
             markers: emptyMarkers,
-            value: `'${this.target}'`,
-            valueSource: `'${this.target}'`,
+            value: `'${this.module}'`,
+            valueSource: `'${this.module}'`,
             unicodeEscapes: [],
             type: undefined
         };
@@ -684,7 +684,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 annotations: [],
-                simpleName: this.alias || this.target,
+                simpleName: this.alias || this.module,
                 type: undefined,
                 fieldType: undefined
             };
