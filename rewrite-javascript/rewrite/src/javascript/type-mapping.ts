@@ -74,34 +74,6 @@ export class JavaScriptTypeMapping {
         return type && this.getType(type);
     }
 
-    private getSignature(type: ts.Type): string | number {
-        // Try to use TypeScript's internal id if available
-        // TypeScript assigns stable IDs to all types, including parameterized, union, and intersection types
-        if ("id" in type && type.id !== undefined) {
-            return type.id as number;
-        }
-
-        // Fallback: Generate a string signature based on type characteristics
-        const typeString = this.checker.typeToString(type);
-        const symbol = type.getSymbol?.();
-
-        if (symbol) {
-            const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
-            if (declaration) {
-                const sourceFile = declaration.getSourceFile();
-                const fileName = sourceFile.fileName;
-                const pos = declaration.pos;
-                // Create unique signature from file + position + type string
-                // This ensures types from different modules are distinguished
-                return `${fileName}:${pos}:${typeString}`;
-            }
-        }
-
-        // Last resort: use type string with a prefix to distinguish from numeric IDs
-        // This might happen for synthetic types or types without declarations
-        return `synthetic:${typeString}`;
-    }
-
     private getType(type: ts.Type): Type {
         // Check for error types first - these indicate type-checking failures
         // and should not be processed further
@@ -308,6 +280,34 @@ export class JavaScriptTypeMapping {
         const result = this.createPrimitiveOrUnknownType(type);
         this.typeCache.set(signature, result);
         return result;
+    }
+
+    private getSignature(type: ts.Type): string | number {
+        // Try to use TypeScript's internal id if available
+        // TypeScript assigns stable IDs to all types, including parameterized, union, and intersection types
+        if ("id" in type && type.id !== undefined) {
+            return type.id as number;
+        }
+
+        // Fallback: Generate a string signature based on type characteristics
+        const typeString = this.checker.typeToString(type);
+        const symbol = type.getSymbol?.();
+
+        if (symbol) {
+            const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
+            if (declaration) {
+                const sourceFile = declaration.getSourceFile();
+                const fileName = sourceFile.fileName;
+                const pos = declaration.pos;
+                // Create unique signature from file + position + type string
+                // This ensures types from different modules are distinguished
+                return `${fileName}:${pos}:${typeString}`;
+            }
+        }
+
+        // Last resort: use type string with a prefix to distinguish from numeric IDs
+        // This might happen for synthetic types or types without declarations
+        return `synthetic:${typeString}`;
     }
 
     primitiveType(node: ts.Node): Type.Primitive {
