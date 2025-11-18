@@ -18,6 +18,7 @@ import {Cursor, SourceFile, Tree} from "./tree";
 import {ExecutionContext} from "./execution";
 import {DataTableDescriptor} from "./data-table";
 import {mapAsync} from "./util";
+import "reflect-metadata";
 
 const OPTIONS_KEY = "__recipe_options__";
 
@@ -88,7 +89,7 @@ export abstract class Recipe {
     }
 
     async descriptor(): Promise<RecipeDescriptor> {
-        const optionsRecord: Record<string, OptionAnnotationDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
+        const optionsRecord: Record<string, OptionDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
         return {
             name: this.name,
             displayName: this.displayName,
@@ -101,7 +102,6 @@ export abstract class Recipe {
                 name: key,
                 value: (this as any)[key],
                 required: descriptor.required ?? true,
-                type: `${this.hasOwnProperty(key) ? typeof (this as any)[key] : ""}`,
                 ...descriptor
             }))
         }
@@ -224,6 +224,30 @@ export class RecipeRegistry {
 
 export function Option(descriptor: OptionAnnotationDescriptor) {
     return function (target: any, propertyKey: string) {
+        var t = Reflect.getMetadata("design:type", target, propertyKey);
+        var simplifiedType = t.name;
+        switch(t.name) {
+            case "String": {
+                simplifiedType = "string";
+                break;
+            }
+            case "Boolean": {
+                simplifiedType = "boolean";
+                break;
+            }
+            case "Number": {
+                simplifiedType = "number";
+                break;
+            }
+            case "Symbol": {
+                simplifiedType = "symbol";
+                break;
+            }
+            case "Object": {
+                simplifiedType = "object";
+                break;
+            }
+        }
         // Ensure the constructor has options storage.
         if (!target.constructor.hasOwnProperty(OPTIONS_KEY)) {
             Object.defineProperty(target.constructor, OPTIONS_KEY, {
@@ -234,7 +258,10 @@ export function Option(descriptor: OptionAnnotationDescriptor) {
         }
 
         // Register the option metadata under the property key.
-        target.constructor[OPTIONS_KEY][propertyKey] = descriptor;
+        target.constructor[OPTIONS_KEY][propertyKey] = {
+            ...descriptor,
+            type: simplifiedType
+        } as OptionDescriptor;
     };
 }
 
