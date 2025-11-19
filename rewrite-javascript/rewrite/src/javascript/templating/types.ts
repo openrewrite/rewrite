@@ -141,9 +141,37 @@ export interface CaptureOptions<T = any> {
      * a preamble declaring the capture identifier with this type annotation, allowing
      * the TypeScript parser/compiler to produce a properly type-attributed AST.
      *
+     * **Why Use Type Attribution:**
+     * When matching against TypeScript code with type information, providing a type ensures
+     * the pattern's AST has matching type attribution, which can be important for:
+     * - Semantic matching based on types
+     * - Matching code that depends on type inference
+     * - Ensuring pattern parses with correct type context
+     *
      * Can be specified as:
-     * - A string type annotation (e.g., "boolean", "string", "number")
+     * - A string type annotation (e.g., "boolean", "string", "number", "Promise<any>", "User[]")
      * - A Type instance from the AST (the type will be inferred from the Type)
+     *
+     * @example
+     * ```typescript
+     * // Match promise chains with proper type attribution
+     * const chain = capture({
+     *   name: 'chain',
+     *   type: 'Promise<any>',  // TypeScript will attribute this as Promise type
+     *   constraint: (call: J.MethodInvocation) => {
+     *     // Validate promise chain structure
+     *     return call.name.simpleName === 'then';
+     *   }
+     * });
+     * pattern`${chain}.catch(err => console.log(err))`
+     *
+     * // Match arrays with type annotation
+     * const items = capture({
+     *   name: 'items',
+     *   type: 'number[]',  // Array of numbers
+     * });
+     * pattern`${items}.map(x => x * 2)`
+     * ```
      */
     type?: string | Type;
 }
