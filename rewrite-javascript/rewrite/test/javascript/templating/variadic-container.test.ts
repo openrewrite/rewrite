@@ -164,8 +164,8 @@ describe('variadic pattern matching in containers', () => {
         // Capture with constraint that checks the array length and verifies cursor is present
         const props = capture({
             variadic: true,
-            constraint: (nodes: J[], cursor: Cursor) => {
-                receivedCursor = cursor;
+            constraint: (nodes: J[], context) => {
+                receivedCursor = context.cursor;
                 // For variadic captures, constraint receives:
                 // 1. The array of captured nodes
                 // 2. A cursor pointing to the parent context (the container holding these elements)

@@ -238,10 +238,10 @@ describe('Capture Constraints', () => {
             let parentIsBinary = false;
 
             const left = capture<J.Literal>({
-                constraint: (node, cursor) => {
+                constraint: (node, context) => {
                     constraintCalled = true;
                     // Check that cursor can navigate to parent
-                    const parent = cursor?.parent?.value;
+                    const parent = context.cursor.parent?.value;
                     if (parent && parent.kind === J.Kind.Binary) {
                         parentIsBinary = true;
                     }
@@ -265,8 +265,8 @@ describe('Capture Constraints', () => {
             let cursorReceived: any = 'not-called';
             let astNode: J | undefined;
             const value1 = capture<J.Literal>({
-                constraint: (node, cursor) => {
-                    cursorReceived = cursor;
+                constraint: (node, context) => {
+                    cursorReceived = context.cursor;
                     astNode = node;
                     return typeof node.value === 'number';
                 }
@@ -285,8 +285,8 @@ describe('Capture Constraints', () => {
             const value2 = capture<J.Literal>({
                 constraint: and(
                     (node) => typeof node.value === 'number',
-                    (node, cursor) => {
-                        cursorReceivedInAnd = cursor;
+                    (node, context) => {
+                        cursorReceivedInAnd = context.cursor;
                         return (node.value as number) > 10;
                     }
                 )
@@ -302,9 +302,9 @@ describe('Capture Constraints', () => {
             const value3 = capture<J.Literal>({
                 constraint: or(
                     (node) => typeof node.value === 'string',
-                    (node, cursor) => {
+                    (node, context) => {
                         // Accept numbers only if cursor has a grandparent (i.e., not at root)
-                        return cursor?.parent?.parent !== undefined && typeof node.value === 'number';
+                        return context.cursor.parent?.parent !== undefined && typeof node.value === 'number';
                     }
                 )
             });
@@ -320,9 +320,9 @@ describe('Capture Constraints', () => {
 
             // Test 4: not composition with cursor-aware constraint
             const value4 = capture<J.Literal>({
-                constraint: not((node, cursor) => {
+                constraint: not((node, context) => {
                     // Reject if cursor has a grandparent (i.e., not at root)
-                    return cursor?.parent?.parent !== undefined;
+                    return context.cursor.parent?.parent !== undefined;
                 })
             });
             const pat4 = pattern`${value4}`;
@@ -340,9 +340,9 @@ describe('Capture Constraints', () => {
             let cursorValue: J | undefined;
 
             const left = capture<J.Literal>({
-                constraint: (node, cursor) => {
+                constraint: (node, context) => {
                     capturedNode = node;
-                    cursorValue = cursor?.value as J;
+                    cursorValue = context.cursor.value as J;
                     return true;
                 }
             });
@@ -368,10 +368,10 @@ describe('Capture Constraints', () => {
             let parentKind: typeof J.Kind | undefined;
 
             const arg = capture<J.Literal>({
-                constraint: (node, cursor) => {
+                constraint: (node, context) => {
                     capturedArg = node;
                     // The cursor's parent should be at a higher level in the tree
-                    const parent = cursor?.parent;
+                    const parent = context.cursor.parent;
                     if (parent) {
                         parentKind = parent.value?.kind;
                     }
@@ -391,6 +391,153 @@ describe('Capture Constraints', () => {
             // This verifies the cursor is at the captured node, not elsewhere
             expect(parentKind).toBeDefined();
             expect(parentKind).not.toBe(J.Kind.Literal);
+        });
+    });
+
+    describe('Constraints with capture access', () => {
+        test('constraint can access previously matched captures', async () => {
+            // Pattern: ${left} + ${right} where right must equal left
+            const left = capture<J.Literal>('left');
+            const right = capture<J.Literal>({
+                name: 'right',
+                constraint: (node, context) => {
+                    const leftValue = context.captures.get(left);
+                    return leftValue !== undefined &&
+                           (leftValue as J.Literal).value === node.value;
+                }
+            });
+            const pat = pattern`${left} + ${right}`;
+
+            // Should match: both sides have same value (10)
+            const match1 = await pat.match(await parseExpression('10 + 10'), new Cursor(await parseExpression('10 + 10'), undefined));
+            expect(match1).toBeDefined();
+            expect((match1?.get(left) as J.Literal)?.value).toBe(10);
+            expect((match1?.get(right) as J.Literal)?.value).toBe(10);
+
+            // Should not match: different values (10 vs 20)
+            const match2 = await pat.match(await parseExpression('10 + 20'), new Cursor(await parseExpression('10 + 20'), undefined));
+            expect(match2).toBeUndefined();
+        });
+
+        test('constraint can access captures by string name', async () => {
+            // Test that captures can be accessed by string name as well as Capture object
+            const left = capture<J.Literal>('left');
+            const right = capture<J.Literal>({
+                name: 'right',
+                constraint: (node, context) => {
+                    // Access by string name instead of Capture object
+                    const leftValue = context.captures.get('left') as J.Literal | undefined;
+                    return leftValue !== undefined && leftValue.value === node.value;
+                }
+            });
+            const pat = pattern`${left} + ${right}`;
+
+            // Should match: same values
+            const match1 = await pat.match(await parseExpression('5 + 5'), new Cursor(await parseExpression('5 + 5'), undefined));
+            expect(match1).toBeDefined();
+
+            // Should not match: different values
+            const match2 = await pat.match(await parseExpression('5 + 10'), new Cursor(await parseExpression('5 + 10'), undefined));
+            expect(match2).toBeUndefined();
+        });
+
+        test('constraint can check for capture presence with has()', async () => {
+            let hasLeftByCapture = false;
+            let hasLeftByString = false;
+
+            const left = capture<J.Literal>('hasTestLeft');
+            const right = capture<J.Literal>({
+                name: 'hasTestRight',
+                constraint: (node, context) => {
+                    // Verify has() works with both Capture object and string
+                    hasLeftByCapture = context.captures.has(left);
+                    hasLeftByString = context.captures.has('hasTestLeft');
+                    return typeof node.value === 'number';
+                }
+            });
+            const pat = pattern`${left} + ${right}`;
+
+            const expr = await parseExpression('15 + 25');
+            const match = await pat.match(expr, new Cursor(expr, undefined));
+            expect(match).toBeDefined();
+            expect(hasLeftByCapture).toBe(true);
+            expect(hasLeftByString).toBe(true);
+        });
+
+        test('multiple captures with dependent constraints', async () => {
+            // Pattern: ${a} + ${b} + ${c} where b > a and c > b
+            const a = capture<J.Literal>('a');
+            const b = capture<J.Literal>({
+                name: 'b',
+                constraint: (node, context) => {
+                    const aValue = context.captures.get(a) as J.Literal | undefined;
+                    return typeof node.value === 'number' &&
+                           aValue !== undefined &&
+                           typeof aValue.value === 'number' &&
+                           node.value > aValue.value;
+                }
+            });
+            const c = capture<J.Literal>({
+                name: 'c',
+                constraint: (node, context) => {
+                    const bValue = context.captures.get(b) as J.Literal | undefined;
+                    return typeof node.value === 'number' &&
+                           bValue !== undefined &&
+                           typeof bValue.value === 'number' &&
+                           node.value > bValue.value;
+                }
+            });
+            const pat = pattern`${a} + ${b} + ${c}`;
+
+            // Should match: 1 < 5 < 10 (strictly increasing)
+            const expr1 = await parseExpression('1 + 5 + 10');
+            const match1 = await pat.match(expr1, new Cursor(expr1, undefined));
+            expect(match1).toBeDefined();
+            expect((match1?.get(a) as J.Literal)?.value).toBe(1);
+            expect((match1?.get(b) as J.Literal)?.value).toBe(5);
+            expect((match1?.get(c) as J.Literal)?.value).toBe(10);
+
+            // Should not match: 5 < 10 but 10 NOT > 10
+            const expr2 = await parseExpression('5 + 10 + 10');
+            const match2 = await pat.match(expr2, new Cursor(expr2, undefined));
+            expect(match2).toBeUndefined();
+
+            // Should not match: 10 NOT > 5
+            const expr3 = await parseExpression('10 + 5 + 1');
+            const match3 = await pat.match(expr3, new Cursor(expr3, undefined));
+            expect(match3).toBeUndefined();
+        });
+
+        test('captures in context reflect current matching state', async () => {
+            // Verify that captures.get() returns undefined for not-yet-matched captures
+            let rightConstraintCalled = false;
+            let leftWasAvailable = false;
+            let rightSawItself = false;
+
+            const left = capture<J.Literal>('stateTestLeft');
+            const right = capture<J.Literal>({
+                name: 'stateTestRight',
+                constraint: (node, context) => {
+                    rightConstraintCalled = true;
+                    // 'left' should be available (already matched)
+                    const leftValue = context.captures.get(left);
+                    leftWasAvailable = leftValue !== undefined;
+
+                    // 'right' itself should NOT be available yet (currently being matched)
+                    const rightValue = context.captures.get('stateTestRight');
+                    rightSawItself = rightValue !== undefined;
+
+                    return typeof node.value === 'number';
+                }
+            });
+            const pat = pattern`${left} + ${right}`;
+
+            const expr = await parseExpression('30 + 40');
+            const match = await pat.match(expr, new Cursor(expr, undefined));
+            expect(match).toBeDefined();
+            expect(rightConstraintCalled).toBe(true);
+            expect(leftWasAvailable).toBe(true); // Should see left capture
+            expect(rightSawItself).toBe(false); // Should not see itself during constraint evaluation
         });
     });
 });

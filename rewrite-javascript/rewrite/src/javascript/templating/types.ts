@@ -35,9 +35,48 @@ export interface VariadicOptions {
 }
 
 /**
+ * Read-only access to captures matched so far during pattern matching.
+ * Provides a consistent interface with MatchResult for looking up captured values.
+ */
+export interface CaptureMap {
+    /**
+     * Gets the value of a capture by Capture object or name.
+     * Returns undefined if the capture hasn't been matched yet.
+     */
+    get<T>(capture: Capture<T>): T | undefined;
+    get(capture: string): any;
+
+    /**
+     * Checks if a capture has been matched.
+     */
+    has(capture: Capture | string): boolean;
+}
+
+/**
+ * Context passed to capture constraint functions.
+ * Provides access to the cursor for AST navigation and previously matched captures.
+ */
+export interface CaptureConstraintContext {
+    /**
+     * The cursor pointing to the node being matched.
+     * Allows navigating the AST (parent, root, etc.).
+     */
+    cursor: Cursor;
+
+    /**
+     * Read-only view of values captured so far in the matching process.
+     * Allows constraints to depend on previous captures.
+     * Returns undefined for captures that haven't been processed yet.
+     */
+    captures: CaptureMap;
+}
+
+/**
  * Constraint function for captures.
- * The cursor parameter is always provided with a defined value, but functions can
- * choose to accept it or not (TypeScript allows functions with fewer parameters).
+ *
+ * Receives the node being validated and a context providing access to:
+ * - cursor: For navigating the AST
+ * - captures: For accessing previously matched captures
  *
  * For non-variadic captures: use ConstraintFunction<T> where T is the node type
  * For variadic captures: use ConstraintFunction<T[]> where T[] is the array type
@@ -45,7 +84,7 @@ export interface VariadicOptions {
  * When used with variadic captures, the cursor points to the nearest common parent
  * of the captured elements.
  */
-export type ConstraintFunction<T> = (node: T, cursor: Cursor) => boolean;
+export type ConstraintFunction<T> = (node: T, context: CaptureConstraintContext) => boolean;
 
 /**
  * Options for the capture function.
@@ -55,37 +94,43 @@ export type ConstraintFunction<T> = (node: T, cursor: Cursor) => boolean;
  * - For regular captures: constraint receives a single node of type T
  * - For variadic captures: constraint receives an array of nodes of type T[]
  *
- * The constraint function can optionally receive a cursor parameter to perform
- * context-aware validation during pattern matching.
+ * The context parameter provides access to the cursor and previously matched captures.
  */
 export interface CaptureOptions<T = any> {
     name?: string;
     variadic?: boolean | VariadicOptions;
     /**
      * Optional constraint function that validates whether a captured node should be accepted.
-     * The function always receives:
+     * The function receives:
      * - node: The captured node (or array of nodes for variadic captures)
-     * - cursor: A cursor at the captured node's position (always defined)
-     *
-     * Functions can choose to accept just the node parameter if they don't need the cursor.
+     * - context: Provides access to cursor and previously matched captures
      *
      * @param node The captured node to validate
-     * @param cursor Cursor at the captured node's position
+     * @param context Provides cursor for AST navigation and previously matched captures
      * @returns true if the capture should be accepted, false otherwise
      *
      * @example
      * ```typescript
-     * // Simple node validation (cursor parameter ignored)
+     * // Simple node validation
      * capture<J.Literal>('size', {
      *     constraint: (node) => typeof node.value === 'number' && node.value > 100
      * })
      *
-     * // Context-aware validation (using cursor)
+     * // Context-aware validation using cursor
      * capture<J.MethodInvocation>('method', {
-     *     constraint: (node, cursor) => {
+     *     constraint: (node, context) => {
      *         if (!node.name.simpleName.startsWith('get')) return false;
-     *         const cls = cursor.firstEnclosing(isClassDeclaration);
+     *         const cls = context.cursor.firstEnclosing(isClassDeclaration);
      *         return cls?.name.simpleName === 'ApiController';
+     *     }
+     * })
+     *
+     * // Validation depending on previous captures
+     * const min = capture('min');
+     * const max = capture('max', {
+     *     constraint: (node, context) => {
+     *         const minVal = context.captures.get(min);
+     *         return minVal && node.value > minVal.value;
      *     }
      * })
      * ```
