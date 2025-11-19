@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, Tree} from '../..';
-import {J} from '../../java';
-import {Capture, Parameter, TemplateOptions, TemplateParameter} from './types';
-import {MatchResult} from './pattern';
-import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
-import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
-import {TemplateEngine} from './engine';
-import {JS} from '..';
+import { Cursor, Tree } from '../..';
+import { J } from '../../java';
+import { ApplyOptions, Capture, Parameter, TemplateOptions, TemplateParameter } from './types';
+import { MatchResult } from './pattern';
+import { generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL } from './utils';
+import { CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL } from './capture';
+import { TemplateEngine } from './engine';
+import { JS } from '..';
 
 /**
  * Coordinates for template application.
@@ -286,12 +286,30 @@ export class Template {
     /**
      * Applies this template and returns the resulting tree.
      *
+     * @param tree Input tree to transform
      * @param cursor The cursor pointing to the current location in the AST
-     * @param tree Input tree
-     * @param values values for parameters in template
+     * @param options Optional configuration including values for parameters
      * @returns A Promise resolving to the generated AST node
+     *
+     * @example
+     * ```typescript
+     * // Simple application without values
+     * const result = await tmpl.apply(node, cursor);
+     *
+     * // With values from pattern match
+     * const match = await pat.match(node, cursor);
+     * const result = await tmpl.apply(node, cursor, { values: match });
+     *
+     * // With explicit values
+     * const result = await tmpl.apply(node, cursor, {
+     *     values: { x: someNode, y: anotherNode }
+     * });
+     * ```
      */
-    async apply(cursor: Cursor, tree: J, values?: Map<Capture | string, J> | Pick<Map<string, J>, 'get'> | Record<string, J>): Promise<J | undefined> {
+    async apply(tree: J, cursor: Cursor, options?: ApplyOptions): Promise<J | undefined> {
+        // Extract values from options
+        const values = options?.values;
+
         // Normalize the values map: convert any Capture keys to string keys
         let normalizedValues: Pick<Map<string, J>, 'get'> | undefined;
         let wrappersMap: Map<string, J.RightPadded<J> | J.RightPadded<J>[]> = new Map();
@@ -405,10 +423,10 @@ export function template(strings: TemplateStringsArray, ...parameters: TemplateP
     // Convert parameters to Parameter objects (no longer need to check for mutable tree property)
     const processedParameters = parameters.map(param => {
         // Just wrap each parameter value in a Parameter object
-        return {value: param};
+        return { value: param };
     });
 
     return new Template(strings, processedParameters);
 }
 
-export type {JavaCoordinates};
+export type { JavaCoordinates };

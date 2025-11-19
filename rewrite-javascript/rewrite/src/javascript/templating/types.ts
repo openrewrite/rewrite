@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, Tree} from '../..';
-import {J, Type} from '../../java';
-import type {Pattern} from "./pattern";
-import type {Template} from "./template";
-import type {CaptureValue, RawCode} from "./capture";
+import { Cursor, Tree } from '../..';
+import { J, Type } from '../../java';
+import type { Pattern } from "./pattern";
+import type { Template } from "./template";
+import type { CaptureValue, RawCode } from "./capture";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -399,6 +399,34 @@ export interface TemplateOptions {
      * The template engine will create a package.json with these dependencies.
      */
     dependencies?: Record<string, string>;
+}
+
+/**
+ * Options for template application.
+ */
+export interface ApplyOptions {
+    /**
+     * Values for parameters in the template.
+     * Can be a Map, MatchResult, or plain object with capture names as keys.
+     *
+     * @example
+     * ```typescript
+     * // Using MatchResult from pattern matching
+     * const match = await pattern.match(node, cursor);
+     * await template.apply(node, cursor, { values: match });
+     *
+     * // Using a Map
+     * await template.apply(node, cursor, {
+     *     values: new Map([['x', someNode]])
+     * });
+     *
+     * // Using a plain object
+     * await template.apply(node, cursor, {
+     *     values: { x: someNode }
+     * });
+     * ```
+     */
+    values?: Map<Capture | string, J> | MatchResult | Record<string, J>;
 }
 
 /**

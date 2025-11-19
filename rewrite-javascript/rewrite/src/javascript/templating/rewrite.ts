@@ -57,10 +57,10 @@ class RewriteRuleImpl implements RewriteRule {
                 if (typeof this.after === 'function') {
                     // Call the function to get a template, then apply it
                     const template = this.after(match);
-                    result = await template.apply(cursor, node, match);
+                    result = await template.apply(node, cursor, { values: match });
                 } else {
                     // Use template.apply() as before
-                    result = await this.after.apply(cursor, node, match);
+                    result = await this.after.apply(node, cursor, { values: match });
                 }
 
                 if (result) {
