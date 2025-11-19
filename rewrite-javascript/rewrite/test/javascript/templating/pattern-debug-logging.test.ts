@@ -30,7 +30,7 @@ describe('Pattern Debug Logging', () => {
         const pat = pattern`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
 
-        const match = await pat.match(node);
+        const match = await pat.match(node, undefined!);
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -41,7 +41,7 @@ describe('Pattern Debug Logging', () => {
         const pat = pattern`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
 
-        const match = await pat.match(node, undefined, { debug: true });
+        const match = await pat.match(node, undefined!, { debug: true });
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -56,7 +56,7 @@ describe('Pattern Debug Logging', () => {
         const pat = pattern({ debug: true })`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
 
-        const match = await pat.match(node);
+        const match = await pat.match(node, undefined!);
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -72,7 +72,7 @@ describe('Pattern Debug Logging', () => {
         const pat = pattern`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
 
-        const match = await pat.match(node);
+        const match = await pat.match(node, undefined!);
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -90,7 +90,7 @@ describe('Pattern Debug Logging', () => {
         const node = await parseExpression('console.log(42)');
 
         // Call with debug: true overrides pattern debug: false
-        const match = await pat.match(node, undefined, { debug: true });
+        const match = await pat.match(node, undefined!, { debug: true });
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -104,7 +104,7 @@ describe('Pattern Debug Logging', () => {
         const node = await parseExpression('console.log(42)');
 
         // Explicitly disable debug at call level
-        const match = await pat.match(node, undefined, { debug: false });
+        const match = await pat.match(node, undefined!, { debug: false });
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe('Pattern Debug Logging', () => {
         // Use console.error instead - should not match
         const node = await parseExpression('console.error(42)');
 
-        const match = await pat.match(node, undefined, { debug: true });
+        const match = await pat.match(node, undefined!, { debug: true });
 
         expect(match).toBeUndefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -138,7 +138,7 @@ describe('Pattern Debug Logging', () => {
         const pat = pattern({ debug: true })`foo(${x}, ${y})`;
         const node = await parseExpression('foo(1, 2)');
 
-        await pat.match(node);
+        await pat.match(node, undefined!);
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
         // First line should show pattern source with ID
@@ -150,7 +150,7 @@ describe('Pattern Debug Logging', () => {
         const pat = pattern({ debug: true })`console.log(${args})`;
         const node = await parseExpression('console.log(1, 2, 3)');
 
-        const match = await pat.match(node);
+        const match = await pat.match(node, undefined!);
 
         expect(match).toBeDefined();
 
@@ -167,7 +167,7 @@ describe('Pattern Debug Logging', () => {
         // Pattern expects addition, but we provide subtraction
         const node = await parseExpression('a - b');
 
-        const match = await pat.match(node);
+        const match = await pat.match(node, undefined!);
 
         expect(match).toBeUndefined();
         expect(consoleErrorSpy).toHaveBeenCalled();

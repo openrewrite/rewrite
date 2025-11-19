@@ -28,9 +28,9 @@ describe('variadic statement matching and expansion', () => {
         return new class extends JavaScriptVisitor<any> {
             override async visitMethodDeclaration(func: J.MethodDeclaration, p: any): Promise<J | undefined> {
                 if (func.body) {
-                    const match = await pat.match(func.body);
+                    const match = await pat.match(func.body, this.cursor);
                     if (match) {
-                        const newBody = await tmpl.apply(this.cursor, func.body, match);
+                        const newBody = await tmpl.apply(func.body, this.cursor, {values: match});
                         if (newBody && newBody !== func.body) {
                             return produce(func, draft => {
                                 draft.body = newBody as J.Block;
