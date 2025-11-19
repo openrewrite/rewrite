@@ -93,7 +93,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * The base implementation will visit the element, which triggers our visit() override
      * for placeholder detection and replacement.
      */
-    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: any): Promise<J.RightPadded<T>> {
+    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: any): Promise<J.RightPadded<T> | undefined> {
         return super.visitRightPadded(right, p);
     }
 

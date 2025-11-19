@@ -15,7 +15,7 @@
  */
 import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
-import {createDraft, Draft, finishDraft, Objectish} from "immer";
+import {createDraft, Draft, finishDraft, nothing, Objectish} from "immer";
 import {mapAsync} from "./util";
 
 /* Not exported beyond the internal immer module */
@@ -23,15 +23,23 @@ export type ValidImmerRecipeReturnType<State> =
     | State
     | void
     | undefined
+    | typeof nothing
 
 export async function produceAsync<Base extends Objectish>(
     before: Promise<Base> | Base,
     recipe: (draft: Draft<Base>) => ValidImmerRecipeReturnType<Draft<Base>> |
         PromiseLike<ValidImmerRecipeReturnType<Draft<Base>>>
-): Promise<Base> {
+): Promise<Base | undefined> {
     const b: Base = await before;
     const draft = createDraft(b);
-    await recipe(draft);
+    const result = await recipe(draft);
+
+    // If recipe explicitly returned Immer's nothing, return undefined
+    if (result === nothing) {
+        return undefined;
+    }
+
+    // Otherwise, return the finished draft (void/undefined means use draft)
     return finishDraft(draft) as Base;
 }
 
@@ -128,9 +136,9 @@ export abstract class TreeVisitor<T extends Tree, P> {
         } else if ((markers.markers?.length || 0) === 0) {
             return markers;
         }
-        return produceAsync<Markers>(markers, async (draft) => {
+        return (await produceAsync<Markers>(markers, async (draft) => {
             draft.markers = await mapAsync(markers.markers, m => this.visitMarker(m, p))
-        });
+        }))!;
     }
 
     protected async visitMarker<M extends Marker>(marker: M, p: P): Promise<M> {
@@ -143,7 +151,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
         recipe?:
             ((draft: Draft<T>) => ValidImmerRecipeReturnType<Draft<T>>) |
             ((draft: Draft<T>) => Promise<ValidImmerRecipeReturnType<Draft<T>>>)
-    ): Promise<T> {
+    ): Promise<T | undefined> {
         return produceAsync(before, async draft => {
             draft.markers = await this.visitMarkers(before.markers, p);
             if (recipe) {

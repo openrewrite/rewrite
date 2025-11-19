@@ -15,7 +15,7 @@
  */
 import {Cursor, Tree} from '../..';
 import {J, Type} from '../../java';
-import type {MatchResult, Pattern} from "./pattern";
+import type {Pattern} from "./pattern";
 import type {Template} from "./template";
 import type {CaptureValue, RawCode} from "./capture";
 
@@ -284,6 +284,49 @@ export interface PatternOptions {
      * @default true (lenient matching enabled for backward compatibility)
      */
     lenientTypeMatching?: boolean;
+
+    /**
+     * Enable debug logging for this pattern.
+     * When enabled, all match attempts will log detailed information to stderr,
+     * including the AST path traversed, mismatches encountered, and captured values.
+     *
+     * Can be overridden at the match() call level.
+     * Global debug can be enabled via PATTERN_DEBUG=true environment variable.
+     *
+     * Precedence: match() call > pattern configure() > PATTERN_DEBUG env var
+     *
+     * @default undefined (inherits from environment or match() call)
+     *
+     * @example
+     * ```typescript
+     * // Pattern-level debug
+     * const pat = pattern({ debug: true })`console.log(${value})`;
+     *
+     * // Disable debug for a noisy pattern when global debug is on
+     * const noisyPat = pattern({ debug: false })`import ${x} from ${y}`;
+     * ```
+     */
+    debug?: boolean;
+}
+
+/**
+ * Options for individual match() calls.
+ */
+export interface MatchOptions {
+    /**
+     * Enable debug logging for this specific match() call.
+     * Overrides pattern-level debug setting and global PATTERN_DEBUG env var.
+     *
+     * @example
+     * ```typescript
+     * // Debug just this call
+     * const match = await pattern.match(node, cursor, { debug: true });
+     *
+     * // Disable debug for this call even if pattern or global debug is on
+     * const match = await pattern.match(node, cursor, { debug: false });
+     * ```
+     */
+    debug?: boolean;
 }
 
 /**
@@ -494,4 +537,138 @@ export interface RewriteConfig {
      * ```
      */
     whereNot?: (node: J, cursor: Cursor) => boolean | Promise<boolean>;
+}
+
+/**
+ * Options for debugging pattern matching.
+ * Used in Layer 1 (Core Instrumentation) to control debug output.
+ */
+export interface DebugOptions {
+    /**
+     * Enable detailed logging during pattern matching.
+     */
+    enabled?: boolean;
+
+    /**
+     * Log structural comparison steps.
+     */
+    logComparison?: boolean;
+
+    /**
+     * Log constraint evaluation.
+     */
+    logConstraints?: boolean;
+}
+
+/**
+ * A single debug log entry collected during pattern matching.
+ * Part of Layer 1 (Core Instrumentation).
+ */
+export interface DebugLogEntry {
+    /**
+     * Severity level of the log entry.
+     */
+    level: 'trace' | 'debug' | 'info' | 'warn';
+
+    /**
+     * The scope/category of the log entry.
+     */
+    scope: 'matching' | 'comparison' | 'constraint';
+
+    /**
+     * Path in the AST where this log entry was generated.
+     */
+    path: string[];
+
+    /**
+     * Human-readable message.
+     */
+    message: string;
+
+    /**
+     * Optional data associated with this log entry.
+     */
+    data?: any;
+}
+
+/**
+ * Detailed explanation of why a pattern failed to match.
+ * Built by Layer 1 (Core Instrumentation) and exposed by Layer 2 (API).
+ */
+export interface MatchExplanation {
+    /**
+     * The reason for the match failure.
+     */
+    reason: 'structural-mismatch' | 'constraint-failed' | 'type-mismatch' | 'kind-mismatch' | 'value-mismatch' | 'array-length-mismatch';
+
+    /**
+     * Path in the AST where the failure occurred (e.g., ['select', 'name']).
+     */
+    path: string[];
+
+    /**
+     * Human-readable description of what was expected.
+     */
+    expected: string;
+
+    /**
+     * Human-readable description of what was actually found.
+     */
+    actual: string;
+
+    /**
+     * For constraint failures, details about which constraints failed.
+     */
+    constraintFailures?: Array<{
+        captureName: string;
+        actualValue: any;
+        error?: string;
+    }>;
+
+    /**
+     * Additional context about the failure.
+     */
+    details?: string;
+}
+
+/**
+ * Interface for accessing captured nodes from a successful pattern match.
+ * Part of the public API.
+ */
+export interface MatchResult {
+    /**
+     * Get a captured node by name or by Capture object.
+     *
+     * @param capture The capture name (string) or Capture object
+     * @returns The captured node(s), or undefined if not found
+     */
+    get(capture: string): any;
+    get<T>(capture: Capture<T>): T | undefined;
+}
+
+/**
+ * Result of a pattern match attempt with debug information.
+ * Part of Layer 2 (Public API).
+ */
+export interface MatchAttemptResult {
+    /**
+     * Whether the pattern matched successfully.
+     */
+    matched: boolean;
+
+    /**
+     * If matched, the match result with captured nodes. Undefined if not matched.
+     * Use `result.get('captureName')` or `result.get(captureObject)` to access captures.
+     */
+    result?: MatchResult;
+
+    /**
+     * If not matched, explanation of why. Undefined if matched.
+     */
+    explanation?: MatchExplanation;
+
+    /**
+     * Debug log entries collected during matching (if debug was enabled).
+     */
+    debugLog?: DebugLogEntry[];
 }

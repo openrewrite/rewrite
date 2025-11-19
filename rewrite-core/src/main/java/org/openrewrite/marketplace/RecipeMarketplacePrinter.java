@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 
 import java.util.BitSet;
-import java.util.Collection;
+import java.util.List;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 
@@ -41,11 +41,14 @@ public class RecipeMarketplacePrinter {
 
     public String print(RecipeMarketplace marketplace) {
         StringJoiner out = new StringJoiner("\n");
-        print(marketplace, out, 0, options, new BitSet());
+        for (RecipeMarketplace.Category category : marketplace.getCategories()) {
+            print(category, out, 0, options, new BitSet());
+        }
+
         return out.toString();
     }
 
-    private void print(RecipeMarketplace marketplace,
+    private void print(RecipeMarketplace.Category category,
                        StringJoiner out,
                        int level,
                        Options options,
@@ -55,9 +58,9 @@ public class RecipeMarketplacePrinter {
         if (level > 0) {
             line.append("|-");
         }
-        line.append(marketplace.isRoot() ? "√" : "\uD83D\uDCC1");
+        line.append("\uD83D\uDCC1");
 
-        String displayName = marketplace.getDisplayName();
+        String displayName = category.getDisplayName();
         switch (options.getNameStyle()) {
             case DISPLAY_NAME:
             case ID:
@@ -65,31 +68,30 @@ public class RecipeMarketplacePrinter {
                 break;
             case BOTH:
                 line.append(displayName);
-                if (!marketplace.getDescription().isEmpty()) {
-                    line.append(" (").append(marketplace.getDescription()).append(')');
+                if (!category.getDescription().isEmpty()) {
+                    line.append(" (").append(category.getDescription()).append(')');
                 }
                 break;
         }
         out.add(line);
 
-        Collection<RecipeMarketplace> categories = marketplace.getCategories();
+        List<RecipeMarketplace.Category> categories = category.getCategories();
         if (options.isOmitEmptyCategories()) {
             categories = categories.stream()
                     .filter(cat -> !cat.getRecipes().isEmpty() || !cat.getCategories().isEmpty())
                     .collect(toList());
         }
 
-        int i = 0;
-        for (RecipeMarketplace category : categories) {
-            if (++i == categories.size()) {
+        for (int i = 0; i < categories.size(); i++) {
+            if (i + 1 == categories.size()) {
                 lastCategoryMask.set(level, true);
             }
-            print(category, out, level + 1, options, (BitSet) lastCategoryMask.clone());
+            print(categories.get(i), out, level + 1, options, (BitSet) lastCategoryMask.clone());
         }
 
         lastCategoryMask.set(level, true);
         level++;
-        for (RecipeListing recipe : marketplace.getRecipes()) {
+        for (RecipeListing recipe : category.getRecipes()) {
             StringBuilder recipeLine = new StringBuilder();
             printTreeLines(recipeLine, level, lastCategoryMask);
             recipeLine.append("|-\uD83E\uDD16");

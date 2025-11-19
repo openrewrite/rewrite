@@ -17,16 +17,17 @@ package org.openrewrite.maven.marketplace;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
+import org.openrewrite.config.ClasspathScanningLoader;
+import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
-import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeClassLoaderTest {
@@ -57,36 +58,23 @@ class RecipeClassLoaderTest {
             return;
         }
 
-        // Create a ResolvedMavenRecipeBundle with the isolated classloader
-        @SuppressWarnings("DataFlowIssue") ResolvedGroupArtifactVersion gav = new ResolvedGroupArtifactVersion(
-                null,
-                "org.openrewrite",
-                "rewrite-java",
-                null,
-                null
-        );
-
-        ResolvedMavenRecipeBundle bundle = new ResolvedMavenRecipeBundle(
-                gav,
-                recipeJar,
-                dependencies,
-                RecipeClassLoader::new,
-                null
-        );
+        Environment env = Environment.builder()
+          .load(new ClasspathScanningLoader(new Properties(), new RecipeClassLoader(recipeJar, dependencies)))
+          .build();
 
         // Get any recipe descriptor from the environment
-        RecipeDescriptor descriptor = bundle.getEnvironment().listRecipeDescriptors().stream()
-                .findFirst()
-                .orElse(null);
+        RecipeDescriptor descriptor = env.listRecipeDescriptors().stream()
+          .findFirst()
+          .orElse(null);
 
         assertThat(descriptor).isNotNull();
 
-        Recipe recipe = bundle.prepare(descriptor, emptyMap());
+        Recipe recipe = env.activateRecipes(descriptor.getName());
         assertThat(recipe).isNotNull();
         assertThat(recipe.getName()).isEqualTo(descriptor.getName());
 
         assertThat(recipe.getClass().getClassLoader())
-                .as("Recipe should be loaded through RecipeClassLoader for isolation")
-                .isInstanceOf(RecipeClassLoader.class);
+          .as("Recipe should be loaded through RecipeClassLoader for isolation")
+          .isInstanceOf(RecipeClassLoader.class);
     }
 }

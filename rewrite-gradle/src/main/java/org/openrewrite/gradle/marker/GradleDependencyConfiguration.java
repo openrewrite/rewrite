@@ -110,10 +110,10 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
      * The list of all dependencies resolved for this configuration, including transitive dependencies.
      */
     public List<ResolvedDependency> getResolved() {
-        List<ResolvedDependency> resolved = new ArrayList<>(getDirectResolved());
-        Map<GroupArtifact, ResolvedDependency> alreadyResolved = new HashMap<>();
-        resolveTransitiveDependencies(resolved, alreadyResolved);
-        return new ArrayList<>(alreadyResolved.values());
+        if (resolutionContext.isResolveRequired()) {
+            resolutionContext.resolve();
+        }
+        return resolutionContext.getResolved();
     }
 
     /**
@@ -162,12 +162,11 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         return this;
     }
     private class LazyResolutionContext {
-        @Getter
-        private boolean resolveRequired;
-        @Nullable
-        private List<MavenRepository> repositories;
-        @Nullable
-        private ExecutionContext ctx;
+        private @Getter boolean resolveRequired;
+        private @Nullable List<MavenRepository> repositories;
+        private @Nullable ExecutionContext ctx;
+        private @Nullable List<ResolvedDependency> resolved;
+
         public void markForReResolution(List<MavenRepository> repositories, ExecutionContext ctx) {
             this.repositories = repositories;
             this.resolveRequired = true;
@@ -233,10 +232,21 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                     }
                 }
                 unsafeSetDirectResolved(newResolved);
+                resolved = null;
             }
             resolveRequired = false;
             repositories = null;
             ctx = null;
+        }
+
+        public List<ResolvedDependency> getResolved() {
+            if (resolved == null) {
+                List<ResolvedDependency> newResolved = new ArrayList<>(getDirectResolved());
+                Map<GroupArtifact, ResolvedDependency> alreadyResolved = new HashMap<>();
+                resolveTransitiveDependencies(newResolved, alreadyResolved);
+                resolved = new ArrayList<>(alreadyResolved.values());
+            }
+            return resolved;
         }
     }
 
