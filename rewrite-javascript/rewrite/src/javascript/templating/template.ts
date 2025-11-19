@@ -15,7 +15,7 @@
  */
 import {Cursor, Tree} from '../..';
 import {J} from '../../java';
-import {ApplyOptions, Capture, Parameter, TemplateOptions, TemplateParameter} from './types';
+import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
 import {MatchResult} from './pattern';
 import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
@@ -236,7 +236,7 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    async getTemplateTree(): Promise<JS.CompilationUnit> {
+    private async getTemplateTree(): Promise<JS.CompilationUnit> {
         // Level 1: Instance cache (fastest path)
         if (this._cachedTemplate) {
             return this._cachedTemplate as JS.CompilationUnit;
