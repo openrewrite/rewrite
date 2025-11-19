@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Cursor, Tree } from '../..';
-import { J } from '../../java';
-import { ApplyOptions, Capture, Parameter, TemplateOptions, TemplateParameter } from './types';
-import { MatchResult } from './pattern';
-import { generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL } from './utils';
-import { CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL } from './capture';
-import { TemplateEngine } from './engine';
-import { JS } from '..';
+import {Cursor, Tree} from '../..';
+import {J} from '../../java';
+import {ApplyOptions, Capture, Parameter, TemplateOptions, TemplateParameter} from './types';
+import {MatchResult} from './pattern';
+import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
+import {TemplateEngine} from './engine';
+import {JS} from '..';
 
 /**
  * Coordinates for template application.
@@ -175,6 +175,18 @@ export class Template {
     private _cachedTemplate?: J;
 
     /**
+     * Creates a new template.
+     *
+     * @param templateParts The string parts of the template
+     * @param parameters The parameters between the string parts
+     */
+    constructor(
+        private readonly templateParts: TemplateStringsArray,
+        private readonly parameters: Parameter[]
+    ) {
+    }
+
+    /**
      * Creates a new builder for constructing templates programmatically.
      *
      * @returns A new TemplateBuilder instance
@@ -192,18 +204,6 @@ export class Template {
     }
 
     /**
-     * Creates a new template.
-     *
-     * @param templateParts The string parts of the template
-     * @param parameters The parameters between the string parts
-     */
-    constructor(
-        private readonly templateParts: TemplateStringsArray,
-        private readonly parameters: Parameter[]
-    ) {
-    }
-
-    /**
      * Configures this template with additional options.
      *
      * @param options Configuration options
@@ -217,7 +217,7 @@ export class Template {
      *     })
      */
     configure(options: TemplateOptions): Template {
-        this.options = { ...this.options, ...options };
+        this.options = {...this.options, ...options};
         // Invalidate cache when configuration changes
         this._cachedTemplate = undefined;
         return this;
@@ -423,10 +423,10 @@ export function template(strings: TemplateStringsArray, ...parameters: TemplateP
     // Convert parameters to Parameter objects (no longer need to check for mutable tree property)
     const processedParameters = parameters.map(param => {
         // Just wrap each parameter value in a Parameter object
-        return { value: param };
+        return {value: param};
     });
 
     return new Template(strings, processedParameters);
 }
 
-export type { JavaCoordinates };
+export type {JavaCoordinates};

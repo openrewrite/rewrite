@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Cursor, Tree } from '../..';
-import { J, Type } from '../../java';
-import type { Pattern } from "./pattern";
-import type { Template } from "./template";
-import type { CaptureValue, RawCode } from "./capture";
+import {Cursor, Tree} from '../..';
+import {J, Type} from '../../java';
+import type {Pattern} from "./pattern";
+import type {Template} from "./template";
+import type {CaptureValue, RawCode} from "./capture";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -344,7 +344,16 @@ export interface MatchOptions {
  * Note: Primitive values (string, number, boolean) are NOT supported in template literals.
  * Use raw() for inserting code strings, or Template.builder() API for programmatic construction.
  */
-export type TemplateParameter = Capture | CaptureValue | TemplateParam | RawCode | Tree | Tree[] | J.RightPadded<any> | J.RightPadded<any>[] | J.Container<any>;
+export type TemplateParameter =
+    Capture
+    | CaptureValue
+    | TemplateParam
+    | RawCode
+    | Tree
+    | Tree[]
+    | J.RightPadded<any>
+    | J.RightPadded<any>[]
+    | J.Container<any>;
 
 /**
  * Parameter specification for template generation (internal).
@@ -671,6 +680,7 @@ export interface MatchResult {
      * @returns The captured node(s), or undefined if not found
      */
     get(capture: string): any;
+
     get<T>(capture: Capture<T>): T | undefined;
 }
 

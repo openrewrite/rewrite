@@ -13,15 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Cursor } from '../..';
-import { J } from '../../java';
-import { Any, Capture, DebugLogEntry, DebugOptions, MatchAttemptResult, MatchExplanation, MatchOptions, PatternOptions, MatchResult as IMatchResult } from './types';
-import { CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode } from './capture';
-import { DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator } from './comparator';
-import { CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL } from './utils';
-import { TemplateEngine } from './engine';
-import { TreePrinters } from '../../print';
-import { JS } from '../index';
+import {Cursor} from '../..';
+import {J} from '../../java';
+import {
+    Any,
+    Capture,
+    DebugLogEntry,
+    DebugOptions,
+    MatchAttemptResult,
+    MatchExplanation,
+    MatchOptions,
+    MatchResult as IMatchResult,
+    PatternOptions
+} from './types';
+import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
+import {DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
+import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {TemplateEngine} from './engine';
+import {TreePrinters} from '../../print';
+import {JS} from '../index';
 
 
 /**
