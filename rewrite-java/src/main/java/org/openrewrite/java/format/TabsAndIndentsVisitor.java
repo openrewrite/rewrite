@@ -53,9 +53,16 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public TabsAndIndentsVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this.style = getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents);
-        this.spacesStyle = getStyle(SpacesStyle.class, styles, IntelliJ::spaces);
-        this.wrappingStyle = getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces);
+        this(getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents),
+                getStyle(SpacesStyle.class, styles, IntelliJ::spaces),
+                getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces),
+                stopAfter);
+    }
+
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingStyle, @Nullable Tree stopAfter) {
+        this.style = style;
+        this.spacesStyle = spacesStyle;
+        this.wrappingStyle = wrappingStyle;
         this.stopAfter = stopAfter;
     }
 
