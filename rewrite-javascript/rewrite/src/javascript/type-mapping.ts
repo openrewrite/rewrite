@@ -27,7 +27,7 @@ export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
     // TypeScript assigns stable IDs to all types, so we don't need secondary caches
     private readonly typeCache: Map<string | number, Type> = new Map();
-    private readonly methodCache: Map<ts.Signature, Type.Method> = new Map();
+    private readonly methodCache: Map<string, Type.Method> = new Map();
 
     private readonly regExpSymbol: ts.Symbol | undefined;
     private readonly stringWrapperType: ts.Type | undefined;
@@ -335,14 +335,18 @@ export class JavaScriptTypeMapping {
      */
     private createMethodType(
         signature: ts.Signature,
-        node: ts.Node,
+        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
         declaringType: Type.FullyQualified,
         name: string,
         declaredFormalTypeNames: string[] = []
     ): Type.Method {
-        // Use signature object directly as cache key
-        // TypeScript's Compiler API reuses signature objects, giving us ~74% cache hit rate
-        const cached = this.methodCache.get(signature);
+        // Create composite cache key: declaring type + method name + signature
+        // This prevents cache collisions when methods with identical signatures have different names
+        // (e.g., util.isString(): any vs util.isArray(): any)
+        const declaringTypeSig = Type.signature(declaringType);
+        const signatureStr = this.checker.signatureToString(signature);
+        const cacheKey = `${declaringTypeSig}#${name}${signatureStr}`;
+        const cached = this.methodCache.get(cacheKey);
         if (cached) {
             return cached;
         }
@@ -376,7 +380,7 @@ export class JavaScriptTypeMapping {
             }
         }) as Type.Method;
 
-        this.methodCache.set(signature, method);
+        this.methodCache.set(cacheKey, method);
         return method;
     }
 
