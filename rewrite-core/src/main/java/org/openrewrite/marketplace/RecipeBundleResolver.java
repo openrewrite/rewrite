@@ -13,17 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.marketplace;
+package org.openrewrite.marketplace;
 
-import org.openrewrite.marketplace.RecipeMarketplace;
+public interface RecipeBundleResolver {
+    String getEcosystem();
 
-public class MavenRecipeMarketplaceFormatter {
-
-    /**
-     * @return A RecipeMarketplace whose entries are sorted by categories first
-     * and then alphabetically by name.
-     */
-    public RecipeMarketplace autoFormat(RecipeMarketplace marketplace) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
+    RecipeBundleReader resolve(RecipeBundle bundle);
 }

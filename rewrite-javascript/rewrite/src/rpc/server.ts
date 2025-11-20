@@ -46,7 +46,7 @@ async function main() {
         .option('--log-file <log_path>', 'log file path')
         .option('--metrics-csv <metrics_csv_path>', 'metrics CSV output path')
         .option('--trace-rpc-messages', 'trace RPC messages at the protocol level')
-        .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 200)
+        .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 1000)
         .option('--recipe-install-dir <install_dir>', 'Recipe installation directory (default is a temporary directory)')
         .parse();
 

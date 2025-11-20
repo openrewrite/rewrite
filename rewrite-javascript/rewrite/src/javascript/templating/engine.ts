@@ -293,7 +293,10 @@ export class TemplateEngine {
                     const typeString = typeof captureType === 'string'
                         ? captureType
                         : this.typeToString(captureType);
-                    preamble.push(`let ${placeholder}: ${typeString};`);
+                    // Only add preamble if we have a concrete type (not 'any')
+                    if (typeString !== 'any') {
+                        preamble.push(`let ${placeholder}: ${typeString};`);
+                    }
                 }
             } else if (isCaptureValue) {
                 // For CaptureValue, check if the root capture has a type
@@ -304,7 +307,10 @@ export class TemplateEngine {
                         const typeString = typeof captureType === 'string'
                             ? captureType
                             : this.typeToString(captureType);
-                        preamble.push(`let ${placeholder}: ${typeString};`);
+                        // Only add preamble if we have a concrete type (not 'any')
+                        if (typeString !== 'any') {
+                            preamble.push(`let ${placeholder}: ${typeString};`);
+                        }
                     }
                 }
             } else if (isTree(param) && !isTreeArray) {
@@ -312,7 +318,10 @@ export class TemplateEngine {
                 const jElement = param as J;
                 if ((jElement as any).type) {
                     const typeString = this.typeToString((jElement as any).type);
-                    preamble.push(`let ${placeholder}: ${typeString};`);
+                    // Only add preamble if we have a concrete type (not 'any')
+                    if (typeString !== 'any') {
+                        preamble.push(`let ${placeholder}: ${typeString};`);
+                    }
                 }
             }
         }
@@ -435,12 +444,13 @@ export class TemplateEngine {
                 const typeString = typeof captureType === 'string'
                     ? captureType
                     : this.typeToString(captureType);
-                const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
-                preamble.push(`let ${placeholder}: ${typeString};`);
-            } else {
-                const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
-                preamble.push(`let ${placeholder};`);
+                // Only add preamble if we have a concrete type (not 'any')
+                if (typeString !== 'any') {
+                    const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
+                    preamble.push(`let ${placeholder}: ${typeString};`);
+                }
             }
+            // Don't add preamble declarations without types - they don't provide type attribution
         }
 
         // Build the template string with placeholders for captures and raw code
@@ -547,14 +557,14 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
     /**
      * Propagates markers from element to RightPadded wrapper.
      */
-    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): Promise<J.RightPadded<T>> {
+    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): Promise<J.RightPadded<T> | undefined> {
         if (!isTree(right.element)) {
             return right;
         }
 
         const visitedElement = await this.visit(right.element as J, p);
         if (visitedElement && visitedElement !== right.element as Tree) {
-            return produceAsync<J.RightPadded<T>>(right, async (draft: any) => {
+            const result = await produceAsync<J.RightPadded<T>>(right, async (draft: any) => {
                 // Visit element first
                 if (right.element && (right.element as any).kind) {
                     // Check if element has a CaptureMarker
@@ -566,6 +576,7 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
                     }
                 }
             });
+            return result!;
         }
 
         return right;

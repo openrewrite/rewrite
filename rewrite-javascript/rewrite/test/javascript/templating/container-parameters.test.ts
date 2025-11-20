@@ -29,7 +29,7 @@ describe('container parameters in templates', () => {
                 if (this.sliceMatcher.matches(method.methodType)) {
                     if (method.select) {
                         const selectExpr = method.select;  // J.RightPadded<Expression>
-                        return await template`${selectExpr}.subarray()`.apply(this.cursor, method);
+                        return await template`${selectExpr}.subarray()`.apply(method, this.cursor);
                     }
                 }
                 return super.visitMethodInvocation(method, p);
@@ -60,7 +60,7 @@ describe('container parameters in templates', () => {
                     if (method.select) {
                         const selectExpr = method.select;  // J.RightPadded<Expression>
                         const args = method.arguments;      // J.Container<Expression>
-                        return await template`${selectExpr}.subarray(${args})`.apply(this.cursor, method);
+                        return await template`${selectExpr}.subarray(${args})`.apply(method, this.cursor);
                     }
                 }
                 return super.visitMethodInvocation(method, p);
@@ -87,7 +87,7 @@ describe('container parameters in templates', () => {
             override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
                 if ((method.name as J.Identifier).simpleName === 'foo') {
                     const args = method.arguments.elements;  // J.RightPadded<Expression>[]
-                    return await template`bar(${args})`.apply(this.cursor, method);
+                    return await template`bar(${args})`.apply(method, this.cursor);
                 }
                 return super.visitMethodInvocation(method, p);
             }

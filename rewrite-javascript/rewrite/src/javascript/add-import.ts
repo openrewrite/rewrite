@@ -1,9 +1,8 @@
 import {JavaScriptVisitor} from "./visitor";
-import {J, emptySpace, rightPadded, space, Statement, singleSpace, Type} from "../java";
+import {emptySpace, J, rightPadded, singleSpace, space, Statement, Type} from "../java";
 import {JS} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
-import {ExecutionContext} from "../execution";
 
 export enum ImportStyle {
     ES6Named,      // import { x } from 'module'
@@ -13,18 +12,31 @@ export enum ImportStyle {
 }
 
 export interface AddImportOptions {
-    /** The module name (e.g., 'fs') to import from */
-    target: string;
+    /** The module name (e.g., 'fs', 'react') to import from */
+    module: string;
 
     /** Optionally, the specific member to import from the module.
-     * If not specified, adds a default import or namespace import */
+     * If not specified, adds a default import or namespace import.
+     * Special values:
+     * - 'default': Adds a default import from the module.
+     *   When using 'default', the `alias` parameter is required.
+     * - '*': Adds a namespace import (import * as alias from 'module').
+     *   When using '*', the `alias` parameter is required.
+     * Cannot be combined with `sideEffectOnly`. */
     member?: string;
 
-    /** Optional alias for the imported member */
+    /** Optional alias for the imported member.
+     * Required when member is 'default' or '*'.
+     * Cannot be combined with `sideEffectOnly`. */
     alias?: string;
 
-    /** If true, only add the import if the member is actually used in the file. Default: true */
+    /** If true, only add the import if the member is actually used in the file. Default: true
+     * Cannot be combined with `sideEffectOnly`. */
     onlyIfReferenced?: boolean;
+
+    /** If true, adds a side-effect import without bindings (e.g., `import 'module'` or `require('module')`).
+     * Cannot be combined with `member`, `alias`, or `onlyIfReferenced`. */
+    sideEffectOnly?: boolean;
 
     /** Optional import style to use. If not specified, auto-detects from file and existing imports */
     style?: ImportStyle;
@@ -34,6 +46,26 @@ export interface AddImportOptions {
  * Register an AddImport visitor to add an import statement to a JavaScript/TypeScript file
  * @param visitor The visitor to add the import addition to
  * @param options Configuration options for the import to add
+ *
+ * @example
+ * // Add a named import
+ * maybeAddImport(visitor, { module: 'fs', member: 'readFile' });
+ *
+ * @example
+ * // Add a default import using the 'default' member specifier
+ * maybeAddImport(visitor, { module: 'react', member: 'default', alias: 'React' });
+ *
+ * @example
+ * // Add a default import (legacy way, without specifying member)
+ * maybeAddImport(visitor, { module: 'react', alias: 'React' });
+ *
+ * @example
+ * // Add a namespace import
+ * maybeAddImport(visitor, { module: 'crypto', member: '*', alias: 'crypto' });
+ *
+ * @example
+ * // Add a side-effect import
+ * maybeAddImport(visitor, { module: 'core-js/stable', sideEffectOnly: true });
  */
 export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,
@@ -41,9 +73,10 @@ export function maybeAddImport(
 ) {
     for (const v of visitor.afterVisit || []) {
         if (v instanceof AddImport &&
-            v.target === options.target &&
+            v.module === options.module &&
             v.member === options.member &&
-            v.alias === options.alias) {
+            v.alias === options.alias &&
+            v.sideEffectOnly === (options.sideEffectOnly ?? false)) {
             return;
         }
     }
@@ -51,18 +84,44 @@ export function maybeAddImport(
 }
 
 export class AddImport<P> extends JavaScriptVisitor<P> {
-    readonly target: string;
+    readonly module: string;
     readonly member?: string;
     readonly alias?: string;
     readonly onlyIfReferenced: boolean;
+    readonly sideEffectOnly: boolean;
     readonly style?: ImportStyle;
 
     constructor(options: AddImportOptions) {
         super();
-        this.target = options.target;
+
+        // Validate that alias is provided when member is 'default'
+        if (options.member === 'default' && !options.alias) {
+            throw new Error("When member is 'default', the alias parameter is required");
+        }
+
+        // Validate that alias is provided when member is '*' (namespace import)
+        if (options.member === '*' && !options.alias) {
+            throw new Error("When member is '*', the alias parameter is required");
+        }
+
+        // Validate that sideEffectOnly is not combined with incompatible options
+        if (options.sideEffectOnly) {
+            if (options.member !== undefined) {
+                throw new Error("Cannot combine sideEffectOnly with member");
+            }
+            if (options.alias !== undefined) {
+                throw new Error("Cannot combine sideEffectOnly with alias");
+            }
+            if (options.onlyIfReferenced !== undefined) {
+                throw new Error("Cannot combine sideEffectOnly with onlyIfReferenced");
+            }
+        }
+
+        this.module = options.module;
         this.member = options.member;
         this.alias = options.alias;
         this.onlyIfReferenced = options.onlyIfReferenced ?? true;
+        this.sideEffectOnly = options.sideEffectOnly ?? false;
         this.style = options.style;
     }
 
@@ -114,8 +173,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         // For .mjs or TypeScript, prefer ES6
         if (sourcePath.endsWith('.mjs') || isTypeScript) {
-            // If we're importing a member, use named imports
-            if (this.member !== undefined) {
+            // If we're importing a member (but not 'default'), use named imports
+            if (this.member !== undefined && this.member !== 'default') {
                 return ImportStyle.ES6Named;
             }
             // Otherwise default import
@@ -175,8 +234,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return ImportStyle.CommonJS;
         }
 
-        // If importing a member, prefer named imports if they exist in the file
-        if (this.member !== undefined) {
+        // If importing a member (but not 'default'), prefer named imports if they exist in the file
+        if (this.member !== undefined && this.member !== 'default') {
             if (hasNamedImports) {
                 return ImportStyle.ES6Named;
             }
@@ -186,7 +245,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // For default/whole module imports
-        if (this.member === undefined) {
+        if (this.member === undefined || this.member === 'default') {
             if (hasNamespaceImports) {
                 return ImportStyle.ES6Namespace;
             }
@@ -195,8 +254,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        // Default to named imports for members, default imports for modules
-        return this.member !== undefined ? ImportStyle.ES6Named : ImportStyle.ES6Default;
+        // Default to named imports for members (except 'default'), default imports for modules
+        return (this.member !== undefined && this.member !== 'default')
+            ? ImportStyle.ES6Named
+            : ImportStyle.ES6Default;
     }
 
     /**
@@ -214,7 +275,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 if (moduleSpecifier) {
                     const moduleName = this.getModuleName(moduleSpecifier);
 
-                    if (moduleName === this.target) {
+                    if (moduleName === this.module) {
                         const importClause = jsImport.importClause;
                         if (importClause?.namedBindings) {
                             if (importClause.namedBindings.kind === JS.Kind.NamedImports) {
@@ -240,7 +301,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     if (initializer?.kind === J.Kind.MethodInvocation &&
                         this.isRequireCall(initializer as J.MethodInvocation)) {
                         const moduleName = this.getModuleNameFromRequire(initializer as J.MethodInvocation);
-                        if (moduleName === this.target) {
+                        if (moduleName === this.module) {
                             return ImportStyle.CommonJS;
                         }
                     }
@@ -259,7 +320,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // If onlyIfReferenced is true, check if the identifier is actually used
-        if (this.onlyIfReferenced) {
+        // Skip this check for side-effect imports
+        if (!this.sideEffectOnly && this.onlyIfReferenced) {
             const isReferenced = await this.checkIdentifierReferenced(compilationUnit);
             if (!isReferenced) {
                 return compilationUnit;
@@ -270,7 +332,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const importStyle = this.determineImportStyle(compilationUnit);
 
         // For ES6 named imports, check if we can merge into an existing import from the same module
-        if (importStyle === ImportStyle.ES6Named && this.member !== undefined) {
+        // Don't try to merge default imports (member === 'default'), side-effect imports, or namespace imports (member === '*')
+        if (!this.sideEffectOnly && importStyle === ImportStyle.ES6Named && this.member !== undefined && this.member !== 'default' && this.member !== '*') {
             const mergedCu = await this.tryMergeIntoExistingImport(compilationUnit, p);
             if (mergedCu !== compilationUnit) {
                 return mergedCu;
@@ -368,7 +431,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 const moduleName = this.getModuleName(moduleSpecifier);
 
                 // Check if this is an import from our target module
-                if (moduleName !== this.target) {
+                if (moduleName !== this.module) {
                     continue;
                 }
 
@@ -390,14 +453,27 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     const newSpecifierBase = this.createImportSpecifier();
                     const newSpecifier = {...newSpecifierBase, prefix: singleSpace};
 
+                    // Transfer the right padding from the element before the insertion point to the new element
+                    // Since we're appending, this is the last existing element
+                    const existingElements = namedImports.elements.elements;
+                    const elementBeforeInsertion = existingElements[existingElements.length - 1];
+                    const paddingToTransfer = elementBeforeInsertion.after;
+
                     // Add the new specifier to the elements
                     const updatedNamedImports: JS.NamedImports = await this.produceJavaScript<JS.NamedImports>(
                         namedImports, p, async namedDraft => {
+                            // Update the element before insertion to have emptySpace as its right padding (before the comma)
+                            const updatedExistingElements = existingElements.slice(0, -1).concat({
+                                ...elementBeforeInsertion,
+                                after: emptySpace
+                            });
+
                             namedDraft.elements = {
                                 ...namedImports.elements,
                                 elements: [
-                                    ...namedImports.elements.elements,
-                                    rightPadded(newSpecifier, emptySpace)
+                                    ...updatedExistingElements,
+                                    // Transfer the padding to the new element (after the comma, before the closing brace)
+                                    rightPadded(newSpecifier, paddingToTransfer)
                                 ]
                             };
                         }
@@ -462,19 +538,55 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         const moduleName = this.getModuleName(moduleSpecifier);
-        if (moduleName !== this.target) {
+        if (moduleName !== this.module) {
             return false;
         }
 
         const importClause = jsImport.importClause;
+
+        // Handle side-effect imports (no import clause)
         if (!importClause) {
+            // If we're trying to add a side-effect import and one already exists, it's a match
+            return this.sideEffectOnly;
+        }
+
+        // If we're adding a side-effect import but there's an existing import with bindings,
+        // it's not a match (side-effect import should be separate)
+        if (this.sideEffectOnly) {
             return false;
         }
 
         // Check if the specific member or default import already exists
-        if (this.member === undefined) {
+        if (this.member === '*') {
+            // We're adding a namespace import, check if one exists
+            const namedBindings = importClause.namedBindings;
+            if (!namedBindings) {
+                return false;
+            }
+
+            // Namespace imports can be represented as J.Identifier or JS.Alias
+            if (namedBindings.kind === J.Kind.Identifier) {
+                const identifier = namedBindings as J.Identifier;
+                return identifier.simpleName === this.alias;
+            } else if (namedBindings.kind === JS.Kind.Alias) {
+                const alias = namedBindings as JS.Alias;
+                if (alias.alias?.kind === J.Kind.Identifier) {
+                    return (alias.alias as J.Identifier).simpleName === this.alias;
+                }
+            }
+            return false;
+        } else if (this.member === undefined || this.member === 'default') {
             // We're adding a default import, check if one exists
-            return importClause.name !== undefined;
+            // For member === 'default', also verify the alias matches if specified
+            if (importClause.name === undefined) {
+                return false;
+            }
+            // If we have an alias, check that it matches
+            if (this.alias && importClause.name.element?.kind === J.Kind.Identifier) {
+                const existingName = (importClause.name.element as J.Identifier).simpleName;
+                return existingName === this.alias;
+            }
+            return true;
         } else {
             // We're adding a named import, check if it exists
             const namedBindings = importClause.namedBindings;
@@ -525,16 +637,21 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         const moduleName = this.getModuleNameFromRequire(methodInv);
-        if (moduleName !== this.target) {
+        if (moduleName !== this.module) {
             return false;
         }
 
         // Check if the variable name matches what we're trying to add
         const pattern = namedVar.name;
-        if (this.member === undefined && pattern?.kind === J.Kind.Identifier) {
+        if ((this.member === undefined || this.member === 'default') && pattern?.kind === J.Kind.Identifier) {
             // Default import style: const fs = require('fs')
+            // For member === 'default', also check the alias matches if specified
+            if (this.alias) {
+                const varName = (pattern as J.Identifier).simpleName;
+                return varName === this.alias;
+            }
             return true;
-        } else if (this.member !== undefined && pattern?.kind === JS.Kind.ObjectBindingPattern) {
+        } else if (this.member !== undefined && this.member !== 'default' && pattern?.kind === JS.Kind.ObjectBindingPattern) {
             // Destructured import: const { member } = require('module')
             const objectPattern = pattern as JS.ObjectBindingPattern;
             for (const elem of objectPattern.bindings.elements) {
@@ -555,64 +672,143 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Check if the identifier is actually referenced in the file
      */
     private async checkIdentifierReferenced(compilationUnit: JS.CompilationUnit): Promise<boolean> {
-        // Use type attribution to detect if the identifier is referenced
-        // Map of module name -> Set of member names used from that module
-        const usedImports = new Map<string, Set<string>>();
+        // For namespace imports, we cannot use type attribution to detect usage
+        // because the namespace itself is used as an identifier, not individual members.
+        // For simplicity, we skip the onlyIfReferenced check for namespace imports.
+        if (this.member === '*') {
+            // TODO: Implement proper namespace usage detection by checking if alias identifier is used
+            return true;
+        }
 
-        // Helper to record usage of a method from a module
-        const recordMethodUsage = (methodType: Type.Method) => {
-            const moduleName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
-            if (moduleName) {
-                if (!usedImports.has(moduleName)) {
-                    usedImports.set(moduleName, new Set());
+        // Step 1: Find the expected declaring type by examining existing imports from the same module
+        let expectedDeclaringType: string | undefined;
+
+        for (const stmt of compilationUnit.statements) {
+            const statement = stmt.element;
+
+            if (statement?.kind === JS.Kind.Import) {
+                const jsImport = statement as JS.Import;
+                const moduleSpecifier = jsImport.moduleSpecifier?.element;
+
+                if (!moduleSpecifier) {
+                    continue;
                 }
-                usedImports.get(moduleName)!.add(methodType.name);
-            }
-        };
 
-        // Create a visitor to collect used identifiers with their type attribution
-        const collector = new class extends JavaScriptVisitor<ExecutionContext> {
-            override async visitIdentifier(identifier: J.Identifier, p: ExecutionContext): Promise<J | undefined> {
-                const type = identifier.type;
-                if (type && Type.isMethod(type)) {
-                    recordMethodUsage(type as Type.Method);
+                const moduleName = this.getModuleName(moduleSpecifier);
+                if (moduleName !== this.module) {
+                    continue;  // Not the module we're interested in
+                }
+
+                // Found an existing import from our target module
+                // Extract the declaring type from any imported member with type attribution
+                const importClause = jsImport.importClause;
+                if (importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
+                    const namedImports = importClause.namedBindings as JS.NamedImports;
+                    for (const elem of namedImports.elements.elements) {
+                        const specifier = elem.element;
+                        if (specifier?.kind === JS.Kind.ImportSpecifier) {
+                            const importSpec = specifier as JS.ImportSpecifier;
+                            let identifier: J.Identifier | undefined;
+                            if (importSpec.specifier?.kind === J.Kind.Identifier) {
+                                identifier = importSpec.specifier as J.Identifier;
+                            } else if (importSpec.specifier?.kind === JS.Kind.Alias) {
+                                const aliasSpec = importSpec.specifier as JS.Alias;
+                                if (aliasSpec.alias?.kind === J.Kind.Identifier) {
+                                    identifier = aliasSpec.alias as J.Identifier;
+                                }
+                            }
+
+                            if (identifier?.type && Type.isMethod(identifier.type)) {
+                                const methodType = identifier.type as Type.Method;
+                                expectedDeclaringType = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                                if (expectedDeclaringType) {
+                                    break;  // Found it!
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (expectedDeclaringType) {
+                    break;  // No need to scan more imports
+                }
+            }
+        }
+
+        // Step 2: Look for references that match
+        const targetName = this.alias || this.member;
+        let found = false;
+
+        // If no existing imports from this module, look for unresolved references
+        // If there ARE existing imports, look for references with the expected declaring type
+
+        const collector = new class extends JavaScriptVisitor<void> {
+            override async visitIdentifier(identifier: J.Identifier, p: void): Promise<J | undefined> {
+                if (identifier.simpleName === targetName) {
+                    const type = identifier.type;
+                    if (expectedDeclaringType) {
+                        // We have an expected declaring type - check for exact match
+                        if (type && Type.isMethod(type)) {
+                            const methodType = type as Type.Method;
+                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                            if (declaringTypeName === expectedDeclaringType) {
+                                found = true;
+                            }
+                        }
+                    } else {
+                        // No existing imports - look for unresolved references (no type)
+                        if (!type) {
+                            found = true;
+                        }
+                    }
                 }
                 return super.visitIdentifier(identifier, p);
             }
 
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
-                if (methodInvocation.methodType) {
-                    recordMethodUsage(methodInvocation.methodType);
+            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: void): Promise<J | undefined> {
+                if (methodInvocation.methodType && methodInvocation.methodType.name === targetName) {
+                    if (expectedDeclaringType) {
+                        const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodInvocation.methodType.declaringType);
+                        if (declaringTypeName === expectedDeclaringType) {
+                            found = true;
+                        }
+                    }
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
 
-            override async visitFunctionCall(functionCall: JS.FunctionCall, p: ExecutionContext): Promise<J | undefined> {
-                if (functionCall.methodType) {
-                    recordMethodUsage(functionCall.methodType);
+            override async visitFunctionCall(functionCall: JS.FunctionCall, p: void): Promise<J | undefined> {
+                if (functionCall.methodType && functionCall.methodType.name === targetName) {
+                    if (expectedDeclaringType) {
+                        const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(functionCall.methodType.declaringType);
+                        if (declaringTypeName === expectedDeclaringType) {
+                            found = true;
+                        }
+                    }
                 }
                 return super.visitFunctionCall(functionCall, p);
             }
 
-            override async visitFieldAccess(fieldAccess: J.FieldAccess, p: ExecutionContext): Promise<J | undefined> {
+            override async visitFieldAccess(fieldAccess: J.FieldAccess, p: void): Promise<J | undefined> {
                 const type = fieldAccess.type;
                 if (type && Type.isMethod(type)) {
-                    recordMethodUsage(type as Type.Method);
+                    const methodType = type as Type.Method;
+                    if (methodType.name === targetName) {
+                        if (expectedDeclaringType) {
+                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                            if (declaringTypeName === expectedDeclaringType) {
+                                found = true;
+                            }
+                        }
+                    }
                 }
                 return super.visitFieldAccess(fieldAccess, p);
             }
         };
 
-        await collector.visit(compilationUnit, new ExecutionContext());
+        await collector.visit(compilationUnit, undefined);
 
-        // Check if our target import is used based on type attribution
-        const moduleMembers = usedImports.get(this.target);
-        if (!moduleMembers) {
-            return false;
-        }
-
-        // For specific members, check if that member is used; otherwise check if any member is used
-        return this.member ? moduleMembers.has(this.member) : moduleMembers.size > 0;
+        return found;
     }
 
     /**
@@ -623,28 +819,77 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const prefix = this.determineImportPrefix(compilationUnit, insertionIndex);
 
         // Create the module specifier
+        // For side-effect imports, use emptySpace since space comes from LeftPadded.before
+        // For regular imports with import clause, use emptySpace since space comes from LeftPadded.before
+        // However, the printer expects the space after 'from' in the literal's prefix
         const moduleSpecifier: J.Literal = {
             id: randomId(),
             kind: J.Kind.Literal,
-            prefix: singleSpace,
+            prefix: this.sideEffectOnly ? emptySpace : singleSpace,
             markers: emptyMarkers,
-            value: `'${this.target}'`,
-            valueSource: `'${this.target}'`,
+            value: `'${this.module}'`,
+            valueSource: `'${this.module}'`,
             unicodeEscapes: [],
             type: undefined
         };
 
         let importClause: JS.ImportClause | undefined;
 
-        if (this.member === undefined) {
+        if (this.sideEffectOnly) {
+            // Side-effect import: import 'module'
+            importClause = undefined;
+        } else if (this.member === '*') {
+            // Namespace import: import * as alias from 'module'
+            const propertyName: J.Identifier = {
+                id: randomId(),
+                kind: J.Kind.Identifier,
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                annotations: [],
+                simpleName: '*',
+                type: undefined,
+                fieldType: undefined
+            };
+
+            const aliasIdentifier: J.Identifier = {
+                id: randomId(),
+                kind: J.Kind.Identifier,
+                prefix: singleSpace,
+                markers: emptyMarkers,
+                annotations: [],
+                simpleName: this.alias!,
+                type: undefined,
+                fieldType: undefined
+            };
+
+            const namespaceBinding: JS.Alias = {
+                id: randomId(),
+                kind: JS.Kind.Alias,
+                prefix: singleSpace,
+                markers: emptyMarkers,
+                propertyName: rightPadded(propertyName, singleSpace),
+                alias: aliasIdentifier
+            };
+
+            importClause = {
+                id: randomId(),
+                kind: JS.Kind.ImportClause,
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                typeOnly: false,
+                name: undefined,
+                namedBindings: namespaceBinding
+            };
+        } else if (this.member === undefined || this.member === 'default') {
             // Default import: import target from 'module'
+            // or: import alias from 'module' (when member === 'default')
             const defaultName: J.Identifier = {
                 id: randomId(),
                 kind: J.Kind.Identifier,
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 annotations: [],
-                simpleName: this.alias || this.target,
+                simpleName: this.alias || this.module,
                 type: undefined,
                 fieldType: undefined
             };

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {autoFormat, AutoformatVisitor, JavaScriptVisitor, typescript} from "../../../src/javascript";
+import {autoFormat, AutoformatVisitor, JavaScriptVisitor, tsx, typescript} from "../../../src/javascript";
 
 
 describe('AutoformatVisitor', () => {
@@ -323,4 +323,42 @@ describe('AutoformatVisitor', () => {
         // TODO we might eventually implement the "Chop down if long" setting for this
         return spec.rewriteRun(typescript(code));
     });
+
+    test('TSX', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            tsx(
+                `
+                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
+                    const handleClick = () => {
+                        console.log('clicked');
+                    };
+
+                    return (
+                    <div ref={ref} onClick={handleClick}>
+                    <h1>{props.title}</h1>
+                    <p>{props.content}</p>
+                    </div>
+                    );
+                };
+                `,
+                `
+                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
+                    const handleClick = () => {
+                        console.log('clicked');
+                    };
+
+                    return (
+                        <div ref={ref} onClick={handleClick}>
+                            <h1>{props.title}</h1>
+                            <p>{props.content}</p>
+                        </div>
+                    );
+                };
+                `
+            )
+            // @formatter:on
+        )
+    })
 });

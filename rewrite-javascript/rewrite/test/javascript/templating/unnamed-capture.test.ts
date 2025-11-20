@@ -29,10 +29,10 @@ describe('unnamed capture', () => {
                 const right = capture();
 
                 //language=typescript
-                let m = await pattern`${left} + ${right}`.match(expr) ||
-                    await pattern`${left} * ${right}`.match(expr);
+                let m = await pattern`${left} + ${right}`.match(expr, this.cursor) ||
+                    await pattern`${left} * ${right}`.match(expr, this.cursor);
 
-                return m && await template`${right} + ${left}`.apply(this.cursor, expr, m) || expr;
+                return m && await template`${right} + ${left}`.apply(expr, this.cursor, {values: m}) || expr;
             }
         });
 

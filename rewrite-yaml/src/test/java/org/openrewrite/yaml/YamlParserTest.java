@@ -466,6 +466,23 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parseTagsCorrectlyOnFirstLineOfMappingEntry() {
+        rewriteRun(
+          yaml(
+            """
+              - !SOMETAG
+                a: b
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Sequence sequence = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
+                Yaml.Mapping mapping = (Yaml.Mapping) sequence.getEntries().getFirst().getBlock();
+                assertThat(mapping.getTag().getName()).isEqualTo("SOMETAG");
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/customer-requests/issues/1471")
     @Test
     void yamlWithDocumentEndMarker() {

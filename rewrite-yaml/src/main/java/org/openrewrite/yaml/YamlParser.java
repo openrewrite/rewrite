@@ -197,7 +197,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         }
 
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
-                        int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
+                        int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix) + 1;
                         Yaml.Tag tag = null;
                         if (mappingStartEvent.getTag() != null) {
                             String prefixAfterColon = fullPrefix.substring(startIndex);
