@@ -17,6 +17,7 @@
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -98,6 +99,52 @@ import static org.openrewrite.xml.Assertions.xml;
               </beans>
               """,
             documentSourceSpec -> documentSourceSpec.path("my/project/notBeans.xml")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/6314")
+    void removeOnlyElementMatchingTextPredicate() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveXmlTag("/test/foo[text()='bar']", null)),
+          xml(
+            """
+              <test>
+                  <foo>bar</foo>
+                  <foo>notBar</foo>
+                  <foo/>
+              </test>
+              """,
+            """
+              <test>
+                  <foo>notBar</foo>
+                  <foo/>
+              </test>
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/6314")
+    void removeOnlyElementMatchingLocalNameAndTextPredicate() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveXmlTag("/test/*[local-name()='foo' and text()='bar']", null)),
+          xml(
+            """
+              <test>
+                  <foo>bar</foo>
+                  <foo>notBar</foo>
+                  <foo/>
+              </test>
+              """,
+            """
+              <test>
+                  <foo>notBar</foo>
+                  <foo/>
+              </test>
+              """
           )
         );
     }

@@ -413,6 +413,43 @@ class XPathMatcherTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/6314")
+    void matchTextFunctionCondition() {
+        SourceFile xml = new XmlParser().parse(
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <test>
+              <foo>bar</foo>
+              <foo>notBar</foo>
+              <foo/>
+            </test>
+            """
+        ).toList().getFirst();
+
+        // text() predicate should only match element with specific text content
+        assertThat(match("/test/foo[text()='bar']", xml)).isTrue();
+        assertThat(match("/test/foo[text()='notBar']", xml)).isTrue();
+        assertThat(match("/test/foo[text()='nonexistent']", xml)).isFalse();
+        assertThat(match("//foo[text()='bar']", xml)).isTrue();
+        assertThat(match("//foo[text()='notBar']", xml)).isTrue();
+        assertThat(match("//foo[text()='nonexistent']", xml)).isFalse();
+
+        // wildcard element with text() predicate
+        assertThat(match("/test/*[text()='bar']", xml)).isTrue();
+        assertThat(match("//*[text()='bar']", xml)).isTrue();
+        assertThat(match("//*[text()='notBar']", xml)).isTrue();
+
+        // combining text() with local-name()
+        assertThat(match("//*[local-name()='foo' and text()='bar']", xml)).isTrue();
+        assertThat(match("//*[local-name()='foo' and text()='notBar']", xml)).isTrue();
+        assertThat(match("//*[local-name()='foo' and text()='nonexistent']", xml)).isFalse();
+
+        // combining text() with or
+        assertThat(match("/test/foo[text()='bar' or text()='notBar']", xml)).isTrue();
+        assertThat(match("/test/foo[text()='nonexistent' or text()='bar']", xml)).isTrue();
+    }
+
+    @Test
     void matchConditionsWithConjunctions() {
         // T&T, T&F, F&T, F&F
         assertThat(match("//*[local-name()='element3' and @ns3:attr='test']", namespacedXml)).isTrue();
