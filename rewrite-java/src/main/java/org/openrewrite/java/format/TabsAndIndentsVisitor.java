@@ -17,15 +17,21 @@ package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.Iterator;
 import java.util.List;
@@ -42,8 +48,15 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     private final SpacesStyle spacesStyle;
     private final WrappingAndBracesStyle wrappingStyle;
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingStyle) {
-        this(style, spacesStyle, wrappingStyle, null);
+    public TabsAndIndentsVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
+    }
+
+    public TabsAndIndentsVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents),
+                getStyle(SpacesStyle.class, styles, IntelliJ::spaces),
+                getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces),
+                stopAfter);
     }
 
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingStyle, @Nullable Tree stopAfter) {
@@ -474,9 +487,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             int declPrefixLength = getLengthOfWhitespace(tree.getPrefix().getLastWhitespace());
 
             return declPrefixLength + style.getContinuationIndent();
-        } else {
-            return computeColumnPosition(tree, firstArg, getCursor());
         }
+        return computeColumnPosition(tree, firstArg, getCursor());
     }
 
     @Override
@@ -800,5 +812,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         ALIGN,
         INDENT,
         CONTINUATION_INDENT
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
     }
 }
