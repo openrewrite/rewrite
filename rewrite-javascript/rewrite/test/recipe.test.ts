@@ -40,7 +40,8 @@ describe("recipes", () => {
                     displayName: "Text",
                     name: "text",
                     required: true,
-                    value: undefined
+                    value: undefined,
+                    type: "string"
                 }
             ],
             recipeList: [],

@@ -36,6 +36,7 @@
     "diff": "^7.0.0",
     "immer": "^10.1.1",
     "picomatch": "^4.0.3",
+    "reflect-metadata": "^0.2.2",
     "tmp-promise": "^3.0.3",
     "typescript": "^5.8.3",
     "vscode-jsonrpc": "^8.2.1"

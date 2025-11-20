@@ -13,7 +13,8 @@
     "skipLibCheck": true,
     "rootDir": ".",
     "outDir": "./dist",
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": [
     "src/**/*",
