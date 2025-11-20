@@ -44,7 +44,7 @@ java {
 dependencies {
     api(project(":rewrite-java"))
 
-    implementation("org.codehaus.groovy:groovy:latest.release")
+    implementation("org.apache.groovy:groovy:4.+")
 
     compileOnly(project(":rewrite-test"))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
@@ -59,7 +59,7 @@ dependencies {
     testImplementation(project(":rewrite-java-test"))
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
-    testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
+    testRuntimeOnly("org.apache.groovy:groovy-all:4.+")
     testRuntimeOnly(project(":rewrite-java-21"))
 }
 
