@@ -334,7 +334,7 @@ export class Pattern {
             lines.push(`[${patternId}] ✅ SUCCESS matching against ${shortKind}:`);
 
             // Mark captured elements with numbered markers
-            let markedAst = ast;
+            let markedAst = tree;
             const captureNumbers = new Map<number, JTree | JTree[]>();
 
             if (result.result) {
@@ -355,7 +355,7 @@ export class Pattern {
                     if (captureNumbers.size > 0) {
                         try {
                             const visitor = new ElementMarkerVisitor(captureNumbers);
-                            markedAst = await visitor.visit(ast, undefined) as J;
+                            markedAst = await visitor.visit(tree, undefined) as J;
                         } catch (markError) {
                             console.warn(`Failed to mark captures: ${markError}`);
                         }
@@ -448,13 +448,13 @@ export class Pattern {
                 // Use explanation's targetElement if available, otherwise fall back to cursor
                 if (explanation?.targetElement || (targetCursor && (targetCursor.value as any)?.id)) {
                     try {
-                        markedTree = await this.markElementWithSearchResult(ast, targetCursor, explanation, false);
+                        markedTree = await this.markElementWithSearchResult(tree, targetCursor, explanation, false);
                     } catch (markError) {
                         // If marking fails, continue without the marker
                         console.warn(`Failed to mark matched tree: ${markError}`);
                     }
                 }
-                const treeToPrint = markedTree || ast;
+                const treeToPrint = markedTree || tree;
                 const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
                 const output = new PrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                 matchedTreeStr = await printer.print(treeToPrint, output);
@@ -464,7 +464,7 @@ export class Pattern {
                 matchedTreeStr = `(tree printing unavailable: ${e})`;
             }
 
-            const sourcePath = this.getSourcePathFromCursor(targetCursor, ast);
+            const sourcePath = this.getSourcePathFromCursor(targetCursor, tree);
             const sourcePathStr = sourcePath ? ` (${sourcePath})` : '';
             lines.push(`[${patternId}]`);
             lines.push(`${redColor}[${patternId}]    Matched tree${sourcePathStr}:${resetColor}`);

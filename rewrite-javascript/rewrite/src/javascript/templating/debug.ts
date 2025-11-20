@@ -418,7 +418,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             try {
                 if (captureMarker.constraint && !captureMarker.variadicOptions) {
                     this.debug.log('debug', 'constraint', `Evaluating constraint for capture: ${captureMarker.captureName}`);
-                    const constraintResult = captureMarker.constraint(p, cursorAtCapturedNode);
+                    const constraintResult = captureMarker.constraint(p, this.buildConstraintContext(cursorAtCapturedNode));
                     if (!constraintResult) {
                         this.debug.log('info', 'constraint', `Constraint failed for capture: ${captureMarker.captureName}`);
                         this.debug.setExplanation('constraint-failed', `Capture ${captureMarker.captureName} with valid constraint`, `Constraint failed for ${(p as JTree).kind}`, `Constraint evaluation returned false`);
@@ -500,7 +500,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             try {
                 if (captureMarker.constraint && !captureMarker.variadicOptions) {
                     this.debug.log('debug', 'constraint', `Evaluating constraint for wrapped capture: ${captureMarker.captureName}`);
-                    const constraintResult = captureMarker.constraint(targetElement as J, cursorAtCapturedNode);
+                    const constraintResult = captureMarker.constraint(targetElement as J, this.buildConstraintContext(cursorAtCapturedNode));
                     if (!constraintResult) {
                         this.debug.log('info', 'constraint', `Constraint failed for wrapped capture: ${captureMarker.captureName}`);
                         this.debug.setExplanation('constraint-failed', `Capture ${captureMarker.captureName} with valid constraint`, `Constraint failed for ${(targetElement as any).kind}`, `Constraint evaluation returned false`);
@@ -759,7 +759,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                 if (captureMarker.constraint) {
                     this.debug.log('debug', 'constraint', `Evaluating variadic constraint for capture: ${captureMarker.captureName} (${capturedElements.length} elements)`);
                     const cursor = this.targetCursor || new Cursor(targetElements[0]);
-                    const constraintResult = captureMarker.constraint(capturedElements as any, cursor);
+                    const constraintResult = captureMarker.constraint(capturedElements as any, this.buildConstraintContext(cursor));
                     if (!constraintResult) {
                         this.debug.log('info', 'constraint', `Variadic constraint failed for capture: ${captureMarker.captureName}`);
                         continue;
