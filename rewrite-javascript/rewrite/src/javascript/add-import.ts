@@ -718,11 +718,20 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 }
                             }
 
+                            // Try to extract declaring type from either type or fieldType
                             if (identifier?.type && Type.isMethod(identifier.type)) {
                                 const methodType = identifier.type as Type.Method;
                                 expectedDeclaringType = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
                                 if (expectedDeclaringType) {
                                     break;  // Found it!
+                                }
+                            } else if (identifier?.fieldType?.kind === Type.Kind.Variable) {
+                                const variableType = identifier.fieldType as Type.Variable;
+                                if (variableType.owner) {
+                                    expectedDeclaringType = Type.FullyQualified.getFullyQualifiedName(variableType.owner);
+                                    if (expectedDeclaringType) {
+                                        break;  // Found it!
+                                    }
                                 }
                             }
                         }
@@ -737,6 +746,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         // Step 2: Look for references that match
         const targetName = this.alias || this.member;
+        const targetModule = this.module;
         let found = false;
 
         // If no existing imports from this module, look for unresolved references
@@ -746,8 +756,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             override async visitIdentifier(identifier: J.Identifier, p: void): Promise<J | undefined> {
                 if (identifier.simpleName === targetName) {
                     const type = identifier.type;
+                    const fieldType = identifier.fieldType;
                     if (expectedDeclaringType) {
                         // We have an expected declaring type - check for exact match
+                        // Check method type (for functions)
                         if (type && Type.isMethod(type)) {
                             const methodType = type as Type.Method;
                             const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
@@ -755,10 +767,53 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 found = true;
                             }
                         }
-                    } else {
-                        // No existing imports - look for unresolved references (no type)
-                        if (!type) {
+                        // Also check field type (for objects, variables, etc.)
+                        else if (fieldType?.kind === Type.Kind.Variable) {
+                            const variableType = fieldType as Type.Variable;
+                            // For variables, the owner is the declaring module/namespace
+                            if (variableType.owner) {
+                                const ownerTypeName = Type.FullyQualified.getFullyQualifiedName(variableType.owner);
+                                if (ownerTypeName === expectedDeclaringType) {
+                                    found = true;
+                                }
+                            }
+                        }
+                        // Even with expectedDeclaringType, also check for unresolved references
+                        // This handles the case where the member isn't imported yet
+                        else if (!type && !fieldType) {
                             found = true;
+                        }
+                    } else {
+                        // No existing imports from this module - look for references that match
+                        // 1. Unresolved references (no type/unknown type and no fieldType)
+                        const isUnknownType = !type || type.kind === Type.Kind.Unknown;
+                        if (isUnknownType && !fieldType) {
+                            found = true;
+                        }
+                        // 2. References with fieldType matching the target module
+                        else if (fieldType?.kind === Type.Kind.Variable) {
+                            const variableType = fieldType as Type.Variable;
+                            if (variableType.owner) {
+                                const ownerTypeName = Type.FullyQualified.getFullyQualifiedName(variableType.owner);
+                                if (ownerTypeName === targetModule) {
+                                    found = true;
+                                } else if (Type.isClass(variableType.owner) && (variableType.owner as Type.Class).owningClass) {
+                                    // Check if the namespace itself has an owningClass that matches the module
+                                    const namespaceOwner = (variableType.owner as Type.Class).owningClass!;
+                                    const namespaceOwnerName = Type.FullyQualified.getFullyQualifiedName(namespaceOwner);
+                                    if (namespaceOwnerName === targetModule) {
+                                        found = true;
+                                    }
+                                }
+                            }
+                        }
+                        // 3. References with method type matching the target module
+                        else if (type && Type.isMethod(type)) {
+                            const methodType = type as Type.Method;
+                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                            if (declaringTypeName === targetModule) {
+                                found = true;
+                            }
                         }
                     }
                 }

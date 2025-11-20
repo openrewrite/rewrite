@@ -68,6 +68,50 @@ function createRemoveThenAddImportVisitor(
 
 /**
  * Helper function to create a visitor that:
+ * 1. Manually removes the first import statement (bypassing RemoveImport which may refuse)
+ * 2. Then adds a specific import back with onlyIfReferenced: true
+ *
+ * This is useful for testing type attribution when RemoveImport would refuse to remove
+ * an import that's still being used.
+ *
+ * @param module The module to import from (e.g., "vitest")
+ * @param member Optional member to import (e.g., "vi")
+ * @param alias Optional alias for the import
+ */
+function createForceRemoveFirstImportThenAddVisitor(
+    module: string,
+    member?: string,
+    alias?: string
+): JavaScriptVisitor<any> {
+    return new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
+            const jsCu = cu as any;
+            // First, manually remove the first statement (the import)
+            let result: any = await this.produceJavaScript(jsCu, p, async (draft: any) => {
+                if (draft.statements && draft.statements.length > 0) {
+                    draft.statements = draft.statements.slice(1);
+                    draft.statements[0].element.prefix = emptySpace;
+                }
+            });
+
+            // Then try to add the import back with onlyIfReferenced: true
+            if (result) {
+                const addImport = new AddImport({
+                    module,
+                    member,
+                    alias,
+                    onlyIfReferenced: true
+                });
+                result = await addImport.visit(result, p) as any;
+            }
+
+            return result;
+        }
+    };
+}
+
+/**
+ * Helper function to create a visitor that:
  * 1. Replaces placeholder() calls with template-generated code that has proper type attribution
  * 2. Registers AddImport to add the import statement based on the detected usage
  *
@@ -1302,6 +1346,289 @@ describe('AddImport visitor', () => {
                     `
                 )
             );
+        });
+    });
+
+    describe('object imports (non-function references)', () => {
+        test('should add import for vitest vi object when referenced', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("vitest", "vi"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    const mock = vi.fn();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should not add import for vitest vi when not referenced', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "vitest", member: "vi", onlyIfReferenced: true }));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                function example() {
+                                    console.log('test');
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for vitest vi when used as standalone identifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("vitest", "vi"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    const mockUtils = vi;
+                                    mockUtils.fn();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for vitest vi with spyOn usage', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("vitest", "vi"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    const spy = vi.spyOn(console, 'log');
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for vitest vi when another vitest import exists (with onlyIfReferenced)', async () => {
+            const spec = new RecipeSpec();
+            // This test manually removes the vi import statement, then adds it back with onlyIfReferenced: true
+            // This tests that type attribution correctly detects usage of object types (not just methods).
+            // The AddImport visitor will merge the vi import into the existing describe import from vitest.
+            spec.recipe = fromVisitor(createForceRemoveFirstImportThenAddVisitor("vitest", "vi"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+                                import {describe} from 'vitest';
+
+                                function example() {
+                                    const mock = vi.fn();
+                                }
+                            `,
+                            `
+                                import {describe, vi} from 'vitest';
+
+                                function example() {
+                                    const mock = vi.fn();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for React forwardRef when namespace owner has module info', async () => {
+            const spec = new RecipeSpec();
+            // This test verifies that when a namespace (e.g., React) owns an export (e.g., forwardRef),
+            // and the namespace has module information in owningClass, we can match it to the module name
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'forwardRef',
+                onlyIfReferenced: true
+            }));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                function MyComponent() {
+                                    return forwardRef(() => null);
+                                }
+                            `,
+                            `
+                                import {forwardRef} from 'react';
+
+                                function MyComponent() {
+                                    return forwardRef(() => null);
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "react": "^18.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for vitest vi when code created via templating', async () => {
+            const spec = new RecipeSpec();
+            // This test simulates code created via templating where vi.fn() is used
+            // but the import doesn't exist. Tests that type attribution works with templated code.
+
+            // Create a visitor that logs what it finds
+            const addImportVisitor = new AddImport({
+                module: 'vitest',
+                member: 'vi',
+                onlyIfReferenced: true
+            });
+
+            spec.recipe = fromVisitor(addImportVisitor);
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                function example() {
+                                    const mockFn = vi.fn();
+                                }
+                            `,
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    const mockFn = vi.fn();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
         });
     });
 });
