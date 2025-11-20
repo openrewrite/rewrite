@@ -933,4 +933,141 @@ describe('AddImport visitor', () => {
             }).toThrow("Cannot combine sideEffectOnly with onlyIfReferenced");
         });
     });
+
+    describe('namespace imports', () => {
+        test('should add namespace import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'crypto',
+                member: '*',
+                alias: 'crypto',
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import * as crypto from 'crypto';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should detect existing namespace import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'crypto',
+                member: '*',
+                alias: 'crypto'
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as crypto from 'crypto';
+
+                        function example() {
+                            console.log(crypto.randomBytes(16));
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add namespace import when named import exists', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'fs',
+                member: '*',
+                alias: 'fs',
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        function example() {
+                            readFile('test.txt', (err, data) => {});
+                        }
+                    `,
+                    `
+                        import {readFile} from 'fs';
+                        import * as fs from 'fs';
+
+                        function example() {
+                            readFile('test.txt', (err, data) => {});
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should throw error when member is "*" without alias', async () => {
+            expect(() => {
+                new AddImport({ module: "crypto", member: "*" });
+            }).toThrow("When member is '*', the alias parameter is required");
+        });
+
+        test('should add namespace import with different alias', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'path',
+                member: '*',
+                alias: 'pathModule',
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import * as pathModule from 'path';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add namespace import when referenced with onlyIfReferenced=true', async () => {
+            const spec = new RecipeSpec();
+            // Note: Due to limitations in type attribution for namespace imports,
+            // onlyIfReferenced currently always returns true for namespace imports (member='*')
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor('crypto', '*', 'crypto'));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as crypto from 'crypto';
+
+                        function example() {
+                            const bytes = crypto.randomBytes(16);
+                        }
+                    `
+                )
+            );
+        });
+    });
 });
