@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe, test} from "@jest/globals";
+import {describe, test, expect} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
@@ -25,6 +25,7 @@ import {
     maybeAddImport,
     RemoveImport,
     Template,
+    tsx,
     typescript
 } from "../../src/javascript";
 import {J} from "../../src/java";
@@ -785,6 +786,151 @@ describe('AddImport visitor', () => {
                     `
                 )
             );
+        });
+    });
+
+    describe('side-effect imports', () => {
+        test('should add side-effect import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "core-js/stable", sideEffectOnly: true }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import 'core-js/stable';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should detect existing side-effect import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "core-js/stable", sideEffectOnly: true }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import 'core-js/stable';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add side-effect import when regular import from same module exists', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "react", sideEffectOnly: true }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {useState} from 'react';
+
+                        function example() {
+                            const [state, setState] = useState(0);
+                        }
+                    `,
+                    `
+                        import {useState} from 'react';
+                        import 'react';
+
+                        function example() {
+                            const [state, setState] = useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add regular import when side-effect import from same module exists', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: "react",
+                member: "useState",
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import 'react';
+                        import {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add side-effect import when default import exists', async () => {
+            const spec = new RecipeSpec();
+            // This test verifies that side-effect and regular imports are treated as separate
+            // A side-effect import is only a match if another side-effect import exists
+            spec.recipe = fromVisitor(new AddImport({ module: "react", sideEffectOnly: true }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import React from 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `,
+                    `
+                        import React from 'react';
+                        import 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should throw error when combining sideEffectOnly with member', async () => {
+            expect(() => {
+                new AddImport({ module: "react", sideEffectOnly: true, member: "useState" });
+            }).toThrow("Cannot combine sideEffectOnly with member");
+        });
+
+        test('should throw error when combining sideEffectOnly with alias', async () => {
+            expect(() => {
+                new AddImport({ module: "react", sideEffectOnly: true, alias: "React" });
+            }).toThrow("Cannot combine sideEffectOnly with alias");
+        });
+
+        test('should throw error when combining sideEffectOnly with onlyIfReferenced', async () => {
+            expect(() => {
+                new AddImport({ module: "react", sideEffectOnly: true, onlyIfReferenced: true });
+            }).toThrow("Cannot combine sideEffectOnly with onlyIfReferenced");
         });
     });
 });

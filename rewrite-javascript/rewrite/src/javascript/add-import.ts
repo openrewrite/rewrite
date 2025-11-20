@@ -20,15 +20,22 @@ export interface AddImportOptions {
      * If not specified, adds a default import or namespace import.
      * Special values:
      * - 'default': Adds a default import from the module.
-     *   When using 'default', the `alias` parameter is required. */
+     *   When using 'default', the `alias` parameter is required.
+     * Cannot be combined with `sideEffectOnly`. */
     member?: string;
 
     /** Optional alias for the imported member.
-     * Required when member is 'default'. */
+     * Required when member is 'default'.
+     * Cannot be combined with `sideEffectOnly`. */
     alias?: string;
 
-    /** If true, only add the import if the member is actually used in the file. Default: true */
+    /** If true, only add the import if the member is actually used in the file. Default: true
+     * Cannot be combined with `sideEffectOnly`. */
     onlyIfReferenced?: boolean;
+
+    /** If true, adds a side-effect import without bindings (e.g., `import 'module'` or `require('module')`).
+     * Cannot be combined with `member`, `alias`, or `onlyIfReferenced`. */
+    sideEffectOnly?: boolean;
 
     /** Optional import style to use. If not specified, auto-detects from file and existing imports */
     style?: ImportStyle;
@@ -50,6 +57,10 @@ export interface AddImportOptions {
  * @example
  * // Add a default import (legacy way, without specifying member)
  * maybeAddImport(visitor, { module: 'react', alias: 'React' });
+ *
+ * @example
+ * // Add a side-effect import
+ * maybeAddImport(visitor, { module: 'core-js/stable', sideEffectOnly: true });
  */
 export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,
@@ -59,7 +70,8 @@ export function maybeAddImport(
         if (v instanceof AddImport &&
             v.module === options.module &&
             v.member === options.member &&
-            v.alias === options.alias) {
+            v.alias === options.alias &&
+            v.sideEffectOnly === (options.sideEffectOnly ?? false)) {
             return;
         }
     }
@@ -71,6 +83,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     readonly member?: string;
     readonly alias?: string;
     readonly onlyIfReferenced: boolean;
+    readonly sideEffectOnly: boolean;
     readonly style?: ImportStyle;
 
     constructor(options: AddImportOptions) {
@@ -81,10 +94,24 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             throw new Error("When member is 'default', the alias parameter is required");
         }
 
+        // Validate that sideEffectOnly is not combined with incompatible options
+        if (options.sideEffectOnly) {
+            if (options.member !== undefined) {
+                throw new Error("Cannot combine sideEffectOnly with member");
+            }
+            if (options.alias !== undefined) {
+                throw new Error("Cannot combine sideEffectOnly with alias");
+            }
+            if (options.onlyIfReferenced !== undefined) {
+                throw new Error("Cannot combine sideEffectOnly with onlyIfReferenced");
+            }
+        }
+
         this.module = options.module;
         this.member = options.member;
         this.alias = options.alias;
         this.onlyIfReferenced = options.onlyIfReferenced ?? true;
+        this.sideEffectOnly = options.sideEffectOnly ?? false;
         this.style = options.style;
     }
 
@@ -283,7 +310,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // If onlyIfReferenced is true, check if the identifier is actually used
-        if (this.onlyIfReferenced) {
+        // Skip this check for side-effect imports
+        if (!this.sideEffectOnly && this.onlyIfReferenced) {
             const isReferenced = await this.checkIdentifierReferenced(compilationUnit);
             if (!isReferenced) {
                 return compilationUnit;
@@ -294,8 +322,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const importStyle = this.determineImportStyle(compilationUnit);
 
         // For ES6 named imports, check if we can merge into an existing import from the same module
-        // Don't try to merge default imports (member === 'default')
-        if (importStyle === ImportStyle.ES6Named && this.member !== undefined && this.member !== 'default') {
+        // Don't try to merge default imports (member === 'default') or side-effect imports
+        if (!this.sideEffectOnly && importStyle === ImportStyle.ES6Named && this.member !== undefined && this.member !== 'default') {
             const mergedCu = await this.tryMergeIntoExistingImport(compilationUnit, p);
             if (mergedCu !== compilationUnit) {
                 return mergedCu;
@@ -492,7 +520,16 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         const importClause = jsImport.importClause;
+
+        // Handle side-effect imports (no import clause)
         if (!importClause) {
+            // If we're trying to add a side-effect import and one already exists, it's a match
+            return this.sideEffectOnly;
+        }
+
+        // If we're adding a side-effect import but there's an existing import with bindings,
+        // it's not a match (side-effect import should be separate)
+        if (this.sideEffectOnly) {
             return false;
         }
 
@@ -662,10 +699,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const prefix = this.determineImportPrefix(compilationUnit, insertionIndex);
 
         // Create the module specifier
+        // For side-effect imports, use emptySpace since space comes from LeftPadded.before
+        // For regular imports with import clause, use emptySpace since space comes from LeftPadded.before
+        // However, the printer expects the space after 'from' in the literal's prefix
         const moduleSpecifier: J.Literal = {
             id: randomId(),
             kind: J.Kind.Literal,
-            prefix: singleSpace,
+            prefix: this.sideEffectOnly ? emptySpace : singleSpace,
             markers: emptyMarkers,
             value: `'${this.module}'`,
             valueSource: `'${this.module}'`,
@@ -675,7 +715,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         let importClause: JS.ImportClause | undefined;
 
-        if (this.member === undefined || this.member === 'default') {
+        if (this.sideEffectOnly) {
+            // Side-effect import: import 'module'
+            importClause = undefined;
+        } else if (this.member === undefined || this.member === 'default') {
             // Default import: import target from 'module'
             // or: import alias from 'module' (when member === 'default')
             const defaultName: J.Identifier = {
