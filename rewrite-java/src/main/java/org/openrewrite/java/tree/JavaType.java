@@ -166,6 +166,11 @@ public interface JavaType {
             this.throwableTypes = ListUtils.nullIfEmpty(throwableTypes);
             return this;
         }
+
+        @Override
+        public String toString() {
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
+        }
     }
 
     class Intersection implements JavaType {
@@ -206,6 +211,11 @@ public interface JavaType {
         public Intersection unsafeSet(JavaType[] bounds) {
             this.bounds = ListUtils.nullIfEmpty(bounds);
             return this;
+        }
+
+        @Override
+        public String toString() {
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
     }
 

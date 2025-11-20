@@ -18,7 +18,8 @@ import {J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptSemanticComparatorVisitor} from '../comparator';
 import {CaptureMarker, CaptureStorageValue, PlaceholderUtils} from './utils';
-import {DebugLogEntry, MatchExplanation} from './types';
+import {Capture, CaptureConstraintContext, CaptureMap, DebugLogEntry, MatchExplanation} from './types';
+import {CAPTURE_NAME_SYMBOL} from './capture';
 
 // ============================================================================
 // Debug Callbacks
@@ -64,6 +65,28 @@ export interface MatcherCallbacks {
 }
 
 /**
+ * Implementation of CaptureMap that wraps the capture storage.
+ * Provides read-only access to previously matched captures.
+ */
+class CaptureMapImpl implements CaptureMap {
+    constructor(private readonly storage: Map<string, CaptureStorageValue>) {}
+
+    get<T>(capture: Capture<T>): T | undefined;
+    get(capture: string): any;
+    get(capture: Capture | string): any {
+        // Use symbol to get internal name without triggering Proxy
+        const name = typeof capture === 'string' ? capture : ((capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName());
+        return this.storage.get(name);
+    }
+
+    has(capture: Capture | string): boolean {
+        // Use symbol to get internal name without triggering Proxy
+        const name = typeof capture === 'string' ? capture : ((capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName());
+        return this.storage.has(name);
+    }
+}
+
+/**
  * A comparator for pattern matching that is lenient about optional properties.
  * Allows patterns without type annotations to match actual code with type annotations.
  * Uses semantic comparison to match semantically equivalent code (e.g., isDate() and util.isDate()).
@@ -75,6 +98,19 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     ) {
         // Enable lenient type matching based on pattern configuration (default: true for backward compatibility)
         super(lenientTypeMatching);
+    }
+
+    /**
+     * Builds the constraint context with the cursor and current captures.
+     * @param cursor The cursor to include in the context
+     * @returns The constraint context for evaluating capture constraints
+     */
+    protected buildConstraintContext(cursor: Cursor): CaptureConstraintContext {
+        const state = this.matcher.saveState();
+        return {
+            cursor,
+            captures: new CaptureMapImpl(state.storage)
+        };
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
@@ -92,12 +128,15 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 : new Cursor(p);
             this.targetCursor = cursorAtCapturedNode;
             try {
-                // Evaluate constraint with cursor at the captured node (always defined)
+                // Evaluate constraint with context (cursor + previous captures)
                 // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
-                if (captureMarker.constraint && !captureMarker.variadicOptions && !captureMarker.constraint(p, cursorAtCapturedNode)) {
-                    const captureName = captureMarker.captureName || 'unnamed';
-                    const targetKind = p.kind || 'unknown';
-                    return this.constraintFailed(captureName, targetKind) as R;
+                if (captureMarker.constraint && !captureMarker.variadicOptions) {
+                    const context = this.buildConstraintContext(cursorAtCapturedNode);
+                    if (!captureMarker.constraint(p, context)) {
+                        const captureName = captureMarker.captureName || 'unnamed';
+                        const targetKind = (p as any).kind || 'unknown';
+                        return this.constraintFailed(captureName, targetKind) as R;
+                    }
                 }
 
                 const success = this.matcher.handleCapture(captureMarker, p, undefined);
@@ -165,7 +204,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             try {
                 // Evaluate constraint with cursor at the captured node (always defined)
                 // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
-                if (captureMarker.constraint && !captureMarker.variadicOptions && !captureMarker.constraint(targetElement as J, cursorAtCapturedNode)) {
+                if (captureMarker.constraint && !captureMarker.variadicOptions && !captureMarker.constraint(targetElement as J, this.buildConstraintContext(cursorAtCapturedNode))) {
                     const captureName = captureMarker.captureName || 'unnamed';
                     const targetKind = (targetElement as J).kind || 'unknown';
                     return this.constraintFailed(captureName, targetKind);
@@ -587,7 +626,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 // The targetCursor points to the parent container (always defined in container matching)
                 if (captureMarker.constraint) {
                     const cursor = this.targetCursor || new Cursor(targetElements[0]);
-                    if (!captureMarker.constraint(capturedElements as any, cursor)) {
+                    if (!captureMarker.constraint(capturedElements as any, this.buildConstraintContext(cursor))) {
                         continue; // Try next consumption amount
                     }
                 }

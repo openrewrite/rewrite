@@ -663,8 +663,7 @@ public interface RewriteTest extends SourceSpecs {
             }
             fail("Failed to parse sources or run recipe", t);
         });
-        ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
-        return ctx;
+        return ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
     }
 
     @Override

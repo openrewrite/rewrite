@@ -35,9 +35,48 @@ export interface VariadicOptions {
 }
 
 /**
+ * Read-only access to captures matched so far during pattern matching.
+ * Provides a consistent interface with MatchResult for looking up captured values.
+ */
+export interface CaptureMap {
+    /**
+     * Gets the value of a capture by Capture object or name.
+     * Returns undefined if the capture hasn't been matched yet.
+     */
+    get<T>(capture: Capture<T>): T | undefined;
+    get(capture: string): any;
+
+    /**
+     * Checks if a capture has been matched.
+     */
+    has(capture: Capture | string): boolean;
+}
+
+/**
+ * Context passed to capture constraint functions.
+ * Provides access to the cursor for AST navigation and previously matched captures.
+ */
+export interface CaptureConstraintContext {
+    /**
+     * The cursor pointing to the node being matched.
+     * Allows navigating the AST (parent, root, etc.).
+     */
+    cursor: Cursor;
+
+    /**
+     * Read-only view of values captured so far in the matching process.
+     * Allows constraints to depend on previous captures.
+     * Returns undefined for captures that haven't been processed yet.
+     */
+    captures: CaptureMap;
+}
+
+/**
  * Constraint function for captures.
- * The cursor parameter is always provided with a defined value, but functions can
- * choose to accept it or not (TypeScript allows functions with fewer parameters).
+ *
+ * Receives the node being validated and a context providing access to:
+ * - cursor: For navigating the AST
+ * - captures: For accessing previously matched captures
  *
  * For non-variadic captures: use ConstraintFunction<T> where T is the node type
  * For variadic captures: use ConstraintFunction<T[]> where T[] is the array type
@@ -45,7 +84,7 @@ export interface VariadicOptions {
  * When used with variadic captures, the cursor points to the nearest common parent
  * of the captured elements.
  */
-export type ConstraintFunction<T> = (node: T, cursor: Cursor) => boolean;
+export type ConstraintFunction<T> = (node: T, context: CaptureConstraintContext) => boolean;
 
 /**
  * Options for the capture function.
@@ -55,37 +94,43 @@ export type ConstraintFunction<T> = (node: T, cursor: Cursor) => boolean;
  * - For regular captures: constraint receives a single node of type T
  * - For variadic captures: constraint receives an array of nodes of type T[]
  *
- * The constraint function can optionally receive a cursor parameter to perform
- * context-aware validation during pattern matching.
+ * The context parameter provides access to the cursor and previously matched captures.
  */
 export interface CaptureOptions<T = any> {
     name?: string;
     variadic?: boolean | VariadicOptions;
     /**
      * Optional constraint function that validates whether a captured node should be accepted.
-     * The function always receives:
+     * The function receives:
      * - node: The captured node (or array of nodes for variadic captures)
-     * - cursor: A cursor at the captured node's position (always defined)
-     *
-     * Functions can choose to accept just the node parameter if they don't need the cursor.
+     * - context: Provides access to cursor and previously matched captures
      *
      * @param node The captured node to validate
-     * @param cursor Cursor at the captured node's position
+     * @param context Provides cursor for AST navigation and previously matched captures
      * @returns true if the capture should be accepted, false otherwise
      *
      * @example
      * ```typescript
-     * // Simple node validation (cursor parameter ignored)
+     * // Simple node validation
      * capture<J.Literal>('size', {
      *     constraint: (node) => typeof node.value === 'number' && node.value > 100
      * })
      *
-     * // Context-aware validation (using cursor)
+     * // Context-aware validation using cursor
      * capture<J.MethodInvocation>('method', {
-     *     constraint: (node, cursor) => {
+     *     constraint: (node, context) => {
      *         if (!node.name.simpleName.startsWith('get')) return false;
-     *         const cls = cursor.firstEnclosing(isClassDeclaration);
+     *         const cls = context.cursor.firstEnclosing(isClassDeclaration);
      *         return cls?.name.simpleName === 'ApiController';
+     *     }
+     * })
+     *
+     * // Validation depending on previous captures
+     * const min = capture('min');
+     * const max = capture('max', {
+     *     constraint: (node, context) => {
+     *         const minVal = context.captures.get(min);
+     *         return minVal && node.value > minVal.value;
      *     }
      * })
      * ```
@@ -96,9 +141,37 @@ export interface CaptureOptions<T = any> {
      * a preamble declaring the capture identifier with this type annotation, allowing
      * the TypeScript parser/compiler to produce a properly type-attributed AST.
      *
+     * **Why Use Type Attribution:**
+     * When matching against TypeScript code with type information, providing a type ensures
+     * the pattern's AST has matching type attribution, which can be important for:
+     * - Semantic matching based on types
+     * - Matching code that depends on type inference
+     * - Ensuring pattern parses with correct type context
+     *
      * Can be specified as:
-     * - A string type annotation (e.g., "boolean", "string", "number")
+     * - A string type annotation (e.g., "boolean", "string", "number", "Promise<any>", "User[]")
      * - A Type instance from the AST (the type will be inferred from the Type)
+     *
+     * @example
+     * ```typescript
+     * // Match promise chains with proper type attribution
+     * const chain = capture({
+     *   name: 'chain',
+     *   type: 'Promise<any>',  // TypeScript will attribute this as Promise type
+     *   constraint: (call: J.MethodInvocation) => {
+     *     // Validate promise chain structure
+     *     return call.name.simpleName === 'then';
+     *   }
+     * });
+     * pattern`${chain}.catch(err => console.log(err))`
+     *
+     * // Match arrays with type annotation
+     * const items = capture({
+     *   name: 'items',
+     *   type: 'number[]',  // Array of numbers
+     * });
+     * pattern`${items}.map(x => x * 2)`
+     * ```
      */
     type?: string | Type;
 }
@@ -344,7 +417,16 @@ export interface MatchOptions {
  * Note: Primitive values (string, number, boolean) are NOT supported in template literals.
  * Use raw() for inserting code strings, or Template.builder() API for programmatic construction.
  */
-export type TemplateParameter = Capture | CaptureValue | TemplateParam | RawCode | Tree | Tree[] | J.RightPadded<any> | J.RightPadded<any>[] | J.Container<any>;
+export type TemplateParameter =
+    Capture
+    | CaptureValue
+    | TemplateParam
+    | RawCode
+    | Tree
+    | Tree[]
+    | J.RightPadded<any>
+    | J.RightPadded<any>[]
+    | J.Container<any>;
 
 /**
  * Parameter specification for template generation (internal).
@@ -399,6 +481,34 @@ export interface TemplateOptions {
      * The template engine will create a package.json with these dependencies.
      */
     dependencies?: Record<string, string>;
+}
+
+/**
+ * Options for template application.
+ */
+export interface ApplyOptions {
+    /**
+     * Values for parameters in the template.
+     * Can be a Map, MatchResult, or plain object with capture names as keys.
+     *
+     * @example
+     * ```typescript
+     * // Using MatchResult from pattern matching
+     * const match = await pattern.match(node, cursor);
+     * await template.apply(node, cursor, { values: match });
+     *
+     * // Using a Map
+     * await template.apply(node, cursor, {
+     *     values: new Map([['x', someNode]])
+     * });
+     *
+     * // Using a plain object
+     * await template.apply(node, cursor, {
+     *     values: { x: someNode }
+     * });
+     * ```
+     */
+    values?: Map<Capture | string, J> | MatchResult | Record<string, J>;
 }
 
 /**
@@ -645,6 +755,7 @@ export interface MatchResult {
      * @returns The captured node(s), or undefined if not found
      */
     get(capture: string): any;
+
     get<T>(capture: Capture<T>): T | undefined;
 }
 

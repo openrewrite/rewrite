@@ -15,131 +15,161 @@
  */
 package org.openrewrite.marketplace;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Incubating;
 import org.openrewrite.NlsRewrite;
-import org.openrewrite.config.RecipeDescriptor;
 
 import java.util.*;
 
-@Getter
-@RequiredArgsConstructor
+import static java.util.Collections.addAll;
+
+@Incubating(since = "8.66.0")
 public class RecipeMarketplace {
-    static final String ROOT = "ε";
+    private final @Getter(AccessLevel.PACKAGE) Category root = new Category("Root");
+    private final @Getter List<RecipeBundleResolver> resolvers = new ArrayList<>();
 
-    @NlsRewrite.DisplayName
-    private final String displayName;
-
-    @NlsRewrite.DisplayName
-    private final String description;
-
-    /**
-     * Every category is itself a slightly-more miniature marketplace contained in a larger
-     * marketplace.
-     */
-    private final List<RecipeMarketplace> categories = new ArrayList<>();
-
-    private final List<RecipeListing> recipes = new ArrayList<>();
-
-    public boolean isRoot() {
-        return ROOT.equals(displayName);
+    public RecipeMarketplace setResolvers(RecipeBundleResolver... resolvers) {
+        this.resolvers.clear();
+        addAll(this.resolvers, resolvers);
+        return this;
     }
 
-    public static RecipeMarketplace newEmpty() {
-        return new RecipeMarketplace(ROOT, "");
+    public @Nullable RecipeListing findRecipe(String name) {
+        return root.findRecipe(name);
     }
 
-    public @Nullable RecipeDescriptor findRecipe(String name) {
-        for (RecipeListing recipe : recipes) {
-            if (recipe.getName().equals(name)) {
-                return recipe.describe();
-            }
-        }
-        for (RecipeMarketplace category : categories) {
-            RecipeDescriptor rd = category.findRecipe(name);
-            if (rd != null) {
-                return rd;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Get all recipes from this marketplace and all subcategories recursively.
-     * The returned set is distinct by recipe name i.e., if the same recipe appears
-     * in multiple categories, only the first occurrence is included.
-     *
-     * @return A set of all unique recipes (by name) in this marketplace and its subcategories
-     */
     public Set<RecipeListing> getAllRecipes() {
-        Map<String, RecipeListing> recipesByName = new LinkedHashMap<>();
-        collectAllRecipes(recipesByName);
-        return new LinkedHashSet<>(recipesByName.values());
+        return root.getAllRecipes();
     }
 
-    private void collectAllRecipes(Map<String, RecipeListing> recipesByName) {
-        for (RecipeListing recipe : recipes) {
-            recipesByName.putIfAbsent(recipe.getName(), recipe);
-        }
-        for (RecipeMarketplace category : categories) {
-            category.collectAllRecipes(recipesByName);
-        }
+    public List<Category> getCategories() {
+        return root.getCategories();
     }
 
-    /**
-     * Add a recipe to this marketplace under the specified category path.
-     * Categories are specified top-down (shallowest to deepest).
-     * Intermediate categories are created as needed.
-     *
-     * @param recipe       The recipe to add
-     * @param categoryPath Category path from shallowest to deepest (e.g., "Java", "Search")
-     */
-    public void addRecipe(RecipeListing recipe, String... categoryPath) {
-        if (categoryPath.length == 0) {
-            recipes.add(recipe);
-            return;
-        }
-
-        // Get the first category in the path
-        String firstCategory = categoryPath[0];
-        RecipeMarketplace targetCategory = findOrCreateCategory(firstCategory);
-
-        // Build remaining path
-        String[] remainingPath = new String[categoryPath.length - 1];
-        System.arraycopy(categoryPath, 1, remainingPath, 0, remainingPath.length);
-
-        // Recursively add to the child category
-        targetCategory.addRecipe(recipe, remainingPath);
+    public void install(RecipeListing recipe, List<String> categoryPath) {
+        root.install(recipe, categoryPath);
     }
 
-    /**
-     * Merge another marketplace into this one. Recursively processes all recipes
-     * and subcategories from the source marketplace. If a recipe with the same name
-     * already exists in the same category, it will be replaced by the one being merged in.
-     *
-     * @param other The marketplace to merge into this one.
-     */
-    public void merge(RecipeMarketplace other) {
-        for (RecipeListing recipe : other.getRecipes()) {
-            recipes.removeIf(existing -> existing.getName().equals(recipe.getName()));
-            recipes.add(recipe);
-        }
-        for (RecipeMarketplace otherCategory : other.getCategories()) {
-            RecipeMarketplace category = findOrCreateCategory(otherCategory.getDisplayName());
-            category.merge(otherCategory);
-        }
+    public Set<RecipeListing> install(RecipeBundleReader bundleReader) {
+        RecipeMarketplace marketplace = bundleReader.read();
+        getRoot().merge(marketplace.getRoot());
+        getRoot().updateBundle(marketplace.getAllRecipes(), bundleReader.getBundle());
+        return marketplace.getAllRecipes();
     }
 
-    private RecipeMarketplace findOrCreateCategory(String categoryName) {
-        for (RecipeMarketplace category : categories) {
-            if (category.getDisplayName().equals(categoryName)) {
-                return category;
+    @Getter
+    @RequiredArgsConstructor
+    public class Category {
+        @NlsRewrite.DisplayName
+        private final String displayName;
+
+        @Setter
+        @NlsRewrite.DisplayName
+        private String description = "";
+
+        private final List<Category> categories = new ArrayList<>();
+        private final List<RecipeListing> recipes = new ArrayList<>();
+
+        public void merge(Category category) {
+            for (RecipeListing recipe : category.recipes) {
+                recipes.remove(recipe);
+                recipes.add(recipe.withMarketplace(RecipeMarketplace.this));
+            }
+            for (Category subCategory : category.categories) {
+                Category existingSubCategory = null;
+                for (Category c : categories) {
+                    if (c.getDisplayName().equals(subCategory.getDisplayName())) {
+                        existingSubCategory = c;
+                        break;
+                    }
+                }
+                if (existingSubCategory != null) {
+                    existingSubCategory.merge(subCategory);
+                } else {
+                    categories.add(subCategory);
+                }
             }
         }
 
-        RecipeMarketplace newCategory = new RecipeMarketplace(categoryName, "");
-        categories.add(newCategory);
-        return newCategory;
+        void updateBundle(Collection<RecipeListing> recipes, RecipeBundle bundle) {
+            for (RecipeListing recipe : recipes) {
+                if (this.recipes.contains(recipe)) {
+                    this.recipes.remove(recipe);
+                    this.recipes.add(recipe.withBundle(bundle));
+                }
+            }
+            for (Category category : categories) {
+                category.updateBundle(recipes, bundle);
+            }
+        }
+
+        public @Nullable RecipeListing findRecipe(String name) {
+            for (RecipeListing recipe : recipes) {
+                if (recipe.getName().equals(name)) {
+                    return recipe;
+                }
+            }
+            for (Category category : categories) {
+                RecipeListing rd = category.findRecipe(name);
+                if (rd != null) {
+                    return rd;
+                }
+            }
+            return null;
+        }
+
+        public Set<RecipeListing> getAllRecipes() {
+            Set<RecipeListing> recipes = new TreeSet<>();
+            getAllRecipesRecursive(recipes);
+            return recipes;
+        }
+
+        private void getAllRecipesRecursive(Set<RecipeListing> recipes) {
+            recipes.addAll(this.recipes);
+            for (Category category : categories) {
+                category.getAllRecipesRecursive(recipes);
+            }
+        }
+
+        /**
+         * Add a recipe to this category under the specified category path.
+         * Categories are specified top-down (shallowest to deepest).
+         * Intermediate categories are created as needed.
+         *
+         * @param recipe       The recipe to add
+         * @param categoryPath Category path from shallowest to deepest (e.g., "Java", "Search")
+         */
+        public void install(RecipeListing recipe, List<String> categoryPath) {
+            recipe = recipe.withMarketplace(RecipeMarketplace.this);
+
+            if (categoryPath.isEmpty()) {
+                recipes.add(recipe);
+                return;
+            }
+
+            // Get the first category in the path
+            String firstCategory = categoryPath.get(0);
+            Category targetCategory = findOrCreateCategory(firstCategory);
+
+            // Recursively add to the child category
+            targetCategory.install(recipe, categoryPath.subList(1, categoryPath.size()));
+        }
+
+        private Category findOrCreateCategory(String categoryName) {
+            for (Category category : categories) {
+                if (category.getDisplayName().equals(categoryName)) {
+                    return category;
+                }
+            }
+
+            // FIXME how do we overlay CategoryDescriptor on these so that the descriptions are set?
+            Category newCategory = new Category(categoryName);
+            categories.add(newCategory);
+            return newCategory;
+        }
     }
 }

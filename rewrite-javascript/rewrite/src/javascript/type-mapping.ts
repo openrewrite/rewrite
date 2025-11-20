@@ -24,11 +24,16 @@ class NonDraftableType {
 }
 
 export class JavaScriptTypeMapping {
+    // Primary cache: Use type signatures (preferring type.id) as cache keys
+    // TypeScript assigns stable IDs to all types, so we don't need secondary caches
     private readonly typeCache: Map<string | number, Type> = new Map();
+    private readonly methodCache: Map<string, Type.Method> = new Map();
+
     private readonly regExpSymbol: ts.Symbol | undefined;
     private readonly stringWrapperType: ts.Type | undefined;
     private readonly numberWrapperType: ts.Type | undefined;
     private readonly booleanWrapperType: ts.Type | undefined;
+
 
     constructor(
         private readonly checker: ts.TypeChecker
@@ -70,21 +75,120 @@ export class JavaScriptTypeMapping {
     }
 
     private getType(type: ts.Type): Type {
+        // Check for error types first - these indicate type-checking failures
+        // and should not be processed further
+        if (type.flags & ts.TypeFlags.Any) {
+            const intrinsicName = (type as any).intrinsicName;
+            if (intrinsicName === 'error') {
+                return Type.unknownType;
+            }
+        }
+
+        // Skip problematic type constructs EARLY - before any caching or recursion
+        // These can cause deep recursion and are often computed/structural types
+        if (type.flags & ts.TypeFlags.Object) {
+            const objectFlags = (type as ts.ObjectType).objectFlags;
+            // Always skip mapped types (e.g., { [K in keyof T]: ... })
+            // These are structural/computed types that can cause infinite recursion
+            if (objectFlags & ts.ObjectFlags.Mapped) {
+                return Type.unknownType;
+            }
+            // Skip instantiated types ONLY if they're not type references
+            // Type references like Array<string>, Promise<T> are instantiated but should be mapped
+            // Other instantiated types (like object literals) should return unknown
+            if (objectFlags & ts.ObjectFlags.Instantiated) {
+                const isTypeReference = objectFlags & ts.ObjectFlags.Reference;
+                if (!isTypeReference) {
+                    return Type.unknownType;
+                }
+            }
+        }
+        // Always skip conditional types (T extends U ? X : Y)
+        if (type.flags & ts.TypeFlags.Conditional) {
+            return Type.unknownType;
+        }
+
+        // Check cache using signature (type.id when available)
         const signature = this.getSignature(type);
         const existing = this.typeCache.get(signature);
         if (existing) {
             return existing;
         }
 
+        // Get symbol for later use in type detection
+        const symbol = type.getSymbol?.();
+
+        // IMPORTANT: Check if this is a type reference to a parameterized type FIRST
+        if (type.flags & ts.TypeFlags.Object) {
+            const objectType = type as ts.ObjectType;
+            const isTypeReference = objectType.objectFlags & ts.ObjectFlags.Reference;
+
+            if (isTypeReference) {
+                const typeRef = type as ts.TypeReference;
+                const hasTypeArgs = typeRef.typeArguments && typeRef.typeArguments.length > 0;
+
+                if (hasTypeArgs) {
+                    // This is a parameterized type reference (e.g., RefObject<HTMLButtonElement>)
+                    // Extract the base class type and type arguments to create a Parameterized type
+
+                    // IMPORTANT: Check if the type arguments are actually type parameters (unsubstituted)
+                    // This happens when TypeScript expands type aliases but doesn't substitute the type parameters
+                    // For example, React.Ref<HTMLButtonElement> expands to RefObject<T> | RefCallback<T> | null
+                    // instead of RefObject<HTMLButtonElement> | RefCallback<HTMLButtonElement> | null
+                    const hasUnsubstitutedTypeParams = typeRef.typeArguments!.some((arg: any) =>
+                        (arg as ts.Type).flags & ts.TypeFlags.TypeParameter
+                    );
+
+                    if (!hasUnsubstitutedTypeParams) {
+                        // Only create parameterized type if type arguments are actual types, not type parameters
+
+                        if (symbol && (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias))) {
+                            const declaredType = this.checker.getDeclaredTypeOfSymbol(symbol);
+
+                            // Get or create the base class type (this gets cached)
+                            const declaredSig = this.getSignature(declaredType);
+                            let classType = this.typeCache.get(declaredSig) as Type.Class | undefined;
+                            if (!classType) {
+                                classType = this.createEmptyClassType(declaredType);
+                                this.typeCache.set(declaredSig, classType);
+                                this.populateClassType(classType, declaredType);
+                            }
+
+                            // Resolve type arguments
+                            const typeParameters: Type[] = [];
+                            for (const typeArg of typeRef.typeArguments!) {
+                                const resolvedArg = this.getType(typeArg as ts.Type);
+                                typeParameters.push(resolvedArg);
+                            }
+
+                            // Create the parameterized type wrapper
+                            const parameterized = Object.assign(new NonDraftableType(), {
+                                kind: Type.Kind.Parameterized,
+                                type: classType,
+                                typeParameters: typeParameters,
+                                fullyQualifiedName: classType.fullyQualifiedName,
+                                toJSON: function () {
+                                    return Type.signature(this);
+                                }
+                            }) as Type.Parameterized;
+
+                            // Cache the parameterized type
+                            this.typeCache.set(signature, parameterized);
+                            return parameterized;
+                        }
+                    }
+                }
+            }
+        }
+
         // Check for class/interface/enum types (including arrays)
         // Arrays in JavaScript are objects with methods, so we treat them as class types
-        const symbol = type.getSymbol?.();
         if (symbol) {
             // Check for function symbols
             if (symbol.flags & ts.SymbolFlags.Function) {
                 const callSignatures = type.getCallSignatures();
                 if (callSignatures.length > 0) {
-                    // Create and cache shell first to handle circular references
+                    // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     const functionType = this.createEmptyFunctionType();
                     this.typeCache.set(signature, functionType);
                     this.populateFunctionType(functionType, callSignatures[0]);
@@ -96,7 +200,7 @@ export class JavaScriptTypeMapping {
             if (symbol.flags & (ts.SymbolFlags.FunctionScopedVariable | ts.SymbolFlags.BlockScopedVariable)) {
                 const callSignatures = type.getCallSignatures();
                 if (callSignatures.length > 0) {
-                    // Create and cache shell first to handle circular references
+                    // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     const functionType = this.createEmptyFunctionType();
                     this.typeCache.set(signature, functionType);
                     this.populateFunctionType(functionType, callSignatures[0]);
@@ -104,19 +208,60 @@ export class JavaScriptTypeMapping {
                 }
             }
 
-            if (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias)) {
-                // Create and cache shell first to handle circular references
+            if (symbol.flags & ts.SymbolFlags.ValueModule) {
                 const classType = this.createEmptyClassType(type);
                 this.typeCache.set(signature, classType);
                 this.populateClassType(classType, type);
                 return classType;
             }
+            if (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias | ts.SymbolFlags.ValueModule)) {
+                // Get the declared type from the symbol (analogous to symType = sym.type in Java)
+                // This is the base class type without specific type arguments
+                const declaredType = this.checker.getDeclaredTypeOfSymbol(symbol);
+                const declaredSig = this.getSignature(declaredType);
+
+                let classType = this.typeCache.get(declaredSig) as Type.Class | undefined;
+
+                if (!classType) {
+                    // Shell-cache: Create stub, cache it, then populate (prevents cycles)
+                    classType = this.createEmptyClassType(declaredType);
+                    this.typeCache.set(declaredSig, classType);
+                    this.populateClassType(classType, declaredType);
+                }
+
+                // Return the base class type (parameterized types are handled at the beginning of getType)
+                return classType;
+            }
+
+            if (symbol.flags & ts.SymbolFlags.TypeParameter) {
+                return this.createGenericTypeVariable(type as ts.TypeParameter, signature);
+            }
+        }
+
+        // Note on type aliases with type arguments (e.g., React.Ref<HTMLButtonElement>):
+        // TypeScript automatically substitutes type parameters when resolving type aliases.
+        // For example, React.Ref<T> = RefCallback<T> | RefObject<T> | null
+        // When we encounter Ref<HTMLButtonElement>, TypeScript gives us:
+        //   RefCallback<HTMLButtonElement> | RefObject<HTMLButtonElement> | null
+        // The type parameters are already correctly substituted in the constituent types,
+        // so we can just process the resolved type normally (falling through to union handling below).
+
+        // Check for union types (e.g., string | number)
+        if (type.flags & ts.TypeFlags.Union) {
+            const unionType = type as ts.UnionType;
+            return this.createUnionType(unionType, signature);
+        }
+
+        // Check for intersection types (e.g., A & B)
+        if (type.flags & ts.TypeFlags.Intersection) {
+            const intersectionType = type as ts.IntersectionType;
+            return this.createIntersectionType(intersectionType, signature);
         }
 
         // Check for function types without symbols (anonymous functions, function types)
         const callSignatures = type.getCallSignatures();
-        if (callSignatures.length > 0) {
-            // Function type - create and cache shell first to handle circular references
+        if (callSignatures && callSignatures.length > 0) {
+            // Shell-cache: Create stub, cache it, then populate (prevents cycles)
             const functionType = this.createEmptyFunctionType();
             this.typeCache.set(signature, functionType);
             this.populateFunctionType(functionType, callSignatures[0]);
@@ -127,11 +272,7 @@ export class JavaScriptTypeMapping {
         if (type.flags & ts.TypeFlags.Object) {
             const objectFlags = (type as ts.ObjectType).objectFlags;
             if (objectFlags & ts.ObjectFlags.Anonymous) {
-                // Anonymous object type - create and cache shell, then populate
-                const classType = this.createEmptyClassType(type);
-                this.typeCache.set(signature, classType);
-                this.populateClassType(classType, type);
-                return classType;
+                return Type.unknownType;
             }
         }
 
@@ -143,6 +284,7 @@ export class JavaScriptTypeMapping {
 
     private getSignature(type: ts.Type): string | number {
         // Try to use TypeScript's internal id if available
+        // TypeScript assigns stable IDs to all types, including parameterized, union, and intersection types
         if ("id" in type && type.id !== undefined) {
             return type.id as number;
         }
@@ -193,11 +335,22 @@ export class JavaScriptTypeMapping {
      */
     private createMethodType(
         signature: ts.Signature,
-        node: ts.Node,
+        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
         declaringType: Type.FullyQualified,
         name: string,
         declaredFormalTypeNames: string[] = []
     ): Type.Method {
+        // Create composite cache key: declaring type + method name + signature
+        // This prevents cache collisions when methods with identical signatures have different names
+        // (e.g., util.isString(): any vs util.isArray(): any)
+        const declaringTypeSig = Type.signature(declaringType);
+        const signatureStr = this.checker.signatureToString(signature);
+        const cacheKey = `${declaringTypeSig}#${name}${signatureStr}`;
+        const cached = this.methodCache.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
         const returnType = signature.getReturnType();
         const parameters = signature.getParameters();
         const parameterTypes: Type[] = [];
@@ -210,7 +363,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Create the Type.Method object
-        return Object.assign(new NonDraftableType(), {
+        const method = Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Method,
             flags: 0, // FIXME - determine flags
             declaringType: declaringType,
@@ -226,14 +379,17 @@ export class JavaScriptTypeMapping {
                 return Type.signature(this);
             }
         }) as Type.Method;
+
+        this.methodCache.set(cacheKey, method);
+        return method;
     }
 
     private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
-        if (declaringType == Type.Primitive.String && this.stringWrapperType) {
+        if (declaringType === Type.Primitive.String && this.stringWrapperType) {
             return this.getType(this.stringWrapperType) as Type.FullyQualified;
-        } else if ((declaringType == Type.Primitive.Double || declaringType == Type.Primitive.BigInt) && this.numberWrapperType) {
+        } else if ((declaringType === Type.Primitive.Double || declaringType === Type.Primitive.BigInt) && this.numberWrapperType) {
             return this.getType(this.numberWrapperType) as Type.FullyQualified;
-        } else if (declaringType == Type.Primitive.Boolean && this.booleanWrapperType) {
+        } else if (declaringType === Type.Primitive.Boolean && this.booleanWrapperType) {
             return this.getType(this.booleanWrapperType) as Type.FullyQualified;
         } else {
             // This should not really happen, but we'll fallback to unknown if needed
@@ -361,6 +517,9 @@ export class JavaScriptTypeMapping {
                     } else {
                         declaringType = mappedType as Type.FullyQualified;
                     }
+                } else if (mappedType && mappedType.kind === Type.Kind.Parameterized) {
+                    // For parameterized types (e.g., Array<string>, number[]), use the base class type
+                    declaringType = (mappedType as Type.Parameterized).type;
                 } else if (mappedType && mappedType.kind === Type.Kind.Primitive) {
                     // Box the primitive to its wrapper type
                     declaringType = this.wrapperType(mappedType as Type.Primitive);
@@ -389,18 +548,18 @@ export class JavaScriptTypeMapping {
                 methodName = node.expression.getText();
 
                 // Check if this is an import first
-                const symbol = this.checker.getSymbolAtLocation(node.expression);
+                const exprSymbol = this.checker.getSymbolAtLocation(node.expression);
                 let moduleSpecifier: string | undefined;
                 let aliasedSymbol: ts.Symbol | undefined;
 
-                if (symbol) {
+                if (exprSymbol) {
                     // Check if this is an aliased symbol (i.e., an import)
-                    if (symbol.flags & ts.SymbolFlags.Alias) {
-                        aliasedSymbol = this.checker.getAliasedSymbol(symbol);
+                    if (exprSymbol.flags & ts.SymbolFlags.Alias) {
+                        aliasedSymbol = this.checker.getAliasedSymbol(exprSymbol);
                     }
 
                     // If getAliasedSymbol returns something different, it's an import
-                    if (aliasedSymbol && aliasedSymbol !== symbol) {
+                    if (aliasedSymbol && aliasedSymbol !== exprSymbol) {
                         // This is definitely an imported symbol
                         const aliasedParentSymbol = (aliasedSymbol as any).parent as ts.Symbol | undefined;
 
@@ -411,8 +570,8 @@ export class JavaScriptTypeMapping {
                             moduleSpecifier = aliasedParentSymbol.name;
                         } else {
                             // Now find the import declaration to get the module specifier
-                            if (symbol.declarations && symbol.declarations.length > 0) {
-                                let importNode: ts.Node = symbol.declarations[0];
+                            if (exprSymbol.declarations && exprSymbol.declarations.length > 0) {
+                                let importNode: ts.Node = exprSymbol.declarations[0];
 
                                 // Traverse up to find the ImportDeclaration
                                 while (importNode && !ts.isImportDeclaration(importNode)) {
@@ -744,8 +903,12 @@ export class JavaScriptTypeMapping {
                 // Additional base types are interfaces
                 if (classType.classKind === Type.Class.Kind.Class) {
                     const firstBase = this.getType(baseTypes[0]);
+                    // Handle both Class and Parameterized (e.g., Component<Props>)
                     if (Type.isClass(firstBase)) {
                         (classType as any).supertype = firstBase;
+                    } else if (Type.isParameterized(firstBase)) {
+                        // For parameterized types, use the base class as the supertype
+                        (classType as any).supertype = (firstBase as Type.Parameterized).type;
                     }
                     // Rest are interfaces
                     for (let i = 1; i < baseTypes.length; i++) {
@@ -829,46 +992,23 @@ export class JavaScriptTypeMapping {
         }
 
         // Check for primitive types
-        if (type.flags === ts.TypeFlags.Null) {
+        // Note: Using bitwise & instead of === for robustness, as TypeScript may assign
+        // multiple flags to a single type (e.g., Boolean + Union)
+        if (type.flags & ts.TypeFlags.Null) {
             return Type.Primitive.Null;
-        } else if (type.flags === ts.TypeFlags.Undefined) {
+        } else if (type.flags & ts.TypeFlags.Undefined) {
             return Type.Primitive.None;
-        } else if (
-            type.flags === ts.TypeFlags.Number ||
-            type.flags === ts.TypeFlags.NumberLiteral ||
-            type.flags === ts.TypeFlags.NumberLike
-        ) {
+        } else if (type.flags & (ts.TypeFlags.Number | ts.TypeFlags.NumberLiteral | ts.TypeFlags.NumberLike)) {
             return Type.Primitive.Double;
-        } else if (
-            type.flags === ts.TypeFlags.String ||
-            type.flags === ts.TypeFlags.StringLiteral ||
-            type.flags === ts.TypeFlags.StringLike
-        ) {
+        } else if (type.flags & (ts.TypeFlags.String | ts.TypeFlags.StringLiteral | ts.TypeFlags.StringLike)) {
             return Type.Primitive.String;
-        } else if (type.flags === ts.TypeFlags.Void) {
+        } else if (type.flags & ts.TypeFlags.Void) {
             return Type.Primitive.Void;
-        } else if (
-            type.flags === ts.TypeFlags.BigInt ||
-            type.flags === ts.TypeFlags.BigIntLiteral ||
-            type.flags === ts.TypeFlags.BigIntLike
-        ) {
+        } else if (type.flags & (ts.TypeFlags.BigInt | ts.TypeFlags.BigIntLiteral | ts.TypeFlags.BigIntLike)) {
             return Type.Primitive.BigInt;
-        } else if (
-            (type.symbol !== undefined && type.symbol === this.regExpSymbol) ||
-            this.checker.typeToString(type) === "RegExp"
-        ) {
+        } else if (type.symbol !== undefined && type.symbol === this.regExpSymbol) {
             return Type.Primitive.String;
-        }
-
-        /**
-         * TypeScript may assign multiple flags to a single type (e.g., Boolean + Union).
-         * Using a bitwise check ensures we detect Boolean even if other flags are set.
-         */
-        if (
-            type.flags & ts.TypeFlags.Boolean ||
-            type.flags & ts.TypeFlags.BooleanLiteral ||
-            type.flags & ts.TypeFlags.BooleanLike
-        ) {
+        } else if (type.flags & (ts.TypeFlags.Boolean | ts.TypeFlags.BooleanLiteral | ts.TypeFlags.BooleanLike)) {
             return Type.Primitive.Boolean;
         }
 
@@ -883,6 +1023,96 @@ export class JavaScriptTypeMapping {
         }
 
         return Type.unknownType;
+    }
+
+    /**
+     * Create a union type from TypeScript union type (e.g., string | number)
+     * Note: Cache check is done in getType() before calling this method
+     */
+    private createUnionType(unionType: ts.UnionType, cacheKey: string | number): Type.Union {
+        // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
+        const union = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Union,
+            bounds: []
+        }) as Type.Union;
+
+        this.typeCache.set(cacheKey, union);
+
+        // Now map all constituent types (may recursively reference this union)
+        const bounds: Type[] = [];
+        for (const constituentType of unionType.types) {
+            bounds.push(this.getType(constituentType));
+        }
+
+        // Update the bounds in the union we created
+        (union as any).bounds = bounds;
+
+        return union;
+    }
+
+    /**
+     * Create an intersection type from TypeScript intersection type (e.g., A & B)
+     * Note: Cache check is done in getType() before calling this method
+     */
+    private createIntersectionType(intersectionType: ts.IntersectionType, cacheKey: string | number): Type.Intersection {
+        // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
+        const intersection = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Intersection,
+            bounds: []
+        }) as Type.Intersection;
+
+        this.typeCache.set(cacheKey, intersection);
+
+        // Now map all constituent types (may recursively reference this intersection)
+        const bounds: Type[] = [];
+        for (const constituentType of intersectionType.types) {
+            bounds.push(this.getType(constituentType));
+        }
+
+        // Update the bounds in the intersection we created
+        (intersection as any).bounds = bounds;
+
+        return intersection;
+    }
+
+    /**
+     * Create a generic type variable from a TypeScript type parameter.
+     * Examples: T, K extends string, V extends keyof T
+     * Note: Cache check is done in getType() before calling this method
+     */
+    private createGenericTypeVariable(typeParam: ts.TypeParameter, cacheKey: string | number): Type.GenericTypeVariable {
+        const symbol = typeParam.getSymbol();
+        const name = symbol ? symbol.getName() : '?';
+
+        // Shell-cache: Create stub, cache it, then populate (prevents cycles)
+        const gtv = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.GenericTypeVariable,
+            name: name,
+            variance: Type.GenericTypeVariable.Variance.Invariant,
+            bounds: []
+        }) as Type.GenericTypeVariable;
+
+        this.typeCache.set(cacheKey, gtv);
+
+        // Get the constraint (upper bound) if it exists
+        const constraint = typeParam.getConstraint();
+        let bounds: Type[] = [];
+        let variance = Type.GenericTypeVariable.Variance.Invariant;
+
+        if (constraint) {
+            const boundType = this.getType(constraint);
+            // Only add bounds if it's not just "object" (the default constraint)
+            if (!(Type.isClass(boundType) && boundType.fullyQualifiedName === 'object')) {
+                bounds = [boundType];
+                variance = Type.GenericTypeVariable.Variance.Covariant;
+            }
+        }
+
+        // Update the variance and bounds
+        (gtv as any).variance = variance;
+        (gtv as any).bounds = bounds;
+
+        return gtv;
     }
 
     /**

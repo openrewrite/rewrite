@@ -29,9 +29,11 @@ describe('raw() function', () => {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     if ((method.select?.element as J.Identifier)?.simpleName === 'console' &&
                         (method.name as J.Identifier).simpleName === 'log') {
-                        return template`logger.${raw(methodName)}(${msg})`.apply(this.cursor, method, new Map([
-                            ['msg', method.arguments.elements[0].element]
-                        ]));
+                        return template`logger.${raw(methodName)}(${msg})`.apply(method, this.cursor, {
+                            values: new Map([
+                                ['msg', method.arguments.elements[0].element]
+                            ])
+                        });
                     }
                     return method;
                 }
@@ -55,9 +57,11 @@ describe('raw() function', () => {
                 override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
                     if ((invocation.select?.element as J.Identifier)?.simpleName === 'logger' &&
                         (invocation.name as J.Identifier).simpleName === 'info') {
-                        return template`${raw(obj)}.${raw(method)}(${msg})`.apply(this.cursor, invocation, new Map([
-                            ['msg', invocation.arguments.elements[0].element]
-                        ]));
+                        return template`${raw(obj)}.${raw(method)}(${msg})`.apply(invocation, this.cursor, {
+                            values: new Map([
+                                ['msg', invocation.arguments.elements[0].element]
+                            ])
+                        });
                     }
                     return invocation;
                 }
@@ -79,9 +83,11 @@ describe('raw() function', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                     if (binary.operator.element === J.Binary.Type.Equal) {
-                        return template`${value} ${raw(operator)} threshold`.apply(this.cursor, binary, new Map([
-                            ['value', binary.left]
-                        ]));
+                        return template`${value} ${raw(operator)} threshold`.apply(binary, this.cursor, {
+                            values: new Map([
+                                ['value', binary.left]
+                            ])
+                        });
                     }
                     return binary;
                 }
@@ -132,9 +138,11 @@ describe('raw() function', () => {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                     if (binary.operator.element === J.Binary.Type.LessThan &&
                         (binary.left as J.Identifier)?.simpleName === 'age') {
-                        return template`${raw(prefix)}.age < ${value}`.apply(this.cursor, binary, new Map([
-                            ['value', binary.right]
-                        ]));
+                        return template`${raw(prefix)}.age < ${value}`.apply(binary, this.cursor, {
+                            values: new Map([
+                                ['value', binary.right]
+                            ])
+                        });
                     }
                     return binary;
                 }
@@ -161,9 +169,9 @@ describe('raw() function', () => {
                     if ((method.select?.element as J.Identifier)?.simpleName === 'console' &&
                         (method.name as J.Identifier).simpleName === 'log') {
                         // Template is constructed with the dynamic log level from recipe option
-                        return template`logger.${raw(logLevel)}(${msg})`.apply(this.cursor, method, new Map([
-                            ['msg', method.arguments.elements[0].element]
-                        ]));
+                        return template`logger.${raw(logLevel)}(${msg})`.apply(method, this.cursor, {
+                            values: {msg: method.arguments.elements[0].element}
+                        });
                     }
                     return method;
                 }
@@ -187,9 +195,9 @@ describe('raw() function', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     // Pattern with raw() for dynamic method name matching
-                    const m = await pattern`console.${raw(methodName)}(${msg})`.match(method);
+                    const m = await pattern`console.${raw(methodName)}(${msg})`.match(method, this.cursor);
                     if (m) {
-                        return template`logger.info(${msg})`.apply(this.cursor, method, m);
+                        return template`logger.info(${msg})`.apply(method, this.cursor, {values: m});
                     }
                     return method;
                 }
@@ -212,10 +220,10 @@ describe('raw() function', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     // Use raw() in pattern to match specific method
-                    const m = await pattern`logger.${raw(oldMethod)}(${msg})`.match(method);
+                    const m = await pattern`logger.${raw(oldMethod)}(${msg})`.match(method, this.cursor);
                     if (m) {
                         // Use raw() in template to replace with different method
-                        return template`logger.${raw(newMethod)}(${msg})`.apply(this.cursor, method, m);
+                        return template`logger.${raw(newMethod)}(${msg})`.apply(method, this.cursor, {values: m});
                     }
                     return method;
                 }
@@ -263,9 +271,9 @@ describe('raw() function', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
                     // Pattern with multiple raw() calls
-                    const m = await pattern`${raw(obj)}.${raw(method)}(${msg})`.match(invocation);
+                    const m = await pattern`${raw(obj)}.${raw(method)}(${msg})`.match(invocation, this.cursor);
                     if (m) {
-                        return template`logger.info(${msg})`.apply(this.cursor, invocation, m);
+                        return template`logger.info(${msg})`.apply(invocation, this.cursor, {values: m});
                     }
                     return invocation;
                 }
@@ -288,9 +296,9 @@ describe('raw() function', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                     // Pattern matching property access with raw() prefix
-                    const m = await pattern`${raw(prefix)}.${field} < ${value}`.match(binary);
+                    const m = await pattern`${raw(prefix)}.${field} < ${value}`.match(binary, this.cursor);
                     if (m) {
-                        return template`${raw(prefix)}.${field} >= ${value}`.apply(this.cursor, binary, m);
+                        return template`${raw(prefix)}.${field} >= ${value}`.apply(binary, this.cursor, {values: m});
                     }
                     return binary;
                 }

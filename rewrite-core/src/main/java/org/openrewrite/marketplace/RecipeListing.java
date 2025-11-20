@@ -15,6 +15,7 @@
  */
 package org.openrewrite.marketplace;
 
+import lombok.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.NlsRewrite;
 import org.openrewrite.Recipe;
@@ -23,49 +24,75 @@ import org.openrewrite.config.RecipeDescriptor;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-public interface RecipeListing {
-    String getName();
-
-    @NlsRewrite.DisplayName
-    String getDisplayName();
-
-    @NlsRewrite.Description
-    String getDescription();
-
+@Getter
+@RequiredArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class RecipeListing implements Comparable<RecipeListing> {
     /**
-     * @return The bundle that contains this recipe, or null
-     * if the source of the recipe is unknown.
+     * The marketplace that this listing belongs to.
      */
-    @Nullable
-    RecipeBundle getBundle();
+    @With(AccessLevel.PACKAGE)
+    private final @Nullable RecipeMarketplace marketplace;
 
-    @Nullable
-    Duration getEstimatedEffortPerOccurrence();
+    private final @EqualsAndHashCode.Include String name;
+    private final @NlsRewrite.DisplayName String displayName;
+    private final @NlsRewrite.Description String description;
+    private final @Nullable Duration estimatedEffortPerOccurrence;
+    private final List<? extends Option> options;
 
-    List<? extends Option> getOptions();
+    @With(AccessLevel.PACKAGE)
+    private final RecipeBundle bundle;
 
-    default RecipeDescriptor describe() {
-        if (getBundle() == null) {
-            throw new IllegalStateException("Unable to describe a recipe whose bundle is unknown");
+    public RecipeBundleReader resolve() {
+        if (marketplace != null) {
+            for (RecipeBundleResolver resolver : marketplace.getResolvers()) {
+                if (resolver.getEcosystem().equals(bundle.getPackageEcosystem())) {
+                    return resolver.resolve(bundle);
+                }
+            }
         }
-        return getBundle().describe(this);
+        throw new IllegalStateException("This listing has not been configured with a resolver.");
     }
 
-    default Recipe prepare(Map<String, Object> options) {
-        if (getBundle() == null) {
-            throw new IllegalStateException("Unable to prepare a recipe whose bundle is unknown");
-        }
-        return getBundle().prepare(this, options);
+    public RecipeDescriptor describe() {
+        return resolve().describe(this);
     }
 
-    interface Option {
-        String getName();
+    public Recipe prepare(Map<String, Object> options) {
+        return resolve().prepare(this, options);
+    }
+
+    @Override
+    public int compareTo(RecipeListing o) {
+        return name.compareTo(o.name);
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Option {
+        String name;
 
         @NlsRewrite.DisplayName
-        String getDisplayName();
+        String displayName;
 
         @NlsRewrite.Description
-        String getDescription();
+        String description;
+    }
+
+    public static RecipeListing fromDescriptor(RecipeDescriptor descriptor, RecipeBundle bundle) {
+        return new RecipeListing(null, descriptor.getName(),
+                descriptor.getDisplayName(),
+                descriptor.getDescription(),
+                descriptor.getEstimatedEffortPerOccurrence(),
+                descriptor.getOptions().stream().map(opt -> new RecipeListing.Option(
+                        opt.getName(),
+                        opt.getDisplayName(),
+                        opt.getDescription()
+                )).collect(Collectors.toList()),
+                bundle
+        );
     }
 }

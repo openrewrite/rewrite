@@ -264,23 +264,22 @@ export class Pattern {
     /**
      * Creates a matcher for this pattern against a specific AST node.
      *
-     * @param ast The AST node to match against
-     * @param cursor Optional cursor at the node's position in a larger tree. Used for context-aware
-     *               capture constraints to navigate to parent nodes. If omitted, a cursor will be
-     *               created at the ast root, allowing constraints to navigate within the matched subtree.
+     * @param tree The AST node to match against
+     * @param cursor Cursor at the node's position in a larger tree. Used for context-aware
+     *               capture constraints to navigate to parent nodes.
      * @param options Optional match options (e.g., debug flag)
      * @returns A MatchResult if the pattern matches, undefined otherwise
      *
      * @example
      * ```typescript
      * // Normal match
-     * const match = await pattern.match(node);
+     * const match = await pattern.match(node, cursor);
      *
      * // Debug this specific call
      * const match = await pattern.match(node, cursor, { debug: true });
      * ```
      */
-    async match(ast: J, cursor?: Cursor, options?: MatchOptions): Promise<MatchResult | undefined> {
+    async match(tree: J, cursor: Cursor, options?: MatchOptions): Promise<MatchResult | undefined> {
         // Three-level precedence: call > pattern > global
         const debugEnabled =
             options?.debug !== undefined
@@ -291,8 +290,8 @@ export class Pattern {
 
         if (debugEnabled) {
             // Use matchWithExplanation and log the result
-            const result = await this.matchWithExplanation(ast, cursor);
-            await this.logMatchResult(ast, cursor, result);
+            const result = await this.matchWithExplanation(tree, cursor);
+            await this.logMatchResult(tree, cursor, result);
 
             if (result.matched) {
                 // result.result is the MatchResult class instance
@@ -303,7 +302,7 @@ export class Pattern {
         }
 
         // Fast path - no debug
-        const matcher = new Matcher(this, ast, cursor);
+        const matcher = new Matcher(this, tree, cursor);
         const success = await matcher.matches();
         if (!success) {
             return undefined;
@@ -317,10 +316,10 @@ export class Pattern {
      * Formats and logs the match result to stderr.
      * @private
      */
-    private async logMatchResult(ast: J, cursor: Cursor | undefined, result: MatchAttemptResult): Promise<void> {
+    private async logMatchResult(tree: J, cursor: Cursor | undefined, result: MatchAttemptResult): Promise<void> {
         const patternSource = this.getPatternSource();
         const patternId = `Pattern #${this.patternId}`;
-        const nodeKind = (ast as any).kind || 'unknown';
+        const nodeKind = (tree as any).kind || 'unknown';
         // Format kind: extract short name (e.g., "org.openrewrite.java.tree.J$Binary" -> "J$Binary")
         const shortKind = nodeKind.split('.').pop() || nodeKind;
 
@@ -643,15 +642,15 @@ export class Pattern {
      * - Explanation of failure (if not matched)
      * - Debug log entries showing the matching process
      *
-     * @param ast The AST node to match against
-     * @param cursor Optional cursor at the node's position in a larger tree
+     * @param tree The AST node to match against
+     * @param cursor Cursor at the node's position in a larger tree
      * @param debugOptions Optional debug options (defaults to all logging enabled)
      * @returns Detailed result with debug information
      *
      * @example
      * const x = capture('x');
      * const pat = pattern`console.log(${x})`;
-     * const attempt = await pat.matchWithExplanation(node);
+     * const attempt = await pat.matchWithExplanation(node, cursor);
      * if (attempt.matched) {
      *     console.log('Matched!');
      *     console.log('Captured x:', attempt.result.get('x'));
@@ -661,8 +660,8 @@ export class Pattern {
      * }
      */
     async matchWithExplanation(
-        ast: J,
-        cursor?: Cursor,
+        tree: J,
+        cursor: Cursor,
         debugOptions?: DebugOptions
     ): Promise<MatchAttemptResult> {
         // Default to full debug logging if not specified
@@ -673,7 +672,7 @@ export class Pattern {
             ...debugOptions
         };
 
-        const matcher = new Matcher(this, ast, cursor, options);
+        const matcher = new Matcher(this, tree, cursor, options);
         const success = await matcher.matches();
 
         if (success) {
@@ -812,17 +811,16 @@ class Matcher {
      *
      * @param pattern The pattern to match
      * @param ast The AST node to match against
-     * @param cursor Optional cursor at the AST node's position
+     * @param cursor Cursor at the AST node's position
      * @param debugOptions Optional debug options for instrumentation
      */
     constructor(
         private readonly pattern: Pattern,
         private readonly ast: J,
-        cursor?: Cursor,
+        cursor: Cursor,
         debugOptions?: DebugOptions
     ) {
-        // If no cursor provided, create one at the ast root so constraints can navigate up
-        this.cursor = cursor ?? new Cursor(ast, undefined);
+        this.cursor = cursor;
         this.debugOptions = debugOptions ?? {};
     }
 
