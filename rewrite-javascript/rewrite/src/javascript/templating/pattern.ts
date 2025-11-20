@@ -31,9 +31,10 @@ import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYM
 import {DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
 import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {TemplateEngine} from './engine';
-import {PrintOutputCapture, TreePrinters} from '../../print';
+import {TreePrinters} from '../../print';
 import {JS} from '../index';
-import {ElementMarkerVisitor, PATTERN_DEBUG_MARKER_PRINTER, shouldUseEmoji} from './debug';
+import {AnsiAwarePrintOutputCapture, ElementMarkerVisitor, PATTERN_DEBUG_MARKER_PRINTER, shouldUseEmoji} from './debug';
+import {dedent, prefixLines} from '../../util';
 
 
 /**
@@ -367,7 +368,7 @@ export class Pattern {
             let treeStr: string;
             try {
                 const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-                const output = new PrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                 treeStr = await printer.print(markedAst, output);
                 // Replace placeholder names with clean display names
                 treeStr = this.replacePlaceholderNames(treeStr);
@@ -425,7 +426,7 @@ export class Pattern {
                 }
                 const patternToPrint = markedPattern || patternAst;
                 const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-                const output = new PrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                 patternTreeStr = await printer.print(patternToPrint, output);
                 // Replace placeholder names with clean display names
                 patternTreeStr = this.replacePlaceholderNames(patternTreeStr);
@@ -456,7 +457,7 @@ export class Pattern {
                 }
                 const treeToPrint = markedTree || tree;
                 const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-                const output = new PrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                 matchedTreeStr = await printer.print(treeToPrint, output);
                 // Replace placeholder names with clean display names
                 matchedTreeStr = this.replacePlaceholderNames(matchedTreeStr);
@@ -493,7 +494,7 @@ export class Pattern {
                                     const elementStrs = await Promise.all(
                                         container.elements.map(async (padded) => {
                                             // Create fresh output capture for each element
-                                            const output = new PrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                                            const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                                             const subtree = await printer.print(padded.element, output);
                                             return subtree.trim();
                                         })
@@ -506,10 +507,24 @@ export class Pattern {
                                 }
                             } else {
                                 // Regular element
-                                const output = new PrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                                 let subtreeStr = await printer.print(element, output);
                                 subtreeStr = this.replacePlaceholderNames(subtreeStr);
-                                lines.push(`[${patternId}]      ${label}:  ${subtreeStr.trim()}`);
+
+                                // Process multi-line output: trim, dedent, then re-indent with proper alignment
+                                subtreeStr = dedent(subtreeStr.trim());
+
+                                // Calculate proper indentation to align continuation lines
+                                // Pattern is: "[Pattern #2]      Label:  content"
+                                // So continuation lines should start at position of "content"
+                                const patternPrefix = `[${patternId}]      `;
+                                const labelPrefix = `${label}:  `;
+                                const firstLinePrefix = patternPrefix + labelPrefix;
+                                const continuationPrefix = patternPrefix + ' '.repeat(labelPrefix.length);
+
+                                // Apply prefixes using prefixLines utility
+                                const prefixedStr = prefixLines(subtreeStr, continuationPrefix, firstLinePrefix);
+                                lines.push(prefixedStr);
                             }
                         } catch (e) {
                             lines.push(`[${patternId}]      ${label}:  (unable to print: ${e})`);

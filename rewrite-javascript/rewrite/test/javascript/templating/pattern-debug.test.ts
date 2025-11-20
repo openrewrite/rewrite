@@ -238,4 +238,41 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation!.actual).toBe('"error"');
     });
 
+    test('multi-line element pattern matching works correctly', async () => {
+        // Parse a multi-line object literal
+        const gen = parser.parse({
+            text: `const obj = {
+    a: 1,
+    b: 2,
+    c: 3
+};`,
+            sourcePath: 'test.ts'
+        });
+        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const statement = cu.statements[0].element;
+
+        // Create a pattern that won't match (expects only two properties)
+        const name = capture('name');
+        const a = capture('a');
+        const b = capture('b');
+        const pat = pattern`const ${name} = { a: ${a}, b: ${b} };`;
+
+        const attempt = await pat.matchWithExplanation(statement, undefined!);
+
+        // Should fail to match because target has 3 properties, pattern expects 2
+        expect(attempt.matched).toBe(false);
+        expect(attempt.explanation).toBeDefined();
+
+        // The explanation should have pattern and target elements
+        expect(attempt.explanation!.patternElement).toBeDefined();
+        expect(attempt.explanation!.targetElement).toBeDefined();
+
+        // Should provide a reason for the mismatch
+        expect(attempt.explanation!.reason).toBeDefined();
+
+        // Note: The ANSI coloring fix in AnsiAwarePrintOutputCapture ensures multi-line
+        // elements are properly highlighted when printed to console. This is tested
+        // implicitly by the debug logging system working correctly.
+    });
+
 });

@@ -21,7 +21,7 @@ import {TreePrinters} from "../print";
 import {SourceFile} from "../tree";
 import {Result, scheduleRun} from "../run";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
-import {mapAsync, trimIndent} from "../util";
+import {dedent, mapAsync, trimIndent} from "../util";
 import {ParseErrorKind} from "../parse-error";
 import {MarkersKind, ParseExceptionResult} from "../markers";
 import {JavaScriptVisitor} from "../javascript";
@@ -240,76 +240,6 @@ class NoopRecipe extends Recipe {
 }
 
 export type AfterRecipeText = string | ((actual: string) => string | undefined) | undefined | null;
-
-/**
- * Simple dedent implementation that removes common leading whitespace from each line.
- *
- * Behavior:
- * - Removes ONE leading newline if present (for template string ergonomics)
- * - Removes trailing newline + whitespace (for template string ergonomics)
- * - Preserves additional leading/trailing empty lines beyond the first
- * - For lines with content: removes common indentation
- * - For lines with only whitespace: removes common indentation, preserving remaining spaces
- *
- * Examples:
- * - `\n  code` → `code` (single leading newline removed)
- * - `\n\n  code` → `\ncode` (first newline removed, second preserved)
- * - `  code\n` → `code` (trailing newline removed)
- * - `  code\n\n` → `code\n` (first trailing newline removed, second preserved)
- */
-function dedent(s: string): string {
-    if (!s) return s;
-
-    // Remove single leading newline for ergonomics
-    let start = s.charCodeAt(0) === 10 ? 1 : 0;  // 10 = '\n'
-
-    // Remove trailing newline + any trailing whitespace
-    let end = s.length;
-    for (let i = s.length - 1; i >= start; i--) {
-        const ch = s.charCodeAt(i);
-        if (ch === 10) {  // '\n'
-            end = i;
-            break;
-        }
-        if (ch !== 32 && ch !== 9) break;  // not ' ' or '\t'
-    }
-
-    if (start >= end) return '';
-
-    const str = start > 0 || end < s.length ? s.slice(start, end) : s;
-    const lines = str.split('\n');
-
-    // If we removed a leading newline, consider all lines for minIndent
-    // Otherwise, skip the first line (it's on the same line as the opening quote)
-    const startLine = start > 0 ? 0 : 1;
-
-    // Find minimum indentation
-    let minIndent = Infinity;
-    for (let i = startLine; i < lines.length; i++) {
-        const line = lines[i];
-        let indent = 0;
-        for (let j = 0; j < line.length; j++) {
-            const ch = line.charCodeAt(j);
-            if (ch === 32 || ch === 9) {  // ' ' or '\t'
-                indent++;
-            } else {
-                // Found non-whitespace, update minIndent
-                if (indent < minIndent) minIndent = indent;
-                break;
-            }
-        }
-    }
-
-    // If all lines are empty or no indentation
-    if (minIndent === Infinity || minIndent === 0) {
-        return lines.join('\n');
-    }
-
-    // Remove common indentation from lines (skip first line only if we didn't remove leading newline)
-    return lines.map((line, i) =>
-        (i === 0 && startLine === 1) ? line : (line.length >= minIndent ? line.slice(minIndent) : '')
-    ).join('\n');
-}
 
 export function dedentAfter(s?: AfterRecipeText): AfterRecipeText {
     if (s !== null) {

@@ -23,7 +23,7 @@
 
 import {Cursor, randomId, Tree} from '../..';
 import {Marker, Markers, MarkersKind} from '../../markers';
-import {MarkerPrinter} from '../../print';
+import {MarkerPrinter, PrintOutputCapture} from '../../print';
 import {J} from '../../java';
 import {JavaScriptVisitor} from '../index';
 import {DebugCallbacks, PatternMatchingComparator} from './comparator';
@@ -148,6 +148,92 @@ export const PATTERN_DEBUG_MARKER_PRINTER: MarkerPrinter = {
         return MarkerPrinter.DEFAULT.afterSyntax(marker, cursor, commentWrapper);
     }
 };
+
+// ============================================================================
+// ANSI-Aware Print Output Capture
+// ============================================================================
+
+/**
+ * A print output capture that tracks active ANSI escape codes and reapplies them
+ * after newlines to ensure multi-line elements maintain their styling.
+ *
+ * This is necessary because ANSI escape codes like \x1b[7m (inverted colors) don't
+ * persist across newlines - each line needs to be individually styled.
+ */
+export class AnsiAwarePrintOutputCapture extends PrintOutputCapture {
+    private activeAnsiCodes: string[] = [];
+
+    /**
+     * Appends text, tracking ANSI escape codes and reapplying them after newlines.
+     */
+    override append(text: string | undefined): AnsiAwarePrintOutputCapture {
+        if (!text || text.length === 0) {
+            return this;
+        }
+
+        // Process the text character by character to handle ANSI codes and newlines
+        let i = 0;
+        while (i < text.length) {
+            // Check for ANSI escape sequence
+            if (text[i] === '\x1b' && i + 1 < text.length && text[i + 1] === '[') {
+                // Find the end of the ANSI sequence (ends with a letter)
+                let j = i + 2;
+                while (j < text.length && !/[a-zA-Z]/.test(text[j])) {
+                    j++;
+                }
+                if (j < text.length) {
+                    j++; // Include the terminating letter
+                    const ansiCode = text.substring(i, j);
+                    super.append(ansiCode);
+
+                    // Track state-changing codes
+                    // \x1b[7m = inverted colors (start)
+                    // \x1b[27m = normal colors (end inverted)
+                    // \x1b[0m = reset all
+                    if (ansiCode === '\x1b[7m') {
+                        this.activeAnsiCodes.push(ansiCode);
+                    } else if (ansiCode === '\x1b[27m') {
+                        // Remove inverted colors from stack
+                        this.activeAnsiCodes = this.activeAnsiCodes.filter(code => code !== '\x1b[7m');
+                    } else if (ansiCode === '\x1b[0m' || ansiCode === '\x1b[m') {
+                        // Reset clears all active codes
+                        this.activeAnsiCodes = [];
+                    }
+
+                    i = j;
+                    continue;
+                }
+            }
+
+            // Check for newline
+            if (text[i] === '\n') {
+                // First, close any active ANSI codes before the newline
+                for (let j = this.activeAnsiCodes.length - 1; j >= 0; j--) {
+                    if (this.activeAnsiCodes[j] === '\x1b[7m') {
+                        super.append('\x1b[27m');
+                    }
+                }
+
+                // Add the newline
+                super.append('\n');
+
+                // Reapply active ANSI codes after the newline
+                for (const code of this.activeAnsiCodes) {
+                    super.append(code);
+                }
+
+                i++;
+                continue;
+            }
+
+            // Regular character
+            super.append(text[i]);
+            i++;
+        }
+
+        return this;
+    }
+}
 
 // ============================================================================
 // Element Marker Visitor
