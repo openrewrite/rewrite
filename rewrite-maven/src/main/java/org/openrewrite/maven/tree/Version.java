@@ -221,7 +221,8 @@ public class Version implements Comparable<Version> {
         private static final Map<String, Integer> QUALIFIERS;
         private final String version;
         private int index;
-        private String token;
+        private int tokenStart;
+        private int tokenEnd;
         private boolean number;
         private boolean terminatedByNumber;
 
@@ -269,10 +270,12 @@ public class Version implements Comparable<Version> {
                 }
 
                 if (end > start) {
-                    this.token = this.version.substring(start, end);
+                    this.tokenStart = start;
+                    this.tokenEnd = end;
                     this.number = state >= 0;
                 } else {
-                    this.token = "0";
+                    this.tokenStart = 0;
+                    this.tokenEnd = 1;
                     this.number = true;
                 }
 
@@ -282,29 +285,33 @@ public class Version implements Comparable<Version> {
 
         @Override
         public String toString() {
-            return String.valueOf(this.token);
+            return this.version.substring(this.tokenStart, this.tokenEnd);
         }
 
         public Version.Item toItem() {
             if (this.number) {
                 try {
-                    return this.token.length() < 10 ? new Version.Item(4, Integer.parseInt(this.token)) : new Version.Item(5, new BigInteger(this.token));
-                } catch (NumberFormatException var2) {
-                    throw new IllegalStateException(var2);
+                    int tokenLength = this.tokenEnd - this.tokenStart;
+                    return tokenLength < 10 ? new Version.Item(4, parseInt(version, tokenStart, tokenEnd)) :
+                            new Version.Item(5, new BigInteger(this.version.substring(this.tokenStart, this.tokenEnd)));
+                } catch (NumberFormatException e) {
+                    throw new IllegalStateException(e);
                 }
             } else {
+                int tokenLength = this.tokenEnd - this.tokenStart;
                 if (this.index >= this.version.length()) {
-                    if ("min".equalsIgnoreCase(this.token)) {
+                    if (tokenLength == 3 && regionMatches(this.tokenStart, "min")) {
                         return Version.Item.MIN;
                     }
 
-                    if ("max".equalsIgnoreCase(this.token)) {
+                    if (tokenLength == 3 && regionMatches(this.tokenStart, "max")) {
                         return Version.Item.MAX;
                     }
                 }
 
-                if (this.terminatedByNumber && this.token.length() == 1) {
-                    switch (this.token.charAt(0)) {
+                if (this.terminatedByNumber && tokenLength == 1) {
+                    char c = this.version.charAt(this.tokenStart);
+                    switch (c) {
                         case 'A':
                         case 'a':
                             return new Version.Item(2, QUALIFIER_ALPHA);
@@ -317,9 +324,49 @@ public class Version implements Comparable<Version> {
                     }
                 }
 
-                Integer qualifier = QUALIFIERS.get(this.token);
-                return qualifier != null ? new Version.Item(2, qualifier) : new Version.Item(3, this.token.toLowerCase(Locale.ENGLISH));
+                String token = this.version.substring(this.tokenStart, this.tokenEnd);
+                Integer qualifier = QUALIFIERS.get(token);
+                return qualifier != null ? new Version.Item(2, qualifier) : new Version.Item(3, token.toLowerCase(Locale.ENGLISH));
             }
+        }
+
+        // Adapted from Java 9's `Integer#parseInt(CharSequence, int, int, int)`
+        public static int parseInt(String s, int beginIndex, int endIndex)
+                throws NumberFormatException {
+
+            int radix = 10;
+            int i = beginIndex;
+            int limit = -Integer.MAX_VALUE;
+
+            if (i < endIndex) {
+                char firstChar = s.charAt(i);
+                if (firstChar < '0') { // Possible leading "+" or "-"
+                    throw new IllegalArgumentException("Illegal version: " + s.subSequence(beginIndex, endIndex));
+                }
+                int multmin = limit / radix;
+                int result = 0;
+                while (i < endIndex) {
+                    // Accumulating negatively avoids surprises near MAX_VALUE
+                    int digit = Character.digit(s.charAt(i), radix);
+                    if (digit < 0 || result < multmin) {
+                        throw new IllegalArgumentException("Illegal version: " + s.subSequence(beginIndex, endIndex));
+                    }
+                    result *= radix;
+                    if (result < limit + digit) {
+                        throw new IllegalArgumentException("Illegal version: " + s.subSequence(beginIndex, endIndex));
+                    }
+                    i++;
+                    result -= digit;
+                }
+                return -result;
+            } else {
+                throw new IllegalArgumentException("Illegal version: " + s.subSequence(beginIndex, endIndex));
+            }
+        }
+
+
+        private boolean regionMatches(int offset, String target) {
+            return this.version.regionMatches(true, offset, target, 0, target.length());
         }
 
         static {
