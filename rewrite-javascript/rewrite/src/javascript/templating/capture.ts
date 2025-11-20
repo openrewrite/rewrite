@@ -15,7 +15,7 @@
  */
 import {Cursor} from '../..';
 import {J, Type} from '../../java';
-import {Any, Capture, CaptureOptions, ConstraintFunction, TemplateParam, VariadicOptions} from './types';
+import {Any, Capture, CaptureConstraintContext, CaptureOptions, ConstraintFunction, TemplateParam, VariadicOptions} from './types';
 
 /**
  * Combines multiple constraints with AND logic.
@@ -30,8 +30,8 @@ import {Any, Capture, CaptureOptions, ConstraintFunction, TemplateParam, Variadi
  *     )
  * });
  */
-export function and<T>(...constraints: ((node: T, cursor?: Cursor) => boolean)[]): (node: T, cursor?: Cursor) => boolean {
-    return (node: T, cursor?: Cursor) => constraints.every(c => c(node, cursor));
+export function and<T>(...constraints: ConstraintFunction<T>[]): ConstraintFunction<T> {
+    return (node: T, context: CaptureConstraintContext) => constraints.every(c => c(node, context));
 }
 
 /**
@@ -46,8 +46,8 @@ export function and<T>(...constraints: ((node: T, cursor?: Cursor) => boolean)[]
  *     )
  * });
  */
-export function or<T>(...constraints: ((node: T, cursor?: Cursor) => boolean)[]): (node: T, cursor?: Cursor) => boolean {
-    return (node: T, cursor?: Cursor) => constraints.some(c => c(node, cursor));
+export function or<T>(...constraints: ConstraintFunction<T>[]): ConstraintFunction<T> {
+    return (node: T, context: CaptureConstraintContext) => constraints.some(c => c(node, context));
 }
 
 /**
@@ -59,8 +59,8 @@ export function or<T>(...constraints: ((node: T, cursor?: Cursor) => boolean)[])
  *     constraint: not((node) => typeof node.value === 'string')
  * });
  */
-export function not<T>(constraint: (node: T, cursor?: Cursor) => boolean): (node: T, cursor?: Cursor) => boolean {
-    return (node: T, cursor?: Cursor) => !constraint(node, cursor);
+export function not<T>(constraint: ConstraintFunction<T>): ConstraintFunction<T> {
+    return (node: T, context: CaptureConstraintContext) => !constraint(node, context);
 }
 
 // Symbol to access the internal capture name without triggering Proxy

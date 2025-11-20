@@ -30,8 +30,8 @@ We will use a CSV format for recipe marketplace data with the following structur
 
 ### Optional Recipe Metadata Columns
 
-- **`displayName`**: Human-readable recipe display name (defaults to `name` if not specified)
-- **`description`**: Recipe description (defaults to empty string if not specified)
+- **`displayName`**: Human-readable recipe display name
+- **`description`**: Recipe description
 - **`estimatedEffortPerOccurrence`**: ISO-8601 duration format (e.g., PT5M, PT1H)
 - **`category1, category2, ..., categoryN`**: Zero or more category columns, read **left to right** with **left representing the deepest level category**
 - **`option1Name, option1DisplayName, option1Description`**: First recipe option

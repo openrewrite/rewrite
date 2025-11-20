@@ -105,7 +105,7 @@ function createAddImportWithTemplateVisitor(
                     .code(templateCode)
                     .build()
                     .configure({ context: [importStatement] })
-                    .apply(this.cursor, methodInvocation);
+                    .apply(methodInvocation, this.cursor);
             }
             return super.visitMethodInvocation(methodInvocation, p);
         }

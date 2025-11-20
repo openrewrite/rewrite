@@ -1654,6 +1654,50 @@ describe('JavaScript type mapping', () => {
             expect(true).toBe(true);
         });
     });
+
+    test('CommonJS require imports distinguish methods with identical signatures', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markTypes((_, type) => {
+            return Type.isMethod(type) && type.name === 'isArray' ? FullyQualified.getFullyQualifiedName(type.declaringType) : null;
+        });
+
+        //language=typescript
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(
+                        `
+                                const util = require('util');
+
+                                util.isArray([]);
+                                util.isString("not an array");
+                            `,
+                        //@formatter:off
+                        `
+                                const util = require('util');
+
+                                /*~~(util)~~>*/util.isArray([]);
+                                util.isString("not an array");
+                            `
+                        //@formatter:on
+                    ),
+                    //language=json
+                    packageJson(
+                        `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                    )
+                )
+            )
+        }, {unsafeCleanup: true});
+    });
 });
 
 /**
