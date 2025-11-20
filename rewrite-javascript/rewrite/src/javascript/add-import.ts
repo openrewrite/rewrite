@@ -1,9 +1,8 @@
 import {JavaScriptVisitor} from "./visitor";
-import {J, emptySpace, rightPadded, space, Statement, singleSpace, Type} from "../java";
+import {emptySpace, J, rightPadded, singleSpace, space, Statement, Type} from "../java";
 import {JS} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
-import {ExecutionContext} from "../execution";
 
 export enum ImportStyle {
     ES6Named,      // import { x } from 'module'
@@ -454,14 +453,27 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     const newSpecifierBase = this.createImportSpecifier();
                     const newSpecifier = {...newSpecifierBase, prefix: singleSpace};
 
+                    // Transfer the right padding from the element before the insertion point to the new element
+                    // Since we're appending, this is the last existing element
+                    const existingElements = namedImports.elements.elements;
+                    const elementBeforeInsertion = existingElements[existingElements.length - 1];
+                    const paddingToTransfer = elementBeforeInsertion.after;
+
                     // Add the new specifier to the elements
                     const updatedNamedImports: JS.NamedImports = await this.produceJavaScript<JS.NamedImports>(
                         namedImports, p, async namedDraft => {
+                            // Update the element before insertion to have emptySpace as its right padding (before the comma)
+                            const updatedExistingElements = existingElements.slice(0, -1).concat({
+                                ...elementBeforeInsertion,
+                                after: emptySpace
+                            });
+
                             namedDraft.elements = {
                                 ...namedImports.elements,
                                 elements: [
-                                    ...namedImports.elements.elements,
-                                    rightPadded(newSpecifier, emptySpace)
+                                    ...updatedExistingElements,
+                                    // Transfer the padding to the new element (after the comma, before the closing brace)
+                                    rightPadded(newSpecifier, paddingToTransfer)
                                 ]
                             };
                         }
@@ -660,41 +672,119 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Check if the identifier is actually referenced in the file
      */
     private async checkIdentifierReferenced(compilationUnit: JS.CompilationUnit): Promise<boolean> {
-        // Use type attribution to detect if the identifier is referenced
-        // Map of module name -> Set of member names used from that module
-        const usedImports = new Map<string, Set<string>>();
+        // For namespace imports, we cannot use type attribution to detect usage
+        // because the namespace itself is used as an identifier, not individual members.
+        // For simplicity, we skip the onlyIfReferenced check for namespace imports.
+        if (this.member === '*') {
+            // TODO: Implement proper namespace usage detection by checking if alias identifier is used
+            return true;
+        }
 
-        // Helper to record usage of a method from a module
-        const recordMethodUsage = (methodType: Type.Method) => {
-            const moduleName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
-            if (moduleName) {
-                if (!usedImports.has(moduleName)) {
-                    usedImports.set(moduleName, new Set());
+        // Step 1: Find the expected declaring type by examining existing imports from the same module
+        let expectedDeclaringType: string | undefined;
+
+        for (const stmt of compilationUnit.statements) {
+            const statement = stmt.element;
+
+            if (statement?.kind === JS.Kind.Import) {
+                const jsImport = statement as JS.Import;
+                const moduleSpecifier = jsImport.moduleSpecifier?.element;
+
+                if (!moduleSpecifier) {
+                    continue;
                 }
-                usedImports.get(moduleName)!.add(methodType.name);
-            }
-        };
 
-        // Create a visitor to collect used identifiers with their type attribution
+                const moduleName = this.getModuleName(moduleSpecifier);
+                if (moduleName !== this.module) {
+                    continue;  // Not the module we're interested in
+                }
+
+                // Found an existing import from our target module
+                // Extract the declaring type from any imported member with type attribution
+                const importClause = jsImport.importClause;
+                if (importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
+                    const namedImports = importClause.namedBindings as JS.NamedImports;
+                    for (const elem of namedImports.elements.elements) {
+                        const specifier = elem.element;
+                        if (specifier?.kind === JS.Kind.ImportSpecifier) {
+                            const importSpec = specifier as JS.ImportSpecifier;
+                            let identifier: J.Identifier | undefined;
+                            if (importSpec.specifier?.kind === J.Kind.Identifier) {
+                                identifier = importSpec.specifier as J.Identifier;
+                            } else if (importSpec.specifier?.kind === JS.Kind.Alias) {
+                                const aliasSpec = importSpec.specifier as JS.Alias;
+                                if (aliasSpec.alias?.kind === J.Kind.Identifier) {
+                                    identifier = aliasSpec.alias as J.Identifier;
+                                }
+                            }
+
+                            if (identifier?.type && Type.isMethod(identifier.type)) {
+                                const methodType = identifier.type as Type.Method;
+                                expectedDeclaringType = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                                if (expectedDeclaringType) {
+                                    break;  // Found it!
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (expectedDeclaringType) {
+                    break;  // No need to scan more imports
+                }
+            }
+        }
+
+        // Step 2: Look for references that match
+        const targetName = this.alias || this.member;
+        let found = false;
+
+        // If no existing imports from this module, look for unresolved references
+        // If there ARE existing imports, look for references with the expected declaring type
+
         const collector = new class extends JavaScriptVisitor<void> {
             override async visitIdentifier(identifier: J.Identifier, p: void): Promise<J | undefined> {
-                const type = identifier.type;
-                if (type && Type.isMethod(type)) {
-                    recordMethodUsage(type as Type.Method);
+                if (identifier.simpleName === targetName) {
+                    const type = identifier.type;
+                    if (expectedDeclaringType) {
+                        // We have an expected declaring type - check for exact match
+                        if (type && Type.isMethod(type)) {
+                            const methodType = type as Type.Method;
+                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                            if (declaringTypeName === expectedDeclaringType) {
+                                found = true;
+                            }
+                        }
+                    } else {
+                        // No existing imports - look for unresolved references (no type)
+                        if (!type) {
+                            found = true;
+                        }
+                    }
                 }
                 return super.visitIdentifier(identifier, p);
             }
 
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: void): Promise<J | undefined> {
-                if (methodInvocation.methodType) {
-                    recordMethodUsage(methodInvocation.methodType);
+                if (methodInvocation.methodType && methodInvocation.methodType.name === targetName) {
+                    if (expectedDeclaringType) {
+                        const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodInvocation.methodType.declaringType);
+                        if (declaringTypeName === expectedDeclaringType) {
+                            found = true;
+                        }
+                    }
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
 
             override async visitFunctionCall(functionCall: JS.FunctionCall, p: void): Promise<J | undefined> {
-                if (functionCall.methodType) {
-                    recordMethodUsage(functionCall.methodType);
+                if (functionCall.methodType && functionCall.methodType.name === targetName) {
+                    if (expectedDeclaringType) {
+                        const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(functionCall.methodType.declaringType);
+                        if (declaringTypeName === expectedDeclaringType) {
+                            found = true;
+                        }
+                    }
                 }
                 return super.visitFunctionCall(functionCall, p);
             }
@@ -702,7 +792,15 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             override async visitFieldAccess(fieldAccess: J.FieldAccess, p: void): Promise<J | undefined> {
                 const type = fieldAccess.type;
                 if (type && Type.isMethod(type)) {
-                    recordMethodUsage(type as Type.Method);
+                    const methodType = type as Type.Method;
+                    if (methodType.name === targetName) {
+                        if (expectedDeclaringType) {
+                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                            if (declaringTypeName === expectedDeclaringType) {
+                                found = true;
+                            }
+                        }
+                    }
                 }
                 return super.visitFieldAccess(fieldAccess, p);
             }
@@ -710,23 +808,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         await collector.visit(compilationUnit, undefined);
 
-        // For namespace imports (member === '*'), we cannot use type attribution to detect usage
-        // because the namespace itself is used as an identifier, not individual members.
-        // We would need to traverse the AST looking for the alias identifier.
-        // For simplicity, we skip the onlyIfReferenced check for namespace imports.
-        if (this.member === '*') {
-            // TODO: Implement proper namespace usage detection by checking if alias identifier is used
-            return true;
-        }
-
-        // Check if our target import is used based on type attribution
-        const moduleMembers = usedImports.get(this.module);
-        if (!moduleMembers) {
-            return false;
-        }
-
-        // For specific members, check if that member is used; otherwise check if any member is used
-        return this.member ? moduleMembers.has(this.member) : moduleMembers.size > 0;
+        return found;
     }
 
     /**
