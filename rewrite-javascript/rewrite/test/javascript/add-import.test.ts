@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe, test} from "@jest/globals";
+import {describe, test, expect} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
@@ -25,6 +25,7 @@ import {
     maybeAddImport,
     RemoveImport,
     Template,
+    tsx,
     typescript
 } from "../../src/javascript";
 import {J} from "../../src/java";
@@ -38,17 +39,17 @@ import {J} from "../../src/java";
  * The source code starts with the import (for type attribution during parse),
  * then the visitor removes the import, and AddImport re-adds it based on usage detection.
  *
- * @param target The module to import from (e.g., "fs")
+ * @param module The module to import from (e.g., "fs")
  * @param member Optional member to import (e.g., "readFile")
  * @param alias Optional alias for the import
  */
 function createRemoveThenAddImportVisitor(
-    target: string,
+    module: string,
     member?: string,
     alias?: string
 ): JavaScriptVisitor<any> {
-    const removeImport = new RemoveImport(target, member);
-    const addImport = new AddImport({ target, member, alias });
+    const removeImport = new RemoveImport(module, member);
+    const addImport = new AddImport({ module, member, alias });
 
     return new class extends JavaScriptVisitor<any> {
         override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
@@ -68,13 +69,13 @@ function createRemoveThenAddImportVisitor(
  * 2. Registers AddImport to add the import statement based on the detected usage
  *
  * @param templateCode The code to insert (e.g., "readFile('test.txt', (err, data) => {})")
- * @param target The module to import from (e.g., "fs")
+ * @param module The module to import from (e.g., "fs")
  * @param member Optional member to import (e.g., "readFile")
  * @param alias Optional alias for the import
  */
 function createAddImportWithTemplateVisitor(
     templateCode: string,
-    target: string,
+    module: string,
     member?: string,
     alias?: string
 ): JavaScriptVisitor<any> {
@@ -82,19 +83,19 @@ function createAddImportWithTemplateVisitor(
     let importStatement: string;
     if (member) {
         if (alias) {
-            importStatement = `import {${member} as ${alias}} from '${target}'`;
+            importStatement = `import {${member} as ${alias}} from '${module}'`;
         } else {
-            importStatement = `import {${member}} from '${target}'`;
+            importStatement = `import {${member}} from '${module}'`;
         }
     } else {
-        importStatement = `import ${alias || target} from '${target}'`;
+        importStatement = `import ${alias || module} from '${module}'`;
     }
 
     return new class extends JavaScriptVisitor<any> {
         constructor() {
             super();
             // Register AddImport in afterVisit so it runs after template changes
-            maybeAddImport(this, { target, member, alias });
+            maybeAddImport(this, { module, member, alias });
         }
 
         override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
@@ -134,7 +135,7 @@ describe('AddImport visitor', () => {
 
         test('should not add import when not referenced with onlyIfReferenced=true', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile", onlyIfReferenced: true }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile", onlyIfReferenced: true }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -150,7 +151,7 @@ describe('AddImport visitor', () => {
 
         test('should add import when not referenced with onlyIfReferenced=false', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile", onlyIfReferenced: false }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile", onlyIfReferenced: false }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -173,7 +174,7 @@ describe('AddImport visitor', () => {
 
         test('should not add import if it already exists', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -211,7 +212,7 @@ describe('AddImport visitor', () => {
 
         test('should not add import if aliased import already exists', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile", alias: "read" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile", alias: "read" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -232,7 +233,7 @@ describe('AddImport visitor', () => {
     describe('default imports', () => {
         test('should add default import when referenced', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -250,7 +251,7 @@ describe('AddImport visitor', () => {
 
         test('should not add default import if it already exists', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -268,7 +269,7 @@ describe('AddImport visitor', () => {
 
         test('should add default import with alias', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", alias: "fileSystem" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", alias: "fileSystem" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -286,7 +287,7 @@ describe('AddImport visitor', () => {
 
         test('should add default import using "default" member specifier', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "react", member: "default", alias: "React" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "default", alias: "React" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -304,7 +305,7 @@ describe('AddImport visitor', () => {
 
         test('should not duplicate default import when using "default" member specifier', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "react", member: "default", alias: "React" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "default", alias: "React" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -322,7 +323,7 @@ describe('AddImport visitor', () => {
 
         test('should throw error when member is "default" without alias', async () => {
             expect(() => {
-                new AddImport({ target: "react", member: "default" });
+                new AddImport({ module: "react", member: "default" });
             }).toThrow("When member is 'default', the alias parameter is required");
         });
     });
@@ -330,7 +331,7 @@ describe('AddImport visitor', () => {
     describe('import positioning', () => {
         test('should add import after existing imports', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "path", member: "join" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "path", member: "join" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -350,7 +351,7 @@ describe('AddImport visitor', () => {
 
         test('should add import at beginning if no existing imports', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -369,7 +370,7 @@ describe('AddImport visitor', () => {
 
         test('should preserve file header comment when adding import', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -393,7 +394,7 @@ describe('AddImport visitor', () => {
     describe('merging imports from same module', () => {
         test('should merge new member into existing import from same module', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFileSync", onlyIfReferenced: false }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFileSync", onlyIfReferenced: false }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -418,7 +419,7 @@ describe('AddImport visitor', () => {
 
         test('should merge aliased member into existing import', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFileSync", alias: "readSync", onlyIfReferenced: false }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFileSync", alias: "readSync", onlyIfReferenced: false }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -443,7 +444,7 @@ describe('AddImport visitor', () => {
 
         test('should not merge if member already exists in import', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -463,7 +464,7 @@ describe('AddImport visitor', () => {
     describe('CommonJS require detection', () => {
         test('should not add import if require statement already exists', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -481,7 +482,7 @@ describe('AddImport visitor', () => {
 
         test('should not add import if destructured require already exists', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -499,7 +500,7 @@ describe('AddImport visitor', () => {
 
         test('should not add import if aliased destructured require already exists', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile", alias: "read" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile", alias: "read" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -520,7 +521,7 @@ describe('AddImport visitor', () => {
         test('should use ES6Named style when explicitly specified', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({
-                target: "fs",
+                module: "fs",
                 member: "readFile",
                 onlyIfReferenced: false,
                 style: ImportStyle.ES6Named
@@ -548,7 +549,7 @@ describe('AddImport visitor', () => {
         test('should use ES6Default style when explicitly specified', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({
-                target: "fs",
+                module: "fs",
                 onlyIfReferenced: false,
                 style: ImportStyle.ES6Default
             }));
@@ -575,7 +576,7 @@ describe('AddImport visitor', () => {
         test('should use ES6Default style with custom alias', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({
-                target: "fs",
+                module: "fs",
                 alias: "fileSystem",
                 onlyIfReferenced: false,
                 style: ImportStyle.ES6Default
@@ -603,7 +604,7 @@ describe('AddImport visitor', () => {
         test('should use ES6Named style with aliased member', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({
-                target: "fs",
+                module: "fs",
                 member: "readFile",
                 alias: "read",
                 onlyIfReferenced: false,
@@ -633,7 +634,7 @@ describe('AddImport visitor', () => {
     describe('usage detection', () => {
         test('should detect usage in field access', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs" }));
 
             //language=typescript
             await spec.rewriteRun(
@@ -744,7 +745,7 @@ describe('AddImport visitor', () => {
         test('should work with .js files using ES6 imports', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({
-                target: "fs",
+                module: "fs",
                 member: "readFile",
                 onlyIfReferenced: false,
                 style: ImportStyle.ES6Named
@@ -771,7 +772,7 @@ describe('AddImport visitor', () => {
 
         test('should detect existing CommonJS require in .js files', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ target: "fs", member: "readFile" }));
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFile" }));
 
             //language=javascript
             await spec.rewriteRun(
@@ -785,6 +786,151 @@ describe('AddImport visitor', () => {
                     `
                 )
             );
+        });
+    });
+
+    describe('side-effect imports', () => {
+        test('should add side-effect import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "core-js/stable", sideEffectOnly: true }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import 'core-js/stable';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should detect existing side-effect import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "core-js/stable", sideEffectOnly: true }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import 'core-js/stable';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add side-effect import when regular import from same module exists', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "react", sideEffectOnly: true }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {useState} from 'react';
+
+                        function example() {
+                            const [state, setState] = useState(0);
+                        }
+                    `,
+                    `
+                        import {useState} from 'react';
+                        import 'react';
+
+                        function example() {
+                            const [state, setState] = useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add regular import when side-effect import from same module exists', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: "react",
+                member: "useState",
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import 'react';
+                        import {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add side-effect import when default import exists', async () => {
+            const spec = new RecipeSpec();
+            // This test verifies that side-effect and regular imports are treated as separate
+            // A side-effect import is only a match if another side-effect import exists
+            spec.recipe = fromVisitor(new AddImport({ module: "react", sideEffectOnly: true }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import React from 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `,
+                    `
+                        import React from 'react';
+                        import 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should throw error when combining sideEffectOnly with member', async () => {
+            expect(() => {
+                new AddImport({ module: "react", sideEffectOnly: true, member: "useState" });
+            }).toThrow("Cannot combine sideEffectOnly with member");
+        });
+
+        test('should throw error when combining sideEffectOnly with alias', async () => {
+            expect(() => {
+                new AddImport({ module: "react", sideEffectOnly: true, alias: "React" });
+            }).toThrow("Cannot combine sideEffectOnly with alias");
+        });
+
+        test('should throw error when combining sideEffectOnly with onlyIfReferenced', async () => {
+            expect(() => {
+                new AddImport({ module: "react", sideEffectOnly: true, onlyIfReferenced: true });
+            }).toThrow("Cannot combine sideEffectOnly with onlyIfReferenced");
         });
     });
 });
