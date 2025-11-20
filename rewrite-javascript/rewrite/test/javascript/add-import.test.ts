@@ -23,12 +23,15 @@ import {
     javascript,
     JavaScriptVisitor,
     maybeAddImport,
+    npm,
+    packageJson,
     RemoveImport,
     Template,
     tsx,
     typescript
 } from "../../src/javascript";
-import {J} from "../../src/java";
+import {emptySpace, J} from "../../src/java";
+import {withDir} from "tmp-promise";
 
 /**
  * Helper function to create a visitor that:
@@ -459,6 +462,31 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('should preserve formatting when merging imports (forwardRef, memo example)', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "memo", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import { forwardRef } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import { forwardRef, memo } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
     });
 
     describe('CommonJS require detection', () => {
@@ -738,6 +766,212 @@ describe('AddImport visitor', () => {
                     `
                 )
             );
+        });
+
+        test('should map declaring type to module specifier (React vs react)', async () => {
+            const spec = new RecipeSpec();
+            // This test verifies the fix for the bug where the declaring type FQN ('React')
+            // differs from the module specifier ('react')
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("react", "useState"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {useState} from 'react';
+
+                        function example() {
+                            const [state, setState] = useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should detect React default import usage when declaring type differs from module', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("react", "default", "React"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import React from 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should detect usage when only named imports exist (forwardRef/memo case)', async () => {
+            const spec = new RecipeSpec();
+            // This tests the specific case where we have import {forwardRef} from 'react'
+            // and want to add memo - the declaring type is 'React' but module is 'react'
+            spec.recipe = fromVisitor(createAddImportWithTemplateVisitor(
+                "promisify(fs.readFile)",
+                "util",
+                "promisify"
+            ));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        function example() {
+                            placeholder();
+                        }
+                    `,
+                    `
+                        import {readFile} from 'fs';
+                        import {promisify} from 'util';
+
+                        function example() {
+                            promisify(fs.readFile);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should handle case where usedImports has declaring type name instead of module', async () => {
+            const spec = new RecipeSpec();
+            // This tests the edge case where some identifiers end up in usedImports
+            // under the declaring type name (e.g., 'React') instead of module name ('react')
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("react", "memo"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {forwardRef, memo} from 'react';
+
+                        function example() {
+                            const Component = memo(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should detect React usage with full type attribution (npm + packageJson)', async () => {
+            const spec = new RecipeSpec();
+            // This is the real-world test with full type attribution from @types/react
+            // Test that AddImport detects usage correctly using onlyIfReferenced: false
+            // This tests the case where forwardRef exists and we want to add memo (from your original question)
+            spec.recipe = fromVisitor(new AddImport({
+                module: "react",
+                member: "memo",
+                onlyIfReferenced: false  // Use false since memo isn't imported yet, so no type attribution
+            }));
+
+            //language=tsx
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import {forwardRef} from 'react';
+
+                                function example() {
+                                    const Component = forwardRef(() => <div/>);
+                                }
+                            `,
+                            `
+                                import {forwardRef, memo} from 'react';
+
+                                function example() {
+                                    const Component = forwardRef(() => <div/>);
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "@types/react": "^18"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        });
+
+        test('should detect React usage with onlyIfReferenced after manual import removal', async () => {
+            const spec = new RecipeSpec();
+            // This test manually removes the import statement, then adds it back with onlyIfReferenced: true
+            // This tests that type attribution correctly detects usage even when declaring type != module name
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
+                    const jsCu = cu as any;
+                    // First, manually remove the first statement (the import)
+                    let result: any = await this.produceJavaScript(jsCu, p, async (draft: any) => {
+                        if (draft.statements && draft.statements.length > 0) {
+                            draft.statements = draft.statements.slice(1);
+                            draft.statements[0].element.prefix = emptySpace;
+                        }
+                    });
+
+                    // Then try to add the import back with onlyIfReferenced: true
+                    if (result) {
+                        const addImport = new AddImport({
+                            module: "react",
+                            member: "memo",
+                            onlyIfReferenced: true
+                        });
+                        result = await addImport.visit(result, p) as any;
+                    }
+
+                    return result;
+                }
+            });
+
+            //language=tsx
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import {memo} from 'react';
+
+                                function example() {
+                                    const Component = memo(() => <div/>);
+                                }
+                            `,
+                            `
+                                import {memo} from 'react';
+
+                                function example() {
+                                    const Component = memo(() => <div/>);
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "@types/react": "^18"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
         });
     });
 
