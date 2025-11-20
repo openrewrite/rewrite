@@ -218,15 +218,15 @@ public class Version implements Comparable<Version> {
         private static final Integer QUALIFIER_ALPHA = -5;
         private static final Integer QUALIFIER_BETA = -4;
         private static final Integer QUALIFIER_MILESTONE = -3;
-        private static final Map<String, Integer> QUALIFIERS;
         private final String version;
         private int index;
-        private String token;
+        private int tokenStart;
+        private int tokenEnd;
         private boolean number;
         private boolean terminatedByNumber;
 
         Tokenizer(String version) {
-            this.version = version.length() > 0 ? version : "0";
+            this.version = !version.isEmpty() ? version : "0";
         }
 
         public boolean next() {
@@ -269,10 +269,12 @@ public class Version implements Comparable<Version> {
                 }
 
                 if (end > start) {
-                    this.token = this.version.substring(start, end);
+                    this.tokenStart = start;
+                    this.tokenEnd = end;
                     this.number = state >= 0;
                 } else {
-                    this.token = "0";
+                    this.tokenStart = 0;
+                    this.tokenEnd = 1;
                     this.number = true;
                 }
 
@@ -282,29 +284,33 @@ public class Version implements Comparable<Version> {
 
         @Override
         public String toString() {
-            return String.valueOf(this.token);
+            return this.version.substring(this.tokenStart, this.tokenEnd);
         }
 
         public Version.Item toItem() {
             if (this.number) {
                 try {
-                    return this.token.length() < 10 ? new Version.Item(4, Integer.parseInt(this.token)) : new Version.Item(5, new BigInteger(this.token));
-                } catch (NumberFormatException var2) {
-                    throw new IllegalStateException(var2);
+                    int tokenLength = this.tokenEnd - this.tokenStart;
+                    return tokenLength < 10 ? new Version.Item(4, parseInt(version, tokenStart, tokenEnd)) :
+                            new Version.Item(5, new BigInteger(version.substring(this.tokenStart, this.tokenEnd)));
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("Illegal version: " + version.substring(this.tokenStart, this.tokenEnd), e);
                 }
             } else {
+                int tokenLength = this.tokenEnd - this.tokenStart;
                 if (this.index >= this.version.length()) {
-                    if ("min".equalsIgnoreCase(this.token)) {
+                    if (tokenLength == 3 && matches("min")) {
                         return Version.Item.MIN;
                     }
 
-                    if ("max".equalsIgnoreCase(this.token)) {
+                    if (tokenLength == 3 && matches("max")) {
                         return Version.Item.MAX;
                     }
                 }
 
-                if (this.terminatedByNumber && this.token.length() == 1) {
-                    switch (this.token.charAt(0)) {
+                if (this.terminatedByNumber && tokenLength == 1) {
+                    char c = this.version.charAt(this.tokenStart);
+                    switch (c) {
                         case 'A':
                         case 'a':
                             return new Version.Item(2, QUALIFIER_ALPHA);
@@ -317,24 +323,98 @@ public class Version implements Comparable<Version> {
                     }
                 }
 
-                Integer qualifier = QUALIFIERS.get(this.token);
-                return qualifier != null ? new Version.Item(2, qualifier) : new Version.Item(3, this.token.toLowerCase(Locale.ENGLISH));
+                // Fast path for common qualifiers (avoiding substring allocation and map lookup)
+                switch (tokenLength) {
+                    case 0:
+                        return new Version.Item(2, 0);
+                    case 2:
+                        if (matches("ga")) {
+                            return new Version.Item(2, 0);
+                        }
+                        if (matches("rc")) {
+                            return new Version.Item(2, -2);
+                        }
+                        if (matches("cr")) {
+                            return new Version.Item(2, -2);
+                        }
+                        if (matches("sp")) {
+                            return new Version.Item(2, 1);
+                        }
+                        break;
+                    case 4:
+                        if (matches("beta")) {
+                            return new Version.Item(2, QUALIFIER_BETA);
+                        }
+                        break;
+                    case 5:
+                        if (matches("alpha")) {
+                            return new Version.Item(2, QUALIFIER_ALPHA);
+                        }
+                        if (matches("final")) {
+                            return new Version.Item(2, 0);
+                        }
+                        break;
+                    case 7:
+                        if (matches("release")) {
+                            return new Version.Item(2, 0);
+                        }
+                        break;
+                    case 8:
+                        if (matches("snapshot")) {
+                            return new Version.Item(2, -1);
+                        }
+                        break;
+                    case 9:
+                        if (matches("milestone")) {
+                            return new Version.Item(2, QUALIFIER_MILESTONE);
+                        }
+                        break;
+                }
+
+                // Unknown qualifier - treat as string
+                String token = this.version.substring(this.tokenStart, this.tokenEnd);
+                return new Version.Item(3, token.toLowerCase(Locale.ENGLISH));
             }
         }
 
-        static {
-            QUALIFIERS = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-            QUALIFIERS.put("alpha", QUALIFIER_ALPHA);
-            QUALIFIERS.put("beta", QUALIFIER_BETA);
-            QUALIFIERS.put("milestone", QUALIFIER_MILESTONE);
-            QUALIFIERS.put("cr", -2);
-            QUALIFIERS.put("rc", -2);
-            QUALIFIERS.put("snapshot", -1);
-            QUALIFIERS.put("ga", 0);
-            QUALIFIERS.put("final", 0);
-            QUALIFIERS.put("release", 0);
-            QUALIFIERS.put("", 0);
-            QUALIFIERS.put("sp", 1);
+        // Adapted from Java 9's `Integer#parseInt(CharSequence, int, int, int)`
+        private static int parseInt(String s, int beginIndex, int endIndex)
+                throws NumberFormatException {
+
+            if (beginIndex >= endIndex) {
+                throw new NumberFormatException("Empty string");
+            }
+
+            int result = 0;
+            int i = beginIndex;
+            int limit = -Integer.MAX_VALUE;
+            int multmin = limit / 10;
+
+            char firstChar = s.charAt(i);
+            if (firstChar < '0' || firstChar > '9') {
+                throw new NumberFormatException("Invalid character");
+            }
+
+            // Accumulating negatively avoids surprises near MAX_VALUE
+            while (i < endIndex) {
+                int digit = s.charAt(i++) - '0';
+                if (digit < 0 || digit > 9) {
+                    throw new NumberFormatException("Invalid character");
+                }
+                if (result < multmin) {
+                    throw new NumberFormatException("Value out of range");
+                }
+                result *= 10;
+                if (result < limit + digit) {
+                    throw new NumberFormatException("Value out of range");
+                }
+                result -= digit;
+            }
+            return -result;
+        }
+
+        private boolean matches(String target) {
+            return this.version.regionMatches(true, this.tokenStart, target, 0, target.length());
         }
     }
 }
