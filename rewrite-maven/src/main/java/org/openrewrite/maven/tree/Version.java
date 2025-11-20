@@ -218,7 +218,6 @@ public class Version implements Comparable<Version> {
         private static final Integer QUALIFIER_ALPHA = -5;
         private static final Integer QUALIFIER_BETA = -4;
         private static final Integer QUALIFIER_MILESTONE = -3;
-        private static final Map<String, Integer> QUALIFIERS;
         private final String version;
         private int index;
         private int tokenStart;
@@ -227,7 +226,7 @@ public class Version implements Comparable<Version> {
         private boolean terminatedByNumber;
 
         Tokenizer(String version) {
-            this.version = version.length() > 0 ? version : "0";
+            this.version = !version.isEmpty() ? version : "0";
         }
 
         public boolean next() {
@@ -293,18 +292,18 @@ public class Version implements Comparable<Version> {
                 try {
                     int tokenLength = this.tokenEnd - this.tokenStart;
                     return tokenLength < 10 ? new Version.Item(4, parseInt(version, tokenStart, tokenEnd)) :
-                            new Version.Item(5, new BigInteger(this.version.substring(this.tokenStart, this.tokenEnd)));
+                            new Version.Item(5, new BigInteger(version.substring(this.tokenStart, this.tokenEnd)));
                 } catch (NumberFormatException e) {
-                    throw new IllegalStateException(e);
+                    throw new IllegalArgumentException("Illegal version: " + version.substring(this.tokenStart, this.tokenEnd), e);
                 }
             } else {
                 int tokenLength = this.tokenEnd - this.tokenStart;
                 if (this.index >= this.version.length()) {
-                    if (tokenLength == 3 && regionMatches(this.tokenStart, "min")) {
+                    if (tokenLength == 3 && matches("min")) {
                         return Version.Item.MIN;
                     }
 
-                    if (tokenLength == 3 && regionMatches(this.tokenStart, "max")) {
+                    if (tokenLength == 3 && matches("max")) {
                         return Version.Item.MAX;
                     }
                 }
@@ -324,64 +323,98 @@ public class Version implements Comparable<Version> {
                     }
                 }
 
+                // Fast path for common qualifiers (avoiding substring allocation and map lookup)
+                switch (tokenLength) {
+                    case 0:
+                        return new Version.Item(2, 0);
+                    case 2:
+                        if (matches("ga")) {
+                            return new Version.Item(2, 0);
+                        }
+                        if (matches("rc")) {
+                            return new Version.Item(2, -2);
+                        }
+                        if (matches("cr")) {
+                            return new Version.Item(2, -2);
+                        }
+                        if (matches("sp")) {
+                            return new Version.Item(2, 1);
+                        }
+                        break;
+                    case 4:
+                        if (matches("beta")) {
+                            return new Version.Item(2, QUALIFIER_BETA);
+                        }
+                        break;
+                    case 5:
+                        if (matches("alpha")) {
+                            return new Version.Item(2, QUALIFIER_ALPHA);
+                        }
+                        if (matches("final")) {
+                            return new Version.Item(2, 0);
+                        }
+                        break;
+                    case 7:
+                        if (matches("release")) {
+                            return new Version.Item(2, 0);
+                        }
+                        break;
+                    case 8:
+                        if (matches("snapshot")) {
+                            return new Version.Item(2, -1);
+                        }
+                        break;
+                    case 9:
+                        if (matches("milestone")) {
+                            return new Version.Item(2, QUALIFIER_MILESTONE);
+                        }
+                        break;
+                }
+
+                // Unknown qualifier - treat as string
                 String token = this.version.substring(this.tokenStart, this.tokenEnd);
-                Integer qualifier = QUALIFIERS.get(token);
-                return qualifier != null ? new Version.Item(2, qualifier) : new Version.Item(3, token.toLowerCase(Locale.ENGLISH));
+                return new Version.Item(3, token.toLowerCase(Locale.ENGLISH));
             }
         }
 
         // Adapted from Java 9's `Integer#parseInt(CharSequence, int, int, int)`
-        public static int parseInt(String s, int beginIndex, int endIndex)
+        private static int parseInt(String s, int beginIndex, int endIndex)
                 throws NumberFormatException {
 
-            int radix = 10;
+            if (beginIndex >= endIndex) {
+                throw new NumberFormatException("Empty string");
+            }
+
+            int result = 0;
             int i = beginIndex;
             int limit = -Integer.MAX_VALUE;
+            int multmin = limit / 10;
 
-            if (i < endIndex) {
-                char firstChar = s.charAt(i);
-                if (firstChar < '0') { // Possible leading "+" or "-"
-                    throw new IllegalArgumentException("Illegal version: " + s.subSequence(beginIndex, endIndex));
-                }
-                int multmin = limit / radix;
-                int result = 0;
-                while (i < endIndex) {
-                    // Accumulating negatively avoids surprises near MAX_VALUE
-                    int digit = Character.digit(s.charAt(i), radix);
-                    if (digit < 0 || result < multmin) {
-                        throw new IllegalArgumentException("Illegal version: " + s.subSequence(beginIndex, endIndex));
-                    }
-                    result *= radix;
-                    if (result < limit + digit) {
-                        throw new IllegalArgumentException("Illegal version: " + s.subSequence(beginIndex, endIndex));
-                    }
-                    i++;
-                    result -= digit;
-                }
-                return -result;
-            } else {
-                throw new IllegalArgumentException("Illegal version: " + s.subSequence(beginIndex, endIndex));
+            char firstChar = s.charAt(i);
+            if (firstChar < '0' || firstChar > '9') {
+                throw new NumberFormatException("Invalid character");
             }
+
+            // Accumulating negatively avoids surprises near MAX_VALUE
+            while (i < endIndex) {
+                int digit = s.charAt(i++) - '0';
+                if (digit < 0 || digit > 9) {
+                    throw new NumberFormatException("Invalid character");
+                }
+                if (result < multmin) {
+                    throw new NumberFormatException("Value out of range");
+                }
+                result *= 10;
+                if (result < limit + digit) {
+                    throw new NumberFormatException("Value out of range");
+                }
+                result -= digit;
+            }
+            return -result;
         }
 
-
-        private boolean regionMatches(int offset, String target) {
-            return this.version.regionMatches(true, offset, target, 0, target.length());
-        }
-
-        static {
-            QUALIFIERS = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-            QUALIFIERS.put("alpha", QUALIFIER_ALPHA);
-            QUALIFIERS.put("beta", QUALIFIER_BETA);
-            QUALIFIERS.put("milestone", QUALIFIER_MILESTONE);
-            QUALIFIERS.put("cr", -2);
-            QUALIFIERS.put("rc", -2);
-            QUALIFIERS.put("snapshot", -1);
-            QUALIFIERS.put("ga", 0);
-            QUALIFIERS.put("final", 0);
-            QUALIFIERS.put("release", 0);
-            QUALIFIERS.put("", 0);
-            QUALIFIERS.put("sp", 1);
+        private boolean matches(String target) {
+            return this.version.regionMatches(true, this.tokenStart, target, 0, target.length());
         }
     }
 }
