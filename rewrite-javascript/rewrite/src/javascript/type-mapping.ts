@@ -65,6 +65,16 @@ export class JavaScriptTypeMapping {
     }
 
     type(node: ts.Node): Type | undefined {
+        // For identifiers, check if this references a variable
+        // This enables fieldType attribution for variable references
+        if (ts.isIdentifier(node)) {
+            const variableType = this.variableType(node);
+            if (variableType) {
+                return variableType;
+            }
+            // Fall through to regular type checking if not a variable
+        }
+
         let type: ts.Type | undefined;
         if (ts.isExpression(node)) {
             type = this.checker.getTypeAtLocation(node);
@@ -318,16 +328,176 @@ export class JavaScriptTypeMapping {
         return Type.isPrimitive(type) ? type : Type.Primitive.None;
     }
 
-    variableType(node: ts.NamedDeclaration): Type.Variable | undefined {
+    variableType(node: ts.Node): Type.Variable | undefined {
+        let symbol: ts.Symbol | undefined;
+        let location: ts.Node = node;
+
+        // Get the symbol depending on node type
         if (ts.isVariableDeclaration(node)) {
-            const symbol = this.checker.getSymbolAtLocation(node.name);
-            if (symbol) {
-                // TODO: Implement in Phase 6
-                // const type = this.checker.getTypeOfSymbolAtLocation(symbol, node);
-                // return JavaType.Variable with proper mapping
+            symbol = this.checker.getSymbolAtLocation(node.name);
+        } else if (ts.isParameter(node)) {
+            symbol = this.checker.getSymbolAtLocation(node.name);
+        } else if (ts.isIdentifier(node)) {
+            // For identifier references (like 'vi' in 'vi.fn()')
+            symbol = this.checker.getSymbolAtLocation(node);
+        } else if (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) {
+            symbol = this.checker.getSymbolAtLocation(node.name);
+        } else {
+            // Not a variable/parameter/property we can handle
+            return undefined;
+        }
+
+        if (!symbol) {
+            return undefined;
+        }
+
+        // Get the variable declaration (resolve aliases if needed)
+        let actualSymbol = symbol;
+        if (symbol.flags & ts.SymbolFlags.Alias) {
+            actualSymbol = this.checker.getAliasedSymbol(symbol);
+        }
+
+        // Check if this symbol represents a variable, parameter, or property
+        // Exclude functions, classes, interfaces, namespaces, type aliases
+        const isExcluded = actualSymbol.flags & (
+            ts.SymbolFlags.Function |
+            ts.SymbolFlags.Class |
+            ts.SymbolFlags.Interface |
+            ts.SymbolFlags.Enum |
+            ts.SymbolFlags.ValueModule |
+            ts.SymbolFlags.NamespaceModule |
+            ts.SymbolFlags.TypeAlias |
+            ts.SymbolFlags.TypeParameter
+        );
+
+        if (isExcluded) {
+            // Not a variable - it's a type, function, class, namespace, etc.
+            return undefined;
+        }
+
+        const isVariable = actualSymbol.flags & (
+            ts.SymbolFlags.Variable |
+            ts.SymbolFlags.Property |
+            ts.SymbolFlags.FunctionScopedVariable |
+            ts.SymbolFlags.BlockScopedVariable
+        );
+
+        if (!isVariable) {
+            // Not a variable we recognize
+            return undefined;
+        }
+
+        // Get the type of the variable
+        const variableType = this.checker.getTypeOfSymbolAtLocation(actualSymbol, location);
+        const mappedType = this.getType(variableType);
+
+        // Get the owner (declaring type) for the variable
+        let ownerType: Type | undefined;
+
+        // Check if the variable is imported
+        if (symbol.flags & ts.SymbolFlags.Alias) {
+            // For imported variables, find the module specifier
+            const declarations = symbol.declarations;
+            if (declarations && declarations.length > 0) {
+                let importNode: ts.Node | undefined = declarations[0];
+
+                // Traverse up to find the ImportDeclaration
+                while (importNode && !ts.isImportDeclaration(importNode)) {
+                    importNode = importNode.parent;
+                }
+
+                if (importNode && ts.isImportDeclaration(importNode)) {
+                    const importDecl = importNode as ts.ImportDeclaration;
+                    if (ts.isStringLiteral(importDecl.moduleSpecifier)) {
+                        const moduleSpecifier = importDecl.moduleSpecifier.text;
+                        // Create a Type.Class representing the module
+                        ownerType = Object.assign(new NonDraftableType(), {
+                            kind: Type.Kind.Class,
+                            flags: 0,
+                            classKind: Type.Class.Kind.Interface,
+                            fullyQualifiedName: moduleSpecifier,
+                            typeParameters: [],
+                            annotations: [],
+                            interfaces: [],
+                            members: [],
+                            methods: [],
+                            toJSON: function () {
+                                return Type.signature(this);
+                            }
+                        }) as Type.Class;
+                    }
+                }
+            }
+        } else {
+            // For non-imported variables, check if they belong to a class/interface/namespace
+            const parentSymbol = (actualSymbol as any).parent as ts.Symbol | undefined;
+            if (parentSymbol) {
+                const parentType = this.checker.getDeclaredTypeOfSymbol(parentSymbol);
+                if (parentType) {
+                    ownerType = this.getType(parentType);
+
+                    // If the parent is a namespace, try to find the module it came from
+                    // This handles cases like React.forwardRef where the namespace is React
+                    // but the module is "react"
+                    if (parentSymbol.flags & ts.SymbolFlags.ValueModule ||
+                        parentSymbol.flags & ts.SymbolFlags.NamespaceModule) {
+                        // Check if this namespace was imported
+                        const parentDeclarations = parentSymbol.declarations;
+                        if (parentDeclarations && parentDeclarations.length > 0) {
+                            const firstDecl = parentDeclarations[0];
+                            const sourceFile = firstDecl.getSourceFile();
+                            // If it's from node_modules or a .d.ts file, try to extract the module name
+                            if (sourceFile.isDeclarationFile) {
+                                const fileName = sourceFile.fileName;
+                                if (fileName.includes('node_modules/')) {
+                                    // Extract module name from path like: /path/node_modules/@types/react/index.d.ts
+                                    const match = fileName.match(/node_modules\/(@[^/]+\/[^/]+|[^/]+)/);
+                                    if (match) {
+                                        let moduleName = match[1];
+                                        // Remove @types/ prefix if present
+                                        if (moduleName.startsWith('@types/')) {
+                                            moduleName = moduleName.substring('@types/'.length);
+                                        }
+                                        // Store the module as the owningClass for now
+                                        // (This is a bit of a hack, but works with the current type system)
+                                        if (Type.isClass(ownerType)) {
+                                            (ownerType as any).owningClass = Object.assign(new NonDraftableType(), {
+                                                kind: Type.Kind.Class,
+                                                flags: 0,
+                                                classKind: Type.Class.Kind.Interface,
+                                                fullyQualifiedName: moduleName,
+                                                typeParameters: [],
+                                                annotations: [],
+                                                interfaces: [],
+                                                members: [],
+                                                methods: [],
+                                                toJSON: function () {
+                                                    return Type.signature(this);
+                                                }
+                                            }) as Type.Class;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-        return undefined;
+
+        // Create the Type.Variable
+        const variable = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Variable,
+            name: actualSymbol.getName(),
+            owner: ownerType,
+            type: mappedType,
+            annotations: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        }) as Type.Variable;
+
+        return variable;
     }
 
     /**
