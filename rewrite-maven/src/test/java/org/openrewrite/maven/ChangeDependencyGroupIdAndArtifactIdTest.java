@@ -1787,6 +1787,78 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2933")
+    @Test
+    void changeExclusionsWithGlob() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.springframework",
+            "spring-web*",
+            "org.springframework.boot",
+            "spring-boot-starter-web",
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>2.13.0</version>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>org.springframework</groupId>
+                                      <artifactId>spring-web</artifactId>
+                                  </exclusion>
+                                  <exclusion>
+                                      <groupId>commons-logging</groupId>
+                                      <artifactId>commons-logging</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>2.13.0</version>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>org.springframework.boot</groupId>
+                                      <artifactId>spring-boot-starter-web</artifactId>
+                                  </exclusion>
+                                  <exclusion>
+                                      <groupId>commons-logging</groupId>
+                                      <artifactId>commons-logging</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
     @Disabled("Requires conversion to a scanning recipe")
     @Issue("https://github.com/openrewrite/rewrite/pull/5815")
     @Test
