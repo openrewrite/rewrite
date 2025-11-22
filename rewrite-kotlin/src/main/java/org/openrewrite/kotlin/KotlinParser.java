@@ -498,8 +498,7 @@ public class KotlinParser implements Parser {
         IrModuleFragment irModuleFragment = backendInput.getIrModuleFragment();
         for (int i = 0; i < kotlinSources.size(); i++) {
             kotlinSources.get(i).setIrFile(irModuleFragment.getFiles().get(i));
-            JavaTypeCache typeCache1 = new JavaTypeCache();
-            new KotlinIrTypeMapping(typeCache1).type(irModuleFragment.getFiles().get(i));
+//            new KotlinIrTypeMapping(new JavaTypeCache()).type(irModuleFragment.getFiles().get(i));
         }
         // TODO:
         //  - remove firFile + nodes from KotlinSource and rely solely on irFile?

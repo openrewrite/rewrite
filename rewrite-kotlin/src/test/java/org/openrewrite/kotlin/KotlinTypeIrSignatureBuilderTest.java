@@ -18,6 +18,8 @@ package org.openrewrite.kotlin;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.ir.declarations.*;
+import org.jetbrains.kotlin.ir.declarations.impl.IrClassImpl;
+import org.jetbrains.kotlin.ir.declarations.impl.IrFieldImpl;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Disabled;
@@ -31,11 +33,12 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Objects;
+import java.util.Optional;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Disabled
 public class KotlinTypeIrSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(KotlinTypeIrSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
@@ -87,33 +90,31 @@ public class KotlinTypeIrSignatureBuilderTest {
     }
 
     public String fieldSignature(String field) {
-        return signatureBuilder().variableSignature(getCompiledSource().getDeclarations().stream()
-                .filter(IrClass.class::isInstance)
-                .map(IrClass.class::cast)
-                .flatMap(it -> it.getDeclarations().stream())
-                .filter(IrProperty.class::isInstance)
-                .map(IrProperty.class::cast)
-                .filter(it -> field.equals(it.getName().asString()))
-                .findFirst()
-                .orElseThrow());
+        return signatureBuilder().variableSignature(Objects.requireNonNull(getField(field)));
     }
 
-    public @Nullable IrProperty getProperty(String field) {
+    public @Nullable IrField getField(String field) {
         return getCompiledSource().getDeclarations().stream()
                 .filter(IrClass.class::isInstance)
                 .map(IrClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(IrProperty.class::isInstance)
-                .map(IrProperty.class::cast)
+                .filter(IrField.class::isInstance)
+                .map(IrField.class::cast)
                 .filter(it -> field.equals(it.getName().asString()))
                 .findFirst()
                 .orElse(null);
     }
 
+    public @Nullable IrProperty getProperty(String field) {
+        return Optional.ofNullable(getField(field))
+          .map(it -> Objects.requireNonNull(it.getCorrespondingPropertySymbol()).getOwner())
+          .orElseThrow();
+    }
+
     public String fieldPropertyGetterSignature(String field) {
         IrProperty property = getProperty(field);
         if (property == null || property.getGetter() == null) {
-            throw new UnsupportedOperationException("No filed or getter for " + field);
+            throw new UnsupportedOperationException("No field or getter for " + field);
         }
         return signatureBuilder().methodSignature(property.getGetter());
     }
@@ -121,7 +122,7 @@ public class KotlinTypeIrSignatureBuilderTest {
     public String fieldPropertySetterSignature(String field) {
         IrProperty property = getProperty(field);
         if (property == null || property.getSetter() == null) {
-            throw new UnsupportedOperationException("No filed or setter for " + field);
+            throw new UnsupportedOperationException("No field or setter for " + field);
         }
         return signatureBuilder().methodSignature(property.getSetter());
     }
@@ -165,18 +166,24 @@ public class KotlinTypeIrSignatureBuilderTest {
 
     @Test
     void fileField() {
-        IrProperty property = getCompiledSource().getDeclarations().stream()
-          .filter(it -> it instanceof IrProperty ip && "field".equals(ip.getName().asString()))
-          .map(it -> (IrProperty) it).findFirst().orElseThrow();
+        IrClass fileClass = (IrClassImpl) getCompiledSource().getDeclarations().stream()
+          .filter(it -> it instanceof IrClassImpl ip && "KotlinTypeGoatKt".equals(ip.getName().asString()))
+          .findFirst().orElseThrow();
+        IrField property = (IrField) fileClass.getDeclarations().stream()
+          .filter(it -> it instanceof IrFieldImpl ip && "field".equals(ip.getName().asString()))
+          .findFirst().orElseThrow();
         assertThat(signatureBuilder().variableSignature(property))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=field,type=kotlin.Int}");
     }
 
     @Test
     void fileFunction() {
-        IrFunction function = getCompiledSource().getDeclarations().stream()
+        IrClass fileClass = (IrClassImpl) getCompiledSource().getDeclarations().stream()
+          .filter(it -> it instanceof IrClassImpl ip && "KotlinTypeGoatKt".equals(ip.getName().asString()))
+          .findFirst().orElseThrow();
+        IrFunction function = (IrFunction) fileClass.getDeclarations().stream()
           .filter(it -> it instanceof IrFunction if1 && "function".equals(if1.getName().asString()))
-          .map(it -> (IrFunction) it).findFirst().orElseThrow();
+          .findFirst().orElseThrow();
         assertThat(signatureBuilder().methodSignature(function))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");
     }

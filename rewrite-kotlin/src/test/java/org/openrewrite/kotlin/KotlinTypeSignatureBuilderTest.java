@@ -112,7 +112,7 @@ public class KotlinTypeSignatureBuilderTest {
     public String fieldPropertyGetterSignature(String field) {
         FirProperty property = getProperty(field);
         if (property == null || property.getGetter() == null) {
-            throw new UnsupportedOperationException("No filed or getter for " + field);
+            throw new UnsupportedOperationException("No field or getter for " + field);
         }
         return signatureBuilder().methodSignature(property.getGetter(), getCompiledSource());
     }
@@ -120,7 +120,7 @@ public class KotlinTypeSignatureBuilderTest {
     public String fieldPropertySetterSignature(String field) {
         FirProperty property = getProperty(field);
         if (property == null || property.getSetter() == null) {
-            throw new UnsupportedOperationException("No filed or setter for " + field);
+            throw new UnsupportedOperationException("No field or setter for " + field);
         }
         return signatureBuilder().methodSignature(property.getSetter(), getCompiledSource());
     }
