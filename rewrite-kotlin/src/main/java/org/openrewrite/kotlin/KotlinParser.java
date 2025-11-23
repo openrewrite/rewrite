@@ -15,25 +15,27 @@
  */
 package org.openrewrite.kotlin;
 
+import kotlin.Unit;
 import kotlin.annotation.AnnotationTarget;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
-import org.jetbrains.kotlin.analyzer.AnalysisResult;
-import org.jetbrains.kotlin.backend.jvm.JvmGeneratorExtensionsImpl;
-import org.jetbrains.kotlin.backend.jvm.JvmIrCodegenFactory;
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys;
+import org.jetbrains.kotlin.cli.common.GroupedKtSources;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
+import org.jetbrains.kotlin.cli.common.modules.ModuleChunk;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
-import org.jetbrains.kotlin.cli.jvm.compiler.KotlinToJVMBytecodeCompiler;
-import org.jetbrains.kotlin.codegen.ClassBuilderFactories;
-import org.jetbrains.kotlin.codegen.CodegenFactory;
-import org.jetbrains.kotlin.codegen.state.GenerationState;
+import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
+import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.JvmCompilerPipelineKt;
+import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.ModuleCompilerEnvironment;
+import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.ModuleCompilerInput;
+import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.ModuleCompilerIrBackendInput;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.util.text.StringUtilRt;
@@ -44,11 +46,17 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
 import org.jetbrains.kotlin.com.intellij.psi.SingleRootFileViewProvider;
 import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.kotlin.config.*;
+import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory;
+import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.pipeline.*;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment;
+import org.jetbrains.kotlin.modules.Module;
+import org.jetbrains.kotlin.modules.TargetIdKt;
+import org.jetbrains.kotlin.platform.CommonPlatforms;
+import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.utils.PathUtil;
 import org.jspecify.annotations.Nullable;
@@ -57,10 +65,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.kotlin.internal.CompiledSource;
-import org.openrewrite.kotlin.internal.KotlinSource;
-import org.openrewrite.kotlin.internal.KotlinTreeParserVisitor;
-import org.openrewrite.kotlin.internal.PsiElementAssociations;
+import org.openrewrite.kotlin.internal.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
@@ -86,14 +91,18 @@ import java.util.stream.Stream;
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
+import static org.jetbrains.kotlin.cli.common.GroupedKtSourcesKt.collectSources;
 import static org.jetbrains.kotlin.cli.common.config.ContentRootsKt.addKotlinSourceRoots;
+import static org.jetbrains.kotlin.cli.common.fir.FirDiagnosticsCompilerResultsReporterKt.reportToMessageCollector;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.JvmArgumentsKt.*;
-import static org.jetbrains.kotlin.cli.jvm.compiler.CliCompilerUtilsKt.createOutputFilesFlushingCallbackIfPossible;
+import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
+import static org.jetbrains.kotlin.cli.jvm.compiler.CoreEnvironmentUtilsKt.applyModuleProperties;
+import static org.jetbrains.kotlin.cli.jvm.compiler.KotlinToJVMBytecodeCompilerKt.configureSourceRoots;
+import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.JvmCompilerPipelineKt.compileModuleToAnalyzedFir;
+import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.JvmCompilerPipelineKt.convertAnalyzedFirToIr;
 import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
-import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
-import static org.jetbrains.kotlin.config.JVMConfigurationKeys.LINK_VIA_SIGNATURES;
 import static org.jetbrains.kotlin.incremental.IncrementalFirJvmCompilerRunnerKt.configureBaseRoots;
 import static org.openrewrite.kotlin.KotlinParser.SourcePathFromSourceTextResolver.determinePath;
 
@@ -262,7 +271,7 @@ public class KotlinParser implements Parser {
         private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
-        private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_1_9;
+        private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_0;
         private boolean isKotlinScript = false;
 
         public Builder() {
@@ -427,6 +436,14 @@ public class KotlinParser implements Parser {
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
         K2JVMCompilerArguments arguments = new K2JVMCompilerArguments();
+        arguments.setModuleName(moduleName);
+        arguments.setLanguageVersion(Objects.requireNonNull(compilerConfiguration.get(LANGUAGE_VERSION_SETTINGS)).getLanguageVersion().getVersionString());
+        arguments.setUseFirLT(Boolean.TRUE.equals(compilerConfiguration.get(USE_FIR)));
+        arguments.setDoNotClearBindingContext(true);
+        arguments.setAllowAnyScriptsInSourceRoots(true);
+        arguments.setIncrementalCompilation(true);
+        arguments.setLinkViaSignatures(true);
+
         configureJdkHome(compilerConfiguration, arguments);
         configureJavaModulesContentRoots(compilerConfiguration, arguments);
         configureAdvancedJvmOptions(compilerConfiguration, arguments);
@@ -472,56 +489,63 @@ public class KotlinParser implements Parser {
             kotlinSources.add(new KotlinSource(source, file, cRLFLocations));
         }
 
-        AnalysisResult analysisResult = KotlinToJVMBytecodeCompiler.INSTANCE.analyze(environment);
-        JvmIrCodegenFactory codegenFactory = new JvmIrCodegenFactory(
-                compilerConfiguration,
-                compilerConfiguration.get(CLIConfigurationKeys.PHASE_CONFIG),
-                null,
-                null,
-                new JvmGeneratorExtensionsImpl(compilerConfiguration, true),
-                null,
-                new JvmIrCodegenFactory.IdeCodegenSettings()
+        // See jvmCompilerPipeline.kt compileModulesUsingFrontendIrAndLightTree() which is used by K2JVMCompiler
+        MessageCollector messageCollector = compilerConfiguration.get(MESSAGE_COLLECTOR_KEY);
+        VfsBasedProjectEnvironment projectEnvironment =
+                JvmCompilerPipelineKt.createProjectEnvironment(compilerConfiguration, disposable,
+                        EnvironmentConfigFiles.JVM_CONFIG_FILES, messageCollector);
+        File buildFile = arguments.getBuildFile() != null ? new File(arguments.getBuildFile()) : null;
+        ModuleChunk moduleChunk = configureModuleChunk(compilerConfiguration, arguments, buildFile);
 
+        List<Module> chunk = moduleChunk.getModules();
+        configureSourceRoots(compilerConfiguration, chunk, buildFile);
+        configureJdkClasspathRoots(compilerConfiguration);
+        Module module = moduleChunk.getModules().get(0);
+        GroupedKtSources groupedSources = collectSources(compilerConfiguration, projectEnvironment, messageCollector);
+
+        CompilerConfiguration moduleConfiguration = applyModuleProperties(compilerConfiguration.copy(), module, buildFile);
+        moduleConfiguration.put(JVMConfigurationKeys.FRIEND_PATHS, module.getFriendPaths());
+
+        ModuleCompilerInput compilerInput = new ModuleCompilerInput(
+                TargetIdKt.TargetId(module),
+                groupedSources,
+                CommonPlatforms.INSTANCE.getDefaultCommonPlatform(),
+                JvmPlatforms.INSTANCE.getUnspecifiedJvmPlatform(),
+                moduleConfiguration,
+                new ArrayList<>()
         );
-        CodegenFactory.IrConversionInput input = new CodegenFactory.IrConversionInput(
-                environment.getProject(),
-                environment.getSourceFiles(),
-                environment.getConfiguration(),
-                analysisResult.getModuleDescriptor(),
-                analysisResult.getBindingContext(),
-                environment.getConfiguration().get(CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS, LanguageVersionSettingsImpl.DEFAULT),
-                false,
-                false
+        BaseDiagnosticsCollector diagnosticsReporter = DiagnosticReporterFactory.INSTANCE.createPendingReporter(
+                (isError, message) -> {
+                    messageCollector.report(isError ? CompilerMessageSeverity.ERROR : CompilerMessageSeverity.WARNING, message, null);
+                    return Unit.INSTANCE;
+                }
         );
-        JvmIrCodegenFactory.JvmIrBackendInput backendInput = codegenFactory.convertToIr(input);
-        runLowerings(codegenFactory, backendInput, environment, analysisResult);
-        IrModuleFragment irModuleFragment = backendInput.getIrModuleFragment();
+        ModuleCompilerEnvironment compilerEnvironment = new ModuleCompilerEnvironment(projectEnvironment, diagnosticsReporter);
+        FirResult analysisResults = compileModuleToAnalyzedFir(
+                compilerInput,
+                compilerEnvironment,
+                emptyList(),
+                null,
+                diagnosticsReporter,
+                null
+        );
+
+        ModuleCompilerIrBackendInput irInput = convertAnalyzedFirToIr(compilerInput, analysisResults, compilerEnvironment);
+        reportToMessageCollector(diagnosticsReporter,
+                messageCollector, moduleConfiguration.getBoolean(CLIConfigurationKeys.RENDER_DIAGNOSTIC_INTERNAL_NAME)
+        );
+        IrModuleFragment irModuleFragment = irInput.getIrModuleFragment();
         for (int i = 0; i < kotlinSources.size(); i++) {
             kotlinSources.get(i).setIrFile(irModuleFragment.getFiles().get(i));
 //            new KotlinIrTypeMapping(new JavaTypeCache()).type(irModuleFragment.getFiles().get(i));
+            System.out.println(PsiTreePrinter.printIrFile(irModuleFragment.getFiles().get(i)));
         }
+
         // TODO:
         //  - remove firFile + nodes from KotlinSource and rely solely on irFile?
         //  - Check if KotlinIrTypeMapping still works
         //  - Rewrite KotlinTreeParserVisitor to solely rely on irFile?
         return new CompiledSource(null, kotlinSources);
-    }
-
-    private CodegenFactory.CodegenInput runLowerings(
-            JvmIrCodegenFactory codegenFactory,
-            JvmIrCodegenFactory.JvmIrBackendInput backendInput,
-            KotlinCoreEnvironment environment,
-            AnalysisResult result) {
-        GenerationState state = new GenerationState.Builder(
-                environment.getProject(),
-                ClassBuilderFactories.BINARIES,
-                result.getModuleDescriptor(),
-                result.getBindingContext(),
-                environment.getConfiguration()
-        )
-                .onIndependentPartCompilationEnd(createOutputFilesFlushingCallbackIfPossible(environment.getConfiguration()))
-                .build();
-        return codegenFactory.invokeLowerings(state, backendInput);
     }
 
     public enum KotlinLanguageLevel {
@@ -534,7 +558,8 @@ public class KotlinParser implements Parser {
         KOTLIN_1_6,
         KOTLIN_1_7,
         KOTLIN_1_8,
-        KOTLIN_1_9
+        KOTLIN_1_9,
+        KOTLIN_2_0,
     }
 
     private CompilerConfiguration compilerConfiguration() {
@@ -544,17 +569,9 @@ public class KotlinParser implements Parser {
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE());
-
         compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(getLanguageVersion(languageLevel), getApiVersion(languageLevel)));
-
         compilerConfiguration.put(USE_FIR, true);
-        compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT, true);
-        compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS, true);
-        compilerConfiguration.put(INCREMENTAL_COMPILATION, true);
-        compilerConfiguration.put(LINK_VIA_SIGNATURES, true);
-
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
-
         return compilerConfiguration;
     }
 
@@ -580,6 +597,8 @@ public class KotlinParser implements Parser {
                 return LanguageVersion.KOTLIN_1_8;
             case KOTLIN_1_9:
                 return LanguageVersion.KOTLIN_1_9;
+            case KOTLIN_2_0:
+                return LanguageVersion.KOTLIN_2_0;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
@@ -607,6 +626,8 @@ public class KotlinParser implements Parser {
                 return ApiVersion.KOTLIN_1_8;
             case KOTLIN_1_9:
                 return ApiVersion.KOTLIN_1_9;
+            case KOTLIN_2_0:
+                return ApiVersion.KOTLIN_2_0;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }

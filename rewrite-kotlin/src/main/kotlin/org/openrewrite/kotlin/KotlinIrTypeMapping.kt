@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin
 
+import org.jetbrains.kotlin.builtins.PrimitiveType
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
 import org.jetbrains.kotlin.descriptors.Modality
@@ -25,10 +26,13 @@ import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrConstructorImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionWithLateBindingImpl
+import org.jetbrains.kotlin.ir.declarations.lazy.IrLazyConstructor
+import org.jetbrains.kotlin.ir.declarations.lazy.IrLazyFunction
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.types.*
+import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
 import org.jetbrains.kotlin.ir.util.constructors
 import org.jetbrains.kotlin.ir.util.functions
 import org.jetbrains.kotlin.ir.util.kotlinFqName
@@ -43,6 +47,7 @@ import org.openrewrite.java.tree.TypeUtils
 
 @Suppress("unused", "UNUSED_PARAMETER")
 class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
+
     private val signatureBuilder: KotlinTypeIrSignatureBuilder = KotlinTypeIrSignatureBuilder()
 
     // TEMP: method to map types in an IrFile.
@@ -61,6 +66,12 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
     }
 
+    private fun IrSimpleTypeImpl.isPrimitive(): Boolean{
+        return isPrimitiveType(true) || isStringClassType()
+                || isNothing() || isNullableNothing()
+                || isUnit()
+    }
+
     override fun type(type: Any?): JavaType {
         if (type == null || type is IrErrorType) {
             return JavaType.Unknown.getInstance()
@@ -71,9 +82,17 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
 
         val signature = signatureBuilder.signature(type)
+
         val existing: JavaType? = typeCache.get(signature)
         if (existing != null) {
             return existing
+        }
+
+        if(type is IrSimpleTypeImpl && type.isPrimitive()){
+            return primitive(type)
+        }
+        if(type is IrSimpleTypeImpl && (type.isAny() || type.isNullableAny())){
+            return classType(type, "kotlin.Any")
         }
 
         val baseType = if (type is IrSimpleType) type.classifier.owner else type
@@ -207,7 +226,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
             // TODO: review
             //  In Kotlin the super type of java.lang.Object is kotlin.Any.
             //  This condition matches the super type from the Java compiler, but is technically incorrect from the POV of the Kotlin compiler.
-            if (signature != "java.lang.Object" ) {
+            if (signature != "kotlin.Any") {
                 for (sType in irClass.superTypes) {
                     when (val classifier: IrClassifierSymbol? = sType.classifierOrNull) {
                         is IrClassSymbol -> {
@@ -366,7 +385,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
                     is IrFunctionImpl -> function.modality
                     is IrFunctionWithLateBindingImpl -> function.modality
                     is Fir2IrLazySimpleFunction -> function.modality
-                    is IrConstructorImpl, is Fir2IrLazyConstructor -> null
+                    is IrConstructorImpl, is Fir2IrLazyConstructor, is IrLazyConstructor, is IrLazyFunction -> null
                     else -> throw UnsupportedOperationException("Unsupported IrFunction type: " + function.javaClass)
                 }
             ),
@@ -548,6 +567,24 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
                     IrConstKind.Null -> JavaType.Primitive.Null
                     IrConstKind.Short -> JavaType.Primitive.Short
                     IrConstKind.String -> JavaType.Primitive.String
+                }
+            }
+            is IrSimpleTypeImpl -> {
+                when(type.getPrimitiveType()){
+                    PrimitiveType.INT -> JavaType.Primitive.Int
+                    PrimitiveType.BOOLEAN -> JavaType.Primitive.Boolean
+                    PrimitiveType.BYTE -> JavaType.Primitive.Byte
+                    PrimitiveType.CHAR -> JavaType.Primitive.Char
+                    PrimitiveType.DOUBLE -> JavaType.Primitive.Double
+                    PrimitiveType.FLOAT -> JavaType.Primitive.Float
+                    PrimitiveType.LONG -> JavaType.Primitive.Long
+                    PrimitiveType.SHORT -> JavaType.Primitive.Short
+                    else -> when{
+                        type.isStringClassType() -> JavaType.Primitive.String
+                        type.isUnit() -> JavaType.Primitive.Void
+                        type.isNothing() || type.isNullableNothing() -> JavaType.Primitive.None
+                        else -> JavaType.Primitive.None
+                    }
                 }
             }
             else -> {
