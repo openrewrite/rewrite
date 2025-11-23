@@ -61,7 +61,6 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
             for (ResolvedDependency resolvedDependency : mrr.getDependencies().get(Scope.Runtime)) {
                 if (resolvedDependency.isDirect() && recipeJar != null) {
                     recipeJar = downloader.downloadArtifact(resolvedDependency);
-                    bundle.setVersion(resolvedDependency.getVersion());
                 }
             }
             if (recipeJar != null) {
@@ -155,7 +154,6 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                         // used and the recipe JAR contains a recipes.csv that didn't necessitate
                         // the whole classpath to be scanned.
                         classpath.add(recipeJar);
-                        bundle.setVersion(resolvedDependency.getVersion());
                         continue;
                     }
                     Path path = downloader.downloadArtifact(resolvedDependency);
