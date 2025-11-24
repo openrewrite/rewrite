@@ -40,6 +40,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
 public class MavenRecipeBundleReader implements RecipeBundleReader {
@@ -59,8 +60,9 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     public RecipeMarketplace read() {
         if (recipeJar == null) {
             for (ResolvedDependency resolvedDependency : mrr.getDependencies().get(Scope.Runtime)) {
-                if (resolvedDependency.isDirect() && recipeJar != null) {
+                if (isResolvedBundle(resolvedDependency)) {
                     recipeJar = downloader.downloadArtifact(resolvedDependency);
+                    break;
                 }
             }
             if (recipeJar != null) {
@@ -95,7 +97,14 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private RecipeMarketplace marketplaceFromClasspathScan() {
         String[] ga = bundle.getPackageName().split(":");
         RecipeMarketplace marketplace = new RecipeMarketplace();
-        Environment env = environment();
+
+        // Scan only the target jar for recipes (using scanJar with jar name filter)
+        List<Path> classpath = classpath();
+        Environment env = Environment.builder().scanJar(
+                requireNonNull(recipeJar).toAbsolutePath(),
+                classpath.stream().map(Path::toAbsolutePath).collect(toList()),
+                RecipeClassLoader.forScanning(recipeJar, classpath)
+        ).build();
 
         // Bundle version may be set in the environment() call above (as the JARs making up
         // the classpath are resolved)
@@ -146,16 +155,16 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         if (classpath == null) {
             classpath = new ArrayList<>();
             for (ResolvedDependency resolvedDependency : mrr.getDependencies().get(Scope.Runtime)) {
+                if (recipeJar != null && isResolvedBundle(resolvedDependency)) {
+                    // recipeJar may be non-null if the listRecipes() method was previously
+                    // used and the recipe JAR contains a recipes.csv that didn't necessitate
+                    // the whole classpath to be scanned.
+                    classpath.add(recipeJar);
+                    continue;
+                }
                 Lock lock = DEPENDENCY_LOCKS.computeIfAbsent(resolvedDependency.getGav(), g -> new ReentrantLock());
                 lock.lock();
                 try {
-                    if (resolvedDependency.isDirect() && recipeJar != null) {
-                        // recipeJar may be non-null if the listRecipes() method was previously
-                        // used and the recipe JAR contains a recipes.csv that didn't necessitate
-                        // the whole classpath to be scanned.
-                        classpath.add(recipeJar);
-                        continue;
-                    }
                     Path path = downloader.downloadArtifact(resolvedDependency);
                     if (path == null) {
                         throw new IllegalStateException("Unable to download dependency " + resolvedDependency.getGav());
@@ -170,5 +179,10 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
             }
         }
         return classpath;
+    }
+
+    private boolean isResolvedBundle(ResolvedDependency resolvedDependency) {
+        return resolvedDependency.isDirect() && bundle.getPackageName()
+                .equals(resolvedDependency.getGroupId() + ":" + resolvedDependency.getArtifactId());
     }
 }
