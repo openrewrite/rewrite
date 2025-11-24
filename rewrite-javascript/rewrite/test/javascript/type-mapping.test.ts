@@ -1459,15 +1459,6 @@ describe('JavaScript type mapping', () => {
 
             const unionType = reactRefType as Type.Union;
 
-            // Debug: Print all union bounds
-            console.log('Union bounds count:', unionType.bounds.length);
-            unionType.bounds.forEach((bound, i) => {
-                console.log(`Bound ${i}:`, bound.kind, Type.signature(bound));
-                if (Type.isParameterized(bound)) {
-                    console.log(`  -> Parameterized with ${bound.typeParameters.length} type params`);
-                }
-            });
-
             // Find the RefObject bound (the second constituent after the callback function)
             const refObjectBound = unionType.bounds.find(b =>
                 Type.isParameterized(b) &&
@@ -1475,23 +1466,11 @@ describe('JavaScript type mapping', () => {
                 b.type.fullyQualifiedName.includes('RefObject')
             );
 
-            console.log('Found refObjectBound:', refObjectBound ? 'yes' : 'no');
-            if (!refObjectBound) {
-                console.log('Looking for any parameterized bound...');
-                const anyParam = unionType.bounds.find(b => Type.isParameterized(b));
-                console.log('Any parameterized?', anyParam ? Type.signature(anyParam) : 'none');
-            }
-
             expect(refObjectBound).toBeDefined();
 
             // Verify the type parameter HTMLButtonElement is preserved
             const parameterizedBound = refObjectBound as Type.Parameterized;
             expect(parameterizedBound.typeParameters).toHaveLength(1);
-
-            // Debug: Print what type we actually got
-            const actualType = parameterizedBound.typeParameters[0];
-            console.log('HTMLButtonElement type kind:', actualType.kind);
-            console.log('HTMLButtonElement type signature:', Type.signature(actualType));
 
             expect(Type.isClass(parameterizedBound.typeParameters[0])).toBe(true);
             expect((parameterizedBound.typeParameters[0] as Type.Class).fullyQualifiedName).toBe('HTMLButtonElement');
