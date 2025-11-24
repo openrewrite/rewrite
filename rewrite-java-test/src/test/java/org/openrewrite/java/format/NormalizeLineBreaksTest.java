@@ -33,7 +33,8 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class NormalizeLineBreaksTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> normalizeLineBreaks(boolean useCRLF) {
-        return spec -> spec.recipe(toRecipe(() -> new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(useCRLF), null)));
+        return spec -> spec.recipe(toRecipe(() -> new NormalizeLineBreaksVisitor<>(
+          new GeneralFormatStyle(useCRLF))));
     }
 
     @Language("java")

@@ -30,7 +30,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class NormalizeLineBreaksTest implements RewriteTest {
     private static Consumer<RecipeSpec> normalizeLineBreaks(boolean useCRLF) {
-        return spec -> spec.recipe(toRecipe(() -> new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(useCRLF), null)));
+        return spec -> spec.recipe(toRecipe(() -> new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(useCRLF))));
     }
 
     @Language("groovy")
@@ -43,14 +43,13 @@ class NormalizeLineBreaksTest implements RewriteTest {
                      "}";
 
     @Language("groovy")
-    String linux = """
-                   class Test {
-                       // some comment
-                       def test() {
-                           System.out.println()
-                       }
-                   }\
-                   """;
+    String linux = "" +
+                   "class Test {\n" +
+                   "    // some comment\n" +
+                   "    def test() {\n" +
+                   "        System.out.println()\n" +
+                   "    }\n" +
+                   "}";
 
     @Language("groovy")
     String windowsJavadoc = "" +
@@ -61,13 +60,12 @@ class NormalizeLineBreaksTest implements RewriteTest {
                             "}";
 
     @Language("groovy")
-    String linuxJavadoc = """
-                          /**
-                           *
-                           */
-                          class Test {
-                          }\
-                          """;
+    String linuxJavadoc = "" +
+                          "/**\n" +
+                          " *\n" +
+                          " */\n" +
+                          "class Test {\n" +
+                          "}";
 
     @Test
     void windowsToLinux() {

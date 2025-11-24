@@ -17,18 +17,17 @@ package org.openrewrite.style;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
-
-import static java.util.Collections.emptySet;
-import static java.util.stream.Collectors.joining;
 
 public class StyleHelper {
 
@@ -58,9 +57,9 @@ public class StyleHelper {
     /**
      * Copies all non-null properties from right into left, recursively. Assumes use of @With from project lombok.
      *
-     * @param left  left object, target of merged properties
+     * @param left left object, target of merged properties
      * @param right right object, source of merged properties
-     * @param <T>   Type of left and right
+     * @param <T> Type of left and right
      * @return left object with merged properties from right
      */
     public static <T> T merge(T left, T right) {
@@ -120,14 +119,6 @@ public class StyleHelper {
         return t;
     }
 
-    public static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return StyleHelper.merge(defaultStyle.get(), style);
-        }
-        return defaultStyle.get();
-    }
-
     public static <S extends Style, T extends SourceFile> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles, T sourceFile) {
         S projectStyle = Style.from(styleClass, sourceFile);
         S style = NamedStyles.merge(styleClass, styles);
@@ -147,22 +138,5 @@ public class StyleHelper {
             return StyleHelper.merge(projectStyle, style);
         }
         return projectStyle;
-    }
-
-    public static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return (S) style.applyDefaults();
-        }
-        return null;
-    }
-
-    public static NamedStyles fromStyles(Style... styles) {
-        return new NamedStyles(Tree.randomId(),
-                "MergedStyles",
-                "Merged styles",
-                "Merged styles from " + Arrays.stream(styles).map(Object::getClass).map(Class::getSimpleName).collect(joining(", ")),
-                emptySet(),
-                Arrays.asList(styles));
     }
 }

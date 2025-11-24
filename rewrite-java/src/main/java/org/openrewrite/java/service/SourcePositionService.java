@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Collections.emptyList;
+
 /**
  * Service for computing source code position metrics such as column alignment positions and tree element lengths.
  * <p>
@@ -105,6 +107,29 @@ public class SourcePositionService {
     }
 
     /**
+     * Computes the total length of a tree element from the first character after its newline prefix
+     * to the end of the element, including any trailing semicolon if applicable.
+     * <p>
+     * This is useful for determining how much horizontal space an element occupies on its line,
+     * which is important for line wrapping decisions.
+     *
+     * @param cursor the cursor pointing to the element whose length should be computed
+     * @return the length in characters of the tree element
+     */
+    public int computeTreeLength(Cursor cursor) {
+        Cursor newLinedElementCursor = computeNewLinedCursorElement(cursor);
+        if (newLinedElementCursor.getValue() instanceof J) {
+            J j = newLinedElementCursor.getValue();
+            TreeVisitor<?, PrintOutputCapture<TreeVisitor<?, ?>>> printer = j.printer(cursor);
+            PrintOutputCapture<TreeVisitor<?, ?>> capture = new PrintOutputCapture<>(printer, PrintOutputCapture.MarkerPrinter.SANITIZED);
+            printer.visit(trimPrefix(j), capture, cursor.getParentOrThrow());
+
+            return capture.getOut().length() + getSuffixLength(j);
+        }
+        throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
+    }
+
+    /**
      * Computes the position span of the element at the given cursor.
      *
      * @see #positionOfChild(Cursor, Object)
@@ -138,6 +163,27 @@ public class SourcePositionService {
      */
     public Span positionOf(Cursor cursor, J child) {
         return positionOfChild(cursor, child);
+    }
+
+    private int getSuffixLength(J tree) {
+        if (tree instanceof Statement && needsSemicolon((Statement) tree)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private boolean needsSemicolon(Statement statement) {
+        return statement instanceof J.MethodInvocation ||
+                statement instanceof J.VariableDeclarations ||
+                statement instanceof J.Assignment ||
+                statement instanceof J.Package ||
+                statement instanceof J.Return ||
+                statement instanceof J.Import ||
+                statement instanceof J.Assert;
+    }
+
+    private J trimPrefix(J tree) {
+        return tree.withPrefix(Space.build(tree.getPrefix().getIndent(), emptyList()));
     }
 
     /**
@@ -193,8 +239,9 @@ public class SourcePositionService {
                     if (!firstElement.getPrefix().getLastWhitespace().contains("\n")) {
                         if (firstElement == cursorValue || SemanticallyEqual.areEqual(firstElement, cursorValue)) {
                             return cursor;
+                        } else {
+                            return new Cursor(parent, firstElement);
                         }
-                        return new Cursor(parent, firstElement);
                     }
                     return null; //do no align when not needed
                 }
@@ -306,7 +353,7 @@ public class SourcePositionService {
                     stopAfterPreVisit();
                 }
 
-                if (tree != cursor.getValue() && cursor.getValue() instanceof J && tree.getId().equals(((J) cursor.getValue()).getId())) {
+                if (tree != cursor.getValue() && tree.getId().equals(((J) cursor.getValue()).getId())) {
                     setCursor(cursor);
                     tree = cursor.getValue();
                 }
@@ -429,7 +476,8 @@ public class SourcePositionService {
                     .endColumn(col)
                     .maxColumn(maxColumn)
                     .build();
+        } else {
+            throw new IllegalArgumentException("The child was not found in the sourceFile. Are you sure the passed in cursor's value contains the child and you are not searching for a mutated element in a non-mutated Cursor value?");
         }
-        throw new IllegalArgumentException("The child was not found in the sourceFile. Are you sure the passed in cursor's value contains the child and you are not searching for a mutated element in a non-mutated Cursor value?");
     }
 }

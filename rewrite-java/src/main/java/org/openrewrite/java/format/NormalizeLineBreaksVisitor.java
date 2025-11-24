@@ -18,21 +18,13 @@ package org.openrewrite.java.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
-import org.openrewrite.style.StyleHelper;
-
-import java.util.List;
-import java.util.function.Supplier;
 
 import static org.openrewrite.format.LineBreaks.normalizeNewLines;
-import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -47,12 +39,8 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
         }
     };
 
-    public NormalizeLineBreaksVisitor(JavaSourceFile cu, @Nullable Tree stopAfter) {
-        this(cu.getMarkers().findAll(NamedStyles.class), cu, stopAfter);
-    }
-
-    public NormalizeLineBreaksVisitor(List<NamedStyles> styles, JavaSourceFile cu, @Nullable Tree stopAfter) {
-        this(getStyle(GeneralFormatStyle.class, styles, () -> autodetectGeneralFormatStyle(cu)), stopAfter);
+    public NormalizeLineBreaksVisitor(GeneralFormatStyle style) {
+        this(style, null);
     }
 
     public NormalizeLineBreaksVisitor(GeneralFormatStyle style, @Nullable Tree stopAfter) {
@@ -70,9 +58,10 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
                 if (c instanceof Javadoc) {
                     c = c.withSuffix(normalizeNewLines(c.getSuffix(), style.isUseCRLFNewLines()));
                     return (Comment) lineBreakJavadocVisitor.visitNonNull((Javadoc) c, 0);
+                } else {
+                    TextComment textComment = (TextComment) c;
+                    c = textComment.withText(normalizeNewLines(textComment.getText(), style.isUseCRLFNewLines()));
                 }
-                TextComment textComment = (TextComment) c;
-                c = textComment.withText(normalizeNewLines(textComment.getText(), style.isUseCRLFNewLines()));
             }
 
             return c.withSuffix(normalizeNewLines(c.getSuffix(), style.isUseCRLFNewLines()));
@@ -93,14 +82,5 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
             return (J) tree;
         }
         return super.visit(tree, p);
-    }
-
-    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return StyleHelper.merge(defaultStyle.get(), style);
-        }
-        return defaultStyle.get();
     }
 }
