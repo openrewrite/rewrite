@@ -21,22 +21,22 @@ import org.jetbrains.kotlin.descriptors.DescriptorVisibility
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyConstructor
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazySimpleFunction
-import org.jetbrains.kotlin.ir.backend.js.utils.valueArguments
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrConstructorImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionWithLateBindingImpl
-import org.jetbrains.kotlin.ir.declarations.lazy.IrLazyConstructor
-import org.jetbrains.kotlin.ir.declarations.lazy.IrLazyFunction
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
+import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
 import org.jetbrains.kotlin.ir.util.constructors
 import org.jetbrains.kotlin.ir.util.functions
 import org.jetbrains.kotlin.ir.util.kotlinFqName
 import org.jetbrains.kotlin.ir.util.properties
+import org.jetbrains.kotlin.psi2ir.lazy.IrLazyConstructor
+import org.jetbrains.kotlin.psi2ir.lazy.IrLazyFunction
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeMapping
 import org.openrewrite.java.internal.JavaTypeCache
@@ -66,7 +66,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
     }
 
-    private fun IrSimpleTypeImpl.isPrimitive(): Boolean{
+    private fun IrSimpleType.isPrimitive(): Boolean{
         return isPrimitiveType(true) || isStringClassType()
                 || isNothing() || isNullableNothing()
                 || isUnit()
@@ -88,10 +88,10 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
             return existing
         }
 
-        if(type is IrSimpleTypeImpl && type.isPrimitive()){
+        if(type is IrSimpleType && type.isPrimitive()){
             return primitive(type)
         }
-        if(type is IrSimpleTypeImpl && (type.isAny() || type.isNullableAny())){
+        if(type is IrSimpleType && (type.isAny() || type.isNullableAny())){
             return classType(type, "kotlin.Any")
         }
 
@@ -114,7 +114,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
                 return type(baseType.type)
             }
 
-            is IrConst<*> -> {
+            is IrConst -> {
                 return primitive(baseType)
             }
 
@@ -373,8 +373,8 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
 
     private fun methodDeclarationType(function: IrFunction, signature: String): JavaType.Method {
         val paramNames: MutableList<String>? =
-            if (function.valueParameters.isEmpty()) null else ArrayList(function.valueParameters.size)
-        for (param: IrValueParameter in function.valueParameters) {
+            if (function.getValueParameters().isEmpty()) null else ArrayList(function.getValueParameters().size)
+        for (param: IrValueParameter in function.getValueParameters()) {
             paramNames!!.add(param.name.asString())
         }
         val method = JavaType.Method(
@@ -410,13 +410,13 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
         val returnType = type(function.returnType)
         val paramTypes: MutableList<JavaType>? =
-            if (function.valueParameters.isNotEmpty() || function.extensionReceiverParameter != null)
-                ArrayList(function.valueParameters.size + (if (function.extensionReceiverParameter != null) 1 else 0))
+            if (function.getValueParameters().isNotEmpty() || function.getExtensionReceiverParameter() != null)
+                ArrayList(function.getValueParameters().size + (if (function.getExtensionReceiverParameter() != null) 1 else 0))
             else null
-        if (function.extensionReceiverParameter != null) {
-            paramTypes!!.add(type(function.extensionReceiverParameter!!.type))
+        if (function.getExtensionReceiverParameter() != null) {
+            paramTypes!!.add(type(function.getExtensionReceiverParameter()!!.type))
         }
-        for (param: IrValueParameter in function.valueParameters) {
+        for (param: IrValueParameter in function.getValueParameters()) {
             paramTypes!!.add(type(param.type))
         }
         method.unsafeSet(
@@ -444,9 +444,9 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
     }
 
     fun methodInvocationType(type: IrCall, signature: String): JavaType.Method {
-        val paramNames: MutableList<String> = ArrayList(type.valueArguments.size)
+        val paramNames: MutableList<String> = ArrayList(type.arguments.size)
 
-        for (v in type.symbol.owner.valueParameters) {
+        for (v in type.symbol.owner.getValueParameters()) {
             paramNames.add(v.name.asString())
         }
         val method = JavaType.Method(
@@ -469,12 +469,12 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
         val returnType = type(type.symbol.owner.returnType)
         val paramTypes: MutableList<JavaType>? =
-            if (type.valueArguments.isNotEmpty() || type.extensionReceiver != null) ArrayList(type.valueArguments.size + (if (type.extensionReceiver != null) 1 else 0))
+            if (type.getValueArguments().isNotEmpty() || type.getExtensionReceiver() != null) ArrayList(type.getValueArguments().size + (if (type.getExtensionReceiver() != null) 1 else 0))
             else null
-        if (type.extensionReceiver != null) {
-            paramTypes!!.add(type(type.extensionReceiver!!.type))
+        if (type.getExtensionReceiver() != null) {
+            paramTypes!!.add(type(type.getExtensionReceiver()!!.type))
         }
-        for (param: IrExpression? in type.valueArguments) {
+        for (param: IrExpression? in type.getValueArguments()) {
             if (param != null) {
                 paramTypes!!.add(type(param.type))
             }
@@ -488,9 +488,9 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
     }
 
     fun methodInvocationType(type: IrConstructorCall, signature: String): JavaType.Method {
-        val paramNames: MutableList<String> = ArrayList(type.valueArguments.size)
+        val paramNames: MutableList<String> = ArrayList(type.getValueArguments().size)
 
-        for (v in type.symbol.owner.valueParameters) {
+        for (v in type.symbol.owner.getValueParameters()) {
             paramNames.add(v.name.asString())
         }
         val method = JavaType.Method(
@@ -513,12 +513,12 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
         val returnType = declaringType
         val paramTypes: MutableList<JavaType>? =
-            if (type.valueArguments.isNotEmpty() || type.extensionReceiver != null) ArrayList(type.valueArguments.size + (if (type.extensionReceiver != null) 1 else 0))
+            if (type.getValueArguments().isNotEmpty() || type.getExtensionReceiver() != null) ArrayList(type.getValueArguments().size + (if (type.getExtensionReceiver() != null) 1 else 0))
             else null
-        if (type.extensionReceiver != null) {
-            paramTypes!!.add(type(type.extensionReceiver!!.type))
+        if (type.getExtensionReceiver() != null) {
+            paramTypes!!.add(type(type.getExtensionReceiver()!!.type))
         }
-        for (param: IrExpression? in type.valueArguments) {
+        for (param: IrExpression? in type.getValueArguments()) {
             if (param != null) {
                 paramTypes!!.add(type(param.type))
             }
@@ -534,7 +534,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
     private fun methodInvocationType(type: IrTypeOperatorCall, signature: String): JavaType {
         val paramNames: MutableList<String> = ArrayList(0) // FIXME init cap
 
-//        for (v in type.symbol.owner.valueParameters) {
+//        for (v in type.symbol.owner.valueParameters()) {
 //            paramNames.add(v.name.asString())
 //        }
         val method = JavaType.Method(
@@ -555,7 +555,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
 
     fun primitive(type: Any?): JavaType.Primitive {
         return when (type) {
-            is IrConst<*> -> {
+            is IrConst -> {
                 when (type.kind) {
                     IrConstKind.Int -> JavaType.Primitive.Int
                     IrConstKind.Boolean -> JavaType.Primitive.Boolean
@@ -569,7 +569,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
                     IrConstKind.String -> JavaType.Primitive.String
                 }
             }
-            is IrSimpleTypeImpl -> {
+            is IrSimpleType -> {
                 when(type.getPrimitiveType()){
                     PrimitiveType.INT -> JavaType.Primitive.Int
                     PrimitiveType.BOOLEAN -> JavaType.Primitive.Boolean
@@ -760,7 +760,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
     private fun isSourceRetention(annotation: IrConstructorCall): Boolean {
         val sig = signatureBuilder.classSignature(annotation.type)
         if (sig == "kotlin.annotation.Retention" || sig == "java.lang.annotation") {
-            for (args in annotation.valueArguments) {
+            for (args in annotation.getValueArguments()) {
                 if (args is IrDeclarationReference && args.symbol.owner is IrDeclarationWithName) {
                     return (args.symbol.owner as IrDeclarationWithName).name.asString() == "SOURCE"
                 }
@@ -815,3 +815,49 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         return !(type.classifierOrNull != null && type.classifierOrNull!!.owner is IrClass && "kotlin.Any" == (type.classifierOrNull!!.owner as IrClass).kotlinFqName.asString())
     }
 }
+
+@Deprecated(message = "See See docs/backend/IR_parameter_api_migration.md")
+fun IrFunction.getValueParameters(): List<IrValueParameter> =
+    parameters.filter { it.kind == IrParameterKind.Regular || it.kind == IrParameterKind.Context }
+
+@OptIn(UnsafeDuringIrConstructionAPI::class)
+@Deprecated(message = "See See docs/backend/IR_parameter_api_migration.md")
+fun IrCall.getValueArguments(): List<IrExpression?> {
+    val valueParametersIndexes = symbol.owner.parameters.mapIndexedNotNull { index, irParameter ->
+        if(irParameter.kind == IrParameterKind.Regular || irParameter.kind == IrParameterKind.Context){
+            index
+        } else null
+    }
+    return valueParametersIndexes.map { arguments[it] }
+}
+
+@OptIn(UnsafeDuringIrConstructionAPI::class)
+@Deprecated(message = "See See docs/backend/IR_parameter_api_migration.md")
+fun IrConstructorCall.getValueArguments(): List<IrExpression?> {
+    val valueParametersIndexes = symbol.owner.parameters.mapIndexedNotNull { index, irParameter ->
+        if(irParameter.kind == IrParameterKind.Regular || irParameter.kind == IrParameterKind.Context){
+            index
+        } else null
+    }
+    return valueParametersIndexes.map { arguments[it] }
+}
+@OptIn(UnsafeDuringIrConstructionAPI::class)
+@Deprecated(message = "See See docs/backend/IR_parameter_api_migration.md")
+fun IrFunctionAccessExpression.getValueArguments(): List<IrExpression?> {
+    val valueParametersIndexes = symbol.owner.parameters.mapIndexedNotNull { index, irParameter ->
+        if(irParameter.kind == IrParameterKind.Regular || irParameter.kind == IrParameterKind.Context){
+            index
+        } else null
+    }
+    return valueParametersIndexes.map { arguments[it] }
+}
+
+@Deprecated(message = "See See docs/backend/IR_parameter_api_migration.md")
+fun IrCall.getExtensionReceiver() = arguments[symbol.owner.parameters.indexOfFirst { it.kind == IrParameterKind.ExtensionReceiver }]
+
+@Deprecated(message = "See See docs/backend/IR_parameter_api_migration.md")
+fun IrConstructorCall.getExtensionReceiver() = arguments[symbol.owner.parameters.indexOfFirst { it.kind == IrParameterKind.ExtensionReceiver }]
+
+@Deprecated(message = "See See docs/backend/IR_parameter_api_migration.md")
+fun IrFunction.getExtensionReceiverParameter(): IrValueParameter? =
+    parameters.firstOrNull { it.kind == IrParameterKind.ExtensionReceiver }

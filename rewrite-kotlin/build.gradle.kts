@@ -7,7 +7,7 @@ plugins {
     kotlin("jvm") version "2.2.21"
 }
 
-val kotlinVersion = "1.9.25"
+val kotlinVersion = "2.2.21"
 
 dependencies {
     compileOnly(project(":rewrite-core"))
@@ -17,6 +17,9 @@ dependencies {
 
     implementation(kotlin("compiler-embeddable", kotlinVersion))
     implementation(kotlin("stdlib", kotlinVersion))
+//    implementation(kotlin("scripting-compiler", kotlinVersion))
+//    implementation(kotlin("scripting-common", kotlinVersion))
+//    implementation(kotlin("scripting-jvm", kotlinVersion))
 
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation(project(":rewrite-test"))

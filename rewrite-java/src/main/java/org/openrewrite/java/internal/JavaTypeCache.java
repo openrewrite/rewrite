@@ -17,13 +17,18 @@ package org.openrewrite.java.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.AdaptiveRadixTree;
+import org.openrewrite.java.tree.JavaType;
 
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class JavaTypeCache implements Cloneable {
 
     AdaptiveRadixTree<Object> typeCache = new AdaptiveRadixTree<>();
+    private Map<String, JavaType> cachedValues= new HashMap<>();
 
     public <T> @Nullable T get(String signature) {
         //noinspection unchecked
@@ -32,10 +37,16 @@ public class JavaTypeCache implements Cloneable {
 
     public void put(String signature, Object o) {
         typeCache.insert(getKeyBytes(signature), o);
+        cachedValues.put(signature, (JavaType) o);
     }
 
     public void clear() {
         typeCache.clear();
+    }
+
+    @Override
+    public String toString() {
+        return cachedValues.entrySet().stream().map(cache -> cache.getKey()+ " -> "+ cache.getValue()).collect(Collectors.joining("\n"));
     }
 
     @Override

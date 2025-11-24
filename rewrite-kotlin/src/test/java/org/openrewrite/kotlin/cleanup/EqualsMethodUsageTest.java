@@ -36,12 +36,12 @@ class EqualsMethodUsageTest implements RewriteTest {
           kotlin(
             """
               fun isSame(obj1 : String, obj2: String) : Boolean {
-                  val isSame = obj1.equals(obj2)
+                  return obj1.equals(obj2)
               }
               """,
             """
               fun isSame(obj1 : String, obj2: String) : Boolean {
-                  val isSame = obj1 == obj2
+                  return obj1 == obj2
               }
               """
           )
