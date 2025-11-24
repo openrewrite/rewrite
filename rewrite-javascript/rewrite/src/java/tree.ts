@@ -37,6 +37,7 @@ export namespace J {
 }
 
 export interface Expression extends J {
+    readonly type?: Type;
 }
 
 export interface MethodCall extends Expression {
