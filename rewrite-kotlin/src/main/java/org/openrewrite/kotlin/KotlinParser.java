@@ -50,14 +50,18 @@ import org.jetbrains.kotlin.config.*;
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory;
 import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
 import org.jetbrains.kotlin.fir.FirSession;
+import org.jetbrains.kotlin.fir.backend.Fir2IrComponentsStorage;
+import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.pipeline.FirResult;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.incremental.CompilerRunnerUtils;
+import org.jetbrains.kotlin.ir.declarations.IrFile;
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment;
 import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.modules.TargetId;
 import org.jetbrains.kotlin.modules.TargetIdKt;
+import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.platform.CommonPlatforms;
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
 import org.jetbrains.kotlin.psi.KtFile;
@@ -217,7 +221,9 @@ public class KotlinParser implements Parser {
                                 })
                                 .limit(1))
                 .filter(Objects::nonNull)
-                .filter(source -> !source.getSourcePath().getFileName().toString().startsWith("dependsOn-"));
+                .filter(source -> {
+                    return !source.getSourcePath().getFileName().toString().startsWith("dependsOn-");
+                });
     }
 
     @Override
@@ -430,11 +436,16 @@ public class KotlinParser implements Parser {
         K2JVMCompilerArguments arguments = new K2JVMCompilerArguments();
         arguments.setModuleName(moduleName);
         arguments.setLanguageVersion(getLanguageVersion(languageLevel).getVersionString());
-        arguments.setUseFirLT(true);
+        // Use incremental compilation, not light-tree
+        arguments.setUseFirLT(false);
+        arguments.setUseFirIC(true);
         arguments.setDoNotClearBindingContext(true);
         arguments.setAllowAnyScriptsInSourceRoots(true);
         arguments.setIncrementalCompilation(true);
         arguments.setLinkViaSignatures(true);
+        // TODO: some tests' kotlin dont compiler, e.g. because of missing return statements etc.
+        //   are they intended to work?
+//        arguments.setSuppressedDiagnostics(new String[]{"NO_RETURN_IN_FUNCTION_WITH_BLOCK_BODY"});
 
         if (classpath != null) {
             List<File> classpathFiles = new ArrayList<>();
@@ -535,24 +546,25 @@ public class KotlinParser implements Parser {
 
         // See jvmCompilerPipeline.kt compileModulesUsingFrontendIrAndLightTree() which is used by K2JVMCompiler
         PerformanceManagerImpl performanceManager = new PerformanceManagerImpl(JvmPlatforms.INSTANCE.getDefaultJvmPlatform(), "Kotlin to IR compiler");
-        IrModuleFragment irModuleFragment= null;
         JvmFir2IrPipeline kotlinToIrCompiler = new JvmFir2IrPipeline(performanceManager);
         JvmFir2IrPipelineArtifact jvmFir2IrPipelineArtifact = kotlinToIrCompiler
                 .executeWithOutputArtifcat(k2compilerArgs(ctx, sources), Services.EMPTY, messageCollector, disposable);
 
-        irModuleFragment = jvmFir2IrPipelineArtifact != null ? jvmFir2IrPipelineArtifact.getResult().getIrModuleFragment() : null;
-
+        List<IrFile> irFiles = jvmFir2IrPipelineArtifact != null ? jvmFir2IrPipelineArtifact.getResult().getIrModuleFragment().getFiles() : null;
+        List<FirFile> firFiles = jvmFir2IrPipelineArtifact != null ? ((Fir2IrComponentsStorage) jvmFir2IrPipelineArtifact.getResult().getComponents()).getFir() : null;
 
         for (int i = 0; i < kotlinSources.size(); i++) {
-            kotlinSources.get(i).setIrFile(irModuleFragment.getFiles().get(i));
-            System.out.println(PsiTreePrinter.printIrFile(irModuleFragment.getFiles().get(i)));
+            KotlinSource kotlinSource = kotlinSources.get(i);
+            kotlinSource.setIrFile(irFiles.get(i));
+            kotlinSource.setFirFile(firFiles.get(i));
+            System.out.println(PsiTreePrinter.printIrFile(irFiles.get(i)));
         }
 
         // TODO:
         //  - remove firFile + nodes from KotlinSource and rely solely on irFile?
         //  - Check if KotlinIrTypeMapping still works
         //  - Rewrite KotlinTreeParserVisitor to solely rely on irFile?
-        return new CompiledSource(null, kotlinSources);
+        return new CompiledSource(jvmFir2IrPipelineArtifact.getResult().getComponents().getSession(), kotlinSources);
     }
 
     public enum KotlinLanguageLevel {
