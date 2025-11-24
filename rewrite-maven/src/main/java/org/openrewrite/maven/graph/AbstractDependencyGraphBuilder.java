@@ -48,9 +48,10 @@ public abstract class AbstractDependencyGraphBuilder<T extends DependencyGraph.D
         ResolvedGroupArtifactVersion gav = dependency.getGav();
 
         T node = createNode(dependency, scope);
-        pathBuffer.add(node);
+        pathBuffer.add(node); // Add at end for O(1) performance
 
-        // Create snapshot with reversed order (current -> parents)
+        // Reverse pathBuffer to get correct order (current -> parents)
+        // We add at end during traversal for O(1) performance, but need to reverse for storage
         List<DependencyGraph.DependencyNode> pathSnapshot = new ArrayList<>(pathBuffer.size());
         for (int i = pathBuffer.size() - 1; i >= 0; i--) {
             pathSnapshot.add(pathBuffer.get(i));
@@ -73,6 +74,6 @@ public abstract class AbstractDependencyGraphBuilder<T extends DependencyGraph.D
             }
         }
 
-        pathBuffer.remove(pathBuffer.size() - 1);
+        pathBuffer.remove(pathBuffer.size() - 1); // Backtrack for next iteration (O(1))
     }
 }
