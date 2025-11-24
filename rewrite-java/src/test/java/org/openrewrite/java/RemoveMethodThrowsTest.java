@@ -94,6 +94,55 @@ class RemoveMethodThrowsTest implements RewriteTest {
     }
 
     @Test
+    void removeSingleExceptionCascadingOverrides() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveMethodThrows("ItfA foo(..)", "java.lang.Exception",
+            true, false)),
+          //language=java
+          java(
+            """
+              interface ItfA {
+                  void foo() throws Exception;
+              }
+              
+              abstract class AbsB implements ItfA {
+                  @Override
+                  public void foo() throws Exception {
+                      // no-op
+                  }
+              }
+
+              class C extends AbsB {
+                  @Override
+                  public void foo() throws Exception {
+                      // no-op
+                  }
+              }
+              """
+            ,
+            """
+              interface ItfA {
+                  void foo();
+              }
+              
+              abstract class AbsB implements ItfA {
+                  @Override
+                  public void foo() {
+                      // no-op
+                  }
+              }
+
+              class C extends AbsB {
+                  @Override
+                  public void foo() {
+                      // no-op
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
     void removeExceptionWithMultipleExceptions() {
         rewriteRun(
           //language=java
