@@ -29,7 +29,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.NameTree;
 
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -107,7 +108,7 @@ public class RemoveMethodThrows extends Recipe {
                                 List<String> throwsTypes = m.getThrows().stream()
                                         .filter(t -> t.getType() != null)
                                         .map(t -> t.getType().toString())
-                                        .collect(Collectors.toList());
+                                        .collect(toList());
                                 throwsTypes.forEach(this::maybeRemoveImport);
                                 // Remove the entire throws clause
                                 return m.withThrows(null);
@@ -123,7 +124,7 @@ public class RemoveMethodThrows extends Recipe {
                                         String fqn = t.getType() != null ? t.getType().toString() : null;
                                         return fqn == null || !fqn.equals(exceptionType);
                                     })
-                                    .collect(Collectors.toList());
+                                    .collect(toList());
 
                             maybeRemoveImport(exceptionType);
 
