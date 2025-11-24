@@ -18,8 +18,11 @@ package org.openrewrite.java.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.style.Style;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -59,15 +62,18 @@ public class WrappingAndBraces extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                return new WrappingAndBracesVisitor<>(cu, null).visit(cu, ctx);
+                WrappingAndBracesStyle style = Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces);
+                return new WrappingAndBracesVisitor<>(style).visit(cu, ctx);
             }
             return (J) tree;
         }
     }
 
     public static <J2 extends J> J2 formatWrappingAndBraces(J j, Cursor cursor) {
-        JavaSourceFile sourceFile = cursor.firstEnclosingOrThrow(JavaSourceFile.class);
+        SourceFile sourceFile = cursor.firstEnclosingOrThrow(SourceFile.class);
+        WrappingAndBracesStyle style = Style.from(WrappingAndBracesStyle.class, sourceFile);
         //noinspection unchecked
-        return (J2) new WrappingAndBracesVisitor<>(sourceFile, null).visitNonNull(j, 0, cursor);
+        return (J2) new WrappingAndBracesVisitor<>(style == null ? IntelliJ.wrappingAndBraces() : style)
+                .visitNonNull(j, 0, cursor);
     }
 }

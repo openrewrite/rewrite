@@ -74,7 +74,7 @@ public class NoWhitespaceAfter extends Recipe {
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
             J.TypeCast t = super.visitTypeCast(typeCast, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getTypecast())) {
-                t = (J.TypeCast) new SpacesVisitor<>(spacesStyle.withOther(spacesStyle.getOther().withAfterTypeCast(false)), emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(t, ctx);
+                t = (J.TypeCast) new SpacesVisitor<>(spacesStyle.withOther(spacesStyle.getOther().withAfterTypeCast(false)), emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(t, ctx);
             }
             return t;
         }
@@ -83,7 +83,7 @@ public class NoWhitespaceAfter extends Recipe {
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference m = super.visitMemberReference(memberRef, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getMethodRef())) {
-                m = (J.MemberReference) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(m, ctx);
+                m = (J.MemberReference) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(m, ctx);
             }
             return m;
         }
@@ -116,7 +116,7 @@ public class NoWhitespaceAfter extends Recipe {
         public J.NewArray visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
             J.NewArray n = super.visitNewArray(newArray, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getArrayInitializer())) {
-                n = (J.NewArray) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(n, ctx);
+                n = (J.NewArray) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(n, ctx);
             }
             return n;
         }
@@ -141,7 +141,7 @@ public class NoWhitespaceAfter extends Recipe {
                 (Boolean.TRUE.equals(noWhitespaceAfterStyle.getUnaryPlus()) && op == J.Unary.Type.Positive) ||
                 (Boolean.TRUE.equals(noWhitespaceAfterStyle.getUnaryMinus()) && op == J.Unary.Type.Negative)
             ) {
-                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(u, ctx);
+                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(u, ctx);
             }
             return u;
         }
@@ -172,7 +172,7 @@ public class NoWhitespaceAfter extends Recipe {
                 m = m.withName(m.getName().withPrefix(
                         m.getName().getPrefix().withWhitespace("")
                 ));
-                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(m, ctx);
+                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(m, ctx);
             }
             return m;
         }

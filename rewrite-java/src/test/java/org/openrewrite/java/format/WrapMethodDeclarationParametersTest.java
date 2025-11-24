@@ -22,34 +22,27 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
-import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.style.LineWrapSetting.*;
-import static org.openrewrite.style.StyleHelper.fromStyles;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class WrapMethodDeclarationParametersTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-          List.of(
-            fromStyles(
-              new WrappingAndBracesStyle(
-                120,
-                new WrappingAndBracesStyle.IfStatement(false),
-                new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
-                new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, true, false),
-                new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                new WrappingAndBracesStyle.Annotations(WrapAlways),
-                new WrappingAndBracesStyle.Annotations(WrapAlways),
-                new WrappingAndBracesStyle.Annotations(WrapAlways),
-                new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                new WrappingAndBracesStyle.Annotations(DoNotWrap)))),
-          null)));
+        spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+          120,
+          new WrappingAndBracesStyle.IfStatement(false),
+          new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
+          new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, true, false),
+          new WrappingAndBracesStyle.Annotations(WrapAlways),
+          new WrappingAndBracesStyle.Annotations(WrapAlways),
+          new WrappingAndBracesStyle.Annotations(WrapAlways),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap)))));
     }
 
     @DocumentExample
@@ -59,12 +52,16 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(String name, int age, boolean active) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   void method(
               String name,
@@ -83,11 +80,15 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               interface Test {
                   void method(String name, int age, boolean active);
               }
               """,
             """
+              package com.example;
+              
               interface Test {
                   void method(
               String name,
@@ -105,12 +106,16 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(String name, int age) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   void method(
               String name,
@@ -128,6 +133,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(
                           String name,
@@ -146,6 +153,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               import java.util.List;
               import java.util.Map;
               
@@ -155,6 +164,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+              
               import java.util.List;
               import java.util.Map;
               
@@ -175,12 +186,16 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(String[] names, int[] ages, boolean[][] flags) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   void method(
               String[] names,
@@ -199,12 +214,16 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(String name, int... values) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   void method(
               String name,
@@ -222,12 +241,16 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   Test(String name, int age, boolean active) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   Test(
               String name,
@@ -246,6 +269,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               import org.jspecify.annotations.Nullable;
               
               class Test {
@@ -254,6 +279,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+              
               import org.jspecify.annotations.Nullable;
               
               class Test {
@@ -273,16 +300,20 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(String name, /* age parameter */ int age, boolean active) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   void method(
-              String name, /* age parameter */
-              int age,
+              String name,
+              /* age parameter */ int age,
               boolean active) {
                   }
               }
@@ -297,6 +328,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   String method(String name, int age) {
                       return name;
@@ -304,6 +337,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   String method(
               String name,
@@ -322,6 +357,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               import java.io.IOException;
               
               class Test {
@@ -330,6 +367,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+              
               import java.io.IOException;
               
               class Test {
@@ -349,12 +388,16 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   public void method(String name, int age) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   public void method(
               String name,
@@ -372,12 +415,16 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   static void method(String name, int age) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   static void method(
               String name,
@@ -395,11 +442,15 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               abstract class Test {
                   abstract void method(String name, int age);
               }
               """,
             """
+              package com.example;
+              
               abstract class Test {
                   abstract void method(
               String name,
@@ -416,11 +467,15 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               interface Test {
                   void method(String name, int age);
               }
               """,
             """
+              package com.example;
+              
               interface Test {
                   void method(
               String name,
@@ -437,6 +492,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               import java.util.List;
               import java.util.Map;
               import java.util.function.Function;
@@ -448,6 +505,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+              
               import java.util.List;
               import java.util.Map;
               import java.util.function.Function;
@@ -470,6 +529,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method() {
                   }
@@ -485,6 +546,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method1(String name, int age) {
                   }
@@ -494,6 +557,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   void method1(
               String name,
@@ -516,6 +581,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   static class Inner {
                       void method(String name, int age) {
@@ -524,6 +591,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   static class Inner {
                       void method(
@@ -543,12 +612,16 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(final String name, final int age) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   void method(
               final String name,
@@ -566,6 +639,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               import java.util.List;
               
               class Test {
@@ -574,6 +649,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+              
               import java.util.List;
               
               class Test {
@@ -594,24 +671,21 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
     void formatLongLinesOnly() {
         //language=java
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  80,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, emptyList(), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(ChopIfTooLong, false, true, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap)))),
-            null))),
+          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            80,
+            new WrappingAndBracesStyle.IfStatement(false),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, emptyList(), false),
+            new WrappingAndBracesStyle.MethodDeclarationParameters(ChopIfTooLong, false, true, false),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap))))),
           java(
             """
+              package com.example;
+              
               class Test {
                   void shortMethod(String n, int a) {
                   }
@@ -621,6 +695,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   void shortMethod(String n, int a) {
                   }
@@ -640,24 +716,21 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
     void preserveMethodWithMaxLengthBelowThreshold() {
         //language=java
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, emptyList(), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(ChopIfTooLong, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap)))),
-            null))),
+          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
+            new WrappingAndBracesStyle.IfStatement(false),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, emptyList(), false),
+            new WrappingAndBracesStyle.MethodDeclarationParameters(ChopIfTooLong, false, false, false),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap))))),
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(String name, int age) {
                   }
@@ -671,30 +744,29 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
     void openCloseNewLine() {
         //language=java
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, emptyList(), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, true),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap)))),
-            null))),
+          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+            120,
+            new WrappingAndBracesStyle.IfStatement(false),
+            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, emptyList(), false),
+            new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, true),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(WrapAlways),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap),
+            new WrappingAndBracesStyle.Annotations(DoNotWrap))))),
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(String name, int age, boolean active) {
                   }
               }
               """,
             """
+              package com.example;
+              
               class Test {
                   void method(String name,
               int age,
@@ -713,6 +785,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+              
               class Test {
                   void method(
                       String name,
@@ -730,6 +804,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+
               class Test {
                   void method(String name,
                       int age, boolean active) {
@@ -737,6 +813,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
               }
               """,
             """
+              package com.example;
+
               class Test {
                   void method(
               String name,
@@ -755,6 +833,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+
               class Test {
                   void method(String name) {
                   }
@@ -770,6 +850,8 @@ class WrapMethodDeclarationParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              package com.example;
+
               class Test {
                   void method() {
                   }

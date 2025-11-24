@@ -17,7 +17,6 @@ package org.openrewrite.java.format;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -65,23 +64,12 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                 boolean isBuilderMethod = chainStarter instanceof J.MethodInvocation && matchers.stream().anyMatch(matcher -> matcher.matches((J.MethodInvocation) chainStarter));
 
                 if (isBuilderMethod || (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways || style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong)) {
+                    // Not long enough to wrap (always wrap builder methods)
                     JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    // always wrap builder methods
-                    if (!isBuilderMethod) {
-                        if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong) {
-                            if (sourceFile == null) {
-                                return m;
-                            }
-                            SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
-                            Cursor cursor = getCursor();
-                            while (cursor.getParentTreeCursor().getValue() instanceof J.MethodInvocation) {
-                                cursor = cursor.getParentTreeCursor();
-                            }
-                            // Not long enough to wrap
-                            if (positionService.positionOf(cursor).getMaxColumn() <= style.getHardWrapAt()) {
-                                return m;
-                            }
-                        }
+                    if (!isBuilderMethod &&
+                            style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong &&
+                            (sourceFile == null || sourceFile.service(SourcePositionService.class).computeTreeLength(getCursor()) <= style.getHardWrapAt())) {
+                        return m;
                     }
 
                     //Only update the whitespace, preserving comments
@@ -92,12 +80,7 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                     }
                     if (after != m.getPadding().getSelect().getAfter()) {
                         m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
-                                .withArguments(ListUtils.map(m.getArguments(), arg -> {
-                                    if (arg.getPrefix().getWhitespace().contains("\n")) {
-                                        return arg.withPrefix(Space.EMPTY);
-                                    }
-                                    return arg;
-                                }));
+                                .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
                     }
                 }
             }

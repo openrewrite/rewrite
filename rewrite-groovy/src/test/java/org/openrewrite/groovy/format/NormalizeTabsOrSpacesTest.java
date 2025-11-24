@@ -27,14 +27,12 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.groovy.Assertions.groovy;
-import static org.openrewrite.style.StyleHelper.fromStyles;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class NormalizeTabsOrSpacesTest implements RewriteTest {
@@ -67,7 +65,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
     }
 
     private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
-        return spec -> spec.recipe(toRecipe(() -> new NormalizeTabsOrSpacesVisitor<>(List.of(fromStyles(with.apply(IntelliJ.tabsAndIndents()))), null)))
+        return spec -> spec.recipe(toRecipe(() -> new NormalizeTabsOrSpacesVisitor<>(with.apply(IntelliJ.tabsAndIndents()))))
           .parser(GroovyParser.builder().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
