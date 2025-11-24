@@ -35,6 +35,7 @@ class AutoFormatTest implements RewriteTest {
             package com.example;
 
             public class MyObject {
+                public MyObject(String... x) {}
                 public static Builder builder() { return new Builder(); }
                 public static Builder newBuilder() { return new Builder(); }
                 public static class Builder {
@@ -45,8 +46,9 @@ class AutoFormatTest implements RewriteTest {
                     MyObject build() { return new MyObject(); }
                 }
 
-                public static void outerMethod(String a, String b, String c) {}
-                public static String innerMethod(String x, String y, String z) { return ""; }
+                public static void outerMethod(String... x) {}
+                public static String innerMethod(String... x) { return ""; }
+                public static String veryLongMethodNameThatExceedsTheMaxLimit(String... x) { return ""; }
             }
             """))
           .recipeFromYaml(
@@ -57,6 +59,7 @@ class AutoFormatTest implements RewriteTest {
             description: Formats the code with some IntelliJ settings overwritten.
             recipeList:
               - org.openrewrite.java.format.AutoFormat:
+                  removeCustomLineBreaks: true
                   style: |
                     type: specs.openrewrite.org/v1beta/style
                     name: junit
@@ -410,6 +413,85 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
+    @Test
+    void retainTrailingCommentsInIf() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  void test() {
+                      int i;
+                      if (1 < 3) { /* multiline comment */
+                          i = 1;
+                      }
+                      if (1 < 3) /* multiline comment */
+                          i = 1;
+                      if (1 < 3) /* multiline comment */ i = 1;
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void test() {
+                      int i;
+                      if (1 < 3) { /* multiline comment */
+                          i = 1;
+                      }
+                      if (1 < 3) /* multiline comment */ i = 1;
+                      if (1 < 3) /* multiline comment */ i = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainTrailingCommentsInSwitchCase() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  int test(int i) {
+                      switch (i) {
+                          case 1: /* multiline comment */ return 1;
+                          case 2: /* multiline comment */
+                              return 2;
+                          case 3: /* multiline comment */
+                          case 4:
+                              return -1;
+                          case 5: /* multiline comment */
+                          case 6: /* multiline comment */ return -2;
+                          default:
+                              return 0;
+                      }
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  int test(int i) {
+                      switch (i) {
+                          case 1: /* multiline comment */
+                              return 1;
+                          case 2: /* multiline comment */
+                              return 2;
+                          case 3: /* multiline comment */
+                          case 4:
+                              return -1;
+                          case 5: /* multiline comment */
+                          case 6: /* multiline comment */
+                              return -2;
+                          default:
+                              return 0;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3191")
     @Test
     void emptyLineBeforeEnumConstants() {
@@ -483,8 +565,7 @@ class AutoFormatTest implements RewriteTest {
               
                   @Foo
                   @Foo
-                  void method(
-                          @Foo @Foo int param) {
+                  void method(@Foo @Foo int param) {
                       @Foo @Foo int localVar;
                   }
               }
@@ -493,8 +574,7 @@ class AutoFormatTest implements RewriteTest {
                   @Foo @Foo VALUE
               }
               
-              record someRecord(
-                      @Foo @Foo String name) {
+              record someRecord(@Foo @Foo String name) {
               }
               """
           )
@@ -559,8 +639,7 @@ class AutoFormatTest implements RewriteTest {
                   @Foo @Foo VALUE
               }
               
-              record someRecord(
-                      @Foo @Foo String name) {
+              record someRecord(@Foo @Foo String name) {
               }
               """
           )
@@ -607,8 +686,7 @@ class AutoFormatTest implements RewriteTest {
               
                   @Foo
                   @Foo
-                  public void method(
-                          @Foo @Foo final int param) {
+                  public void method(@Foo @Foo final int param) {
                       @Foo @Foo final int localVar;
                   }
               }
@@ -643,8 +721,7 @@ class AutoFormatTest implements RewriteTest {
               
                   @Foo
                   @Foo
-                  public void method(
-                          @Foo @Foo final int param) {
+                  public void method(@Foo @Foo final int param) {
                       @Foo @Foo final int localVar;
                   }
               }
@@ -659,8 +736,7 @@ class AutoFormatTest implements RewriteTest {
               
                   @Foo
                   @Foo
-                  public void method(
-                          @Foo @Foo final int param) {
+                  public void method(@Foo @Foo final int param) {
                       @Foo @Foo final int localVar;
                   }
               }
@@ -720,8 +796,7 @@ class AutoFormatTest implements RewriteTest {
               
                   @Foo
                   @Foo
-                  T method(
-                          @Foo @Foo T param) {
+                  T method(@Foo @Foo T param) {
                       @Foo @Foo T localVar;
                       return param;
                   }
@@ -763,8 +838,7 @@ class AutoFormatTest implements RewriteTest {
               
                   @Foo
                   @Foo
-                  T method(
-                          @Foo @Foo T param) {
+                  T method(@Foo @Foo T param) {
                       @Foo @Foo T localVar;
                       return param;
                   }
@@ -786,8 +860,7 @@ class AutoFormatTest implements RewriteTest {
               
                   @Foo
                   @Foo
-                  T method(
-                          @Foo @Foo T param) {
+                  T method(@Foo @Foo T param) {
                       @Foo @Foo T localVar;
                       return param;
                   }
@@ -1526,7 +1599,8 @@ class AutoFormatTest implements RewriteTest {
                       boolean someCondition(Item item) { return true; }
                       boolean otherCondition(Item item) { return false; }
                   
-                      static class Item {}
+                      static class Item {
+                      }
                   }
                   """,
                 """
@@ -1995,544 +2069,6 @@ class AutoFormatTest implements RewriteTest {
         }
 
         @Test
-        void recordSingleVariableDeclarationsIndented() {
-            rewriteRun(
-              java(
-                """
-                  import java.lang.annotation.Repeatable;
-                  
-                  @Repeatable(Foo.Foos.class)
-                  @interface Foo {
-                      @interface Foos {
-                          Foo[] value();
-                      }
-                  }
-                  """,
-                SourceSpec::skip),
-              java(
-                """
-                  record someRecord1(
-                  @Foo @Foo String name) {
-                  }
-                  """,
-                """
-                  record someRecord1(
-                          @Foo @Foo String name) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord2(
-                                       @Foo @Foo String name) {
-                  }
-                  """,
-                """
-                  record someRecord2(
-                          @Foo @Foo String name) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord3(@Foo @Foo String name) {
-                  }
-                  """,
-                """
-                  record someRecord3(@Foo @Foo String name) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord4(    @Foo @Foo String name) {
-                  }
-                  """,
-                """
-                  record someRecord4(@Foo @Foo String name) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord5(    @Foo @Foo String name
-                  ) {
-                  }
-                  """,
-                """
-                  record someRecord5(@Foo @Foo String name
-                  ) {
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void recordMultipleVariableDeclarationsIndented() {
-            rewriteRun(
-              java(
-                """
-                  import java.lang.annotation.Repeatable;
-                  
-                  @Repeatable(Foo.Foos.class)
-                  @interface Foo {
-                      @interface Foos {
-                          Foo[] value();
-                      }
-                  }
-                  """,
-                SourceSpec::skip),
-              java(
-                """
-                  record someRecord1(
-                  @Foo @Foo String name,
-                  int age) {
-                  }
-                  """,
-                """
-                  record someRecord1(
-                          @Foo @Foo String name,
-                          int age) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord2(
-                                       @Foo @Foo String name,
-                                       int age) {
-                  }
-                  """,
-                """
-                  record someRecord2(
-                          @Foo @Foo String name,
-                          int age) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord3(@Foo @Foo String name, int age) {
-                  }
-                  """,
-                """
-                  record someRecord3(@Foo @Foo String name, int age) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord4(    @Foo @Foo String name,       int age) {
-                  }
-                  """,
-                """
-                  record someRecord4(@Foo @Foo String name, int age) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord5(    @Foo @Foo String name,       int age
-                  ) {
-                  }
-                  """,
-                """
-                  record someRecord5(@Foo @Foo String name, int age
-                  ) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord6(
-                                       String name,
-                                       /* some comment */ int age) {
-                  }
-                  """,
-                """
-                  record someRecord6(
-                          String name,
-                          /* some comment */ int age) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord7(
-                                       String name,
-                                       // some comment
-                                       int age) {
-                  }
-                  """,
-                """
-                  record someRecord7(
-                          String name,
-                          // some comment
-                          int age) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord8(
-                                       String name, // some comment
-                                       int age) {
-                  }
-                  """,
-                """
-                  record someRecord8(
-                          String name, // some comment
-                          int age) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord9(
-                                         String name,       /* some comment */ int age
-                  ) {
-                  }
-                  """,
-                """
-                  record someRecord9(
-                          String name,       /* some comment */ int age
-                  ) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord10(
-                          @Foo @Foo String name,
-                          int age) {
-                  }
-                  """,
-                """
-                  record someRecord10(
-                          @Foo @Foo String name,
-                          int age) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord11(@Foo @Foo String name,
-                  int age) {
-                  }
-                  """,
-                """
-                  record someRecord11(@Foo @Foo String name,
-                                      int age) {
-                  }
-                  """
-              ),
-              java(
-                """
-                  record someRecord12(@Foo @Foo String name,
-                                     int age) {
-                  }
-                  """,
-                """
-                  record someRecord12(@Foo @Foo String name,
-                                      int age) {
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void methodSingleParameterIndented() {
-            rewriteRun(
-              java(
-                """
-                  class Test1 {
-                      void someMethod1(
-                  String name) {
-                      }
-                  }
-                  """,
-                """
-                  class Test1 {
-                      void someMethod1(
-                              String name) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test2 {
-                      void someMethod2(
-                                           String name) {
-                      }
-                  }
-                  """,
-                """
-                  class Test2 {
-                      void someMethod2(
-                              String name) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test3 {
-                      void someMethod3(String name) {
-                      }
-                  }
-                  """,
-                """
-                  class Test3 {
-                      void someMethod3(String name) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test4 {
-                      void someMethod4(    String name) {
-                      }
-                  }
-                  """,
-                """
-                  class Test4 {
-                      void someMethod4(String name) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test5 {
-                      void someMethod5(    String name
-                      ) {
-                      }
-                  }
-                  """,
-                """
-                  class Test5 {
-                      void someMethod5(String name
-                      ) {
-                      }
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void methodMultipleParametersIndented() {
-            rewriteRun(
-              java(
-                """
-                  class Test1 {
-                      void someMethod1(
-                  String name,
-                  int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test1 {
-                      void someMethod1(
-                              String name,
-                              int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test2 {
-                      void someMethod2(
-                                           String name,
-                                           int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test2 {
-                      void someMethod2(
-                              String name,
-                              int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test3 {
-                      void someMethod3(String name, int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test3 {
-                      void someMethod3(String name, int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test4 {
-                      void someMethod4(    String name,       int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test4 {
-                      void someMethod4(String name, int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test5 {
-                      void someMethod5(    String name,       int age
-                      ) {
-                      }
-                  }
-                  """,
-                """
-                  class Test5 {
-                      void someMethod5(String name, int age
-                      ) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test6 {
-                      void someMethod6(
-                                           String name,
-                                           /* some comment */ int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test6 {
-                      void someMethod6(
-                              String name,
-                              /* some comment */ int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test7 {
-                      void someMethod7(
-                                           String name,
-                                           // some comment
-                                           int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test7 {
-                      void someMethod7(
-                              String name,
-                              // some comment
-                              int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test8 {
-                      void someMethod8(
-                                           String name, // some comment
-                                           int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test8 {
-                      void someMethod8(
-                              String name, // some comment
-                              int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test9 {
-                      void someMethod9(
-                                           String name,       /* some comment */ int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test9 {
-                      void someMethod9(
-                              String name,       /* some comment */ int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test10 {
-                      void someMethod10(
-                              String name,
-                              int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test10 {
-                      void someMethod10(
-                              String name,
-                              int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test11 {
-                      void someMethod11(String name,
-                                           int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test11 {
-                      void someMethod11(String name,
-                                        int age) {
-                      }
-                  }
-                  """
-              ),
-              java(
-                """
-                  class Test12 {
-                      void someMethod12(String name,
-                                       int age) {
-                      }
-                  }
-                  """,
-                """
-                  class Test12 {
-                      void someMethod12(String name,
-                                        int age) {
-                      }
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
         void nestedMethodInvocationWithMultipleArguments() {
             rewriteRun(
               java(
@@ -2552,9 +2088,7 @@ class AutoFormatTest implements RewriteTest {
     
                   class Test1 {
                       void test() {
-                          MyObject.outerMethod("arg1",
-                                  MyObject.innerMethod("nested1", "nested2", "nested3"),
-                                  "arg3");
+                          MyObject.outerMethod("arg1", MyObject.innerMethod("nested1", "nested2", "nested3"), "arg3");
                       }
                   }
                   """
@@ -2582,15 +2116,7 @@ class AutoFormatTest implements RewriteTest {
     
                   class Test2 {
                       void test() {
-                          MyObject.outerMethod(
-                                  "arg1",
-                                  MyObject.innerMethod(
-                                          "nested1",
-                                          "nested2",
-                                          "nested3"
-                                  ),
-                                  "arg3"
-                          );
+                          MyObject.outerMethod("arg1", MyObject.innerMethod("nested1", "nested2", "nested3"), "arg3");
                       }
                   }
                   """
@@ -2813,14 +2339,14 @@ class AutoFormatTest implements RewriteTest {
                       }
                   }
                   """,
-                  """
-                  package com.example;
+                """
+                package com.example;
 
-                  class Test {
-                      void method(String name) {
-                      }
-                  }
-                  """
+                class Test {
+                    void method(String name) {
+                    }
+                }
+                """
               )
             );
         }
@@ -2834,10 +2360,9 @@ class AutoFormatTest implements RewriteTest {
                   package com.example;
 
                   class Test {
-                      void method(
-                              String name,
-                              int age,
-                              boolean active) {
+                      void method(String name,
+                                  int age,
+                                  boolean active) {
                       }
                   }
                   """,
@@ -2845,10 +2370,9 @@ class AutoFormatTest implements RewriteTest {
                   package com.example;
 
                   class Test {
-                      void method(
-                              String name,
-                              int age,
-                              boolean active) {
+                      void method(String name,
+                                  int age,
+                                  boolean active) {
                       }
                   }
                   """
@@ -2985,8 +2509,8 @@ class AutoFormatTest implements RewriteTest {
                   package com.example;
 
                   class Test {
-                      void method(String name,
-                                  /* age parameter */ int age,
+                      void method(String name, /* age parameter */
+                                  int age,
                                   boolean active) {
                       }
                   }
@@ -3403,8 +2927,7 @@ class AutoFormatTest implements RewriteTest {
                   package com.example;
 
                   class Test {
-                      void method(
-                          String name,
+                      void method(String name,
                           int age) {
                       }
                   }
@@ -3413,9 +2936,8 @@ class AutoFormatTest implements RewriteTest {
                   package com.example;
 
                   class Test {
-                      void method(
-                              String name,
-                              int age) {
+                      void method(String name,
+                                  int age) {
                       }
                   }
                   """
@@ -3495,6 +3017,792 @@ class AutoFormatTest implements RewriteTest {
                               wrap: ChopIfTooLong
               """.formatted(hardWrapAt),
               "org.openrewrite.java.AutoFormatWithMethodParameterChopIfTooLong"
+            );
+        }
+    }
+
+    @Nested
+    class MethodInvocationArguments {
+
+        @Test
+        void formatMethodInvocationWithMultipleArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithTwoArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotFormatMethodInvocationWithSingleArgument() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatNewClassWithMultipleArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject obj = new MyObject("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject obj = new MyObject("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void preserveAlreadyFormattedMethodInvocation() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithComments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", /* comment */ "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", /* comment */
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatNestedMethodInvocations() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", MyObject.innerMethod("nested1", "nested2", "nested3"), "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  MyObject.innerMethod("nested1",
+                                          "nested2",
+                                          "nested3"),
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationInFieldDeclaration() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      private final String value = MyObject.innerMethod("arg1", "arg2", "arg3");
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      private final String value = MyObject.innerMethod("arg1",
+                              "arg2",
+                              "arg3");
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationInReturn() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      String test() {
+                          return MyObject.innerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      String test() {
+                          return MyObject.innerMethod("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithPartialNewlines() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                              "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatLongLinesOnly() {
+            rewriteRun(
+              spec -> withMethodInvocationArgumentChopIfTooLong(spec, 80),
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          short1("a", "b");
+                          MyObject.veryLongMethodNameThatExceedsTheMaxLimit("arg1", "arg2", "arg3");
+                      }
+
+                      private static void short1(String a, String b) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          short1("a", "b");
+                          MyObject.veryLongMethodNameThatExceedsTheMaxLimit("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+
+                      private static void short1(String a, String b) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void preserveMethodInvocationBelowThreshold() {
+            rewriteRun(
+              spec -> withMethodInvocationArgumentChopIfTooLong(spec, 120),
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatWithOpenNewLine() {
+            rewriteRun(
+              this::withMethodInvocationArgumentOpenNewLine,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod(
+                                  "arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatWithCloseNewLine() {
+            rewriteRun(
+              this::withMethodInvocationArgumentCloseNewLine,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2",
+                                  "arg3"
+                          );
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatWithOpenAndCloseNewLine() {
+            rewriteRun(
+              this::withMethodInvocationArgumentOpenAndCloseNewLine,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1", "arg2", "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod(
+                                  "arg1",
+                                  "arg2",
+                                  "arg3"
+                          );
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMultipleMethodInvocationsInClass() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test1() {
+                          MyObject.outerMethod("a", "b", "c");
+                      }
+
+                      void test2() {
+                          MyObject.innerMethod("x", "y", "z");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test1() {
+                          MyObject.outerMethod("a",
+                                  "b",
+                                  "c");
+                      }
+
+                      void test2() {
+                          MyObject.innerMethod("x",
+                                  "y",
+                                  "z");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithLambdaArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.util.function.Function;
+
+                  class Test {
+                      void test() {
+                          process("arg1", x -> x.toUpperCase(), "arg3");
+                      }
+
+                      void process(String a, Function<String, String> f, String c) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.util.function.Function;
+
+                  class Test {
+                      void test() {
+                          process("arg1",
+                                  x -> x.toUpperCase(),
+                                  "arg3");
+                      }
+
+                      void process(String a, Function<String, String> f, String c) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatMethodInvocationWithMultilineLambda() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.util.function.Function;
+
+                  class Test {
+                      void test() {
+                          process("arg1", x -> {
+                              return x.toUpperCase();
+                          }, "arg3");
+                      }
+
+                      void process(String a, Function<String, String> f, String c) {
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.util.function.Function;
+
+                  class Test {
+                      void test() {
+                          process("arg1",
+                                  x -> {
+                                      return x.toUpperCase();
+                                  },
+                                  "arg3");
+                      }
+
+                      void process(String a, Function<String, String> f, String c) {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void indentArgumentsOnTheirOwnNewLineAlready() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod(
+                          "arg1",
+                          "arg2",
+                          "arg3");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          MyObject.outerMethod("arg1",
+                                  "arg2",
+                                  "arg3");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatNewClassInFieldInitializer() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  import java.util.ArrayList;
+                  import java.util.List;
+
+                  class Test {
+                      private final MyObject obj = new MyObject("a", "b", "c");
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  import java.util.ArrayList;
+                  import java.util.List;
+
+                  class Test {
+                      private final MyObject obj = new MyObject("a",
+                              "b",
+                              "c");
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void formatChainedMethodCallsWithArguments() {
+            rewriteRun(
+              this::withMethodInvocationArgumentWrapping,
+              java(
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          String result = "hello"
+                              .substring(1, 3)
+                              .concat("world");
+                      }
+                  }
+                  """,
+                """
+                  package com.example;
+
+                  class Test {
+                      void test() {
+                          String result = "hello".substring(1,
+                                  3).concat("world");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        private void withMethodInvocationArgumentWrapping(RecipeSpec spec) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentWrapping
+              displayName: Autoformat java code with method invocation argument wrapping
+              description: Formats the code with method invocation argument wrapping enabled.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    removeCustomLineBreaks: true
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            methodCallArguments:
+                              wrap: WrapAlways
+              """,
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentWrapping"
+            );
+        }
+
+        private void withMethodInvocationArgumentChopIfTooLong(RecipeSpec spec, int hardWrapAt) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentChopIfTooLong
+              displayName: Autoformat java code with method invocation argument chop if too long
+              description: Formats the code with method invocation argument wrapping only for long lines.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    removeCustomLineBreaks: true
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            hardWrapAt: %d
+                            methodCallArguments:
+                              wrap: ChopIfTooLong
+              """.formatted(hardWrapAt),
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentChopIfTooLong"
+            );
+        }
+
+        private void withMethodInvocationArgumentOpenNewLine(RecipeSpec spec) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenNewLine
+              displayName: Autoformat java code with method invocation argument open new line
+              description: Formats the code with method invocation argument wrapping and open new line.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    removeCustomLineBreaks: true
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            methodCallArguments:
+                              wrap: WrapAlways
+                              openNewLine: true
+              """,
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenNewLine"
+            );
+        }
+
+        private void withMethodInvocationArgumentCloseNewLine(RecipeSpec spec) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentCloseNewLine
+              displayName: Autoformat java code with method invocation argument close new line
+              description: Formats the code with method invocation argument wrapping and close new line.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    removeCustomLineBreaks: true
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            methodCallArguments:
+                              wrap: WrapAlways
+                              closeNewLine: true
+              """,
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentCloseNewLine"
+            );
+        }
+
+        private void withMethodInvocationArgumentOpenAndCloseNewLine(RecipeSpec spec) {
+            spec.recipeFromYaml(
+              """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenAndCloseNewLine
+              displayName: Autoformat java code with method invocation argument open and close new line
+              description: Formats the code with method invocation argument wrapping and both open and close new lines.
+              recipeList:
+                - org.openrewrite.java.format.AutoFormat:
+                    removeCustomLineBreaks: true
+                    style: |
+                      type: specs.openrewrite.org/v1beta/style
+                      name: junit
+                      displayName: Unit Test style
+                      description: Only used in unit tests
+                      styleConfigs:
+                        - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            methodCallArguments:
+                              wrap: WrapAlways
+                              openNewLine: true
+                              closeNewLine: true
+              """,
+              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenAndCloseNewLine"
             );
         }
     }

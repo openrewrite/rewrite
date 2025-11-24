@@ -1126,8 +1126,8 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void foo() {
                       int x = 0;
-                      x ++;
-                      x --;
+                      x++;
+                      x--;
                       -- x;
                       ++ x;
                       x = - x;
@@ -2494,7 +2494,7 @@ class SpacesTest implements RewriteTest {
     void compositeMethodDeclarationParentheses() {
         rewriteRun(
           spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))
-              .withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))
+            .withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))
           ),
           java(
             """
@@ -4851,6 +4851,75 @@ class SpacesTest implements RewriteTest {
             """
               class A {
                   void m(@Deprecated @SuppressWarnings("ALL") int a) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepMinimalViableSpaces() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withBeforeComma(true))), //This style has no impact on throws, interfaces commas
+          java(
+            """
+              class Test {
+                  void guardedCases(Object o) {
+                      switch (o) {
+                          case Integer i when i > 0 -> System.out.println("Perfect");
+                          case String s when "YES".equalsIgnoreCase(s) -> System.out.println("Great"); //The labels here should not suddenly receive no space
+                          default -> System.out.println("OK");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handleThrowsExtendsImplements() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withAfterComma(true).withBeforeComma(true))), //This style has no impact on throws, interfaces commas
+          java(
+            """
+              class Test {
+                  void guardedCases(Object o) throws IllegalStateException , IllegalArgumentException {
+                  }
+
+                  public static class ExtendedTest extends Test {
+                  }
+
+                  public static class ImplementsTestBeforeComma implements AutoCloseable
+                          , Comparable<ImplementsTestBeforeComma> {
+                  }
+
+                  public static class ImplementsTestAfterComma implements AutoCloseable,
+                          Comparable<ImplementsTestAfterComma> {
+                  }
+
+                  public static class ExtendsAndImplements extends Test implements AutoCloseable , Comparable<ExtendsAndImplements> {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void guardedCases(Object o) throws IllegalStateException, IllegalArgumentException {
+                  }
+
+                  public static class ExtendedTest extends Test {
+                  }
+
+                  public static class ImplementsTestBeforeComma implements AutoCloseable
+                          , Comparable<ImplementsTestBeforeComma> {
+                  }
+
+                  public static class ImplementsTestAfterComma implements AutoCloseable,
+                          Comparable<ImplementsTestAfterComma> {
+                  }
+
+                  public static class ExtendsAndImplements extends Test implements AutoCloseable, Comparable<ExtendsAndImplements> {
                   }
               }
               """

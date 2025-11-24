@@ -16,16 +16,23 @@
 package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -35,12 +42,12 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
 
     private final BlankLinesStyle style;
 
-    public BlankLinesVisitor(BlankLinesStyle style) {
-        this(style, null);
+    public BlankLinesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
     }
 
-    public BlankLinesVisitor(BlankLinesStyle style, @Nullable Tree stopAfter) {
-        this.style = style;
+    public BlankLinesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this.style = getStyle(BlankLinesStyle.class, styles, IntelliJ::blankLines);
         this.stopAfter = stopAfter;
     }
 
@@ -329,5 +336,14 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
     }
 }
