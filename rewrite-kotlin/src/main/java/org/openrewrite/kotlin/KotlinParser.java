@@ -92,6 +92,7 @@ public class KotlinParser implements Parser {
     private final String moduleName;
     private final KotlinLanguageLevel languageLevel;
     private final boolean isKotlinScript;
+    private final boolean parsePsi;
 
     @Override
     public Stream<SourceFile> parse(@Language("kotlin") String... sources) {
@@ -155,12 +156,18 @@ public class KotlinParser implements Parser {
                                             return ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException());
                                         }
 
-                                        KotlinTypeMapping typeMapping = new KotlinTypeMapping(typeCache, firSession, kotlinSource.getFirFile());
-                                        PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
-                                        associations.initialize();
-                                        KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
-                                        SourceFile cu = psiParser.parse();
-
+                                        SourceFile cu = null;
+                                        if(parsePsi) {
+                                            KotlinTypeMapping typeMapping = new KotlinTypeMapping(typeCache, firSession, kotlinSource.getFirFile());
+                                            PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
+                                            associations.initialize();
+                                            KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
+                                            cu = psiParser.parse();
+                                        } else {
+                                            KotlinIrTypeMapping typeMapping = new KotlinIrTypeMapping(typeCache);
+                                            KotlinIrTreeParserVisitor irParser = new KotlinIrTreeParserVisitor(kotlinSource, typeMapping, styles, relativeTo, ctx);
+                                            cu = irParser.parse();
+                                        }
                                         parsingListener.parsed(kotlinSource.getInput(), cu);
                                         return requirePrintEqualsInput(cu, kotlinSource.getInput(), relativeTo, ctx);
                                     } catch (Throwable t) {
@@ -239,6 +246,7 @@ public class KotlinParser implements Parser {
         private String moduleName = "main";
         private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_1_9;
         private boolean isKotlinScript = false;
+        private boolean parsePsi = true;
 
         public Builder() {
             super(K.CompilationUnit.class);
@@ -323,6 +331,11 @@ public class KotlinParser implements Parser {
             return this;
         }
 
+        public Builder parsePsi(boolean parsePsi) {
+            this.parsePsi = parsePsi;
+            return this;
+        }
+
         private @Nullable Collection<Path> resolvedClasspath() {
             if (artifactNames != null && !artifactNames.isEmpty()) {
                 classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
@@ -333,7 +346,7 @@ public class KotlinParser implements Parser {
 
         @Override
         public KotlinParser build() {
-            return new KotlinParser(resolvedClasspath(), dependsOn, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript);
+            return new KotlinParser(resolvedClasspath(), dependsOn, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript, parsePsi);
         }
 
         @Override

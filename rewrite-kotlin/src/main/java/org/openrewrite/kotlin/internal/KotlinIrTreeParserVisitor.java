@@ -247,7 +247,51 @@ public class KotlinIrTreeParserVisitor extends IrVisitor<J, ExecutionContext> {
 
     @Override
     public J visitSimpleFunction(@NotNull IrSimpleFunction irSimpleFunction, ExecutionContext executionContext) {
-        return null;
+        // Minimal method declaration for top-level/local functions
+        JavaType.Method mt = typeMapping.methodDeclarationType(irSimpleFunction);
+        String nameStr;
+        try {
+            nameStr = irSimpleFunction.getName().asString();
+        } catch (Throwable t) {
+            nameStr = "<fn>";
+        }
+        J.MethodDeclaration.IdentifierWithAnnotations name = new J.MethodDeclaration.IdentifierWithAnnotations(
+                new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), nameStr, mt, null), emptyList());
+
+        // Parameters container: keep it simple for now with empty parens if none
+        List<JRightPadded<Statement>> paramElems = new ArrayList<>();
+        if (irSimpleFunction.getValueParameters().isEmpty()) {
+            paramElems.add(JRightPadded.build(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)));
+        } else {
+            for (IrValueParameter p : irSimpleFunction.getValueParameters()) {
+                // Represent parameters as variable declarations with just the name
+                JavaType.Variable pv = (JavaType.Variable) typeMapping.type(p);
+                String pn = p.getName() == null ? "p" : p.getName().asString();
+                J.Identifier pid = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), pn,
+                        pv == null ? null : pv.getType(), pv);
+                J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
+                        randomId(), Space.EMPTY, Markers.EMPTY, pid, emptyList(), null, pv);
+                J.VariableDeclarations vd = new J.VariableDeclarations(randomId(), Space.EMPTY, Markers.EMPTY,
+                        emptyList(), emptyList(), null, null, singletonList(JRightPadded.build(nv)));
+                paramElems.add(JRightPadded.build(vd));
+            }
+        }
+        JContainer<Statement> params = JContainer.build(Space.EMPTY, paramElems, Markers.EMPTY);
+
+        J.Block body = null;
+        if (irSimpleFunction.getBody() != null) {
+            J b = irSimpleFunction.getBody().accept(this, executionContext);
+            if (b instanceof J.Block) {
+                body = (J.Block) b;
+            } else if (b instanceof Expression) {
+                // expression to block
+                body = new J.Block(randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                        singletonList(JRightPadded.build(exprStmt((Expression) b))), Space.EMPTY);
+            }
+        }
+
+        return new J.MethodDeclaration(randomId(), Space.EMPTY, Markers.EMPTY,
+                emptyList(), emptyList(), null, null, name, params, null, body, null, mt);
     }
 
     @Override
@@ -395,37 +439,80 @@ public class KotlinIrTreeParserVisitor extends IrVisitor<J, ExecutionContext> {
 
     @Override
     public J visitMemberAccess(@NotNull IrMemberAccessExpression<?> irMemberAccessExpression, ExecutionContext executionContext) {
-        return null;
+        // Fallback to expression
+        return visitExpression((IrExpression) irMemberAccessExpression, executionContext);
     }
 
     @Override
     public J visitFunctionAccess(@NotNull IrFunctionAccessExpression irFunctionAccessExpression, ExecutionContext executionContext) {
-        return null;
+        if (irFunctionAccessExpression instanceof IrCall) {
+            return visitCall((IrCall) irFunctionAccessExpression, executionContext);
+        }
+        return visitExpression(irFunctionAccessExpression, executionContext);
     }
 
     @Override
     public J visitConstructorCall(@NotNull IrConstructorCall irConstructorCall, ExecutionContext executionContext) {
-        return null;
+        // new class expression: type and args
+        Expression select = null;
+        JavaType.Method mt = (JavaType.Method) typeMapping.type(irConstructorCall);
+        List<JRightPadded<Expression>> args = new ArrayList<>();
+        int vc = irConstructorCall.getValueArgumentsCount();
+        for (int i = 0; i < vc; i++) {
+            IrExpression a = irConstructorCall.getValueArgument(i);
+            if (a == null) continue;
+            J aj = a.accept(this, executionContext);
+            Expression eax = asExpression(aj);
+            if (eax == null) eax = (Expression) empty();
+            args.add(JRightPadded.build(eax));
+        }
+        JContainer<Expression> arguments = JContainer.build(Space.EMPTY, args, Markers.EMPTY);
+        // Qualifier type for allocation
+        TypeTree clazz = null;
+        JavaType allocatedType = mt == null ? null : mt.getDeclaringType();
+        if (allocatedType != null) {
+            clazz = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), TypeUtils.asFullyQualified(allocatedType) != null ? TypeUtils.asFullyQualified(allocatedType).getClassName() : allocatedType.toString(), allocatedType, null);
+        }
+        return new J.NewClass(randomId(), Space.EMPTY, Markers.EMPTY, null, Space.EMPTY, clazz, arguments, null, mt);
     }
 
     @Override
     public J visitSingletonReference(@NotNull IrGetSingletonValue irGetSingletonValue, ExecutionContext executionContext) {
-        return null;
+        // reference to an object singleton; map to identifier with type
+        JavaType t = typeMapping.type(irGetSingletonValue);
+        String name = "<object>";
+        if (t instanceof JavaType.FullyQualified) {
+            name = ((JavaType.FullyQualified) t).getClassName();
+        }
+        return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, t, null);
     }
 
     @Override
     public J visitGetObjectValue(@NotNull IrGetObjectValue irGetObjectValue, ExecutionContext executionContext) {
-        return null;
+        JavaType t = typeMapping.type(irGetObjectValue);
+        String name = "<object>";
+        if (t instanceof JavaType.FullyQualified) {
+            name = ((JavaType.FullyQualified) t).getClassName();
+        }
+        return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, t, null);
     }
 
     @Override
     public J visitGetEnumValue(@NotNull IrGetEnumValue irGetEnumValue, ExecutionContext executionContext) {
-        return null;
+        JavaType t = typeMapping.type(irGetEnumValue);
+        String name = "<enum>";
+        try {
+            name = irGetEnumValue.getSymbol().getOwner().getName().asString();
+        } catch (Throwable ignored) {
+        }
+        return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, t, null);
     }
 
     @Override
     public J visitRawFunctionReference(@NotNull IrRawFunctionReference irRawFunctionReference, ExecutionContext executionContext) {
-        return null;
+        JavaType t = typeMapping.type(irRawFunctionReference);
+        String name = "<fun>";
+        return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, t, null);
     }
 
     @Override
@@ -487,7 +574,49 @@ public class KotlinIrTreeParserVisitor extends IrVisitor<J, ExecutionContext> {
 
     @Override
     public J visitCall(@NotNull IrCall irCall, ExecutionContext executionContext) {
-        return null;
+        // Handle unary logical not: Kotlin '!' operator is a call to 'not' on Boolean
+        String simpleName = null;
+        try {
+            simpleName = irCall.getSymbol().getOwner().getName().asString();
+        } catch (Throwable ignore) {
+        }
+        if ("not".equals(simpleName) && irCall.getDispatchReceiver() != null) {
+            J recv = irCall.getDispatchReceiver().accept(this, executionContext);
+            Expression expr = asExpression(recv);
+            if (expr == null) expr = (Expression) empty();
+            return new J.Unary(randomId(), Space.EMPTY, Markers.EMPTY, JLeftPadded.build(J.Unary.Type.Not), expr, typeMapping.type(irCall));
+        }
+
+        // Regular method invocation
+        JRightPadded<Expression> select = null;
+        IrExpression dispatch = irCall.getDispatchReceiver();
+        if (dispatch == null) {
+            dispatch = irCall.getExtensionReceiver();
+        }
+        if (dispatch != null) {
+            J selJ = dispatch.accept(this, executionContext);
+            Expression selExpr = asExpression(selJ);
+            if (selExpr != null) {
+                select = JRightPadded.build(selExpr);
+            }
+        }
+        if (simpleName == null) {
+            simpleName = "<invoke>";
+        }
+        JavaType.Method mt = typeMapping.methodInvocationType(irCall);
+        J.Identifier name = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), simpleName, mt, null);
+        List<JRightPadded<Expression>> argsList = new ArrayList<>();
+        int argc = irCall.getValueArgumentsCount();
+        for (int i = 0; i < argc; i++) {
+            IrExpression a = irCall.getValueArgument(i);
+            if (a == null) continue;
+            J aj = a.accept(this, executionContext);
+            Expression ex = asExpression(aj);
+            if (ex == null) ex = (Expression) empty();
+            argsList.add(JRightPadded.build(ex));
+        }
+        JContainer<Expression> args = JContainer.build(Space.EMPTY, argsList.isEmpty() ? singletonList(JRightPadded.build(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))) : argsList, Markers.EMPTY);
+        return new J.MethodInvocation(randomId(), Space.EMPTY, Markers.EMPTY, select, null, name, args, mt);
     }
 
     @Override
@@ -605,7 +734,35 @@ public class KotlinIrTreeParserVisitor extends IrVisitor<J, ExecutionContext> {
 
     @Override
     public J visitFunctionExpression(@NotNull IrFunctionExpression irFunctionExpression, ExecutionContext executionContext) {
-        return null;
+        IrFunction func = irFunctionExpression.getFunction();
+        // Parameters
+        List<JRightPadded<J>> params = new ArrayList<>();
+        boolean parenthesized = true;
+        for (IrValueParameter p : func.getValueParameters()) {
+            JavaType.Variable pv = (JavaType.Variable) typeMapping.type(p);
+            String pn = p.getName() == null ? "p" : p.getName().asString();
+            J.Identifier pid = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), pn,
+                    pv == null ? null : pv.getType(), pv);
+            params.add(JRightPadded.build(pid));
+        }
+        J.Lambda.Parameters lparams = new J.Lambda.Parameters(randomId(), Space.EMPTY, Markers.EMPTY, parenthesized, params);
+        // Body
+        J body = null;
+        if (func.getBody() != null) {
+            body = func.getBody().accept(this, executionContext);
+            if (!(body instanceof J.Block)) {
+                // wrap expressions into block per Kotlin printer expectations
+                Expression as = asExpression(body);
+                if (as != null) {
+                    body = new J.Block(randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                            singletonList(JRightPadded.build(exprStmt(as))), Space.EMPTY);
+                }
+            }
+        } else {
+            body = new J.Block(randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), emptyList(), Space.EMPTY);
+        }
+        JavaType t = typeMapping.type(irFunctionExpression);
+        return new J.Lambda(randomId(), Space.EMPTY, Markers.EMPTY, lparams, Space.EMPTY, body, t);
     }
 
     @Override
@@ -717,17 +874,55 @@ public class KotlinIrTreeParserVisitor extends IrVisitor<J, ExecutionContext> {
 
     @Override
     public J visitSetValue(@NotNull IrSetValue irSetValue, ExecutionContext executionContext) {
-        return null;
+        // Treat as a simple assignment to a local variable
+        String name;
+        try {
+            name = irSetValue.getSymbol().getOwner().getName().asString();
+        } catch (Throwable t) {
+            name = "<value>";
+        }
+        JavaType t = typeMapping.type(irSetValue);
+        J.Identifier id = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, t, null);
+        Expression value = null;
+        if (irSetValue.getValue() != null) {
+            J v = irSetValue.getValue().accept(this, executionContext);
+            value = asExpression(v);
+        }
+        if (value == null) {
+            value = (Expression) empty();
+        }
+        return new J.Assignment(randomId(), Space.EMPTY, Markers.EMPTY, id, JLeftPadded.build(value), t);
     }
 
     @Override
     public J visitVararg(@NotNull IrVararg irVararg, ExecutionContext executionContext) {
-        return null;
+        // Represent as a new array with given elements
+        List<JRightPadded<Expression>> elems = new ArrayList<>();
+        for (IrVarargElement e : irVararg.getElements()) {
+            J je;
+            if (e instanceof IrSpreadElement) {
+                je = ((IrSpreadElement) e).getExpression().accept(this, executionContext);
+            } else if (e instanceof IrExpression) {
+                je = ((IrExpression) e).accept(this, executionContext);
+            } else {
+                je = empty();
+            }
+            Expression ex = asExpression(je);
+            if (ex == null) ex = (Expression) empty();
+            elems.add(JRightPadded.build(ex));
+        }
+        JContainer<Expression> init = JContainer.build(Space.EMPTY, elems, Markers.EMPTY);
+        JavaType arrType = typeMapping.type(irVararg);
+        return new J.NewArray(randomId(), Space.EMPTY, Markers.EMPTY, null, Collections.emptyList(), init, arrType);
     }
 
     @Override
     public J visitSpreadElement(@NotNull IrSpreadElement irSpreadElement, ExecutionContext executionContext) {
-        return null;
+        // Just return the underlying expression
+        if (irSpreadElement.getExpression() != null) {
+            return irSpreadElement.getExpression().accept(this, executionContext);
+        }
+        return empty();
     }
 
     @Override
