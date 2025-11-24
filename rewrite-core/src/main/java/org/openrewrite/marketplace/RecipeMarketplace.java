@@ -22,7 +22,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.NlsRewrite;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static java.util.Collections.addAll;
 
@@ -55,9 +58,14 @@ public class RecipeMarketplace {
 
     public Set<RecipeListing> install(RecipeBundleReader bundleReader) {
         RecipeMarketplace marketplace = bundleReader.read();
-        getRoot().merge(marketplace.getRoot());
-        getRoot().updateBundle(marketplace.getAllRecipes(), bundleReader.getBundle());
+        RecipeBundle bundle = bundleReader.getBundle();
+        uninstall(bundle.getPackageEcosystem(), bundle.getPackageName());
+        root.merge(marketplace.getRoot());
         return marketplace.getAllRecipes();
+    }
+
+    public void uninstall(String packageEcosystem, String packageName) {
+        root.uninstall(packageEcosystem, packageName);
     }
 
     @Getter
@@ -94,15 +102,11 @@ public class RecipeMarketplace {
             }
         }
 
-        void updateBundle(Collection<RecipeListing> recipes, RecipeBundle bundle) {
-            for (RecipeListing recipe : recipes) {
-                if (this.recipes.contains(recipe)) {
-                    this.recipes.remove(recipe);
-                    this.recipes.add(recipe.withBundle(bundle));
-                }
-            }
+        public void uninstall(String packageEcosystem, String packageName) {
+            recipes.removeIf(r -> r.getBundle().getPackageName().equals(packageName) &&
+                                  r.getBundle().getPackageEcosystem().equals(packageEcosystem));
             for (Category category : categories) {
-                category.updateBundle(recipes, bundle);
+                category.uninstall(packageEcosystem, packageName);
             }
         }
 
