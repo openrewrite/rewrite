@@ -69,7 +69,6 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
     private fun IrSimpleType.isPrimitive(): Boolean{
         return isPrimitiveType(true) || isStringClassType()
                 || isNothing() || isNullableNothing()
-                || isUnit()
     }
 
     override fun type(type: Any?): JavaType {
@@ -88,11 +87,12 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
             return existing
         }
 
-        if(type is IrSimpleType && type.isPrimitive()){
-            return primitive(type)
-        }
-        if(type is IrSimpleType && (type.isAny() || type.isNullableAny())){
-            return classType(type, "kotlin.Any")
+        if (type is IrSimpleType) {
+            when {
+                type.isPrimitive() -> return primitive(type)
+                type.isAny() || type.isNullableAny() -> return classType(type, "kotlin.Any")
+                type.isUnit() -> return classType(type, "kotlin.Unit")
+            }
         }
 
         val baseType = if (type is IrSimpleType) type.classifier.owner else type
@@ -579,9 +579,8 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
                     PrimitiveType.FLOAT -> JavaType.Primitive.Float
                     PrimitiveType.LONG -> JavaType.Primitive.Long
                     PrimitiveType.SHORT -> JavaType.Primitive.Short
-                    else -> when{
+                    else -> when {
                         type.isStringClassType() -> JavaType.Primitive.String
-                        type.isUnit() -> JavaType.Primitive.Void
                         type.isNothing() || type.isNullableNothing() -> JavaType.Primitive.None
                         else -> JavaType.Primitive.None
                     }

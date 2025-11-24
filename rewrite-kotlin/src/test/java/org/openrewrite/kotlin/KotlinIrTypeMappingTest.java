@@ -38,7 +38,6 @@ import java.nio.file.Path;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Disabled
 @SuppressWarnings("ConstantConditions")
 public class KotlinIrTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));

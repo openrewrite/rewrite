@@ -89,7 +89,6 @@ public class KotlinIrTreeParserVisitor extends IrVisitor<J, ExecutionContext> {
 
     private final Charset charset;
     private final Boolean charsetBomMarked;
-    private final Stack<KtElement> ownerStack = new Stack<>();
     private final ExecutionContext executionContext;
     private final List<Integer> cRLFLocations;
 
@@ -105,7 +104,6 @@ public class KotlinIrTreeParserVisitor extends IrVisitor<J, ExecutionContext> {
         EncodingDetectingInputStream stream = kotlinSource.getInput().getSource(ctx);
         charset = stream.getCharset();
         charsetBomMarked = stream.isCharsetBomMarked();
-        ownerStack.push(kotlinSource.getKtFile());
         executionContext = ctx;
         cRLFLocations = kotlinSource.getCRLFLocations();
     }

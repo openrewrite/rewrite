@@ -3905,6 +3905,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private static boolean isSpace(ASTNode node) {
+        if(node == null) return false;
         IElementType elementType = node.getElementType();
         return elementType == KtTokens.WHITE_SPACE ||
                elementType == KtTokens.BLOCK_COMMENT ||
