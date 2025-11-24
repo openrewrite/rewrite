@@ -43,7 +43,7 @@ class MyParserDebug {
             throw new RuntimeException("Parser failed: " + error.toString());
         }
         else if (result instanceof J.CompilationUnit) {
-            // This part runs if parsing SUCCEEDS (what we were trying before)
+            // This part runs if parsing SUCCEEDS
             J.CompilationUnit cu = (J.CompilationUnit) result;
             var imports = cu.getImports();
 
