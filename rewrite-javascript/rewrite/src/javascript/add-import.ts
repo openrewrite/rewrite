@@ -452,77 +452,48 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
                     // Find the correct insertion position (alphabetical, case-insensitive)
                     const newName = (this.alias || this.member!).toLowerCase();
-                    let insertIndex = existingElements.length; // Default to end
-
-                    for (let j = 0; j < existingElements.length; j++) {
-                        const elem = existingElements[j].element;
-                        if (elem?.kind === JS.Kind.ImportSpecifier) {
-                            const specifier = elem as JS.ImportSpecifier;
-                            const existingName = this.getImportAlias(specifier) || this.getImportName(specifier);
-                            if (newName.localeCompare(existingName.toLowerCase()) < 0) {
-                                insertIndex = j;
-                                break;
-                            }
+                    let insertIndex = existingElements.findIndex(elem => {
+                        if (elem.element?.kind === JS.Kind.ImportSpecifier) {
+                            const name = this.getImportAlias(elem.element) || this.getImportName(elem.element);
+                            return newName.localeCompare(name.toLowerCase()) < 0;
                         }
-                    }
+                        return false;
+                    });
+                    if (insertIndex === -1) insertIndex = existingElements.length;
 
-                    // Create the new specifier
-                    const newSpecifierBase = this.createImportSpecifier();
-
-                    // Add the new specifier to the elements at the correct position
+                    // Build the new elements array with proper spacing
                     const updatedNamedImports: JS.NamedImports = await this.produceJavaScript<JS.NamedImports>(
                         namedImports, p, async namedDraft => {
-                            const newElements: J.RightPadded<JS.ImportSpecifier>[] = [];
+                            const lastIndex = existingElements.length - 1;
+                            const trailingSpace = existingElements[lastIndex].after;
+                            const newSpecifier = this.createImportSpecifier();
 
-                            if (insertIndex === 0) {
-                                // Inserting at the beginning
-                                // New element gets empty prefix (first element), existing first element gets space prefix
-                                const newSpecifier = {...newSpecifierBase, prefix: emptySpace};
-                                newElements.push(rightPadded(newSpecifier, emptySpace));
-
-                                // Update first existing element to have space prefix
-                                for (let j = 0; j < existingElements.length; j++) {
-                                    const elem = existingElements[j];
-                                    if (j === 0 && elem.element) {
-                                        newElements.push({
-                                            ...elem,
-                                            element: {...elem.element, prefix: singleSpace}
-                                        });
-                                    } else {
-                                        newElements.push(elem);
-                                    }
+                            const newElements = existingElements.flatMap((elem, j) => {
+                                const results: J.RightPadded<JS.ImportSpecifier>[] = [];
+                                if (j === insertIndex) {
+                                    // Insert new element here; first element gets no prefix, others get space
+                                    const prefix = j === 0 ? emptySpace : singleSpace;
+                                    results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
                                 }
-                            } else if (insertIndex === existingElements.length) {
-                                // Inserting at the end
-                                const newSpecifier = {...newSpecifierBase, prefix: singleSpace};
-                                const lastElement = existingElements[existingElements.length - 1];
-                                const paddingToTransfer = lastElement.after;
-
-                                // All existing elements except last keep their padding
-                                for (let j = 0; j < existingElements.length - 1; j++) {
-                                    newElements.push(existingElements[j]);
+                                // Adjust existing element: first after insertion gets space prefix
+                                let adjusted = elem;
+                                if (j === 0 && insertIndex === 0 && elem.element) {
+                                    adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
                                 }
-                                // Last existing element gets emptySpace padding (before comma)
-                                newElements.push({...lastElement, after: emptySpace});
-                                // New element gets the transferred padding
-                                newElements.push(rightPadded(newSpecifier, paddingToTransfer));
-                            } else {
-                                // Inserting in the middle
-                                const newSpecifier = {...newSpecifierBase, prefix: singleSpace};
-
-                                for (let j = 0; j < existingElements.length; j++) {
-                                    if (j === insertIndex) {
-                                        // Insert new element before this position
-                                        newElements.push(rightPadded(newSpecifier, emptySpace));
-                                    }
-                                    newElements.push(existingElements[j]);
+                                // Last element before a new trailing element loses its trailing space
+                                if (j === lastIndex && insertIndex > lastIndex) {
+                                    adjusted = {...adjusted, after: emptySpace};
                                 }
+                                results.push(adjusted);
+                                return results;
+                            });
+
+                            // Append at end if inserting after all existing elements
+                            if (insertIndex > lastIndex) {
+                                newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
                             }
 
-                            namedDraft.elements = {
-                                ...namedImports.elements,
-                                elements: newElements
-                            };
+                            namedDraft.elements = {...namedImports.elements, elements: newElements};
                         }
                     );
 
