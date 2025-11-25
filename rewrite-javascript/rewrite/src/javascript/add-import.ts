@@ -793,15 +793,29 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         // 2. References with fieldType matching the target module
                         else if (fieldType?.kind === Type.Kind.Variable) {
                             const variableType = fieldType as Type.Variable;
-                            if (variableType.owner) {
-                                const ownerTypeName = Type.FullyQualified.getFullyQualifiedName(variableType.owner);
-                                if (ownerTypeName === targetModule) {
-                                    found = true;
-                                } else if (Type.isClass(variableType.owner) && (variableType.owner as Type.Class).owningClass) {
-                                    // Check if the namespace itself has an owningClass that matches the module
-                                    const namespaceOwner = (variableType.owner as Type.Class).owningClass!;
-                                    const namespaceOwnerName = Type.FullyQualified.getFullyQualifiedName(namespaceOwner);
-                                    if (namespaceOwnerName === targetModule) {
+                            if (variableType.owner && Type.isClass(variableType.owner)) {
+                                // Traverse owningClass chain to find the module (handles nested namespaces)
+                                let current: Type.Class | undefined = variableType.owner as Type.Class;
+                                let moduleType: Type.Class | undefined;
+
+                                // Walk up the owningClass chain to find the root module
+                                while (current) {
+                                    if (current.owningClass && Type.isClass(current.owningClass)) {
+                                        current = current.owningClass as Type.Class;
+                                    } else if (current.owningClass) {
+                                        // owningClass exists but isn't a Class - use it and stop
+                                        moduleType = current.owningClass as Type.Class;
+                                        break;
+                                    } else {
+                                        // No owningClass - current is the root
+                                        moduleType = current;
+                                        break;
+                                    }
+                                }
+
+                                if (moduleType) {
+                                    const moduleName = Type.FullyQualified.getFullyQualifiedName(moduleType);
+                                    if (moduleName === targetModule) {
                                         found = true;
                                     }
                                 }
