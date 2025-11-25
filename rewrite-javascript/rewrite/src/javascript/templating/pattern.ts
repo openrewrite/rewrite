@@ -617,6 +617,17 @@ export class MatchResult implements IMatchResult {
     }
 
     /**
+     * Checks if a capture has been matched.
+     *
+     * @param capture The capture name (string) or Capture object
+     * @returns true if the capture exists in the match result
+     */
+    has(capture: Capture | string): boolean {
+        const name = typeof capture === "string" ? capture : ((capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName());
+        return this.storage.has(name);
+    }
+
+    /**
      * Extracts semantic elements from storage value.
      * For wrappers, extracts the .element; for arrays, returns array of elements.
      *
