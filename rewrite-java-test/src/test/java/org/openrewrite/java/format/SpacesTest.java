@@ -4575,6 +4575,26 @@ class SpacesTest implements RewriteTest {
             """
               enum Test { }
               """
+          ),
+          java(
+            """
+              enum Tester {ONE, TWO}
+              """,
+            """
+              enum Tester { ONE, TWO }
+              """
+          ),
+          java(
+            """
+              class TestEnum {
+                  enum Tester {ONE, TWO}
+              }
+              """,
+            """
+              class TestEnum {
+                  enum Tester { ONE, TWO }
+              }
+              """
           )
         );
     }
@@ -4589,6 +4609,26 @@ class SpacesTest implements RewriteTest {
               """,
             """
               enum Test {}
+              """
+          ),
+          java(
+            """
+              enum Tester { ONE, TWO }
+              """,
+            """
+              enum Tester {ONE, TWO}
+              """
+          ),
+          java(
+            """
+              class TestEnum {
+                  enum Tester { ONE, TWO }
+              }
+              """,
+            """
+              class TestEnum {
+                  enum Tester {ONE, TWO}
+              }
               """
           )
         );
