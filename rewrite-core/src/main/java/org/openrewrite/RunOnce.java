@@ -25,7 +25,8 @@ import org.openrewrite.marker.SearchResult;
 public class RunOnce extends Recipe {
 
     @Option(displayName = "Fully qualified recipe name",
-            description = "The fully qualified name of the recipe to prevent from running if it ran before.",
+            description = "The fully qualified name of the recipe to only run once." +
+                          " Usually the name of the recipe this is put on as a precondition.",
             example = "org.openrewrite.FindGitProvenance")
     @Nullable
     String fqrn;
