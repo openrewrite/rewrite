@@ -58,13 +58,13 @@ class RunOnceTest implements RewriteTest {
             "org.openrewrite.test.AppendBlaOnce"),
           text(
             """
-              abc
-              """,
+            abc
+            """,
             """
-              abc
-              bla
-              
-              """,
+            abc
+            bla
+            
+            """,
             spec -> spec.path("a/file.txt")
           )
         );
@@ -110,13 +110,13 @@ class RunOnceTest implements RewriteTest {
             "org.openrewrite.test.AppendFirstNotSecond"),
           text(
             """
-              abc
-              """,
+            abc
+            """,
             """
-              abc
-              first
-              
-              """,
+            abc
+            first
+            
+            """,
             spec -> spec.path("a/file.txt")
           )
         );
