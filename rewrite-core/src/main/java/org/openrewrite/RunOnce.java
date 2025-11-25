@@ -7,7 +7,7 @@ import org.openrewrite.marker.SearchResult;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class PreventIfAlreadyRan extends Recipe {
+public class RunOnce extends Recipe {
 
     @Option(displayName = "Fully qualified recipe name",
             description = "The fully qualified name of the recipe to prevent from running if it ran before.",

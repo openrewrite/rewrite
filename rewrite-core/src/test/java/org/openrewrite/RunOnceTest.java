@@ -6,7 +6,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.test.SourceSpecs.text;
 
-class PreventIfAlreadyRanTest implements RewriteTest {
+class RunOnceTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -32,7 +32,7 @@ class PreventIfAlreadyRanTest implements RewriteTest {
             displayName: Append bla
             description: Append bla.
             preconditions:
-              - org.openrewrite.PreventIfAlreadyRan:
+              - org.openrewrite.RunOnce:
                   fqrn: org.openrewrite.text.AppendToTextFile
             recipeList:
               - org.openrewrite.text.AppendToTextFile:
@@ -84,7 +84,7 @@ class PreventIfAlreadyRanTest implements RewriteTest {
             displayName: Append second
             description: Append second.
             preconditions:
-              - org.openrewrite.PreventIfAlreadyRan:
+              - org.openrewrite.RunOnce:
                   fqrn: org.openrewrite.text.AppendToTextFile
             recipeList:
               - org.openrewrite.text.AppendToTextFile:
