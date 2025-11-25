@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelineArtifact;
+import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelineArtifact;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.util.text.StringUtilRt;
@@ -171,6 +172,7 @@ public class KotlinParser implements Parser {
                                         parsingListener.parsed(kotlinSource.getInput(), cu);
                                         return requirePrintEqualsInput(cu, kotlinSource.getInput(), relativeTo, ctx);
                                     } catch (Throwable t) {
+                                        t.printStackTrace();
                                         ctx.getOnError().accept(t);
                                         return ParseError.build(this, kotlinSource.getInput(), relativeTo, ctx, t);
                                     }
@@ -438,13 +440,22 @@ public class KotlinParser implements Parser {
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE();
 
-        JvmFir2IrPipeline kotlinToIrCompiler = new JvmFir2IrPipeline();
-        JvmFir2IrPipelineArtifact jvmFir2IrPipelineArtifact = kotlinToIrCompiler
+        // TODO: Use IR Pipeline instead of FIR Pipeline
+//        JvmFir2IrPipeline kotlinToIrCompiler = new JvmFir2IrPipeline();
+//        JvmFir2IrPipelineArtifact jvmFir2IrPipelineArtifact = kotlinToIrCompiler
+//                .execute(k2compilerArgs(ctx, sources), Services.EMPTY, messageCollector, disposable);
+
+//        assert jvmFir2IrPipelineArtifact != null;
+//        List<IrFile> irFiles = jvmFir2IrPipelineArtifact.getResult().getIrModuleFragment().getFiles();
+//        assert irFiles.size() == sources.size();
+//        List<FirFile> firFiles = ((Fir2IrComponentsStorage) jvmFir2IrPipelineArtifact.getResult().getComponents()).getFir();
+
+        JvmFirPipeline kotlinToFirCompiler = new JvmFirPipeline();
+        JvmFrontendPipelineArtifact jvmFrontendPipelineArtifact = kotlinToFirCompiler
                 .execute(k2compilerArgs(ctx, sources), Services.EMPTY, messageCollector, disposable);
-        assert jvmFir2IrPipelineArtifact != null;
-        List<IrFile> irFiles = jvmFir2IrPipelineArtifact.getResult().getIrModuleFragment().getFiles();
-        List<FirFile> firFiles = ((Fir2IrComponentsStorage) jvmFir2IrPipelineArtifact.getResult().getComponents()).getFir();
-        assert irFiles.size() == sources.size();
+        assert jvmFrontendPipelineArtifact != null;
+        List<FirFile> firFiles = jvmFrontendPipelineArtifact.getResult().getOutputs().get(0).getFir();
+
         assert firFiles.size() == sources.size();
 
         for (int i = 0; i < sources.size(); i++) {
@@ -453,11 +464,14 @@ public class KotlinParser implements Parser {
             List<Integer> cRLFLocations = getCRLFLocations(sourceText);
             KotlinSource kotlinSource = new KotlinSource(source, cRLFLocations);
             kotlinSource.setFirFile(firFiles.get(i));
-            kotlinSource.setIrFile(irFiles.get(i));
+//            kotlinSource.setIrFile(irFiles.get(i));
             kotlinSources.add(kotlinSource);
-            System.out.println(PsiTreePrinter.printIrFile(irFiles.get(i)));
+//            System.out.println(PsiTreePrinter.printIrFile(irFiles.get(i)));
+            System.out.println(PsiTreePrinter.printFirFile(firFiles.get(i)));
         }
-        return new CompiledSource(jvmFir2IrPipelineArtifact.getResult().getComponents().getSession(), kotlinSources);
+//        FirSession firSession = jvmFir2IrPipelineArtifact.getResult().getComponents().getSession();
+        FirSession firSession = jvmFrontendPipelineArtifact.getResult().getOutputs().get(0).getSession();
+        return new CompiledSource(firSession, kotlinSources);
     }
 
     public enum KotlinLanguageLevel {

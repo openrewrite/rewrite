@@ -66,6 +66,7 @@ import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.methodName
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.variableName
+import kotlin.math.sign
 
 @Suppress("DuplicatedCode")
 class KotlinTypeMapping(
@@ -98,6 +99,9 @@ class KotlinTypeMapping(
         val existing = typeCache.get<JavaType>(signature)
         if (existing != null) {
             return existing
+        }
+        if("java.lang.Object" == signature){
+            return null
         }
         return type(type, parent, signature)
     }

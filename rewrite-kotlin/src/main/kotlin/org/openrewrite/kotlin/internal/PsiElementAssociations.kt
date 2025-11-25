@@ -296,6 +296,8 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                             directFirInfos.firstOrNull { it.fir is FirLiteralExpression }?.fir
                         }
                         is KtImportDirective -> {
+                            // TODO
+//                            directFirInfos.firstOrNull { it.fir is FirImport && it.fir !is FirErrorImport }?.fir
                             directFirInfos.firstOrNull { it.fir is FirImport }?.fir
                         }
                         is KtNamedFunction -> {
@@ -369,7 +371,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             }
             is FirSafeCallExpression -> {
                 return when (fir.selector) {
-                    is FirFunctionCall -> when ((fir.selector as FirFunctionCall).calleeReference?.resolved?.resolvedSymbol) {
+                    is FirFunctionCall -> when ((fir.selector as? FirFunctionCall)?.calleeReference?.resolved?.resolvedSymbol) {
                         is FirConstructorSymbol -> ExpressionType.CONSTRUCTOR
                         is FirNamedFunctionSymbol -> ExpressionType.METHOD_INVOCATION
                         else -> null

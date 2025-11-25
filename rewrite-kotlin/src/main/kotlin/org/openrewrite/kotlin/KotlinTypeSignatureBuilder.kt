@@ -212,6 +212,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         throw UnsupportedOperationException("This should never happen.")
     }
 
+    @OptIn(SymbolInternals::class)
     override fun classSignature(type: Any): String {
         return when (type) {
             is ConeClassLikeType -> convertClassIdToFqn(type.classId)
@@ -219,8 +220,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is ConeTypeParameterType -> signature(type)
             is FirClass -> convertClassIdToFqn(type.classId)
             is FirFile -> fileSignature(type)
-            is FirResolvedTypeRef -> classSignature(type.toReference(firSession)!!)
+            is FirResolvedTypeRef -> classSignature(type.coneType)
             is FirResolvedQualifier -> convertClassIdToFqn(type.classId)
+            is FirJavaTypeRef -> signature(type)
+            is FirRegularClassSymbol -> classSignature(type.fir)
             else -> {
                 throw UnsupportedOperationException("Unsupported class type: ${type.javaClass.name}")
             }
@@ -322,6 +325,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         val clazz = when {
             function.symbol is FirConstructorSymbol -> classSignature(function.returnTypeRef)
             function.dispatchReceiverType != null -> classSignature(function.dispatchReceiverType!!)
+            function.symbol is FirNamedFunctionSymbol -> classSignature(function.returnTypeRef)
             function.symbol.getOwnerLookupTag() != null && function.symbol.getOwnerLookupTag()!!
                 .toRegularClassSymbol(firSession) != null -> {
                 classSignature(function.symbol.getOwnerLookupTag()!!.toRegularClassSymbol(firSession)!!)

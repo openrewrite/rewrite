@@ -26,7 +26,7 @@ class KotlinIrTreeParserVisitorTest {
         KotlinParser psiKotlinParser = KotlinParser.builder().parsePsi(true).logCompilationWarningsAndErrors(true).build();
         InMemoryExecutionContext psiCtx = new InMemoryExecutionContext();
         psiCtx.putMessage(REQUIRE_PRINT_EQUALS_INPUT, false);
-        K.CompilationUnit expected = (K.CompilationUnit) psiKotlinParser
+        SourceFile actualSourceFile = psiKotlinParser
           .parseInputs(singletonList(input), null, psiCtx)
           .findFirst()
           .orElseThrow();
@@ -40,7 +40,7 @@ class KotlinIrTreeParserVisitorTest {
           .orElseThrow();
 
         assertEquals(
-          expected,
+          (K.CompilationUnit) actualSourceFile,
           actual,
           "K.CompilationUnit of KotlinIrTreeParserVisitor does not match output of KotlinTreeParserVisitor"
         );
