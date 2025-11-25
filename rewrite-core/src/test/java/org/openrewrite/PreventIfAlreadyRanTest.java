@@ -10,7 +10,55 @@ class PreventIfAlreadyRanTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipeFromYaml(
+        spec.cycles(1).expectedCyclesThatMakeChanges(1);
+    }
+
+    @Test
+    void appendOnce() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.test.AppendBlaOnce
+            displayName: Append bla once
+            description: Append bla once.
+            recipeList:
+              - org.openrewrite.test.AppendBla
+              - org.openrewrite.test.AppendBla
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.test.AppendBla
+            displayName: Append bla
+            description: Append bla.
+            preconditions:
+              - org.openrewrite.PreventIfAlreadyRan:
+                  fqrn: org.openrewrite.text.AppendToTextFile
+            recipeList:
+              - org.openrewrite.text.AppendToTextFile:
+                  relativeFileName: "a/file.txt"
+                  content: "bla"
+                  existingFileStrategy: Merge
+            """,
+            "org.openrewrite.test.AppendBlaOnce"),
+          text(
+            """
+              abc
+              """,
+            """
+              abc
+              bla
+              
+              """,
+            spec -> spec.path("a/file.txt")
+          )
+        );
+    }
+
+    @Test
+    void appendFirstNotSecond() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
             """
             ---
             type: specs.openrewrite.org/v1beta/recipe
@@ -44,14 +92,7 @@ class PreventIfAlreadyRanTest implements RewriteTest {
                   content: "second"
                   existingFileStrategy: Merge
             """,
-            "org.openrewrite.test.AppendFirstNotSecond")
-          .cycles(1)
-          .expectedCyclesThatMakeChanges(1);
-    }
-
-    @Test
-    void recipePreventsSecondInstance() {
-        rewriteRun(
+            "org.openrewrite.test.AppendFirstNotSecond"),
           text(
             """
               abc
