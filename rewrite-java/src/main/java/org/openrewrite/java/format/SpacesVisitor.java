@@ -588,19 +588,18 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     whitespace = " ";
                 }
                 break;
-            case ENUM_VALUE_SET_PREFIX:
-                Cursor classCursor = getCursor().getParentTreeCursor().getParentTreeCursor();
-                if (classCursor.getMessage("singleLineEnum") == Boolean.TRUE && evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false)) {
-                    whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
-                }
-                break;
             case TYPE_BOUNDS:
                 whitespace = " ";
                 break;
             case BLOCK_END:
                 J.Block block = getCursor().getValue();
                 if (getCursor().dropParentWhile(v -> !(v instanceof J.ClassDeclaration) && !Cursor.ROOT_VALUE.equals(v)).getMessage("singleLineEnum") == Boolean.TRUE) {
-                    whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
+                    if (block.getStatements().isEmpty()) {
+                        whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
+                    } else {
+                        whitespace = "";
+                    }
+                    break;
                 } else if (block.getStatements().isEmpty() && block.getEnd().getComments().isEmpty()) {
                     parentTreeCursor = getCursor().getParentTreeCursor();
                     if (parentTreeCursor.getValue() instanceof J.ClassDeclaration || parentTreeCursor.getValue() instanceof J.MethodDeclaration) {
