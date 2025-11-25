@@ -26,8 +26,8 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.maven.Assertions.pomXml;
 
 class DoesNotIncludeDependencyTest implements RewriteTest {
     private static final String marker = "<!--~~>-->";
@@ -43,7 +43,11 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
       """;
 
     private Recipe defaultRecipeWithOnlyDirectAndScope(@Nullable Boolean onlyDirect, @Nullable String scope) {
-        return new DoesNotIncludeDependency("org.springframework", "spring-beans", onlyDirect, scope);
+        return new DoesNotIncludeDependency("org.springframework", "spring-beans", onlyDirect, scope, null);
+    }
+
+    private Recipe defaultRecipeWithOnlyDirectAndVersion(@Nullable Boolean onlyDirect, @Nullable String version) {
+        return new DoesNotIncludeDependency("org.springframework", "spring-beans", onlyDirect, null, version);
     }
 
     private String wrappedScope(String scope) {
@@ -54,7 +58,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     @Test
     void dependencyPresentTransitivelyWithoutScopeOrDesiredScopeSpecifiedButDirectOnlyMarked() {
         rewriteRun(
-          spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
+          spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null, null)),
           pomXml(
             """
               <project>
@@ -153,7 +157,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(
-                          directDependencyTemplate.formatted(wrappedScope(existingScope)),
+                    directDependencyTemplate.formatted(wrappedScope(existingScope)),
                     String.format(marker + directDependencyTemplate, wrappedScope(existingScope))
                   )
                 );
@@ -171,11 +175,29 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             }
 
             @Test
+            void withMatchingVersionNotMarked() {
+                rewriteRun(
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndVersion(onlyDirect, "6.0.0")),
+                  pomXml(directDependencyTemplate.formatted(""))
+                );
+            }
+
+            @Test
+            void withNonMatchingVersionMarked() {
+                rewriteRun(
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndVersion(onlyDirect, "5.x")),
+                  pomXml(
+                    directDependencyTemplate.formatted(""),
+                    String.format(marker + directDependencyTemplate, ""))
+                );
+            }
+
+            @Test
             void multimoduleMarksOnlyCorrectModule() {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
-                          directDependencyTemplate.formatted(""),
+                    directDependencyTemplate.formatted(""),
                     spec -> spec.path("a/pom.xml")
                   ),
                   pomXml(
@@ -263,7 +285,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(
-                          transitiveDependencyTemplate.formatted(wrappedScope(existingScope)),
+                    transitiveDependencyTemplate.formatted(wrappedScope(existingScope)),
                     String.format(marker + transitiveDependencyTemplate, wrappedScope(existingScope))
                   )
                 );
@@ -281,11 +303,29 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             }
 
             @Test
+            void withMatchingVersionNotMarked() {
+                rewriteRun(
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndVersion(onlyDirect, "6.0.2")),
+                  pomXml(transitiveDependencyTemplate.formatted(""))
+                );
+            }
+
+            @Test
+            void withNonMatchingVersionMarked() {
+                rewriteRun(
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndVersion(onlyDirect, "5.x")),
+                  pomXml(
+                    transitiveDependencyTemplate.formatted(""),
+                    String.format(marker + transitiveDependencyTemplate, ""))
+                );
+            }
+
+            @Test
             void multimoduleMarksOnlyCorrectModule() {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
-                          transitiveDependencyTemplate.formatted(""),
+                    transitiveDependencyTemplate.formatted(""),
                     spec -> spec.path("a/pom.xml")
                   ),
                   pomXml(
@@ -313,7 +353,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
-                          transitiveDependencyTemplate.formatted(""),
+                    transitiveDependencyTemplate.formatted(""),
                     String.format(marker + transitiveDependencyTemplate, "")
                   )
                 );
@@ -325,7 +365,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
-                          transitiveDependencyTemplate.formatted(wrappedScope(scope)),
+                    transitiveDependencyTemplate.formatted(wrappedScope(scope)),
                     String.format(marker + transitiveDependencyTemplate, wrappedScope(scope))
                   )
                 );
@@ -338,23 +378,34 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(
-                          transitiveDependencyTemplate.formatted(wrappedScope(existingScope)),
+                    transitiveDependencyTemplate.formatted(wrappedScope(existingScope)),
                     String.format(marker + transitiveDependencyTemplate, wrappedScope(existingScope))
                   )
                 );
             }
 
             @CsvSource({"compile,compile", "compile,test"})
-            @CsvSource({"runtime,compile", "runtime,test",})
+            @CsvSource({"runtime,compile", "runtime,test"})
             @CsvSource({"test,test"})
             @ParameterizedTest
             void withScopeInDesiredScopeMarked(String existingScope, String desiredScope) {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(
-                          transitiveDependencyTemplate.formatted(wrappedScope(existingScope)),
+                    transitiveDependencyTemplate.formatted(wrappedScope(existingScope)),
                     String.format(marker + transitiveDependencyTemplate, wrappedScope(existingScope))
                   )
+                );
+            }
+
+            @CsvSource({"5.x", "6.x", "6.0.0", "6.0.2"})
+            @ParameterizedTest
+            void withAnyVersionAlwaysMarked(String version) {
+                rewriteRun(
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndVersion(onlyDirect, version)),
+                  pomXml(
+                    transitiveDependencyTemplate.formatted(""),
+                    String.format(marker + transitiveDependencyTemplate, ""))
                 );
             }
 
@@ -363,7 +414,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
-                          transitiveDependencyTemplate.formatted(""),
+                    transitiveDependencyTemplate.formatted(""),
                     String.format(marker + transitiveDependencyTemplate, ""),
                     spec -> spec.path("a/pom.xml")
                   ),
