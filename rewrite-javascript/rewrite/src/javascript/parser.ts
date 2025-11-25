@@ -114,7 +114,7 @@ export class JavaScriptParser extends Parser {
     }
 
     /**
-     * Finds and parses package.json if relativeTo is provided.
+     * Finds and parses package.json (and optionally package-lock.json) if relativeTo is provided.
      * Only searches in the relativeTo directory (typically the Git repo root).
      * Returns null if relativeTo is not set or package.json doesn't exist/is invalid.
      */
@@ -134,7 +134,23 @@ export class JavaScriptParser extends Parser {
             const content = ts.sys.readFile(packageJsonPath);
             if (content) {
                 const packageJson = JSON.parse(content);
-                return createNodeProjectMarker(packageJsonPath, packageJson);
+
+                // Try to read package-lock.json for resolution info
+                let packageLockJson: any = undefined;
+                const packageLockPath = path.join(this.relativeTo, 'package-lock.json');
+                if (ts.sys.fileExists(packageLockPath)) {
+                    try {
+                        const lockContent = ts.sys.readFile(packageLockPath);
+                        if (lockContent) {
+                            packageLockJson = JSON.parse(lockContent);
+                        }
+                    } catch (lockError) {
+                        // Silently ignore package-lock.json parse errors
+                        // We can still create the marker without resolution info
+                    }
+                }
+
+                return createNodeProjectMarker(packageJsonPath, packageJson, packageLockJson);
             }
         } catch (error) {
             console.warn(`Failed to parse package.json at ${packageJsonPath}:`, error);

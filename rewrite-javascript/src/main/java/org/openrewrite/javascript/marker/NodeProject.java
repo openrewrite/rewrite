@@ -27,10 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
+import static java.util.Collections.emptyList;
 
 /**
- * Contains metadata about a Node.js project, parsed from package.json.
+ * Contains metadata about a Node.js project, parsed from package.json and package-lock.json.
  * Attached as a marker to JS.CompilationUnit to provide dependency context for recipes.
  * <p>
  * Similar to GradleProject marker, this allows recipes to:
@@ -38,6 +38,10 @@ import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
  * - Check if specific packages are in use
  * - Modify dependencies programmatically
  * - Understand the project structure
+ * <p>
+ * The model separates requests (Dependency) from resolutions (ResolvedDependency):
+ * - The dependency arrays contain Dependency objects (what was requested)
+ * - The resolutions map links each Dependency to its ResolvedDependency
  */
 @Value
 @With
@@ -50,17 +54,18 @@ public class NodeProject implements Marker, RpcCodec<NodeProject> {
     @Nullable String description;
     String packageJsonPath;
 
-    // Dependencies organized by scope
-    List<NodeDependency> dependencies;
-    List<NodeDependency> devDependencies;
-    List<NodeDependency> peerDependencies;
-    List<NodeDependency> optionalDependencies;
-    List<NodeDependency> bundledDependencies;
+    // Dependency requests organized by scope (from package.json)
+    List<Dependency> dependencies;
+    List<Dependency> devDependencies;
+    List<Dependency> peerDependencies;
+    List<Dependency> optionalDependencies;
+    List<Dependency> bundledDependencies;
 
-    // Additional metadata
-    @Nullable Map<String, String> scripts;
+    // Resolution map (from package-lock.json) - maps requests to resolved versions
+    @Nullable Map<Dependency, ResolvedDependency> resolutions;
+
+    // Node/npm version requirements
     @Nullable Map<String, String> engines;
-    @Nullable Repository repository;
 
     @Override
     public void rpcSend(NodeProject after, RpcSendQueue q) {
@@ -70,26 +75,25 @@ public class NodeProject implements Marker, RpcCodec<NodeProject> {
         q.getAndSend(after, NodeProject::getDescription);
         q.getAndSend(after, NodeProject::getPackageJsonPath);
 
-        // Send dependency arrays with asRef to enable deduplication
         q.getAndSendListAsRef(after, NodeProject::getDependencies,
-                dep -> dep.getName() + "@" + dep.getVersion() + ":" + dep.getScope(),
+                dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
         q.getAndSendListAsRef(after, NodeProject::getDevDependencies,
-                dep -> dep.getName() + "@" + dep.getVersion() + ":" + dep.getScope(),
+                dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
         q.getAndSendListAsRef(after, NodeProject::getPeerDependencies,
-                dep -> dep.getName() + "@" + dep.getVersion() + ":" + dep.getScope(),
+                dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
         q.getAndSendListAsRef(after, NodeProject::getOptionalDependencies,
-                dep -> dep.getName() + "@" + dep.getVersion() + ":" + dep.getScope(),
+                dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
         q.getAndSendListAsRef(after, NodeProject::getBundledDependencies,
-                dep -> dep.getName() + "@" + dep.getVersion() + ":" + dep.getScope(),
+                dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
 
-        q.getAndSend(after, NodeProject::getScripts);
+        // TODO: send resolutions map when package-lock.json parsing is implemented
+
         q.getAndSend(after, NodeProject::getEngines);
-        q.getAndSend(after, NodeProject::getRepository, repo -> repo.rpcSend(repo, q));
     }
 
     @Override
@@ -110,112 +114,98 @@ public class NodeProject implements Marker, RpcCodec<NodeProject> {
                         dep -> dep.rpcReceive(dep, q)))
                 .withBundledDependencies(q.receiveList(before.bundledDependencies,
                         dep -> dep.rpcReceive(dep, q)))
-                .withScripts(q.receive(before.scripts))
-                .withEngines(q.receive(before.engines))
-                .withRepository(q.receive(before.repository, repo -> repo.rpcReceive(repo, q)));
+                // TODO: receive resolutions map when package-lock.json parsing is implemented
+                .withEngines(q.receive(before.engines));
     }
 
     /**
-     * Scope/section of package.json where a dependency is declared.
-     */
-    public enum DependencyScope {
-        DEPENDENCIES("dependencies"),
-        DEV_DEPENDENCIES("devDependencies"),
-        PEER_DEPENDENCIES("peerDependencies"),
-        OPTIONAL_DEPENDENCIES("optionalDependencies"),
-        BUNDLED_DEPENDENCIES("bundledDependencies");
-
-        private final String value;
-
-        DependencyScope(String value) {
-            this.value = value;
-        }
-
-        public String getValue() {
-            return value;
-        }
-    }
-
-    /**
-     * Represents a Node.js dependency from package.json.
-     * Analogous to Maven's GroupArtifactVersion or Gradle's Dependency.
+     * Represents a dependency request as declared in package.json.
+     * This is what a package asks for (name + version constraint).
      * <p>
-     * This class is designed to be extensible for future transitive dependency support.
-     * Uses asRef() when creating instances to enable reference deduplication during RPC serialization.
+     * When the same name+versionConstraint appears multiple times, the same
+     * Dependency instance is reused. This enables reference deduplication
+     * during RPC serialization.
      */
     @Value
     @With
-    public static class NodeDependency implements RpcCodec<NodeDependency> {
-        String name;                          // Package name (e.g., "react")
-        String version;                       // Version constraint (e.g., "^18.2.0")
-        @Nullable String resolved;            // Actual resolved version (from package-lock.json if available)
-        DependencyScope scope;                // Which section this came from
-
-        // Fields reserved for future transitive dependency support
-        // Initially these will be null/empty
-        @Nullable List<NodeDependency> dependencies;  // Transitive dependencies (not populated initially)
-        @Nullable Integer depth;                       // Depth in dependency tree (0 for direct)
-        @Nullable List<String> requestedBy;           // Package names that requested this dependency
+    public static class Dependency implements RpcCodec<Dependency> {
+        String name;              // Package name (e.g., "react")
+        String versionConstraint; // Version constraint (e.g., "^18.2.0")
 
         @Override
-        public void rpcSend(NodeDependency after, RpcSendQueue q) {
-            q.getAndSend(after, NodeDependency::getName);
-            q.getAndSend(after, NodeDependency::getVersion);
-            q.getAndSend(after, NodeDependency::getResolved);
-            q.getAndSend(after, NodeDependency::getScope);
-            q.getAndSend(after, NodeDependency::getDepth);
-
-            // Future: send transitive dependencies
-            if (after.dependencies != null) {
-                q.getAndSendListAsRef(after, NodeDependency::getDependencies,
-                        dep -> dep.getName() + "@" + dep.getVersion() + ":" + dep.getScope(),
-                        dep -> dep.rpcSend(dep, q));
-            } else {
-                q.getAndSend(after, d -> null);
-            }
-
-            q.getAndSend(after, NodeDependency::getRequestedBy);
+        public void rpcSend(Dependency after, RpcSendQueue q) {
+            q.getAndSend(after, Dependency::getName);
+            q.getAndSend(after, Dependency::getVersionConstraint);
         }
 
         @Override
-        public NodeDependency rpcReceive(NodeDependency before, RpcReceiveQueue q) {
-            NodeDependency result = before
+        public Dependency rpcReceive(Dependency before, RpcReceiveQueue q) {
+            return before
+                    .withName(q.receive(before.name))
+                    .withVersionConstraint(q.receive(before.versionConstraint));
+        }
+    }
+
+    /**
+     * Represents a resolved dependency from package-lock.json.
+     * This is what was actually installed (name + resolved version + its own dependencies).
+     * <p>
+     * Each ResolvedDependency's dependency arrays contain Dependency objects (requests),
+     * which can be looked up in NodeProject.resolutions to find their resolved versions.
+     */
+    @Value
+    @With
+    public static class ResolvedDependency implements RpcCodec<ResolvedDependency> {
+        String name;    // Package name (e.g., "react")
+        String version; // Actual resolved version (e.g., "18.3.1")
+
+        // This package's own dependency requests
+        @Nullable List<Dependency> dependencies;
+        @Nullable List<Dependency> devDependencies;
+        @Nullable List<Dependency> peerDependencies;
+        @Nullable List<Dependency> optionalDependencies;
+
+        // Node/npm version requirements for this package
+        @Nullable Map<String, String> engines;
+
+        // SPDX license identifier (e.g., "MIT", "Apache-2.0")
+        @Nullable String license;
+
+        @Override
+        public void rpcSend(ResolvedDependency after, RpcSendQueue q) {
+            q.getAndSend(after, ResolvedDependency::getName);
+            q.getAndSend(after, ResolvedDependency::getVersion);
+            q.getAndSendListAsRef(after, r -> r.getDependencies() != null ? r.getDependencies() : emptyList(),
+                    dep -> dep.getName() + "@" + dep.getVersionConstraint(),
+                    dep -> dep.rpcSend(dep, q));
+            q.getAndSendListAsRef(after, r -> r.getDevDependencies() != null ? r.getDevDependencies() : emptyList(),
+                    dep -> dep.getName() + "@" + dep.getVersionConstraint(),
+                    dep -> dep.rpcSend(dep, q));
+            q.getAndSendListAsRef(after, r -> r.getPeerDependencies() != null ? r.getPeerDependencies() : emptyList(),
+                    dep -> dep.getName() + "@" + dep.getVersionConstraint(),
+                    dep -> dep.rpcSend(dep, q));
+            q.getAndSendListAsRef(after, r -> r.getOptionalDependencies() != null ? r.getOptionalDependencies() : emptyList(),
+                    dep -> dep.getName() + "@" + dep.getVersionConstraint(),
+                    dep -> dep.rpcSend(dep, q));
+            q.getAndSend(after, ResolvedDependency::getEngines);
+            q.getAndSend(after, ResolvedDependency::getLicense);
+        }
+
+        @Override
+        public ResolvedDependency rpcReceive(ResolvedDependency before, RpcReceiveQueue q) {
+            return before
                     .withName(q.receive(before.name))
                     .withVersion(q.receive(before.version))
-                    .withResolved(q.receive(before.resolved))
-                    .withScope(q.receiveAndGet(before.scope, toEnum(DependencyScope.class)))
-                    .withDepth(q.receive(before.depth));
-
-            // Future: receive transitive dependencies
-            List<NodeDependency> deps = q.receiveList(before.dependencies,
-                    dep -> rpcReceive(dep, q));
-
-            return result
-                    .withDependencies(deps)
-                    .withRequestedBy(q.receive(before.requestedBy));
-        }
-    }
-
-    /**
-     * Repository information from package.json.
-     */
-    @Value
-    @With
-    public static class Repository implements RpcCodec<Repository> {
-        String type;
-        String url;
-
-        @Override
-        public void rpcSend(Repository after, RpcSendQueue q) {
-            q.getAndSend(after, Repository::getType);
-            q.getAndSend(after, Repository::getUrl);
-        }
-
-        @Override
-        public Repository rpcReceive(Repository before, RpcReceiveQueue q) {
-            return before
-                    .withType(q.receive(before.type))
-                    .withUrl(q.receive(before.url));
+                    .withDependencies(q.receiveList(before.dependencies,
+                            dep -> dep.rpcReceive(dep, q)))
+                    .withDevDependencies(q.receiveList(before.devDependencies,
+                            dep -> dep.rpcReceive(dep, q)))
+                    .withPeerDependencies(q.receiveList(before.peerDependencies,
+                            dep -> dep.rpcReceive(dep, q)))
+                    .withOptionalDependencies(q.receiveList(before.optionalDependencies,
+                            dep -> dep.rpcReceive(dep, q)))
+                    .withEngines(q.receive(before.engines))
+                    .withLicense(q.receive(before.license));
         }
     }
 }

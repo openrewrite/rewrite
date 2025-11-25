@@ -107,13 +107,20 @@ export interface NodeProject extends Marker {
  *
  * All Dependency instances are wrapped with asRef() to enable
  * reference deduplication during RPC serialization.
+ *
+ * @param packageJsonPath Path to the package.json file
+ * @param packageJsonContent Parsed package.json content
+ * @param packageLockContent Optional parsed package-lock.json content for resolution info
  */
 export function createNodeProjectMarker(
     packageJsonPath: string,
-    packageJsonContent: any
+    packageJsonContent: any,
+    packageLockContent?: any
 ): NodeProject {
     // Cache for deduplicating dependencies with the same name+versionConstraint.
     const dependencyCache = new Map<string, Dependency>();
+    // Cache for deduplicating resolved dependencies with the same name+version.
+    const resolvedDependencyCache = new Map<string, ResolvedDependency>();
 
     function getOrCreateDependency(
         name: string,
@@ -149,6 +156,144 @@ export function createNodeProjectMarker(
         return deps.map(name => getOrCreateDependency(name, '*'));
     }
 
+    /**
+     * Extracts package name from a package-lock.json path.
+     * e.g., "node_modules/@babel/core" -> "@babel/core"
+     * e.g., "node_modules/foo/node_modules/bar" -> "bar"
+     */
+    function extractPackageName(pkgPath: string): string {
+        // For nested packages, we want the last package name
+        const nodeModulesIndex = pkgPath.lastIndexOf('node_modules/');
+        if (nodeModulesIndex === -1) return pkgPath;
+        return pkgPath.slice(nodeModulesIndex + 'node_modules/'.length);
+    }
+
+    /**
+     * Creates or retrieves a ResolvedDependency from the cache.
+     * This ensures the same resolved package is reused across the dependency tree.
+     */
+    function getOrCreateResolvedDependency(
+        name: string,
+        version: string,
+        pkgEntry: any
+    ): ResolvedDependency {
+        const key = `${name}@${version}`;
+        let resolved = resolvedDependencyCache.get(key);
+        if (!resolved) {
+            resolved = asRef({
+                kind: ResolvedDependencyKind,
+                name,
+                version,
+                dependencies: parseDependencies(pkgEntry.dependencies),
+                devDependencies: parseDependencies(pkgEntry.devDependencies),
+                peerDependencies: parseDependencies(pkgEntry.peerDependencies),
+                optionalDependencies: parseDependencies(pkgEntry.optionalDependencies),
+                engines: pkgEntry.engines,
+                license: pkgEntry.license,
+            });
+            resolvedDependencyCache.set(key, resolved);
+        }
+        return resolved;
+    }
+
+    /**
+     * Parses package-lock.json to build the resolutions map.
+     * The map links Dependency requests to their ResolvedDependency.
+     */
+    function parseResolutions(
+        lockContent: any
+    ): Map<Dependency, ResolvedDependency> | undefined {
+        if (!lockContent?.packages) return undefined;
+
+        const resolutions = new Map<Dependency, ResolvedDependency>();
+        const packages = lockContent.packages as Record<string, any>;
+
+        // First pass: create all ResolvedDependency objects
+        for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
+            // Skip the root package (empty string key)
+            if (pkgPath === '') continue;
+
+            const name = extractPackageName(pkgPath);
+            const version = pkgEntry.version;
+
+            if (name && version) {
+                getOrCreateResolvedDependency(name, version, pkgEntry);
+            }
+        }
+
+        // Second pass: link dependencies to their resolutions
+        // We need to map each Dependency (name + versionConstraint) to its ResolvedDependency
+        for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
+            const allDeps: Record<string, string> = {
+                ...(pkgEntry.dependencies || {}),
+                ...(pkgEntry.devDependencies || {}),
+                ...(pkgEntry.peerDependencies || {}),
+                ...(pkgEntry.optionalDependencies || {}),
+            };
+
+            for (const [depName, versionConstraint] of Object.entries(allDeps)) {
+                const dep = getOrCreateDependency(depName, versionConstraint);
+
+                // If we haven't resolved this dependency yet, find its resolution
+                if (!resolutions.has(dep)) {
+                    // Look for the resolved package in the packages map
+                    // First try direct path, then nested paths
+                    const directPath = `node_modules/${depName}`;
+
+                    // For nested dependencies, we need to find the correct resolution
+                    // by walking up from the current package's node_modules
+                    let resolvedEntry: any = null;
+                    let searchPath = pkgPath === '' ? '' : pkgPath;
+
+                    // Walk up the directory tree to find the resolved package
+                    while (true) {
+                        const candidatePath = searchPath
+                            ? `${searchPath}/node_modules/${depName}`
+                            : `node_modules/${depName}`;
+
+                        if (packages[candidatePath]) {
+                            resolvedEntry = packages[candidatePath];
+                            break;
+                        }
+
+                        // Move up one level
+                        const lastNodeModules = searchPath.lastIndexOf('/node_modules');
+                        if (lastNodeModules === -1) {
+                            // We're at the root, try the direct path one more time
+                            if (packages[directPath]) {
+                                resolvedEntry = packages[directPath];
+                            }
+                            break;
+                        }
+                        searchPath = searchPath.slice(0, lastNodeModules);
+                    }
+
+                    if (resolvedEntry && resolvedEntry.version) {
+                        const resolved = getOrCreateResolvedDependency(
+                            depName,
+                            resolvedEntry.version,
+                            resolvedEntry
+                        );
+                        resolutions.set(dep, resolved);
+                    }
+                }
+            }
+        }
+
+        return resolutions.size > 0 ? resolutions : undefined;
+    }
+
+    const dependencies = parseDependencies(packageJsonContent.dependencies);
+    const devDependencies = parseDependencies(packageJsonContent.devDependencies);
+    const peerDependencies = parseDependencies(packageJsonContent.peerDependencies);
+    const optionalDependencies = parseDependencies(packageJsonContent.optionalDependencies);
+    const bundledDependencies = parseBundledDependencies(
+        packageJsonContent.bundledDependencies || packageJsonContent.bundleDependencies
+    );
+
+    // Parse resolutions from package-lock.json if provided
+    const resolutions = packageLockContent ? parseResolutions(packageLockContent) : undefined;
+
     return {
         kind: NodeProjectMarkerKind,
         id: randomId(),
@@ -156,14 +301,12 @@ export function createNodeProjectMarker(
         version: packageJsonContent.version,
         description: packageJsonContent.description,
         packageJsonPath,
-        dependencies: parseDependencies(packageJsonContent.dependencies),
-        devDependencies: parseDependencies(packageJsonContent.devDependencies),
-        peerDependencies: parseDependencies(packageJsonContent.peerDependencies),
-        optionalDependencies: parseDependencies(packageJsonContent.optionalDependencies),
-        bundledDependencies: parseBundledDependencies(
-            packageJsonContent.bundledDependencies || packageJsonContent.bundleDependencies
-        ),
-        resolutions: undefined, // Not populated until package-lock.json is parsed
+        dependencies,
+        devDependencies,
+        peerDependencies,
+        optionalDependencies,
+        bundledDependencies,
+        resolutions,
         engines: packageJsonContent.engines,
     };
 }

@@ -72,10 +72,20 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
             );
 
             yield spec;
+        } else if (spec.path === 'package-lock.json') {
+            // Write package-lock.json from the test spec
+            // Note: This is written AFTER npm install runs (via package.json handling above),
+            // so it will override any generated lock file with the test's mock data
+            fs.writeFileSync(
+                path.join(relativeTo, 'package-lock.json'),
+                spec.before
+            );
+
+            yield spec;
         }
     }
     for (const spec of sourceSpecs) {
-        if (spec.path !== 'package.json') {
+        if (spec.path !== 'package.json' && spec.path !== 'package-lock.json') {
             if (spec.kind === JS.Kind.CompilationUnit) {
                 yield {
                     ...spec,
@@ -92,6 +102,13 @@ export function packageJson(before: string, after?: AfterRecipeText): SourceSpec
     return {
         ...json(before, after),
         path: 'package.json'
+    };
+}
+
+export function packageLockJson(before: string, after?: AfterRecipeText): SourceSpec<Json.Document> {
+    return {
+        ...json(before, after),
+        path: 'package-lock.json'
     };
 }
 
