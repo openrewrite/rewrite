@@ -67,8 +67,8 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
     }
 
     private fun IrSimpleType.isPrimitive(): Boolean{
-        return isPrimitiveType(true) || isStringClassType()
-                || isNothing() || isNullableNothing()
+        return isPrimitiveType(true) || isStringClassType() ||
+                isNothing() || isNullableNothing()
     }
 
     override fun type(type: Any?): JavaType {
