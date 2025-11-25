@@ -243,7 +243,8 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             if (resolved == null) {
                 List<ResolvedDependency> newResolved = new ArrayList<>(getDirectResolved());
                 Map<GroupArtifact, ResolvedDependency> alreadyResolved = new HashMap<>();
-                resolveTransitiveDependencies(newResolved, alreadyResolved);
+                Map<GroupArtifact, Version> versionCache = new HashMap<>();
+                resolveTransitiveDependencies(newResolved, alreadyResolved, versionCache);
                 resolved = new ArrayList<>(alreadyResolved.values());
             }
             return resolved;
@@ -391,20 +392,25 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         this.directResolved = directResolved;
     }
 
-    private static void resolveTransitiveDependencies(List<ResolvedDependency> resolved, Map<GroupArtifact, ResolvedDependency> alreadyResolved) {
+    private static void resolveTransitiveDependencies(List<ResolvedDependency> resolved, Map<GroupArtifact, ResolvedDependency> alreadyResolved, Map<GroupArtifact, Version> versionCache) {
         for (ResolvedDependency dependency : resolved) {
             GroupArtifact ga = dependency.getGav().asGroupArtifact();
             if (alreadyResolved.containsKey(ga)) {
                 ResolvedDependency alreadyPresent = alreadyResolved.get(ga);
+                if (alreadyPresent.getVersion().equals(dependency.getVersion()) && alreadyPresent.getDependencies().size() == dependency.getDependencies().size()) {
+                    continue;
+                }
+
                 Version newVersion = new Version(dependency.getVersion());
-                Version presentVersion = new Version(alreadyPresent.getVersion());
+                Version presentVersion = versionCache.computeIfAbsent(ga, ignored -> new Version(alreadyPresent.getVersion()));
                 int compared = presentVersion.compareTo(newVersion);
                 if (compared > 0 || (compared == 0 && alreadyPresent.getDependencies().size() == dependency.getDependencies().size())) {
                     continue;
                 }
+                versionCache.replace(ga, newVersion);
             }
             alreadyResolved.put(ga, dependency);
-            resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved);
+            resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved, versionCache);
         }
     }
 

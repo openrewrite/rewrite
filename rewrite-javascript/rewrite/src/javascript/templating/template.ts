@@ -15,7 +15,7 @@
  */
 import {Cursor, Tree} from '../..';
 import {J} from '../../java';
-import {Capture, Parameter, TemplateOptions, TemplateParameter} from './types';
+import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
 import {MatchResult} from './pattern';
 import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
@@ -175,6 +175,18 @@ export class Template {
     private _cachedTemplate?: J;
 
     /**
+     * Creates a new template.
+     *
+     * @param templateParts The string parts of the template
+     * @param parameters The parameters between the string parts
+     */
+    constructor(
+        private readonly templateParts: TemplateStringsArray,
+        private readonly parameters: Parameter[]
+    ) {
+    }
+
+    /**
      * Creates a new builder for constructing templates programmatically.
      *
      * @returns A new TemplateBuilder instance
@@ -192,18 +204,6 @@ export class Template {
     }
 
     /**
-     * Creates a new template.
-     *
-     * @param templateParts The string parts of the template
-     * @param parameters The parameters between the string parts
-     */
-    constructor(
-        private readonly templateParts: TemplateStringsArray,
-        private readonly parameters: Parameter[]
-    ) {
-    }
-
-    /**
      * Configures this template with additional options.
      *
      * @param options Configuration options
@@ -217,7 +217,7 @@ export class Template {
      *     })
      */
     configure(options: TemplateOptions): Template {
-        this.options = { ...this.options, ...options };
+        this.options = {...this.options, ...options};
         // Invalidate cache when configuration changes
         this._cachedTemplate = undefined;
         return this;
@@ -236,7 +236,7 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    async getTemplateTree(): Promise<JS.CompilationUnit> {
+    private async getTemplateTree(): Promise<JS.CompilationUnit> {
         // Level 1: Instance cache (fastest path)
         if (this._cachedTemplate) {
             return this._cachedTemplate as JS.CompilationUnit;
@@ -286,12 +286,30 @@ export class Template {
     /**
      * Applies this template and returns the resulting tree.
      *
+     * @param tree Input tree to transform
      * @param cursor The cursor pointing to the current location in the AST
-     * @param tree Input tree
-     * @param values values for parameters in template
+     * @param options Optional configuration including values for parameters
      * @returns A Promise resolving to the generated AST node
+     *
+     * @example
+     * ```typescript
+     * // Simple application without values
+     * const result = await tmpl.apply(node, cursor);
+     *
+     * // With values from pattern match
+     * const match = await pat.match(node, cursor);
+     * const result = await tmpl.apply(node, cursor, { values: match });
+     *
+     * // With explicit values
+     * const result = await tmpl.apply(node, cursor, {
+     *     values: { x: someNode, y: anotherNode }
+     * });
+     * ```
      */
-    async apply(cursor: Cursor, tree: J, values?: Map<Capture | string, J> | Pick<Map<string, J>, 'get'> | Record<string, J>): Promise<J | undefined> {
+    async apply(tree: J, cursor: Cursor, options?: ApplyOptions): Promise<J | undefined> {
+        // Extract values from options
+        const values = options?.values;
+
         // Normalize the values map: convert any Capture keys to string keys
         let normalizedValues: Pick<Map<string, J>, 'get'> | undefined;
         let wrappersMap: Map<string, J.RightPadded<J> | J.RightPadded<J>[]> = new Map();

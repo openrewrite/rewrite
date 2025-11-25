@@ -26,19 +26,6 @@ describe('Statement Expression Wrapping', () => {
         parser = new JavaScriptParser();
     });
 
-    async function parseExpression(code: string): Promise<J> {
-        const gen = parser.parse({text: code, sourcePath: 'test.ts'});
-        const cu = (await gen.next()).value as JS.CompilationUnit;
-        const stmt = cu.statements[0].element as JS.ExpressionStatement;
-        return stmt.expression;
-    }
-
-    async function parseStatement(code: string): Promise<J> {
-        const gen = parser.parse({text: code, sourcePath: 'test.ts'});
-        const cu = (await gen.next()).value as JS.CompilationUnit;
-        return cu.statements[0].element;
-    }
-
     it('should wrap function declaration in StatementExpression when replacing an expression', async () => {
         // Parse: const c = x
         const sourceCode = 'const c = x';
@@ -61,7 +48,7 @@ describe('Statement Expression Wrapping', () => {
         const tmpl = template`function foo() { return 42; }`;
 
         // Apply the template - it should wrap the function in a StatementExpression
-        const result = await tmpl.apply(initializerCursor, initializer, match);
+        const result = await tmpl.apply(initializer, initializerCursor, {values: match});
         expect(result).toBeTruthy();
 
         // The result should be a StatementExpression wrapping the function
@@ -91,7 +78,7 @@ describe('Statement Expression Wrapping', () => {
         const tmpl = template`function foo() { return 42; }`;
 
         // Apply the template - should NOT wrap since we're replacing a statement
-        const result = await tmpl.apply(stmtCursor, exprStmt, match);
+        const result = await tmpl.apply(exprStmt, stmtCursor, {values: match});
         expect(result).toBeTruthy();
 
         // The result should be a MethodDeclaration, not wrapped
@@ -118,7 +105,7 @@ describe('Statement Expression Wrapping', () => {
         const tmpl = template`42`;
 
         // Apply the template - should NOT wrap since both are expressions
-        const result = await tmpl.apply(initializerCursor, initializer, match);
+        const result = await tmpl.apply(initializer, initializerCursor, {values: match});
         expect(result).toBeTruthy();
 
         // The result should be a Literal, not wrapped
@@ -148,7 +135,7 @@ describe('Statement Expression Wrapping', () => {
         const tmpl = template`function bar() { return 42; }`;
 
         // Apply the template - should wrap since we're in expression context
-        const result = await tmpl.apply(initializerCursor, initializer, match);
+        const result = await tmpl.apply(initializer, initializerCursor, {values: match});
         expect(result).toBeTruthy();
 
         // The result should be wrapped in StatementExpression
@@ -171,7 +158,7 @@ describe('Statement Expression Wrapping', () => {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 const match = await pat.match(literal, this.cursor);
                 if (match) {
-                    return tmpl.apply(this.cursor, literal, match);
+                    return tmpl.apply(literal, this.cursor, {values: match});
                 }
                 return literal;
             }

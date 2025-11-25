@@ -337,9 +337,6 @@ describe('JavaScript type mapping', () => {
                               {
                                 "name": "test-project",
                                 "version": "1.0.0",
-                                "dependencies": {
-                                  "lodash": "^4.17.21"
-                                },
                                 "devDependencies": {
                                   "@types/lodash": "^4.14.195"
                                 }
@@ -543,7 +540,6 @@ describe('JavaScript type mapping', () => {
                                 "name": "test-project",
                                 "version": "1.0.0",
                                 "dependencies": {
-                                  "react": "^16.8.0",
                                   "react-spinners": "^0.5.0"
                                 },
                                 "devDependencies": {
@@ -1459,15 +1455,6 @@ describe('JavaScript type mapping', () => {
 
             const unionType = reactRefType as Type.Union;
 
-            // Debug: Print all union bounds
-            console.log('Union bounds count:', unionType.bounds.length);
-            unionType.bounds.forEach((bound, i) => {
-                console.log(`Bound ${i}:`, bound.kind, Type.signature(bound));
-                if (Type.isParameterized(bound)) {
-                    console.log(`  -> Parameterized with ${bound.typeParameters.length} type params`);
-                }
-            });
-
             // Find the RefObject bound (the second constituent after the callback function)
             const refObjectBound = unionType.bounds.find(b =>
                 Type.isParameterized(b) &&
@@ -1475,23 +1462,11 @@ describe('JavaScript type mapping', () => {
                 b.type.fullyQualifiedName.includes('RefObject')
             );
 
-            console.log('Found refObjectBound:', refObjectBound ? 'yes' : 'no');
-            if (!refObjectBound) {
-                console.log('Looking for any parameterized bound...');
-                const anyParam = unionType.bounds.find(b => Type.isParameterized(b));
-                console.log('Any parameterized?', anyParam ? Type.signature(anyParam) : 'none');
-            }
-
             expect(refObjectBound).toBeDefined();
 
             // Verify the type parameter HTMLButtonElement is preserved
             const parameterizedBound = refObjectBound as Type.Parameterized;
             expect(parameterizedBound.typeParameters).toHaveLength(1);
-
-            // Debug: Print what type we actually got
-            const actualType = parameterizedBound.typeParameters[0];
-            console.log('HTMLButtonElement type kind:', actualType.kind);
-            console.log('HTMLButtonElement type signature:', Type.signature(actualType));
 
             expect(Type.isClass(parameterizedBound.typeParameters[0])).toBe(true);
             expect((parameterizedBound.typeParameters[0] as Type.Class).fullyQualifiedName).toBe('HTMLButtonElement');
@@ -1653,6 +1628,207 @@ describe('JavaScript type mapping', () => {
 
             expect(true).toBe(true);
         });
+    });
+
+    describe('variable types (fieldType)', () => {
+        test('should map imported variable reference with owner type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'vi') {
+                    // Check fieldType for variable attribution
+                    const identifier = node as J.Identifier;
+                    const fieldType = identifier.fieldType;
+                    if (fieldType?.kind === Type.Kind.Variable) {
+                        const varType = fieldType as Type.Variable;
+                        const ownerName = varType.owner ?
+                            Type.FullyQualified.getFullyQualifiedName(varType.owner) : 'no-owner';
+                        return `Variable<name=${varType.name}, owner=${ownerName}>`;
+                    }
+                    return 'NOT_VARIABLE';
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    const mock = vi.fn();
+                                }
+                            `,
+                            `
+                                import {/*~~(Variable<name=vi, owner=vitest>)~~>*/vi} from 'vitest';
+
+                                function example() {
+                                    const mock = /*~~(Variable<name=vi, owner=vitest>)~~>*/vi.fn();
+                                }
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should map function imports as Variable with owner', async () => {
+            // Functions imported from modules are also represented as Variables.
+            // The Variable's `owner` property contains the module they come from.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, _type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'describe') {
+                    const identifier = node as J.Identifier;
+                    const fieldType = identifier.fieldType;
+                    if (fieldType?.kind === Type.Kind.Variable) {
+                        const varType = fieldType as Type.Variable;
+                        const ownerName = varType.owner ?
+                            Type.FullyQualified.getFullyQualifiedName(varType.owner) : 'no-owner';
+                        return `Variable<name=${varType.name}, owner=${ownerName}>`;
+                    }
+                    return 'NOT_VARIABLE';
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {describe} from 'vitest';
+
+                                describe('test', () => {});
+                            `,
+                            // describe is a Variable with vitest as owner
+                            `
+                                import {/*~~(Variable<name=describe, owner=vitest>)~~>*/describe} from 'vitest';
+
+                                /*~~(Variable<name=describe, owner=vitest>)~~>*/describe('test', () => {});
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should map variable used as standalone assignment', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'vi') {
+                    const identifier = node as J.Identifier;
+                    const fieldType = identifier.fieldType;
+                    if (fieldType?.kind === Type.Kind.Variable) {
+                        const varType = fieldType as Type.Variable;
+                        const ownerName = varType.owner ?
+                            Type.FullyQualified.getFullyQualifiedName(varType.owner) : 'no-owner';
+                        return `Variable<owner=${ownerName}>`;
+                    }
+                    return 'NOT_VARIABLE';
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                const mockUtils = vi;
+                            `,
+                            `
+                                import {/*~~(Variable<owner=vitest>)~~>*/vi} from 'vitest';
+
+                                const mockUtils = /*~~(Variable<owner=vitest>)~~>*/vi;
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+    });
+
+    test('CommonJS require imports distinguish methods with identical signatures', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markTypes((_, type) => {
+            return Type.isMethod(type) && type.name === 'isArray' ? FullyQualified.getFullyQualifiedName(type.declaringType) : null;
+        });
+
+        //language=typescript
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(
+                        `
+                                const util = require('util');
+
+                                util.isArray([]);
+                                util.isString("not an array");
+                            `,
+                        //@formatter:off
+                        `
+                                const util = require('util');
+
+                                /*~~(util)~~>*/util.isArray([]);
+                                util.isString("not an array");
+                            `
+                        //@formatter:on
+                    ),
+                    //language=json
+                    packageJson(
+                        `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                    )
+                )
+            )
+        }, {unsafeCleanup: true});
     });
 });
 

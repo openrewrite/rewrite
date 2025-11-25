@@ -79,6 +79,8 @@ public class RecipeMarketplaceReader {
         settings.setHeaderExtractionEnabled(false);
         settings.setNullValue("");
         settings.setDelimiterDetectionEnabled(true, ',', '\t', ';');
+        // Allow larger content in columns (e.g., long recipe descriptions)
+        settings.setMaxCharsPerColumn(-1); // No limit
 
         CsvParser parser = new CsvParser(settings);
         parser.beginParsing(csv);

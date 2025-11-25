@@ -24,7 +24,8 @@ import org.openrewrite.config.RecipeDescriptor;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @Getter
 @RequiredArgsConstructor
@@ -33,7 +34,7 @@ public class RecipeListing implements Comparable<RecipeListing> {
     /**
      * The marketplace that this listing belongs to.
      */
-    @With(AccessLevel.PACKAGE)
+    @With
     private final @Nullable RecipeMarketplace marketplace;
 
     private final @EqualsAndHashCode.Include String name;
@@ -64,6 +65,10 @@ public class RecipeListing implements Comparable<RecipeListing> {
         return resolve().prepare(this, options);
     }
 
+    public ClassLoader classLoader() {
+        return resolve().classLoader();
+    }
+
     @Override
     public int compareTo(RecipeListing o) {
         return name.compareTo(o.name);
@@ -91,7 +96,7 @@ public class RecipeListing implements Comparable<RecipeListing> {
                         opt.getName(),
                         opt.getDisplayName(),
                         opt.getDescription()
-                )).collect(Collectors.toList()),
+                )).collect(toList()),
                 bundle
         );
     }

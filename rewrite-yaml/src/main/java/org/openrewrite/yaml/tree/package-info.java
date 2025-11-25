@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@CheckReturnValue
 @NullMarked
 package org.openrewrite.yaml.tree;
 
 import org.jspecify.annotations.NullMarked;
+
+import javax.annotation.CheckReturnValue;
