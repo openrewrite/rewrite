@@ -5047,6 +5047,44 @@ class SpacesTest implements RewriteTest {
     }
 
     @Test
+    void annotationPositions() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class TestClass {
+                protected void doSomething(Object o) {
+                }
+            }
+            """
+          ),
+          java(
+            """
+            class TesterOne extends TestClass {
+                @Override
+                protected void doSomething(Object o) {
+                }
+            }
+            """
+          ),
+          java(
+            """
+            class TesterTwo extends TestClass {
+                @Override   protected void doSomething(Object o) {
+                }
+            }
+            """,
+            """
+            class TesterTwo extends TestClass {
+                @Override protected void doSomething(Object o) {
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void tooMuchSpacesInBlock() {
         rewriteRun(
           spaces(),

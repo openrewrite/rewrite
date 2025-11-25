@@ -492,6 +492,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     if (modifiers != null && modifiers.indexOf((J.Modifier) getCursor().getValue()) > 0) {
                         whitespace = " ";
                     }
+                    if (modifiers != null && modifiers.indexOf((J.Modifier) getCursor().getValue()) == 0) {
+                        if (!StringUtils.hasLineBreak(space.getWhitespace()) && !space.getWhitespace().isEmpty()) {
+                            whitespace = " ";
+                        }
+                    }
                 }
                 break;
             case MEMBER_REFERENCE_NAME:
