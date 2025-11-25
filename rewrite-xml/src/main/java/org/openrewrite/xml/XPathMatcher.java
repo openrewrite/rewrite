@@ -44,7 +44,7 @@ public class XPathMatcher {
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']` or foo[@bar='baz']
     private static final Pattern ELEMENT_WITH_CONDITION_PATTERN = Pattern.compile("(@)?([-:\\w]+|\\*)(\\[.+])");
     private static final Pattern CONDITION_PATTERN = Pattern.compile("(\\[.*?])+?");
-    private static final Pattern CONDITION_CONJUNCTION_PATTERN = Pattern.compile("(((local-name|namespace-uri)\\(\\)|(@)?([-\\w:]+|\\*))\\h*=\\h*[\"'](.*?)[\"'](\\h?(or|and)\\h?)?)+?");
+    private static final Pattern CONDITION_CONJUNCTION_PATTERN = Pattern.compile("(((local-name|namespace-uri|text)\\(\\)|(@)?([-\\w:]+|\\*))\\h*=\\h*[\"'](.*?)[\"'](\\h?(or|and)\\h?)?)+?");
 
     private final String expression;
     private final boolean startsWithSlash;
@@ -296,8 +296,10 @@ public class XPathMatcher {
                             break;
                         }
                     }
-                } else if (isFunctionCondition) { // [local-name()='name'] pattern
-                    if (isAttributeElement) {
+                } else if (isFunctionCondition) { // [local-name()='name'] or [text()='value'] pattern
+                    if ("text()".equals(selector)) {
+                        matchCurrentCondition = tag.getValue().map(v -> v.equals(value)).orElse(false);
+                    } else if (isAttributeElement) {
                         for (Xml.Attribute a : tag.getAttributes()) {
                             if (matchesElementAndFunction(new Cursor(cursor, a), element, selector, value)) {
                                 matchCurrentCondition = true;
