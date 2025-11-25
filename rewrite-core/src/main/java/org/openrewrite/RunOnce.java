@@ -33,12 +33,12 @@ public class RunOnce extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "";
+        return "Run once precondition";
     }
 
     @Override
     public String getDescription() {
-        return "";
+        return "This recipe can be used as a precondition to ensure that the specified recipe only makes changes once per execution cycle.";
     }
 
     @Override
