@@ -48,7 +48,12 @@ public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<
 
     @Override
     public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
-        return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
+        switch (loc) {
+            case METHOD_SELECT:
+                loc = JRightPadded.Location.LANGUAGE_EXTENSION;
+                break;
+        }
+        return super.visitRightPadded(right, loc, p);
     }
 
     @Override
@@ -58,7 +63,20 @@ public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<
 
     @Override
     public Space visitSpace(@Nullable Space space, Space.Location loc, P ctx) {
-        return super.visitSpace(space, Space.Location.LANGUAGE_EXTENSION, ctx);
+        switch (loc) {
+            case TERNARY_PREFIX:
+            case TERNARY_TRUE:
+            case TERNARY_FALSE:
+            case UNARY_PREFIX:
+            case UNARY_OPERATOR:
+            case BINARY_PREFIX:
+            case BINARY_OPERATOR:
+            case METHOD_SELECT_SUFFIX:
+            case METHOD_INVOCATION_NAME:
+                loc = Space.Location.LANGUAGE_EXTENSION;
+                break;
+        }
+        return super.visitSpace(space, loc, ctx);
     }
 
     @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")

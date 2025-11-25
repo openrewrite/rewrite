@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -49,6 +50,17 @@ public class AutoFormat extends Recipe {
             required = false)
     @Nullable
     Boolean removeCustomLineBreaks;
+
+    @JsonCreator
+    public AutoFormat(@Nullable String style, @Nullable Boolean removeCustomLineBreaks) {
+        this.style = style;
+        this.removeCustomLineBreaks = removeCustomLineBreaks;
+    }
+
+    @Deprecated
+    public AutoFormat(@Nullable String style) {
+        this(style, null);
+    }
 
     @Override
     public String getDisplayName() {

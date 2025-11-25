@@ -4926,4 +4926,131 @@ class SpacesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void handleInstanceOf() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                void isString(Object o) {
+                    return o   instanceof   String;
+                }
+            }
+            """,
+            """
+            class Test {
+                void isString(Object o) {
+                    return o instanceof String;
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void handleIfBeforeParentheses() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if      (o instanceof String) {
+                        return true;
+                    }
+                    if(o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) {
+                        return true;
+                    }
+                    if (o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void elseIfSplitBySpace() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) {
+                        return true;
+                    } else     if (o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) {
+                        return true;
+                    } else if (o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void tooMuchSpacesInBlock() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            public class Test    {
+            
+            
+            
+            
+                    //test
+            
+            
+            
+            
+                //Testing
+            
+            
+            
+            
+            
+            }
+            """,
+            """
+            public class Test {
+            
+
+                    //test
+            
+            
+                //Testing
+
+
+            }
+            """)
+        );
+    }
 }

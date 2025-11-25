@@ -66,6 +66,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         this(spacesStyle, null, null, stopAfter, removeCustomLineBreaks);
     }
 
+    @Deprecated
+    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter) {
+        this(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, stopAfter, false);
+    }
+
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
         this.spacesStyle = spacesStyle;
         this.emptyForInitializerPadStyle = emptyForInitializerPadStyle;
@@ -258,6 +263,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             case METHOD_SELECT:
                 after = "";
                 break;
+            case INSTANCEOF:
+                after = " ";
+                break;
             default:
                 if (hasLineBreakInSpace(right.getAfter())) {
                     after = right.getAfter().getWhitespace();
@@ -430,7 +438,6 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             case LAMBDA_ARROW_PREFIX:
                 whitespace = evaluate(() -> spacesStyle.getAroundOperators().getLambdaArrow(), true) ? " " : "";
                 break;
-            case ANNOTATED_TYPE_PREFIX:
             case METHOD_DECLARATION_PARAMETERS:
                 whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getMethodDeclaration(), false) ? " " : "";
                 break;
@@ -496,8 +503,16 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             case WHILE_CONDITION:
                 whitespace = evaluate(() -> spacesStyle.getBeforeKeywords().getWhileKeyword(), true) ? " " : "";
                 break;
+            case IF_PREFIX:
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                if (parentTreeCursor.getValue() instanceof J.If.Else) {
+                    whitespace = " ";
+                }
+                break;
             case ELSE_PREFIX:
-                whitespace = evaluate(() -> spacesStyle.getBeforeKeywords().getElseKeyword(), true) ? " " : "";
+                if (space.getComments().isEmpty()) {
+                    space = space.withWhitespace(evaluate(() -> spacesStyle.getBeforeKeywords().getElseKeyword(), true) ? " " : "");
+                }
                 break;
             case TRY_FINALLY:
                 whitespace = evaluate(() -> spacesStyle.getBeforeKeywords().getFinallyKeyword(), true) ? " " : "";
@@ -585,6 +600,17 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                         whitespace = evaluate(() -> spacesStyle.getWithin().getCodeBraces(), false) ? " " : "";
                     }
                 }
+                if (block.getStatements().isEmpty()) {
+                    if (StringUtils.countOccurrences(block.getEnd().getWhitespace(), "\n") > 3) {
+                        space = space.withWhitespace("\n\n\n" + block.getEnd().getWhitespace().substring(block.getEnd().getWhitespace().lastIndexOf("\n") + 1));
+                    }
+                    space = space.withComments(ListUtils.map(space.getComments(), comment -> {
+                        if (StringUtils.countOccurrences(comment.getSuffix(), "\n") > 3) {
+                            comment = comment.withSuffix("\n\n\n" + comment.getSuffix().substring(comment.getSuffix().lastIndexOf("\n") + 1));
+                        }
+                        return comment;
+                    }));
+                }
                 break;
             case BINARY_OPERATOR:
                 J.Binary binary = getCursor().getParentTreeCursor().getValue();
@@ -604,11 +630,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 boolean firstAnnotation = true;
                 parentTreeCursor = getCursor().getParentTreeCursor();
                 if (parentTreeCursor.getValue() instanceof J.ClassDeclaration) {
-                    firstAnnotation = ((J.ClassDeclaration) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) == 0;
+                    firstAnnotation = ((J.ClassDeclaration) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
                 } else if (parentTreeCursor.getValue() instanceof J.MethodDeclaration) {
-                    firstAnnotation = ((J.MethodDeclaration) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) == 0;
+                    firstAnnotation = ((J.MethodDeclaration) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
                 } else if (parentTreeCursor.getValue() instanceof J.VariableDeclarations) {
-                    firstAnnotation = ((J.VariableDeclarations) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) == 0;
+                    firstAnnotation = ((J.VariableDeclarations) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
                 }
                 if (!firstAnnotation && space.getWhitespace().isEmpty() && (space.getComments().isEmpty() || space.getComments().get(space.getComments().size() - 1).getSuffix().isEmpty())) {
                     whitespace = " ";

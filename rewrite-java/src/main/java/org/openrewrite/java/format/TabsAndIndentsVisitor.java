@@ -59,6 +59,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 stopAfter);
     }
 
+    @Deprecated
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingStyle) {
+        this(style, spacesStyle, wrappingStyle, null);
+    }
+
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingStyle, @Nullable Tree stopAfter) {
         this.style = style;
         this.spacesStyle = spacesStyle;

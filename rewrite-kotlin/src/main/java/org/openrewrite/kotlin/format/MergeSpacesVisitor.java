@@ -663,6 +663,10 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
                     }
                     return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin());
                 }));
+            } else if (comment instanceof TextComment) {
+                if (newSpace.getComments().get(index) instanceof TextComment) {
+                    comment = ((TextComment) comment).withText(((TextComment) newSpace.getComments().get(index)).getText());
+                }
             }
             return comment.withSuffix(newSpace.getComments().get(index).getSuffix());
         }));

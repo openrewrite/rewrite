@@ -49,6 +49,11 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
         this(getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents), stopAfter);
     }
 
+    @Deprecated
+    public NormalizeTabsOrSpacesVisitor(TabsAndIndentsStyle style) {
+        this(style, null);
+    }
+
     public NormalizeTabsOrSpacesVisitor(TabsAndIndentsStyle style, @Nullable Tree stopAfter) {
         this.style = style;
         this.stopAfter = stopAfter;
