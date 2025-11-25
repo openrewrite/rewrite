@@ -38,7 +38,6 @@ import java.nio.file.Path;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Disabled
 @SuppressWarnings("ConstantConditions")
 public class KotlinIrTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
@@ -117,7 +116,7 @@ public class KotlinIrTypeMappingTest {
     public String fieldPropertyGetterType(String field) {
         IrProperty property = getProperty(field);
         if (property == null || property.getGetter() == null) {
-            throw new UnsupportedOperationException("No filed or getter for " + field);
+            throw new UnsupportedOperationException("No field or getter for " + field);
         }
         return typeMapper().methodDeclarationType(property.getGetter()).toString();
     }
@@ -125,7 +124,7 @@ public class KotlinIrTypeMappingTest {
     public String fieldPropertySetterType(String field) {
         IrProperty property = getProperty(field);
         if (property == null || property.getSetter() == null) {
-            throw new UnsupportedOperationException("No filed or setter for " + field);
+            throw new UnsupportedOperationException("No field or setter for " + field);
         }
         return typeMapper().methodDeclarationType(property.getSetter()).toString();
     }
