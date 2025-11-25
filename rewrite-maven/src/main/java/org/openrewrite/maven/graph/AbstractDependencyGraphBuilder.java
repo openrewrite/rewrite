@@ -35,41 +35,45 @@ public abstract class AbstractDependencyGraphBuilder<T extends DependencyGraph.D
     public void collectDependencyPaths(List<ResolvedDependency> dependencies,
                                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> paths,
                                        String scope) {
+        List<DependencyGraph.DependencyNode> pathBuffer = new ArrayList<>();
         for (ResolvedDependency dependency : dependencies) {
-            List<DependencyGraph.DependencyNode> parentPath = new ArrayList<>();
-            collectDependencyPathsRecursive(dependency, parentPath, paths, scope);
+            collectDependencyPathsRecursive(dependency, pathBuffer, paths, scope);
         }
     }
 
     private void collectDependencyPathsRecursive(ResolvedDependency dependency,
-                                                 List<DependencyGraph.DependencyNode> parentPath,
+                                                 List<DependencyGraph.DependencyNode> pathBuffer,
                                                  Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> paths,
                                                  String scope) {
         ResolvedGroupArtifactVersion gav = dependency.getGav();
 
-        // Create path for this dependency including all parents
-        List<DependencyGraph.DependencyNode> pathNodes = new ArrayList<>();
-
-        // Add the current dependency using the specific node type created by subclass
         T node = createNode(dependency, scope);
-        pathNodes.add(node);
+        pathBuffer.add(node);
 
-        // Add all parents from the parent path
-        pathNodes.addAll(parentPath);
-
-        DependencyGraph.DependencyPath path = new DependencyGraph.DependencyPath(pathNodes, scope);
+        // We add at the end for performance during recursing but reverse
+        // when creating a snapshot to get correct order (current -> parents)
+        List<DependencyGraph.DependencyNode> pathSnapshot = new ArrayList<>(pathBuffer.size());
+        for (int i = pathBuffer.size() - 1; i >= 0; i--) {
+            pathSnapshot.add(pathBuffer.get(i));
+        }
+        DependencyGraph.DependencyPath path = new DependencyGraph.DependencyPath(pathSnapshot, scope);
         paths.computeIfAbsent(gav, k -> new ArrayList<>()).add(path);
 
-        // Create new parent path for children that includes this dependency
-        List<DependencyGraph.DependencyNode> newParentPath = new ArrayList<>();
-        newParentPath.add(node);
-        newParentPath.addAll(parentPath);
-
-        // Recursively process child dependencies
         for (ResolvedDependency child : dependency.getDependencies()) {
-            if (newParentPath.stream().noneMatch(childPath -> childPath.getGroupId().equals(child.getGroupId()) && childPath.getArtifactId().equals(child.getArtifactId()))) {
-                collectDependencyPathsRecursive(child, newParentPath, paths, scope);
+            boolean hasCycle = false;
+            for (int i = 0; i < pathBuffer.size(); i++) {
+                DependencyGraph.DependencyNode n = pathBuffer.get(i);
+                if (n.getGroupId().equals(child.getGroupId()) &&
+                    n.getArtifactId().equals(child.getArtifactId())) {
+                    hasCycle = true;
+                    break;
+                }
+            }
+            if (!hasCycle) {
+                collectDependencyPathsRecursive(child, pathBuffer, paths, scope);
             }
         }
+
+        pathBuffer.remove(pathBuffer.size() - 1); // Backtrack for next iteration
     }
 }
