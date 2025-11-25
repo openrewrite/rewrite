@@ -17,7 +17,6 @@
  */
 import {RecipeSpec} from "../../src/test";
 import {
-    DependencyScope,
     findNodeProject,
     JS,
     NodeProject,
@@ -77,26 +76,25 @@ describe("NodeProject marker", () => {
                         // Check dependencies
                         expect(nodeProject!.dependencies).toHaveLength(1);
                         expect(nodeProject!.dependencies[0].name).toBe("react");
-                        expect(nodeProject!.dependencies[0].version).toBe("^18.2.0");
-                        expect(nodeProject!.dependencies[0].scope).toBe(DependencyScope.Dependencies);
-                        expect(nodeProject!.dependencies[0].depth).toBe(0);
+                        expect(nodeProject!.dependencies[0].versionConstraint).toBe("^18.2.0");
 
                         // Check devDependencies
                         expect(nodeProject!.devDependencies).toHaveLength(2);
-                        expect(nodeProject!.devDependencies[0].scope).toBe(DependencyScope.DevDependencies);
+                        expect(nodeProject!.devDependencies.map(d => d.name)).toContain("jest");
+                        expect(nodeProject!.devDependencies.map(d => d.name)).toContain("typescript");
 
                         // Check peerDependencies
                         expect(nodeProject!.peerDependencies).toHaveLength(1);
                         expect(nodeProject!.peerDependencies[0].name).toBe("react-dom");
-                        expect(nodeProject!.peerDependencies[0].scope).toBe(DependencyScope.PeerDependencies);
+                        expect(nodeProject!.peerDependencies[0].versionConstraint).toBe("^18.2.0");
 
                         // Check optionalDependencies
                         expect(nodeProject!.optionalDependencies).toHaveLength(1);
-                        expect(nodeProject!.optionalDependencies[0].scope).toBe(DependencyScope.OptionalDependencies);
+                        expect(nodeProject!.optionalDependencies[0].name).toBe("fsevents");
 
                         // Check bundledDependencies
                         expect(nodeProject!.bundledDependencies).toHaveLength(1);
-                        expect(nodeProject!.bundledDependencies[0].scope).toBe(DependencyScope.BundledDependencies);
+                        expect(nodeProject!.bundledDependencies[0].name).toBe("bundled-package");
                     }},
                     packageJson(`
                         {
@@ -204,9 +202,9 @@ describe("NodeProject marker", () => {
                         expect(NodeProjectQueries.hasDependency(nodeProject!, "nonexistent")).toBe(false);
 
                         // Should find dependency in specific scope
-                        expect(NodeProjectQueries.hasDependency(nodeProject!, "react", DependencyScope.Dependencies)).toBe(true);
-                        expect(NodeProjectQueries.hasDependency(nodeProject!, "react", DependencyScope.DevDependencies)).toBe(false);
-                        expect(NodeProjectQueries.hasDependency(nodeProject!, "jest", DependencyScope.DevDependencies)).toBe(true);
+                        expect(NodeProjectQueries.hasDependency(nodeProject!, "react", "dependencies")).toBe(true);
+                        expect(NodeProjectQueries.hasDependency(nodeProject!, "react", "devDependencies")).toBe(false);
+                        expect(NodeProjectQueries.hasDependency(nodeProject!, "jest", "devDependencies")).toBe(true);
                     }},
                     packageJson(`
                         {
@@ -237,9 +235,7 @@ describe("NodeProject marker", () => {
 
                         expect(reactDep).toBeDefined();
                         expect(reactDep?.name).toBe("react");
-                        expect(reactDep?.version).toBe("^18.2.0");
-                        expect(reactDep?.scope).toBe(DependencyScope.Dependencies);
-                        expect(reactDep?.depth).toBe(0);
+                        expect(reactDep?.versionConstraint).toBe("^18.2.0");
                     }},
                     packageJson(`
                         {
@@ -255,7 +251,7 @@ describe("NodeProject marker", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("should handle package.json with scripts and engines", async () => {
+    test("should handle package.json with engines", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -264,34 +260,18 @@ describe("NodeProject marker", () => {
                     {...typescript(`const x = 1;`), afterRecipe: async (cu: JS.CompilationUnit) => {
                         const nodeProject = findNodeProject(cu);
                         expect(nodeProject).toBeDefined();
-                        expect(nodeProject!.scripts).toEqual({
-                            "build": "tsc",
-                            "test": "jest"
-                        });
                         expect(nodeProject!.engines).toEqual({
                             "node": ">=18.0.0",
                             "npm": ">=9.0.0"
-                        });
-                        expect(nodeProject!.repository).toEqual({
-                            type: "git",
-                            url: "https://github.com/test/test-project.git"
                         });
                     }},
                     packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
-                            "scripts": {
-                                "build": "tsc",
-                                "test": "jest"
-                            },
                             "engines": {
                                 "node": ">=18.0.0",
                                 "npm": ">=9.0.0"
-                            },
-                            "repository": {
-                                "type": "git",
-                                "url": "https://github.com/test/test-project.git"
                             }
                         }
                     `)
@@ -329,13 +309,13 @@ describe("NodeProject marker", () => {
                         expect(reactDeps).toHaveLength(1);
                         expect(reactDeps[0].name).toBe('react');
 
-                        // Find all dev dependencies
-                        const devDeps = NodeProjectQueries.findDependencies(
+                        // Find all dependencies with version constraint starting with '^29'
+                        const v29Deps = NodeProjectQueries.findDependencies(
                             nodeProject!,
-                            dep => dep.scope === DependencyScope.DevDependencies
+                            dep => dep.versionConstraint.startsWith('^29')
                         );
-                        expect(devDeps).toHaveLength(1);
-                        expect(devDeps[0].name).toBe('jest');
+                        expect(v29Deps).toHaveLength(1);
+                        expect(v29Deps[0].name).toBe('jest');
                     }},
                     packageJson(`
                         {
@@ -347,6 +327,46 @@ describe("NodeProject marker", () => {
                             },
                             "devDependencies": {
                                 "jest": "^29.0.0"
+                            }
+                        }
+                    `)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
+    test("should deduplicate identical dependency requests", async () => {
+        const spec = new RecipeSpec();
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    {...typescript(`const x = 1;`), afterRecipe: async (cu: JS.CompilationUnit) => {
+                        const nodeProject = findNodeProject(cu);
+                        expect(nodeProject).toBeDefined();
+
+                        // Both dependencies and peerDependencies have react@^18.2.0
+                        // They should be the same instance due to deduplication
+                        const depReact = nodeProject!.dependencies[0];
+                        const peerReact = nodeProject!.peerDependencies[0];
+
+                        expect(depReact.name).toBe("react");
+                        expect(peerReact.name).toBe("react");
+                        expect(depReact.versionConstraint).toBe("^18.2.0");
+                        expect(peerReact.versionConstraint).toBe("^18.2.0");
+
+                        // Should be the exact same object reference
+                        expect(depReact).toBe(peerReact);
+                    }},
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "react": "^18.2.0"
+                            },
+                            "peerDependencies": {
+                                "react": "^18.2.0"
                             }
                         }
                     `)

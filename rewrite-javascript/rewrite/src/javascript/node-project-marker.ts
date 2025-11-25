@@ -20,50 +20,50 @@ import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {createDraft, finishDraft} from "immer";
 
 export const NodeProjectMarkerKind = "org.openrewrite.javascript.marker.NodeProject" as const;
-export const NodeDependencyKind = "org.openrewrite.javascript.marker.NodeProject$NodeDependency" as const;
+export const DependencyKind = "org.openrewrite.javascript.marker.NodeProject$Dependency" as const;
+export const ResolvedDependencyKind = "org.openrewrite.javascript.marker.NodeProject$ResolvedDependency" as const;
 
 /**
- * Scope/section of package.json where a dependency is declared.
- */
-export enum DependencyScope {
-    Dependencies = "dependencies",
-    DevDependencies = "devDependencies",
-    PeerDependencies = "peerDependencies",
-    OptionalDependencies = "optionalDependencies",
-    BundledDependencies = "bundledDependencies"
-}
-
-/**
- * Represents a Node.js dependency from package.json.
- * Analogous to Maven's GroupArtifactVersion or Gradle's Dependency.
+ * Represents a dependency request as declared in package.json.
+ * This is what a package asks for (name + version constraint).
  *
- * This interface is designed to be extensible for future transitive dependency support.
- * Use asRef() when creating instances to enable reference deduplication during RPC serialization.
+ * When the same name+versionConstraint appears multiple times, the same
+ * Dependency instance is reused. This enables reference deduplication
+ * during RPC serialization via asRef().
  */
-export interface NodeDependency {
-    readonly kind: typeof NodeDependencyKind;
-    readonly name: string;           // Package name (e.g., "react")
-    readonly version: string;         // Version constraint (e.g., "^18.2.0")
-    readonly resolved?: string;       // Actual resolved version (from package-lock.json if available)
-    readonly scope: DependencyScope; // Which section this came from
-
-    // Fields reserved for future transitive dependency support
-    // Initially these will be undefined/empty
-    readonly dependencies?: NodeDependency[];  // Transitive dependencies (not populated initially)
-    readonly depth?: number;                    // Depth in dependency tree (0 for direct)
-    readonly requestedBy?: string[];           // Package names that requested this dependency
+export interface Dependency {
+    readonly kind: typeof DependencyKind;
+    readonly name: string;              // Package name (e.g., "react")
+    readonly versionConstraint: string; // Version constraint (e.g., "^18.2.0")
 }
 
 /**
- * Repository information from package.json.
+ * Represents a resolved dependency from package-lock.json.
+ * This is what was actually installed (name + resolved version + its own dependencies).
+ *
+ * Each ResolvedDependency's dependency arrays contain Dependency objects (requests),
+ * which can be looked up in NodeProject.resolutions to find their resolved versions.
  */
-export interface Repository {
-    readonly type: string;
-    readonly url: string;
+export interface ResolvedDependency {
+    readonly kind: typeof ResolvedDependencyKind;
+    readonly name: string;    // Package name (e.g., "react")
+    readonly version: string; // Actual resolved version (e.g., "18.3.1")
+
+    // This package's own dependency requests
+    readonly dependencies?: Dependency[];
+    readonly devDependencies?: Dependency[];
+    readonly peerDependencies?: Dependency[];
+    readonly optionalDependencies?: Dependency[];
+
+    // Node/npm version requirements for this package
+    readonly engines?: Record<string, string>;
+
+    // SPDX license identifier (e.g., "MIT", "Apache-2.0")
+    readonly license?: string;
 }
 
 /**
- * Contains metadata about a Node.js project, parsed from package.json.
+ * Contains metadata about a Node.js project, parsed from package.json and package-lock.json.
  * Attached as a marker to JS.CompilationUnit to provide dependency context for recipes.
  *
  * Similar to GradleProject marker, this allows recipes to:
@@ -71,6 +71,10 @@ export interface Repository {
  * - Check if specific packages are in use
  * - Modify dependencies programmatically
  * - Understand the project structure
+ *
+ * The model separates requests (Dependency) from resolutions (ResolvedDependency):
+ * - The dependency arrays contain Dependency objects (what was requested)
+ * - The resolutions map links each Dependency to its ResolvedDependency
  */
 export interface NodeProject extends Marker {
     readonly kind: typeof NodeProjectMarkerKind;
@@ -82,45 +86,67 @@ export interface NodeProject extends Marker {
     readonly description?: string;    // Project description
     readonly packageJsonPath: string; // Path to the package.json file
 
-    // Dependencies organized by scope
-    readonly dependencies: NodeDependency[];          // Regular dependencies
-    readonly devDependencies: NodeDependency[];       // Development dependencies
-    readonly peerDependencies: NodeDependency[];      // Peer dependencies
-    readonly optionalDependencies: NodeDependency[];  // Optional dependencies
-    readonly bundledDependencies: NodeDependency[];   // Bundled dependencies
+    // Dependency requests organized by scope (from package.json)
+    readonly dependencies: Dependency[];          // Regular dependencies
+    readonly devDependencies: Dependency[];       // Development dependencies
+    readonly peerDependencies: Dependency[];      // Peer dependencies
+    readonly optionalDependencies: Dependency[];  // Optional dependencies
+    readonly bundledDependencies: Dependency[];   // Bundled dependencies
 
-    // Additional metadata
-    readonly scripts?: Record<string, string>;        // npm scripts
-    readonly engines?: Record<string, string>;        // Node/npm version requirements
-    readonly repository?: Repository;                 // Repository info
+    // Resolution map (from package-lock.json) - maps requests to resolved versions
+    // Key is Dependency (by value equality on name+versionConstraint)
+    readonly resolutions?: Map<Dependency, ResolvedDependency>;
+
+    // Node/npm version requirements
+    readonly engines?: Record<string, string>;
 }
 
 /**
  * Creates a NodeProject marker from a package.json file.
  * Should be called during parsing to attach to JS.CompilationUnit.
  *
- * All NodeDependency instances are wrapped with asRef() to enable
+ * All Dependency instances are wrapped with asRef() to enable
  * reference deduplication during RPC serialization.
  */
 export function createNodeProjectMarker(
     packageJsonPath: string,
     packageJsonContent: any
 ): NodeProject {
+    // Cache for deduplicating dependencies with the same name+versionConstraint.
+    const dependencyCache = new Map<string, Dependency>();
+
+    function getOrCreateDependency(
+        name: string,
+        versionConstraint: string
+    ): Dependency {
+        const key = `${name}@${versionConstraint}`;
+        let dep = dependencyCache.get(key);
+        if (!dep) {
+            dep = asRef({
+                kind: DependencyKind,
+                name,
+                versionConstraint,
+            });
+            dependencyCache.set(key, dep);
+        }
+        return dep;
+    }
 
     function parseDependencies(
-        deps: Record<string, string> | undefined,
-        scope: DependencyScope
-    ): NodeDependency[] {
+        deps: Record<string, string> | undefined
+    ): Dependency[] {
         if (!deps) return [];
-        return Object.entries(deps).map(([name, version]) => asRef({
-            kind: NodeDependencyKind,
-            name,
-            version,
-            scope,
-            depth: 0,  // Mark as direct dependency
-            dependencies: undefined,  // No transitives initially
-            requestedBy: undefined
-        }));
+        return Object.entries(deps).map(([name, versionConstraint]) =>
+            getOrCreateDependency(name, versionConstraint)
+        );
+    }
+
+    function parseBundledDependencies(
+        deps: string[] | undefined
+    ): Dependency[] {
+        if (!deps) return [];
+        // bundledDependencies is just an array of package names with no version constraint
+        return deps.map(name => getOrCreateDependency(name, '*'));
     }
 
     return {
@@ -130,29 +156,15 @@ export function createNodeProjectMarker(
         version: packageJsonContent.version,
         description: packageJsonContent.description,
         packageJsonPath,
-        dependencies: parseDependencies(
-            packageJsonContent.dependencies,
-            DependencyScope.Dependencies
+        dependencies: parseDependencies(packageJsonContent.dependencies),
+        devDependencies: parseDependencies(packageJsonContent.devDependencies),
+        peerDependencies: parseDependencies(packageJsonContent.peerDependencies),
+        optionalDependencies: parseDependencies(packageJsonContent.optionalDependencies),
+        bundledDependencies: parseBundledDependencies(
+            packageJsonContent.bundledDependencies || packageJsonContent.bundleDependencies
         ),
-        devDependencies: parseDependencies(
-            packageJsonContent.devDependencies,
-            DependencyScope.DevDependencies
-        ),
-        peerDependencies: parseDependencies(
-            packageJsonContent.peerDependencies,
-            DependencyScope.PeerDependencies
-        ),
-        optionalDependencies: parseDependencies(
-            packageJsonContent.optionalDependencies,
-            DependencyScope.OptionalDependencies
-        ),
-        bundledDependencies: parseDependencies(
-            packageJsonContent.bundledDependencies || packageJsonContent.bundleDependencies,
-            DependencyScope.BundledDependencies
-        ),
-        scripts: packageJsonContent.scripts,
+        resolutions: undefined, // Not populated until package-lock.json is parsed
         engines: packageJsonContent.engines,
-        repository: packageJsonContent.repository
     };
 }
 
@@ -169,9 +181,9 @@ export function findNodeProject(cu: { markers: Markers }): NodeProject | undefin
 export namespace NodeProjectQueries {
 
     /**
-     * Get all dependencies from all scopes.
+     * Get all dependency requests from all scopes.
      */
-    export function getAllDependencies(project: NodeProject): NodeDependency[] {
+    export function getAllDependencies(project: NodeProject): Dependency[] {
         return [
             ...project.dependencies,
             ...project.devDependencies,
@@ -182,96 +194,114 @@ export namespace NodeProjectQueries {
     }
 
     /**
-     * Check if project has a specific dependency, optionally filtered by scope.
+     * Check if project has a specific dependency request, optionally filtered by scope.
      */
     export function hasDependency(
         project: NodeProject,
         packageName: string,
-        scope?: DependencyScope
+        scope?: 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies' | 'bundledDependencies'
     ): boolean {
         const deps = scope
-            ? getDependenciesByScope(project, scope)
+            ? project[scope]
             : getAllDependencies(project);
         return deps.some(dep => dep.name === packageName);
     }
 
     /**
-     * Get all dependencies for a specific scope.
-     */
-    export function getDependenciesByScope(
-        project: NodeProject,
-        scope: DependencyScope
-    ): NodeDependency[] {
-        switch (scope) {
-            case DependencyScope.Dependencies:
-                return project.dependencies;
-            case DependencyScope.DevDependencies:
-                return project.devDependencies;
-            case DependencyScope.PeerDependencies:
-                return project.peerDependencies;
-            case DependencyScope.OptionalDependencies:
-                return project.optionalDependencies;
-            case DependencyScope.BundledDependencies:
-                return project.bundledDependencies;
-        }
-    }
-
-    /**
-     * Find a specific dependency by name across all scopes.
+     * Find a specific dependency request by name across all scopes.
      */
     export function findDependency(
         project: NodeProject,
         packageName: string
-    ): NodeDependency | undefined {
+    ): Dependency | undefined {
         return getAllDependencies(project).find(dep => dep.name === packageName);
     }
 
     /**
-     * Get all dependencies matching a predicate.
+     * Get all dependency requests matching a predicate.
      */
     export function findDependencies(
         project: NodeProject,
-        predicate: (dep: NodeDependency) => boolean
-    ): NodeDependency[] {
+        predicate: (dep: Dependency) => boolean
+    ): Dependency[] {
         return getAllDependencies(project).filter(predicate);
+    }
+
+    /**
+     * Resolve a dependency request to its installed version.
+     * Returns undefined if resolutions are not available or the dependency is not resolved.
+     */
+    export function resolve(
+        project: NodeProject,
+        dependency: Dependency
+    ): ResolvedDependency | undefined {
+        return project.resolutions?.get(dependency);
+    }
+
+    /**
+     * Find and resolve a dependency by name.
+     * Returns the resolved dependency if found and resolutions are available.
+     */
+    export function findResolved(
+        project: NodeProject,
+        packageName: string
+    ): ResolvedDependency | undefined {
+        const dep = findDependency(project, packageName);
+        return dep ? resolve(project, dep) : undefined;
     }
 }
 
 /**
- * Register RPC codec for NodeDependency.
- * This must be registered before NodeProject since NodeProject contains NodeDependencies.
+ * Register RPC codec for Dependency.
  */
-RpcCodecs.registerCodec(NodeDependencyKind, {
-    async rpcReceive(before: NodeDependency, q: RpcReceiveQueue): Promise<NodeDependency> {
+RpcCodecs.registerCodec(DependencyKind, {
+    async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
         const draft = createDraft(before);
-        draft.kind = NodeDependencyKind;
+        draft.kind = DependencyKind;
         draft.name = await q.receive(before.name);
-        draft.version = await q.receive(before.version);
-        draft.resolved = await q.receive(before.resolved);
-        draft.scope = await q.receive(before.scope);
-        draft.depth = await q.receive(before.depth);
+        draft.versionConstraint = await q.receive(before.versionConstraint);
 
-        // Future: receive transitive dependencies
-        draft.dependencies = (await q.receiveList(before.dependencies)) || undefined;
-
-        draft.requestedBy = await q.receive(before.requestedBy);
-
-        return finishDraft(draft) as NodeDependency;
+        return finishDraft(draft) as Dependency;
     },
 
-    async rpcSend(after: NodeDependency, q: RpcSendQueue): Promise<void> {
+    async rpcSend(after: Dependency, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.name);
+        await q.getAndSend(after, a => a.versionConstraint);
+    }
+});
+
+/**
+ * Register RPC codec for ResolvedDependency.
+ */
+RpcCodecs.registerCodec(ResolvedDependencyKind, {
+    async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
+        const draft = createDraft(before);
+        draft.kind = ResolvedDependencyKind;
+        draft.name = await q.receive(before.name);
+        draft.version = await q.receive(before.version);
+        draft.dependencies = (await q.receiveList(before.dependencies)) || undefined;
+        draft.devDependencies = (await q.receiveList(before.devDependencies)) || undefined;
+        draft.peerDependencies = (await q.receiveList(before.peerDependencies)) || undefined;
+        draft.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || undefined;
+        draft.engines = await q.receive(before.engines);
+        draft.license = await q.receive(before.license);
+
+        return finishDraft(draft) as ResolvedDependency;
+    },
+
+    async rpcSend(after: ResolvedDependency, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.name);
         await q.getAndSend(after, a => a.version);
-        await q.getAndSend(after, a => a.resolved);
-        await q.getAndSend(after, a => a.scope);
-        await q.getAndSend(after, a => a.depth);
-
-        // Future: send transitive dependencies
         await q.getAndSendList(after, a => (a.dependencies || []).map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`,
-            undefined); // Let RPC system use NodeDependency codec
-
-        await q.getAndSend(after, a => a.requestedBy);
+            dep => `${dep.name}@${dep.versionConstraint}`);
+        await q.getAndSendList(after, a => (a.devDependencies || []).map(d => asRef(d)),
+            dep => `${dep.name}@${dep.versionConstraint}`);
+        await q.getAndSendList(after, a => (a.peerDependencies || []).map(d => asRef(d)),
+            dep => `${dep.name}@${dep.versionConstraint}`);
+        await q.getAndSendList(after, a => (a.optionalDependencies || []).map(d => asRef(d)),
+            dep => `${dep.name}@${dep.versionConstraint}`);
+        await q.getAndSend(after, a => a.engines);
+        await q.getAndSend(after, a => a.license);
     }
 });
 
@@ -288,16 +318,15 @@ RpcCodecs.registerCodec(NodeProjectMarkerKind, {
         draft.description = await q.receive(before.description);
         draft.packageJsonPath = await q.receive(before.packageJsonPath);
 
-        // Receive dependency arrays - RPC system will use NodeDependency codec automatically
         draft.dependencies = (await q.receiveList(before.dependencies)) || [];
         draft.devDependencies = (await q.receiveList(before.devDependencies)) || [];
         draft.peerDependencies = (await q.receiveList(before.peerDependencies)) || [];
         draft.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || [];
         draft.bundledDependencies = (await q.receiveList(before.bundledDependencies)) || [];
 
-        draft.scripts = await q.receive(before.scripts);
+        // TODO: receive resolutions map when package-lock.json parsing is implemented
+
         draft.engines = await q.receive(before.engines);
-        draft.repository = await q.receive(before.repository);
 
         return finishDraft(draft) as NodeProject;
     },
@@ -309,21 +338,19 @@ RpcCodecs.registerCodec(NodeProjectMarkerKind, {
         await q.getAndSend(after, a => a.description);
         await q.getAndSend(after, a => a.packageJsonPath);
 
-        // Send dependency arrays with asRef to enable deduplication
-        // RPC system will use NodeDependency codec automatically for each item
         await q.getAndSendList(after, a => a.dependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`);
+            dep => `${dep.name}@${dep.versionConstraint}`);
         await q.getAndSendList(after, a => a.devDependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`);
+            dep => `${dep.name}@${dep.versionConstraint}`);
         await q.getAndSendList(after, a => a.peerDependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`);
+            dep => `${dep.name}@${dep.versionConstraint}`);
         await q.getAndSendList(after, a => a.optionalDependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`);
+            dep => `${dep.name}@${dep.versionConstraint}`);
         await q.getAndSendList(after, a => a.bundledDependencies.map(d => asRef(d)),
-            dep => `${dep.name}@${dep.version}:${dep.scope}`);
+            dep => `${dep.name}@${dep.versionConstraint}`);
 
-        await q.getAndSend(after, a => a.scripts);
+        // TODO: send resolutions map when package-lock.json parsing is implemented
+
         await q.getAndSend(after, a => a.engines);
-        await q.getAndSend(after, a => a.repository);
     }
 });
