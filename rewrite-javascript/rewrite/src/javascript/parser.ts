@@ -150,7 +150,7 @@ export class JavaScriptParser extends Parser {
                     }
                 }
 
-                return createNodeProjectMarker(packageJsonPath, packageJson, packageLockJson);
+                return createNodeProjectMarker('package.json', packageJson, packageLockJson);
             }
         } catch (error) {
             console.warn(`Failed to parse package.json at ${packageJsonPath}:`, error);

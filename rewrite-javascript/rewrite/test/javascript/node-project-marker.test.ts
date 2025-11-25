@@ -43,7 +43,7 @@ describe("NodeProject marker", () => {
                         expect(nodeProject?.name).toBe("test-project");
                         expect(nodeProject?.version).toBe("1.0.0");
                         expect(nodeProject?.description).toBe("Test project");
-                        expect(nodeProject?.packageJsonPath).toContain("package.json");
+                        expect(nodeProject?.packageJsonPath).toBe("package.json");
                     }},
                     packageJson(`
                         {
