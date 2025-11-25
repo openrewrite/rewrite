@@ -46,7 +46,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
 
     private final JavaTypeCache typeCache;
 
-    public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
+    public JavaType type(@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
                 type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
@@ -458,7 +458,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(@Nullable Type selectType, @Nullable Symbol symbol) {
         /*
          TODO: AttrRecover class does not exist for java 11; there is JCNoType
           in the Type.class, so maybe it is possible to retrieve this information...

@@ -123,26 +123,20 @@ This document tracks the implementation of enhanced type mapping for the JavaScr
   - Handle partial type argument inference
   - Support default type parameters
 
-### Phase 6: Variable Types
-- [ ] **6.1 Complete `variableType()` Implementation**
-  - Map variable declarations to `JavaType.Variable`
-  - Include owner type information
-  - Handle variable annotations
-  ```typescript
-  variableType(node: ts.NamedDeclaration): JavaType.Variable | undefined {
-    if (ts.isVariableDeclaration(node)) {
-      const symbol = this.checker.getSymbolAtLocation(node.name);
-      if (symbol) {
-        const type = this.checker.getTypeOfSymbolAtLocation(symbol, node);
-        // Create JavaType.Variable with proper type mapping
-      }
-    }
-  }
-  ```
+### Phase 6: Variable Types ✅
+- [x] **6.1 Complete `variableType()` Implementation** ✅
+  - ✅ Map variable declarations to `JavaType.Variable`
+  - ✅ Include owner type information (declaring module/class)
+  - ✅ Handle variable references (not just declarations)
+  - ✅ Handle imported variables (extract module specifier as owner)
+  - ✅ Handle parameters and properties
+  - ✅ Filter out functions, classes, namespaces (not variables)
+  - ✅ Integrated into `type()` method for identifier nodes
+  - ✅ All tests passing (vitest `vi` object detection works correctly)
 
-- [ ] **6.2 Handle Property Declarations**
-  - Map class properties
-  - Handle property modifiers (readonly, optional)
+- [x] **6.2 Handle Property Declarations** ✅
+  - ✅ Map class properties (handled in variableType)
+  - ⚠️ Property modifiers (readonly, optional) - deferred
 
 ### Phase 7: JSX and React Types
 - [ ] **7.1 Map JSX Element Types**
@@ -235,6 +229,16 @@ This document tracks the implementation of enhanced type mapping for the JavaScr
 - **Readonly Arrays**: Both `readonly T[]` and `ReadonlyArray<T>` are correctly identified by `isArrayType()`
 - **Object.freeze**: Arrays frozen with `Object.freeze()` are still detected as arrays
 - **Tuples**: Tuple types like `[string, number]` are NOT recognized by `isArrayType()` and need special handling
+
+### Phase 6 Learnings
+- **Symbol Flags**: Use `ts.SymbolFlags.Variable | ts.SymbolFlags.Property | ts.SymbolFlags.FunctionScopedVariable | ts.SymbolFlags.BlockScopedVariable` to identify variables
+- **Exclusion Strategy**: Must explicitly exclude functions, classes, interfaces, namespaces, type aliases, and type parameters to avoid false positives
+- **Alias Resolution**: For imported variables, use `checker.getAliasedSymbol()` to get the actual symbol
+- **Owner Type**: For imported variables, create a Type.Class with the module specifier as fullyQualifiedName
+- **Type Integration**: Call `variableType()` from `type()` method for identifier nodes to enable fieldType attribution
+- **Parser Integration**: Parser's `mapIdentifier()` already handles extracting `fieldType` from `Type.Variable` (lines 843-844)
+- **Use Case**: Critical for detecting object/variable usage in AddImport with `onlyIfReferenced: true` (e.g., vitest's `vi` object)
+- **Import Merging**: When AddImport detects usage and adds an import, it correctly merges with existing imports from the same module
 
 ### TypeChecker Capabilities Discovered
 - TypeChecker can infer types even from plain JavaScript through control flow analysis
