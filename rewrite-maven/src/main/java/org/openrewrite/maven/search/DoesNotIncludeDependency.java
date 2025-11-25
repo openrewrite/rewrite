@@ -39,6 +39,15 @@ public class DoesNotIncludeDependency extends Recipe {
             example = "guava")
     String artifactId;
 
+    @Option(displayName = "Version",
+            description = "Match only dependencies with the specified version. " +
+                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used. " +
+                    "All versions are searched by default.",
+            example = "1.x",
+            required = false)
+    @Nullable
+    String version;
+
     @Option(displayName = "Only direct dependencies",
             description = "Default false. If enabled, transitive dependencies will not be considered.",
             required = false,
@@ -53,15 +62,6 @@ public class DoesNotIncludeDependency extends Recipe {
             example = "compile")
     @Nullable
     String scope;
-
-    @Option(displayName = "Version",
-            description = "Match only dependencies with the specified version. " +
-                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used. " +
-                    "All versions are searched by default.",
-            example = "1.x",
-            required = false)
-    @Nullable
-    String version;
 
     @Override
     public String getDisplayName() {

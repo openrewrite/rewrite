@@ -43,11 +43,11 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
       """;
 
     private Recipe defaultRecipeWithOnlyDirectAndScope(@Nullable Boolean onlyDirect, @Nullable String scope) {
-        return new DoesNotIncludeDependency("org.springframework", "spring-beans", onlyDirect, scope, null);
+        return new DoesNotIncludeDependency("org.springframework", "spring-beans", null, onlyDirect, scope);
     }
 
     private Recipe defaultRecipeWithOnlyDirectAndVersion(@Nullable Boolean onlyDirect, @Nullable String version) {
-        return new DoesNotIncludeDependency("org.springframework", "spring-beans", onlyDirect, null, version);
+        return new DoesNotIncludeDependency("org.springframework", "spring-beans", version, onlyDirect, null);
     }
 
     private String wrappedScope(String scope) {
@@ -58,7 +58,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     @Test
     void dependencyPresentTransitivelyWithoutScopeOrDesiredScopeSpecifiedButDirectOnlyMarked() {
         rewriteRun(
-          spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null, null)),
+          spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, true, null)),
           pomXml(
             """
               <project>
