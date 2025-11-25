@@ -1002,8 +1002,7 @@ class AutoFormatTest implements RewriteTest {
               
                   @Foo /* comment
                   on multiple
-                  lines */
-                  final String method2() {
+                  lines */ final String method2() {
                       return "test";
                   }
               
