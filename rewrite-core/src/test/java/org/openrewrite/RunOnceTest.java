@@ -48,7 +48,7 @@ class RunOnceTest implements RewriteTest {
             description: Append bla.
             preconditions:
               - org.openrewrite.RunOnce:
-                  fqrn: org.openrewrite.text.AppendToTextFile
+                  fqrn: org.openrewrite.test.AppendBla
             recipeList:
               - org.openrewrite.text.AppendToTextFile:
                   relativeFileName: "a/file.txt"
