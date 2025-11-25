@@ -1631,4 +1631,49 @@ describe('AddImport visitor', () => {
             }, {unsafeCleanup: true});
         });
     });
+
+    describe('multiple maybeAddImport calls for same module', () => {
+        test('should merge multiple imports from same module into single statement', async () => {
+            const spec = new RecipeSpec();
+
+            // Test 1: No existing import - should create one and merge all members
+            const noExistingImportVisitor = new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
+                    maybeAddImport(this, {module: 'vitest', member: 'test', onlyIfReferenced: false});
+                    maybeAddImport(this, {module: 'vitest', member: 'expect', onlyIfReferenced: false});
+                    maybeAddImport(this, {module: 'vitest', member: 'beforeEach', onlyIfReferenced: false});
+                    return cu;
+                }
+            };
+            spec.recipe = fromVisitor(noExistingImportVisitor);
+
+            //language=typescript
+            await spec.rewriteRun(
+                // No existing import - creates one and merges
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import {test, expect, beforeEach} from 'vitest';
+
+                        const x = 1;
+                    `
+                ),
+                // Existing import - merges into it
+                typescript(
+                    `
+                        import {vi} from 'vitest';
+
+                        const x = 1;
+                    `,
+                    `
+                        import {vi, test, expect, beforeEach} from 'vitest';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+    });
 });

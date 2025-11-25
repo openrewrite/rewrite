@@ -794,30 +794,18 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         else if (fieldType?.kind === Type.Kind.Variable) {
                             const variableType = fieldType as Type.Variable;
                             if (variableType.owner && Type.isClass(variableType.owner)) {
-                                // Traverse owningClass chain to find the module (handles nested namespaces)
-                                let current: Type.Class | undefined = variableType.owner as Type.Class;
-                                let moduleType: Type.Class | undefined;
+                                // Traverse owningClass chain to find the root module (handles nested namespaces)
+                                // For example: React.forwardRef -> owner is "React" namespace -> owningClass is "react" module
+                                let current: Type.Class = variableType.owner as Type.Class;
 
-                                // Walk up the owningClass chain to find the root module
-                                while (current) {
-                                    if (current.owningClass && Type.isClass(current.owningClass)) {
-                                        current = current.owningClass as Type.Class;
-                                    } else if (current.owningClass) {
-                                        // owningClass exists but isn't a Class - use it and stop
-                                        moduleType = current.owningClass as Type.Class;
-                                        break;
-                                    } else {
-                                        // No owningClass - current is the root
-                                        moduleType = current;
-                                        break;
-                                    }
+                                // Walk up the owningClass chain until we reach the root
+                                while (current.owningClass && Type.isClass(current.owningClass)) {
+                                    current = current.owningClass as Type.Class;
                                 }
 
-                                if (moduleType) {
-                                    const moduleName = Type.FullyQualified.getFullyQualifiedName(moduleType);
-                                    if (moduleName === targetModule) {
-                                        found = true;
-                                    }
+                                const moduleName = Type.FullyQualified.getFullyQualifiedName(current);
+                                if (moduleName === targetModule) {
+                                    found = true;
                                 }
                             }
                         }
@@ -891,12 +879,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // For side-effect imports, use emptySpace since space comes from LeftPadded.before
         // For regular imports with import clause, use emptySpace since space comes from LeftPadded.before
         // However, the printer expects the space after 'from' in the literal's prefix
+        // Note: value contains the unquoted string, valueSource contains the quoted version for printing
         const moduleSpecifier: J.Literal = {
             id: randomId(),
             kind: J.Kind.Literal,
             prefix: this.sideEffectOnly ? emptySpace : singleSpace,
             markers: emptyMarkers,
-            value: `'${this.module}'`,
+            value: this.module,
             valueSource: `'${this.module}'`,
             unicodeEscapes: [],
             type: undefined

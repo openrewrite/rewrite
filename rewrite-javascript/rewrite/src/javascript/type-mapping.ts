@@ -449,33 +449,25 @@ export class JavaScriptTypeMapping {
                             // If it's from node_modules or a .d.ts file, try to extract the module name
                             if (sourceFile.isDeclarationFile) {
                                 const fileName = sourceFile.fileName;
-                                if (fileName.includes('node_modules/')) {
-                                    // Extract module name from path like: /path/node_modules/@types/react/index.d.ts
-                                    const match = fileName.match(/node_modules\/(@[^/]+\/[^/]+|[^/]+)/);
-                                    if (match) {
-                                        let moduleName = match[1];
-                                        // Remove @types/ prefix if present
-                                        if (moduleName.startsWith('@types/')) {
-                                            moduleName = moduleName.substring('@types/'.length);
-                                        }
-                                        // Store the module as the owningClass for now
-                                        // (This is a bit of a hack, but works with the current type system)
-                                        if (Type.isClass(ownerType)) {
-                                            (ownerType as any).owningClass = Object.assign(new NonDraftableType(), {
-                                                kind: Type.Kind.Class,
-                                                flags: 0,
-                                                classKind: Type.Class.Kind.Interface,
-                                                fullyQualifiedName: moduleName,
-                                                typeParameters: [],
-                                                annotations: [],
-                                                interfaces: [],
-                                                members: [],
-                                                methods: [],
-                                                toJSON: function () {
-                                                    return Type.signature(this);
-                                                }
-                                            }) as Type.Class;
-                                        }
+                                const moduleName = this.extractModuleNameFromPath(fileName);
+                                if (moduleName) {
+                                    // Store the module as the owningClass for now
+                                    // (This is a bit of a hack, but works with the current type system)
+                                    if (Type.isClass(ownerType)) {
+                                        (ownerType as any).owningClass = Object.assign(new NonDraftableType(), {
+                                            kind: Type.Kind.Class,
+                                            flags: 0,
+                                            classKind: Type.Class.Kind.Interface,
+                                            fullyQualifiedName: moduleName,
+                                            typeParameters: [],
+                                            annotations: [],
+                                            interfaces: [],
+                                            members: [],
+                                            methods: [],
+                                            toJSON: function () {
+                                                return Type.signature(this);
+                                            }
+                                        }) as Type.Class;
                                     }
                                 }
                             }
@@ -498,6 +490,67 @@ export class JavaScriptTypeMapping {
         }) as Type.Variable;
 
         return variable;
+    }
+
+    /**
+     * Extract the npm module name from a file path.
+     * Handles various package manager layouts:
+     * - Standard: /path/node_modules/react/index.d.ts -> react
+     * - Scoped: /path/node_modules/@types/react/index.d.ts -> react
+     * - Scoped with __ encoding: /path/node_modules/@types/testing-library__react/index.d.ts -> @testing-library/react
+     * - Nested node_modules: /path/node_modules/pkg/node_modules/dep/index.d.ts -> dep
+     * - pnpm: /path/node_modules/.pnpm/react@18.2.0/node_modules/react/index.d.ts -> react
+     *
+     * @returns The module name, or undefined if not from node_modules
+     */
+    private extractModuleNameFromPath(fileName: string): string | undefined {
+        if (!fileName.includes('node_modules/')) {
+            return undefined;
+        }
+
+        // Find the last occurrence of node_modules/ to handle nested dependencies
+        // This also correctly handles pnpm's .pnpm structure
+        const lastNodeModulesIndex = fileName.lastIndexOf('node_modules/');
+        const afterNodeModules = fileName.substring(lastNodeModulesIndex + 'node_modules/'.length);
+
+        // Split by '/' to get path segments
+        const segments = afterNodeModules.split('/');
+        if (segments.length === 0) {
+            return undefined;
+        }
+
+        let moduleName: string;
+
+        // Handle scoped packages (@scope/package)
+        if (segments[0].startsWith('@') && segments.length > 1) {
+            moduleName = `${segments[0]}/${segments[1]}`;
+        } else {
+            moduleName = segments[0];
+        }
+
+        // Skip pnpm's .pnpm directory - it contains versioned package paths
+        // In pnpm, the actual package is in: .pnpm/pkg@version/node_modules/pkg
+        // So we already handled this by using lastIndexOf above
+        if (moduleName === '.pnpm') {
+            return undefined;
+        }
+
+        // Remove @types/ prefix and decode DefinitelyTyped scoped package encoding
+        // DefinitelyTyped encodes scoped packages using __ instead of /
+        // Example: @types/testing-library__react -> @testing-library/react
+        if (moduleName.startsWith('@types/')) {
+            moduleName = moduleName.substring('@types/'.length);
+            // Decode __ encoding for scoped packages
+            // testing-library__react -> @testing-library/react
+            if (moduleName.includes('__')) {
+                const parts = moduleName.split('__');
+                if (parts.length === 2) {
+                    moduleName = `@${parts[0]}/${parts[1]}`;
+                }
+            }
+        }
+
+        return moduleName;
     }
 
     /**
