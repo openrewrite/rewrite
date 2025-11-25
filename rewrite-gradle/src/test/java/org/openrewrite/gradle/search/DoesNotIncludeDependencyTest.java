@@ -124,7 +124,8 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         void withNonMatchingVersionMarked() {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithVersion("5.x")),
-              buildGradle(directDependencyTemplate.formatted("api"),
+              buildGradle(
+                directDependencyTemplate.formatted("api"),
                 String.format(marker + directDependencyTemplate, "api"))
             );
         }
@@ -197,7 +198,8 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         void withNonMatchingVersionMarked() {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithVersion("5.x")),
-              buildGradle(transitiveDependencyTemplate.formatted("api"),
+              buildGradle(
+                transitiveDependencyTemplate.formatted("api"),
                 String.format(marker + transitiveDependencyTemplate, "api"))
             );
         }

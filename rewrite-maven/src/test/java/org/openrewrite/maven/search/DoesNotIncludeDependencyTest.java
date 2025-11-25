@@ -186,7 +186,8 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             void withNonMatchingVersionMarked() {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndVersion(onlyDirect, "5.x")),
-                  pomXml(directDependencyTemplate.formatted(""),
+                  pomXml(
+                    directDependencyTemplate.formatted(""),
                     String.format(marker + directDependencyTemplate, ""))
                 );
             }
@@ -313,7 +314,8 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             void withNonMatchingVersionMarked() {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndVersion(onlyDirect, "5.x")),
-                  pomXml(transitiveDependencyTemplate.formatted(""),
+                  pomXml(
+                    transitiveDependencyTemplate.formatted(""),
                     String.format(marker + transitiveDependencyTemplate, ""))
                 );
             }
@@ -383,7 +385,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             }
 
             @CsvSource({"compile,compile", "compile,test"})
-            @CsvSource({"runtime,compile", "runtime,test",})
+            @CsvSource({"runtime,compile", "runtime,test"})
             @CsvSource({"test,test"})
             @ParameterizedTest
             void withScopeInDesiredScopeMarked(String existingScope, String desiredScope) {
@@ -401,7 +403,8 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             void withAnyVersionAlwaysMarked(String version) {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndVersion(onlyDirect, version)),
-                  pomXml(transitiveDependencyTemplate.formatted(""),
+                  pomXml(
+                    transitiveDependencyTemplate.formatted(""),
                     String.format(marker + transitiveDependencyTemplate, ""))
                 );
             }
