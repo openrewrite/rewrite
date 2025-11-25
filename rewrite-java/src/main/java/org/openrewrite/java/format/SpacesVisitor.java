@@ -505,12 +505,14 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case IF_PREFIX:
                 parentTreeCursor = getCursor().getParentTreeCursor();
-                if (parentTreeCursor.getValue() instanceof J.If.Else) {
-                    whitespace = " ";
+                if (parentTreeCursor.getValue() instanceof J.If.Else && space.getComments().isEmpty()) {
+                    space = space.withWhitespace(" ");
                 }
                 break;
             case ELSE_PREFIX:
-                if (space.getComments().isEmpty()) {
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                parent = parentTreeCursor.getValue();
+                if (parent instanceof J.If && ((J.If) parent).getThenPart() instanceof J.Block && space.getComments().isEmpty()) {
                     space = space.withWhitespace(evaluate(() -> spacesStyle.getBeforeKeywords().getElseKeyword(), true) ? " " : "");
                 }
                 break;

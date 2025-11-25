@@ -5016,6 +5016,37 @@ class SpacesTest implements RewriteTest {
     }
 
     @Test
+    void elseIfWithoutBraces() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String)
+                        return true;
+                    else
+                    if (o instanceof Character)
+                        return true;
+                    return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String)
+                        return true;
+                    else if (o instanceof Character)
+                        return true;
+                    return false;
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
     void tooMuchSpacesInBlock() {
         rewriteRun(
           spaces(),
