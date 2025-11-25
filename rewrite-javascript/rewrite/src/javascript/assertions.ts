@@ -39,51 +39,57 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
         fs.mkdirSync(relativeTo, { recursive: true });
     }
 
-    for (const spec of sourceSpecs) {
-        if (spec.path === 'package.json') {
-            // Parse package.json to extract dependencies
-            const packageJsonContent = JSON.parse(spec.before!);
-            const dependencies = {
-                ...packageJsonContent.dependencies,
-                ...packageJsonContent.devDependencies
-            };
+    // Find package.json and package-lock.json specs
+    const packageJsonSpec = sourceSpecs.find(spec => spec.path === 'package.json');
+    const packageLockSpec = sourceSpecs.find(spec => spec.path === 'package-lock.json');
 
-            // Get or create cached workspace with node_modules (don't pass targetDir to use caching)
-            if (Object.keys(dependencies).length > 0) {
-                const cachedWorkspace = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+    if (packageJsonSpec) {
+        // Parse package.json to check if there are dependencies
+        const packageJsonContent = JSON.parse(packageJsonSpec.before!);
+        const hasDependencies = Object.keys({
+            ...packageJsonContent.dependencies,
+            ...packageJsonContent.devDependencies
+        }).length > 0;
 
-                // Symlink node_modules from cached workspace to test directory
-                const cachedNodeModules = path.join(cachedWorkspace, 'node_modules');
-                const testNodeModules = path.join(relativeTo, 'node_modules');
+        // Get or create cached workspace with node_modules
+        if (hasDependencies) {
+            const cachedWorkspace = await DependencyWorkspace.getOrCreateWorkspace({
+                packageJsonContent: packageJsonSpec.before!,
+                packageLockContent: packageLockSpec?.before ?? undefined
+            });
 
-                // Remove existing node_modules if present
-                if (fs.existsSync(testNodeModules)) {
-                    fs.rmSync(testNodeModules, { recursive: true, force: true });
-                }
+            // Symlink node_modules from cached workspace to test directory
+            const cachedNodeModules = path.join(cachedWorkspace, 'node_modules');
+            const testNodeModules = path.join(relativeTo, 'node_modules');
 
-                // Create symlink
-                fs.symlinkSync(cachedNodeModules, testNodeModules, 'junction');
+            // Remove existing node_modules if present
+            if (fs.existsSync(testNodeModules)) {
+                fs.rmSync(testNodeModules, { recursive: true, force: true });
             }
 
-            // Write the actual package.json from the test spec
-            fs.writeFileSync(
-                path.join(relativeTo, 'package.json'),
-                spec.before
-            );
-
-            yield spec;
-        } else if (spec.path === 'package-lock.json') {
-            // Write package-lock.json from the test spec
-            // Note: This is written AFTER npm install runs (via package.json handling above),
-            // so it will override any generated lock file with the test's mock data
-            fs.writeFileSync(
-                path.join(relativeTo, 'package-lock.json'),
-                spec.before
-            );
-
-            yield spec;
+            // Create symlink
+            fs.symlinkSync(cachedNodeModules, testNodeModules, 'junction');
         }
+
+        // Write the actual package.json from the test spec
+        fs.writeFileSync(
+            path.join(relativeTo, 'package.json'),
+            packageJsonSpec.before
+        );
+
+        yield packageJsonSpec;
     }
+
+    if (packageLockSpec) {
+        // Write package-lock.json from the test spec
+        fs.writeFileSync(
+            path.join(relativeTo, 'package-lock.json'),
+            packageLockSpec.before
+        );
+
+        yield packageLockSpec;
+    }
+
     for (const spec of sourceSpecs) {
         if (spec.path !== 'package.json' && spec.path !== 'package-lock.json') {
             if (spec.kind === JS.Kind.CompilationUnit) {
