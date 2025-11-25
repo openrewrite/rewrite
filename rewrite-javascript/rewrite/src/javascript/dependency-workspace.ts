@@ -47,6 +47,42 @@ export class DependencyWorkspace {
             // Create/update workspace in target directory
             fs.mkdirSync(targetDir, {recursive: true});
 
+            // Check if we can reuse a cached workspace by symlinking node_modules
+            const hash = this.hashDependencies(dependencies);
+            const cachedWorkspaceDir = path.join(this.WORKSPACE_BASE, hash);
+            const cachedNodeModules = path.join(cachedWorkspaceDir, 'node_modules');
+
+            if (fs.existsSync(cachedNodeModules) && this.isWorkspaceValid(cachedWorkspaceDir, dependencies)) {
+                // Symlink node_modules from cached workspace
+                try {
+                    const targetNodeModules = path.join(targetDir, 'node_modules');
+
+                    // Remove existing node_modules if present (might be invalid)
+                    if (fs.existsSync(targetNodeModules)) {
+                        fs.rmSync(targetNodeModules, {recursive: true, force: true});
+                    }
+
+                    // Create symlink to cached node_modules
+                    fs.symlinkSync(cachedNodeModules, targetNodeModules, 'dir');
+
+                    // Write package.json
+                    const packageJson = {
+                        name: "openrewrite-template-workspace",
+                        version: "1.0.0",
+                        private: true,
+                        dependencies: dependencies
+                    };
+                    fs.writeFileSync(
+                        path.join(targetDir, 'package.json'),
+                        JSON.stringify(packageJson, null, 2)
+                    );
+
+                    return targetDir;
+                } catch (symlinkError) {
+                    // Symlink failed (e.g., cross-device, permissions) - fall through to npm install
+                }
+            }
+
             try {
                 const packageJson = {
                     name: "openrewrite-template-workspace",
@@ -214,6 +250,7 @@ export class DependencyWorkspace {
 
     /**
      * Checks if a workspace is valid (has node_modules and matching package.json).
+     * Handles both real node_modules directories and symlinks to cached workspaces.
      *
      * @param workspaceDir Directory to check
      * @param expectedDependencies Optional dependencies to check against package.json
@@ -222,7 +259,22 @@ export class DependencyWorkspace {
         const nodeModules = path.join(workspaceDir, 'node_modules');
         const packageJsonPath = path.join(workspaceDir, 'package.json');
 
+        // Check node_modules exists (as directory or symlink)
         if (!fs.existsSync(nodeModules) || !fs.existsSync(packageJsonPath)) {
+            return false;
+        }
+
+        // If node_modules is a symlink, verify the target still exists
+        try {
+            const stats = fs.lstatSync(nodeModules);
+            if (stats.isSymbolicLink()) {
+                const target = fs.readlinkSync(nodeModules);
+                const absoluteTarget = path.isAbsolute(target) ? target : path.resolve(path.dirname(nodeModules), target);
+                if (!fs.existsSync(absoluteTarget)) {
+                    return false;
+                }
+            }
+        } catch {
             return false;
         }
 
