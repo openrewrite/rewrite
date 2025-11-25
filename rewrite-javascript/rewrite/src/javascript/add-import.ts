@@ -448,33 +448,80 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 // We found a matching import with named bindings - merge into it
                 return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
                     const namedImports = importClause.namedBindings as JS.NamedImports;
-
-                    // Create the new specifier with a space prefix (since it's not the first element)
-                    const newSpecifierBase = this.createImportSpecifier();
-                    const newSpecifier = {...newSpecifierBase, prefix: singleSpace};
-
-                    // Transfer the right padding from the element before the insertion point to the new element
-                    // Since we're appending, this is the last existing element
                     const existingElements = namedImports.elements.elements;
-                    const elementBeforeInsertion = existingElements[existingElements.length - 1];
-                    const paddingToTransfer = elementBeforeInsertion.after;
 
-                    // Add the new specifier to the elements
+                    // Find the correct insertion position (alphabetical, case-insensitive)
+                    const newName = (this.alias || this.member!).toLowerCase();
+                    let insertIndex = existingElements.length; // Default to end
+
+                    for (let j = 0; j < existingElements.length; j++) {
+                        const elem = existingElements[j].element;
+                        if (elem?.kind === JS.Kind.ImportSpecifier) {
+                            const specifier = elem as JS.ImportSpecifier;
+                            const existingName = this.getImportAlias(specifier) || this.getImportName(specifier);
+                            if (newName.localeCompare(existingName.toLowerCase()) < 0) {
+                                insertIndex = j;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Create the new specifier
+                    const newSpecifierBase = this.createImportSpecifier();
+
+                    // Add the new specifier to the elements at the correct position
                     const updatedNamedImports: JS.NamedImports = await this.produceJavaScript<JS.NamedImports>(
                         namedImports, p, async namedDraft => {
-                            // Update the element before insertion to have emptySpace as its right padding (before the comma)
-                            const updatedExistingElements = existingElements.slice(0, -1).concat({
-                                ...elementBeforeInsertion,
-                                after: emptySpace
-                            });
+                            const newElements: J.RightPadded<JS.ImportSpecifier>[] = [];
+
+                            if (insertIndex === 0) {
+                                // Inserting at the beginning
+                                // New element gets empty prefix (first element), existing first element gets space prefix
+                                const newSpecifier = {...newSpecifierBase, prefix: emptySpace};
+                                newElements.push(rightPadded(newSpecifier, emptySpace));
+
+                                // Update first existing element to have space prefix
+                                for (let j = 0; j < existingElements.length; j++) {
+                                    const elem = existingElements[j];
+                                    if (j === 0 && elem.element) {
+                                        newElements.push({
+                                            ...elem,
+                                            element: {...elem.element, prefix: singleSpace}
+                                        });
+                                    } else {
+                                        newElements.push(elem);
+                                    }
+                                }
+                            } else if (insertIndex === existingElements.length) {
+                                // Inserting at the end
+                                const newSpecifier = {...newSpecifierBase, prefix: singleSpace};
+                                const lastElement = existingElements[existingElements.length - 1];
+                                const paddingToTransfer = lastElement.after;
+
+                                // All existing elements except last keep their padding
+                                for (let j = 0; j < existingElements.length - 1; j++) {
+                                    newElements.push(existingElements[j]);
+                                }
+                                // Last existing element gets emptySpace padding (before comma)
+                                newElements.push({...lastElement, after: emptySpace});
+                                // New element gets the transferred padding
+                                newElements.push(rightPadded(newSpecifier, paddingToTransfer));
+                            } else {
+                                // Inserting in the middle
+                                const newSpecifier = {...newSpecifierBase, prefix: singleSpace};
+
+                                for (let j = 0; j < existingElements.length; j++) {
+                                    if (j === insertIndex) {
+                                        // Insert new element before this position
+                                        newElements.push(rightPadded(newSpecifier, emptySpace));
+                                    }
+                                    newElements.push(existingElements[j]);
+                                }
+                            }
 
                             namedDraft.elements = {
                                 ...namedImports.elements,
-                                elements: [
-                                    ...updatedExistingElements,
-                                    // Transfer the padding to the new element (after the comma, before the closing brace)
-                                    rightPadded(newSpecifier, paddingToTransfer)
-                                ]
+                                elements: newElements
                             };
                         }
                     );

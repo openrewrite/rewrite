@@ -1633,11 +1633,11 @@ describe('AddImport visitor', () => {
     });
 
     describe('multiple maybeAddImport calls for same module', () => {
-        test('should merge multiple imports from same module into single statement', async () => {
+        test('should merge imports alphabetically (case-insensitive)', async () => {
             const spec = new RecipeSpec();
 
-            // Test 1: No existing import - should create one and merge all members
-            const noExistingImportVisitor = new class extends JavaScriptVisitor<any> {
+            // Visitor that adds imports in non-alphabetical order
+            const addImportsVisitor = new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
                     maybeAddImport(this, {module: 'vitest', member: 'test', onlyIfReferenced: false});
                     maybeAddImport(this, {module: 'vitest', member: 'expect', onlyIfReferenced: false});
@@ -1645,30 +1645,30 @@ describe('AddImport visitor', () => {
                     return cu;
                 }
             };
-            spec.recipe = fromVisitor(noExistingImportVisitor);
+            spec.recipe = fromVisitor(addImportsVisitor);
 
             //language=typescript
             await spec.rewriteRun(
-                // No existing import - creates one and merges
+                // No existing import - creates one and merges in alphabetical order
                 typescript(
                     `
                         const x = 1;
                     `,
                     `
-                        import {test, expect, beforeEach} from 'vitest';
+                        import {beforeEach, expect, test} from 'vitest';
 
                         const x = 1;
                     `
                 ),
-                // Existing import - merges into it
+                // Existing import - inserts at correct alphabetical position
                 typescript(
                     `
-                        import {vi} from 'vitest';
+                        import {afterEach, vi} from 'vitest';
 
                         const x = 1;
                     `,
                     `
-                        import {vi, test, expect, beforeEach} from 'vitest';
+                        import {afterEach, beforeEach, expect, test, vi} from 'vitest';
 
                         const x = 1;
                     `
