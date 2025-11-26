@@ -243,7 +243,8 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
      */
     public enum PackageManager {
         Npm,
-        Yarn,
+        YarnClassic,
+        YarnBerry,
         Pnpm,
         Bun
     }
