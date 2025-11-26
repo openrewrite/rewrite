@@ -20,6 +20,7 @@ import {createNodeResolutionResultMarker, NodeResolutionResult, PackageManager} 
 import * as fs from "fs";
 import * as path from "path";
 import * as YAML from "yaml";
+import {execSync} from "child_process";
 
 export interface PackageJsonParserOptions extends ParserOptions {
     /**
@@ -169,17 +170,16 @@ export class PackageJsonParser extends Parser {
             }
         }
 
-        // Try pnpm-lock.yaml (pnpm)
+        // Try pnpm-lock.yaml (pnpm) - use CLI for compatibility across lockfile versions
         const pnpmLockPath = path.join(dir, 'pnpm-lock.yaml');
         if (fs.existsSync(pnpmLockPath)) {
             try {
-                const content = fs.readFileSync(pnpmLockPath, 'utf-8');
-                const parsed = this.parsePnpmLock(content);
+                const parsed = this.getPnpmDependencies(dir);
                 if (parsed) {
                     return { content: parsed, packageManager: PackageManager.Pnpm };
                 }
             } catch (error) {
-                // Silently ignore errors
+                // Silently ignore errors (CLI not available)
             }
         }
 
@@ -286,63 +286,80 @@ export class PackageJsonParser extends Parser {
     }
 
     /**
-     * Parses pnpm-lock.yaml directly to npm package-lock.json format.
-     *
-     * pnpm-lock.yaml structure (v9):
-     * - packages: defines available packages with name@version keys, resolution, engines
-     * - snapshots: defines dependency relationships with name@version keys
+     * Gets dependency information from pnpm using its CLI.
+     * Uses `pnpm list --json --depth=Infinity` to get the full dependency tree.
+     * This approach works across all pnpm lockfile versions (v5, v6, v9).
      */
-    private parsePnpmLock(content: string): any {
-        const lock = YAML.parse(content);
-        if (!lock?.packages) return undefined;
+    private getPnpmDependencies(dir: string): any {
+        const output = execSync('pnpm list --json --depth=Infinity', {
+            cwd: dir,
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+            timeout: 30000
+        });
 
+        const pnpmList = JSON.parse(output);
+        return this.convertPnpmListToNpmFormat(pnpmList);
+    }
+
+    /**
+     * Converts pnpm list --json output to npm package-lock.json format.
+     */
+    private convertPnpmListToNpmFormat(pnpmList: any): any {
         const packages: Record<string, any> = {
             "": {} // Root package placeholder
         };
 
-        // Process packages section for version and metadata
-        for (const [pkgKey, pkgInfo] of Object.entries(lock.packages as Record<string, any>)) {
-            // Keys are like "is-odd@3.0.1"
-            const atIndex = pkgKey.lastIndexOf('@');
-            if (atIndex <= 0) continue;
+        // pnpm list returns an array of projects (for workspaces) or a single object
+        const projects = Array.isArray(pnpmList) ? pnpmList : [pnpmList];
 
-            const name = pkgKey.substring(0, atIndex);
-            const version = pkgKey.substring(atIndex + 1);
-            const npmKey = `node_modules/${name}@${version}`;
-
-            packages[npmKey] = {
-                version,
-                engines: pkgInfo.engines,
-            };
-        }
-
-        // Process snapshots section for dependency relationships
-        if (lock.snapshots) {
-            for (const [pkgKey, snapshotInfo] of Object.entries(lock.snapshots as Record<string, any>)) {
-                const atIndex = pkgKey.lastIndexOf('@');
-                if (atIndex <= 0) continue;
-
-                const name = pkgKey.substring(0, atIndex);
-                const version = pkgKey.substring(atIndex + 1);
-                const npmKey = `node_modules/${name}@${version}`;
-
-                if (packages[npmKey] && snapshotInfo?.dependencies) {
-                    // Convert dependencies from "name: version" to constraint format
-                    const deps: Record<string, string> = {};
-                    for (const [depName, depVersion] of Object.entries(snapshotInfo.dependencies as Record<string, string>)) {
-                        deps[depName] = `^${depVersion}`;
-                    }
-                    if (Object.keys(deps).length > 0) {
-                        packages[npmKey].dependencies = deps;
-                    }
-                }
-            }
+        for (const project of projects) {
+            this.extractPnpmDependencies(project.dependencies, packages);
+            this.extractPnpmDependencies(project.devDependencies, packages);
+            this.extractPnpmDependencies(project.optionalDependencies, packages);
         }
 
         return Object.keys(packages).length > 1 ? {
             lockfileVersion: 3,
             packages
         } : undefined;
+    }
+
+    /**
+     * Recursively extracts dependencies from pnpm list output.
+     * Uses name@version as key to handle multiple versions of the same package.
+     */
+    private extractPnpmDependencies(deps: any, packages: Record<string, any>): void {
+        if (!deps) return;
+
+        for (const [name, info] of Object.entries(deps as Record<string, any>)) {
+            const version = info.version;
+            if (!version) continue;
+
+            const pkgKey = `node_modules/${name}@${version}`;
+
+            if (!packages[pkgKey]) {
+                const pkgEntry: any = { version };
+
+                // Extract nested dependency version constraints
+                if (info.dependencies) {
+                    const nestedDeps: Record<string, string> = {};
+                    for (const [depName, depInfo] of Object.entries(info.dependencies as Record<string, any>)) {
+                        nestedDeps[depName] = (depInfo as any).version || '*';
+                    }
+                    if (Object.keys(nestedDeps).length > 0) {
+                        pkgEntry.dependencies = nestedDeps;
+                    }
+                }
+
+                packages[pkgKey] = pkgEntry;
+            }
+
+            // Recursively process nested dependencies
+            if (info.dependencies) {
+                this.extractPnpmDependencies(info.dependencies, packages);
+            }
+        }
     }
 
     /**
@@ -377,6 +394,8 @@ export class PackageJsonParser extends Parser {
      *   resolution: "is-odd@npm:3.0.1"
      *   dependencies:
      *     is-number: "npm:^6.0.0"
+     *   peerDependencies:
+     *     react: "^17.0.0 || ^18.0.0"
      */
     private parseYarnBerryLock(content: string): any {
         const lock = YAML.parse(content);
@@ -401,6 +420,7 @@ export class PackageJsonParser extends Parser {
                 if (npmIndex > 0) {
                     name = entry.resolution.substring(0, npmIndex);
                 } else {
+                    // Handle other resolution formats (e.g., patches, links)
                     continue;
                 }
             } else {
@@ -420,19 +440,23 @@ export class PackageJsonParser extends Parser {
 
             const pkgEntry: any = { version };
 
-            // Parse dependencies
-            if (entry.dependencies && typeof entry.dependencies === 'object') {
-                const deps: Record<string, string> = {};
-                for (const [depName, depConstraint] of Object.entries(entry.dependencies as Record<string, string>)) {
-                    // Constraint is like "npm:^6.0.0" - strip the "npm:" prefix
-                    const constraint = depConstraint.startsWith('npm:')
-                        ? depConstraint.substring(4)
-                        : depConstraint;
-                    deps[depName] = constraint;
+            // Collect all dependency types
+            const allDeps: Record<string, string> = {};
+            for (const depType of ['dependencies', 'peerDependencies', 'optionalDependencies']) {
+                const deps = entry[depType];
+                if (deps && typeof deps === 'object') {
+                    for (const [depName, depConstraint] of Object.entries(deps as Record<string, string>)) {
+                        // Constraint is like "npm:^6.0.0" - strip the "npm:" prefix
+                        const constraint = String(depConstraint).startsWith('npm:')
+                            ? String(depConstraint).substring(4)
+                            : String(depConstraint);
+                        allDeps[depName] = constraint;
+                    }
                 }
-                if (Object.keys(deps).length > 0) {
-                    pkgEntry.dependencies = deps;
-                }
+            }
+
+            if (Object.keys(allDeps).length > 0) {
+                pkgEntry.dependencies = allDeps;
             }
 
             packages[pkgKey] = pkgEntry;
@@ -454,11 +478,18 @@ export class PackageJsonParser extends Parser {
      *   integrity sha512-...
      *   dependencies:
      *     is-number "^6.0.0"
+     *   optionalDependencies:
+     *     fsevents "^2.0.0"
+     *   peerDependencies:
+     *     react "^17.0.0 || ^18.0.0"
      */
     private parseYarnClassicLock(content: string): any {
         const packages: Record<string, any> = {
             "": {} // Root package placeholder
         };
+
+        // Dependency section types we want to capture
+        const depSectionTypes = ['dependencies', 'optionalDependencies', 'peerDependencies'];
 
         // Split into package blocks - each block starts with an unindented line ending with ":"
         // and may span multiple version constraints (e.g., "pkg@^1.0.0, pkg@^1.2.0:")
@@ -466,7 +497,7 @@ export class PackageJsonParser extends Parser {
         let currentNames: string[] = [];
         let currentVersion: string | null = null;
         let currentDeps: Record<string, string> = {};
-        let inDependencies = false;
+        let inDependencySection = false;
 
         for (const line of lines) {
             // Skip comments and empty lines
@@ -510,7 +541,7 @@ export class PackageJsonParser extends Parser {
 
                 currentVersion = null;
                 currentDeps = {};
-                inDependencies = false;
+                inDependencySection = false;
                 continue;
             }
 
@@ -521,21 +552,23 @@ export class PackageJsonParser extends Parser {
                 continue;
             }
 
-            // Dependencies section start
-            if (line.match(/^\s+dependencies:\s*$/)) {
-                inDependencies = true;
+            // Check for dependency section start (dependencies, optionalDependencies, peerDependencies)
+            const sectionMatch = line.match(/^\s+(\w+):\s*$/);
+            if (sectionMatch) {
+                inDependencySection = depSectionTypes.includes(sectionMatch[1]);
                 continue;
             }
 
-            // Other section (resolved, integrity, etc.) - ends dependencies section
-            if (line.match(/^\s+\w+:/) && !line.match(/^\s{4}/)) {
-                inDependencies = false;
+            // Other field with value on same line (resolved, integrity, etc.) - not a section
+            if (line.match(/^\s+\w+\s+["']/)) {
+                inDependencySection = false;
                 continue;
             }
 
-            // Dependency entry: '    is-number "^6.0.0"'
-            if (inDependencies) {
-                const depMatch = line.match(/^\s{4}(.+?)\s+"([^"]+)"/);
+            // Dependency entry: '    is-number "^6.0.0"' or '    "@babel/core" "^7.0.0"'
+            if (inDependencySection) {
+                // Handle both quoted and unquoted package names
+                const depMatch = line.match(/^\s{4}"?([^"]+)"?\s+"([^"]+)"/);
                 if (depMatch) {
                     currentDeps[depMatch[1]] = depMatch[2];
                 }

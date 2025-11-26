@@ -13,7 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {PackageJsonParser, findNodeResolutionResult, NodeResolutionResultQueries, npm, packageJson, packageLockJson, typescript} from "../../src/javascript";
+import {
+    findNodeResolutionResult,
+    NodeResolutionResultQueries,
+    npm,
+    packageJson,
+    PackageJsonParser,
+    packageLockJson,
+    typescript
+} from "../../src/javascript";
 import {Json} from "../../src/json";
 import {RecipeSpec} from "../../src/test";
 import {withDir} from "tmp-promise";
