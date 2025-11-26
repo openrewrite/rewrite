@@ -41,7 +41,7 @@ import static java.util.Collections.emptyList;
  * <p>
  * The model separates requests (Dependency) from resolutions (ResolvedDependency):
  * - The dependency arrays contain Dependency objects (what was requested)
- * - The resolutions map links each Dependency to its ResolvedDependency
+ * - The resolvedDependencies list contains what was actually installed
  */
 @Value
 @With
@@ -64,14 +64,31 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
     List<Dependency> optionalDependencies;
     List<Dependency> bundledDependencies;
 
-    // Resolution map (from package-lock.json) - maps requests to resolved versions
-    @Nullable Map<Dependency, ResolvedDependency> resolvedDependencies;
+    // Resolved dependencies from package-lock.json - what was actually installed
+    // Use getResolvedDependency() helper to look up by name
+    List<ResolvedDependency> resolvedDependencies;
 
     // The package manager used by the project (npm, yarn, pnpm, etc.)
     @Nullable PackageManager packageManager;
 
     // Node/npm version requirements
     @Nullable Map<String, String> engines;
+
+    /**
+     * Look up a resolved dependency by package name.
+     *
+     * @param packageName The name of the package to look up
+     * @return The resolved dependency, or null if not found
+     */
+    public @Nullable ResolvedDependency getResolvedDependency(String packageName) {
+        if (resolvedDependencies == null) {
+            return null;
+        }
+        return resolvedDependencies.stream()
+                .filter(r -> r.getName().equals(packageName))
+                .findFirst()
+                .orElse(null);
+    }
 
     @Override
     public void rpcSend(NodeResolutionResult after, RpcSendQueue q) {
@@ -97,8 +114,9 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
         q.getAndSendListAsRef(after, NodeResolutionResult::getBundledDependencies,
                 dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
-
-        // TODO: send resolvedDependencies map when package-lock.json parsing is implemented
+        q.getAndSendListAsRef(after, NodeResolutionResult::getResolvedDependencies,
+                resolved -> resolved.getName() + "@" + resolved.getVersion(),
+                resolved -> resolved.rpcSend(resolved, q));
 
         q.getAndSend(after, NodeResolutionResult::getPackageManager);
         q.getAndSend(after, NodeResolutionResult::getEngines);
@@ -123,7 +141,8 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
                         dep -> dep.rpcReceive(dep, q)))
                 .withBundledDependencies(q.receiveList(before.bundledDependencies,
                         dep -> dep.rpcReceive(dep, q)))
-                // TODO: receive resolvedDependencies map when package-lock.json parsing is implemented
+                .withResolvedDependencies(q.receiveList(before.resolvedDependencies,
+                        resolved -> resolved.rpcReceive(resolved, q)))
                 .withPackageManager(q.receiveAndGet(before.packageManager, s -> s == null ? null : PackageManager.valueOf(s.toString())))
                 .withEngines(q.receive(before.engines));
     }

@@ -84,7 +84,7 @@ export interface ResolvedDependency {
  *
  * The model separates requests (Dependency) from resolutions (ResolvedDependency):
  * - The dependency arrays contain Dependency objects (what was requested)
- * - The resolvedDependencies map links each Dependency to its ResolvedDependency
+ * - The resolvedDependencies list contains what was actually installed
  */
 export interface NodeResolutionResult extends Marker {
     readonly kind: typeof NodeResolutionResultKind;
@@ -106,9 +106,9 @@ export interface NodeResolutionResult extends Marker {
     readonly optionalDependencies: Dependency[];  // Optional dependencies
     readonly bundledDependencies: Dependency[];   // Bundled dependencies
 
-    // Resolution map (from package-lock.json) - maps requests to resolved versions
-    // Key is Dependency (by value equality on name+versionConstraint)
-    readonly resolvedDependencies?: Map<Dependency, ResolvedDependency>;
+    // Resolved dependencies from package-lock.json - what was actually installed
+    // Use getResolvedDependency() helper to look up by name
+    readonly resolvedDependencies: ResolvedDependency[];
 
     // The package manager used by the project (npm, yarn, pnpm, etc.)
     readonly packageManager?: PackageManager;
@@ -215,18 +215,16 @@ export function createNodeResolutionResultMarker(
     }
 
     /**
-     * Parses package-lock.json to build the resolutions map.
-     * The map links Dependency requests to their ResolvedDependency.
+     * Parses package-lock.json to build a list of resolved dependencies.
      */
     function parseResolutions(
         lockContent: any
-    ): Map<Dependency, ResolvedDependency> | undefined {
-        if (!lockContent?.packages) return undefined;
+    ): ResolvedDependency[] {
+        if (!lockContent?.packages) return [];
 
-        const resolutions = new Map<Dependency, ResolvedDependency>();
         const packages = lockContent.packages as Record<string, any>;
 
-        // First pass: create all ResolvedDependency objects
+        // Create ResolvedDependency objects for all packages
         for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
             // Skip the root package (empty string key)
             if (pkgPath === '') continue;
@@ -239,66 +237,8 @@ export function createNodeResolutionResultMarker(
             }
         }
 
-        // Second pass: link dependencies to their resolutions
-        // We need to map each Dependency (name + versionConstraint) to its ResolvedDependency
-        for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
-            const allDeps: Record<string, string> = {
-                ...(pkgEntry.dependencies || {}),
-                ...(pkgEntry.devDependencies || {}),
-                ...(pkgEntry.peerDependencies || {}),
-                ...(pkgEntry.optionalDependencies || {}),
-            };
-
-            for (const [depName, versionConstraint] of Object.entries(allDeps)) {
-                const dep = getOrCreateDependency(depName, versionConstraint);
-
-                // If we haven't resolved this dependency yet, find its resolution
-                if (!resolutions.has(dep)) {
-                    // Look for the resolved package in the packages map
-                    // First try direct path, then nested paths
-                    const directPath = `node_modules/${depName}`;
-
-                    // For nested dependencies, we need to find the correct resolution
-                    // by walking up from the current package's node_modules
-                    let resolvedEntry: any = null;
-                    let searchPath = pkgPath === '' ? '' : pkgPath;
-
-                    // Walk up the directory tree to find the resolved package
-                    while (true) {
-                        const candidatePath = searchPath
-                            ? `${searchPath}/node_modules/${depName}`
-                            : `node_modules/${depName}`;
-
-                        if (packages[candidatePath]) {
-                            resolvedEntry = packages[candidatePath];
-                            break;
-                        }
-
-                        // Move up one level
-                        const lastNodeModules = searchPath.lastIndexOf('/node_modules');
-                        if (lastNodeModules === -1) {
-                            // We're at the root, try the direct path one more time
-                            if (packages[directPath]) {
-                                resolvedEntry = packages[directPath];
-                            }
-                            break;
-                        }
-                        searchPath = searchPath.slice(0, lastNodeModules);
-                    }
-
-                    if (resolvedEntry && resolvedEntry.version) {
-                        const resolved = getOrCreateResolvedDependency(
-                            depName,
-                            resolvedEntry.version,
-                            resolvedEntry
-                        );
-                        resolutions.set(dep, resolved);
-                    }
-                }
-            }
-        }
-
-        return resolutions.size > 0 ? resolutions : undefined;
+        // Return all unique resolved dependencies
+        return Array.from(resolvedDependencyCache.values());
     }
 
     const dependencies = parseDependencies(packageJsonContent.dependencies);
@@ -310,7 +250,7 @@ export function createNodeResolutionResultMarker(
     );
 
     // Parse resolved dependencies from package-lock.json if provided
-    const resolvedDependencies = packageLockContent ? parseResolutions(packageLockContent) : undefined;
+    const resolvedDependencies = packageLockContent ? parseResolutions(packageLockContent) : [];
 
     return {
         kind: NodeResolutionResultKind,
@@ -391,26 +331,25 @@ export namespace NodeResolutionResultQueries {
     }
 
     /**
-     * Resolve a dependency request to its installed version.
-     * Returns undefined if resolvedDependencies are not available or the dependency is not resolved.
+     * Get a resolved dependency by package name.
+     * Returns undefined if the package is not in resolvedDependencies.
      */
-    export function resolve(
+    export function getResolvedDependency(
         project: NodeResolutionResult,
-        dependency: Dependency
+        packageName: string
     ): ResolvedDependency | undefined {
-        return project.resolvedDependencies?.get(dependency);
+        return project.resolvedDependencies.find(r => r.name === packageName);
     }
 
     /**
      * Find and resolve a dependency by name.
-     * Returns the resolved dependency if found and resolvedDependencies are available.
+     * Returns the resolved dependency if found.
      */
     export function findResolved(
         project: NodeResolutionResult,
         packageName: string
     ): ResolvedDependency | undefined {
-        const dep = findDependency(project, packageName);
-        return dep ? resolve(project, dep) : undefined;
+        return getResolvedDependency(project, packageName);
     }
 }
 
@@ -487,8 +426,7 @@ RpcCodecs.registerCodec(NodeResolutionResultKind, {
         draft.peerDependencies = (await q.receiveList(before.peerDependencies)) || [];
         draft.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || [];
         draft.bundledDependencies = (await q.receiveList(before.bundledDependencies)) || [];
-
-        // TODO: receive resolvedDependencies map when package-lock.json parsing is implemented
+        draft.resolvedDependencies = (await q.receiveList(before.resolvedDependencies)) || [];
 
         draft.packageManager = await q.receive(before.packageManager);
         draft.engines = await q.receive(before.engines);
@@ -514,8 +452,8 @@ RpcCodecs.registerCodec(NodeResolutionResultKind, {
             dep => `${dep.name}@${dep.versionConstraint}`);
         await q.getAndSendList(after, a => a.bundledDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-
-        // TODO: send resolvedDependencies map when package-lock.json parsing is implemented
+        await q.getAndSendList(after, a => a.resolvedDependencies.map(r => asRef(r)),
+            resolved => `${resolved.name}@${resolved.version}`);
 
         await q.getAndSend(after, a => a.packageManager);
         await q.getAndSend(after, a => a.engines);
