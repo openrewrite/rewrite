@@ -282,6 +282,19 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5179")
+    @Test
+    void tagsInSequences() {
+        rewriteRun(
+          yaml(
+            """
+            Conditions:
+              IsPollingFrequencyInMinutesSingular: !Equals [!Ref PollingFrequencyInMinutes, 1]
+            """
+          )
+        );
+    }
+
     @Test
     void globalTags() {
         rewriteRun(
