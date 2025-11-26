@@ -349,15 +349,10 @@ describe("NodeResolutionResult marker", () => {
                     `), afterRecipe: async (doc: Json.Document) => {
                         const nodeResolutionResult = findNodeResolutionResult(doc);
                         expect(nodeResolutionResult).toBeDefined();
-                        expect(nodeResolutionResult!.resolvedDependencies).toBeDefined();
-                        expect(nodeResolutionResult!.resolvedDependencies!.size).toBeGreaterThan(0);
+                        expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Find the lodash dependency request
-                        const lodashDep = NodeResolutionResultQueries.findDependency(nodeResolutionResult!, "lodash");
-                        expect(lodashDep).toBeDefined();
-
-                        // Resolve it using the resolvedDependencies map
-                        const resolvedLodash = nodeResolutionResult!.resolvedDependencies!.get(lodashDep!);
+                        // Resolve using the helper
+                        const resolvedLodash = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "lodash");
                         expect(resolvedLodash).toBeDefined();
                         expect(resolvedLodash!.name).toBe("lodash");
                         expect(resolvedLodash!.version).toBe("4.17.20");
@@ -407,13 +402,10 @@ describe("NodeResolutionResult marker", () => {
                     `), afterRecipe: async (doc: Json.Document) => {
                         const nodeResolutionResult = findNodeResolutionResult(doc);
                         expect(nodeResolutionResult).toBeDefined();
-                        expect(nodeResolutionResult!.resolvedDependencies).toBeDefined();
+                        expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Find and resolve express
-                        const expressDep = NodeResolutionResultQueries.findDependency(nodeResolutionResult!, "express");
-                        expect(expressDep).toBeDefined();
-
-                        const resolvedExpress = nodeResolutionResult!.resolvedDependencies!.get(expressDep!);
+                        // Resolve express using the helper
+                        const resolvedExpress = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "express");
                         expect(resolvedExpress).toBeDefined();
                         expect(resolvedExpress!.name).toBe("express");
                         expect(resolvedExpress!.version).toBe("4.18.2");
@@ -422,12 +414,8 @@ describe("NodeResolutionResult marker", () => {
                         expect(resolvedExpress!.dependencies).toBeDefined();
                         expect(resolvedExpress!.dependencies!.length).toBeGreaterThan(0);
 
-                        // Find body-parser in express's dependencies
-                        const bodyParserDep = resolvedExpress!.dependencies!.find((d: Dependency) => d.name === "body-parser");
-                        expect(bodyParserDep).toBeDefined();
-
-                        // Resolve body-parser
-                        const resolvedBodyParser = nodeResolutionResult!.resolvedDependencies!.get(bodyParserDep!);
+                        // body-parser should also be in the resolved dependencies list
+                        const resolvedBodyParser = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "body-parser");
                         expect(resolvedBodyParser).toBeDefined();
                         expect(resolvedBodyParser!.name).toBe("body-parser");
                         expect(resolvedBodyParser!.version).toBe("1.20.1");
@@ -499,17 +487,11 @@ describe("NodeResolutionResult marker", () => {
                     `), afterRecipe: async (doc: Json.Document) => {
                         const nodeResolutionResult = findNodeResolutionResult(doc);
                         expect(nodeResolutionResult).toBeDefined();
-                        expect(nodeResolutionResult!.resolvedDependencies).toBeDefined();
+                        expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Both 'chalk' and 'yargs' depend on various packages
-                        // We'll verify that identical Dependency requests get deduplicated
-                        const chalkDep = NodeResolutionResultQueries.findDependency(nodeResolutionResult!, "chalk");
-                        const yargsDep = NodeResolutionResultQueries.findDependency(nodeResolutionResult!, "yargs");
-                        expect(chalkDep).toBeDefined();
-                        expect(yargsDep).toBeDefined();
-
-                        const resolvedChalk = nodeResolutionResult!.resolvedDependencies!.get(chalkDep!);
-                        const resolvedYargs = nodeResolutionResult!.resolvedDependencies!.get(yargsDep!);
+                        // Resolve chalk and yargs using the helper
+                        const resolvedChalk = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "chalk");
+                        const resolvedYargs = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "yargs");
                         expect(resolvedChalk).toBeDefined();
                         expect(resolvedYargs).toBeDefined();
 
@@ -522,10 +504,10 @@ describe("NodeResolutionResult marker", () => {
                         // The Dependency objects should be the same instance (deduplication)
                         expect(supportsColorFromChalk).toBe(supportsColorFromYargs);
 
-                        // And they should resolve to the same ResolvedDependency
-                        const resolvedSupportsColorFromChalk = nodeResolutionResult!.resolvedDependencies!.get(supportsColorFromChalk!);
-                        const resolvedSupportsColorFromYargs = nodeResolutionResult!.resolvedDependencies!.get(supportsColorFromYargs!);
-                        expect(resolvedSupportsColorFromChalk).toBe(resolvedSupportsColorFromYargs);
+                        // supports-color should be in the resolved dependencies list
+                        const resolvedSupportsColor = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "supports-color");
+                        expect(resolvedSupportsColor).toBeDefined();
+                        expect(resolvedSupportsColor!.version).toBe("7.2.0");
                     }},
                     packageLockJson(`
                         {
@@ -586,11 +568,10 @@ describe("NodeResolutionResult marker", () => {
                         const nodeResolutionResult = findNodeResolutionResult(doc);
                         expect(nodeResolutionResult).toBeDefined();
 
-                        // Test resolve() with explicit dependency
-                        const lodashDep = NodeResolutionResultQueries.findDependency(nodeResolutionResult!, "lodash");
-                        const resolvedViaResolve = NodeResolutionResultQueries.resolve(nodeResolutionResult!, lodashDep!);
-                        expect(resolvedViaResolve).toBeDefined();
-                        expect(resolvedViaResolve!.version).toBe("4.17.21");
+                        // Test getResolvedDependency() helper
+                        const resolvedViaHelper = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "lodash");
+                        expect(resolvedViaHelper).toBeDefined();
+                        expect(resolvedViaHelper!.version).toBe("4.17.21");
 
                         // Test findResolved() convenience method
                         const resolvedViaFindResolved = NodeResolutionResultQueries.findResolved(nodeResolutionResult!, "lodash");
@@ -598,7 +579,7 @@ describe("NodeResolutionResult marker", () => {
                         expect(resolvedViaFindResolved!.version).toBe("4.17.21");
 
                         // Both should return the same instance
-                        expect(resolvedViaResolve).toBe(resolvedViaFindResolved);
+                        expect(resolvedViaHelper).toBe(resolvedViaFindResolved);
 
                         // Test with non-existent package
                         const nonExistent = NodeResolutionResultQueries.findResolved(nodeResolutionResult!, "nonexistent");

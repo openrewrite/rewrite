@@ -77,12 +77,10 @@ describe("PackageJsonParser", () => {
                     `), afterRecipe: async (doc: Json.Document) => {
                         const marker = findNodeResolutionResult(doc);
                         expect(marker).toBeDefined();
-                        expect(marker!.resolvedDependencies).toBeDefined();
+                        expect(marker!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Check resolved dependency
-                        const lodashDep = NodeResolutionResultQueries.findDependency(marker!, "lodash");
-                        expect(lodashDep).toBeDefined();
-                        const resolved = marker!.resolvedDependencies!.get(lodashDep!);
+                        // Check resolved dependency using helper
+                        const resolved = NodeResolutionResultQueries.getResolvedDependency(marker!, "lodash");
                         expect(resolved).toBeDefined();
                         expect(resolved!.version).toBe("4.17.21");
                         expect(resolved!.license).toBe("MIT");
@@ -167,7 +165,7 @@ describe("PackageJsonParser", () => {
             const marker = findNodeResolutionResult(results[0]);
             expect(marker).toBeDefined();
             // Should not have resolved dependencies since we skipped resolution
-            expect(marker!.resolvedDependencies).toBeUndefined();
+            expect(marker!.resolvedDependencies).toHaveLength(0);
         }, {unsafeCleanup: true});
     });
 
@@ -212,7 +210,7 @@ describe("PackageJsonParser", () => {
             expect(marker!.dependencies).toHaveLength(1);
             expect(marker!.dependencies[0].name).toBe("react");
             // No lock file = no resolved dependencies
-            expect(marker!.resolvedDependencies).toBeUndefined();
+            expect(marker!.resolvedDependencies).toHaveLength(0);
         }, {unsafeCleanup: true});
     });
 
