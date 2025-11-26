@@ -216,17 +216,31 @@ describe("Lock file parsing", () => {
         });
     });
 
-    describe("yarn (yarn.lock)", () => {
+    describe("yarn classic (yarn.lock v1)", () => {
         test("should parse all dependencies from yarn.lock", async () => {
             const marker = await getMarkerOrSkip("yarn");
             if (!marker) return; // Skip if CLI not available
             assertCommonExpectations(marker.resolvedDependencies, "yarn");
         });
 
-        test("should set packageManager to Yarn", async () => {
+        test("should set packageManager to YarnClassic", async () => {
             const marker = await getMarkerOrSkip("yarn");
             if (!marker) return; // Skip if CLI not available
-            expect(marker.packageManager).toBe(PackageManager.Yarn);
+            expect(marker.packageManager).toBe(PackageManager.YarnClassic);
+        });
+    });
+
+    describe("yarn berry (yarn.lock v2+)", () => {
+        test("should parse all dependencies from yarn.lock", async () => {
+            const marker = await getMarkerOrSkip("yarn-berry");
+            if (!marker) return; // Skip if CLI not available
+            assertCommonExpectations(marker.resolvedDependencies, "yarn-berry");
+        });
+
+        test("should set packageManager to YarnBerry", async () => {
+            const marker = await getMarkerOrSkip("yarn-berry");
+            if (!marker) return; // Skip if CLI not available
+            expect(marker.packageManager).toBe(PackageManager.YarnBerry);
         });
     });
 });

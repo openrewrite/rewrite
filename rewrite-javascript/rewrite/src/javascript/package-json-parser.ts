@@ -186,9 +186,9 @@ export class PackageJsonParser extends Parser {
         const yarnLockPath = path.join(dir, 'yarn.lock');
         if (fs.existsSync(yarnLockPath)) {
             try {
-                const content = this.getYarnDependencies(dir);
-                if (content) {
-                    return { content, packageManager: PackageManager.Yarn };
+                const result = this.getYarnDependencies(dir);
+                if (result) {
+                    return result;
                 }
             } catch (error) {
                 // Silently ignore errors
@@ -360,18 +360,19 @@ export class PackageJsonParser extends Parser {
      * Gets dependency information from yarn using its CLI.
      * For Yarn Classic (v1), uses `yarn list --json`.
      * For Yarn Berry (v2+), uses `yarn info --all --json`.
+     * Returns both the content and which type of yarn was detected.
      */
-    private getYarnDependencies(dir: string): any {
+    private getYarnDependencies(dir: string): { content: any; packageManager: PackageManager } | undefined {
         // Try Yarn Berry first (v2+)
         try {
-            const output = execSync('yarn info --all --json', {
+            const output = execSync('yarn info --all --recursive --json', {
                 cwd: dir,
                 encoding: 'utf-8',
                 stdio: ['pipe', 'pipe', 'pipe'],
                 timeout: 30000
             });
             const result = this.convertYarnBerryOutputToNpmFormat(output);
-            if (result) return result;
+            if (result) return { content: result, packageManager: PackageManager.YarnBerry };
         } catch {
             // Yarn Berry command failed, try Yarn Classic
         }
@@ -384,14 +385,18 @@ export class PackageJsonParser extends Parser {
                 stdio: ['pipe', 'pipe', 'pipe'],
                 timeout: 30000
             });
-            return this.convertYarnClassicOutputToNpmFormat(output);
+            const content = this.convertYarnClassicOutputToNpmFormat(output);
+            if (content) return { content, packageManager: PackageManager.YarnClassic };
         } catch {
-            return undefined;
+            // Yarn Classic command failed
         }
+        return undefined;
     }
 
     /**
      * Converts Yarn Berry (v2+) output to npm package-lock.json format.
+     * Input format: newline-delimited JSON with entries like:
+     * {"value":"is-odd@npm:3.0.1","children":{"Version":"3.0.1","Dependencies":[{"descriptor":"is-number@npm:^6.0.0","locator":"is-number@npm:6.0.0"}]}}
      */
     private convertYarnBerryOutputToNpmFormat(output: string): any {
         const packages: Record<string, any> = {
@@ -407,17 +412,44 @@ export class PackageJsonParser extends Parser {
             try {
                 const entry = JSON.parse(line);
 
-                // Yarn Berry format: { value: "pkg@version", children: { Version: "x.y.z", ... } }
+                // Yarn Berry format: { value: "pkg@npm:version", children: { Version: "x.y.z", Dependencies: [...] } }
                 if (entry.value && entry.children?.Version) {
-                    const atIndex = entry.value.lastIndexOf('@');
-                    if (atIndex > 0) {
-                        const name = entry.value.substring(0, atIndex);
-                        const version = entry.children.Version;
-                        packages[`node_modules/${name}@${version}`] = {
-                            version,
-                            license: entry.children.License,
-                        };
+                    // Skip workspace entries
+                    if (entry.value.includes('@workspace:')) continue;
+
+                    // Parse name from value like "is-odd@npm:3.0.1"
+                    const npmIndex = entry.value.indexOf('@npm:');
+                    if (npmIndex <= 0) continue;
+
+                    const name = entry.value.substring(0, npmIndex);
+                    const version = entry.children.Version;
+                    const pkgKey = `node_modules/${name}@${version}`;
+
+                    const pkgEntry: any = {
+                        version,
+                        license: entry.children.License,
+                    };
+
+                    // Parse dependencies from Dependencies array
+                    if (entry.children.Dependencies && Array.isArray(entry.children.Dependencies)) {
+                        const deps: Record<string, string> = {};
+                        for (const dep of entry.children.Dependencies) {
+                            // descriptor: "is-number@npm:^6.0.0"
+                            if (dep.descriptor) {
+                                const depNpmIndex = dep.descriptor.indexOf('@npm:');
+                                if (depNpmIndex > 0) {
+                                    const depName = dep.descriptor.substring(0, depNpmIndex);
+                                    const depConstraint = dep.descriptor.substring(depNpmIndex + 5);
+                                    deps[depName] = depConstraint;
+                                }
+                            }
+                        }
+                        if (Object.keys(deps).length > 0) {
+                            pkgEntry.dependencies = deps;
+                        }
                     }
+
+                    packages[pkgKey] = pkgEntry;
                 }
             } catch {
                 // Skip unparseable lines

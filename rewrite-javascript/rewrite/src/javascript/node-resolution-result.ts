@@ -28,7 +28,8 @@ export const ResolvedDependencyKind = "org.openrewrite.javascript.marker.NodeRes
  */
 export const enum PackageManager {
     Npm = 'Npm',
-    Yarn = 'Yarn',
+    YarnClassic = 'YarnClassic',
+    YarnBerry = 'YarnBerry',
     Pnpm = 'Pnpm',
     Bun = 'Bun',
 }
