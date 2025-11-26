@@ -40,7 +40,7 @@ public class PackageJsonParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.getFileName().toString().equals("package.json");
+        return "package.json".equals(path.getFileName().toString());
     }
 
     @Override
