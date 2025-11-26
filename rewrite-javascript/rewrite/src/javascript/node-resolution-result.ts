@@ -19,9 +19,19 @@ import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {createDraft, finishDraft} from "immer";
 
-export const NodeProjectMarkerKind = "org.openrewrite.javascript.marker.NodeProject" as const;
-export const DependencyKind = "org.openrewrite.javascript.marker.NodeProject$Dependency" as const;
-export const ResolvedDependencyKind = "org.openrewrite.javascript.marker.NodeProject$ResolvedDependency" as const;
+export const NodeResolutionResultKind = "org.openrewrite.javascript.marker.NodeResolutionResult" as const;
+export const DependencyKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Dependency" as const;
+export const ResolvedDependencyKind = "org.openrewrite.javascript.marker.NodeResolutionResult$ResolvedDependency" as const;
+
+/**
+ * Represents the package manager used by a Node.js project.
+ */
+export const enum PackageManager {
+    Npm = 'Npm',
+    Yarn = 'Yarn',
+    Pnpm = 'Ppm',
+    Bun = 'Bun',
+}
 
 /**
  * Represents a dependency request as declared in package.json.
@@ -42,7 +52,7 @@ export interface Dependency {
  * This is what was actually installed (name + resolved version + its own dependencies).
  *
  * Each ResolvedDependency's dependency arrays contain Dependency objects (requests),
- * which can be looked up in NodeProject.resolutions to find their resolved versions.
+ * which can be looked up in NodeResolutionResult.resolvedDependencies to find their resolved versions.
  */
 export interface ResolvedDependency {
     readonly kind: typeof ResolvedDependencyKind;
@@ -66,7 +76,7 @@ export interface ResolvedDependency {
  * Contains metadata about a Node.js project, parsed from package.json and package-lock.json.
  * Attached as a marker to JS.CompilationUnit to provide dependency context for recipes.
  *
- * Similar to GradleProject marker, this allows recipes to:
+ * Similar to MavenResolutionResult marker, this allows recipes to:
  * - Query project dependencies
  * - Check if specific packages are in use
  * - Modify dependencies programmatically
@@ -74,17 +84,20 @@ export interface ResolvedDependency {
  *
  * The model separates requests (Dependency) from resolutions (ResolvedDependency):
  * - The dependency arrays contain Dependency objects (what was requested)
- * - The resolutions map links each Dependency to its ResolvedDependency
+ * - The resolvedDependencies map links each Dependency to its ResolvedDependency
  */
-export interface NodeProject extends Marker {
-    readonly kind: typeof NodeProjectMarkerKind;
+export interface NodeResolutionResult extends Marker {
+    readonly kind: typeof NodeResolutionResultKind;
     readonly id: UUID;
 
     // Project metadata from package.json
     readonly name?: string;           // Project name
     readonly version?: string;        // Project version
     readonly description?: string;    // Project description
-    readonly packageJsonPath: string; // Path to the package.json file
+    readonly path: string;            // Path to the package.json file
+
+    // Paths to workspace package.json files (only populated on workspace root)
+    readonly workspacePackagePaths?: string[];
 
     // Dependency requests organized by scope (from package.json)
     readonly dependencies: Dependency[];          // Regular dependencies
@@ -95,28 +108,33 @@ export interface NodeProject extends Marker {
 
     // Resolution map (from package-lock.json) - maps requests to resolved versions
     // Key is Dependency (by value equality on name+versionConstraint)
-    readonly resolutions?: Map<Dependency, ResolvedDependency>;
+    readonly resolvedDependencies?: Map<Dependency, ResolvedDependency>;
+
+    // The package manager used by the project (npm, yarn, pnpm, etc.)
+    readonly packageManager?: PackageManager;
 
     // Node/npm version requirements
     readonly engines?: Record<string, string>;
 }
 
 /**
- * Creates a NodeProject marker from a package.json file.
+ * Creates a NodeResolutionResult marker from a package.json file.
  * Should be called during parsing to attach to JS.CompilationUnit.
  *
  * All Dependency instances are wrapped with asRef() to enable
  * reference deduplication during RPC serialization.
  *
- * @param packageJsonPath Path to the package.json file
+ * @param path Path to the package.json file
  * @param packageJsonContent Parsed package.json content
  * @param packageLockContent Optional parsed package-lock.json content for resolution info
+ * @param workspacePackagePaths Optional resolved paths to workspace package.json files (only for workspace root)
  */
-export function createNodeProjectMarker(
-    packageJsonPath: string,
+export function createNodeResolutionResultMarker(
+    path: string,
     packageJsonContent: any,
-    packageLockContent?: any
-): NodeProject {
+    packageLockContent?: any,
+    workspacePackagePaths?: string[]
+): NodeResolutionResult {
     // Cache for deduplicating dependencies with the same name+versionConstraint.
     const dependencyCache = new Map<string, Dependency>();
     // Cache for deduplicating resolved dependencies with the same name+version.
@@ -291,42 +309,44 @@ export function createNodeProjectMarker(
         packageJsonContent.bundledDependencies || packageJsonContent.bundleDependencies
     );
 
-    // Parse resolutions from package-lock.json if provided
-    const resolutions = packageLockContent ? parseResolutions(packageLockContent) : undefined;
+    // Parse resolved dependencies from package-lock.json if provided
+    const resolvedDependencies = packageLockContent ? parseResolutions(packageLockContent) : undefined;
 
     return {
-        kind: NodeProjectMarkerKind,
+        kind: NodeResolutionResultKind,
         id: randomId(),
         name: packageJsonContent.name,
         version: packageJsonContent.version,
         description: packageJsonContent.description,
-        packageJsonPath,
+        path,
+        workspacePackagePaths,
         dependencies,
         devDependencies,
         peerDependencies,
         optionalDependencies,
         bundledDependencies,
-        resolutions,
+        resolvedDependencies,
+        // packageManager is not set here - it should be determined by the caller based on lock file presence
         engines: packageJsonContent.engines,
     };
 }
 
 /**
- * Helper function to find a NodeProject marker on a compilation unit.
+ * Helper function to find a NodeResolutionResult marker on a compilation unit.
  */
-export function findNodeProject(cu: { markers: Markers }): NodeProject | undefined {
-    return findMarker<NodeProject>(cu, NodeProjectMarkerKind);
+export function findNodeResolutionResult(cu: { markers: Markers }): NodeResolutionResult | undefined {
+    return findMarker<NodeResolutionResult>(cu, NodeResolutionResultKind);
 }
 
 /**
  * Helper functions for querying dependencies
  */
-export namespace NodeProjectQueries {
+export namespace NodeResolutionResultQueries {
 
     /**
      * Get all dependency requests from all scopes.
      */
-    export function getAllDependencies(project: NodeProject): Dependency[] {
+    export function getAllDependencies(project: NodeResolutionResult): Dependency[] {
         return [
             ...project.dependencies,
             ...project.devDependencies,
@@ -340,7 +360,7 @@ export namespace NodeProjectQueries {
      * Check if project has a specific dependency request, optionally filtered by scope.
      */
     export function hasDependency(
-        project: NodeProject,
+        project: NodeResolutionResult,
         packageName: string,
         scope?: 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies' | 'bundledDependencies'
     ): boolean {
@@ -354,7 +374,7 @@ export namespace NodeProjectQueries {
      * Find a specific dependency request by name across all scopes.
      */
     export function findDependency(
-        project: NodeProject,
+        project: NodeResolutionResult,
         packageName: string
     ): Dependency | undefined {
         return getAllDependencies(project).find(dep => dep.name === packageName);
@@ -364,7 +384,7 @@ export namespace NodeProjectQueries {
      * Get all dependency requests matching a predicate.
      */
     export function findDependencies(
-        project: NodeProject,
+        project: NodeResolutionResult,
         predicate: (dep: Dependency) => boolean
     ): Dependency[] {
         return getAllDependencies(project).filter(predicate);
@@ -372,21 +392,21 @@ export namespace NodeProjectQueries {
 
     /**
      * Resolve a dependency request to its installed version.
-     * Returns undefined if resolutions are not available or the dependency is not resolved.
+     * Returns undefined if resolvedDependencies are not available or the dependency is not resolved.
      */
     export function resolve(
-        project: NodeProject,
+        project: NodeResolutionResult,
         dependency: Dependency
     ): ResolvedDependency | undefined {
-        return project.resolutions?.get(dependency);
+        return project.resolvedDependencies?.get(dependency);
     }
 
     /**
      * Find and resolve a dependency by name.
-     * Returns the resolved dependency if found and resolutions are available.
+     * Returns the resolved dependency if found and resolvedDependencies are available.
      */
     export function findResolved(
-        project: NodeProject,
+        project: NodeResolutionResult,
         packageName: string
     ): ResolvedDependency | undefined {
         const dep = findDependency(project, packageName);
@@ -449,17 +469,18 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
 });
 
 /**
- * Register RPC codec for NodeProject marker.
+ * Register RPC codec for NodeResolutionResult marker.
  * This handles serialization/deserialization for communication between JS and Java.
  */
-RpcCodecs.registerCodec(NodeProjectMarkerKind, {
-    async rpcReceive(before: NodeProject, q: RpcReceiveQueue): Promise<NodeProject> {
+RpcCodecs.registerCodec(NodeResolutionResultKind, {
+    async rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): Promise<NodeResolutionResult> {
         const draft = createDraft(before);
         draft.id = await q.receive(before.id);
         draft.name = await q.receive(before.name);
         draft.version = await q.receive(before.version);
         draft.description = await q.receive(before.description);
-        draft.packageJsonPath = await q.receive(before.packageJsonPath);
+        draft.path = await q.receive(before.path);
+        draft.workspacePackagePaths = await q.receive(before.workspacePackagePaths);
 
         draft.dependencies = (await q.receiveList(before.dependencies)) || [];
         draft.devDependencies = (await q.receiveList(before.devDependencies)) || [];
@@ -467,19 +488,21 @@ RpcCodecs.registerCodec(NodeProjectMarkerKind, {
         draft.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || [];
         draft.bundledDependencies = (await q.receiveList(before.bundledDependencies)) || [];
 
-        // TODO: receive resolutions map when package-lock.json parsing is implemented
+        // TODO: receive resolvedDependencies map when package-lock.json parsing is implemented
 
+        draft.packageManager = await q.receive(before.packageManager);
         draft.engines = await q.receive(before.engines);
 
-        return finishDraft(draft) as NodeProject;
+        return finishDraft(draft) as NodeResolutionResult;
     },
 
-    async rpcSend(after: NodeProject, q: RpcSendQueue): Promise<void> {
+    async rpcSend(after: NodeResolutionResult, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.id);
         await q.getAndSend(after, a => a.name);
         await q.getAndSend(after, a => a.version);
         await q.getAndSend(after, a => a.description);
-        await q.getAndSend(after, a => a.packageJsonPath);
+        await q.getAndSend(after, a => a.path);
+        await q.getAndSend(after, a => a.workspacePackagePaths);
 
         await q.getAndSendList(after, a => a.dependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
@@ -492,8 +515,9 @@ RpcCodecs.registerCodec(NodeProjectMarkerKind, {
         await q.getAndSendList(after, a => a.bundledDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
 
-        // TODO: send resolutions map when package-lock.json parsing is implemented
+        // TODO: send resolvedDependencies map when package-lock.json parsing is implemented
 
+        await q.getAndSend(after, a => a.packageManager);
         await q.getAndSend(after, a => a.engines);
     }
 });

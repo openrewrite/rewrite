@@ -48,7 +48,7 @@ import {
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
 import {produce} from "immer";
-import {createNodeProjectMarker, NodeProject} from "./node-project-marker";
+import {createNodeResolutionResultMarker, NodeResolutionResult} from "./node-resolution-result";
 import Kind = JS.Kind;
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
@@ -118,7 +118,7 @@ export class JavaScriptParser extends Parser {
      * Only searches in the relativeTo directory (typically the Git repo root).
      * Returns null if relativeTo is not set or package.json doesn't exist/is invalid.
      */
-    private findAndParsePackageJson(): NodeProject | null {
+    private findAndParsePackageJson(): NodeResolutionResult | null {
         // Only search if relativeTo is provided (indicates Git repo root)
         if (!this.relativeTo) {
             return null;
@@ -150,7 +150,7 @@ export class JavaScriptParser extends Parser {
                     }
                 }
 
-                return createNodeProjectMarker('package.json', packageJson, packageLockJson);
+                return createNodeResolutionResultMarker('package.json', packageJson, packageLockJson);
             }
         } catch (error) {
             console.warn(`Failed to parse package.json at ${packageJsonPath}:`, error);
@@ -311,7 +311,7 @@ export class JavaScriptParser extends Parser {
         const typeMapping = new JavaScriptTypeMapping(typeChecker);
 
         // Find and parse package.json once for this batch.
-        // All compilation units in this batch will share the same NodeProject marker instance.
+        // All compilation units in this batch will share the same NodeResolutionResult marker instance.
         const nodeProject = this.findAndParsePackageJson();
 
         for (const input of inputFiles.values()) {
@@ -339,7 +339,7 @@ export class JavaScriptParser extends Parser {
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
                         .visit(sourceFile) as SourceFile,
                     draft => {
-                        // Attach the shared NodeProject marker to this compilation unit
+                        // Attach the shared NodeResolutionResult marker to this compilation unit
                         if (nodeProject) {
                             draft.markers.markers.push(nodeProject);
                         }

@@ -52,10 +52,12 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
         }).length > 0;
 
         // Get or create cached workspace with node_modules
+        // Note: We don't pass packageLockContent here because test lock files are mocks
+        // that don't correspond to real packages. The lock file is still written to the
+        // test directory and parsed by the parser for the NodeResolutionResult marker.
         if (hasDependencies) {
             const cachedWorkspace = await DependencyWorkspace.getOrCreateWorkspace({
-                packageJsonContent: packageJsonSpec.before!,
-                packageLockContent: packageLockSpec?.before ?? undefined
+                packageJsonContent: packageJsonSpec.before!
             });
 
             // Symlink node_modules from cached workspace to test directory

@@ -352,7 +352,11 @@ export class DependencyWorkspace {
         if (expectedDependencies) {
             try {
                 const packageJsonContent = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-                const existingDeps = packageJsonContent.dependencies || {};
+                // Merge dependencies and devDependencies (same as getOrCreateWorkspace)
+                const existingDeps = {
+                    ...packageJsonContent.dependencies,
+                    ...packageJsonContent.devDependencies
+                };
 
                 // Check if all expected dependencies match
                 const expectedKeys = Object.keys(expectedDependencies).sort();

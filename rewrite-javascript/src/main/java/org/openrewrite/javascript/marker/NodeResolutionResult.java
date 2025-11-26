@@ -33,7 +33,7 @@ import static java.util.Collections.emptyList;
  * Contains metadata about a Node.js project, parsed from package.json and package-lock.json.
  * Attached as a marker to JS.CompilationUnit to provide dependency context for recipes.
  * <p>
- * Similar to GradleProject marker, this allows recipes to:
+ * Similar to MavenResolutionResult marker, this allows recipes to:
  * - Query project dependencies
  * - Check if specific packages are in use
  * - Modify dependencies programmatically
@@ -45,14 +45,17 @@ import static java.util.Collections.emptyList;
  */
 @Value
 @With
-public class NodeProject implements Marker, RpcCodec<NodeProject> {
+public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResult> {
     UUID id;
 
     // Project metadata from package.json
     @Nullable String name;
     @Nullable String version;
     @Nullable String description;
-    String packageJsonPath;
+    String path;
+
+    // Paths to workspace package.json files (only populated on workspace root)
+    @Nullable List<String> workspacePackagePaths;
 
     // Dependency requests organized by scope (from package.json)
     List<Dependency> dependencies;
@@ -62,48 +65,54 @@ public class NodeProject implements Marker, RpcCodec<NodeProject> {
     List<Dependency> bundledDependencies;
 
     // Resolution map (from package-lock.json) - maps requests to resolved versions
-    @Nullable Map<Dependency, ResolvedDependency> resolutions;
+    @Nullable Map<Dependency, ResolvedDependency> resolvedDependencies;
+
+    // The package manager used by the project (npm, yarn, pnpm, etc.)
+    @Nullable PackageManager packageManager;
 
     // Node/npm version requirements
     @Nullable Map<String, String> engines;
 
     @Override
-    public void rpcSend(NodeProject after, RpcSendQueue q) {
-        q.getAndSend(after, NodeProject::getId);
-        q.getAndSend(after, NodeProject::getName);
-        q.getAndSend(after, NodeProject::getVersion);
-        q.getAndSend(after, NodeProject::getDescription);
-        q.getAndSend(after, NodeProject::getPackageJsonPath);
+    public void rpcSend(NodeResolutionResult after, RpcSendQueue q) {
+        q.getAndSend(after, NodeResolutionResult::getId);
+        q.getAndSend(after, NodeResolutionResult::getName);
+        q.getAndSend(after, NodeResolutionResult::getVersion);
+        q.getAndSend(after, NodeResolutionResult::getDescription);
+        q.getAndSend(after, NodeResolutionResult::getPath);
+        q.getAndSend(after, NodeResolutionResult::getWorkspacePackagePaths);
 
-        q.getAndSendListAsRef(after, NodeProject::getDependencies,
+        q.getAndSendListAsRef(after, NodeResolutionResult::getDependencies,
                 dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
-        q.getAndSendListAsRef(after, NodeProject::getDevDependencies,
+        q.getAndSendListAsRef(after, NodeResolutionResult::getDevDependencies,
                 dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
-        q.getAndSendListAsRef(after, NodeProject::getPeerDependencies,
+        q.getAndSendListAsRef(after, NodeResolutionResult::getPeerDependencies,
                 dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
-        q.getAndSendListAsRef(after, NodeProject::getOptionalDependencies,
+        q.getAndSendListAsRef(after, NodeResolutionResult::getOptionalDependencies,
                 dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
-        q.getAndSendListAsRef(after, NodeProject::getBundledDependencies,
+        q.getAndSendListAsRef(after, NodeResolutionResult::getBundledDependencies,
                 dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
 
-        // TODO: send resolutions map when package-lock.json parsing is implemented
+        // TODO: send resolvedDependencies map when package-lock.json parsing is implemented
 
-        q.getAndSend(after, NodeProject::getEngines);
+        q.getAndSend(after, NodeResolutionResult::getPackageManager);
+        q.getAndSend(after, NodeResolutionResult::getEngines);
     }
 
     @Override
-    public NodeProject rpcReceive(NodeProject before, RpcReceiveQueue q) {
+    public NodeResolutionResult rpcReceive(NodeResolutionResult before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.id, UUID::fromString))
                 .withName(q.receive(before.name))
                 .withVersion(q.receive(before.version))
                 .withDescription(q.receive(before.description))
-                .withPackageJsonPath(q.receive(before.packageJsonPath))
+                .withPath(q.receive(before.path))
+                .withWorkspacePackagePaths(q.receive(before.workspacePackagePaths))
                 .withDependencies(q.receiveList(before.dependencies,
                         dep -> dep.rpcReceive(dep, q)))
                 .withDevDependencies(q.receiveList(before.devDependencies,
@@ -114,7 +123,8 @@ public class NodeProject implements Marker, RpcCodec<NodeProject> {
                         dep -> dep.rpcReceive(dep, q)))
                 .withBundledDependencies(q.receiveList(before.bundledDependencies,
                         dep -> dep.rpcReceive(dep, q)))
-                // TODO: receive resolutions map when package-lock.json parsing is implemented
+                // TODO: receive resolvedDependencies map when package-lock.json parsing is implemented
+                .withPackageManager(q.receiveAndGet(before.packageManager, s -> s == null ? null : PackageManager.valueOf(s.toString())))
                 .withEngines(q.receive(before.engines));
     }
 
@@ -151,7 +161,7 @@ public class NodeProject implements Marker, RpcCodec<NodeProject> {
      * This is what was actually installed (name + resolved version + its own dependencies).
      * <p>
      * Each ResolvedDependency's dependency arrays contain Dependency objects (requests),
-     * which can be looked up in NodeProject.resolutions to find their resolved versions.
+     * which can be looked up in NodeResolutionResult.resolvedDependencies to find their resolved versions.
      */
     @Value
     @With
@@ -207,5 +217,15 @@ public class NodeProject implements Marker, RpcCodec<NodeProject> {
                     .withEngines(q.receive(before.engines))
                     .withLicense(q.receive(before.license));
         }
+    }
+
+    /**
+     * Represents the package manager used by a Node.js project.
+     */
+    public enum PackageManager {
+        Npm,
+        Yarn,
+        Pnpm,
+        Bun
     }
 }
