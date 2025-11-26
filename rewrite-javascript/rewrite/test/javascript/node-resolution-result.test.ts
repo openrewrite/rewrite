@@ -17,6 +17,7 @@
  */
 import {RecipeSpec} from "../../src/test";
 import {
+    createNodeResolutionResultMarker,
     Dependency,
     findNodeResolutionResult,
     NodeResolutionResultQueries,
@@ -608,6 +609,161 @@ describe("NodeResolutionResult marker", () => {
                 )
             );
         }, {unsafeCleanup: true});
+    });
+
+    test("getTransitiveDependency should answer 'what version does X use?'", async () => {
+        const spec = new RecipeSpec();
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    {...packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "express": "^4.18.0"
+                            }
+                        }
+                    `), afterRecipe: async (doc: Json.Document) => {
+                        const nodeResolutionResult = findNodeResolutionResult(doc);
+                        expect(nodeResolutionResult).toBeDefined();
+
+                        // Test: What version of body-parser does express use?
+                        const bodyParser = NodeResolutionResultQueries.getTransitiveDependency(
+                            nodeResolutionResult!,
+                            "express",
+                            "body-parser"
+                        );
+                        expect(bodyParser).toBeDefined();
+                        expect(bodyParser!.name).toBe("body-parser");
+                        expect(bodyParser!.version).toBe("1.20.1");
+
+                        // Test: What version of bytes does body-parser use?
+                        const bytes = NodeResolutionResultQueries.getTransitiveDependency(
+                            nodeResolutionResult!,
+                            "body-parser",
+                            "bytes"
+                        );
+                        expect(bytes).toBeDefined();
+                        expect(bytes!.name).toBe("bytes");
+                        expect(bytes!.version).toBe("3.1.2");
+
+                        // Test: Non-existent transitive dependency returns undefined
+                        const nonExistent = NodeResolutionResultQueries.getTransitiveDependency(
+                            nodeResolutionResult!,
+                            "express",
+                            "nonexistent"
+                        );
+                        expect(nonExistent).toBeUndefined();
+
+                        // Test: Non-existent parent package returns undefined
+                        const nonExistentParent = NodeResolutionResultQueries.getTransitiveDependency(
+                            nodeResolutionResult!,
+                            "nonexistent",
+                            "body-parser"
+                        );
+                        expect(nonExistentParent).toBeUndefined();
+                    }},
+                    packageLockJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "lockfileVersion": 3,
+                            "packages": {
+                                "": {
+                                    "name": "test-project",
+                                    "version": "1.0.0",
+                                    "dependencies": {
+                                        "express": "^4.18.0"
+                                    }
+                                },
+                                "node_modules/express": {
+                                    "version": "4.18.2",
+                                    "license": "MIT",
+                                    "dependencies": {
+                                        "body-parser": "1.20.1"
+                                    }
+                                },
+                                "node_modules/body-parser": {
+                                    "version": "1.20.1",
+                                    "license": "MIT",
+                                    "dependencies": {
+                                        "bytes": "3.1.2"
+                                    }
+                                },
+                                "node_modules/bytes": {
+                                    "version": "3.1.2",
+                                    "license": "MIT"
+                                }
+                            }
+                        }
+                    `)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
+    test("getAllResolvedVersions should return multiple versions of same package", () => {
+        // Test the marker creation directly without npm install since we need fake packages
+        const packageJsonContent = {
+            name: "test-project",
+            version: "1.0.0",
+            dependencies: {
+                "package-a": "^1.0.0",
+                "package-b": "^1.0.0"
+            }
+        };
+
+        // This lock file has two versions of lodash due to different dependency constraints
+        const packageLockContent = {
+            name: "test-project",
+            version: "1.0.0",
+            lockfileVersion: 3,
+            packages: {
+                "": {
+                    name: "test-project",
+                    version: "1.0.0",
+                    dependencies: {
+                        "package-a": "^1.0.0",
+                        "package-b": "^1.0.0"
+                    }
+                },
+                "node_modules/package-a": {
+                    version: "1.0.0",
+                    dependencies: {
+                        lodash: "^4.17.0"
+                    }
+                },
+                "node_modules/package-b": {
+                    version: "1.0.0",
+                    dependencies: {
+                        lodash: "^3.10.0"
+                    }
+                },
+                "node_modules/lodash": {
+                    version: "4.17.21",
+                    license: "MIT"
+                },
+                "node_modules/package-b/node_modules/lodash": {
+                    version: "3.10.1",
+                    license: "MIT"
+                }
+            }
+        };
+
+        const marker = createNodeResolutionResultMarker(
+            "package.json",
+            packageJsonContent,
+            packageLockContent
+        );
+
+        // Both lodash versions should be in resolvedDependencies
+        const lodashVersions = NodeResolutionResultQueries.getAllResolvedVersions(marker, "lodash");
+        expect(lodashVersions).toHaveLength(2);
+        const versions = lodashVersions.map(l => l.version).sort();
+        expect(versions).toEqual(["3.10.1", "4.17.21"]);
     });
 
     test("should include engines in ResolvedDependency", async () => {

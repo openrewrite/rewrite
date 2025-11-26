@@ -29,7 +29,7 @@ export const ResolvedDependencyKind = "org.openrewrite.javascript.marker.NodeRes
 export const enum PackageManager {
     Npm = 'Npm',
     Yarn = 'Yarn',
-    Pnpm = 'Ppm',
+    Pnpm = 'Pnpm',
     Bun = 'Bun',
 }
 
@@ -128,12 +128,14 @@ export interface NodeResolutionResult extends Marker {
  * @param packageJsonContent Parsed package.json content
  * @param packageLockContent Optional parsed package-lock.json content for resolution info
  * @param workspacePackagePaths Optional resolved paths to workspace package.json files (only for workspace root)
+ * @param packageManager Optional package manager that was detected from lock file
  */
 export function createNodeResolutionResultMarker(
     path: string,
     packageJsonContent: any,
     packageLockContent?: any,
-    workspacePackagePaths?: string[]
+    workspacePackagePaths?: string[],
+    packageManager?: PackageManager
 ): NodeResolutionResult {
     // Cache for deduplicating dependencies with the same name+versionConstraint.
     const dependencyCache = new Map<string, Dependency>();
@@ -175,15 +177,41 @@ export function createNodeResolutionResultMarker(
     }
 
     /**
-     * Extracts package name from a package-lock.json path.
-     * e.g., "node_modules/@babel/core" -> "@babel/core"
-     * e.g., "node_modules/foo/node_modules/bar" -> "bar"
+     * Extracts package name and optionally version from a package-lock.json path.
+     * Handles both standard npm format and extended format with version suffix.
+     * e.g., "node_modules/@babel/core" -> { name: "@babel/core" }
+     * e.g., "node_modules/foo/node_modules/bar" -> { name: "bar" }
+     * e.g., "node_modules/is-odd@3.0.1" -> { name: "is-odd", version: "3.0.1" }
      */
-    function extractPackageName(pkgPath: string): string {
+    function extractPackageInfo(pkgPath: string): { name: string; version?: string } {
         // For nested packages, we want the last package name
         const nodeModulesIndex = pkgPath.lastIndexOf('node_modules/');
-        if (nodeModulesIndex === -1) return pkgPath;
-        return pkgPath.slice(nodeModulesIndex + 'node_modules/'.length);
+        if (nodeModulesIndex === -1) return { name: pkgPath };
+
+        let nameWithVersion = pkgPath.slice(nodeModulesIndex + 'node_modules/'.length);
+
+        // Check if the path has a version suffix (e.g., "is-odd@3.0.1")
+        // Handle scoped packages (@scope/name@version) correctly
+        const atIndex = nameWithVersion.lastIndexOf('@');
+        if (atIndex > 0 && !nameWithVersion.substring(0, atIndex).includes('/')) {
+            // Not a scoped package, the @ is a version separator
+            return {
+                name: nameWithVersion.substring(0, atIndex),
+                version: nameWithVersion.substring(atIndex + 1)
+            };
+        } else if (atIndex > 0) {
+            // Could be scoped package with version: @scope/name@version
+            const parts = nameWithVersion.split('@');
+            if (parts.length === 3 && parts[0] === '') {
+                // @scope/name@version -> ["", "scope/name", "version"]
+                return {
+                    name: `@${parts[1]}`,
+                    version: parts[2]
+                };
+            }
+        }
+
+        return { name: nameWithVersion };
     }
 
     /**
@@ -229,8 +257,10 @@ export function createNodeResolutionResultMarker(
             // Skip the root package (empty string key)
             if (pkgPath === '') continue;
 
-            const name = extractPackageName(pkgPath);
-            const version = pkgEntry.version;
+            const pkgInfo = extractPackageInfo(pkgPath);
+            const name = pkgInfo.name;
+            // Use version from path if available, otherwise from entry
+            const version = pkgInfo.version || pkgEntry.version;
 
             if (name && version) {
                 getOrCreateResolvedDependency(name, version, pkgEntry);
@@ -266,7 +296,7 @@ export function createNodeResolutionResultMarker(
         optionalDependencies,
         bundledDependencies,
         resolvedDependencies,
-        // packageManager is not set here - it should be determined by the caller based on lock file presence
+        packageManager,
         engines: packageJsonContent.engines,
     };
 }
@@ -350,6 +380,56 @@ export namespace NodeResolutionResultQueries {
         packageName: string
     ): ResolvedDependency | undefined {
         return getResolvedDependency(project, packageName);
+    }
+
+    /**
+     * Get all resolved dependencies with a specific name (handles multiple versions).
+     * Returns an empty array if no versions are found.
+     */
+    export function getAllResolvedVersions(
+        project: NodeResolutionResult,
+        packageName: string
+    ): ResolvedDependency[] {
+        return project.resolvedDependencies.filter(r => r.name === packageName);
+    }
+
+    /**
+     * Get the resolved version of a transitive dependency.
+     * Answers "what version of `transitiveDep` does `parentPackage` use?"
+     *
+     * @param project The NodeResolutionResult marker
+     * @param parentPackage The package that has the transitive dependency
+     * @param transitiveDep The name of the transitive dependency to look up
+     * @returns The resolved transitive dependency, or undefined if not found
+     *
+     * @example
+     * // Find what version of 'accepts' does 'express' use
+     * const accepts = getTransitiveDependency(project, 'express', 'accepts');
+     */
+    export function getTransitiveDependency(
+        project: NodeResolutionResult,
+        parentPackage: string,
+        transitiveDep: string
+    ): ResolvedDependency | undefined {
+        const parent = getResolvedDependency(project, parentPackage);
+        if (!parent) return undefined;
+
+        // Check all dependency scopes of the parent
+        const allParentDeps = [
+            ...(parent.dependencies || []),
+            ...(parent.devDependencies || []),
+            ...(parent.peerDependencies || []),
+            ...(parent.optionalDependencies || []),
+        ];
+
+        // Find the dependency request for the transitive package
+        const depRequest = allParentDeps.find(d => d.name === transitiveDep);
+        if (!depRequest) return undefined;
+
+        // Find matching resolved dependency
+        // For now, we return the first match by name
+        // TODO: When multiple versions exist, we should match by version constraint
+        return getResolvedDependency(project, transitiveDep);
     }
 }
 
