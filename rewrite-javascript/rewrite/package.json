@@ -38,7 +38,8 @@
     "picomatch": "^4.0.3",
     "tmp-promise": "^3.0.3",
     "typescript": "^5.8.3",
-    "vscode-jsonrpc": "^8.2.1"
+    "vscode-jsonrpc": "^8.2.1",
+    "yaml": "^2.6.1"
   },
   "devDependencies": {
     "@types/benchmark": "^2.1.5",
