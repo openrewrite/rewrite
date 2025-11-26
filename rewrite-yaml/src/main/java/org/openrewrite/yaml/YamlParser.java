@@ -399,7 +399,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
                         }
                         Yaml.Tag tag = null;
-                        if (sse.getTag() != null && startBracketPrefix == null) { // <-- add check
+                        if (sse.getTag() != null && startBracketPrefix == null) {
                             String prefixAfterColon = fullPrefix.substring(startIndex);
                             final int tagStartIndex = prefixAfterColon.indexOf('!');
                             String tagPrefix = prefixAfterColon.substring(0, tagStartIndex);
