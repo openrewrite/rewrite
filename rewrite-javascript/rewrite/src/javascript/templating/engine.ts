@@ -699,9 +699,6 @@ export class TemplateApplier {
     }
 
     private wrapTree(originalTree: J, resultToUse: J) {
-        if (this.cursor && (!("parentTree" in this.cursor) || typeof this.cursor?.parentTree !== "function")) {
-            throw new Error("Wrong cursor: " + JSON.stringify(this.cursor) + " when visiting " + JSON.stringify(originalTree));
-        }
         const parentTree = this.cursor?.parentTree()?.value;
 
         // Only apply wrapping logic if we have parent context
