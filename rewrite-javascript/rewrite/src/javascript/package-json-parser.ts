@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Parser, ParserInput, ParserOptions, parserInputFile, parserInputRead} from "../parser";
+import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers} from "../parser";
 import {SourceFile} from "../tree";
-import {JsonParser} from "../json/parser";
-import {Json} from "../json/tree";
+import {Json, JsonParser} from "../json";
 import {createNodeResolutionResultMarker, NodeResolutionResult} from "./node-resolution-result";
 import * as fs from "fs";
 import * as path from "path";
@@ -160,3 +159,6 @@ export class PackageJsonParser extends Parser {
         return undefined;
     }
 }
+
+// Register with the Parsers registry for RPC support
+Parsers.registerParser("packageJson", PackageJsonParser);
