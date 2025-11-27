@@ -459,6 +459,13 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return variableDeclarations;
     }
 
+    override async visitShebang(shebang: JS.Shebang, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(shebang, p);
+        p.append(shebang.text);
+        await this.afterSyntax(shebang, p);
+        return shebang;
+    }
+
     override async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(multiVariable, p);
         await this.visitNodes(multiVariable.leadingAnnotations, p);
