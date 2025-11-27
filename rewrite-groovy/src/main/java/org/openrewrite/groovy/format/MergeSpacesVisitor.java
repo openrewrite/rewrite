@@ -1605,6 +1605,27 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
     }
 
     @Override
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, GRightPadded.Location loc, Object p) {
+        return visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    @Override
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, GLeftPadded.Location loc, Object p) {
+        return visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    @Override
+    public Space visitSpace(Space space, GSpace.Location loc, Object p) {
+        return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    @Override
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
+                                                        GContainer.Location loc, Object p) {
+        return visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    @Override
     public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, @Nullable Object ctx) {
         JRightPadded<T> newRight = (JRightPadded<T>) ctx;
         if (right == newRight) {
