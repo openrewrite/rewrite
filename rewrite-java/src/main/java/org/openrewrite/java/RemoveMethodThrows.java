@@ -28,9 +28,8 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.NameTree;
 
+import java.util.ArrayList;
 import java.util.List;
-
-import static java.util.stream.Collectors.toList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -40,24 +39,16 @@ public class RemoveMethodThrows extends Recipe {
             example = "com.example.MyClass myMethod(..)")
     String methodPattern;
 
-    @Option(displayName = "Exception type",
-            description = "Fully qualified name of the exception to remove (e.g. `java.io.IOException`).",
-            example = "java.io.IOException",
-            required = false)
-    @Nullable
-    String exceptionType;
+    @Option(displayName = "Exception type pattern",
+            description = "A type pattern that is used to find matching exception to remove. Use `*` to match all.",
+            example = "java.io.IOException")
+    String exceptionTypePattern;
 
     @Option(displayName = "Match overriden methods",
             description = "Whether to match overridden forms of the method on subclasses of typeMatcher. Default is true.",
             required = false)
     @Nullable
     Boolean matchOverrides;
-
-    @Option(displayName = "Remove all throws declarations",
-            description = "Remove all throws declarations. Default is false.",
-            required = false)
-    @Nullable
-    Boolean removeAll;
 
     @Override
     public String getDisplayName() {
@@ -71,24 +62,12 @@ public class RemoveMethodThrows extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        Validated<Object> v = super.validate()
-                .and(MethodMatcher.validate(methodPattern));
-
-        // Cross-field validation: exceptionType is required unless removeAll is true
-        if ((Boolean.FALSE.equals(removeAll) || removeAll == null) && exceptionType == null) {
-            v = v.and(Validated.invalid(
-                    "exceptionType",
-                    exceptionType,
-                    "exceptionType must be provided when removeAll is false"));
-        }
-
-        return v;
+        return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         boolean varMatchOverrides = matchOverrides != null ? matchOverrides : true;
-        boolean varRemoveAll = removeAll != null ? removeAll : false;
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, varMatchOverrides);
         return Preconditions.check(new DeclaresMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
 
@@ -103,30 +82,18 @@ public class RemoveMethodThrows extends Recipe {
                                 return m; // no throws to modify
                             }
 
-                            if (varRemoveAll) {
-                                // get list of throws to maybeRemoveImport later
-                                List<String> throwsTypes = m.getThrows().stream()
-                                        .filter(t -> t.getType() != null)
-                                        .map(t -> t.getType().toString())
-                                        .collect(toList());
-                                throwsTypes.forEach(this::maybeRemoveImport);
-                                // Remove the entire throws clause
-                                return m.withThrows(null);
+                            TypeMatcher typeMatcher = new TypeMatcher(exceptionTypePattern);
+
+                            List<NameTree> updatedThrows = new ArrayList<>();
+                            for (NameTree nameTree : m.getThrows()) {
+                                if (nameTree.getType() != null) {
+                                    if (typeMatcher.matches(nameTree.getType())) {
+                                        maybeRemoveImport(nameTree.getType().toString());
+                                    } else {
+                                        updatedThrows.add(nameTree);
+                                    }
+                                }
                             }
-
-                            if (exceptionType == null) {
-                                throw new IllegalStateException("exceptionType should never be null here");
-                            }
-
-                            List<NameTree> updatedThrows = m.getThrows().stream()
-                                    .filter(t -> {
-                                        // Keep only exception types that are not the target
-                                        String fqn = t.getType() != null ? t.getType().toString() : null;
-                                        return fqn == null || !fqn.equals(exceptionType);
-                                    })
-                                    .collect(toList());
-
-                            maybeRemoveImport(exceptionType);
 
                             if (updatedThrows.isEmpty()) {
                                 // Remove the entire throws clause
