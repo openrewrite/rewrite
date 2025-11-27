@@ -588,6 +588,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return updateIfChanged(scopedVariableDeclarations, updates);
     }
 
+    protected async visitShebang(shebang: JS.Shebang, p: P): Promise<J | undefined> {
+        const updates: any = {
+            prefix: await this.visitSpace(shebang.prefix, p),
+            markers: await this.visitMarkers(shebang.markers, p)
+        };
+        return updateIfChanged(shebang, updates);
+    }
+
     protected async visitStatementExpression(statementExpression: JS.StatementExpression, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(statementExpression, p);
         if (!expression?.kind || expression.kind !== JS.Kind.StatementExpression) {
@@ -1158,6 +1166,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitSatisfiesExpression(tree as unknown as JS.SatisfiesExpression, p);
                 case JS.Kind.ScopedVariableDeclarations:
                     return this.visitScopedVariableDeclarations(tree as unknown as JS.ScopedVariableDeclarations, p);
+                case JS.Kind.Shebang:
+                    return this.visitShebang(tree as unknown as JS.Shebang, p);
                 case JS.Kind.StatementExpression:
                     return this.visitStatementExpression(tree as unknown as JS.StatementExpression, p);
                 case JS.Kind.TaggedTemplateExpression:
