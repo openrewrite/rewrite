@@ -16,11 +16,11 @@
 
 import {RecipeSpec} from "../../../src/test";
 import {javascript} from "../../../src/javascript";
-import {SimplifyObjectBindingProperties} from "../../../src/javascript/cleanup";
+import {UseObjectPropertyShorthand} from "../../../src/javascript/cleanup";
 
-describe("SimplifyObjectBindingProperties", () => {
+describe("UseObjectPropertyShorthand", () => {
     const spec = new RecipeSpec();
-    spec.recipe = new SimplifyObjectBindingProperties();
+    spec.recipe = new UseObjectPropertyShorthand();
 
     test("simplifies { x: x } to { x }", () => spec.rewriteRun(
         //language=javascript
@@ -89,6 +89,61 @@ describe("SimplifyObjectBindingProperties", () => {
         javascript(
             `const fn = ({ a: a }) => a;`,
             `const fn = ({ a }) => a;`
+        )
+    ));
+
+    // Object literal tests
+    test("simplifies object literal { x: x } to { x }", () => spec.rewriteRun(
+        //language=javascript
+        javascript(
+            `const obj = { x: x };`,
+            `const obj = { x };`
+        )
+    ));
+
+    test("simplifies multiple object literal properties", () => spec.rewriteRun(
+        //language=javascript
+        javascript(
+            `const obj = { foo: foo, bar: bar };`,
+            `const obj = { foo, bar };`
+        )
+    ));
+
+    test("handles mixed object literal properties", () => spec.rewriteRun(
+        //language=javascript
+        javascript(
+            `const obj = { foo: foo, bar: baz, qux: qux };`,
+            `const obj = { foo, bar: baz, qux };`
+        )
+    ));
+
+    test("does not change object literal when names differ", () => spec.rewriteRun(
+        //language=javascript
+        javascript(
+            `const obj = { x: y };`
+        )
+    ));
+
+    test("preserves already shorthand object literal properties", () => spec.rewriteRun(
+        //language=javascript
+        javascript(
+            `const obj = { x };`
+        )
+    ));
+
+    test("simplifies object literal in function call", () => spec.rewriteRun(
+        //language=javascript
+        javascript(
+            `doSomething({ monitorId: monitorId, token: token });`,
+            `doSomething({ monitorId, token });`
+        )
+    ));
+
+    test("simplifies object literal in return statement", () => spec.rewriteRun(
+        //language=javascript
+        javascript(
+            `function getData() { return { name: name, value: value }; }`,
+            `function getData() { return { name, value }; }`
         )
     ));
 });

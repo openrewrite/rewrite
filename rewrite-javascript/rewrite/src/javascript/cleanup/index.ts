@@ -14,4 +14,4 @@
  * limitations under the License.
  */
 
-export {SimplifyObjectBindingProperties} from "./simplify-object-binding-properties";
+export {UseObjectPropertyShorthand} from "./use-object-property-shorthand";
