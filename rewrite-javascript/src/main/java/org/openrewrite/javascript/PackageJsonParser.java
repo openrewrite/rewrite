@@ -65,7 +65,7 @@ public class PackageJsonParser implements Parser {
 
         @Override
         public String getDslName() {
-            return "json";
+            return "package.json";
         }
     }
 }

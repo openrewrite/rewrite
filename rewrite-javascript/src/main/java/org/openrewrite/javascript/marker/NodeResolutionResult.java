@@ -122,7 +122,7 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
         q.getAndSend(after, NodeResolutionResult::getPackageManager);
         q.getAndSend(after, NodeResolutionResult::getEngines);
         q.getAndSendList(after, n -> n.getNpmrcConfigs() != null ? n.getNpmrcConfigs() : emptyList(),
-                npmrc -> npmrc.getScope().name(),
+                Npmrc::getScope,
                 npmrc -> npmrc.rpcSend(npmrc, q));
     }
 
@@ -283,7 +283,7 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
 
         @Override
         public void rpcSend(Npmrc after, RpcSendQueue q) {
-            q.getAndSend(after, n -> n.getScope().name());
+            q.getAndSend(after, Npmrc::getScope);
             q.getAndSend(after, Npmrc::getProperties);
         }
 
