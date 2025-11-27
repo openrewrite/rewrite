@@ -122,6 +122,12 @@ public interface XPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitPrimaryExpr(XPathParser.PrimaryExprContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link XPathParser#predicateValue}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitPredicateValue(XPathParser.PredicateValueContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link XPathParser#functionCall}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

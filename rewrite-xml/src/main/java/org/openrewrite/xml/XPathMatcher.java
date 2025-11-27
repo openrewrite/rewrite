@@ -22,14 +22,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.xml.internal.grammar.XPathLexer;
 import org.openrewrite.xml.internal.grammar.XPathParser;
 import org.openrewrite.xml.internal.grammar.XPathParserBaseVisitor;
-import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.trait.Namespaced;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 import static java.util.Collections.reverse;
 
@@ -195,11 +192,10 @@ public class XPathMatcher {
                 return "";
             }
 
-            // Use FindTags to locate the element at the path
+            // Locate the element at the path
             if (absPath != null || relPath != null) {
                 String pathStr = absPath != null ? absPath.getText() : relPath.getText();
-                // FindTags expects an XPath expression, so we can pass it directly
-                java.util.Set<Xml.Tag> found = FindTags.find(root, pathStr);
+                Set<Xml.Tag> found = findChildTags(root, pathStr);
                 if (!found.isEmpty()) {
                     // Return the text content of the first matching tag
                     return found.iterator().next().getValue().orElse("");
@@ -496,7 +492,19 @@ public class XPathMatcher {
                     if (i >= orderedPath.size()) {
                         return false;
                     }
-                    if (!matchStep(beforeSteps.get(i), orderedPath.get(i))) {
+                    // Compute position for this step
+                    Xml.Tag currentTag = orderedPath.get(i);
+                    int position = 1;
+                    int size = 1;
+                    if (i > 0) {
+                        Xml.Tag parentTag = orderedPath.get(i - 1);
+                        StepInfo stepInfo = beforeSteps.get(i);
+                        String expectedName = stepInfo.step.nodeTest() != null ? stepInfo.step.nodeTest().getText() : "*";
+                        PositionInfo posInfo = computePosition(parentTag, currentTag, expectedName);
+                        position = posInfo.position;
+                        size = posInfo.size;
+                    }
+                    if (!matchStep(beforeSteps.get(i), currentTag, position, size)) {
                         return false;
                     }
                 }
@@ -579,12 +587,34 @@ public class XPathMatcher {
                     return matchNodeTypeTest(step.nodeTypeTest(), pathIdx, orderedPath);
                 }
 
+                // Compute position and size for positional predicates
+                Xml.Tag currentTag = pathIdx < orderedPath.size() ? orderedPath.get(pathIdx) : null;
+                int position = 1;
+                int size = 1;
+                if (currentTag != null && pathIdx > 0) {
+                    Xml.Tag parentTag = orderedPath.get(pathIdx - 1);
+                    String expectedName = step.nodeTest() != null ? step.nodeTest().getText() : "*";
+                    PositionInfo posInfo = computePosition(parentTag, currentTag, expectedName);
+                    position = posInfo.position;
+                    size = posInfo.size;
+                }
+
                 // Handle descendant axis for element steps
                 if (i > 0 && stepInfo.isDescendant) {
                     // Find the next matching element
                     boolean found = false;
                     for (int searchIdx = pathIdx; searchIdx < orderedPath.size(); searchIdx++) {
-                        if (matchStep(stepInfo, orderedPath.get(searchIdx))) {
+                        Xml.Tag searchTag = orderedPath.get(searchIdx);
+                        int searchPos = 1;
+                        int searchSize = 1;
+                        if (searchIdx > 0) {
+                            Xml.Tag searchParent = orderedPath.get(searchIdx - 1);
+                            String expectedName = step.nodeTest() != null ? step.nodeTest().getText() : "*";
+                            PositionInfo posInfo = computePosition(searchParent, searchTag, expectedName);
+                            searchPos = posInfo.position;
+                            searchSize = posInfo.size;
+                        }
+                        if (matchStep(stepInfo, searchTag, searchPos, searchSize)) {
                             pathIdx = searchIdx + 1;
                             found = true;
                             break;
@@ -598,7 +628,7 @@ public class XPathMatcher {
                     if (pathIdx >= orderedPath.size()) {
                         return false;
                     }
-                    if (!matchStep(stepInfo, orderedPath.get(pathIdx))) {
+                    if (!matchStep(stepInfo, orderedPath.get(pathIdx), position, size)) {
                         return false;
                     }
                     pathIdx++;
@@ -614,9 +644,37 @@ public class XPathMatcher {
         }
 
         /**
-         * Match a single step against a tag.
+         * Compute the position and size for a tag among its siblings with the same name.
          */
-        private boolean matchStep(StepInfo stepInfo, Xml.Tag tag) {
+        private PositionInfo computePosition(Xml.Tag parent, Xml.Tag currentTag, String expectedName) {
+            List<Xml.Tag> matchingSiblings = new ArrayList<>();
+            int position = 1;
+
+            List<? extends Content> contents = parent.getContent();
+            if (contents != null) {
+                for (Content content : contents) {
+                    if (content instanceof Xml.Tag) {
+                        Xml.Tag child = (Xml.Tag) content;
+                        boolean matches = "*".equals(expectedName) || child.getName().equals(expectedName);
+                        if (matches) {
+                            matchingSiblings.add(child);
+                            if (child == currentTag) {
+                                position = matchingSiblings.size();
+                            }
+                        }
+                    }
+                }
+            }
+
+            return new PositionInfo(position, matchingSiblings.isEmpty() ? 1 : matchingSiblings.size());
+        }
+
+        /**
+         * Match a single step against a tag.
+         * @param position 1-based position of this tag among matching siblings (use 1 if unknown)
+         * @param size total count of matching siblings (use 1 if unknown)
+         */
+        private boolean matchStep(StepInfo stepInfo, Xml.Tag tag, int position, int size) {
             XPathParser.StepContext step = stepInfo.step;
             XPathParser.NodeTestContext nodeTest = step.nodeTest();
 
@@ -632,7 +690,7 @@ public class XPathMatcher {
 
             // Check predicates
             for (XPathParser.PredicateContext predicate : step.predicate()) {
-                if (!evaluatePredicate(predicate, tag)) {
+                if (!evaluatePredicate(predicate, tag, position, size)) {
                     return false;
                 }
             }
@@ -698,8 +756,9 @@ public class XPathMatcher {
             }
 
             // Check predicates on the attribute
+            // Positional predicates on attributes are uncommon, use position=1, size=1
             for (XPathParser.PredicateContext predicate : predicates) {
-                if (!evaluateAttributePredicate(predicate, attribute)) {
+                if (!evaluateAttributePredicate(predicate, attribute, 1, 1)) {
                     return false;
                 }
             }
@@ -710,24 +769,26 @@ public class XPathMatcher {
         /**
          * Evaluate predicate against attribute.
          */
-        private boolean evaluateAttributePredicate(XPathParser.PredicateContext predicate, Xml.Attribute attribute) {
-            return evaluateOrExpr(predicate.predicateExpr().orExpr(), null, attribute);
+        private boolean evaluateAttributePredicate(XPathParser.PredicateContext predicate, Xml.Attribute attribute,
+                                                   int position, int size) {
+            return evaluateOrExpr(predicate.predicateExpr().orExpr(), null, attribute, position, size);
         }
 
         /**
          * Evaluate a predicate against a tag.
          */
-        private boolean evaluatePredicate(XPathParser.PredicateContext predicate, Xml.Tag tag) {
-            return evaluateOrExpr(predicate.predicateExpr().orExpr(), tag, null);
+        private boolean evaluatePredicate(XPathParser.PredicateContext predicate, Xml.Tag tag, int position, int size) {
+            return evaluateOrExpr(predicate.predicateExpr().orExpr(), tag, null, position, size);
         }
 
         /**
          * Evaluate OR expression.
          */
-        private boolean evaluateOrExpr(XPathParser.OrExprContext orExpr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute) {
+        private boolean evaluateOrExpr(XPathParser.OrExprContext orExpr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute,
+                                       int position, int size) {
             List<XPathParser.AndExprContext> andExprs = orExpr.andExpr();
             for (XPathParser.AndExprContext andExpr : andExprs) {
-                if (evaluateAndExpr(andExpr, tag, attribute)) {
+                if (evaluateAndExpr(andExpr, tag, attribute, position, size)) {
                     return true;
                 }
             }
@@ -737,9 +798,10 @@ public class XPathMatcher {
         /**
          * Evaluate AND expression.
          */
-        private boolean evaluateAndExpr(XPathParser.AndExprContext andExpr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute) {
+        private boolean evaluateAndExpr(XPathParser.AndExprContext andExpr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute,
+                                        int position, int size) {
             for (XPathParser.PrimaryExprContext primaryExpr : andExpr.primaryExpr()) {
-                if (!evaluatePrimaryExpr(primaryExpr, tag, attribute)) {
+                if (!evaluatePrimaryExpr(primaryExpr, tag, attribute, position, size)) {
                     return false;
                 }
             }
@@ -748,21 +810,220 @@ public class XPathMatcher {
 
         /**
          * Evaluate primary expression.
+         * @param position 1-based position of the current node among matching siblings
+         * @param size total count of matching siblings
          */
         private boolean evaluatePrimaryExpr(XPathParser.PrimaryExprContext primaryExpr,
-                                            Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute) {
-            String expectedValue = unquote(primaryExpr.stringLiteral().STRING_LITERAL().getText());
+                                            Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute,
+                                            int position, int size) {
+            XPathParser.PredicateValueContext predicateValue = primaryExpr.predicateValue();
 
-            if (primaryExpr.functionCall() != null) {
-                return evaluateFunctionCall(primaryExpr.functionCall(), expectedValue, tag, attribute);
-            } else if (primaryExpr.attributeStep() != null) {
-                return evaluateAttributeTest(primaryExpr.attributeStep(), expectedValue, tag);
-            } else if (primaryExpr.relativeLocationPath() != null) {
-                return evaluateRelativePathTest(primaryExpr.relativeLocationPath(), expectedValue, tag);
-            } else if (primaryExpr.childElementTest() != null) {
-                return evaluateChildElementTest(primaryExpr.childElementTest(), expectedValue, tag);
+            // Evaluate the predicate value
+            Object value = evaluatePredicateValue(predicateValue, tag, attribute, position, size);
+
+            // Check if there's a comparison
+            if (primaryExpr.comparisonOp() != null && primaryExpr.comparand() != null) {
+                Object comparand = evaluateComparand(primaryExpr.comparand());
+                return evaluateComparison(value, primaryExpr.comparisonOp(), comparand);
+            } else {
+                // No comparison - treat as boolean or positional
+                return toBoolOrPositional(value, position);
             }
-            return false;
+        }
+
+        /**
+         * Evaluate a predicate value expression.
+         */
+        private Object evaluatePredicateValue(XPathParser.PredicateValueContext predicateValue,
+                                              Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute,
+                                              int position, int size) {
+            if (predicateValue.functionCall() != null) {
+                return evaluatePredicateFunctionCall(predicateValue.functionCall(), tag, attribute, position, size);
+            } else if (predicateValue.attributeStep() != null) {
+                return getAttributeValue(predicateValue.attributeStep(), tag);
+            } else if (predicateValue.relativeLocationPath() != null) {
+                return getRelativePathValue(predicateValue.relativeLocationPath(), tag);
+            } else if (predicateValue.childElementTest() != null) {
+                return getChildElementValue(predicateValue.childElementTest(), tag);
+            } else if (predicateValue.NUMBER() != null) {
+                String numStr = predicateValue.NUMBER().getText();
+                if (numStr.contains(".")) {
+                    return Double.parseDouble(numStr);
+                } else {
+                    return Integer.parseInt(numStr);
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Convert value to boolean, treating numbers as positional predicates.
+         * In XPath, [1] means position()=1, not a truthy check.
+         */
+        private boolean toBoolOrPositional(Object value, int position) {
+            if (value instanceof Number) {
+                // Numeric value is a positional predicate
+                return ((Number) value).intValue() == position;
+            }
+            return toBool(value);
+        }
+
+        /**
+         * Evaluate function call in predicate context and return its value.
+         */
+        private Object evaluatePredicateFunctionCall(XPathParser.FunctionCallContext funcCall,
+                                                     Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute,
+                                                     int position, int size) {
+            String funcName;
+            if (funcCall.LOCAL_NAME() != null) {
+                funcName = "local-name";
+            } else if (funcCall.NAMESPACE_URI() != null) {
+                funcName = "namespace-uri";
+            } else if (funcCall.QNAME() != null) {
+                funcName = funcCall.QNAME().getText();
+            } else {
+                return null;
+            }
+
+            switch (funcName) {
+                case "local-name":
+                    if (attribute != null) {
+                        Namespaced namespaced = new Namespaced(new Cursor(cursor.getParent(), attribute));
+                        return namespaced.getLocalName().orElse("");
+                    } else if (tag != null) {
+                        Namespaced namespaced = new Namespaced(findCursorForTag(tag));
+                        return namespaced.getLocalName().orElse("");
+                    }
+                    return "";
+                case "namespace-uri":
+                    if (attribute != null) {
+                        Namespaced namespaced = new Namespaced(new Cursor(cursor.getParent(), attribute));
+                        return namespaced.getNamespaceUri().orElse("");
+                    } else if (tag != null) {
+                        Namespaced namespaced = new Namespaced(findCursorForTag(tag));
+                        return namespaced.getNamespaceUri().orElse("");
+                    }
+                    return "";
+                case "text":
+                    if (tag != null) {
+                        return tag.getValue().orElse("");
+                    }
+                    return "";
+                case "position":
+                    return position;
+                case "last":
+                    return size;
+                case "contains":
+                case "starts-with":
+                case "ends-with":
+                case "string-length":
+                case "not":
+                    // These need arguments - evaluate them
+                    List<Object> args = new ArrayList<>();
+                    if (funcCall.functionArgs() != null) {
+                        for (XPathParser.FunctionArgContext arg : funcCall.functionArgs().functionArg()) {
+                            args.add(evaluateFunctionArg(arg));
+                        }
+                    }
+                    return evaluateFunction(funcName, args);
+                default:
+                    return null;
+            }
+        }
+
+        /**
+         * Get attribute value for comparison.
+         */
+        private Object getAttributeValue(XPathParser.AttributeStepContext attrStep, Xml.@Nullable Tag tag) {
+            if (tag == null) {
+                return null;
+            }
+            String attrName = attrStep.QNAME() != null ? attrStep.QNAME().getText() : "*";
+            for (Xml.Attribute attr : tag.getAttributes()) {
+                if ("*".equals(attrName) || attr.getKeyAsString().equals(attrName)) {
+                    return attr.getValueAsString();
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Get value from relative path for comparison.
+         */
+        private Object getRelativePathValue(XPathParser.RelativeLocationPathContext relPath, Xml.@Nullable Tag tag) {
+            if (tag == null) {
+                return null;
+            }
+
+            List<XPathParser.StepContext> steps = relPath.step();
+            if (steps.isEmpty()) {
+                return null;
+            }
+
+            // Check if last step is a node type test (like text())
+            XPathParser.StepContext lastStep = steps.get(steps.size() - 1);
+            boolean endsWithNodeTypeTest = lastStep.nodeTypeTest() != null;
+
+            // Build the element path (without the final node type test if present)
+            StringBuilder elementPath = new StringBuilder();
+            int elementStepCount = endsWithNodeTypeTest ? steps.size() - 1 : steps.size();
+            List<XPathParser.PathSeparatorContext> separators = relPath.pathSeparator();
+
+            for (int i = 0; i < elementStepCount; i++) {
+                if (i > 0 && i - 1 < separators.size()) {
+                    elementPath.append(separators.get(i - 1).getText());
+                }
+                elementPath.append(steps.get(i).getText());
+            }
+
+            // Find matching elements using the element path
+            Set<Xml.Tag> matchingTags;
+            String pathStr = elementPath.toString();
+            if (elementPath.length() == 0) {
+                matchingTags = Collections.singleton(tag);
+            } else if ("*".equals(pathStr)) {
+                // Wildcard matches any direct child element
+                matchingTags = new LinkedHashSet<>();
+                List<? extends Content> contents = tag.getContent();
+                if (contents != null) {
+                    for (Content content : contents) {
+                        if (content instanceof Xml.Tag) {
+                            matchingTags.add((Xml.Tag) content);
+                        }
+                    }
+                }
+            } else {
+                matchingTags = findChildTags(tag, pathStr);
+            }
+
+            if (matchingTags.isEmpty()) {
+                return null;
+            }
+
+            Xml.Tag matchingTag = matchingTags.iterator().next();
+            if (endsWithNodeTypeTest) {
+                String nodeTypeName = lastStep.nodeTypeTest().QNAME().getText();
+                if ("text".equals(nodeTypeName)) {
+                    return matchingTag.getValue().orElse("");
+                }
+                return null;
+            } else {
+                return matchingTag.getValue().orElse("");
+            }
+        }
+
+        /**
+         * Get child element value for comparison.
+         */
+        private Object getChildElementValue(XPathParser.ChildElementTestContext childTest, Xml.@Nullable Tag tag) {
+            if (tag == null) {
+                return null;
+            }
+            String childName = childTest.QNAME() != null ? childTest.QNAME().getText() : "*";
+            for (Xml.Tag child : findDirectChildren(tag, childName)) {
+                return child.getValue().orElse("");
+            }
+            return null;
         }
 
         /**
@@ -861,7 +1122,7 @@ public class XPathMatcher {
 
             String childName = childTest.QNAME() != null ? childTest.QNAME().getText() : "*";
 
-            for (Xml.Tag child : FindTags.find(tag, childName)) {
+            for (Xml.Tag child : findDirectChildren(tag, childName)) {
                 if (child.getValue().map(v -> v.equals(expectedValue)).orElse(false)) {
                     return true;
                 }
@@ -901,12 +1162,12 @@ public class XPathMatcher {
             }
 
             // Find matching elements using the element path
-            java.util.Set<Xml.Tag> matchingTags;
+            Set<Xml.Tag> matchingTags;
             if (elementPath.length() > 0) {
-                matchingTags = FindTags.find(tag, elementPath.toString());
+                matchingTags = findChildTags(tag, elementPath.toString());
             } else {
                 // No element path means the entire expression is just text() or similar
-                matchingTags = java.util.Collections.singleton(tag);
+                matchingTags = Collections.singleton(tag);
             }
 
             // Check the expected value
@@ -942,6 +1203,117 @@ public class XPathMatcher {
             }
             return s;
         }
+
+        /**
+         * Find child tags matching a simple path expression.
+         * Supports element names, wildcards (*), multi-step paths (foo/bar), and descendant axis (//).
+         * Does NOT use FindTags to avoid circular dependency.
+         */
+        private Set<Xml.Tag> findChildTags(Xml.Tag startTag, String pathExpr) {
+            Set<Xml.Tag> result = new LinkedHashSet<>();
+
+            // Handle descendant-or-self axis (//)
+            if (pathExpr.startsWith("//")) {
+                String elementName = pathExpr.substring(2);
+                // Remove any further path separators for now (simple case)
+                if (elementName.contains("/")) {
+                    elementName = elementName.substring(0, elementName.indexOf('/'));
+                }
+                findDescendants(startTag, elementName, result);
+                return result;
+            }
+
+            // Handle paths with leading slash (absolute paths)
+            boolean isAbsolute = pathExpr.startsWith("/");
+            if (isAbsolute) {
+                pathExpr = pathExpr.substring(1);
+            }
+
+            // Split path into steps
+            String[] steps = pathExpr.split("/");
+            if (steps.length == 0) {
+                return result;
+            }
+
+            Set<Xml.Tag> currentMatches = new LinkedHashSet<>();
+
+            // For absolute paths, the first step matches the startTag itself (the root)
+            // For relative paths, the first step matches children of startTag
+            if (isAbsolute) {
+                // First step should match the startTag (root element)
+                String firstStep = steps[0];
+                if ("*".equals(firstStep) || startTag.getName().equals(firstStep)) {
+                    if (steps.length == 1) {
+                        currentMatches.add(startTag);
+                    } else {
+                        // Continue from children for remaining steps
+                        currentMatches = findDirectChildren(startTag, steps[1]);
+                        // Process remaining steps starting from index 2
+                        for (int i = 2; i < steps.length; i++) {
+                            Set<Xml.Tag> nextMatches = new LinkedHashSet<>();
+                            for (Xml.Tag match : currentMatches) {
+                                nextMatches.addAll(findDirectChildren(match, steps[i]));
+                            }
+                            currentMatches = nextMatches;
+                        }
+                    }
+                }
+            } else {
+                // Relative path - start with children for the first step
+                currentMatches = findDirectChildren(startTag, steps[0]);
+
+                // Process remaining steps
+                for (int i = 1; i < steps.length; i++) {
+                    Set<Xml.Tag> nextMatches = new LinkedHashSet<>();
+                    for (Xml.Tag match : currentMatches) {
+                        nextMatches.addAll(findDirectChildren(match, steps[i]));
+                    }
+                    currentMatches = nextMatches;
+                }
+            }
+
+            return currentMatches;
+        }
+
+        /**
+         * Find all descendant tags matching the given element name.
+         */
+        private void findDescendants(Xml.Tag tag, String elementName, Set<Xml.Tag> result) {
+            // Check if this tag matches
+            if ("*".equals(elementName) || tag.getName().equals(elementName)) {
+                result.add(tag);
+            }
+            // Recursively search children
+            List<? extends Content> contents = tag.getContent();
+            if (contents != null) {
+                for (Content content : contents) {
+                    if (content instanceof Xml.Tag) {
+                        findDescendants((Xml.Tag) content, elementName, result);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Find direct children of a tag matching the given element name or wildcard.
+         */
+        private Set<Xml.Tag> findDirectChildren(Xml.Tag parent, String elementName) {
+            Set<Xml.Tag> result = new LinkedHashSet<>();
+            List<? extends Content> contents = parent.getContent();
+            if (contents == null) {
+                return result;
+            }
+
+            for (Content content : contents) {
+                if (content instanceof Xml.Tag) {
+                    Xml.Tag child = (Xml.Tag) content;
+                    if ("*".equals(elementName) || child.getName().equals(elementName)) {
+                        result.add(child);
+                    }
+                }
+            }
+            return result;
+        }
     }
 
     /**
@@ -954,6 +1326,19 @@ public class XPathMatcher {
         StepInfo(XPathParser.StepContext step, boolean isDescendant) {
             this.step = step;
             this.isDescendant = isDescendant;
+        }
+    }
+
+    /**
+     * Helper class to hold position information for positional predicates.
+     */
+    private static class PositionInfo {
+        final int position;
+        final int size;
+
+        PositionInfo(int position, int size) {
+            this.position = position;
+            this.size = size;
         }
     }
 }

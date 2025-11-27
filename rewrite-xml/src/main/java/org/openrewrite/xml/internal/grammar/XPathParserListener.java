@@ -183,6 +183,16 @@ public interface XPathParserListener extends ParseTreeListener {
 	 */
 	void exitPrimaryExpr(XPathParser.PrimaryExprContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link XPathParser#predicateValue}.
+	 * @param ctx the parse tree
+	 */
+	void enterPredicateValue(XPathParser.PredicateValueContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XPathParser#predicateValue}.
+	 * @param ctx the parse tree
+	 */
+	void exitPredicateValue(XPathParser.PredicateValueContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link XPathParser#functionCall}.
 	 * @param ctx the parse tree
 	 */

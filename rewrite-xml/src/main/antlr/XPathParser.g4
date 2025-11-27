@@ -26,7 +26,8 @@
  * - Node type tests: /root/element/text(), /root/comment(), etc.
  * - Predicates with conditions: /root/element[@attr='value']
  * - Child element predicates: /root/element[child='value']
- * - XPath functions: local-name(), namespace-uri(), text(), contains(), etc.
+ * - Positional predicates: /root/element[1], /root/element[last()]
+ * - XPath functions: local-name(), namespace-uri(), text(), contains(), position(), last(), etc.
  * - Logical operators in predicates: and, or
  * - Multiple predicates: /root/element[@attr='value'][local-name()='element']
  * - Top-level function expressions: contains(/root/element, 'value')
@@ -128,10 +129,17 @@ andExpr
 
 // Primary expression in a predicate
 primaryExpr
-    : functionCall EQUALS stringLiteral                // local-name()='value', text()='value'
-    | attributeStep EQUALS stringLiteral               // @attr='value' or @*='value'
-    | relativeLocationPath EQUALS stringLiteral        // bar/baz/text()='value'
-    | childElementTest EQUALS stringLiteral            // child='value' or *='value'
+    : predicateValue comparisonOp comparand            // any value expression with comparison
+    | predicateValue                                   // standalone value (last(), position(), number, boolean)
+    ;
+
+// A value-producing expression in a predicate
+predicateValue
+    : functionCall                                     // local-name(), last(), position(), contains(), etc.
+    | attributeStep                                    // @attr, @*
+    | relativeLocationPath                             // bar/baz/text()
+    | childElementTest                                 // child, *
+    | NUMBER                                           // positional predicate [1], [2], etc.
     ;
 
 // XPath function call - unified for both top-level and predicate use

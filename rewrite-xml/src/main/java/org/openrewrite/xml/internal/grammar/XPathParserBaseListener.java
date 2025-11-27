@@ -224,6 +224,18 @@ public class XPathParserBaseListener implements XPathParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterPredicateValue(XPathParser.PredicateValueContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitPredicateValue(XPathParser.PredicateValueContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterFunctionCall(XPathParser.FunctionCallContext ctx) { }
 	/**
 	 * {@inheritDoc}

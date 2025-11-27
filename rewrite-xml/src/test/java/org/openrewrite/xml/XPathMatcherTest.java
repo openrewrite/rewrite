@@ -666,4 +666,41 @@ class XPathMatcherTest {
         assertThat(match("//element1/text()", namespacedXml)).isTrue();
         assertThat(match("/root/parent/text()", namespacedXml)).isFalse(); // parent has child elements, not direct text
     }
+
+    @Test
+    void matchPositionalPredicates() {
+        // xmlDoc has two <dependency> elements under <dependencies>
+        // [1] selects the first dependency
+        assertThat(match("/dependencies/dependency[1]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[2]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[3]", xmlDoc)).isFalse(); // only 2 dependencies
+
+        // [last()] selects the last element
+        assertThat(match("/dependencies/dependency[last()]", xmlDoc)).isTrue();
+
+        // position() function
+        assertThat(match("/dependencies/dependency[position()=1]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()=2]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()=3]", xmlDoc)).isFalse();
+
+        // Combining positional with other predicates
+        // The first dependency has groupId, the second doesn't
+        assertThat(match("/dependencies/dependency[1]/groupId", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[2]/groupId", xmlDoc)).isFalse();
+
+        // position() with comparison operators
+        assertThat(match("/dependencies/dependency[position()>1]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()<2]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()>=1]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()<=2]", xmlDoc)).isTrue();
+    }
+
+    @Test
+    void matchPositionalWithOtherConditions() {
+        // Combining positional predicates with attribute/element conditions
+        // First dependency's artifactId has scope="compile", second has scope="test"
+        assertThat(match("/dependencies/dependency[1]/artifactId[@scope='compile']", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[2]/artifactId[@scope='test']", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[1]/artifactId[@scope='test']", xmlDoc)).isFalse();
+    }
 }
