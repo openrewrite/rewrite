@@ -15,8 +15,9 @@
  */
 
 import {RecipeSpec} from "../../../src/test";
-import {javascript} from "../../../src/javascript";
+import {javascript, JavaScriptVisitor, JS, typescript} from "../../../src/javascript";
 import {UseObjectPropertyShorthand} from "../../../src/javascript/cleanup";
+import {J, Type} from "../../../src/java";
 
 describe("UseObjectPropertyShorthand", () => {
     const spec = new RecipeSpec();
@@ -146,4 +147,31 @@ describe("UseObjectPropertyShorthand", () => {
             `function getData() { return { name, value }; }`
         )
     ));
+
+    test("preserves type attribution after simplification", async () => spec.rewriteRun({
+        //language=typescript
+        ...typescript(
+            `let foo: boolean; const obj = { foo: foo };`,
+            `let foo: boolean; const obj = { foo };`
+        ),
+        afterRecipe: async (cu: JS.CompilationUnit) => {
+            let foundShorthandProperty = false;
+
+            await new class extends JavaScriptVisitor<void> {
+                protected async visitPropertyAssignment(prop: JS.PropertyAssignment, _: void): Promise<J | undefined> {
+                    // Find the shorthand property (no initializer means shorthand)
+                    if (!prop.initializer) {
+                        foundShorthandProperty = true;
+                        const nameIdent = prop.name.element as J.Identifier;
+                        expect(nameIdent.simpleName).toBe('foo');
+                        // The identifier should retain type information as Primitive.Boolean
+                        expect(nameIdent.type).toBe(Type.Primitive.Boolean);
+                    }
+                    return prop;
+                }
+            }().visit(cu, undefined);
+
+            expect(foundShorthandProperty).toBe(true);
+        }
+    }));
 });
