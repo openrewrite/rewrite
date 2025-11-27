@@ -15,11 +15,12 @@
  */
 import {
     findNodeResolutionResult,
-    NodeResolutionResultQueries,
     npm,
+    NpmrcScope,
     packageJson,
     PackageJsonParser,
     packageLockJson,
+    readNpmrcConfigs,
     typescript
 } from "../../src/javascript";
 import {Json} from "../../src/json";
@@ -274,4 +275,103 @@ describe("PackageJsonParser", () => {
             );
         }, {unsafeCleanup: true});
     });
+
+    test("should read project .npmrc configuration", async () => {
+        await withDir(async (dir) => {
+            // Write package.json
+            const packageJsonContent = {
+                name: "test-project",
+                version: "1.0.0"
+            };
+            fs.writeFileSync(
+                path.join(dir.path, 'package.json'),
+                JSON.stringify(packageJsonContent, null, 2)
+            );
+
+            // Write project .npmrc
+            fs.writeFileSync(
+                path.join(dir.path, '.npmrc'),
+                `# Project npm config
+registry=https://registry.example.com/
+@myorg:registry=https://myorg.registry.com/
+save-exact=true
+`
+            );
+
+            // Parse
+            const parser = new PackageJsonParser({relativeTo: dir.path});
+            const results: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(dir.path, 'package.json'))) {
+                results.push(result as Json.Document);
+            }
+
+            expect(results).toHaveLength(1);
+            const marker = findNodeResolutionResult(results[0]);
+            expect(marker).toBeDefined();
+
+            // Should have npmrcConfigs with at least the project config
+            expect(marker!.npmrcConfigs).toBeDefined();
+            const projectConfig = marker!.npmrcConfigs!.find(c => c.scope === NpmrcScope.Project);
+            expect(projectConfig).toBeDefined();
+            expect(projectConfig!.properties['registry']).toBe('https://registry.example.com/');
+            expect(projectConfig!.properties['@myorg:registry']).toBe('https://myorg.registry.com/');
+            expect(projectConfig!.properties['save-exact']).toBe('true');
+        }, {unsafeCleanup: true});
+    });
+
+    test("should parse .npmrc with comments and empty lines", async () => {
+        await withDir(async (dir) => {
+            // Write package.json
+            fs.writeFileSync(
+                path.join(dir.path, 'package.json'),
+                JSON.stringify({name: "test", version: "1.0.0"}, null, 2)
+            );
+
+            // Write .npmrc with various formats
+            fs.writeFileSync(
+                path.join(dir.path, '.npmrc'),
+                `# This is a comment
+; This is also a comment
+
+registry=https://example.com/
+  key-with-spaces = value-with-spaces
+empty-value=
+//registry.npmjs.org/:_authToken=\${NPM_TOKEN}
+`
+            );
+
+            // Parse
+            const parser = new PackageJsonParser({relativeTo: dir.path});
+            const results: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(dir.path, 'package.json'))) {
+                results.push(result as Json.Document);
+            }
+
+            const marker = findNodeResolutionResult(results[0]);
+            expect(marker).toBeDefined();
+
+            const projectConfig = marker!.npmrcConfigs!.find(c => c.scope === NpmrcScope.Project);
+            expect(projectConfig).toBeDefined();
+            expect(projectConfig!.properties['registry']).toBe('https://example.com/');
+            expect(projectConfig!.properties['key-with-spaces']).toBe('value-with-spaces');
+            expect(projectConfig!.properties['empty-value']).toBe('');
+            expect(projectConfig!.properties['//registry.npmjs.org/:_authToken']).toBe('${NPM_TOKEN}');
+        }, {unsafeCleanup: true});
+    });
+
+    test("readNpmrcConfigs should read from project directory", async () => {
+        await withDir(async (dir) => {
+            // Write .npmrc
+            fs.writeFileSync(
+                path.join(dir.path, '.npmrc'),
+                'registry=https://test.registry.com/'
+            );
+
+            const configs = readNpmrcConfigs(dir.path);
+            const projectConfig = configs.find(c => c.scope === NpmrcScope.Project);
+            expect(projectConfig).toBeDefined();
+            expect(projectConfig!.properties['registry']).toBe('https://test.registry.com/');
+        }, {unsafeCleanup: true});
+    });
+
 });

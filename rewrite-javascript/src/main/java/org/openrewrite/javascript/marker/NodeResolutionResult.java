@@ -74,6 +74,9 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
     // Node/npm version requirements
     @Nullable Map<String, String> engines;
 
+    // npm configuration from various scopes (global, user, project, env)
+    @Nullable List<Npmrc> npmrcConfigs;
+
     /**
      * Look up a resolved dependency by package name.
      *
@@ -120,6 +123,9 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
 
         q.getAndSend(after, NodeResolutionResult::getPackageManager);
         q.getAndSend(after, NodeResolutionResult::getEngines);
+        q.getAndSendList(after, n -> n.getNpmrcConfigs() != null ? n.getNpmrcConfigs() : emptyList(),
+                npmrc -> npmrc.getScope().name(),
+                npmrc -> npmrc.rpcSend(npmrc, q));
     }
 
     @Override
@@ -144,7 +150,9 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
                 .withResolvedDependencies(q.receiveList(before.resolvedDependencies,
                         resolved -> resolved.rpcReceive(resolved, q)))
                 .withPackageManager(q.receiveAndGet(before.packageManager, s -> s == null ? null : PackageManager.valueOf(s.toString())))
-                .withEngines(q.receive(before.engines));
+                .withEngines(q.receive(before.engines))
+                .withNpmrcConfigs(q.receiveList(before.npmrcConfigs,
+                        npmrc -> npmrc.rpcReceive(npmrc, q)));
     }
 
     /**
@@ -252,5 +260,40 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
         YarnBerry,
         Pnpm,
         Bun
+    }
+
+    /**
+     * Represents the scope/source of an npmrc configuration.
+     * Listed from lowest to highest priority.
+     */
+    public enum NpmrcScope {
+        Global,   // $PREFIX/etc/npmrc
+        User,     // $HOME/.npmrc
+        Project   // .npmrc in project root
+    }
+
+    /**
+     * Represents npm configuration from a specific scope.
+     * Multiple Npmrc objects can be collected (one per scope) to allow
+     * recipes to merge configurations or modify specific scopes.
+     */
+    @Value
+    @With
+    public static class Npmrc implements RpcCodec<Npmrc> {
+        NpmrcScope scope;
+        Map<String, String> properties;
+
+        @Override
+        public void rpcSend(Npmrc after, RpcSendQueue q) {
+            q.getAndSend(after, n -> n.getScope().name());
+            q.getAndSend(after, Npmrc::getProperties);
+        }
+
+        @Override
+        public Npmrc rpcReceive(Npmrc before, RpcReceiveQueue q) {
+            return before
+                    .withScope(q.receiveAndGet(before.scope, s -> NpmrcScope.valueOf(s.toString())))
+                    .withProperties(q.receive(before.properties));
+        }
     }
 }

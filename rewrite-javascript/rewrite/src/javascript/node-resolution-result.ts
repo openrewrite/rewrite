@@ -19,6 +19,9 @@ import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {createDraft, finishDraft} from "immer";
 import * as semver from "semver";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 
 export const NodeResolutionResultKind = "org.openrewrite.javascript.marker.NodeResolutionResult" as const;
 export const DependencyKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Dependency" as const;
@@ -33,6 +36,29 @@ export const enum PackageManager {
     YarnBerry = 'YarnBerry',
     Pnpm = 'Pnpm',
     Bun = 'Bun',
+}
+
+/**
+ * Represents the scope/source of an npmrc configuration.
+ * Listed from lowest to highest priority.
+ */
+export const enum NpmrcScope {
+    Global = 'Global',       // $PREFIX/etc/npmrc
+    User = 'User',           // $HOME/.npmrc
+    Project = 'Project',     // .npmrc in project root
+}
+
+export const NpmrcKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Npmrc" as const;
+
+/**
+ * Represents npm configuration from a specific scope.
+ * Multiple Npmrc objects can be collected (one per scope) to allow
+ * recipes to merge configurations or modify specific scopes.
+ */
+export interface Npmrc {
+    readonly kind: typeof NpmrcKind;
+    readonly scope: NpmrcScope;
+    readonly properties: Record<string, string>;
 }
 
 /**
@@ -118,6 +144,9 @@ export interface NodeResolutionResult extends Marker {
 
     // Node/npm version requirements
     readonly engines?: Record<string, string>;
+
+    // npm configuration from various scopes (global, user, project, env)
+    readonly npmrcConfigs?: Npmrc[];
 }
 
 /**
@@ -132,13 +161,15 @@ export interface NodeResolutionResult extends Marker {
  * @param packageLockContent Optional parsed package-lock.json content for resolution info
  * @param workspacePackagePaths Optional resolved paths to workspace package.json files (only for workspace root)
  * @param packageManager Optional package manager that was detected from lock file
+ * @param npmrcConfigs Optional npm configuration from various scopes
  */
 export function createNodeResolutionResultMarker(
     path: string,
     packageJsonContent: any,
     packageLockContent?: any,
     workspacePackagePaths?: string[],
-    packageManager?: PackageManager
+    packageManager?: PackageManager,
+    npmrcConfigs?: Npmrc[]
 ): NodeResolutionResult {
     // Cache for deduplicating resolved dependencies with the same name+version.
     const resolvedDependencyCache = new Map<string, ResolvedDependency>();
@@ -437,6 +468,7 @@ export function createNodeResolutionResultMarker(
         resolvedDependencies,
         packageManager,
         engines: packageJsonContent.engines,
+        npmrcConfigs,
     };
 }
 
@@ -445,6 +477,136 @@ export function createNodeResolutionResultMarker(
  */
 export function findNodeResolutionResult(cu: { markers: Markers }): NodeResolutionResult | undefined {
     return findMarker<NodeResolutionResult>(cu, NodeResolutionResultKind);
+}
+
+/**
+ * Parses an .npmrc file content into a key-value map.
+ *
+ * .npmrc format:
+ * - Lines are key=value pairs
+ * - Lines starting with # or ; are comments
+ * - Empty lines are ignored
+ * - Values can contain ${VAR} or ${VAR:-default} for env variable substitution
+ */
+function parseNpmrc(content: string): Record<string, string> {
+    const properties: Record<string, string> = {};
+
+    for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+
+        // Skip comments and empty lines
+        if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith(';')) {
+            continue;
+        }
+
+        // Parse key=value
+        const eqIndex = trimmed.indexOf('=');
+        if (eqIndex === -1) continue;
+
+        const key = trimmed.substring(0, eqIndex).trim();
+        const value = trimmed.substring(eqIndex + 1).trim();
+
+        if (key) {
+            properties[key] = value;
+        }
+    }
+
+    return properties;
+}
+
+/**
+ * Reads .npmrc configurations from all scope levels.
+ * Returns an array of Npmrc objects, one for each scope that has configuration.
+ *
+ * Scopes (from lowest to highest priority):
+ * - Global: $PREFIX/etc/npmrc (npm's installation directory)
+ * - User: $HOME/.npmrc (user's home directory)
+ * - Project: .npmrc in project root (sibling of package.json)
+ * - Env: npm_config_* environment variables
+ *
+ * @param projectDir The project directory containing package.json
+ * @returns Array of Npmrc objects for each scope with configuration
+ */
+export function readNpmrcConfigs(projectDir: string): Npmrc[] {
+    const configs: Npmrc[] = [];
+
+    // 1. Global config: $PREFIX/etc/npmrc
+    // Try to get npm prefix from npm itself, fall back to common locations
+    const globalNpmrcPaths = [
+        // Try NPM_CONFIG_GLOBALCONFIG env var first
+        process.env.NPM_CONFIG_GLOBALCONFIG,
+        // Common global locations
+        '/usr/local/etc/npmrc',
+        '/etc/npmrc',
+    ].filter(Boolean) as string[];
+
+    // Also try to detect from npm prefix if node is installed
+    const nodeDir = process.execPath ? path.dirname(path.dirname(process.execPath)) : undefined;
+    if (nodeDir) {
+        globalNpmrcPaths.unshift(path.join(nodeDir, 'etc', 'npmrc'));
+    }
+
+    for (const globalPath of globalNpmrcPaths) {
+        if (fs.existsSync(globalPath)) {
+            try {
+                const content = fs.readFileSync(globalPath, 'utf-8');
+                const properties = parseNpmrc(content);
+                if (Object.keys(properties).length > 0) {
+                    configs.push({
+                        kind: NpmrcKind,
+                        scope: NpmrcScope.Global,
+                        properties
+                    });
+                    break; // Only use the first found global config
+                }
+            } catch {
+                // Ignore read errors
+            }
+        }
+    }
+
+    // 2. User config: $HOME/.npmrc
+    const userNpmrcPath = process.env.NPM_CONFIG_USERCONFIG || path.join(os.homedir(), '.npmrc');
+    if (fs.existsSync(userNpmrcPath)) {
+        try {
+            const content = fs.readFileSync(userNpmrcPath, 'utf-8');
+            const properties = parseNpmrc(content);
+            if (Object.keys(properties).length > 0) {
+                configs.push({
+                    kind: NpmrcKind,
+                    scope: NpmrcScope.User,
+                    properties
+                });
+            }
+        } catch {
+            // Ignore read errors
+        }
+    }
+
+    // 3. Project config: .npmrc in project root
+    const projectNpmrcPath = path.join(projectDir, '.npmrc');
+    if (fs.existsSync(projectNpmrcPath)) {
+        try {
+            const content = fs.readFileSync(projectNpmrcPath, 'utf-8');
+            const properties = parseNpmrc(content);
+            if (Object.keys(properties).length > 0) {
+                configs.push({
+                    kind: NpmrcKind,
+                    scope: NpmrcScope.Project,
+                    properties
+                });
+            }
+        } catch {
+            // Ignore read errors
+        }
+    }
+
+    // Note: We intentionally don't capture npm_config_* environment variables.
+    // While users can set config via env vars, npm also automatically injects
+    // many npm_config_* vars when running child processes, and there's no way
+    // to distinguish user-set vars from npm-injected ones at runtime.
+
+    return configs;
 }
 
 /**
@@ -515,6 +677,25 @@ export namespace NodeResolutionResultQueries {
         return project.resolvedDependencies.filter(r => r.name === packageName);
     }
 }
+
+/**
+ * Register RPC codec for Npmrc.
+ */
+RpcCodecs.registerCodec(NpmrcKind, {
+    async rpcReceive(before: Npmrc, q: RpcReceiveQueue): Promise<Npmrc> {
+        const draft = createDraft(before);
+        draft.kind = NpmrcKind;
+        draft.scope = await q.receive(before.scope);
+        draft.properties = await q.receive(before.properties);
+
+        return finishDraft(draft) as Npmrc;
+    },
+
+    async rpcSend(after: Npmrc, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.scope);
+        await q.getAndSend(after, a => a.properties);
+    }
+});
 
 /**
  * Register RPC codec for Dependency.
@@ -595,6 +776,7 @@ RpcCodecs.registerCodec(NodeResolutionResultKind, {
 
         draft.packageManager = await q.receive(before.packageManager);
         draft.engines = await q.receive(before.engines);
+        draft.npmrcConfigs = (await q.receiveList(before.npmrcConfigs)) || undefined;
 
         return finishDraft(draft) as NodeResolutionResult;
     },
@@ -622,5 +804,7 @@ RpcCodecs.registerCodec(NodeResolutionResultKind, {
 
         await q.getAndSend(after, a => a.packageManager);
         await q.getAndSend(after, a => a.engines);
+        await q.getAndSendList(after, a => a.npmrcConfigs || [],
+            npmrc => npmrc.scope);
     }
 });

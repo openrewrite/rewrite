@@ -16,7 +16,7 @@
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers} from "../parser";
 import {SourceFile} from "../tree";
 import {Json, JsonParser} from "../json";
-import {createNodeResolutionResultMarker, NodeResolutionResult, PackageManager} from "./node-resolution-result";
+import {createNodeResolutionResultMarker, NodeResolutionResult, PackageManager, readNpmrcConfigs} from "./node-resolution-result";
 import * as fs from "fs";
 import * as path from "path";
 import * as YAML from "yaml";
@@ -133,7 +133,18 @@ export class PackageJsonParser extends Parser {
                 packageManager = lockResult?.packageManager;
             }
 
-            return createNodeResolutionResultMarker(relativePath, packageJson, lockContent, undefined, packageManager);
+            // Read .npmrc configurations from all scopes
+            const projectDir = this.relativeTo || dir;
+            const npmrcConfigs = readNpmrcConfigs(projectDir);
+
+            return createNodeResolutionResultMarker(
+                relativePath,
+                packageJson,
+                lockContent,
+                undefined,
+                packageManager,
+                npmrcConfigs.length > 0 ? npmrcConfigs : undefined
+            );
         } catch (error) {
             console.warn(`Failed to create NodeResolutionResult marker: ${error}`);
             return null;

@@ -47,10 +47,7 @@ describe("Lock file parsing", () => {
     /**
      * Common assertions that should pass for all package managers
      */
-    function assertCommonExpectations(
-        resolvedDeps: ResolvedDependency[],
-        packageManagerName: string
-    ) {
+    function assertCommonExpectations(resolvedDeps: ResolvedDependency[]) {
         // Should have resolved dependencies
         expect(resolvedDeps.length).toBeGreaterThan(0);
 
@@ -136,7 +133,7 @@ describe("Lock file parsing", () => {
         test("should parse all dependencies from package-lock.json", async () => {
             const marker = await parseAndGetMarker("npm");
             expect(marker).not.toBeNull();
-            assertCommonExpectations(marker!.resolvedDependencies, "npm");
+            assertCommonExpectations(marker!.resolvedDependencies);
         });
 
         test("should set packageManager to Npm", async () => {
@@ -248,7 +245,7 @@ describe("Lock file parsing", () => {
         test("should parse all dependencies from bun.lock", async () => {
             const marker = await parseAndGetMarker("bun");
             expect(marker).not.toBeNull();
-            assertCommonExpectations(marker!.resolvedDependencies, "bun");
+            assertCommonExpectations(marker!.resolvedDependencies);
         });
 
         test("should set packageManager to Bun", async () => {
@@ -264,7 +261,7 @@ describe("Lock file parsing", () => {
         test("should parse all dependencies from pnpm-lock.yaml", async () => {
             const marker = await getMarkerOrSkip("pnpm");
             if (!marker) return; // Skip if node_modules not available
-            assertCommonExpectations(marker.resolvedDependencies, "pnpm");
+            assertCommonExpectations(marker.resolvedDependencies);
         });
 
         test("should set packageManager to Pnpm", async () => {
@@ -311,7 +308,7 @@ describe("Lock file parsing", () => {
         test("should parse all dependencies from yarn.lock", async () => {
             const marker = await getMarkerOrSkip("yarn");
             if (!marker) return; // Skip if node_modules not available
-            assertCommonExpectations(marker.resolvedDependencies, "yarn");
+            assertCommonExpectations(marker.resolvedDependencies);
         });
 
         test("should set packageManager to YarnClassic", async () => {
@@ -363,7 +360,7 @@ describe("Lock file parsing", () => {
         test("should parse all dependencies from yarn.lock", async () => {
             const marker = await getMarkerOrSkip("yarn-berry");
             if (!marker) return; // Skip if CLI not available
-            assertCommonExpectations(marker.resolvedDependencies, "yarn-berry");
+            assertCommonExpectations(marker.resolvedDependencies);
         });
 
         test("should set packageManager to YarnBerry", async () => {
