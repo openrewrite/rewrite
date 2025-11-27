@@ -503,7 +503,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         }
 
         JRightPadded<T> newRight = (JRightPadded<T>) ctx;
-        return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, newRight);
+        return visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, newRight);
     }
 
     @Override
@@ -513,7 +513,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         }
 
         JLeftPadded<T> newLeft = (JLeftPadded<T>) ctx;
-        return super.visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, newLeft);
+        return visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, newLeft);
     }
 
     @Override
@@ -528,7 +528,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         }
 
         JContainer<J2> newContainer = (JContainer<J2>) ctx;
-        return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, newContainer);
+        return visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, newContainer);
     }
 
     @Override

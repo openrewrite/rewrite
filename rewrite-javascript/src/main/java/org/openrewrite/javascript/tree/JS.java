@@ -24,9 +24,11 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
+import org.openrewrite.javascript.service.JavaScriptAutoFormatService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.request.Print;
 
@@ -221,10 +223,17 @@ public interface JS extends J {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
             try {
-                return JavaSourceFile.super.service(service);
+                Class<S> serviceClass;
+                if (AutoFormatService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(JavaScriptAutoFormatService.class.getName());
+                } else {
+                    return JavaSourceFile.super.service(service);
+                }
+                return (T) serviceClass.getConstructor().newInstance();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

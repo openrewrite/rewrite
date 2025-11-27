@@ -125,6 +125,14 @@ export class JavaScriptTypeMapping {
             return existing;
         }
 
+        // TypeScript represents `boolean` as a union of `false | true`, but the union
+        // type still has the Boolean flag set. Check this early to return Primitive.Boolean
+        // before we process it as a generic union type.
+        if (type.flags & ts.TypeFlags.Boolean) {
+            this.typeCache.set(signature, Type.Primitive.Boolean);
+            return Type.Primitive.Boolean;
+        }
+
         // Get symbol for later use in type detection
         const symbol = type.getSymbol?.();
 
@@ -258,8 +266,7 @@ export class JavaScriptTypeMapping {
 
         // Check for union types (e.g., string | number)
         if (type.flags & ts.TypeFlags.Union) {
-            const unionType = type as ts.UnionType;
-            return this.createUnionType(unionType, signature);
+            return this.createUnionType(type as ts.UnionType, signature);
         }
 
         // Check for intersection types (e.g., A & B)
