@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.13.2
+// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-xml/src/main/antlr/XPathParser.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -21,252 +21,276 @@ import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 /**
- * This class provides an empty implementation of {@link XMLParserListener},
+ * This class provides an empty implementation of {@link XPathParserListener},
  * which can be extended to create a listener which only needs to handle a subset
  * of the available methods.
  */
 @SuppressWarnings("CheckReturnValue")
-public class XMLParserBaseListener implements XMLParserListener {
+public class XPathParserBaseListener implements XPathParserListener {
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDocument(XMLParser.DocumentContext ctx) { }
+	@Override public void enterXpathExpression(XPathParser.XpathExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitDocument(XMLParser.DocumentContext ctx) { }
+	@Override public void exitXpathExpression(XPathParser.XpathExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterProlog(XMLParser.PrologContext ctx) { }
+	@Override public void enterBooleanExpr(XPathParser.BooleanExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitProlog(XMLParser.PrologContext ctx) { }
+	@Override public void exitBooleanExpr(XPathParser.BooleanExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterXmldecl(XMLParser.XmldeclContext ctx) { }
+	@Override public void enterComparisonOp(XPathParser.ComparisonOpContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitXmldecl(XMLParser.XmldeclContext ctx) { }
+	@Override public void exitComparisonOp(XPathParser.ComparisonOpContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterMisc(XMLParser.MiscContext ctx) { }
+	@Override public void enterComparand(XPathParser.ComparandContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitMisc(XMLParser.MiscContext ctx) { }
+	@Override public void exitComparand(XPathParser.ComparandContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDoctypedecl(XMLParser.DoctypedeclContext ctx) { }
+	@Override public void enterAbsoluteLocationPath(XPathParser.AbsoluteLocationPathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitDoctypedecl(XMLParser.DoctypedeclContext ctx) { }
+	@Override public void exitAbsoluteLocationPath(XPathParser.AbsoluteLocationPathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterIntsubset(XMLParser.IntsubsetContext ctx) { }
+	@Override public void enterRelativeLocationPath(XPathParser.RelativeLocationPathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitIntsubset(XMLParser.IntsubsetContext ctx) { }
+	@Override public void exitRelativeLocationPath(XPathParser.RelativeLocationPathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterMarkupdecl(XMLParser.MarkupdeclContext ctx) { }
+	@Override public void enterPathSeparator(XPathParser.PathSeparatorContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitMarkupdecl(XMLParser.MarkupdeclContext ctx) { }
+	@Override public void exitPathSeparator(XPathParser.PathSeparatorContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDeclSep(XMLParser.DeclSepContext ctx) { }
+	@Override public void enterStep(XPathParser.StepContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitDeclSep(XMLParser.DeclSepContext ctx) { }
+	@Override public void exitStep(XPathParser.StepContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterExternalid(XMLParser.ExternalidContext ctx) { }
+	@Override public void enterNodeTypeTest(XPathParser.NodeTypeTestContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitExternalid(XMLParser.ExternalidContext ctx) { }
+	@Override public void exitNodeTypeTest(XPathParser.NodeTypeTestContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterProcessinginstruction(XMLParser.ProcessinginstructionContext ctx) { }
+	@Override public void enterAttributeStep(XPathParser.AttributeStepContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitProcessinginstruction(XMLParser.ProcessinginstructionContext ctx) { }
+	@Override public void exitAttributeStep(XPathParser.AttributeStepContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterContent(XMLParser.ContentContext ctx) { }
+	@Override public void enterNodeTest(XPathParser.NodeTestContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitContent(XMLParser.ContentContext ctx) { }
+	@Override public void exitNodeTest(XPathParser.NodeTestContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterElement(XMLParser.ElementContext ctx) { }
+	@Override public void enterPredicate(XPathParser.PredicateContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitElement(XMLParser.ElementContext ctx) { }
+	@Override public void exitPredicate(XPathParser.PredicateContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterJspdirective(XMLParser.JspdirectiveContext ctx) { }
+	@Override public void enterPredicateExpr(XPathParser.PredicateExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitJspdirective(XMLParser.JspdirectiveContext ctx) { }
+	@Override public void exitPredicateExpr(XPathParser.PredicateExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterJspscriptlet(XMLParser.JspscriptletContext ctx) { }
+	@Override public void enterOrExpr(XPathParser.OrExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitJspscriptlet(XMLParser.JspscriptletContext ctx) { }
+	@Override public void exitOrExpr(XPathParser.OrExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterJspexpression(XMLParser.JspexpressionContext ctx) { }
+	@Override public void enterAndExpr(XPathParser.AndExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitJspexpression(XMLParser.JspexpressionContext ctx) { }
+	@Override public void exitAndExpr(XPathParser.AndExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterJspdeclaration(XMLParser.JspdeclarationContext ctx) { }
+	@Override public void enterPrimaryExpr(XPathParser.PrimaryExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitJspdeclaration(XMLParser.JspdeclarationContext ctx) { }
+	@Override public void exitPrimaryExpr(XPathParser.PrimaryExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterJspcomment(XMLParser.JspcommentContext ctx) { }
+	@Override public void enterFunctionCall(XPathParser.FunctionCallContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitJspcomment(XMLParser.JspcommentContext ctx) { }
+	@Override public void exitFunctionCall(XPathParser.FunctionCallContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterReference(XMLParser.ReferenceContext ctx) { }
+	@Override public void enterFunctionArgs(XPathParser.FunctionArgsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitReference(XMLParser.ReferenceContext ctx) { }
+	@Override public void exitFunctionArgs(XPathParser.FunctionArgsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterAttribute(XMLParser.AttributeContext ctx) { }
+	@Override public void enterFunctionArg(XPathParser.FunctionArgContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitAttribute(XMLParser.AttributeContext ctx) { }
+	@Override public void exitFunctionArg(XPathParser.FunctionArgContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterChardata(XMLParser.ChardataContext ctx) { }
+	@Override public void enterAttributeTest(XPathParser.AttributeTestContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitChardata(XMLParser.ChardataContext ctx) { }
+	@Override public void exitAttributeTest(XPathParser.AttributeTestContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterChildElementTest(XPathParser.ChildElementTestContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitChildElementTest(XPathParser.ChildElementTestContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterStringLiteral(XPathParser.StringLiteralContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitStringLiteral(XPathParser.StringLiteralContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

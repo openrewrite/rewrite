@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.13.2
+// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-xml/src/main/antlr/XPathParser.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
 import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
 
 /**
- * This class provides an empty implementation of {@link XMLParserVisitor},
+ * This class provides an empty implementation of {@link XPathParserVisitor},
  * which can be extended to create a visitor which only needs to handle a subset
  * of the available methods.
  *
@@ -26,145 +26,159 @@ import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
  * operations with no return type.
  */
 @SuppressWarnings("CheckReturnValue")
-public class XMLParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> implements XMLParserVisitor<T> {
+public class XPathParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> implements XPathParserVisitor<T> {
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDocument(XMLParser.DocumentContext ctx) { return visitChildren(ctx); }
+	@Override public T visitXpathExpression(XPathParser.XpathExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitProlog(XMLParser.PrologContext ctx) { return visitChildren(ctx); }
+	@Override public T visitBooleanExpr(XPathParser.BooleanExprContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitXmldecl(XMLParser.XmldeclContext ctx) { return visitChildren(ctx); }
+	@Override public T visitComparisonOp(XPathParser.ComparisonOpContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitMisc(XMLParser.MiscContext ctx) { return visitChildren(ctx); }
+	@Override public T visitComparand(XPathParser.ComparandContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDoctypedecl(XMLParser.DoctypedeclContext ctx) { return visitChildren(ctx); }
+	@Override public T visitAbsoluteLocationPath(XPathParser.AbsoluteLocationPathContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitIntsubset(XMLParser.IntsubsetContext ctx) { return visitChildren(ctx); }
+	@Override public T visitRelativeLocationPath(XPathParser.RelativeLocationPathContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitMarkupdecl(XMLParser.MarkupdeclContext ctx) { return visitChildren(ctx); }
+	@Override public T visitPathSeparator(XPathParser.PathSeparatorContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDeclSep(XMLParser.DeclSepContext ctx) { return visitChildren(ctx); }
+	@Override public T visitStep(XPathParser.StepContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitExternalid(XMLParser.ExternalidContext ctx) { return visitChildren(ctx); }
+	@Override public T visitNodeTypeTest(XPathParser.NodeTypeTestContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitProcessinginstruction(XMLParser.ProcessinginstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitAttributeStep(XPathParser.AttributeStepContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitContent(XMLParser.ContentContext ctx) { return visitChildren(ctx); }
+	@Override public T visitNodeTest(XPathParser.NodeTestContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitElement(XMLParser.ElementContext ctx) { return visitChildren(ctx); }
+	@Override public T visitPredicate(XPathParser.PredicateContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitJspdirective(XMLParser.JspdirectiveContext ctx) { return visitChildren(ctx); }
+	@Override public T visitPredicateExpr(XPathParser.PredicateExprContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitJspscriptlet(XMLParser.JspscriptletContext ctx) { return visitChildren(ctx); }
+	@Override public T visitOrExpr(XPathParser.OrExprContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitJspexpression(XMLParser.JspexpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitAndExpr(XPathParser.AndExprContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitJspdeclaration(XMLParser.JspdeclarationContext ctx) { return visitChildren(ctx); }
+	@Override public T visitPrimaryExpr(XPathParser.PrimaryExprContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitJspcomment(XMLParser.JspcommentContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFunctionCall(XPathParser.FunctionCallContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitReference(XMLParser.ReferenceContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFunctionArgs(XPathParser.FunctionArgsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAttribute(XMLParser.AttributeContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFunctionArg(XPathParser.FunctionArgContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitChardata(XMLParser.ChardataContext ctx) { return visitChildren(ctx); }
+	@Override public T visitAttributeTest(XPathParser.AttributeTestContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitChildElementTest(XPathParser.ChildElementTestContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitStringLiteral(XPathParser.StringLiteralContext ctx) { return visitChildren(ctx); }
 }
