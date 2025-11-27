@@ -19,6 +19,8 @@ import {Json, JsonParser} from "../json";
 import {
     createNodeResolutionResultMarker,
     NodeResolutionResult,
+    PackageLockContent,
+    PackageLockEntry,
     PackageManager,
     readNpmrcConfigs
 } from "./node-resolution-result";
@@ -27,6 +29,29 @@ import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
 import {execSync} from "child_process";
+
+/**
+ * Bun.lock package entry metadata.
+ */
+interface BunLockMetadata {
+    readonly dependencies?: Record<string, string>;
+    readonly devDependencies?: Record<string, string>;
+    readonly peerDependencies?: Record<string, string>;
+    readonly optionalDependencies?: Record<string, string>;
+}
+
+/**
+ * Bun.lock package entry: [name@version, url, metadata, integrity]
+ * Note: Using unknown for first element since we need runtime validation of parsed JSON.
+ */
+type BunLockPackageEntry = [unknown, string?, BunLockMetadata?, string?];
+
+/**
+ * Parsed bun.lock content structure.
+ */
+interface BunLockContent {
+    readonly packages?: Record<string, BunLockPackageEntry>;
+}
 
 export interface PackageJsonParserOptions extends ParserOptions {
     /**
@@ -163,7 +188,7 @@ export class PackageJsonParser extends Parser {
 
             // Try to read lock file if dependency resolution is not skipped
             // Use relativeTo directory if available (for tests), otherwise use the directory from input path
-            let lockContent: any = undefined;
+            let lockContent: PackageLockContent | undefined = undefined;
             let packageManager: PackageManager | undefined = undefined;
             if (!this.skipDependencyResolution) {
                 const lockDir = this.relativeTo || dir;
@@ -196,7 +221,7 @@ export class PackageJsonParser extends Parser {
      *
      * @returns Object with parsed lock file content and detected package manager, or undefined if no lock file found
      */
-    private async tryReadLockFile(dir: string): Promise<{ content: any; packageManager: PackageManager } | undefined> {
+    private async tryReadLockFile(dir: string): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
         // Try package-lock.json (npm) - already JSON
         const npmLockPath = path.join(dir, 'package-lock.json');
         if (fs.existsSync(npmLockPath)) {
@@ -212,9 +237,12 @@ export class PackageJsonParser extends Parser {
         const bunLockPath = path.join(dir, 'bun.lock');
         if (fs.existsSync(bunLockPath)) {
             try {
-                const content = await fsp.readFile(bunLockPath, 'utf-8');
-                const bunLock = this.parseJsonc(content);
-                return { content: this.convertBunLockToNpmFormat(bunLock), packageManager: PackageManager.Bun };
+                const fileContent = await fsp.readFile(bunLockPath, 'utf-8');
+                const bunLock = this.parseJsonc(fileContent) as BunLockContent;
+                const content = this.convertBunLockToNpmFormat(bunLock);
+                if (content) {
+                    return { content, packageManager: PackageManager.Bun };
+                }
             } catch (error) {
                 console.debug?.(`Failed to parse bun.lock: ${error}`);
             }
@@ -269,7 +297,7 @@ export class PackageJsonParser extends Parser {
     /**
      * Parses JSONC (JSON with Comments and trailing commas) content.
      */
-    private parseJsonc(content: string): any {
+    private parseJsonc(content: string): Record<string, any> {
         // Remove single-line comments (// ...)
         let stripped = content.replace(/\/\/.*$/gm, '');
         // Remove multi-line comments (/* ... */)
@@ -459,20 +487,18 @@ export class PackageJsonParser extends Parser {
      * - Values are arrays: [name@version, url, metadata, integrity]
      * - metadata can have: { dependencies: {...}, devDependencies: {...}, ... }
      */
-    private convertBunLockToNpmFormat(bunLock: any): any {
-        if (!bunLock?.packages) {
+    private convertBunLockToNpmFormat(bunLock: BunLockContent): PackageLockContent | undefined {
+        if (!bunLock.packages) {
             return undefined;
         }
 
-        const packages: Record<string, any> = {
+        const packages: Record<string, PackageLockEntry> = {
             "": {} // Root package placeholder
         };
 
         for (const [key, value] of Object.entries(bunLock.packages)) {
-            if (!Array.isArray(value)) continue;
-
             // bun.lock array format: [name@version, url, metadata, integrity]
-            const [nameAtVersion, , metadata] = value as any[];
+            const [nameAtVersion, , metadata] = value;
 
             if (typeof nameAtVersion !== 'string') continue;
 
@@ -483,25 +509,17 @@ export class PackageJsonParser extends Parser {
             const name = nameAtVersion.substring(0, atIndex);
             const version = nameAtVersion.substring(atIndex + 1);
 
-            const pkgEntry: any = {
+            const pkgEntry: PackageLockEntry = {
                 version,
+                dependencies: metadata?.dependencies && Object.keys(metadata.dependencies).length > 0
+                    ? metadata.dependencies : undefined,
+                devDependencies: metadata?.devDependencies && Object.keys(metadata.devDependencies).length > 0
+                    ? metadata.devDependencies : undefined,
+                peerDependencies: metadata?.peerDependencies && Object.keys(metadata.peerDependencies).length > 0
+                    ? metadata.peerDependencies : undefined,
+                optionalDependencies: metadata?.optionalDependencies && Object.keys(metadata.optionalDependencies).length > 0
+                    ? metadata.optionalDependencies : undefined,
             };
-
-            // bun.lock metadata object has dependencies, devDependencies, etc as direct properties
-            if (metadata && typeof metadata === 'object') {
-                if (metadata.dependencies && Object.keys(metadata.dependencies).length > 0) {
-                    pkgEntry.dependencies = metadata.dependencies;
-                }
-                if (metadata.devDependencies && Object.keys(metadata.devDependencies).length > 0) {
-                    pkgEntry.devDependencies = metadata.devDependencies;
-                }
-                if (metadata.peerDependencies && Object.keys(metadata.peerDependencies).length > 0) {
-                    pkgEntry.peerDependencies = metadata.peerDependencies;
-                }
-                if (metadata.optionalDependencies && Object.keys(metadata.optionalDependencies).length > 0) {
-                    pkgEntry.optionalDependencies = metadata.optionalDependencies;
-                }
-            }
 
             // Convert bun's path format to npm's node_modules format
             // bun uses "parent/child" for nested deps, npm uses "node_modules/parent/node_modules/child"
@@ -527,7 +545,7 @@ export class PackageJsonParser extends Parser {
      * Gets dependency information from pnpm using its CLI.
      * Uses `pnpm list --json --depth=Infinity` to get the full dependency tree.
      */
-    private getPnpmDependencies(dir: string): any {
+    private getPnpmDependencies(dir: string): Record<string, any> | undefined {
         const output = execSync('pnpm list --json --depth=Infinity', {
             cwd: dir,
             encoding: 'utf-8',
@@ -542,7 +560,7 @@ export class PackageJsonParser extends Parser {
     /**
      * Converts pnpm list --json output to npm package-lock.json format.
      */
-    private convertPnpmListToNpmFormat(pnpmList: any): any {
+    private convertPnpmListToNpmFormat(pnpmList: any): Record<string, any> | undefined {
         const packages: Record<string, any> = {
             "": {} // Root package placeholder
         };

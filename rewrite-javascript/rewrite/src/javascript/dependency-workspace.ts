@@ -75,12 +75,13 @@ export class DependencyWorkspace {
      */
     static async getOrCreateWorkspace(options: WorkspaceOptions): Promise<string> {
         // Extract dependencies from package.json content if provided
-        let dependencies = options.dependencies;
+        let dependencies: Record<string, string> | undefined = options.dependencies;
+        let parsedPackageJson: Record<string, any> | undefined;
         if (options.packageJsonContent) {
-            const parsed = JSON.parse(options.packageJsonContent);
+            parsedPackageJson = JSON.parse(options.packageJsonContent);
             dependencies = {
-                ...parsed.dependencies,
-                ...parsed.devDependencies
+                ...parsedPackageJson?.dependencies,
+                ...parsedPackageJson?.devDependencies
             };
         }
 
@@ -89,7 +90,7 @@ export class DependencyWorkspace {
         }
 
         // Use the refactored internal method
-        return this.createWorkspace(dependencies, options.packageJsonContent, options.packageLockContent, options.targetDir);
+        return this.createWorkspace(dependencies, parsedPackageJson, options.packageJsonContent, options.packageLockContent, options.targetDir);
     }
 
     /**
@@ -97,6 +98,7 @@ export class DependencyWorkspace {
      */
     private static async createWorkspace(
         dependencies: Record<string, string>,
+        parsedPackageJson: Record<string, any> | undefined,
         packageJsonContent: string | undefined,
         packageLockContent: string | undefined,
         targetDir: string | undefined
@@ -113,9 +115,11 @@ export class DependencyWorkspace {
 
         // Helper to write package files to a directory
         const writePackageFiles = (dir: string) => {
-            // Write package.json (use provided content or generate)
+            // Write package.json (use provided content or generate from parsed/dependencies)
             if (packageJsonContent) {
                 fs.writeFileSync(path.join(dir, 'package.json'), packageJsonContent);
+            } else if (parsedPackageJson) {
+                fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(parsedPackageJson, null, 2));
             } else {
                 const packageJson = {
                     name: "openrewrite-template-workspace",

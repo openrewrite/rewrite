@@ -17,7 +17,7 @@ import {findMarker, Marker, Markers} from "../markers";
 import {randomId, UUID} from "../uuid";
 import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {createDraft, finishDraft} from "immer";
+import {castDraft, createDraft, finishDraft} from "immer";
 import * as semver from "semver";
 import * as fs from "fs";
 import * as path from "path";
@@ -26,6 +26,47 @@ import {homedir} from "os";
 export const NodeResolutionResultKind = "org.openrewrite.javascript.marker.NodeResolutionResult" as const;
 export const DependencyKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Dependency" as const;
 export const ResolvedDependencyKind = "org.openrewrite.javascript.marker.NodeResolutionResult$ResolvedDependency" as const;
+
+/**
+ * Parsed package.json content structure.
+ */
+export interface PackageJsonContent {
+    readonly name?: string;
+    readonly version?: string;
+    readonly description?: string;
+    readonly dependencies?: Record<string, string>;
+    readonly devDependencies?: Record<string, string>;
+    readonly peerDependencies?: Record<string, string>;
+    readonly optionalDependencies?: Record<string, string>;
+    readonly bundledDependencies?: string[];
+    readonly bundleDependencies?: string[];  // Legacy alias
+    readonly engines?: Record<string, string>;
+}
+
+/**
+ * Package entry in a package-lock.json packages map.
+ */
+export interface PackageLockEntry {
+    readonly version?: string;
+    readonly resolved?: string;
+    readonly integrity?: string;
+    readonly license?: string;
+    readonly dependencies?: Record<string, string>;
+    readonly devDependencies?: Record<string, string>;
+    readonly peerDependencies?: Record<string, string>;
+    readonly optionalDependencies?: Record<string, string>;
+    readonly engines?: Record<string, string> | string[];  // Can be legacy array format
+}
+
+/**
+ * Parsed package-lock.json content structure (npm lockfile v3 format).
+ */
+export interface PackageLockContent {
+    readonly name?: string;
+    readonly version?: string;
+    readonly lockfileVersion?: number;
+    readonly packages?: Record<string, PackageLockEntry>;
+}
 
 /**
  * Represents the package manager used by a Node.js project.
@@ -165,8 +206,8 @@ export interface NodeResolutionResult extends Marker {
  */
 export function createNodeResolutionResultMarker(
     path: string,
-    packageJsonContent: any,
-    packageLockContent?: any,
+    packageJsonContent: PackageJsonContent,
+    packageLockContent?: PackageLockContent,
     workspacePackagePaths?: string[],
     packageManager?: PackageManager,
     npmrcConfigs?: Npmrc[]
@@ -252,7 +293,7 @@ export function createNodeResolutionResultMarker(
     function getOrCreateResolvedDependency(
         name: string,
         version: string,
-        pkgEntry?: any
+        pkgEntry?: PackageLockEntry
     ): ResolvedDependency {
         const key = `${name}@${version}`;
         let resolved = resolvedDependencyCache.get(key);
@@ -420,14 +461,14 @@ export function createNodeResolutionResultMarker(
      * 2. Second pass: Populate dependencies using path-based resolution
      */
     function parseResolutions(
-        lockContent: any
+        lockContent: PackageLockContent
     ): ResolvedDependency[] {
-        if (!lockContent?.packages) return [];
+        if (!lockContent.packages) return [];
 
-        const packages = lockContent.packages as Record<string, any>;
+        const packages = lockContent.packages;
 
         // First pass: Create all ResolvedDependency placeholders and build path map
-        const packageInfos: Array<{path: string; name: string; version: string; entry: any}> = [];
+        const packageInfos: Array<{path: string; name: string; version: string; entry: PackageLockEntry}> = [];
         for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
             // Skip the root package (empty string key)
             if (pkgPath === '') continue;
@@ -449,7 +490,7 @@ export function createNodeResolutionResultMarker(
             const key = `${name}@${version}`;
             const resolved = resolvedDependencyCache.get(key);
             if (resolved) {
-                const mutableResolved = resolved as any;
+                const mutableResolved = castDraft(resolved);
                 if (entry.dependencies) {
                     mutableResolved.dependencies = parseDependencies(entry.dependencies, pkgPath);
                 }
