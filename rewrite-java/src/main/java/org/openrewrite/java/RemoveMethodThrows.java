@@ -62,7 +62,7 @@ public class RemoveMethodThrows extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides != null ? matchOverrides : true);
-        TypeMatcher typeMatcher = new TypeMatcher(exceptionTypePattern);
+        TypeMatcher typeMatcher = new TypeMatcher(exceptionTypePattern, true);
         return Preconditions.check(new DeclaresMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {

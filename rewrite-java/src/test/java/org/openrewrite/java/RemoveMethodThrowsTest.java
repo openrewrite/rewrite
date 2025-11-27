@@ -30,8 +30,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
         ));
     }
 
-    @Test
     @DocumentExample
+    @Test
     void removeSingleException() {
         rewriteRun(
           //language=java
@@ -41,6 +41,32 @@ class RemoveMethodThrowsTest implements RewriteTest {
               
               class A {
                   public void foo() throws IOException {
+                      // no-op
+                  }
+              }
+              """
+            ,
+            """
+              class A {
+                  public void foo() {
+                      // no-op
+                  }
+              }
+              """
+          ));
+    }
+
+
+    @Test
+    void removeExceptionSubclass() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.FileNotFoundException;
+              
+              class A {
+                  public void foo() throws FileNotFoundException {
                       // no-op
                   }
               }
