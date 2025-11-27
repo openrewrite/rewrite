@@ -19,12 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.NameTree;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -71,30 +68,14 @@ public class RemoveMethodThrows extends Recipe {
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                         J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
                         J.ClassDeclaration cd = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
-
-                        if (methodMatcher.matches(m, cd)) {
-                            if (m.getThrows() == null) {
-                                return m; // no throws to modify
-                            }
-
-                            List<NameTree> updatedThrows = new ArrayList<>();
-                            for (NameTree nameTree : m.getThrows()) {
-                                if (nameTree.getType() != null) {
-                                    if (typeMatcher.matches(nameTree.getType())) {
-                                        maybeRemoveImport(nameTree.getType().toString());
-                                    } else {
-                                        updatedThrows.add(nameTree);
-                                    }
+                        if (methodMatcher.matches(m, cd) && m.getThrows() != null) {
+                            return m.withThrows(ListUtils.map(m.getThrows(), nt -> {
+                                if (typeMatcher.matches(nt.getType())) {
+                                    maybeRemoveImport(nt.getType().toString());
+                                    return null;
                                 }
-                            }
-
-                            if (updatedThrows.isEmpty()) {
-                                // Remove the entire throws clause
-                                return m.withThrows(null);
-                            }
-
-                            // Replace with filtered throws list
-                            return m.withThrows(updatedThrows);
+                                return nt;
+                            }));
                         }
                         return m;
                     }
