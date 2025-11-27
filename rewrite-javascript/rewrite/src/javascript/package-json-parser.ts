@@ -233,7 +233,8 @@ export class PackageJsonParser extends Parser {
             }
         }
 
-        // Try bun.lock (bun v1.2+) - JSONC format (JSON with comments)
+        // Try bun.lock (text format, JSONC)
+        // Note: bun.lockb (binary format) is not supported - use `bun install --save-text-lockfile`
         const bunLockPath = path.join(dir, 'bun.lock');
         if (fs.existsSync(bunLockPath)) {
             try {
