@@ -287,7 +287,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitShebang(JS.Shebang shebang, RpcReceiveQueue q) {
         return shebang
-                .withText(q.receiveString(shebang.getText()));
+                .withText(q.receive(shebang.getText()));
     }
 
     @Override
