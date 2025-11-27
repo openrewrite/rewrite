@@ -21,7 +21,7 @@ import {createDraft, finishDraft} from "immer";
 import * as semver from "semver";
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
+import {homedir} from "os";
 
 export const NodeResolutionResultKind = "org.openrewrite.javascript.marker.NodeResolutionResult" as const;
 export const DependencyKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Dependency" as const;
@@ -174,6 +174,9 @@ export function createNodeResolutionResultMarker(
     // Cache for deduplicating resolved dependencies with the same name+version.
     const resolvedDependencyCache = new Map<string, ResolvedDependency>();
 
+    // Index from package name to all resolved versions (for O(1) semver fallback lookup)
+    const nameToResolved = new Map<string, ResolvedDependency[]>();
+
     // Map from lock file path to ResolvedDependency for path-based lookups.
     // e.g., "node_modules/is-odd" -> ResolvedDependency for is-odd@3.0.1
     const pathToResolved = new Map<string, ResolvedDependency>();
@@ -221,6 +224,7 @@ export function createNodeResolutionResultMarker(
     /**
      * Creates or retrieves a ResolvedDependency from the cache.
      * This ensures the same resolved package is reused across the dependency tree.
+     * Also maintains the nameToResolved index for O(1) name lookups.
      */
     function getOrCreateResolvedDependency(
         name: string,
@@ -243,6 +247,14 @@ export function createNodeResolutionResultMarker(
                 license: pkgEntry?.license,
             });
             resolvedDependencyCache.set(key, resolved);
+
+            // Maintain name index for O(1) lookup during semver fallback
+            const existing = nameToResolved.get(name);
+            if (existing) {
+                existing.push(resolved);
+            } else {
+                nameToResolved.set(name, [resolved]);
+            }
         }
         return resolved;
     }
@@ -292,14 +304,9 @@ export function createNodeResolutionResultMarker(
 
         // Fallback: use semver matching to find a version that satisfies the constraint
         // This is needed for yarn/pnpm which don't encode nesting in their lock files
-        const candidates: ResolvedDependency[] = [];
-        for (const resolved of resolvedDependencyCache.values()) {
-            if (resolved.name === name) {
-                candidates.push(resolved);
-            }
-        }
+        const candidates = nameToResolved.get(name);
 
-        if (candidates.length === 0) {
+        if (!candidates || candidates.length === 0) {
             return undefined;
         }
 
@@ -566,7 +573,7 @@ export function readNpmrcConfigs(projectDir: string): Npmrc[] {
     }
 
     // 2. User config: $HOME/.npmrc
-    const userNpmrcPath = process.env.NPM_CONFIG_USERCONFIG || path.join(os.homedir(), '.npmrc');
+    const userNpmrcPath = process.env.NPM_CONFIG_USERCONFIG || path.join(homedir(), '.npmrc');
     if (fs.existsSync(userNpmrcPath)) {
         try {
             const content = fs.readFileSync(userNpmrcPath, 'utf-8');

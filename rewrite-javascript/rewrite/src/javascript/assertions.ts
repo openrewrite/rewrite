@@ -21,6 +21,8 @@ import ts from 'typescript';
 import {json, Json} from "../json";
 import {DependencyWorkspace} from "./dependency-workspace";
 import {setTemplateSourceFileCache} from "./templating/engine";
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Shared TypeScript source file cache for test parsers.
@@ -32,9 +34,6 @@ export const sourceFileCache: Map<string, ts.SourceFile> = new Map();
 setTemplateSourceFileCache(sourceFileCache);
 
 export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): AsyncGenerator<SourceSpec<any>, void, unknown> {
-    const fs = require('fs');
-    const path = require('path');
-
     // Ensure the target directory exists
     if (!fs.existsSync(relativeTo)) {
         fs.mkdirSync(relativeTo, { recursive: true });
@@ -45,7 +44,7 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
     const packageLockSpec = sourceSpecs.find(spec => spec.path === 'package-lock.json');
 
     // Write package-lock.json first (if provided) so PackageJsonParser can read it
-    if (packageLockSpec) {
+    if (packageLockSpec && packageLockSpec.before) {
         fs.writeFileSync(
             path.join(relativeTo, 'package-lock.json'),
             packageLockSpec.before
@@ -86,7 +85,7 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
         // Write the actual package.json from the test spec
         fs.writeFileSync(
             path.join(relativeTo, 'package.json'),
-            packageJsonSpec.before
+            packageJsonSpec.before!
         );
 
         // Use PackageJsonParser to parse and attach NodeResolutionResult marker

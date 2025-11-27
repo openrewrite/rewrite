@@ -16,8 +16,14 @@
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers} from "../parser";
 import {SourceFile} from "../tree";
 import {Json, JsonParser} from "../json";
-import {createNodeResolutionResultMarker, NodeResolutionResult, PackageManager, readNpmrcConfigs} from "./node-resolution-result";
+import {
+    createNodeResolutionResultMarker,
+    NodeResolutionResult,
+    PackageManager,
+    readNpmrcConfigs
+} from "./node-resolution-result";
 import * as fs from "fs";
+import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
 import {execSync} from "child_process";
@@ -43,10 +49,43 @@ export class PackageJsonParser extends Parser {
     private readonly jsonParser: JsonParser;
     private readonly skipDependencyResolution: boolean;
 
+    /** Fields to copy from package.json that contain dependency maps */
+    private static readonly DEPENDENCY_FIELDS = [
+        'dependencies',
+        'devDependencies',
+        'peerDependencies',
+        'optionalDependencies'
+    ] as const;
+
     constructor(options: PackageJsonParserOptions = {}) {
         super(options);
         this.jsonParser = new JsonParser(options);
         this.skipDependencyResolution = options.skipDependencyResolution ?? false;
+    }
+
+    /**
+     * Extracts package metadata from a package.json object into a lock file entry format.
+     * Copies version, dependency fields, engines, and license.
+     */
+    private static extractPackageMetadata(pkgJson: any, fallbackVersion?: string): Record<string, any> {
+        const entry: Record<string, any> = {
+            version: pkgJson.version || fallbackVersion,
+        };
+
+        for (const field of PackageJsonParser.DEPENDENCY_FIELDS) {
+            if (pkgJson[field] && Object.keys(pkgJson[field]).length > 0) {
+                entry[field] = pkgJson[field];
+            }
+        }
+
+        if (pkgJson.engines) {
+            entry.engines = pkgJson.engines;
+        }
+        if (pkgJson.license) {
+            entry.license = pkgJson.license;
+        }
+
+        return entry;
     }
 
     /**
@@ -89,7 +128,7 @@ export class PackageJsonParser extends Parser {
 
                 // Create NodeResolutionResult marker if not already created for this directory
                 if (!marker) {
-                    marker = this.createMarker(input, dir);
+                    marker = await this.createMarker(input, dir);
                 }
 
                 // Attach the marker to the JSON document
@@ -111,7 +150,7 @@ export class PackageJsonParser extends Parser {
     /**
      * Creates a NodeResolutionResult marker from the package.json content and optional lock file.
      */
-    private createMarker(input: ParserInput, dir: string): NodeResolutionResult | null {
+    private async createMarker(input: ParserInput, dir: string): Promise<NodeResolutionResult | null> {
         try {
             const content = parserInputRead(input);
             const packageJson = JSON.parse(content);
@@ -128,7 +167,7 @@ export class PackageJsonParser extends Parser {
             let packageManager: PackageManager | undefined = undefined;
             if (!this.skipDependencyResolution) {
                 const lockDir = this.relativeTo || dir;
-                const lockResult = this.tryReadLockFile(lockDir);
+                const lockResult = await this.tryReadLockFile(lockDir);
                 lockContent = lockResult?.content;
                 packageManager = lockResult?.packageManager;
             }
@@ -157,15 +196,15 @@ export class PackageJsonParser extends Parser {
      *
      * @returns Object with parsed lock file content and detected package manager, or undefined if no lock file found
      */
-    private tryReadLockFile(dir: string): { content: any; packageManager: PackageManager } | undefined {
+    private async tryReadLockFile(dir: string): Promise<{ content: any; packageManager: PackageManager } | undefined> {
         // Try package-lock.json (npm) - already JSON
         const npmLockPath = path.join(dir, 'package-lock.json');
         if (fs.existsSync(npmLockPath)) {
             try {
-                const content = fs.readFileSync(npmLockPath, 'utf-8');
+                const content = await fsp.readFile(npmLockPath, 'utf-8');
                 return { content: JSON.parse(content), packageManager: PackageManager.Npm };
             } catch (error) {
-                // Silently ignore parse errors
+                console.debug?.(`Failed to parse package-lock.json: ${error}`);
             }
         }
 
@@ -173,11 +212,11 @@ export class PackageJsonParser extends Parser {
         const bunLockPath = path.join(dir, 'bun.lock');
         if (fs.existsSync(bunLockPath)) {
             try {
-                const content = fs.readFileSync(bunLockPath, 'utf-8');
+                const content = await fsp.readFile(bunLockPath, 'utf-8');
                 const bunLock = this.parseJsonc(content);
                 return { content: this.convertBunLockToNpmFormat(bunLock), packageManager: PackageManager.Bun };
             } catch (error) {
-                // Silently ignore parse errors
+                console.debug?.(`Failed to parse bun.lock: ${error}`);
             }
         }
 
@@ -186,7 +225,7 @@ export class PackageJsonParser extends Parser {
         if (fs.existsSync(pnpmLockPath)) {
             try {
                 // Try node_modules first for 100% accuracy
-                const parsed = this.walkNodeModules(dir);
+                const parsed = await this.walkNodeModules(dir);
                 if (parsed) {
                     return { content: parsed, packageManager: PackageManager.Pnpm };
                 }
@@ -196,7 +235,7 @@ export class PackageJsonParser extends Parser {
                     return { content: cliParsed, packageManager: PackageManager.Pnpm };
                 }
             } catch (error) {
-                // Silently ignore errors (CLI not available)
+                console.debug?.(`Failed to parse pnpm dependencies: ${error}`);
             }
         }
 
@@ -204,13 +243,13 @@ export class PackageJsonParser extends Parser {
         const yarnLockPath = path.join(dir, 'yarn.lock');
         if (fs.existsSync(yarnLockPath)) {
             try {
-                const content = fs.readFileSync(yarnLockPath, 'utf-8');
+                const content = await fsp.readFile(yarnLockPath, 'utf-8');
                 // Detect yarn version for packageManager field
                 const isYarnBerry = content.includes('__metadata:');
                 const packageManager = isYarnBerry ? PackageManager.YarnBerry : PackageManager.YarnClassic;
 
                 // Try node_modules first for 100% accuracy
-                const parsed = this.walkNodeModules(dir);
+                const parsed = await this.walkNodeModules(dir);
                 if (parsed) {
                     return { content: parsed, packageManager };
                 }
@@ -220,7 +259,7 @@ export class PackageJsonParser extends Parser {
                     return { content: lockParsed, packageManager };
                 }
             } catch (error) {
-                // Silently ignore errors
+                console.debug?.(`Failed to parse yarn.lock: ${error}`);
             }
         }
 
@@ -248,7 +287,7 @@ export class PackageJsonParser extends Parser {
      * @param dir The project directory containing node_modules
      * @returns npm package-lock.json format with packages map, or undefined if node_modules doesn't exist
      */
-    private walkNodeModules(dir: string): any {
+    private async walkNodeModules(dir: string): Promise<any> {
         const nodeModulesPath = path.join(dir, 'node_modules');
         if (!fs.existsSync(nodeModulesPath)) {
             return undefined;
@@ -261,9 +300,9 @@ export class PackageJsonParser extends Parser {
         // Check if this is a pnpm project (has .pnpm directory)
         const pnpmPath = path.join(nodeModulesPath, '.pnpm');
         if (fs.existsSync(pnpmPath)) {
-            this.walkPnpmNodeModules(pnpmPath, packages);
+            await this.walkPnpmNodeModules(pnpmPath, packages);
         } else {
-            this.walkNodeModulesRecursive(nodeModulesPath, 'node_modules', packages);
+            await this.walkNodeModulesRecursive(nodeModulesPath, 'node_modules', packages);
         }
 
         return Object.keys(packages).length > 1 ? {
@@ -276,24 +315,25 @@ export class PackageJsonParser extends Parser {
      * Walks pnpm's .pnpm directory structure to build packages map.
      * pnpm stores packages in .pnpm/<name>@<version>/node_modules/<name>/
      */
-    private walkPnpmNodeModules(pnpmPath: string, packages: Record<string, any>): void {
+    private async walkPnpmNodeModules(pnpmPath: string, packages: Record<string, any>): Promise<void> {
         let entries: fs.Dirent[];
         try {
-            entries = fs.readdirSync(pnpmPath, { withFileTypes: true });
+            entries = await fsp.readdir(pnpmPath, { withFileTypes: true });
         } catch {
             return;
         }
 
-        for (const entry of entries) {
+        // Process entries in parallel for better performance
+        await Promise.all(entries.map(async (entry) => {
             // Skip non-directories and special files
             if (!entry.isDirectory() || entry.name === 'node_modules') {
-                continue;
+                return;
             }
 
             // Parse name@version from directory name
             // Handle scoped packages: @scope+name@version
             const atIndex = entry.name.lastIndexOf('@');
-            if (atIndex <= 0) continue;
+            if (atIndex <= 0) return;
 
             let name = entry.name.substring(0, atIndex);
             const version = entry.name.substring(atIndex + 1);
@@ -307,45 +347,18 @@ export class PackageJsonParser extends Parser {
             const pkgDir = path.join(pnpmPath, entry.name, 'node_modules', name.replace('/', path.sep));
             const packageJsonPath = path.join(pkgDir, 'package.json');
 
-            if (!fs.existsSync(packageJsonPath)) continue;
-
             let pkgJson: any;
             try {
-                const content = fs.readFileSync(packageJsonPath, 'utf-8');
+                const content = await fsp.readFile(packageJsonPath, 'utf-8');
                 pkgJson = JSON.parse(content);
             } catch {
-                continue;
+                return;
             }
 
             // Use name@version as the key for pnpm (flat structure with version)
             const pkgKey = `node_modules/${name}@${version}`;
-
-            const pkgEntry: any = {
-                version: pkgJson.version || version,
-            };
-
-            // Copy dependency fields
-            if (pkgJson.dependencies && Object.keys(pkgJson.dependencies).length > 0) {
-                pkgEntry.dependencies = pkgJson.dependencies;
-            }
-            if (pkgJson.devDependencies && Object.keys(pkgJson.devDependencies).length > 0) {
-                pkgEntry.devDependencies = pkgJson.devDependencies;
-            }
-            if (pkgJson.peerDependencies && Object.keys(pkgJson.peerDependencies).length > 0) {
-                pkgEntry.peerDependencies = pkgJson.peerDependencies;
-            }
-            if (pkgJson.optionalDependencies && Object.keys(pkgJson.optionalDependencies).length > 0) {
-                pkgEntry.optionalDependencies = pkgJson.optionalDependencies;
-            }
-            if (pkgJson.engines) {
-                pkgEntry.engines = pkgJson.engines;
-            }
-            if (pkgJson.license) {
-                pkgEntry.license = pkgJson.license;
-            }
-
-            packages[pkgKey] = pkgEntry;
-        }
+            packages[pkgKey] = PackageJsonParser.extractPackageMetadata(pkgJson, version);
+        }));
     }
 
     /**
@@ -356,28 +369,29 @@ export class PackageJsonParser extends Parser {
      * @param relativePath Relative path from project root (e.g., "node_modules" or "node_modules/foo/node_modules")
      * @param packages The packages map to populate
      */
-    private walkNodeModulesRecursive(
+    private async walkNodeModulesRecursive(
         nodeModulesPath: string,
         relativePath: string,
         packages: Record<string, any>
-    ): void {
+    ): Promise<void> {
         let entries: fs.Dirent[];
         try {
-            entries = fs.readdirSync(nodeModulesPath, { withFileTypes: true });
+            entries = await fsp.readdir(nodeModulesPath, { withFileTypes: true });
         } catch {
             return; // Directory not readable
         }
 
-        for (const entry of entries) {
+        // Process entries in parallel for better performance
+        await Promise.all(entries.map(async (entry) => {
             // Skip hidden files
             if (entry.name.startsWith('.')) {
-                continue;
+                return;
             }
 
             // Accept directories and symlinks (pnpm uses symlinks)
             const isDirectoryOrSymlink = entry.isDirectory() || entry.isSymbolicLink();
             if (!isDirectoryOrSymlink) {
-                continue;
+                return;
             }
 
             // Handle scoped packages (@scope/name)
@@ -385,76 +399,55 @@ export class PackageJsonParser extends Parser {
                 const scopePath = path.join(nodeModulesPath, entry.name);
                 let scopeEntries: fs.Dirent[];
                 try {
-                    scopeEntries = fs.readdirSync(scopePath, { withFileTypes: true });
+                    scopeEntries = await fsp.readdir(scopePath, { withFileTypes: true });
                 } catch {
-                    continue;
+                    return;
                 }
 
-                for (const scopeEntry of scopeEntries) {
+                await Promise.all(scopeEntries.map(async (scopeEntry) => {
                     // Accept directories and symlinks for scoped packages too
-                    if (!scopeEntry.isDirectory() && !scopeEntry.isSymbolicLink()) continue;
+                    if (!scopeEntry.isDirectory() && !scopeEntry.isSymbolicLink()) return;
 
                     const scopedName = `${entry.name}/${scopeEntry.name}`;
                     const pkgPath = path.join(scopePath, scopeEntry.name);
-                    this.processPackage(pkgPath, `${relativePath}/${scopedName}`, packages);
-                }
+                    await this.processPackage(pkgPath, `${relativePath}/${scopedName}`, packages);
+                }));
             } else {
                 const pkgPath = path.join(nodeModulesPath, entry.name);
-                this.processPackage(pkgPath, `${relativePath}/${entry.name}`, packages);
+                await this.processPackage(pkgPath, `${relativePath}/${entry.name}`, packages);
             }
-        }
+        }));
     }
 
     /**
      * Processes a single package directory, reading its package.json and
      * recursively processing nested node_modules.
      */
-    private processPackage(
+    private async processPackage(
         pkgPath: string,
         relativePath: string,
         packages: Record<string, any>
-    ): void {
+    ): Promise<void> {
         const packageJsonPath = path.join(pkgPath, 'package.json');
 
         // Read and parse the package's package.json
         let pkgJson: any;
         try {
-            const content = fs.readFileSync(packageJsonPath, 'utf-8');
+            const content = await fsp.readFile(packageJsonPath, 'utf-8');
             pkgJson = JSON.parse(content);
         } catch {
             return; // Not a valid package
         }
 
-        const pkgEntry: any = {
-            version: pkgJson.version,
-        };
-
-        // Copy dependency fields if present
-        if (pkgJson.dependencies && Object.keys(pkgJson.dependencies).length > 0) {
-            pkgEntry.dependencies = pkgJson.dependencies;
-        }
-        if (pkgJson.devDependencies && Object.keys(pkgJson.devDependencies).length > 0) {
-            pkgEntry.devDependencies = pkgJson.devDependencies;
-        }
-        if (pkgJson.peerDependencies && Object.keys(pkgJson.peerDependencies).length > 0) {
-            pkgEntry.peerDependencies = pkgJson.peerDependencies;
-        }
-        if (pkgJson.optionalDependencies && Object.keys(pkgJson.optionalDependencies).length > 0) {
-            pkgEntry.optionalDependencies = pkgJson.optionalDependencies;
-        }
-        if (pkgJson.engines) {
-            pkgEntry.engines = pkgJson.engines;
-        }
-        if (pkgJson.license) {
-            pkgEntry.license = pkgJson.license;
-        }
-
-        packages[relativePath] = pkgEntry;
+        packages[relativePath] = PackageJsonParser.extractPackageMetadata(pkgJson);
 
         // Recursively process nested node_modules
         const nestedNodeModules = path.join(pkgPath, 'node_modules');
-        if (fs.existsSync(nestedNodeModules)) {
-            this.walkNodeModulesRecursive(nestedNodeModules, `${relativePath}/node_modules`, packages);
+        try {
+            await fsp.access(nestedNodeModules);
+            await this.walkNodeModulesRecursive(nestedNodeModules, `${relativePath}/node_modules`, packages);
+        } catch {
+            // No nested node_modules, that's fine
         }
     }
 
