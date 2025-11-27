@@ -20,11 +20,17 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.tree.J;
 
 public class JavaScriptAutoFormatService extends AutoFormatService {
 
     @Override
     public <P> JavaVisitor<P> autoFormatVisitor(@Nullable Tree stopAfter) {
-        return new JavaIsoVisitor<>();
+        return new JavaIsoVisitor<P>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, P ctx) {
+                return (J) tree;
+            }
+        };
     }
 }
