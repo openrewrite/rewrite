@@ -26,8 +26,7 @@ class RemoveMethodThrowsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveMethodThrows("A foo(..)", true, "java.io.IOException"
-        ));
+        spec.recipe(new RemoveMethodThrows("A foo(..)", true, "java.io.IOException"));
     }
 
     @DocumentExample
@@ -38,14 +37,13 @@ class RemoveMethodThrowsTest implements RewriteTest {
           java(
             """
               import java.io.IOException;
-              
+
               class A {
                   public void foo() throws IOException {
                       // no-op
                   }
               }
-              """
-            ,
+              """,
             """
               class A {
                   public void foo() {
@@ -53,9 +51,9 @@ class RemoveMethodThrowsTest implements RewriteTest {
                   }
               }
               """
-          ));
+          )
+        );
     }
-
 
     @Test
     void removeExceptionSubclass() {
@@ -64,14 +62,13 @@ class RemoveMethodThrowsTest implements RewriteTest {
           java(
             """
               import java.io.FileNotFoundException;
-              
+
               class A {
                   public void foo() throws FileNotFoundException {
                       // no-op
                   }
               }
-              """
-            ,
+              """,
             """
               class A {
                   public void foo() {
@@ -79,36 +76,35 @@ class RemoveMethodThrowsTest implements RewriteTest {
                   }
               }
               """
-          ));
+          )
+        );
     }
 
     @Test
     void removeSingleExceptionOverrides() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveMethodThrows("Itf foo(..)", true, "java.io.IOException"
-          )),
+          spec -> spec.recipe(new RemoveMethodThrows("Itf foo(..)", true, "java.io.IOException")),
           //language=java
           java(
             """
               import java.io.IOException;
-              
+
               interface Itf {
                   void foo();
               }
-              
+
               class A implements Itf {
                   @Override
                   public void foo() throws IOException {
                       // no-op
                   }
               }
-              """
-            ,
+              """,
             """
               interface Itf {
                   void foo();
               }
-              
+
               class A implements Itf {
                   @Override
                   public void foo() {
@@ -116,21 +112,21 @@ class RemoveMethodThrowsTest implements RewriteTest {
                   }
               }
               """
-          ));
+          )
+        );
     }
 
     @Test
     void removeSingleExceptionCascadingOverrides() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveMethodThrows("ItfA foo(..)", true, "java.lang.Exception"
-          )),
+          spec -> spec.recipe(new RemoveMethodThrows("ItfA foo(..)", true, "java.lang.Exception")),
           //language=java
           java(
             """
               interface ItfA {
                   void foo() throws Exception;
               }
-              
+
               abstract class AbsB implements ItfA {
                   @Override
                   public void foo() throws Exception {
@@ -144,13 +140,12 @@ class RemoveMethodThrowsTest implements RewriteTest {
                       // no-op
                   }
               }
-              """
-            ,
+              """,
             """
               interface ItfA {
                   void foo();
               }
-              
+
               abstract class AbsB implements ItfA {
                   @Override
                   public void foo() {
@@ -165,7 +160,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
                   }
               }
               """
-          ));
+          )
+        );
     }
 
     @Test
@@ -179,8 +175,7 @@ class RemoveMethodThrowsTest implements RewriteTest {
                       // no-op
                   }
               }
-              """
-            ,
+              """,
             """
               class A {
                   public void foo() throws java.lang.IllegalArgumentException {
@@ -194,21 +189,19 @@ class RemoveMethodThrowsTest implements RewriteTest {
     @Test
     void removeAllExceptions() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveMethodThrows("A foo(..)", false, "*"
-          )),
+          spec -> spec.recipe(new RemoveMethodThrows("A foo(..)", false, "*")),
           //language=java
           java(
             """
               import java.io.IOException;
               import java.lang.IllegalArgumentException;
-              
+
               class A {
                   public void foo() throws IOException, IllegalArgumentException {
                       // no-op
                   }
               }
-              """
-            ,
+              """,
             """
               class A {
                   public void foo() {
@@ -216,7 +209,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
                   }
               }
               """
-          ));
+          )
+        );
     }
 
     @Test
@@ -231,7 +225,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
                   }
               }
               """
-          ));
+          )
+        );
     }
 
     @Test
@@ -246,7 +241,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
                   }
               }
               """
-          ));
+          )
+        );
     }
 
 }
