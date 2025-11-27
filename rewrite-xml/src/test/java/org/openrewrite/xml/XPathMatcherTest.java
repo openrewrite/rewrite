@@ -94,7 +94,7 @@ class XPathMatcherTest {
     ).toList().getFirst();
 
     private final SourceFile namespacedXml = new XmlParser().parse(
-      """ 
+      """
         <?xml version="1.0" encoding="UTF-8"?>
         <root xmlns="http://www.example.com/namespace1"
               xmlns:ns2="http://www.example.com/namespace2"
