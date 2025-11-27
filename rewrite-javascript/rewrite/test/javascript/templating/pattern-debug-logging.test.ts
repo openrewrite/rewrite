@@ -171,9 +171,7 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        console.log('===== PATH EXAMPLE =====');
         calls.forEach((call, i) => console.log(`${i}: ${call}`));
-        console.log('==========================');
 
         // Should show path and operator mismatch
         expect(calls.some(c => c.includes('At path:'))).toBe(true);

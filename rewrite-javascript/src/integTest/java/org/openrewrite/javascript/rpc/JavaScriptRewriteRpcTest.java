@@ -320,7 +320,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
                   assertThat(marker.getName()).isEqualTo("test-project");
                   assertThat(marker.getVersion()).isEqualTo("1.0.0");
                   assertThat(marker.getDependencies()).hasSize(1);
-                  assertThat(marker.getDependencies().get(0).getName()).isEqualTo("lodash");
+                  assertThat(marker.getDependencies().getFirst().getName()).isEqualTo("lodash");
 
                   // Check resolved dependencies from lock file
                   assertThat(marker.getResolvedDependencies()).isNotEmpty();

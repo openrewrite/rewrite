@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 /**
  * Contains metadata about a Node.js project, parsed from package.json and package-lock.json.
@@ -84,9 +85,6 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
      * @return The resolved dependency, or null if not found
      */
     public @Nullable ResolvedDependency getResolvedDependency(String packageName) {
-        if (resolvedDependencies == null) {
-            return null;
-        }
         return resolvedDependencies.stream()
                 .filter(r -> r.getName().equals(packageName))
                 .findFirst()
@@ -149,7 +147,7 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
                         dep -> dep.rpcReceive(dep, q)))
                 .withResolvedDependencies(q.receiveList(before.resolvedDependencies,
                         resolved -> resolved.rpcReceive(resolved, q)))
-                .withPackageManager(q.receiveAndGet(before.packageManager, s -> s == null ? null : PackageManager.valueOf(s.toString())))
+                .withPackageManager(q.receiveAndGet(before.packageManager, toEnum(PackageManager.class)))
                 .withEngines(q.receive(before.engines))
                 .withNpmrcConfigs(q.receiveList(before.npmrcConfigs,
                         npmrc -> npmrc.rpcReceive(npmrc, q)));
@@ -292,7 +290,7 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
         @Override
         public Npmrc rpcReceive(Npmrc before, RpcReceiveQueue q) {
             return before
-                    .withScope(q.receiveAndGet(before.scope, s -> NpmrcScope.valueOf(s.toString())))
+                    .withScope(q.receiveAndGet(before.scope, toEnum(NpmrcScope.class)))
                     .withProperties(q.receive(before.properties));
         }
     }
