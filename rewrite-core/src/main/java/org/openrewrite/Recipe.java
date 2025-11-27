@@ -472,7 +472,7 @@ public abstract class Recipe implements Cloneable {
         List<Field> requiredFields = NullUtils.findNonNullFields(clazz);
         for (Field field : requiredFields) {
             try {
-                validated = validated.and(Validated.required(clazz.getSimpleName() + '.' + field.getName(), field.get(this)));
+                validated = validated.and(Validated.required(clazz.getName() + '.' + field.getName(), field.get(this)));
             } catch (IllegalAccessException e) {
                 validated = Validated.invalid(field.getName(), null, "Unable to access " + clazz.getName() + "." + field.getName(), e);
             }

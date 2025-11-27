@@ -90,11 +90,25 @@ class ParseJsonReader extends ParserSourceReader {
                 })
             } satisfies Json.Object as Json.Object;
         } else if (typeof parsed === "string") {
-            this.cursor += parsed.length + 2;
+            // Extract original source to preserve escape sequences
+            const sourceStart = this.cursor;
+            this.cursor++; // skip opening quote
+            while (this.cursor < this.source.length) {
+                const char = this.source[this.cursor];
+                if (char === '\\') {
+                    this.cursor += 2; // skip escape sequence
+                } else if (char === '"') {
+                    this.cursor++; // skip closing quote
+                    break;
+                } else {
+                    this.cursor++;
+                }
+            }
+            const source = this.source.slice(sourceStart, this.cursor);
             return {
                 kind: Json.Kind.Literal,
                 ...base,
-                source: `"${parsed}"`,
+                source,
                 value: parsed
             } satisfies Json.Literal as Json.Literal;
         } else if (typeof parsed === "number") {
