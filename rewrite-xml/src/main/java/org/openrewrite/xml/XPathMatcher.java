@@ -300,15 +300,9 @@ public class XPathMatcher {
                     if ("text()".equals(selector)) {
                         Xml.Tag tempTag = tag;
                         if (!condition.group(2).isEmpty()) {
-                            String[] subSelectors = condition.group(2).split("\\|");
-                            for (String subSelector : subSelectors) {
-                                if (tempTag == null) {
-                                    break;
-                                }
-                                tempTag = FindTags.findSingle(tempTag, subSelector);
-                            }
+                            tempTag = FindTags.findSingle(tempTag, condition.group(2));
                         }
-                        matchCurrentCondition = tempTag == null ? false : tempTag.getValue().map(v -> v.equals(value)).orElse(false);
+                        matchCurrentCondition = tempTag != null && tempTag.getValue().map(v -> v.equals(value)).orElse(false);
                     } else if (isAttributeElement) {
                         for (Xml.Attribute a : tag.getAttributes()) {
                             if (matchesElementAndFunction(new Cursor(cursor, a), element, selector, value)) {

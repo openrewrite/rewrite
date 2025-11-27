@@ -435,8 +435,8 @@ class XPathMatcherTest {
         ).toList().getFirst();
 
         // text() predicate should only match element with specific text content
-        assertThat(match("/test/foo[bar/text()='bla']", xml)).isTrue();
         assertThat(match("/test/foo[bar/baz/text()='bla']", xml)).isTrue();
+        assertThat(match("/test/foo[bar/text()='bla']", xml)).isTrue();
         assertThat(match("/test/foo[text()='bar']", xml)).isTrue();
         assertThat(match("/test/foo[text()='notBar']", xml)).isTrue();
         assertThat(match("/test/foo[text()='nonexistent']", xml)).isFalse();
