@@ -2851,6 +2851,7 @@ public interface J extends Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Import implements Statement, Comparable<Import> {
+
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2870,6 +2871,9 @@ public interface J extends Tree {
 
         JLeftPadded<Boolean> statik;
 
+        @Nullable
+        JLeftPadded<Boolean> module;
+
         @With
         @Getter
         FieldAccess qualid;
@@ -2881,15 +2885,22 @@ public interface J extends Tree {
             return statik.getElement();
         }
 
-        public Import withStatic(boolean statik) {
+        public J.Import withStatic(boolean statik) {
             return getPadding().withStatic(this.statik.withElement(statik));
         }
 
+        public boolean isModule() {
+            return module != null ? module.getElement() : false;
+        }
+
+        public J.Import withModule(boolean module) {
+            return this.module != null ?
+                    getPadding().withModule(this.module.withElement(module)) :
+                    getPadding().withModule(JLeftPadded.build(module));
+        }
+
         public J.@Nullable Identifier getAlias() {
-            if (alias == null) {
-                return null;
-            }
-            return alias.getElement();
+            return alias != null ? alias.getElement() : null;
         }
 
         public J.Import withAlias(J.@Nullable Identifier alias) {
@@ -2897,12 +2908,12 @@ public interface J extends Tree {
                 if (alias == null) {
                     return this;
                 }
-                return new J.Import(null, id, prefix, markers, statik, qualid, JLeftPadded
+                return new J.Import(null, id, prefix, markers, statik, module, qualid, JLeftPadded
                         .build(alias)
                         .withBefore(Space.format(" ")));
             }
             if (alias == null) {
-                return new J.Import(null, id, prefix, markers, statik, qualid, null);
+                return new J.Import(null, id, prefix, markers, statik, module, qualid, null);
             }
             return getPadding().withAlias(this.alias.withElement(alias));
         }
@@ -3056,7 +3067,15 @@ public interface J extends Tree {
             }
 
             public Import withStatic(JLeftPadded<Boolean> statik) {
-                return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.qualid, t.alias);
+                return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.module, t.qualid, t.alias);
+            }
+
+            public @Nullable JLeftPadded<Boolean> getModule() {
+                return t.module;
+            }
+
+            public Import withModule(JLeftPadded<Boolean> module) {
+                return t.module == module ? t : new Import(t.id, t.prefix, t.markers, t.statik, module, t.qualid, t.alias);
             }
 
             public @Nullable JLeftPadded<J.Identifier> getAlias() {
@@ -3064,7 +3083,7 @@ public interface J extends Tree {
             }
 
             public Import withAlias(@Nullable JLeftPadded<J.Identifier> alias) {
-                return t.alias == alias ? t : new Import(t.id, t.prefix, t.markers, t.statik, t.qualid, alias);
+                return t.alias == alias ? t : new Import(t.id, t.prefix, t.markers, t.statik, t.module, t.qualid, alias);
             }
         }
 
