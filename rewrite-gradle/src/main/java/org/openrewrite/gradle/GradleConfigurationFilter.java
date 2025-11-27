@@ -59,7 +59,7 @@ class GradleConfigurationFilter {
             GradleDependencyConfiguration gdc = requireNonNull(gradleProject.getConfiguration(tmpConfiguration));
             for (GradleDependencyConfiguration transitive : gradleProject.configurationsExtendingFrom(gdc, true)) {
                 if (transitive.findResolvedDependency(dependency.getGroupId(), dependency.getArtifactId()) != null) {
-                    filteredConfigurations.remove(tmpConfiguration);
+                    filteredConfigurations.remove(transitive.getName());
                 }
             }
         }

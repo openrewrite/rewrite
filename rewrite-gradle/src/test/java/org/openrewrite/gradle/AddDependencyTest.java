@@ -25,6 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.plugins.UpgradePluginVersion;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -1759,6 +1760,79 @@ class AddDependencyTest implements RewriteTest {
             )
           )
         );
+    }
+
+    @Test
+    void afterRecipesUpdatingParent() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpgradePluginVersion("org.springframework.boot", "3.0.x", null),
+            new AddDependency("jakarta.xml.bind", "jakarta.xml.bind-api", "3.0.x", null, null, null, null, null, null, true)
+          ),
+          mavenProject("project",
+            buildGradle(
+              //language=groovy
+                """
+                plugins {
+                  id 'org.springframework.boot' version '2.7.18'
+                  id 'io.spring.dependency-management' version '1.0.13.RELEASE'
+                  id 'java'
+                }
+                
+                apply plugin: 'java'
+                
+                repositories {
+                  mavenLocal()
+                  mavenCentral()
+                }
+                
+                dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-cache'
+                  implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+                  implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+                  implementation 'org.springframework.boot:spring-boot-starter-web'
+                  implementation 'org.springframework.boot:spring-boot-starter-validation'
+                  implementation 'javax.cache:cache-api'
+                  runtimeOnly 'org.springframework.boot:spring-boot-starter-actuator'
+                  runtimeOnly 'org.ehcache:ehcache'
+                  runtimeOnly 'com.h2database:h2'
+                  runtimeOnly 'mysql:mysql-connector-java'
+                  runtimeOnly 'org.postgresql:postgresql'
+                  testImplementation 'org.springframework.boot:spring-boot-starter-test'
+                }
+                """,
+              //language=groovy
+                """
+                plugins {
+                  id 'org.springframework.boot' version '3.0.13'
+                  id 'io.spring.dependency-management' version '1.0.13.RELEASE'
+                  id 'java'
+                }
+                
+                apply plugin: 'java'
+                
+                repositories {
+                  mavenLocal()
+                  mavenCentral()
+                }
+                
+                dependencies {
+                    implementation "jakarta.xml.bind:jakarta.xml.bind-api:3.0.1"
+                  implementation 'org.springframework.boot:spring-boot-starter-cache'
+                  implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+                  implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+                  implementation 'org.springframework.boot:spring-boot-starter-web'
+                  implementation 'org.springframework.boot:spring-boot-starter-validation'
+                  implementation 'javax.cache:cache-api'
+                  runtimeOnly 'org.springframework.boot:spring-boot-starter-actuator'
+                  runtimeOnly 'org.ehcache:ehcache'
+                  runtimeOnly 'com.h2database:h2'
+                  runtimeOnly 'mysql:mysql-connector-java'
+                  runtimeOnly 'org.postgresql:postgresql'
+                  testImplementation 'org.springframework.boot:spring-boot-starter-test'
+                }
+                """
+            )));
     }
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
