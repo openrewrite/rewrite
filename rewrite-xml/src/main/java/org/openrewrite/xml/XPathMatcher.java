@@ -44,7 +44,7 @@ public class XPathMatcher {
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']` or foo[@bar='baz']
     private static final Pattern ELEMENT_WITH_CONDITION_PATTERN = Pattern.compile("(@)?([-:\\w]+|\\*)(\\[.+])");
     private static final Pattern CONDITION_PATTERN = Pattern.compile("(\\[.*?])+?");
-    private static final Pattern CONDITION_CONJUNCTION_PATTERN = Pattern.compile("\\[?((.*?)((local-name|namespace-uri|text)\\(\\)|(@)?([-\\w:]+|\\*))\\h*=\\h*[\"'](.*?)[\"'](\\h?(or|and)\\h?)?)+?");
+    private static final Pattern CONDITION_CONJUNCTION_PATTERN = Pattern.compile("\\[?(?:(.*?)((?:local-name|namespace-uri|text)\\(\\)|(@)?([-\\w:]+|\\*))\\h*=\\h*[\"'](.*?)[\"'](?:\\h?(or|and)\\h?)?)+?");
 
     private final String expression;
     private final boolean startsWithSlash;
@@ -275,11 +275,11 @@ public class XPathMatcher {
             while (condition.find() && (stillMatchesConditions || orCondition)) {
                 boolean matchCurrentCondition = false;
 
-                boolean isAttributeCondition = condition.group(5) != null;
-                String selector = isAttributeCondition ? condition.group(6) : condition.group(3);
+                boolean isAttributeCondition = condition.group(3) != null;
+                String selector = isAttributeCondition ? condition.group(4) : condition.group(2);
                 boolean isFunctionCondition = selector.endsWith("()");
-                String value = condition.group(7);
-                String conjunction = condition.group(9);
+                String value = condition.group(5);
+                String conjunction = condition.group(6);
                 orCondition = "or".equals(conjunction);
 
                 // invalid conjunction if not 'or' or 'and'
@@ -299,8 +299,8 @@ public class XPathMatcher {
                 } else if (isFunctionCondition) { // [local-name()='name'] or [text()='value'] pattern
                     if ("text()".equals(selector)) {
                         Xml.Tag tempTag = tag;
-                        if (!condition.group(2).isEmpty()) {
-                            tempTag = FindTags.findSingle(tempTag, condition.group(2));
+                        if (!condition.group(1).isEmpty()) {
+                            tempTag = FindTags.findSingle(tempTag, condition.group(1));
                         }
                         matchCurrentCondition = tempTag != null && tempTag.getValue().map(v -> v.equals(value)).orElse(false);
                     } else if (isAttributeElement) {
