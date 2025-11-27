@@ -34,4 +34,17 @@ describe('JSON parsing', () => {
             `
         )
     ));
+
+    test('parses JSON with escaped quotes, Unicode, and emojis', () => spec.rewriteRun(
+        //language=json
+        json(
+            `
+              {
+                "emoji": "Hello 👋 World 🌍",
+                "japanese": "こんにちは",
+                "mixed": "Test 🎉 with \\"quotes\\" and ü"
+              }
+            `
+        )
+    ));
 });
