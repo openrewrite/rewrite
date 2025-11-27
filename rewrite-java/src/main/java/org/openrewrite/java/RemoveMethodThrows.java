@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -78,6 +79,16 @@ public class RemoveMethodThrows extends Recipe {
                             }));
                         }
                         return m;
+                    }
+
+                    @Override
+                    public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
+                        JavaType jt = super.visitType(javaType, ctx);
+                        if (jt instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) jt)) {
+                            JavaType.Method mt = (JavaType.Method) jt;
+                            return mt.withThrownExceptions(ListUtils.filter(mt.getThrownExceptions(), te -> !typeMatcher.matches(te)));
+                        }
+                        return jt;
                     }
                 }
         );

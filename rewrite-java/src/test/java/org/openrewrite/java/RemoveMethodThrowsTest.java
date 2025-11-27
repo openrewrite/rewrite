@@ -17,9 +17,11 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class RemoveMethodThrowsTest implements RewriteTest {
@@ -76,6 +78,44 @@ class RemoveMethodThrowsTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void updateTypeInformationForInvocations() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.IOException;
+
+              class A {
+                  public void foo() throws IOException {
+                      // no-op
+                  }
+
+                  public void bar() throws Exception {
+                      foo();
+                  }
+              }
+              """,
+            """
+              class A {
+                  public void foo() {
+                      // no-op
+                  }
+              
+                  public void bar() throws Exception {
+                      foo();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration bar = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getLast();
+                J.MethodInvocation fooCall = (J.MethodInvocation) bar.getBody().getStatements().getFirst();
+                assertThat(fooCall.getMethodType().getThrownExceptions()).isEmpty();
+            })
           )
         );
     }
