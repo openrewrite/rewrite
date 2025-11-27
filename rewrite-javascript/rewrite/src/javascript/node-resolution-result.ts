@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Marker, Markers, findMarker} from "../markers";
+import {findMarker, Marker, Markers} from "../markers";
 import {randomId, UUID} from "../uuid";
 import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
@@ -185,6 +185,29 @@ export function createNodeResolutionResultMarker(
     const dependencyCache = new Map<string, Dependency>();
 
     /**
+     * Normalizes the engines field from package-lock.json.
+     * Some older packages have engines as an array like ["node >=0.6.0"] instead of
+     * the standard object format {"node": ">=0.6.0"}.
+     */
+    function normalizeEngines(engines?: Record<string, string> | string[]): Record<string, string> | undefined {
+        if (!engines) return undefined;
+        if (Array.isArray(engines)) {
+            // Convert array format to object format
+            // e.g., ["node >=0.6.0"] -> {"node": ">=0.6.0"}
+            const result: Record<string, string> = {};
+            for (const entry of engines) {
+                const spaceIdx = entry.indexOf(' ');
+                if (spaceIdx > 0) {
+                    const key = entry.substring(0, spaceIdx);
+                    result[key] = entry.substring(spaceIdx + 1);
+                }
+            }
+            return Object.keys(result).length > 0 ? result : undefined;
+        }
+        return engines;
+    }
+
+    /**
      * Extracts package name and optionally version from a package-lock.json path.
      * e.g., "node_modules/@babel/core" -> { name: "@babel/core" }
      * e.g., "node_modules/foo/node_modules/bar" -> { name: "bar" }
@@ -243,7 +266,7 @@ export function createNodeResolutionResultMarker(
                 devDependencies: undefined,
                 peerDependencies: undefined,
                 optionalDependencies: undefined,
-                engines: pkgEntry?.engines,
+                engines: normalizeEngines(pkgEntry?.engines),
                 license: pkgEntry?.license,
             });
             resolvedDependencyCache.set(key, resolved);

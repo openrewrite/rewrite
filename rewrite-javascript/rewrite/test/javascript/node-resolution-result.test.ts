@@ -743,4 +743,100 @@ describe("NodeResolutionResult marker", () => {
             );
         }, {unsafeCleanup: true});
     });
+
+    test("should normalize engines from legacy array format to object format", () => {
+        // Some older packages have engines as an array like ["node >=0.6.0"]
+        // instead of the standard object format {"node": ">=0.6.0"}
+        const packageJsonContent = {
+            name: "test-project",
+            version: "1.0.0",
+            dependencies: {
+                "legacy-package": "^1.0.0"
+            }
+        };
+
+        const packageLockContent = {
+            name: "test-project",
+            version: "1.0.0",
+            lockfileVersion: 3,
+            packages: {
+                "": {
+                    name: "test-project",
+                    version: "1.0.0",
+                    dependencies: {
+                        "legacy-package": "^1.0.0"
+                    }
+                },
+                "node_modules/legacy-package": {
+                    version: "1.0.0",
+                    license: "MIT",
+                    // Legacy array format for engines
+                    engines: [
+                        "node >=0.6.0"
+                    ]
+                }
+            }
+        };
+
+        const marker = createNodeResolutionResultMarker(
+            "package.json",
+            packageJsonContent,
+            packageLockContent
+        );
+
+        const legacyDep = marker.dependencies.find(d => d.name === "legacy-package");
+        expect(legacyDep?.resolved).toBeDefined();
+        // Should be normalized to object format
+        expect(legacyDep!.resolved!.engines).toEqual({
+            "node": ">=0.6.0"
+        });
+    });
+
+    test("should normalize engines with multiple entries from legacy array format", () => {
+        const packageJsonContent = {
+            name: "test-project",
+            version: "1.0.0",
+            dependencies: {
+                "legacy-package": "^1.0.0"
+            }
+        };
+
+        const packageLockContent = {
+            name: "test-project",
+            version: "1.0.0",
+            lockfileVersion: 3,
+            packages: {
+                "": {
+                    name: "test-project",
+                    version: "1.0.0",
+                    dependencies: {
+                        "legacy-package": "^1.0.0"
+                    }
+                },
+                "node_modules/legacy-package": {
+                    version: "1.0.0",
+                    license: "MIT",
+                    // Legacy array format with multiple entries
+                    engines: [
+                        "node >=0.6.0",
+                        "npm >=1.0.0"
+                    ]
+                }
+            }
+        };
+
+        const marker = createNodeResolutionResultMarker(
+            "package.json",
+            packageJsonContent,
+            packageLockContent
+        );
+
+        const legacyDep = marker.dependencies.find(d => d.name === "legacy-package");
+        expect(legacyDep?.resolved).toBeDefined();
+        // Should be normalized to object format with both entries
+        expect(legacyDep!.resolved!.engines).toEqual({
+            "node": ">=0.6.0",
+            "npm": ">=1.0.0"
+        });
+    });
 });
