@@ -30,8 +30,7 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveTrailingWhitespace())
-          .typeValidationOptions(TypeValidation.builder().allowNonWhitespaceInWhitespace(true).build());
+        spec.recipe(new RemoveTrailingWhitespace());
     }
 
     @AfterEach
