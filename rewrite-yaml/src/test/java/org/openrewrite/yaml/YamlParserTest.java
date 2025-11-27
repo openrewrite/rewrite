@@ -282,6 +282,19 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5179")
+    @Test
+    void tagsInSequences() {
+        rewriteRun(
+          yaml(
+            """
+            Conditions:
+              IsPollingFrequencyInMinutesSingular: !Equals [!Ref PollingFrequencyInMinutes, 1]
+            """
+          )
+        );
+    }
+
     @Test
     void globalTags() {
         rewriteRun(
@@ -462,6 +475,23 @@ class YamlParserTest implements RewriteTest {
               - item2
               other_anchor: *anchor
               """
+          )
+        );
+    }
+
+    @Test
+    void parseTagsCorrectlyOnFirstLineOfMappingEntry() {
+        rewriteRun(
+          yaml(
+            """
+              - !SOMETAG
+                a: b
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Sequence sequence = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
+                Yaml.Mapping mapping = (Yaml.Mapping) sequence.getEntries().getFirst().getBlock();
+                assertThat(mapping.getTag().getName()).isEqualTo("SOMETAG");
+            })
           )
         );
     }

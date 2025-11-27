@@ -118,14 +118,9 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
 
                     Space removedSpace = removedModifierPrefix.getAndSet(null);
                     if (removedSpace != null) {
-                        J.Modifier nextModifier = mod.withPrefix(mod.getPrefix().withComments(
+                        J.Modifier nextModifier = mod.withPrefix(removedSpace.withComments(
                                 ListUtils.concatAll(removedSpace.getComments(), mod.getComments())));
-
-                        // Also handle modifier's own comments if any
-                        if (!modifierComments.isEmpty()) {
-                            nextModifier = nextModifier.withComments(ListUtils.concatAll(new ArrayList<>(modifierComments), mod.getComments()));
-                            modifierComments.clear();
-                        }
+                        modifierComments.clear();
 
                         return nextModifier;
                     }

@@ -26,9 +26,9 @@ describe('variadic template expansion', () => {
     function matchAndReplace(pat: Pattern, tmpl: Template) {
         return new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await pat.match(method);
+                const match = await pat.match(method, this.cursor);
                 if (match) {
-                    return await tmpl.apply(this.cursor, method, match);
+                    return await tmpl.apply(method, this.cursor, {values: match});
                 }
                 return method;
             }

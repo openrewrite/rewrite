@@ -446,7 +446,7 @@ public class RawPom {
                 .profiles(mapProfiles(getProfiles()))
                 .subprojects(mapSubProjects(getModules(), getSubprojects()));
         if (StringUtils.isBlank(pomVersion)) {
-            builder.dependencies(mapRequestedDependencies(getDependencies()))
+            builder = builder.dependencies(mapRequestedDependencies(getDependencies()))
                     .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
                     .repositories(mapRepositories(getRepositories()))
                     .pluginRepositories(mapPluginRepositories(getPluginRepositories()))

@@ -15,7 +15,7 @@
  */
 import {Cursor, ExecutionContext, Recipe} from '../..';
 import {J} from '../../java';
-import {RewriteRule, RewriteConfig} from './types';
+import {RewriteRule, RewriteConfig, PreMatchContext, PostMatchContext} from './types';
 import {Pattern, MatchResult} from './pattern';
 import {Template} from './template';
 
@@ -26,28 +26,29 @@ class RewriteRuleImpl implements RewriteRule {
     constructor(
         private readonly before: Pattern[],
         private readonly after: Template | ((match: MatchResult) => Template),
-        private readonly where?: (node: J, cursor: Cursor) => boolean | Promise<boolean>,
-        private readonly whereNot?: (node: J, cursor: Cursor) => boolean | Promise<boolean>
+        private readonly preMatch?: (node: J, context: PreMatchContext) => boolean | Promise<boolean>,
+        private readonly postMatch?: (node: J, context: PostMatchContext) => boolean | Promise<boolean>
     ) {
     }
 
     async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
+        // Evaluate preMatch before attempting any pattern matching
+        if (this.preMatch) {
+            const preMatchResult = await this.preMatch(node, { cursor });
+            if (!preMatchResult) {
+                return undefined; // Early exit - don't attempt pattern matching
+            }
+        }
+
         for (const pattern of this.before) {
             // Pass cursor to pattern.match() for context-aware capture constraints
             const match = await pattern.match(node, cursor);
             if (match) {
-                // Evaluate context predicates after structural match
-                if (this.where) {
-                    const whereResult = await this.where(node, cursor);
-                    if (!whereResult) {
-                        continue; // Pattern matched but context doesn't, try next pattern
-                    }
-                }
-
-                if (this.whereNot) {
-                    const whereNotResult = await this.whereNot(node, cursor);
-                    if (whereNotResult) {
-                        continue; // Pattern matched but context is excluded, try next pattern
+                // Evaluate postMatch after structural match succeeds
+                if (this.postMatch) {
+                    const postMatchResult = await this.postMatch(node, { cursor, captures: match });
+                    if (!postMatchResult) {
+                        continue; // Pattern matched but postMatch failed, try next pattern
                     }
                 }
 
@@ -57,10 +58,10 @@ class RewriteRuleImpl implements RewriteRule {
                 if (typeof this.after === 'function') {
                     // Call the function to get a template, then apply it
                     const template = this.after(match);
-                    result = await template.apply(cursor, node, match);
+                    result = await template.apply(node, cursor, { values: match });
                 } else {
                     // Use template.apply() as before
-                    result = await this.after.apply(cursor, node, match);
+                    result = await this.after.apply(node, cursor, { values: match });
                 }
 
                 if (result) {
@@ -69,7 +70,7 @@ class RewriteRuleImpl implements RewriteRule {
             }
         }
 
-        // Return undefined if no patterns match or all context checks failed
+        // Return undefined if no patterns match or all postMatch checks failed
         return undefined;
     }
 
@@ -121,20 +122,26 @@ class RewriteRuleImpl implements RewriteRule {
  *
  * @example
  * // Single pattern
- * const swapOperands = rewrite(() => ({
- *     before: pattern`${"left"} + ${"right"}`,
- *     after: template`${"right"} + ${"left"}`
- * }));
+ * const swapOperands = rewrite(() => {
+ *     const { left, right } = { left: capture(), right: capture() };
+ *     return {
+ *         before: pattern`${left} + ${right}`,
+ *         after: template`${right} + ${left}`
+ *     };
+ * });
  *
  * @example
  * // Multiple patterns
- * const normalizeComparisons = rewrite(() => ({
- *     before: [
- *         pattern`${"left"} == ${"right"}`,
- *         pattern`${"left"} === ${"right"}`
- *     ],
- *     after: template`${"left"} === ${"right"}`
- * }));
+ * const normalizeComparisons = rewrite(() => {
+ *     const { left, right } = { left: capture(), right: capture() };
+ *     return {
+ *         before: [
+ *             pattern`${left} == ${right}`,
+ *             pattern`${left} === ${right}`
+ *         ],
+ *         after: template`${left} === ${right}`
+ *     };
+ * });
  *
  * @example
  * // Using in a visitor - IMPORTANT: use `|| node` to handle undefined when no match
@@ -162,8 +169,8 @@ export function rewrite(
     return new RewriteRuleImpl(
         Array.isArray(config.before) ? config.before : [config.before],
         config.after,
-        config.where,
-        config.whereNot
+        config.preMatch,
+        config.postMatch
     );
 }
 

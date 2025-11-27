@@ -247,6 +247,11 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return scopedVariableDeclarations;
     }
 
+    override async visitShebang(shebang: JS.Shebang, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(shebang, el => el.text);
+        return shebang;
+    }
+
     override async visitStatementExpression(statementExpression: JS.StatementExpression, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(statementExpression, el => el.statement, el => this.visit(el, q));
         return statementExpression;
@@ -826,6 +831,13 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             variables: await q.receiveListDefined(scopedVariableDeclarations.variables, el => this.visitRightPadded(el, q))
         };
         return updateIfChanged(scopedVariableDeclarations, updates);
+    }
+
+    override async visitShebang(shebang: JS.Shebang, q: RpcReceiveQueue): Promise<J | undefined> {
+        const updates = {
+            text: await q.receive(shebang.text)
+        };
+        return updateIfChanged(shebang, updates);
     }
 
     override async visitStatementExpression(statementExpression: JS.StatementExpression, q: RpcReceiveQueue): Promise<J | undefined> {

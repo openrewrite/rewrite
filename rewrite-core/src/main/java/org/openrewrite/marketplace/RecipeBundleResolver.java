@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NullMarked
-@NonNullFields
-package org.openrewrite.javascript.marketplace;
+package org.openrewrite.marketplace;
 
-import org.jspecify.annotations.NullMarked;
-import org.openrewrite.internal.lang.NonNullFields;
+public interface RecipeBundleResolver {
+    String getEcosystem();
+
+    RecipeBundleReader resolve(RecipeBundle bundle);
+}

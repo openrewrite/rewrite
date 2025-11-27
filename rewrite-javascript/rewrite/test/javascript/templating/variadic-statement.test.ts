@@ -14,16 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {
-    capture,
-    JavaScriptVisitor,
-    maybeAutoFormat,
-    Pattern,
-    pattern,
-    Template,
-    template,
-    typescript
-} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {produce} from "immer";
 
@@ -37,13 +28,13 @@ describe('variadic statement matching and expansion', () => {
         return new class extends JavaScriptVisitor<any> {
             override async visitMethodDeclaration(func: J.MethodDeclaration, p: any): Promise<J | undefined> {
                 if (func.body) {
-                    const match = await pat.match(func.body);
+                    const match = await pat.match(func.body, this.cursor);
                     if (match) {
-                        const newBody = await tmpl.apply(this.cursor, func.body, match);
+                        const newBody = await tmpl.apply(func.body, this.cursor, {values: match});
                         if (newBody && newBody !== func.body) {
-                            return maybeAutoFormat(func, produce(func, draft => {
+                            return produce(func, draft => {
                                 draft.body = newBody as J.Block;
-                            }), p, undefined, this.cursor.parent);
+                            });
                         }
                     }
                 }

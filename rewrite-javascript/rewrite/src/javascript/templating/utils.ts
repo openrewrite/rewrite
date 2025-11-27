@@ -18,7 +18,7 @@ import {J} from '../../java';
 import {JS} from '../index';
 import {Marker, Markers} from '../../markers';
 import {randomId} from '../../uuid';
-import {VariadicOptions} from './types';
+import {ConstraintFunction, VariadicOptions} from './types';
 
 /**
  * Internal storage value type for pattern match captures.
@@ -49,7 +49,8 @@ export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
 export class LRUCache<K, V> {
     private cache = new Map<K, V>();
 
-    constructor(private maxSize: number) {}
+    constructor(private maxSize: number) {
+    }
 
     get(key: K): V | undefined {
         const value = this.cache.get(key);
@@ -111,7 +112,7 @@ export function generateCacheKey(
         Array.from(templateParts).join('|'),
         itemsKey,
         contextStatements.join(';'),
-        JSON.stringify(dependencies || {})
+        JSON.stringify(dependencies)
     ].join('::');
 }
 
@@ -126,7 +127,7 @@ export class CaptureMarker implements Marker {
     constructor(
         public readonly captureName: string,
         public readonly variadicOptions?: VariadicOptions,
-        public readonly constraint?: (node: any, cursor?: Cursor) => boolean
+        public readonly constraint?: ConstraintFunction<any>
     ) {
     }
 }

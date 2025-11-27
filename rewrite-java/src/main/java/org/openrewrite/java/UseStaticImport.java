@@ -88,11 +88,10 @@ public class UseStaticImport extends Recipe {
                     return m;
                 }
 
-                JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
-                maybeRemoveImport(receiverType);
-                maybeAddImport(receiverType.getFullyQualifiedName(), m.getSimpleName(), false);
-
                 if (m.getSelect() != null) {
+                    JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
+                    maybeRemoveImport(receiverType);
+                    maybeAddImport(receiverType.getFullyQualifiedName(), m.getSimpleName(), false);
                     return m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getPrefix()));
                 }
             }
