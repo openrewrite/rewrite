@@ -161,17 +161,22 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
         String name;              // Package name (e.g., "react")
         String versionConstraint; // Version constraint (e.g., "^18.2.0")
 
+        // The resolved version of this dependency (from package-lock.json)
+        @Nullable ResolvedDependency resolved;
+
         @Override
         public void rpcSend(Dependency after, RpcSendQueue q) {
             q.getAndSend(after, Dependency::getName);
             q.getAndSend(after, Dependency::getVersionConstraint);
+            q.getAndSend(after, Dependency::getResolved);
         }
 
         @Override
         public Dependency rpcReceive(Dependency before, RpcReceiveQueue q) {
             return before
                     .withName(q.receive(before.name))
-                    .withVersionConstraint(q.receive(before.versionConstraint));
+                    .withVersionConstraint(q.receive(before.versionConstraint))
+                    .withResolved(q.receive(before.resolved));
         }
     }
 

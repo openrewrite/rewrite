@@ -352,12 +352,12 @@ describe("NodeResolutionResult marker", () => {
                         expect(nodeResolutionResult).toBeDefined();
                         expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Resolve using the helper
-                        const resolvedLodash = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "lodash");
-                        expect(resolvedLodash).toBeDefined();
-                        expect(resolvedLodash!.name).toBe("lodash");
-                        expect(resolvedLodash!.version).toBe("4.17.20");
-                        expect(resolvedLodash!.license).toBe("MIT");
+                        // Resolve using the resolved property on Dependency
+                        const lodashDep = nodeResolutionResult!.dependencies.find(d => d.name === "lodash");
+                        expect(lodashDep?.resolved).toBeDefined();
+                        expect(lodashDep!.resolved!.name).toBe("lodash");
+                        expect(lodashDep!.resolved!.version).toBe("4.17.20");
+                        expect(lodashDep!.resolved!.license).toBe("MIT");
                     }},
                     packageLockJson(`
                         {
@@ -405,8 +405,9 @@ describe("NodeResolutionResult marker", () => {
                         expect(nodeResolutionResult).toBeDefined();
                         expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Resolve express using the helper
-                        const resolvedExpress = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "express");
+                        // Resolve express using the resolved property
+                        const expressDep = nodeResolutionResult!.dependencies.find(d => d.name === "express");
+                        const resolvedExpress = expressDep?.resolved;
                         expect(resolvedExpress).toBeDefined();
                         expect(resolvedExpress!.name).toBe("express");
                         expect(resolvedExpress!.version).toBe("4.18.2");
@@ -415,11 +416,11 @@ describe("NodeResolutionResult marker", () => {
                         expect(resolvedExpress!.dependencies).toBeDefined();
                         expect(resolvedExpress!.dependencies!.length).toBeGreaterThan(0);
 
-                        // body-parser should also be in the resolved dependencies list
-                        const resolvedBodyParser = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "body-parser");
-                        expect(resolvedBodyParser).toBeDefined();
-                        expect(resolvedBodyParser!.name).toBe("body-parser");
-                        expect(resolvedBodyParser!.version).toBe("1.20.1");
+                        // Navigate to body-parser through express's dependencies using resolved property
+                        const bodyParserDep = resolvedExpress!.dependencies!.find(d => d.name === "body-parser");
+                        expect(bodyParserDep?.resolved).toBeDefined();
+                        expect(bodyParserDep!.resolved!.name).toBe("body-parser");
+                        expect(bodyParserDep!.resolved!.version).toBe("1.20.1");
                     }},
                     packageLockJson(`
                         {
@@ -490,25 +491,28 @@ describe("NodeResolutionResult marker", () => {
                         expect(nodeResolutionResult).toBeDefined();
                         expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Resolve chalk and yargs using the helper
-                        const resolvedChalk = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "chalk");
-                        const resolvedYargs = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "yargs");
-                        expect(resolvedChalk).toBeDefined();
-                        expect(resolvedYargs).toBeDefined();
+                        // Resolve chalk and yargs using the resolved property
+                        const chalkDep = nodeResolutionResult!.dependencies.find(d => d.name === "chalk");
+                        const yargsDep = nodeResolutionResult!.dependencies.find(d => d.name === "yargs");
+                        expect(chalkDep?.resolved).toBeDefined();
+                        expect(yargsDep?.resolved).toBeDefined();
 
                         // Both chalk and yargs depend on 'supports-color@^7.1.0' in our mock lock file
-                        const supportsColorFromChalk = resolvedChalk!.dependencies!.find((d: Dependency) => d.name === "supports-color");
-                        const supportsColorFromYargs = resolvedYargs!.dependencies!.find((d: Dependency) => d.name === "supports-color");
+                        const supportsColorFromChalk = chalkDep!.resolved!.dependencies!.find((d: Dependency) => d.name === "supports-color");
+                        const supportsColorFromYargs = yargsDep!.resolved!.dependencies!.find((d: Dependency) => d.name === "supports-color");
                         expect(supportsColorFromChalk).toBeDefined();
                         expect(supportsColorFromYargs).toBeDefined();
 
-                        // The Dependency objects should be the same instance (deduplication)
-                        expect(supportsColorFromChalk).toBe(supportsColorFromYargs);
+                        // Both should have the same version constraint
+                        expect(supportsColorFromChalk!.versionConstraint).toBe("^7.1.0");
+                        expect(supportsColorFromYargs!.versionConstraint).toBe("^7.1.0");
 
-                        // supports-color should be in the resolved dependencies list
-                        const resolvedSupportsColor = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "supports-color");
-                        expect(resolvedSupportsColor).toBeDefined();
-                        expect(resolvedSupportsColor!.version).toBe("7.2.0");
+                        // The resolved ResolvedDependency objects should be the same instance (deduplication)
+                        expect(supportsColorFromChalk!.resolved).toBe(supportsColorFromYargs!.resolved);
+
+                        // supports-color should resolve to 7.2.0 via the resolved property
+                        expect(supportsColorFromChalk!.resolved).toBeDefined();
+                        expect(supportsColorFromChalk!.resolved!.version).toBe("7.2.0");
                     }},
                     packageLockJson(`
                         {
@@ -550,68 +554,7 @@ describe("NodeResolutionResult marker", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("NodeResolutionResultQueries.resolve and findResolved should work correctly", async () => {
-        const spec = new RecipeSpec();
-        await withDir(async (repo) => {
-            await spec.rewriteRun(
-                npm(
-                    repo.path,
-                    typescript(`const x = 1;`),
-                    {...packageJson(`
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "dependencies": {
-                                "lodash": "^4.17.0"
-                            }
-                        }
-                    `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
-
-                        // Test getResolvedDependency() helper
-                        const resolvedViaHelper = NodeResolutionResultQueries.getResolvedDependency(nodeResolutionResult!, "lodash");
-                        expect(resolvedViaHelper).toBeDefined();
-                        expect(resolvedViaHelper!.version).toBe("4.17.21");
-
-                        // Test findResolved() convenience method
-                        const resolvedViaFindResolved = NodeResolutionResultQueries.findResolved(nodeResolutionResult!, "lodash");
-                        expect(resolvedViaFindResolved).toBeDefined();
-                        expect(resolvedViaFindResolved!.version).toBe("4.17.21");
-
-                        // Both should return the same instance
-                        expect(resolvedViaHelper).toBe(resolvedViaFindResolved);
-
-                        // Test with non-existent package
-                        const nonExistent = NodeResolutionResultQueries.findResolved(nodeResolutionResult!, "nonexistent");
-                        expect(nonExistent).toBeUndefined();
-                    }},
-                    packageLockJson(`
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "lockfileVersion": 3,
-                            "packages": {
-                                "": {
-                                    "name": "test-project",
-                                    "version": "1.0.0",
-                                    "dependencies": {
-                                        "lodash": "^4.17.0"
-                                    }
-                                },
-                                "node_modules/lodash": {
-                                    "version": "4.17.21",
-                                    "license": "MIT"
-                                }
-                            }
-                        }
-                    `)
-                )
-            );
-        }, {unsafeCleanup: true});
-    });
-
-    test("getTransitiveDependency should answer 'what version does X use?'", async () => {
+    test("should navigate dependency tree using resolved property", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -630,41 +573,22 @@ describe("NodeResolutionResult marker", () => {
                         const nodeResolutionResult = findNodeResolutionResult(doc);
                         expect(nodeResolutionResult).toBeDefined();
 
-                        // Test: What version of body-parser does express use?
-                        const bodyParser = NodeResolutionResultQueries.getTransitiveDependency(
-                            nodeResolutionResult!,
-                            "express",
-                            "body-parser"
-                        );
+                        // Navigate: project -> express -> body-parser -> bytes
+                        const express = nodeResolutionResult!.dependencies.find(d => d.name === "express")?.resolved;
+                        expect(express).toBeDefined();
+                        expect(express!.version).toBe("4.18.2");
+
+                        const bodyParser = express!.dependencies?.find(d => d.name === "body-parser")?.resolved;
                         expect(bodyParser).toBeDefined();
-                        expect(bodyParser!.name).toBe("body-parser");
                         expect(bodyParser!.version).toBe("1.20.1");
 
-                        // Test: What version of bytes does body-parser use?
-                        const bytes = NodeResolutionResultQueries.getTransitiveDependency(
-                            nodeResolutionResult!,
-                            "body-parser",
-                            "bytes"
-                        );
+                        const bytes = bodyParser!.dependencies?.find(d => d.name === "bytes")?.resolved;
                         expect(bytes).toBeDefined();
-                        expect(bytes!.name).toBe("bytes");
                         expect(bytes!.version).toBe("3.1.2");
 
-                        // Test: Non-existent transitive dependency returns undefined
-                        const nonExistent = NodeResolutionResultQueries.getTransitiveDependency(
-                            nodeResolutionResult!,
-                            "express",
-                            "nonexistent"
-                        );
+                        // Non-existent transitive dependency returns undefined
+                        const nonExistent = express!.dependencies?.find(d => d.name === "nonexistent")?.resolved;
                         expect(nonExistent).toBeUndefined();
-
-                        // Test: Non-existent parent package returns undefined
-                        const nonExistentParent = NodeResolutionResultQueries.getTransitiveDependency(
-                            nodeResolutionResult!,
-                            "nonexistent",
-                            "body-parser"
-                        );
-                        expect(nonExistentParent).toBeUndefined();
                     }},
                     packageLockJson(`
                         {
@@ -786,9 +710,9 @@ describe("NodeResolutionResult marker", () => {
                         expect(nodeResolutionResult).toBeDefined();
 
                         // Use typescript which has engine requirements
-                        const resolvedPkg = NodeResolutionResultQueries.findResolved(nodeResolutionResult!, "typescript");
-                        expect(resolvedPkg).toBeDefined();
-                        expect(resolvedPkg!.engines).toEqual({
+                        const tsDep = nodeResolutionResult!.dependencies.find(d => d.name === "typescript");
+                        expect(tsDep?.resolved).toBeDefined();
+                        expect(tsDep!.resolved!.engines).toEqual({
                             "node": ">=14.17"
                         });
                     }},

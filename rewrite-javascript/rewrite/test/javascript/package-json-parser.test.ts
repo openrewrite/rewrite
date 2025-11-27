@@ -87,11 +87,11 @@ describe("PackageJsonParser", () => {
                         expect(marker).toBeDefined();
                         expect(marker!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Check resolved dependency using helper
-                        const resolved = NodeResolutionResultQueries.getResolvedDependency(marker!, "lodash");
-                        expect(resolved).toBeDefined();
-                        expect(resolved!.version).toBe("4.17.21");
-                        expect(resolved!.license).toBe("MIT");
+                        // Check resolved dependency using the resolved property
+                        const lodashDep = marker!.dependencies.find(d => d.name === "lodash");
+                        expect(lodashDep?.resolved).toBeDefined();
+                        expect(lodashDep!.resolved!.version).toBe("4.17.21");
+                        expect(lodashDep!.resolved!.license).toBe("MIT");
                     }},
                     packageLockJson(`
                         {

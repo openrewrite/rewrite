@@ -18,6 +18,7 @@ import {randomId, UUID} from "../uuid";
 import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {createDraft, finishDraft} from "immer";
+import * as semver from "semver";
 
 export const NodeResolutionResultKind = "org.openrewrite.javascript.marker.NodeResolutionResult" as const;
 export const DependencyKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Dependency" as const;
@@ -46,6 +47,7 @@ export interface Dependency {
     readonly kind: typeof DependencyKind;
     readonly name: string;              // Package name (e.g., "react")
     readonly versionConstraint: string; // Version constraint (e.g., "^18.2.0")
+    readonly resolved?: ResolvedDependency; // The resolved version of this dependency
 }
 
 /**
@@ -107,8 +109,8 @@ export interface NodeResolutionResult extends Marker {
     readonly optionalDependencies: Dependency[];  // Optional dependencies
     readonly bundledDependencies: Dependency[];   // Bundled dependencies
 
-    // Resolved dependencies from package-lock.json - what was actually installed
-    // Use getResolvedDependency() helper to look up by name
+    // Resolved dependencies from lock file - what was actually installed
+    // Use getAllResolvedVersions() to look up by name (handles multiple versions)
     readonly resolvedDependencies: ResolvedDependency[];
 
     // The package manager used by the project (npm, yarn, pnpm, etc.)
@@ -138,48 +140,18 @@ export function createNodeResolutionResultMarker(
     workspacePackagePaths?: string[],
     packageManager?: PackageManager
 ): NodeResolutionResult {
-    // Cache for deduplicating dependencies with the same name+versionConstraint.
-    const dependencyCache = new Map<string, Dependency>();
     // Cache for deduplicating resolved dependencies with the same name+version.
     const resolvedDependencyCache = new Map<string, ResolvedDependency>();
 
-    function getOrCreateDependency(
-        name: string,
-        versionConstraint: string
-    ): Dependency {
-        const key = `${name}@${versionConstraint}`;
-        let dep = dependencyCache.get(key);
-        if (!dep) {
-            dep = asRef({
-                kind: DependencyKind,
-                name,
-                versionConstraint,
-            });
-            dependencyCache.set(key, dep);
-        }
-        return dep;
-    }
+    // Map from lock file path to ResolvedDependency for path-based lookups.
+    // e.g., "node_modules/is-odd" -> ResolvedDependency for is-odd@3.0.1
+    const pathToResolved = new Map<string, ResolvedDependency>();
 
-    function parseDependencies(
-        deps: Record<string, string> | undefined
-    ): Dependency[] {
-        if (!deps) return [];
-        return Object.entries(deps).map(([name, versionConstraint]) =>
-            getOrCreateDependency(name, versionConstraint)
-        );
-    }
-
-    function parseBundledDependencies(
-        deps: string[] | undefined
-    ): Dependency[] {
-        if (!deps) return [];
-        // bundledDependencies is just an array of package names with no version constraint
-        return deps.map(name => getOrCreateDependency(name, '*'));
-    }
+    // Cache for deduplicating dependencies with the same name+versionConstraint+contextPath.
+    const dependencyCache = new Map<string, Dependency>();
 
     /**
      * Extracts package name and optionally version from a package-lock.json path.
-     * Handles both standard npm format and extended format with version suffix.
      * e.g., "node_modules/@babel/core" -> { name: "@babel/core" }
      * e.g., "node_modules/foo/node_modules/bar" -> { name: "bar" }
      * e.g., "node_modules/is-odd@3.0.1" -> { name: "is-odd", version: "3.0.1" }
@@ -222,21 +194,22 @@ export function createNodeResolutionResultMarker(
     function getOrCreateResolvedDependency(
         name: string,
         version: string,
-        pkgEntry: any
+        pkgEntry?: any
     ): ResolvedDependency {
         const key = `${name}@${version}`;
         let resolved = resolvedDependencyCache.get(key);
         if (!resolved) {
+            // Create a placeholder first - dependencies will be populated later
             resolved = asRef({
                 kind: ResolvedDependencyKind,
                 name,
                 version,
-                dependencies: parseDependencies(pkgEntry.dependencies),
-                devDependencies: parseDependencies(pkgEntry.devDependencies),
-                peerDependencies: parseDependencies(pkgEntry.peerDependencies),
-                optionalDependencies: parseDependencies(pkgEntry.optionalDependencies),
-                engines: pkgEntry.engines,
-                license: pkgEntry.license,
+                dependencies: undefined,
+                devDependencies: undefined,
+                peerDependencies: undefined,
+                optionalDependencies: undefined,
+                engines: pkgEntry?.engines,
+                license: pkgEntry?.license,
             });
             resolvedDependencyCache.set(key, resolved);
         }
@@ -244,7 +217,146 @@ export function createNodeResolutionResultMarker(
     }
 
     /**
+     * Resolves a dependency name from a given context path using Node.js-style resolution.
+     * Looks for the package in nested node_modules first, then walks up to parent directories.
+     * Falls back to semver matching when path-based resolution fails (e.g., for yarn/pnpm).
+     *
+     * @param name Package name to resolve
+     * @param versionConstraint Version constraint (e.g., "^3.0.1") for semver fallback
+     * @param contextPath The path of the parent package (e.g., "node_modules/is-even")
+     *                    Use "" for root-level dependencies
+     */
+    function resolveFromContext(
+        name: string,
+        versionConstraint: string,
+        contextPath: string
+    ): ResolvedDependency | undefined {
+        // Start from the context path and walk up looking for the package
+        let currentPath = contextPath;
+
+        while (true) {
+            // Try to find the package in node_modules at this level
+            const candidatePath = currentPath
+                ? `${currentPath}/node_modules/${name}`
+                : `node_modules/${name}`;
+
+            const resolved = pathToResolved.get(candidatePath);
+            if (resolved) {
+                return resolved;
+            }
+
+            // Walk up to parent directory
+            if (!currentPath) {
+                break; // Already at root
+            }
+
+            // Remove the last /node_modules/pkg segment to go up one level
+            const lastNodeModules = currentPath.lastIndexOf('/node_modules/');
+            if (lastNodeModules === -1) {
+                currentPath = ''; // Try root level next
+            } else {
+                currentPath = currentPath.substring(0, lastNodeModules);
+            }
+        }
+
+        // Fallback: use semver matching to find a version that satisfies the constraint
+        // This is needed for yarn/pnpm which don't encode nesting in their lock files
+        const candidates: ResolvedDependency[] = [];
+        for (const resolved of resolvedDependencyCache.values()) {
+            if (resolved.name === name) {
+                candidates.push(resolved);
+            }
+        }
+
+        if (candidates.length === 0) {
+            return undefined;
+        }
+
+        if (candidates.length === 1) {
+            return candidates[0];
+        }
+
+        // Multiple versions - use semver to find the best match
+        // First try to find one that satisfies the constraint
+        for (const candidate of candidates) {
+            try {
+                if (semver.satisfies(candidate.version, versionConstraint)) {
+                    return candidate;
+                }
+            } catch {
+                // Invalid semver, skip this candidate for matching
+            }
+        }
+
+        // If no exact match, return the highest version as fallback
+        return candidates.sort((a, b) => {
+            try {
+                return semver.compare(b.version, a.version);
+            } catch {
+                return 0;
+            }
+        })[0];
+    }
+
+    /**
+     * Creates or retrieves a Dependency from the cache.
+     * Links to resolved dependency using path-based Node.js-style resolution.
+     *
+     * @param name Package name
+     * @param versionConstraint Version constraint from package.json
+     * @param contextPath The path context for resolution (parent package path)
+     */
+    function getOrCreateDependency(
+        name: string,
+        versionConstraint: string,
+        contextPath: string
+    ): Dependency {
+        // Include context in cache key to handle different resolutions of same constraint
+        const key = `${name}@${versionConstraint}@${contextPath}`;
+        let dep = dependencyCache.get(key);
+        if (!dep) {
+            // Resolve using path-based lookup with semver fallback
+            const resolved = resolveFromContext(name, versionConstraint, contextPath);
+            dep = asRef({
+                kind: DependencyKind,
+                name,
+                versionConstraint,
+                resolved,
+            });
+            dependencyCache.set(key, dep);
+        }
+        return dep;
+    }
+
+    /**
+     * Parses dependencies from a Record, using the given context path for resolution.
+     */
+    function parseDependencies(
+        deps: Record<string, string> | undefined,
+        contextPath: string
+    ): Dependency[] {
+        if (!deps) return [];
+        return Object.entries(deps).map(([name, versionConstraint]) =>
+            getOrCreateDependency(name, versionConstraint, contextPath)
+        );
+    }
+
+    /**
+     * Parses bundled dependencies (array of names with no version constraint).
+     */
+    function parseBundledDependencies(
+        deps: string[] | undefined,
+        contextPath: string
+    ): Dependency[] {
+        if (!deps) return [];
+        return deps.map(name => getOrCreateDependency(name, '*', contextPath));
+    }
+
+    /**
      * Parses package-lock.json to build a list of resolved dependencies.
+     * Two-pass approach:
+     * 1. First pass: Create all ResolvedDependency objects and build path->resolved map
+     * 2. Second pass: Populate dependencies using path-based resolution
      */
     function parseResolutions(
         lockContent: any
@@ -253,7 +365,8 @@ export function createNodeResolutionResultMarker(
 
         const packages = lockContent.packages as Record<string, any>;
 
-        // Create ResolvedDependency objects for all packages
+        // First pass: Create all ResolvedDependency placeholders and build path map
+        const packageInfos: Array<{path: string; name: string; version: string; entry: any}> = [];
         for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
             // Skip the root package (empty string key)
             if (pkgPath === '') continue;
@@ -264,7 +377,30 @@ export function createNodeResolutionResultMarker(
             const version = pkgInfo.version || pkgEntry.version;
 
             if (name && version) {
-                getOrCreateResolvedDependency(name, version, pkgEntry);
+                const resolved = getOrCreateResolvedDependency(name, version, pkgEntry);
+                pathToResolved.set(pkgPath, resolved);
+                packageInfos.push({path: pkgPath, name, version, entry: pkgEntry});
+            }
+        }
+
+        // Second pass: Populate dependencies using path-based resolution
+        for (const {path: pkgPath, name, version, entry} of packageInfos) {
+            const key = `${name}@${version}`;
+            const resolved = resolvedDependencyCache.get(key);
+            if (resolved) {
+                const mutableResolved = resolved as any;
+                if (entry.dependencies) {
+                    mutableResolved.dependencies = parseDependencies(entry.dependencies, pkgPath);
+                }
+                if (entry.devDependencies) {
+                    mutableResolved.devDependencies = parseDependencies(entry.devDependencies, pkgPath);
+                }
+                if (entry.peerDependencies) {
+                    mutableResolved.peerDependencies = parseDependencies(entry.peerDependencies, pkgPath);
+                }
+                if (entry.optionalDependencies) {
+                    mutableResolved.optionalDependencies = parseDependencies(entry.optionalDependencies, pkgPath);
+                }
             }
         }
 
@@ -272,16 +408,18 @@ export function createNodeResolutionResultMarker(
         return Array.from(resolvedDependencyCache.values());
     }
 
-    const dependencies = parseDependencies(packageJsonContent.dependencies);
-    const devDependencies = parseDependencies(packageJsonContent.devDependencies);
-    const peerDependencies = parseDependencies(packageJsonContent.peerDependencies);
-    const optionalDependencies = parseDependencies(packageJsonContent.optionalDependencies);
-    const bundledDependencies = parseBundledDependencies(
-        packageJsonContent.bundledDependencies || packageJsonContent.bundleDependencies
-    );
-
-    // Parse resolved dependencies from package-lock.json if provided
+    // Parse resolved dependencies first (before dependencies) so we can link them
     const resolvedDependencies = packageLockContent ? parseResolutions(packageLockContent) : [];
+
+    // Now parse dependencies from package.json - they resolve from root context ("")
+    const dependencies = parseDependencies(packageJsonContent.dependencies, '');
+    const devDependencies = parseDependencies(packageJsonContent.devDependencies, '');
+    const peerDependencies = parseDependencies(packageJsonContent.peerDependencies, '');
+    const optionalDependencies = parseDependencies(packageJsonContent.optionalDependencies, '');
+    const bundledDependencies = parseBundledDependencies(
+        packageJsonContent.bundledDependencies || packageJsonContent.bundleDependencies,
+        ''
+    );
 
     return {
         kind: NodeResolutionResultKind,
@@ -362,75 +500,19 @@ export namespace NodeResolutionResultQueries {
     }
 
     /**
-     * Get a resolved dependency by package name.
-     * Returns undefined if the package is not in resolvedDependencies.
-     */
-    export function getResolvedDependency(
-        project: NodeResolutionResult,
-        packageName: string
-    ): ResolvedDependency | undefined {
-        return project.resolvedDependencies.find(r => r.name === packageName);
-    }
-
-    /**
-     * Find and resolve a dependency by name.
-     * Returns the resolved dependency if found.
-     */
-    export function findResolved(
-        project: NodeResolutionResult,
-        packageName: string
-    ): ResolvedDependency | undefined {
-        return getResolvedDependency(project, packageName);
-    }
-
-    /**
      * Get all resolved dependencies with a specific name (handles multiple versions).
      * Returns an empty array if no versions are found.
+     *
+     * For navigation, prefer using the Dependency.resolved property:
+     * @example
+     * const express = project.dependencies.find(d => d.name === 'express')?.resolved;
+     * const accepts = express?.dependencies?.find(d => d.name === 'accepts')?.resolved;
      */
     export function getAllResolvedVersions(
         project: NodeResolutionResult,
         packageName: string
     ): ResolvedDependency[] {
         return project.resolvedDependencies.filter(r => r.name === packageName);
-    }
-
-    /**
-     * Get the resolved version of a transitive dependency.
-     * Answers "what version of `transitiveDep` does `parentPackage` use?"
-     *
-     * @param project The NodeResolutionResult marker
-     * @param parentPackage The package that has the transitive dependency
-     * @param transitiveDep The name of the transitive dependency to look up
-     * @returns The resolved transitive dependency, or undefined if not found
-     *
-     * @example
-     * // Find what version of 'accepts' does 'express' use
-     * const accepts = getTransitiveDependency(project, 'express', 'accepts');
-     */
-    export function getTransitiveDependency(
-        project: NodeResolutionResult,
-        parentPackage: string,
-        transitiveDep: string
-    ): ResolvedDependency | undefined {
-        const parent = getResolvedDependency(project, parentPackage);
-        if (!parent) return undefined;
-
-        // Check all dependency scopes of the parent
-        const allParentDeps = [
-            ...(parent.dependencies || []),
-            ...(parent.devDependencies || []),
-            ...(parent.peerDependencies || []),
-            ...(parent.optionalDependencies || []),
-        ];
-
-        // Find the dependency request for the transitive package
-        const depRequest = allParentDeps.find(d => d.name === transitiveDep);
-        if (!depRequest) return undefined;
-
-        // Find matching resolved dependency
-        // For now, we return the first match by name
-        // TODO: When multiple versions exist, we should match by version constraint
-        return getResolvedDependency(project, transitiveDep);
     }
 }
 
@@ -443,6 +525,7 @@ RpcCodecs.registerCodec(DependencyKind, {
         draft.kind = DependencyKind;
         draft.name = await q.receive(before.name);
         draft.versionConstraint = await q.receive(before.versionConstraint);
+        draft.resolved = await q.receive(before.resolved);
 
         return finishDraft(draft) as Dependency;
     },
@@ -450,6 +533,7 @@ RpcCodecs.registerCodec(DependencyKind, {
     async rpcSend(after: Dependency, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.name);
         await q.getAndSend(after, a => a.versionConstraint);
+        await q.getAndSend(after, a => a.resolved);
     }
 });
 

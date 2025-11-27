@@ -170,27 +170,43 @@ export class PackageJsonParser extends Parser {
             }
         }
 
-        // Try pnpm-lock.yaml (pnpm) - use CLI for compatibility across lockfile versions
+        // Try pnpm-lock.yaml (pnpm) - prefer node_modules, fall back to CLI
         const pnpmLockPath = path.join(dir, 'pnpm-lock.yaml');
         if (fs.existsSync(pnpmLockPath)) {
             try {
-                const parsed = this.getPnpmDependencies(dir);
+                // Try node_modules first for 100% accuracy
+                const parsed = this.walkNodeModules(dir);
                 if (parsed) {
                     return { content: parsed, packageManager: PackageManager.Pnpm };
+                }
+                // Fall back to pnpm CLI
+                const cliParsed = this.getPnpmDependencies(dir);
+                if (cliParsed) {
+                    return { content: cliParsed, packageManager: PackageManager.Pnpm };
                 }
             } catch (error) {
                 // Silently ignore errors (CLI not available)
             }
         }
 
-        // Try yarn.lock (yarn)
+        // Try yarn.lock (yarn) - prefer node_modules, fall back to lock file parsing
         const yarnLockPath = path.join(dir, 'yarn.lock');
         if (fs.existsSync(yarnLockPath)) {
             try {
                 const content = fs.readFileSync(yarnLockPath, 'utf-8');
-                const result = this.parseYarnLock(content);
-                if (result) {
-                    return result;
+                // Detect yarn version for packageManager field
+                const isYarnBerry = content.includes('__metadata:');
+                const packageManager = isYarnBerry ? PackageManager.YarnBerry : PackageManager.YarnClassic;
+
+                // Try node_modules first for 100% accuracy
+                const parsed = this.walkNodeModules(dir);
+                if (parsed) {
+                    return { content: parsed, packageManager };
+                }
+                // Fall back to parsing lock file directly
+                const lockParsed = this.parseYarnLock(content);
+                if (lockParsed) {
+                    return { content: lockParsed, packageManager };
                 }
             } catch (error) {
                 // Silently ignore errors
@@ -211,6 +227,224 @@ export class PackageJsonParser extends Parser {
         // Remove trailing commas before ] or }
         stripped = stripped.replace(/,(\s*[}\]])/g, '$1');
         return JSON.parse(stripped);
+    }
+
+    /**
+     * Walks the node_modules directory to build an npm-format packages structure.
+     * This provides 100% accurate resolution for all package managers since it reads
+     * the actual installed packages rather than trying to interpret lock file formats.
+     *
+     * @param dir The project directory containing node_modules
+     * @returns npm package-lock.json format with packages map, or undefined if node_modules doesn't exist
+     */
+    private walkNodeModules(dir: string): any {
+        const nodeModulesPath = path.join(dir, 'node_modules');
+        if (!fs.existsSync(nodeModulesPath)) {
+            return undefined;
+        }
+
+        const packages: Record<string, any> = {
+            "": {} // Root package placeholder
+        };
+
+        // Check if this is a pnpm project (has .pnpm directory)
+        const pnpmPath = path.join(nodeModulesPath, '.pnpm');
+        if (fs.existsSync(pnpmPath)) {
+            this.walkPnpmNodeModules(pnpmPath, packages);
+        } else {
+            this.walkNodeModulesRecursive(nodeModulesPath, 'node_modules', packages);
+        }
+
+        return Object.keys(packages).length > 1 ? {
+            lockfileVersion: 3,
+            packages
+        } : undefined;
+    }
+
+    /**
+     * Walks pnpm's .pnpm directory structure to build packages map.
+     * pnpm stores packages in .pnpm/<name>@<version>/node_modules/<name>/
+     */
+    private walkPnpmNodeModules(pnpmPath: string, packages: Record<string, any>): void {
+        let entries: fs.Dirent[];
+        try {
+            entries = fs.readdirSync(pnpmPath, { withFileTypes: true });
+        } catch {
+            return;
+        }
+
+        for (const entry of entries) {
+            // Skip non-directories and special files
+            if (!entry.isDirectory() || entry.name === 'node_modules') {
+                continue;
+            }
+
+            // Parse name@version from directory name
+            // Handle scoped packages: @scope+name@version
+            const atIndex = entry.name.lastIndexOf('@');
+            if (atIndex <= 0) continue;
+
+            let name = entry.name.substring(0, atIndex);
+            const version = entry.name.substring(atIndex + 1);
+
+            // pnpm encodes @ as + in scoped packages: @scope+name -> @scope/name
+            if (name.startsWith('@') && name.includes('+')) {
+                name = name.replace('+', '/');
+            }
+
+            // The actual package is at .pnpm/<name>@<version>/node_modules/<name>/
+            const pkgDir = path.join(pnpmPath, entry.name, 'node_modules', name.replace('/', path.sep));
+            const packageJsonPath = path.join(pkgDir, 'package.json');
+
+            if (!fs.existsSync(packageJsonPath)) continue;
+
+            let pkgJson: any;
+            try {
+                const content = fs.readFileSync(packageJsonPath, 'utf-8');
+                pkgJson = JSON.parse(content);
+            } catch {
+                continue;
+            }
+
+            // Use name@version as the key for pnpm (flat structure with version)
+            const pkgKey = `node_modules/${name}@${version}`;
+
+            const pkgEntry: any = {
+                version: pkgJson.version || version,
+            };
+
+            // Copy dependency fields
+            if (pkgJson.dependencies && Object.keys(pkgJson.dependencies).length > 0) {
+                pkgEntry.dependencies = pkgJson.dependencies;
+            }
+            if (pkgJson.devDependencies && Object.keys(pkgJson.devDependencies).length > 0) {
+                pkgEntry.devDependencies = pkgJson.devDependencies;
+            }
+            if (pkgJson.peerDependencies && Object.keys(pkgJson.peerDependencies).length > 0) {
+                pkgEntry.peerDependencies = pkgJson.peerDependencies;
+            }
+            if (pkgJson.optionalDependencies && Object.keys(pkgJson.optionalDependencies).length > 0) {
+                pkgEntry.optionalDependencies = pkgJson.optionalDependencies;
+            }
+            if (pkgJson.engines) {
+                pkgEntry.engines = pkgJson.engines;
+            }
+            if (pkgJson.license) {
+                pkgEntry.license = pkgJson.license;
+            }
+
+            packages[pkgKey] = pkgEntry;
+        }
+    }
+
+    /**
+     * Recursively walks a node_modules directory, reading package.json files
+     * and building the packages map.
+     *
+     * @param nodeModulesPath Absolute path to the node_modules directory
+     * @param relativePath Relative path from project root (e.g., "node_modules" or "node_modules/foo/node_modules")
+     * @param packages The packages map to populate
+     */
+    private walkNodeModulesRecursive(
+        nodeModulesPath: string,
+        relativePath: string,
+        packages: Record<string, any>
+    ): void {
+        let entries: fs.Dirent[];
+        try {
+            entries = fs.readdirSync(nodeModulesPath, { withFileTypes: true });
+        } catch {
+            return; // Directory not readable
+        }
+
+        for (const entry of entries) {
+            // Skip hidden files
+            if (entry.name.startsWith('.')) {
+                continue;
+            }
+
+            // Accept directories and symlinks (pnpm uses symlinks)
+            const isDirectoryOrSymlink = entry.isDirectory() || entry.isSymbolicLink();
+            if (!isDirectoryOrSymlink) {
+                continue;
+            }
+
+            // Handle scoped packages (@scope/name)
+            if (entry.name.startsWith('@')) {
+                const scopePath = path.join(nodeModulesPath, entry.name);
+                let scopeEntries: fs.Dirent[];
+                try {
+                    scopeEntries = fs.readdirSync(scopePath, { withFileTypes: true });
+                } catch {
+                    continue;
+                }
+
+                for (const scopeEntry of scopeEntries) {
+                    // Accept directories and symlinks for scoped packages too
+                    if (!scopeEntry.isDirectory() && !scopeEntry.isSymbolicLink()) continue;
+
+                    const scopedName = `${entry.name}/${scopeEntry.name}`;
+                    const pkgPath = path.join(scopePath, scopeEntry.name);
+                    this.processPackage(pkgPath, `${relativePath}/${scopedName}`, packages);
+                }
+            } else {
+                const pkgPath = path.join(nodeModulesPath, entry.name);
+                this.processPackage(pkgPath, `${relativePath}/${entry.name}`, packages);
+            }
+        }
+    }
+
+    /**
+     * Processes a single package directory, reading its package.json and
+     * recursively processing nested node_modules.
+     */
+    private processPackage(
+        pkgPath: string,
+        relativePath: string,
+        packages: Record<string, any>
+    ): void {
+        const packageJsonPath = path.join(pkgPath, 'package.json');
+
+        // Read and parse the package's package.json
+        let pkgJson: any;
+        try {
+            const content = fs.readFileSync(packageJsonPath, 'utf-8');
+            pkgJson = JSON.parse(content);
+        } catch {
+            return; // Not a valid package
+        }
+
+        const pkgEntry: any = {
+            version: pkgJson.version,
+        };
+
+        // Copy dependency fields if present
+        if (pkgJson.dependencies && Object.keys(pkgJson.dependencies).length > 0) {
+            pkgEntry.dependencies = pkgJson.dependencies;
+        }
+        if (pkgJson.devDependencies && Object.keys(pkgJson.devDependencies).length > 0) {
+            pkgEntry.devDependencies = pkgJson.devDependencies;
+        }
+        if (pkgJson.peerDependencies && Object.keys(pkgJson.peerDependencies).length > 0) {
+            pkgEntry.peerDependencies = pkgJson.peerDependencies;
+        }
+        if (pkgJson.optionalDependencies && Object.keys(pkgJson.optionalDependencies).length > 0) {
+            pkgEntry.optionalDependencies = pkgJson.optionalDependencies;
+        }
+        if (pkgJson.engines) {
+            pkgEntry.engines = pkgJson.engines;
+        }
+        if (pkgJson.license) {
+            pkgEntry.license = pkgJson.license;
+        }
+
+        packages[relativePath] = pkgEntry;
+
+        // Recursively process nested node_modules
+        const nestedNodeModules = path.join(pkgPath, 'node_modules');
+        if (fs.existsSync(nestedNodeModules)) {
+            this.walkNodeModulesRecursive(nestedNodeModules, `${relativePath}/node_modules`, packages);
+        }
     }
 
     /**
@@ -288,7 +522,6 @@ export class PackageJsonParser extends Parser {
     /**
      * Gets dependency information from pnpm using its CLI.
      * Uses `pnpm list --json --depth=Infinity` to get the full dependency tree.
-     * This approach works across all pnpm lockfile versions (v5, v6, v9).
      */
     private getPnpmDependencies(dir: string): any {
         const output = execSync('pnpm list --json --depth=Infinity', {
@@ -363,24 +596,18 @@ export class PackageJsonParser extends Parser {
     }
 
     /**
-     * Parses yarn.lock file and returns content with package manager type.
+     * Parses yarn.lock file and returns npm-format content.
      * Detects whether it's Yarn Classic (v1) or Yarn Berry (v2+) format.
      */
-    private parseYarnLock(content: string): { content: any; packageManager: PackageManager } | undefined {
+    private parseYarnLock(content: string): any {
         // Yarn Berry (v2+) has __metadata section at the start
         if (content.includes('__metadata:')) {
-            const parsed = this.parseYarnBerryLock(content);
-            if (parsed) {
-                return { content: parsed, packageManager: PackageManager.YarnBerry };
-            }
+            return this.parseYarnBerryLock(content);
         }
 
         // Yarn Classic (v1) starts with "# yarn lockfile v1"
         if (content.includes('# yarn lockfile v1')) {
-            const parsed = this.parseYarnClassicLock(content);
-            if (parsed) {
-                return { content: parsed, packageManager: PackageManager.YarnClassic };
-            }
+            return this.parseYarnClassicLock(content);
         }
 
         return undefined;
@@ -394,8 +621,6 @@ export class PackageJsonParser extends Parser {
      *   resolution: "is-odd@npm:3.0.1"
      *   dependencies:
      *     is-number: "npm:^6.0.0"
-     *   peerDependencies:
-     *     react: "^17.0.0 || ^18.0.0"
      */
     private parseYarnBerryLock(content: string): any {
         const lock = YAML.parse(content);
@@ -420,7 +645,6 @@ export class PackageJsonParser extends Parser {
                 if (npmIndex > 0) {
                     name = entry.resolution.substring(0, npmIndex);
                 } else {
-                    // Handle other resolution formats (e.g., patches, links)
                     continue;
                 }
             } else {
@@ -440,23 +664,18 @@ export class PackageJsonParser extends Parser {
 
             const pkgEntry: any = { version };
 
-            // Collect all dependency types
-            const allDeps: Record<string, string> = {};
-            for (const depType of ['dependencies', 'peerDependencies', 'optionalDependencies']) {
-                const deps = entry[depType];
-                if (deps && typeof deps === 'object') {
-                    for (const [depName, depConstraint] of Object.entries(deps as Record<string, string>)) {
-                        // Constraint is like "npm:^6.0.0" - strip the "npm:" prefix
-                        const constraint = String(depConstraint).startsWith('npm:')
-                            ? String(depConstraint).substring(4)
-                            : String(depConstraint);
-                        allDeps[depName] = constraint;
-                    }
+            // Parse dependencies
+            if (entry.dependencies && typeof entry.dependencies === 'object') {
+                const deps: Record<string, string> = {};
+                for (const [depName, depConstraint] of Object.entries(entry.dependencies as Record<string, string>)) {
+                    // Constraint is like "npm:^6.0.0" - strip the "npm:" prefix
+                    deps[depName] = depConstraint.startsWith('npm:')
+                        ? depConstraint.substring(4)
+                        : depConstraint;
                 }
-            }
-
-            if (Object.keys(allDeps).length > 0) {
-                pkgEntry.dependencies = allDeps;
+                if (Object.keys(deps).length > 0) {
+                    pkgEntry.dependencies = deps;
+                }
             }
 
             packages[pkgKey] = pkgEntry;
@@ -478,18 +697,11 @@ export class PackageJsonParser extends Parser {
      *   integrity sha512-...
      *   dependencies:
      *     is-number "^6.0.0"
-     *   optionalDependencies:
-     *     fsevents "^2.0.0"
-     *   peerDependencies:
-     *     react "^17.0.0 || ^18.0.0"
      */
     private parseYarnClassicLock(content: string): any {
         const packages: Record<string, any> = {
             "": {} // Root package placeholder
         };
-
-        // Dependency section types we want to capture
-        const depSectionTypes = ['dependencies', 'optionalDependencies', 'peerDependencies'];
 
         // Split into package blocks - each block starts with an unindented line ending with ":"
         // and may span multiple version constraints (e.g., "pkg@^1.0.0, pkg@^1.2.0:")
@@ -497,7 +709,7 @@ export class PackageJsonParser extends Parser {
         let currentNames: string[] = [];
         let currentVersion: string | null = null;
         let currentDeps: Record<string, string> = {};
-        let inDependencySection = false;
+        let inDependencies = false;
 
         for (const line of lines) {
             // Skip comments and empty lines
@@ -541,7 +753,7 @@ export class PackageJsonParser extends Parser {
 
                 currentVersion = null;
                 currentDeps = {};
-                inDependencySection = false;
+                inDependencies = false;
                 continue;
             }
 
@@ -552,23 +764,21 @@ export class PackageJsonParser extends Parser {
                 continue;
             }
 
-            // Check for dependency section start (dependencies, optionalDependencies, peerDependencies)
-            const sectionMatch = line.match(/^\s+(\w+):\s*$/);
-            if (sectionMatch) {
-                inDependencySection = depSectionTypes.includes(sectionMatch[1]);
+            // Dependencies section start
+            if (line.match(/^\s+dependencies:\s*$/)) {
+                inDependencies = true;
                 continue;
             }
 
-            // Other field with value on same line (resolved, integrity, etc.) - not a section
-            if (line.match(/^\s+\w+\s+["']/)) {
-                inDependencySection = false;
+            // Other section (resolved, integrity, etc.) - ends dependencies section
+            if (line.match(/^\s+\w+:/) && !line.match(/^\s{4}/)) {
+                inDependencies = false;
                 continue;
             }
 
-            // Dependency entry: '    is-number "^6.0.0"' or '    "@babel/core" "^7.0.0"'
-            if (inDependencySection) {
-                // Handle both quoted and unquoted package names
-                const depMatch = line.match(/^\s{4}"?([^"]+)"?\s+"([^"]+)"/);
+            // Dependency entry: '    is-number "^6.0.0"'
+            if (inDependencies) {
+                const depMatch = line.match(/^\s{4}(.+?)\s+"([^"]+)"/);
                 if (depMatch) {
                     currentDeps[depMatch[1]] = depMatch[2];
                 }

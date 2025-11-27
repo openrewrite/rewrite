@@ -149,7 +149,8 @@ describe("Lock file parsing", () => {
             const marker = await parseAndGetMarker("npm");
             expect(marker).not.toBeNull();
 
-            const isOdd = NodeResolutionResultQueries.getResolvedDependency(marker!, "is-odd");
+            // Use the resolved property from direct dependency
+            const isOdd = marker!.dependencies.find(d => d.name === "is-odd")?.resolved;
             expect(isOdd).toBeDefined();
             expect(isOdd!.license).toBe("MIT");
         });
@@ -170,19 +171,76 @@ describe("Lock file parsing", () => {
             expect(isOdd0!.engines).toEqual({node: ">=0.10.0"});
         });
 
-        test("getTransitiveDependency should find correct version in dependency chain", async () => {
+        test("should find correct transitive dependency version via resolved property", async () => {
             const marker = await parseAndGetMarker("npm");
             expect(marker).not.toBeNull();
 
+            // Navigate: is-odd (direct dep) -> is-number (transitive)
             // is-odd@3.0.1 depends on is-number@6.0.0
-            const isNumber = NodeResolutionResultQueries.getTransitiveDependency(
-                marker!,
-                "is-odd",
-                "is-number"
-            );
+            const isOdd = marker!.dependencies.find(d => d.name === "is-odd")?.resolved;
+            expect(isOdd).toBeDefined();
+            expect(isOdd!.version).toBe("3.0.1");
+
+            const isNumber = isOdd!.dependencies?.find(d => d.name === "is-number")?.resolved;
             expect(isNumber).toBeDefined();
-            // Note: getTransitiveDependency returns first match, may need enhancement for version-specific lookup
-            expect(["3.0.0", "6.0.0"]).toContain(isNumber!.version);
+            expect(isNumber!.version).toBe("6.0.0");
+        });
+
+        test("dependencies should have resolved property linked to ResolvedDependency", async () => {
+            const marker = await parseAndGetMarker("npm");
+            expect(marker).not.toBeNull();
+
+            // Check that direct dependencies from package.json have resolved linked
+            const isOddDep = marker!.dependencies.find(d => d.name === "is-odd");
+            expect(isOddDep).toBeDefined();
+            expect(isOddDep!.resolved).toBeDefined();
+            expect(isOddDep!.resolved!.name).toBe("is-odd");
+            expect(isOddDep!.resolved!.version).toBe("3.0.1");
+
+            // Dev dependencies should also have resolved linked
+            const isEvenDep = marker!.devDependencies.find(d => d.name === "is-even");
+            expect(isEvenDep).toBeDefined();
+            expect(isEvenDep!.resolved).toBeDefined();
+            expect(isEvenDep!.resolved!.name).toBe("is-even");
+            expect(isEvenDep!.resolved!.version).toBe("1.0.0");
+        });
+
+        test("transitive dependencies in ResolvedDependency should also have resolved linked", async () => {
+            const marker = await parseAndGetMarker("npm");
+            expect(marker).not.toBeNull();
+
+            // Get is-odd@3.0.1 resolved dependency
+            const isOdd3 = marker!.resolvedDependencies.find(
+                d => d.name === "is-odd" && d.version === "3.0.1"
+            );
+            expect(isOdd3).toBeDefined();
+
+            // Its dependency on is-number should have resolved linked
+            const isNumberDep = isOdd3!.dependencies!.find(d => d.name === "is-number");
+            expect(isNumberDep).toBeDefined();
+            expect(isNumberDep!.resolved).toBeDefined();
+            expect(isNumberDep!.resolved!.name).toBe("is-number");
+            // Should be is-number@6.0.0 (the version is-odd@3.0.1 uses)
+            expect(isNumberDep!.resolved!.version).toBe("6.0.0");
+        });
+
+        test("navigating dependency tree via resolved property", async () => {
+            const marker = await parseAndGetMarker("npm");
+            expect(marker).not.toBeNull();
+
+            // Navigate from is-odd@3.0.1 -> is-number@6.0.0 using resolved
+            const isOddDep = marker!.dependencies.find(d => d.name === "is-odd");
+            const isOdd = isOddDep!.resolved!;
+            expect(isOdd.version).toBe("3.0.1");
+
+            // Follow to is-number
+            const isNumberDep = isOdd.dependencies!.find(d => d.name === "is-number");
+            const isNumber = isNumberDep!.resolved!;
+            expect(isNumber.name).toBe("is-number");
+            expect(isNumber.version).toBe("6.0.0");
+
+            // is-number@6.0.0 has no dependencies, it's a leaf
+            expect(isNumber.dependencies).toBeUndefined();
         });
     });
 
@@ -205,28 +263,99 @@ describe("Lock file parsing", () => {
     describe("pnpm (pnpm-lock.yaml)", () => {
         test("should parse all dependencies from pnpm-lock.yaml", async () => {
             const marker = await getMarkerOrSkip("pnpm");
-            if (!marker) return; // Skip if CLI not available
+            if (!marker) return; // Skip if node_modules not available
             assertCommonExpectations(marker.resolvedDependencies, "pnpm");
         });
 
         test("should set packageManager to Pnpm", async () => {
             const marker = await getMarkerOrSkip("pnpm");
-            if (!marker) return; // Skip if CLI not available
+            if (!marker) return; // Skip if node_modules not available
             expect(marker.packageManager).toBe(PackageManager.Pnpm);
+        });
+
+        test("dependencies should resolve to correct version using path-based resolution", async () => {
+            const marker = await getMarkerOrSkip("pnpm");
+            if (!marker) return; // Skip if node_modules not available
+
+            // is-odd@^3.0.1 should resolve to is-odd@3.0.1 (not 0.1.2)
+            const isOddDep = marker.dependencies.find(d => d.name === "is-odd");
+            expect(isOddDep).toBeDefined();
+            expect(isOddDep!.resolved).toBeDefined();
+            expect(isOddDep!.resolved!.version).toBe("3.0.1");
+
+            // is-even's dependency on is-odd@^0.1.2 should resolve to 0.1.2
+            const isEvenResolved = marker.resolvedDependencies.find(
+                d => d.name === "is-even" && d.version === "1.0.0"
+            );
+            expect(isEvenResolved).toBeDefined();
+            const nestedIsOdd = isEvenResolved!.dependencies!.find(d => d.name === "is-odd");
+            expect(nestedIsOdd).toBeDefined();
+            expect(nestedIsOdd!.resolved).toBeDefined();
+            expect(nestedIsOdd!.resolved!.version).toBe("0.1.2");
+        });
+
+        test("should capture license and engine information from node_modules", async () => {
+            const marker = await getMarkerOrSkip("pnpm");
+            if (!marker) return; // Skip if node_modules not available
+
+            // Use getAllResolvedVersions to get the specific version we want
+            const isOddVersions = NodeResolutionResultQueries.getAllResolvedVersions(marker, "is-odd");
+            const isOdd3 = isOddVersions.find(d => d.version === "3.0.1");
+            expect(isOdd3).toBeDefined();
+            expect(isOdd3!.license).toBe("MIT");
+            expect(isOdd3!.engines).toEqual({node: ">=4"});
         });
     });
 
     describe("yarn classic (yarn.lock v1)", () => {
         test("should parse all dependencies from yarn.lock", async () => {
             const marker = await getMarkerOrSkip("yarn");
-            if (!marker) return; // Skip if CLI not available
+            if (!marker) return; // Skip if node_modules not available
             assertCommonExpectations(marker.resolvedDependencies, "yarn");
         });
 
         test("should set packageManager to YarnClassic", async () => {
             const marker = await getMarkerOrSkip("yarn");
-            if (!marker) return; // Skip if CLI not available
+            if (!marker) return; // Skip if node_modules not available
             expect(marker.packageManager).toBe(PackageManager.YarnClassic);
+        });
+
+        test("dependencies should resolve to correct version using path-based resolution", async () => {
+            const marker = await getMarkerOrSkip("yarn");
+            if (!marker) return; // Skip if node_modules not available
+
+            // is-odd@^3.0.1 should resolve to is-odd@3.0.1 (not 0.1.2)
+            const isOddDep = marker.dependencies.find(d => d.name === "is-odd");
+            expect(isOddDep).toBeDefined();
+            expect(isOddDep!.resolved).toBeDefined();
+            expect(isOddDep!.resolved!.version).toBe("3.0.1");
+
+            // is-even's dependency on is-odd@^0.1.2 should resolve to 0.1.2
+            const isEvenResolved = marker.resolvedDependencies.find(
+                d => d.name === "is-even" && d.version === "1.0.0"
+            );
+            expect(isEvenResolved).toBeDefined();
+            const nestedIsOdd = isEvenResolved!.dependencies!.find(d => d.name === "is-odd");
+            expect(nestedIsOdd).toBeDefined();
+            expect(nestedIsOdd!.resolved).toBeDefined();
+            expect(nestedIsOdd!.resolved!.version).toBe("0.1.2");
+        });
+
+        test("should capture license and engine information from node_modules", async () => {
+            const marker = await getMarkerOrSkip("yarn");
+            if (!marker) return; // Skip if node_modules not available
+
+            // Use getAllResolvedVersions to get the specific version we want
+            const isOddVersions = NodeResolutionResultQueries.getAllResolvedVersions(marker, "is-odd");
+            const isOdd3 = isOddVersions.find(d => d.version === "3.0.1");
+            expect(isOdd3).toBeDefined();
+            expect(isOdd3!.license).toBe("MIT");
+            expect(isOdd3!.engines).toEqual({node: ">=4"});
+
+            // Also check the older version has different engines
+            const isOdd0 = isOddVersions.find(d => d.version === "0.1.2");
+            expect(isOdd0).toBeDefined();
+            expect(isOdd0!.engines).toEqual({node: ">=0.10.0"});
         });
     });
 
