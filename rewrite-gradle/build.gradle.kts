@@ -55,7 +55,7 @@ dependencies {
     implementation(project(":rewrite-properties"))
     implementation(project(":rewrite-toml"))
 
-    compileOnly("org.codehaus.groovy:groovy:latest.release")
+    compileOnly("org.apache.groovy:groovy:4.+")
     compileOnly(gradleApi())
     // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
     compileOnly("com.gradle:develocity-gradle-plugin:3.+")
