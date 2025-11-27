@@ -26,8 +26,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveMethodThrows("A foo(..)", "java.io.IOException",
-          true));
+        spec.recipe(new RemoveMethodThrows("A foo(..)", true, "java.io.IOException"
+        ));
     }
 
     @Test
@@ -59,8 +59,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
     @Test
     void removeSingleExceptionOverrides() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveMethodThrows("Itf foo(..)", "java.io.IOException",
-            true)),
+          spec -> spec.recipe(new RemoveMethodThrows("Itf foo(..)", true, "java.io.IOException"
+          )),
           //language=java
           java(
             """
@@ -96,8 +96,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
     @Test
     void removeSingleExceptionCascadingOverrides() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveMethodThrows("ItfA foo(..)", "java.lang.Exception",
-            true)),
+          spec -> spec.recipe(new RemoveMethodThrows("ItfA foo(..)", true, "java.lang.Exception"
+          )),
           //language=java
           java(
             """
@@ -168,8 +168,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
     @Test
     void removeAllExceptions() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveMethodThrows("A foo(..)", "*",
-            false)),
+          spec -> spec.recipe(new RemoveMethodThrows("A foo(..)", false, "*"
+          )),
           //language=java
           java(
             """
