@@ -450,8 +450,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
     public J visitShebang(JS.Shebang shebang, P p) {
         JS.Shebang s = shebang;
         s = s.withPrefix(visitSpace(s.getPrefix(), JsSpace.Location.SHEBANG_PREFIX, p));
-        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        return s;
+        return s.withMarkers(visitMarkers(s.getMarkers(), p));
     }
 
     public J visitStatementExpression(JS.StatementExpression expression, P p) {
