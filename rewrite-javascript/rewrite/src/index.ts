@@ -38,11 +38,14 @@ export async function activate(registry: RecipeRegistry): Promise<void> {
     const {OrderImports} = await import("./recipe/index.js");
     const {ModernizeOctalEscapeSequences, ModernizeOctalLiterals, RemoveDuplicateObjectKeys} = await import("./javascript/migrate/es6/index.js");
     const {ExportAssignmentToExportDefault} = await import("./javascript/migrate/typescript/index.js");
+    const {SimplifyObjectBindingProperties} = await import("./javascript/cleanup/index.js");
+
     registry.register(ExportAssignmentToExportDefault);
     registry.register(OrderImports);
     registry.register(ModernizeOctalEscapeSequences);
     registry.register(ModernizeOctalLiterals);
     registry.register(RemoveDuplicateObjectKeys);
+    registry.register(SimplifyObjectBindingProperties);
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
