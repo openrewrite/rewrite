@@ -128,9 +128,10 @@ andExpr
 
 // Primary expression in a predicate
 primaryExpr
-    : functionCall EQUALS stringLiteral       // local-name()='value', text()='value'
-    | attributeTest EQUALS stringLiteral      // @attr='value' or @*='value'
-    | childElementTest EQUALS stringLiteral   // child='value' or *='value'
+    : functionCall EQUALS stringLiteral                // local-name()='value', text()='value'
+    | attributeStep EQUALS stringLiteral               // @attr='value' or @*='value'
+    | relativeLocationPath EQUALS stringLiteral        // bar/baz/text()='value'
+    | childElementTest EQUALS stringLiteral            // child='value' or *='value'
     ;
 
 // XPath function call - unified for both top-level and predicate use
@@ -154,11 +155,6 @@ functionArg
     | relativeLocationPath
     | stringLiteral
     | NUMBER
-    ;
-
-// Attribute test in predicate
-attributeTest
-    : AT (QNAME | WILDCARD)
     ;
 
 // Child element test in predicate

@@ -40,10 +40,10 @@ DOT : '.' ;
 COMMA : ',' ;
 EQUALS : '=' ;
 NOT_EQUALS : '!=' ;
+LTE : '<=' ;  // Must come before LT for proper lexing
+GTE : '>=' ;  // Must come before GT for proper lexing
 LT : '<' ;
 GT : '>' ;
-LTE : '<=' ;
-GTE : '>=' ;
 WILDCARD : '*' ;
 
 // Numbers

@@ -86,22 +86,11 @@ public class XPathMatcher {
     private static class XPathMatcherVisitor extends XPathParserBaseVisitor<Boolean> {
         private final List<Xml.Tag> path;
         private final Cursor cursor;
-        private final boolean startsWithSlash;
-        private final boolean startsWithDoubleSlash;
+        private Xml.@Nullable Tag rootTag;
 
         XPathMatcherVisitor(List<Xml.Tag> path, Cursor cursor) {
             this.path = path;
             this.cursor = cursor;
-            // Path comes in reverse order (current node first, root last)
-            this.startsWithSlash = false;
-            this.startsWithDoubleSlash = false;
-        }
-
-        XPathMatcherVisitor(List<Xml.Tag> path, Cursor cursor, boolean startsWithSlash, boolean startsWithDoubleSlash) {
-            this.path = path;
-            this.cursor = cursor;
-            this.startsWithSlash = startsWithSlash;
-            this.startsWithDoubleSlash = startsWithDoubleSlash;
         }
 
         @Override
@@ -201,15 +190,8 @@ public class XPathMatcher {
          */
         private Object evaluatePathExpression(XPathParser.@Nullable AbsoluteLocationPathContext absPath,
                                               XPathParser.@Nullable RelativeLocationPathContext relPath) {
-            // Find the root of the document from the cursor
-            Cursor rootCursor = cursor;
-            while (rootCursor.getParent() != null && !(rootCursor.getParent().getValue() instanceof Xml.Document)) {
-                rootCursor = rootCursor.getParent();
-            }
-
-            // Get the document or root element
-            Object root = rootCursor.getValue();
-            if (!(root instanceof Xml.Tag)) {
+            Xml.Tag root = getRootTag();
+            if (root == null) {
                 return "";
             }
 
@@ -217,13 +199,31 @@ public class XPathMatcher {
             if (absPath != null || relPath != null) {
                 String pathStr = absPath != null ? absPath.getText() : relPath.getText();
                 // FindTags expects an XPath expression, so we can pass it directly
-                java.util.Set<Xml.Tag> found = FindTags.find((Xml.Tag) root, pathStr);
+                java.util.Set<Xml.Tag> found = FindTags.find(root, pathStr);
                 if (!found.isEmpty()) {
                     // Return the text content of the first matching tag
                     return found.iterator().next().getValue().orElse("");
                 }
             }
             return "";
+        }
+
+        /**
+         * Get the root tag of the document, caching the result for performance.
+         */
+        private Xml.@Nullable Tag getRootTag() {
+            if (rootTag == null) {
+                // Find the root of the document from the cursor
+                Cursor rootCursor = cursor;
+                while (rootCursor.getParent() != null && !(rootCursor.getParent().getValue() instanceof Xml.Document)) {
+                    rootCursor = rootCursor.getParent();
+                }
+                Object root = rootCursor.getValue();
+                if (root instanceof Xml.Tag) {
+                    rootTag = (Xml.Tag) root;
+                }
+            }
+            return rootTag;
         }
 
         /**
@@ -755,8 +755,10 @@ public class XPathMatcher {
 
             if (primaryExpr.functionCall() != null) {
                 return evaluateFunctionCall(primaryExpr.functionCall(), expectedValue, tag, attribute);
-            } else if (primaryExpr.attributeTest() != null) {
-                return evaluateAttributeTest(primaryExpr.attributeTest(), expectedValue, tag);
+            } else if (primaryExpr.attributeStep() != null) {
+                return evaluateAttributeTest(primaryExpr.attributeStep(), expectedValue, tag);
+            } else if (primaryExpr.relativeLocationPath() != null) {
+                return evaluateRelativePathTest(primaryExpr.relativeLocationPath(), expectedValue, tag);
             } else if (primaryExpr.childElementTest() != null) {
                 return evaluateChildElementTest(primaryExpr.childElementTest(), expectedValue, tag);
             }
@@ -830,13 +832,13 @@ public class XPathMatcher {
         /**
          * Evaluate attribute test [@attr='value'] or [@*='value'].
          */
-        private boolean evaluateAttributeTest(XPathParser.AttributeTestContext attrTest, String expectedValue,
+        private boolean evaluateAttributeTest(XPathParser.AttributeStepContext attrStep, String expectedValue,
                                               Xml.@Nullable Tag tag) {
             if (tag == null) {
                 return false;
             }
 
-            String attrName = attrTest.QNAME() != null ? attrTest.QNAME().getText() : "*";
+            String attrName = attrStep.QNAME() != null ? attrStep.QNAME().getText() : "*";
 
             for (Xml.Attribute attr : tag.getAttributes()) {
                 if ("*".equals(attrName) || attr.getKeyAsString().equals(attrName)) {
@@ -861,6 +863,69 @@ public class XPathMatcher {
 
             for (Xml.Tag child : FindTags.find(tag, childName)) {
                 if (child.getValue().map(v -> v.equals(expectedValue)).orElse(false)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Evaluate relative path test within predicate [bar/baz/text()='value'].
+         * This handles path expressions that may end with a node type test like text().
+         */
+        private boolean evaluateRelativePathTest(XPathParser.RelativeLocationPathContext relPath, String expectedValue,
+                                                 Xml.@Nullable Tag tag) {
+            if (tag == null) {
+                return false;
+            }
+
+            List<XPathParser.StepContext> steps = relPath.step();
+            if (steps.isEmpty()) {
+                return false;
+            }
+
+            // Check if last step is a node type test (like text())
+            XPathParser.StepContext lastStep = steps.get(steps.size() - 1);
+            boolean endsWithNodeTypeTest = lastStep.nodeTypeTest() != null;
+
+            // Build the element path (without the final node type test if present)
+            StringBuilder elementPath = new StringBuilder();
+            int elementStepCount = endsWithNodeTypeTest ? steps.size() - 1 : steps.size();
+            List<XPathParser.PathSeparatorContext> separators = relPath.pathSeparator();
+
+            for (int i = 0; i < elementStepCount; i++) {
+                if (i > 0 && i - 1 < separators.size()) {
+                    elementPath.append(separators.get(i - 1).getText());
+                }
+                elementPath.append(steps.get(i).getText());
+            }
+
+            // Find matching elements using the element path
+            java.util.Set<Xml.Tag> matchingTags;
+            if (elementPath.length() > 0) {
+                matchingTags = FindTags.find(tag, elementPath.toString());
+            } else {
+                // No element path means the entire expression is just text() or similar
+                matchingTags = java.util.Collections.singleton(tag);
+            }
+
+            // Check the expected value
+            for (Xml.Tag matchingTag : matchingTags) {
+                String actualValue;
+                if (endsWithNodeTypeTest) {
+                    String nodeTypeName = lastStep.nodeTypeTest().QNAME().getText();
+                    if ("text".equals(nodeTypeName)) {
+                        actualValue = matchingTag.getValue().orElse("");
+                    } else {
+                        // Other node type tests not supported in comparison context
+                        continue;
+                    }
+                } else {
+                    // Direct element value comparison
+                    actualValue = matchingTag.getValue().orElse("");
+                }
+
+                if (actualValue.equals(expectedValue)) {
                     return true;
                 }
             }
