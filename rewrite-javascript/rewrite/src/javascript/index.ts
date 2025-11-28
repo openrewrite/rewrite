@@ -19,6 +19,8 @@ export * from "./assertions";
 export * from "./parser";
 export * from "./style";
 export * from "./markers";
+export * from "./node-resolution-result";
+export * from "./package-json-parser";
 export * from "./preconditions";
 export * from "./templating/index";
 export * from "./method-matcher";

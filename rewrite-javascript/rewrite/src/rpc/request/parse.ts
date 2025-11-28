@@ -15,15 +15,28 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {ExecutionContext} from "../../execution";
-import {ParserInput, Parsers} from "../../parser";
+import {ParserInput, parserInputFile, Parsers, ParserType} from "../../parser";
 import {randomId, UUID} from "../../uuid";
 import {produce} from "immer";
 import {SourceFile} from "../../tree";
 import {withMetrics} from "./metrics";
+import * as path from "path";
 
 export class Parse {
     constructor(private readonly inputs: ParserInput[],
                 private readonly relativeTo?: string) {
+    }
+
+    /**
+     * Determines the parser type based on the file path.
+     */
+    private static getParserType(input: ParserInput): ParserType {
+        const filePath = parserInputFile(input);
+        const fileName = path.basename(filePath);
+        if (fileName === 'package.json') {
+            return "packageJson";
+        }
+        return "javascript";
     }
 
     static handle(connection: rpc.MessageConnection,
@@ -40,7 +53,12 @@ export class Parse {
                         typeof input === 'string' ? input : input.sourcePath
                     ).join(',');
 
-                    const parser = Parsers.createParser("javascript", {
+                    // Derive parser type from the first input's file path
+                    const parserType = request.inputs.length > 0
+                        ? Parse.getParserType(request.inputs[0])
+                        : "javascript";
+
+                    const parser = Parsers.createParser(parserType, {
                         ctx: new ExecutionContext(),
                         relativeTo: request.relativeTo
                     })!;

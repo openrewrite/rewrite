@@ -119,8 +119,25 @@ class ParseJsonReader extends ParserSourceReader {
                 source: parsed.toString(),
                 value: parsed,
             } satisfies Json.Literal as Json.Literal;
+        } else if (typeof parsed === "boolean") {
+            const source = parsed ? "true" : "false";
+            this.cursor += source.length;
+            return {
+                kind: Json.Kind.Literal,
+                ...base,
+                source,
+                value: parsed,
+            } satisfies Json.Literal as Json.Literal;
+        } else if (parsed === null) {
+            this.cursor += 4; // "null".length
+            return {
+                kind: Json.Kind.Literal,
+                ...base,
+                source: "null",
+                value: null,
+            } satisfies Json.Literal as Json.Literal;
         } else {
-            throw new Error(`Unsupported JSON type: ${parsed}`);
+            throw new Error(`Unsupported JSON type: ${typeof parsed}`);
         }
     }
 

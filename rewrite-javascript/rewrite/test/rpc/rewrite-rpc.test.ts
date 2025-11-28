@@ -24,7 +24,8 @@ import {RecipeSpec} from "@openrewrite/rewrite/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
-import {javascript, JavaScriptVisitor, JS, npm, packageJson, typescript} from "@openrewrite/rewrite/javascript";
+import {findNodeResolutionResult, javascript, JavaScriptVisitor, JS, npm, packageJson, typescript} from "@openrewrite/rewrite/javascript";
+import {Json} from "@openrewrite/rewrite/json";
 import {J} from "@openrewrite/rewrite/java";
 import {withDir} from "tmp-promise";
 
@@ -97,6 +98,29 @@ describe("Rewrite RPC", () => {
         expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
         expect(sourceFile.sourcePath).toEqual("hello.js");
         return sourceFile;
+    });
+
+    test("parse package.json with PackageJsonParser", async () => {
+        // Parser type is automatically detected from the file path
+        const sourceFile = (await client.parse([{
+            text: JSON.stringify({
+                name: "test-project",
+                version: "1.0.0",
+                dependencies: {
+                    "lodash": "^4.17.21"
+                }
+            }, null, 2),
+            sourcePath: "package.json"
+        }], Json.Kind.Document))[0];
+        expect(sourceFile.kind).toEqual(Json.Kind.Document);
+        expect(sourceFile.sourcePath).toEqual("package.json");
+        // Check that the NodeResolutionResult marker is attached
+        const marker = findNodeResolutionResult(sourceFile as Json.Document);
+        expect(marker).toBeDefined();
+        expect(marker!.name).toEqual("test-project");
+        expect(marker!.version).toEqual("1.0.0");
+        expect(marker!.dependencies).toHaveLength(1);
+        expect(marker!.dependencies[0].name).toEqual("lodash");
     });
 
     test("getRecipes", async () =>

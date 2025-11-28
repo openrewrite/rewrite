@@ -47,4 +47,21 @@ describe('JSON parsing', () => {
             `
         )
     ));
+
+    test('parses JSON with booleans and null', () => spec.rewriteRun(
+        //language=json
+        json(
+            `
+              {
+                "enabled": true,
+                "disabled": false,
+                "nothing": null,
+                "nested": {
+                  "flag": true,
+                  "empty": null
+                }
+              }
+            `
+        )
+    ));
 });
