@@ -22,6 +22,7 @@ export * from "./markers";
 export * from "./preconditions";
 export * from "./templating/index";
 export * from "./method-matcher";
+export * from "./format";
 
 export * from "./add-import";
 export * from "./remove-import";

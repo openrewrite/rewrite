@@ -156,7 +156,6 @@ public class Environment {
             }
         }
         if (!recipesNotFound.isEmpty()) {
-            @SuppressWarnings("deprecation")
             List<String> suggestions = recipesNotFound.stream()
                     .map(r -> recipesByName.keySet().stream()
                             .min(comparingInt(a -> LevenshteinDistance.getDefaultInstance().apply(a, r)))

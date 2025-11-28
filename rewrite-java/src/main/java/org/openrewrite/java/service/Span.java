@@ -13,9 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NullMarked
-@NonNullFields
-package org.openrewrite.javascript.marketplace;
+package org.openrewrite.java.service;
 
-import org.jspecify.annotations.NullMarked;
-import org.openrewrite.internal.lang.NonNullFields;
+import lombok.Builder;
+import lombok.Value;
+
+/**
+ * Tracks the beginning and ending of a given LST element in source code
+ */
+@Value
+@Builder
+public class Span {
+    int startLine;
+    int startColumn;
+    int endLine;
+    int endColumn;
+    int maxColumn;
+}

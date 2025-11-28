@@ -158,7 +158,7 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     }
 
     public async visitSpace(space: Json.Space, q: RpcReceiveQueue): Promise<Json.Space> {
-        return produceAsync<Json.Space>(space, async draft => {
+        return (await produceAsync<Json.Space>(space, async draft => {
             draft.comments = await q.receiveListDefined(space.comments, async c => {
                 return await produceAsync(c, async draft => {
                     draft.multiline = await q.receive(c.multiline);
@@ -168,7 +168,7 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
                 })
             });
             draft.whitespace = await q.receive(space.whitespace);
-        });
+        }))!;
     }
 
     public async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: RpcReceiveQueue): Promise<Json.RightPadded<T> | undefined> {

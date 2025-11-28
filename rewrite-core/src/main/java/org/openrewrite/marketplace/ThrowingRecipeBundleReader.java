@@ -15,23 +15,35 @@
  */
 package org.openrewrite.marketplace;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
+import org.openrewrite.Recipe;
+import org.openrewrite.config.RecipeDescriptor;
 
-import java.net.URI;
-import java.util.Properties;
+import java.util.Map;
 
 @RequiredArgsConstructor
-public class YamlRecipeBundleLoader implements RecipeBundleLoader {
-    private final Properties properties;
+public class ThrowingRecipeBundleReader implements RecipeBundleReader {
+    private final @Getter RecipeBundle bundle;
+    private final RuntimeException t;
 
     @Override
-    public String getEcosystem() {
-        return "yaml";
+    public RecipeMarketplace read() {
+        throw t;
     }
 
     @Override
-    public @Nullable RecipeBundle createBundle(String packageName, String version, @Nullable String team) {
-        return new YamlRecipeBundle(URI.create(packageName), version, properties, team);
+    public RecipeDescriptor describe(RecipeListing listing) {
+        throw t;
+    }
+
+    @Override
+    public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+        throw t;
+    }
+
+    @Override
+    public ClassLoader classLoader() {
+        throw t;
     }
 }

@@ -232,7 +232,7 @@ export class TypeVisitor<P> {
         recipe?: (draft: Draft<T>) =>
             ValidImmerRecipeReturnType<Draft<T>> |
             PromiseLike<ValidImmerRecipeReturnType<Draft<T>>>
-    ): Promise<T> {
+    ): Promise<T | undefined> {
         if (recipe) {
             return produceAsync<T>(before, recipe);
         }

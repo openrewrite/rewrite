@@ -54,7 +54,8 @@ describe('variadic marker attachment', () => {
 
         // Pattern should have the captures array
         expect(pat.captures).toHaveLength(1);
-        expect(pat.captures[0].getName()).toBe('args');
-        expect(pat.captures[0].isVariadic()).toBe(true);
+        const firstCapture = pat.captures[0] as typeof args;
+        expect(firstCapture.getName()).toBe('args');
+        expect(firstCapture.isVariadic()).toBe(true);
     });
 });
