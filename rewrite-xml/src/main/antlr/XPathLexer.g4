@@ -27,6 +27,7 @@ WS : [ \t\r\n]+ -> skip ;
 // Path separators
 SLASH : '/' ;
 DOUBLE_SLASH : '//' ;
+AXIS_SEP : '::' ;
 
 // Brackets
 LBRACKET : '[' ;
@@ -36,6 +37,7 @@ RPAREN : ')' ;
 
 // Operators
 AT : '@' ;
+DOTDOT : '..' ;  // Must come before DOT for proper lexing
 DOT : '.' ;
 COMMA : ',' ;
 EQUALS : '=' ;
@@ -65,12 +67,16 @@ STRING_LITERAL
 
 // NCName (Non-Colonized Name) - XML name without colons
 // QName (Qualified Name) - NCName with optional prefix
-// We use a combined rule that allows optional namespace prefix
+// QNAME must come before NCNAME to match longer token first
 QNAME
-    : NCNAME (':' NCNAME)?
+    : NCNAME_CHARS ':' NCNAME_CHARS
     ;
 
-fragment NCNAME
+NCNAME
+    : NCNAME_CHARS
+    ;
+
+fragment NCNAME_CHARS
     : NAME_START_CHAR NAME_CHAR*
     ;
 

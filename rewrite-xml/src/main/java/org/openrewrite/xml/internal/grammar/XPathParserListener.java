@@ -33,6 +33,16 @@ public interface XPathParserListener extends ParseTreeListener {
 	 */
 	void exitXpathExpression(XPathParser.XpathExpressionContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link XPathParser#filterExpr}.
+	 * @param ctx the parse tree
+	 */
+	void enterFilterExpr(XPathParser.FilterExprContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XPathParser#filterExpr}.
+	 * @param ctx the parse tree
+	 */
+	void exitFilterExpr(XPathParser.FilterExprContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link XPathParser#booleanExpr}.
 	 * @param ctx the parse tree
 	 */
@@ -102,6 +112,36 @@ public interface XPathParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitStep(XPathParser.StepContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XPathParser#axisStep}.
+	 * @param ctx the parse tree
+	 */
+	void enterAxisStep(XPathParser.AxisStepContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XPathParser#axisStep}.
+	 * @param ctx the parse tree
+	 */
+	void exitAxisStep(XPathParser.AxisStepContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XPathParser#axisName}.
+	 * @param ctx the parse tree
+	 */
+	void enterAxisName(XPathParser.AxisNameContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XPathParser#axisName}.
+	 * @param ctx the parse tree
+	 */
+	void exitAxisName(XPathParser.AxisNameContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XPathParser#abbreviatedStep}.
+	 * @param ctx the parse tree
+	 */
+	void enterAbbreviatedStep(XPathParser.AbbreviatedStepContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XPathParser#abbreviatedStep}.
+	 * @param ctx the parse tree
+	 */
+	void exitAbbreviatedStep(XPathParser.AbbreviatedStepContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link XPathParser#nodeTypeTest}.
 	 * @param ctx the parse tree

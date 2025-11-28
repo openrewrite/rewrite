@@ -27,11 +27,14 @@
  * - Predicates with conditions: /root/element[@attr='value']
  * - Child element predicates: /root/element[child='value']
  * - Positional predicates: /root/element[1], /root/element[last()]
+ * - Parenthesized expressions with predicates: (/root/element)[1], (/root/a)[last()]
  * - XPath functions: local-name(), namespace-uri(), text(), contains(), position(), last(), etc.
  * - Logical operators in predicates: and, or
  * - Multiple predicates: /root/element[@attr='value'][local-name()='element']
  * - Top-level function expressions: contains(/root/element, 'value')
  * - Boolean expressions: not(contains(...)), string-length(...) > 2
+ * - Abbreviated syntax: . (self), .. (parent)
+ * - Parent axis: parent::node(), parent::element
  */
 parser grammar XPathParser;
 
@@ -40,8 +43,14 @@ options { tokenVocab=XPathLexer; }
 // Entry point for XPath expression
 xpathExpression
     : booleanExpr
+    | filterExpr
     | absoluteLocationPath
     | relativeLocationPath
+    ;
+
+// Filter expression - parenthesized path with predicates and optional trailing path: (/root/a)[1]/child
+filterExpr
+    : LPAREN (absoluteLocationPath | relativeLocationPath) RPAREN predicate+ (pathSeparator relativeLocationPath)?
     ;
 
 // Boolean expression (function calls with optional comparison)
@@ -85,25 +94,44 @@ pathSeparator
 
 // A single step in the path
 step
-    : nodeTest predicate*
+    : axisStep predicate*
+    | nodeTest predicate*
     | attributeStep predicate*
     | nodeTypeTest
+    | abbreviatedStep
+    ;
+
+// Axis step - explicit axis like parent::node()
+axisStep
+    : axisName AXIS_SEP nodeTest
+    ;
+
+// Supported axis names (NCName - no namespace prefix)
+axisName
+    : NCNAME  // parent, ancestor, self, child, etc. - validated at runtime
+    ;
+
+// Abbreviated step - . or ..
+abbreviatedStep
+    : DOTDOT    // parent::node()
+    | DOT       // self::node()
     ;
 
 // Node type test - text(), comment(), node(), processing-instruction()
 // Validation of which functions are valid node type tests happens at runtime
 nodeTypeTest
-    : QNAME LPAREN RPAREN
+    : NCNAME LPAREN RPAREN
     ;
 
-// Attribute step (@attr or @*)
+// Attribute step (@attr, @ns:attr, or @*)
 attributeStep
-    : AT (QNAME | WILDCARD)
+    : AT (QNAME | NCNAME | WILDCARD)
     ;
 
-// Node test (element name or wildcard)
+// Node test (element name, ns:element, or wildcard)
 nodeTest
     : QNAME
+    | NCNAME
     | WILDCARD
     ;
 
@@ -143,10 +171,11 @@ predicateValue
     ;
 
 // XPath function call - unified for both top-level and predicate use
+// Function names are NCNames (no namespace prefix in standard XPath 1.0)
 functionCall
     : LOCAL_NAME LPAREN RPAREN
     | NAMESPACE_URI LPAREN RPAREN
-    | QNAME LPAREN functionArgs? RPAREN
+    | NCNAME LPAREN functionArgs? RPAREN
     ;
 
 // Function arguments (comma-separated)
@@ -165,9 +194,10 @@ functionArg
     | NUMBER
     ;
 
-// Child element test in predicate
+// Child element test in predicate (element name, ns:element, or wildcard)
 childElementTest
     : QNAME
+    | NCNAME
     | WILDCARD
     ;
 

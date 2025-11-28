@@ -32,6 +32,12 @@ public interface XPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitXpathExpression(XPathParser.XpathExpressionContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link XPathParser#filterExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitFilterExpr(XPathParser.FilterExprContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link XPathParser#booleanExpr}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -73,6 +79,24 @@ public interface XPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitStep(XPathParser.StepContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#axisStep}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitAxisStep(XPathParser.AxisStepContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#axisName}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitAxisName(XPathParser.AxisNameContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#abbreviatedStep}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitAbbreviatedStep(XPathParser.AbbreviatedStepContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link XPathParser#nodeTypeTest}.
 	 * @param ctx the parse tree

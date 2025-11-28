@@ -703,4 +703,67 @@ class XPathMatcherTest {
         assertThat(match("/dependencies/dependency[2]/artifactId[@scope='test']", xmlDoc)).isTrue();
         assertThat(match("/dependencies/dependency[1]/artifactId[@scope='test']", xmlDoc)).isFalse();
     }
+
+    @Test
+    void matchParenthesizedPathExpressions() {
+        // Parenthesized path expressions apply predicates to the entire result set
+        // (/dependencies/dependency)[1] - first dependency from the entire document
+        assertThat(match("(/dependencies/dependency)[1]", xmlDoc)).isTrue();
+        assertThat(match("(/dependencies/dependency)[2]", xmlDoc)).isTrue();
+        assertThat(match("(/dependencies/dependency)[3]", xmlDoc)).isFalse();
+
+        // (/dependencies/dependency)[last()] - last dependency
+        assertThat(match("(/dependencies/dependency)[last()]", xmlDoc)).isTrue();
+
+        // With position() function
+        assertThat(match("(/dependencies/dependency)[position()=1]", xmlDoc)).isTrue();
+        assertThat(match("(/dependencies/dependency)[position()=2]", xmlDoc)).isTrue();
+
+        // Descendant axis in parenthesized expression
+        assertThat(match("(//dependency)[1]", xmlDoc)).isTrue();
+        assertThat(match("(//dependency)[last()]", xmlDoc)).isTrue();
+    }
+
+    @Test
+    void matchAdvancedFilterExpressions() {
+        // (/path/expr)[predicate]/trailing - filter expression with trailing path
+        assertThat(match("(/project/build/plugins/plugin)[1]/groupId", pomXml1)).isTrue();
+        assertThat(match("(/project/build/plugins/plugin)[1]/artifactId", pomXml1)).isTrue();
+        assertThat(match("(/project/build/plugins/plugin)[1]/configuration", pomXml1)).isTrue();
+        assertThat(match("(/project/build/plugins/plugin)[1]/configuration/source", pomXml1)).isTrue();
+
+        // Test with attribute access in trailing path (not yet supported)
+        // assertThat(match("(/dependencies/dependency)[1]/artifactId/@scope", xmlDoc)).isTrue();
+    }
+
+    @Test
+    void matchAbbreviatedSyntax() {
+        // . means self (current node)
+        assertThat(match("/dependencies/./dependency", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency/.", xmlDoc)).isTrue();
+
+        // .. means parent
+        assertThat(match("/dependencies/dependency/groupId/..", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency/groupId/../artifactId", xmlDoc)).isTrue();
+
+        // Multiple parent references
+        assertThat(match("/dependencies/dependency/groupId/../../dependency", xmlDoc)).isTrue();
+    }
+
+    @Test
+    void matchParentAxis() {
+        // parent::node() - explicit parent axis with node() test
+        assertThat(match("/dependencies/dependency/groupId/parent::node()", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency/groupId/parent::dependency", xmlDoc)).isTrue();
+
+        // parent with specific element name
+        assertThat(match("/dependencies/dependency/parent::dependencies", xmlDoc)).isTrue();
+
+        // self::node() - explicit self axis
+        assertThat(match("/dependencies/self::node()", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/self::dependencies", xmlDoc)).isTrue();
+
+        // Combined with other path steps
+        assertThat(match("/dependencies/dependency/groupId/parent::dependency/artifactId", xmlDoc)).isTrue();
+    }
 }

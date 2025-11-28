@@ -99,12 +99,104 @@ public class XPathMatcher {
         public Boolean visitXpathExpression(XPathParser.XpathExpressionContext ctx) {
             if (ctx.booleanExpr() != null) {
                 return visitBooleanExpr(ctx.booleanExpr());
+            } else if (ctx.filterExpr() != null) {
+                return visitFilterExpr(ctx.filterExpr());
             } else if (ctx.absoluteLocationPath() != null) {
                 return visitAbsoluteLocationPath(ctx.absoluteLocationPath());
             } else if (ctx.relativeLocationPath() != null) {
                 return visitRelativeLocationPathFromStart(ctx.relativeLocationPath(), false, false);
             }
             return false;
+        }
+
+        /**
+         * Visit filter expression: (/path/expr)[predicate] or (/path/expr)[predicate]/trailing
+         * This collects all matching nodes first, then applies predicates to the result set.
+         * If there's a trailing path after the predicates, it continues matching from the filtered nodes.
+         */
+        public Boolean visitFilterExpr(XPathParser.FilterExprContext ctx) {
+            // Get the path expression (absolute or relative) - first one is inside parentheses
+            String pathExpr;
+            if (ctx.absoluteLocationPath() != null) {
+                pathExpr = ctx.absoluteLocationPath().getText();
+            } else if (!ctx.relativeLocationPath().isEmpty()) {
+                // First relativeLocationPath is inside the parentheses
+                pathExpr = ctx.relativeLocationPath(0).getText();
+            } else {
+                return false;
+            }
+
+            // Find all matching nodes in the document
+            Xml.Tag root = getRootTag();
+            if (root == null) {
+                return false;
+            }
+
+            Set<Xml.Tag> allMatches = findChildTags(root, pathExpr);
+            if (allMatches.isEmpty()) {
+                return false;
+            }
+
+            // Convert to list for positional access
+            List<Xml.Tag> matchList = new ArrayList<>(allMatches);
+
+            // Apply predicates to filter the result set
+            List<Xml.Tag> filteredMatches = new ArrayList<>();
+            int size = matchList.size();
+            for (int i = 0; i < matchList.size(); i++) {
+                Xml.Tag tag = matchList.get(i);
+                int position = i + 1; // 1-based
+                boolean allPredicatesMatch = true;
+                for (XPathParser.PredicateContext predicate : ctx.predicate()) {
+                    if (!evaluatePredicate(predicate, tag, position, size)) {
+                        allPredicatesMatch = false;
+                        break;
+                    }
+                }
+                if (allPredicatesMatch) {
+                    filteredMatches.add(tag);
+                }
+            }
+
+            if (filteredMatches.isEmpty()) {
+                return false;
+            }
+
+            // Check if there's a trailing path after the predicates: (/foo/bar)[1]/baz
+            // The second relativeLocationPath (index 1) would be the trailing path
+            boolean hasTrailingPath = ctx.pathSeparator() != null && ctx.relativeLocationPath().size() > 1;
+
+            if (hasTrailingPath) {
+                // Get the trailing path
+                XPathParser.RelativeLocationPathContext trailingPath = ctx.relativeLocationPath(1);
+                String trailingPathExpr = trailingPath.getText();
+                boolean isDescendant = ctx.pathSeparator().DOUBLE_SLASH() != null;
+
+                // From the filtered matches, find children matching the trailing path
+                Set<Xml.Tag> trailingMatches = new LinkedHashSet<>();
+                for (Xml.Tag filteredTag : filteredMatches) {
+                    if (isDescendant) {
+                        // FIXME: Descendant axis in trailing path not fully implemented yet
+                        findDescendants(filteredTag, trailingPathExpr, trailingMatches);
+                    } else {
+                        trailingMatches.addAll(findChildTags(filteredTag, trailingPathExpr));
+                    }
+                }
+
+                // Check if current cursor is on one of the trailing matches
+                Xml.Tag currentTag = null;
+                if (cursor.getValue() instanceof Xml.Tag) {
+                    currentTag = cursor.getValue();
+                }
+                return currentTag != null && trailingMatches.contains(currentTag);
+            } else {
+                // No trailing path - check if cursor is on one of the filtered matches
+                Xml.Tag currentTag = null;
+                if (cursor.getValue() instanceof Xml.Tag) {
+                    currentTag = cursor.getValue();
+                }
+                return currentTag != null && filteredMatches.contains(currentTag);
+            }
         }
 
         @Override
@@ -141,8 +233,8 @@ public class XPathMatcher {
                 funcName = "local-name";
             } else if (funcCall.NAMESPACE_URI() != null) {
                 funcName = "namespace-uri";
-            } else if (funcCall.QNAME() != null) {
-                funcName = funcCall.QNAME().getText();
+            } else if (funcCall.NCNAME() != null) {
+                funcName = funcCall.NCNAME().getText();
             } else {
                 return null;
             }
@@ -242,7 +334,7 @@ public class XPathMatcher {
         /**
          * Evaluate comparison between two values.
          */
-        private boolean evaluateComparison(Object left, XPathParser.ComparisonOpContext op, Object right) {
+        private boolean evaluateComparison(@Nullable Object left, XPathParser.ComparisonOpContext op, @Nullable Object right) {
             if (left == null || right == null) {
                 return false;
             }
@@ -436,21 +528,27 @@ public class XPathMatcher {
             List<Xml.Tag> orderedPath = new ArrayList<>(path);
             reverse(orderedPath);
 
-            // Count how many steps match elements (not attributes or node type tests)
-            long elementSteps = steps.stream()
-                    .filter(s -> s.step.nodeTest() != null)
-                    .count();
-
-            // Check if we have a descendant-or-self axis (//) anywhere
+            // Check if we have special step types that affect path traversal
             boolean hasDescendant = steps.stream().anyMatch(s -> s.isDescendant);
+            boolean hasAbbreviatedStep = steps.stream().anyMatch(s -> s.step.abbreviatedStep() != null);
+            boolean hasAxisStep = steps.stream().anyMatch(s -> s.step.axisStep() != null);
+            boolean hasAttributeStep = steps.stream().anyMatch(s -> s.step.attributeStep() != null);
+            boolean hasNodeTypeTest = steps.stream().anyMatch(s -> s.step.nodeTypeTest() != null);
 
             if (hasDescendant) {
                 return matchWithDescendant(steps, orderedPath);
             }
 
-            // Check for special step types that don't add to element count
-            boolean hasAttributeStep = steps.stream().anyMatch(s -> s.step.attributeStep() != null);
-            boolean hasNodeTypeTest = steps.stream().anyMatch(s -> s.step.nodeTypeTest() != null);
+            // If we have abbreviated steps (..) or axis steps (parent::) that can move backwards,
+            // we can't do simple path length validation - just try to match
+            if (hasAbbreviatedStep || hasAxisStep) {
+                return matchStepsAgainstPath(steps, orderedPath, 0);
+            }
+
+            // Count how many steps match elements (not attributes or node type tests)
+            long elementSteps = steps.stream()
+                    .filter(s -> s.step.nodeTest() != null)
+                    .count();
 
             // For strict absolute paths, verify path length matches for element steps
             // (attribute step and node type tests don't add to path length)
@@ -563,9 +661,90 @@ public class XPathMatcher {
         private boolean matchStepsAgainstPath(List<StepInfo> steps, List<Xml.Tag> orderedPath, int pathStartIdx) {
             int pathIdx = pathStartIdx;
 
+            // Track whether we did a virtual sibling check (element exists but wasn't in cursor path)
+            boolean didSiblingCheck = false;
+
             for (int i = 0; i < steps.size(); i++) {
                 StepInfo stepInfo = steps.get(i);
                 XPathParser.StepContext step = stepInfo.step;
+
+                // Handle abbreviated step (. or ..)
+                if (step.abbreviatedStep() != null) {
+                    if (step.abbreviatedStep().DOTDOT() != null) {
+                        // .. means parent - move backwards in the path
+                        if (didSiblingCheck) {
+                            // Previous step was a sibling check, so we're already conceptually at parent level
+                            // The .. just confirms we want to stay at the current path position
+                            didSiblingCheck = false;
+                            // Don't decrement pathIdx
+                        } else {
+                            // If we've already gone past the cursor's current position, clamp
+                            if (pathIdx > orderedPath.size()) {
+                                pathIdx = orderedPath.size();
+                            }
+                            if (pathIdx <= 0) {
+                                return false; // No parent available
+                            }
+                            pathIdx--; // Move to parent
+                        }
+                    }
+                    // . means self - stay at current position (no-op)
+                    continue;
+                }
+
+                // Handle axis step (parent::node(), etc.)
+                if (step.axisStep() != null) {
+                    String axisName = step.axisStep().axisName().NCNAME().getText();
+                    String nodeTestName = getNodeTestName(step.axisStep().nodeTest());
+
+                    if ("parent".equals(axisName)) {
+                        // parent axis - move backwards in the path
+                        if (didSiblingCheck) {
+                            // Previous step was a sibling check, so we're already at parent level
+                            didSiblingCheck = false;
+                            // Don't decrement pathIdx, just verify the parent matches the node test
+                            if (pathIdx > 0) {
+                                Xml.Tag parentTag = orderedPath.get(pathIdx - 1);
+                                if (!"*".equals(nodeTestName) && !"node".equals(nodeTestName) &&
+                                        !parentTag.getName().equals(nodeTestName)) {
+                                    return false;
+                                }
+                            }
+                            continue;
+                        }
+                        if (pathIdx <= 0) {
+                            return false; // No parent available
+                        }
+                        pathIdx--; // Move to parent
+                        // Verify the parent matches the node test
+                        Xml.Tag parentTag = orderedPath.get(pathIdx);
+                        if (!"*".equals(nodeTestName) && !"node".equals(nodeTestName) &&
+                                !parentTag.getName().equals(nodeTestName)) {
+                            return false;
+                        }
+                    } else if ("self".equals(axisName)) {
+                        // self axis - verify current context node matches
+                        // The current context is the node we just matched (pathIdx - 1)
+                        int contextIdx = pathIdx - 1;
+                        if (contextIdx < 0 || contextIdx >= orderedPath.size()) {
+                            return false;
+                        }
+                        Xml.Tag currentTag = orderedPath.get(contextIdx);
+                        if (!"*".equals(nodeTestName) && !"node".equals(nodeTestName) &&
+                                !currentTag.getName().equals(nodeTestName)) {
+                            return false;
+                        }
+                        // Stay at current position (don't advance)
+                    } else if ("child".equals(axisName)) {
+                        // child axis is the default, handled below with normal element matching
+                        // Fall through to normal step handling
+                    } else {
+                        // Unsupported axis (ancestor, following, preceding, etc.)
+                        // FIXME: Other axes not yet implemented
+                        return false;
+                    }
+                    continue;
+                }
 
                 // Handle attribute step first (may or may not be descendant)
                 if (step.attributeStep() != null) {
@@ -626,9 +805,53 @@ public class XPathMatcher {
                 } else {
                     // Regular element step
                     if (pathIdx >= orderedPath.size()) {
+                        // We've gone past the cursor position - check if next step moves back up
+                        // This handles patterns like /a/b/c/.. (cursor at /a/b) or /a/b/c/../d (cursor at /a/b/d)
+                        if (i + 1 < steps.size()) {
+                            XPathParser.StepContext nextStep = steps.get(i + 1).step;
+                            boolean isBackTrack = (nextStep.abbreviatedStep() != null && nextStep.abbreviatedStep().DOTDOT() != null) ||
+                                    (nextStep.axisStep() != null && "parent".equals(nextStep.axisStep().axisName().NCNAME().getText()));
+
+                            if (isBackTrack) {
+                                // Pattern is going "up" after this step, so verify the element exists
+                                // The parent is at orderedPath[pathIdx - 1]
+                                if (pathIdx <= 0) {
+                                    return false;
+                                }
+                                Xml.Tag parent = orderedPath.get(pathIdx - 1);
+                                String expectedChild = step.nodeTest() != null ? getNodeTestName(step.nodeTest()) : "*";
+                                if (!childExists(parent, expectedChild)) {
+                                    return false;
+                                }
+                                // Don't advance pathIdx - the .. will handle moving back
+                                // But we need to mark that we've "visited" this virtual position
+                                // Actually, we stay at pathIdx because the .. will not change it
+                                // (it would move back, but we're already at the right level)
+                                continue;
+                            }
+                        }
                         return false;
                     }
                     if (!matchStep(stepInfo, orderedPath.get(pathIdx), position, size)) {
+                        // Element doesn't match - but check if next step is .. or parent::
+                        // In that case, we may be at a sibling position and need to verify the sibling exists
+                        if (i + 1 < steps.size()) {
+                            XPathParser.StepContext nextStep = steps.get(i + 1).step;
+                            boolean isBackTrack = (nextStep.abbreviatedStep() != null && nextStep.abbreviatedStep().DOTDOT() != null) ||
+                                    (nextStep.axisStep() != null && "parent".equals(nextStep.axisStep().axisName().NCNAME().getText()));
+
+                            if (isBackTrack && pathIdx > 0) {
+                                // Check if expected element exists as sibling (child of parent)
+                                Xml.Tag parent = orderedPath.get(pathIdx - 1);
+                                String expectedChild = step.nodeTest() != null ? getNodeTestName(step.nodeTest()) : "*";
+                                if (childExists(parent, expectedChild)) {
+                                    // Element exists as sibling - continue without advancing
+                                    // Mark that we did a sibling check so the .. won't decrement pathIdx
+                                    didSiblingCheck = true;
+                                    continue;
+                                }
+                            }
+                        }
                         return false;
                     }
                     pathIdx++;
@@ -637,9 +860,12 @@ public class XPathMatcher {
 
             // For element paths, verify we've used the entire path
             boolean hasAttributeStep = steps.stream().anyMatch(s -> s.step.attributeStep() != null);
-            if (!hasAttributeStep) {
+            boolean hasAbbreviatedStep = steps.stream().anyMatch(s -> s.step.abbreviatedStep() != null);
+            boolean hasAxisStep = steps.stream().anyMatch(s -> s.step.axisStep() != null);
+            if (!hasAttributeStep && !hasAbbreviatedStep && !hasAxisStep) {
                 return pathIdx == orderedPath.size();
             }
+            // With abbreviated/axis steps, the path index may have moved around
             return true;
         }
 
@@ -703,7 +929,7 @@ public class XPathMatcher {
          */
         private boolean matchNodeTypeTest(XPathParser.NodeTypeTestContext nodeTypeTest,
                                           int pathIdx, List<Xml.Tag> orderedPath) {
-            String functionName = nodeTypeTest.QNAME().getText();
+            String functionName = nodeTypeTest.NCNAME().getText();
 
             switch (functionName) {
                 case "text":
@@ -748,7 +974,7 @@ public class XPathMatcher {
             }
 
             Xml.Attribute attribute = cursor.getValue();
-            String attrName = attrStep.QNAME() != null ? attrStep.QNAME().getText() : "*";
+            String attrName = getAttributeStepName(attrStep);
 
             // Check attribute name
             if (!"*".equals(attrName) && !attribute.getKeyAsString().equals(attrName)) {
@@ -879,8 +1105,8 @@ public class XPathMatcher {
                 funcName = "local-name";
             } else if (funcCall.NAMESPACE_URI() != null) {
                 funcName = "namespace-uri";
-            } else if (funcCall.QNAME() != null) {
-                funcName = funcCall.QNAME().getText();
+            } else if (funcCall.NCNAME() != null) {
+                funcName = funcCall.NCNAME().getText();
             } else {
                 return null;
             }
@@ -938,7 +1164,7 @@ public class XPathMatcher {
             if (tag == null) {
                 return null;
             }
-            String attrName = attrStep.QNAME() != null ? attrStep.QNAME().getText() : "*";
+            String attrName = getAttributeStepName(attrStep);
             for (Xml.Attribute attr : tag.getAttributes()) {
                 if ("*".equals(attrName) || attr.getKeyAsString().equals(attrName)) {
                     return attr.getValueAsString();
@@ -1002,7 +1228,7 @@ public class XPathMatcher {
 
             Xml.Tag matchingTag = matchingTags.iterator().next();
             if (endsWithNodeTypeTest) {
-                String nodeTypeName = lastStep.nodeTypeTest().QNAME().getText();
+                String nodeTypeName = lastStep.nodeTypeTest().NCNAME().getText();
                 if ("text".equals(nodeTypeName)) {
                     return matchingTag.getValue().orElse("");
                 }
@@ -1019,7 +1245,7 @@ public class XPathMatcher {
             if (tag == null) {
                 return null;
             }
-            String childName = childTest.QNAME() != null ? childTest.QNAME().getText() : "*";
+            String childName = getChildElementTestName(childTest);
             for (Xml.Tag child : findDirectChildren(tag, childName)) {
                 return child.getValue().orElse("");
             }
@@ -1031,14 +1257,14 @@ public class XPathMatcher {
          */
         private boolean evaluateFunctionCall(XPathParser.FunctionCallContext funcCall, String expectedValue,
                                              Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute) {
-            // Get the function name - could be from dedicated tokens or QNAME
+            // Get the function name - could be from dedicated tokens or NCNAME
             String funcName;
             if (funcCall.LOCAL_NAME() != null) {
                 funcName = "local-name";
             } else if (funcCall.NAMESPACE_URI() != null) {
                 funcName = "namespace-uri";
-            } else if (funcCall.QNAME() != null) {
-                funcName = funcCall.QNAME().getText();
+            } else if (funcCall.NCNAME() != null) {
+                funcName = funcCall.NCNAME().getText();
             } else {
                 return false;
             }
@@ -1099,7 +1325,7 @@ public class XPathMatcher {
                 return false;
             }
 
-            String attrName = attrStep.QNAME() != null ? attrStep.QNAME().getText() : "*";
+            String attrName = getAttributeStepName(attrStep);
 
             for (Xml.Attribute attr : tag.getAttributes()) {
                 if ("*".equals(attrName) || attr.getKeyAsString().equals(attrName)) {
@@ -1120,7 +1346,7 @@ public class XPathMatcher {
                 return false;
             }
 
-            String childName = childTest.QNAME() != null ? childTest.QNAME().getText() : "*";
+            String childName = getChildElementTestName(childTest);
 
             for (Xml.Tag child : findDirectChildren(tag, childName)) {
                 if (child.getValue().map(v -> v.equals(expectedValue)).orElse(false)) {
@@ -1174,7 +1400,7 @@ public class XPathMatcher {
             for (Xml.Tag matchingTag : matchingTags) {
                 String actualValue;
                 if (endsWithNodeTypeTest) {
-                    String nodeTypeName = lastStep.nodeTypeTest().QNAME().getText();
+                    String nodeTypeName = lastStep.nodeTypeTest().NCNAME().getText();
                     if ("text".equals(nodeTypeName)) {
                         actualValue = matchingTag.getValue().orElse("");
                     } else {
@@ -1202,6 +1428,45 @@ public class XPathMatcher {
                 return s.substring(1, s.length() - 1);
             }
             return s;
+        }
+
+        /**
+         * Get name from attribute step (handles QNAME, NCNAME, or WILDCARD).
+         */
+        private String getAttributeStepName(XPathParser.AttributeStepContext attrStep) {
+            if (attrStep.QNAME() != null) {
+                return attrStep.QNAME().getText();
+            } else if (attrStep.NCNAME() != null) {
+                return attrStep.NCNAME().getText();
+            } else {
+                return "*";
+            }
+        }
+
+        /**
+         * Get name from node test (handles QNAME, NCNAME, or WILDCARD).
+         */
+        private String getNodeTestName(XPathParser.NodeTestContext nodeTest) {
+            if (nodeTest.QNAME() != null) {
+                return nodeTest.QNAME().getText();
+            } else if (nodeTest.NCNAME() != null) {
+                return nodeTest.NCNAME().getText();
+            } else {
+                return "*";
+            }
+        }
+
+        /**
+         * Get name from child element test (handles QNAME, NCNAME, or WILDCARD).
+         */
+        private String getChildElementTestName(XPathParser.ChildElementTestContext childTest) {
+            if (childTest.QNAME() != null) {
+                return childTest.QNAME().getText();
+            } else if (childTest.NCNAME() != null) {
+                return childTest.NCNAME().getText();
+            } else {
+                return "*";
+            }
         }
 
         /**
@@ -1292,6 +1557,25 @@ public class XPathMatcher {
                     }
                 }
             }
+        }
+
+        /**
+         * Check if a tag has a child with the given name.
+         */
+        private boolean childExists(Xml.Tag parent, String childName) {
+            List<? extends Content> contents = parent.getContent();
+            if (contents == null) {
+                return false;
+            }
+            for (Content content : contents) {
+                if (content instanceof Xml.Tag) {
+                    Xml.Tag child = (Xml.Tag) content;
+                    if ("*".equals(childName) || child.getName().equals(childName)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         /**

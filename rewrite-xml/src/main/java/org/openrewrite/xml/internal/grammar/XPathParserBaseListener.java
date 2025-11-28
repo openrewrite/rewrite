@@ -44,6 +44,18 @@ public class XPathParserBaseListener implements XPathParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterFilterExpr(XPathParser.FilterExprContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitFilterExpr(XPathParser.FilterExprContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterBooleanExpr(XPathParser.BooleanExprContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -123,6 +135,42 @@ public class XPathParserBaseListener implements XPathParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitStep(XPathParser.StepContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterAxisStep(XPathParser.AxisStepContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitAxisStep(XPathParser.AxisStepContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterAxisName(XPathParser.AxisNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitAxisName(XPathParser.AxisNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterAbbreviatedStep(XPathParser.AbbreviatedStepContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitAbbreviatedStep(XPathParser.AbbreviatedStepContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
