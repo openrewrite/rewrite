@@ -1748,7 +1748,7 @@ public class GroovyParserVisitor {
                     String value = sourceSubstring(cursor, delimiter.close);
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
-                    while (indexNextSign > 0 && source.charAt(indexNextSign - 1) == '\\') {
+                    while (isEscaped(indexNextSign)) {
                         indexNextSign = source.indexOf("$", indexNextSign + 1);
                     }
                     if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
@@ -2751,7 +2751,7 @@ public class GroovyParserVisitor {
      */
     private boolean isEscaped(int index) {
         int backslashCount = 0;
-        while (index >= 0 && source.charAt(index) == '\\') {
+        while (index > 0 && source.charAt(index - 1) == '\\') {
             backslashCount++;
             index--;
         }
@@ -2763,11 +2763,22 @@ public class GroovyParserVisitor {
      * The cursor will not be moved.
      */
     private String sourceSubstring(int beginIndex, String untilDelim) {
-        int endIndex = source.indexOf(untilDelim, Math.max(beginIndex, cursor + untilDelim.length()));
-        // don't stop if last char is escaped.
-        // Fixed potential infinite loop by correctly handling escaped delimiters in the source string.
-        while (endIndex > 0 && isEscaped(endIndex - 1)) {
+        int fromIndex = Math.max(beginIndex, cursor + untilDelim.length());
+        int endIndex = source.indexOf(untilDelim, fromIndex);
+        if (endIndex < 0) {
+            throw new IllegalArgumentException(
+                "Couldn't find delimiter: " + untilDelim + " with fromIndex: " + fromIndex
+            );
+        }
+        // don't stop if the last char is escaped.
+        // Fixed a potential infinite loop by correctly handling escaped delimiters in the source string.
+        while (isEscaped(endIndex)) {
             endIndex = source.indexOf(untilDelim, endIndex + 1);
+        }
+        if (endIndex < 0) {
+            throw new IllegalArgumentException(
+                "Couldn't find unescaped delimiter: " + untilDelim + " with fromIndex: " + fromIndex
+            );
         }
         return source.substring(beginIndex, endIndex);
     }
