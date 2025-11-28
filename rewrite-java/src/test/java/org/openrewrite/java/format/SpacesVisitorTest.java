@@ -1983,6 +1983,24 @@ class SpacesVisitorTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multilineEnum() {
+        rewriteRun(
+          java(
+            """
+            enum Color {
+                RED,    GREEN, BLUE
+            }
+            """,
+            """
+            enum Color {
+                RED, GREEN, BLUE
+            }
+            """
+          )
+        );
+    }
+
     // ===========================
     // TypeParameters tests
     // ===========================

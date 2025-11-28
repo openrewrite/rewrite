@@ -216,7 +216,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 }.visit((J) classCursor.getValue(), (J.EnumValue) right.getElement());
                 if (classCursor.getMessage("singleLineEnum") == Boolean.TRUE) {
                     if (atomicIndex.get() == 0) {
-                        before = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
+                        before = ""; // goes into the EnumValueSet parent
                     } else if (atomicIndex.get() > 0) {
                         before = evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
                     }
@@ -647,7 +647,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 }
             case ENUM_VALUE_SET_PREFIX:
                 if (getCursor().getNearestMessage("singleLineEnum") == Boolean.TRUE) {
-                    whitespace = "";
+                    whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
                 }
                 break;
             default:
