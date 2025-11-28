@@ -645,6 +645,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 if (!firstAnnotation && space.getWhitespace().isEmpty() && (space.getComments().isEmpty() || space.getComments().get(space.getComments().size() - 1).getSuffix().isEmpty())) {
                     whitespace = " ";
                 }
+            case ENUM_VALUE_SET_PREFIX:
+                if (getCursor().getNearestMessage("singleLineEnum") == Boolean.TRUE) {
+                    whitespace = "";
+                }
+                break;
             default:
                 if (!StringUtils.hasLineBreak(space.getWhitespace()) && !space.getWhitespace().isEmpty()) {
                     whitespace = " ";
