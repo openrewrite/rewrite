@@ -311,15 +311,15 @@ class XPathMatcherTest {
     @Disabled
     void otherUncoveredXpathFunctions() {
         // Other common XPath functions
-       assertThat(match("contains(/root/element1, 'content1')", namespacedXml)).isTrue();
-       assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
-       assertThat(match("string-length(/root/element1) > 2", namespacedXml)).isTrue();
-       assertThat(match("starts-with(/root/element1, 'content1')", namespacedXml)).isTrue();
-       assertThat(match("ends-with(/root/element1, 'content1')", namespacedXml)).isTrue();
-       assertThat(match("substring-before(/root/element1, '1') = 'content'", namespacedXml)).isTrue();
-       assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
-       assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
-       assertThat(match("count(/root/*)", namespacedXml)).isTrue();
+        assertThat(match("contains(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
+        assertThat(match("string-length(/root/element1) > 2", namespacedXml)).isTrue();
+        assertThat(match("starts-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("ends-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("substring-before(/root/element1, '1') = 'content'", namespacedXml)).isTrue();
+        assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
+        assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
+        assertThat(match("count(/root/*)", namespacedXml)).isTrue();
     }
 
     @Test
@@ -421,12 +421,22 @@ class XPathMatcherTest {
             <test>
               <foo>bar</foo>
               <foo>notBar</foo>
+              <foo>
+                <bar>bla</bar>
+              </foo>
+              <foo>
+                <bar>
+                  <baz>bla</baz>
+                </bar>
+              </foo>
               <foo/>
             </test>
             """
         ).toList().getFirst();
 
         // text() predicate should only match element with specific text content
+        assertThat(match("/test/foo[bar/baz/text()='bla']", xml)).isTrue();
+        assertThat(match("/test/foo[bar/text()='bla']", xml)).isTrue();
         assertThat(match("/test/foo[text()='bar']", xml)).isTrue();
         assertThat(match("/test/foo[text()='notBar']", xml)).isTrue();
         assertThat(match("/test/foo[text()='nonexistent']", xml)).isFalse();
