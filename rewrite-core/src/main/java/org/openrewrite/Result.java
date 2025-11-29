@@ -208,6 +208,11 @@ public class Result {
 
     @Incubating(since = "7.34.0")
     public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
+        return diff(relativeTo, markerPrinter, ignoreAllWhitespace, false);
+    }
+
+    @Incubating(since = "8.67.0")
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace, boolean binaryPatch) {
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
         if (before == null && after == null) {
@@ -234,11 +239,12 @@ public class Result {
                 beforePath,
                 afterPath,
                 relativeTo,
-                before == null ? "" : before.printAll(out),
-                after == null ? "" : after.printAll(out.clone()),
+                before == null ? new byte[0] : before.printAllAsBytes(out),
+                after == null ? new byte[0] : after.printAllAsBytes(out.clone()),
                 recipeSet,
                 beforeMode,
-                afterMode
+                afterMode,
+                binaryPatch
         )) {
             return diffEntry.getDiff(ignoreAllWhitespace);
         }

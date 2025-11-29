@@ -3,7 +3,8 @@ plugins {
 }
 
 dependencies {
-    api("org.openrewrite.tools:jgit:latest.release")
+    // TODO: Revert this back to latest.release
+    api("org.openrewrite.tools:jgit:latest.integration")
     implementation("org.openrewrite.tools:java-object-diff:latest.release")
     implementation("io.quarkus.gizmo:gizmo:1.0.+")
     api("com.fasterxml.jackson.core:jackson-core")
