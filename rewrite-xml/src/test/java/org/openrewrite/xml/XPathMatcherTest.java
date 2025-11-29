@@ -15,7 +15,6 @@
  */
 package org.openrewrite.xml;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -308,18 +307,144 @@ class XPathMatcherTest {
     }
 
     @Test
-    @Disabled
-    void otherUncoveredXpathFunctions() {
-        // Other common XPath functions
-       assertThat(match("contains(/root/element1, 'content1')", namespacedXml)).isTrue();
-       assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
-       assertThat(match("string-length(/root/element1) > 2", namespacedXml)).isTrue();
-       assertThat(match("starts-with(/root/element1, 'content1')", namespacedXml)).isTrue();
-       assertThat(match("ends-with(/root/element1, 'content1')", namespacedXml)).isTrue();
-       assertThat(match("substring-before(/root/element1, '1') = 'content'", namespacedXml)).isTrue();
-       assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
-       assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
-       assertThat(match("count(/root/*)", namespacedXml)).isTrue();
+    void matchTextNodeTypeTest() {
+        // text() node type test works in path steps
+        assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
+        assertThat(match("//element1/text()", namespacedXml)).isTrue();
+        assertThat(match("/root/ns2:element2/text()", namespacedXml)).isTrue();
+        // parent has child elements, not direct text content
+        assertThat(match("/root/parent/text()", namespacedXml)).isFalse();
+    }
+
+    @Test
+    void matchContainsFunction() {
+        // Basic contains - positive cases
+        assertThat(match("contains(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("contains(/root/element1, 'content')", namespacedXml)).isTrue();
+        assertThat(match("contains(/root/element1, '1')", namespacedXml)).isTrue();
+        assertThat(match("contains(/root/element1, 'ent')", namespacedXml)).isTrue();
+
+        // Basic contains - negative cases
+        assertThat(match("contains(/root/element1, 'notfound')", namespacedXml)).isFalse();
+        assertThat(match("contains(/root/element1, 'CONTENT1')", namespacedXml)).isFalse(); // case sensitive
+        assertThat(match("contains(/root/element1, '')", namespacedXml)).isTrue(); // empty string is always contained
+
+        // Contains with different elements
+        assertThat(match("contains(/root/ns2:element2, 'content2')", namespacedXml)).isTrue();
+        assertThat(match("contains(/root/parent/element3, 'content3')", namespacedXml)).isTrue();
+
+        // Contains with non-existent path
+        assertThat(match("contains(/root/nonexistent, 'anything')", namespacedXml)).isFalse();
+    }
+
+    @Test
+    void matchNotFunction() {
+        // not() with contains
+        assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
+        assertThat(match("not(contains(/root/element1, 'notfound'))", namespacedXml)).isTrue();
+
+        // not() with starts-with
+        assertThat(match("not(starts-with(/root/element1, 'content'))", namespacedXml)).isFalse();
+        assertThat(match("not(starts-with(/root/element1, 'xyz'))", namespacedXml)).isTrue();
+
+        // Double negation
+        assertThat(match("not(not(contains(/root/element1, 'content1')))", namespacedXml)).isTrue();
+    }
+
+    @Test
+    void matchStringLengthFunction() {
+        // string-length with comparisons
+        assertThat(match("string-length(/root/element1) > 0", namespacedXml)).isTrue();
+        assertThat(match("string-length(/root/element1) > 2", namespacedXml)).isTrue();
+        assertThat(match("string-length(/root/element1) > 100", namespacedXml)).isFalse();
+
+        assertThat(match("string-length(/root/element1) < 100", namespacedXml)).isTrue();
+        assertThat(match("string-length(/root/element1) < 5", namespacedXml)).isFalse();
+
+        assertThat(match("string-length(/root/element1) = 8", namespacedXml)).isTrue(); // "content1" = 8 chars
+        assertThat(match("string-length(/root/element1) = 7", namespacedXml)).isFalse();
+
+        assertThat(match("string-length(/root/element1) >= 8", namespacedXml)).isTrue();
+        assertThat(match("string-length(/root/element1) >= 9", namespacedXml)).isFalse();
+
+        assertThat(match("string-length(/root/element1) <= 8", namespacedXml)).isTrue();
+        assertThat(match("string-length(/root/element1) <= 7", namespacedXml)).isFalse();
+
+        assertThat(match("string-length(/root/element1) != 7", namespacedXml)).isTrue();
+        assertThat(match("string-length(/root/element1) != 8", namespacedXml)).isFalse();
+
+        // string-length of non-existent path
+        assertThat(match("string-length(/root/nonexistent) = 0", namespacedXml)).isTrue();
+    }
+
+    @Test
+    void matchStartsWithFunction() {
+        assertThat(match("starts-with(/root/element1, 'content')", namespacedXml)).isTrue();
+        assertThat(match("starts-with(/root/element1, 'con')", namespacedXml)).isTrue();
+        assertThat(match("starts-with(/root/element1, 'c')", namespacedXml)).isTrue();
+        assertThat(match("starts-with(/root/element1, '')", namespacedXml)).isTrue();
+        assertThat(match("starts-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+
+        assertThat(match("starts-with(/root/element1, 'ontent')", namespacedXml)).isFalse();
+        assertThat(match("starts-with(/root/element1, '1')", namespacedXml)).isFalse();
+        assertThat(match("starts-with(/root/element1, 'Content')", namespacedXml)).isFalse(); // case sensitive
+    }
+
+    @Test
+    void matchEndsWithFunction() {
+        assertThat(match("ends-with(/root/element1, '1')", namespacedXml)).isTrue();
+        assertThat(match("ends-with(/root/element1, 'ent1')", namespacedXml)).isTrue();
+        assertThat(match("ends-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("ends-with(/root/element1, '')", namespacedXml)).isTrue();
+
+        assertThat(match("ends-with(/root/element1, 'content')", namespacedXml)).isFalse();
+        assertThat(match("ends-with(/root/element1, '2')", namespacedXml)).isFalse();
+        assertThat(match("ends-with(/root/element1, 'Content1')", namespacedXml)).isFalse(); // case sensitive
+    }
+
+    @Test
+    void matchSubstringFunctions() {
+        // substring-before
+        assertThat(match("substring-before(/root/element1, '1') = 'content'", namespacedXml)).isTrue();
+        assertThat(match("substring-before(/root/element1, 'tent') = 'con'", namespacedXml)).isTrue();
+        assertThat(match("substring-before(/root/element1, 'c') = ''", namespacedXml)).isTrue(); // nothing before first char
+        assertThat(match("substring-before(/root/element1, 'notfound') = ''", namespacedXml)).isTrue(); // delimiter not found
+
+        // substring-after
+        assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
+        assertThat(match("substring-after(/root/element1, 'con') = 'tent1'", namespacedXml)).isTrue();
+        assertThat(match("substring-after(/root/element1, '1') = ''", namespacedXml)).isTrue(); // nothing after last char
+        assertThat(match("substring-after(/root/element1, 'notfound') = ''", namespacedXml)).isTrue(); // delimiter not found
+    }
+
+    @Test
+    void matchCountFunction() {
+        // TODO: count() with wildcard paths like count(/root/*) requires special handling
+        // to count all matching nodes rather than evaluating path to text content.
+        // For now, count() with a path that has text content returns 1 (truthy)
+        assertThat(match("count(/root/element1)", namespacedXml)).isTrue(); // has content, so count >= 1
+        assertThat(match("count(/root/element1) > 0", namespacedXml)).isTrue();
+
+        // count of non-existent returns 0
+        assertThat(match("count(/root/nonexistent) = 0", namespacedXml)).isTrue();
+    }
+
+    @Test
+    void matchNestedFunctionCalls() {
+        // Nested function calls
+        assertThat(match("not(not(contains(/root/element1, 'content1')))", namespacedXml)).isTrue();
+        assertThat(match("not(not(not(contains(/root/element1, 'content1'))))", namespacedXml)).isFalse();
+
+        // contains with substring result
+        assertThat(match("contains(substring-after(/root/element1, 'con'), 'tent')", namespacedXml)).isTrue();
+    }
+
+    @Test
+    void matchFunctionWithDescendantPath() {
+        // Using // descendant axis in function arguments
+        assertThat(match("contains(//element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("contains(//element3, 'content3')", namespacedXml)).isTrue();
+        assertThat(match("string-length(//element1) = 8", namespacedXml)).isTrue();
     }
 
     @Test
@@ -421,12 +546,22 @@ class XPathMatcherTest {
             <test>
               <foo>bar</foo>
               <foo>notBar</foo>
+              <foo>
+                <bar>bla</bar>
+              </foo>
+              <foo>
+                <bar>
+                  <baz>bla</baz>
+                </bar>
+              </foo>
               <foo/>
             </test>
             """
         ).toList().getFirst();
 
         // text() predicate should only match element with specific text content
+        assertThat(match("/test/foo[bar/baz/text()='bla']", xml)).isTrue();
+        assertThat(match("/test/foo[bar/text()='bla']", xml)).isTrue();
         assertThat(match("/test/foo[text()='bar']", xml)).isTrue();
         assertThat(match("/test/foo[text()='notBar']", xml)).isTrue();
         assertThat(match("/test/foo[text()='nonexistent']", xml)).isFalse();
@@ -522,5 +657,113 @@ class XPathMatcherTest {
                 return super.visitAttribute(attribute, ctx);
             }
         }, x, new ArrayList<>()).isEmpty();
+    }
+
+    @Test
+    void matchNodeTypeTests() {
+        // text() node type test - matches elements with text content
+        assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
+        assertThat(match("//element1/text()", namespacedXml)).isTrue();
+        assertThat(match("/root/parent/text()", namespacedXml)).isFalse(); // parent has child elements, not direct text
+    }
+
+    @Test
+    void matchPositionalPredicates() {
+        // xmlDoc has two <dependency> elements under <dependencies>
+        // [1] selects the first dependency
+        assertThat(match("/dependencies/dependency[1]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[2]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[3]", xmlDoc)).isFalse(); // only 2 dependencies
+
+        // [last()] selects the last element
+        assertThat(match("/dependencies/dependency[last()]", xmlDoc)).isTrue();
+
+        // position() function
+        assertThat(match("/dependencies/dependency[position()=1]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()=2]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()=3]", xmlDoc)).isFalse();
+
+        // Combining positional with other predicates
+        // The first dependency has groupId, the second doesn't
+        assertThat(match("/dependencies/dependency[1]/groupId", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[2]/groupId", xmlDoc)).isFalse();
+
+        // position() with comparison operators
+        assertThat(match("/dependencies/dependency[position()>1]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()<2]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()>=1]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[position()<=2]", xmlDoc)).isTrue();
+    }
+
+    @Test
+    void matchPositionalWithOtherConditions() {
+        // Combining positional predicates with attribute/element conditions
+        // First dependency's artifactId has scope="compile", second has scope="test"
+        assertThat(match("/dependencies/dependency[1]/artifactId[@scope='compile']", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[2]/artifactId[@scope='test']", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[1]/artifactId[@scope='test']", xmlDoc)).isFalse();
+    }
+
+    @Test
+    void matchParenthesizedPathExpressions() {
+        // Parenthesized path expressions apply predicates to the entire result set
+        // (/dependencies/dependency)[1] - first dependency from the entire document
+        assertThat(match("(/dependencies/dependency)[1]", xmlDoc)).isTrue();
+        assertThat(match("(/dependencies/dependency)[2]", xmlDoc)).isTrue();
+        assertThat(match("(/dependencies/dependency)[3]", xmlDoc)).isFalse();
+
+        // (/dependencies/dependency)[last()] - last dependency
+        assertThat(match("(/dependencies/dependency)[last()]", xmlDoc)).isTrue();
+
+        // With position() function
+        assertThat(match("(/dependencies/dependency)[position()=1]", xmlDoc)).isTrue();
+        assertThat(match("(/dependencies/dependency)[position()=2]", xmlDoc)).isTrue();
+
+        // Descendant axis in parenthesized expression
+        assertThat(match("(//dependency)[1]", xmlDoc)).isTrue();
+        assertThat(match("(//dependency)[last()]", xmlDoc)).isTrue();
+    }
+
+    @Test
+    void matchAdvancedFilterExpressions() {
+        // (/path/expr)[predicate]/trailing - filter expression with trailing path
+        assertThat(match("(/project/build/plugins/plugin)[1]/groupId", pomXml1)).isTrue();
+        assertThat(match("(/project/build/plugins/plugin)[1]/artifactId", pomXml1)).isTrue();
+        assertThat(match("(/project/build/plugins/plugin)[1]/configuration", pomXml1)).isTrue();
+        assertThat(match("(/project/build/plugins/plugin)[1]/configuration/source", pomXml1)).isTrue();
+
+        // Test with attribute access in trailing path (not yet supported)
+        // assertThat(match("(/dependencies/dependency)[1]/artifactId/@scope", xmlDoc)).isTrue();
+    }
+
+    @Test
+    void matchAbbreviatedSyntax() {
+        // . means self (current node)
+        assertThat(match("/dependencies/./dependency", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency/.", xmlDoc)).isTrue();
+
+        // .. means parent
+        assertThat(match("/dependencies/dependency/groupId/..", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency/groupId/../artifactId", xmlDoc)).isTrue();
+
+        // Multiple parent references
+        assertThat(match("/dependencies/dependency/groupId/../../dependency", xmlDoc)).isTrue();
+    }
+
+    @Test
+    void matchParentAxis() {
+        // parent::node() - explicit parent axis with node() test
+        assertThat(match("/dependencies/dependency/groupId/parent::node()", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency/groupId/parent::dependency", xmlDoc)).isTrue();
+
+        // parent with specific element name
+        assertThat(match("/dependencies/dependency/parent::dependencies", xmlDoc)).isTrue();
+
+        // self::node() - explicit self axis
+        assertThat(match("/dependencies/self::node()", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/self::dependencies", xmlDoc)).isTrue();
+
+        // Combined with other path steps
+        assertThat(match("/dependencies/dependency/groupId/parent::dependency/artifactId", xmlDoc)).isTrue();
     }
 }
