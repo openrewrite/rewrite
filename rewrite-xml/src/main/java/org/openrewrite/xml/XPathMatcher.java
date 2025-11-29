@@ -26,7 +26,10 @@ import org.openrewrite.xml.trait.Namespaced;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.singleton;
 
@@ -50,6 +53,10 @@ public class XPathMatcher {
     private static final int FLAG_HAS_AXIS_STEP = 1 << 4;
     private static final int FLAG_HAS_ATTRIBUTE_STEP = 1 << 5;
     private static final int FLAG_HAS_NODE_TYPE_TEST = 1 << 6;
+    // Combined mask: features that prevent early path length rejection
+    private static final int FLAGS_VARIABLE_PATH_LENGTH =
+            FLAG_HAS_DESCENDANT | FLAG_HAS_ABBREVIATED_STEP | FLAG_HAS_AXIS_STEP |
+            FLAG_HAS_ATTRIBUTE_STEP | FLAG_HAS_NODE_TYPE_TEST;
 
     // Expression type constants
     private static final int EXPR_PATH = 0;           // Simple path (compiled)
@@ -122,9 +129,8 @@ public class XPathMatcher {
         // Fast path: for compiled path expressions, bypass the visitor entirely
         if (exprType == EXPR_PATH && compiledSteps != null) {
             // Early rejection for simple absolute paths: if path length doesn't match expected elements, fail fast
-            // Only applies when there's no descendant axis, backtracking, or other features that affect path length
             if ((stepFlags & FLAG_ABSOLUTE_PATH) != 0 &&
-                (stepFlags & (FLAG_HAS_DESCENDANT | FLAG_HAS_ABBREVIATED_STEP | FLAG_HAS_AXIS_STEP | FLAG_HAS_ATTRIBUTE_STEP | FLAG_HAS_NODE_TYPE_TEST)) == 0 &&
+                (stepFlags & FLAGS_VARIABLE_PATH_LENGTH) == 0 &&
                 pathLength != compiledElementSteps) {
                 return false;
             }
@@ -298,6 +304,7 @@ public class XPathMatcher {
          * This collects all matching nodes first, then applies predicates to the result set.
          * If there's a trailing path after the predicates, it continues matching from the filtered nodes.
          */
+        @Override
         public Boolean visitFilterExpr(XPathParser.FilterExprContext ctx) {
             // Get the path expression (absolute or relative) - first one is inside parentheses
             String pathExpr;
@@ -401,16 +408,13 @@ public class XPathMatcher {
             // For boolean expressions, we need to be more careful about when to "match".
             // Only return true if the boolean result is true AND we're at a relevant position.
             // For simplicity, only match at the root element to avoid multiple matches.
-            if (result && pathLength == 1) {
-                return true;
-            }
-            return false;
+            return result && pathLength == 1;
         }
 
         /**
          * Evaluate a function call expression and return its result.
          */
-        private Object evaluateFunctionCallExpr(XPathParser.FunctionCallContext funcCall) {
+        private @Nullable Object evaluateFunctionCallExpr(XPathParser.FunctionCallContext funcCall) {
             // Get the function name
             String funcName;
             if (funcCall.LOCAL_NAME() != null) {
@@ -423,7 +427,7 @@ public class XPathMatcher {
                 return null;
             }
 
-            List<Object> args = new ArrayList<>();
+            List<@Nullable Object> args = new ArrayList<>();
             if (funcCall.functionArgs() != null) {
                 for (XPathParser.FunctionArgContext arg : funcCall.functionArgs().functionArg()) {
                     args.add(evaluateFunctionArg(arg));
@@ -436,7 +440,7 @@ public class XPathMatcher {
         /**
          * Evaluate a function argument.
          */
-        private Object evaluateFunctionArg(XPathParser.FunctionArgContext arg) {
+        private @Nullable Object evaluateFunctionArg(XPathParser.FunctionArgContext arg) {
             if (arg.absoluteLocationPath() != null) {
                 return evaluatePathExpression(arg.absoluteLocationPath(), null);
             } else if (arg.relativeLocationPath() != null) {
@@ -501,7 +505,7 @@ public class XPathMatcher {
         /**
          * Evaluate the comparand (right side of comparison).
          */
-        private Object evaluateComparand(XPathParser.ComparandContext comparand) {
+        private @Nullable Object evaluateComparand(XPathParser.ComparandContext comparand) {
             if (comparand.stringLiteral() != null) {
                 return unquote(comparand.stringLiteral().STRING_LITERAL().getText());
             } else if (comparand.NUMBER() != null) {
@@ -558,7 +562,8 @@ public class XPathMatcher {
         /**
          * Evaluate a function by name with arguments.
          */
-        private Object evaluateFunction(String funcName, List<Object> args) {
+        @SuppressWarnings("DataFlowIssue")
+        private Object evaluateFunction(String funcName, List<@Nullable Object> args) {
             switch (funcName) {
                 case "contains":
                     if (args.size() >= 2) {
@@ -582,7 +587,7 @@ public class XPathMatcher {
                     }
                     return false;
                 case "string-length":
-                    if (args.size() >= 1) {
+                    if (!args.isEmpty()) {
                         String str = args.get(0) != null ? args.get(0).toString() : "";
                         return str.length();
                     }
@@ -604,7 +609,7 @@ public class XPathMatcher {
                     }
                     return "";
                 case "not":
-                    if (args.size() >= 1) {
+                    if (!args.isEmpty()) {
                         return !toBool(args.get(0));
                     }
                     return true;
@@ -613,7 +618,7 @@ public class XPathMatcher {
                     // The argument should already be evaluated, but for count we need special handling
                     // If we have a non-empty result from path evaluation, count it as 1
                     // For proper count, we'd need to return the set of nodes, not just the first one's value
-                    if (args.size() >= 1) {
+                    if (!args.isEmpty()) {
                         Object arg = args.get(0);
                         if (arg instanceof String && !((String) arg).isEmpty()) {
                             // A non-empty string means at least one match was found
@@ -632,7 +637,7 @@ public class XPathMatcher {
         /**
          * Convert value to boolean.
          */
-        private boolean toBool(Object value) {
+        private boolean toBool(@Nullable Object value) {
             if (value == null) {
                 return false;
             } else if (value instanceof Boolean) {
@@ -676,8 +681,8 @@ public class XPathMatcher {
                 return matchStepsAgainstPathCompiled(0);
             }
 
-            if (!((stepFlags & FLAG_HAS_ATTRIBUTE_STEP) != 0)) {
-                if (!((stepFlags & FLAG_HAS_NODE_TYPE_TEST) != 0) && pathLength != compiledElementSteps) {
+            if ((stepFlags & FLAG_HAS_ATTRIBUTE_STEP) == 0) {
+                if ((stepFlags & FLAG_HAS_NODE_TYPE_TEST) == 0 && pathLength != compiledElementSteps) {
                     return false;
                 }
             }
@@ -694,6 +699,7 @@ public class XPathMatcher {
         private boolean matchDescendantOrRelativeCompiled(boolean isDescendantOrSelf) {
             // Check for internal // (already computed during precompilation as hasDescendant for steps after first)
             boolean hasInternalDescendant = false;
+            //noinspection DataFlowIssue
             for (int i = 1; i < compiledSteps.length; i++) {
                 if (compiledSteps[i].isDescendant) {
                     hasInternalDescendant = true;
@@ -724,6 +730,7 @@ public class XPathMatcher {
         private boolean matchWithDescendantCompiled() {
             // Find where the // occurs
             int descendantIndex = -1;
+            //noinspection DataFlowIssue
             for (int i = 0; i < compiledSteps.length; i++) {
                 if (compiledSteps[i].isDescendant) {
                     descendantIndex = i;
@@ -788,6 +795,7 @@ public class XPathMatcher {
             int pathIdx = pathStartIdx;
             boolean didSiblingCheck = false;
 
+            //noinspection DataFlowIssue
             for (int i = stepStartIdx; i < compiledSteps.length; i++) {
                 CompiledStep step = compiledSteps[i];
 
@@ -944,9 +952,9 @@ public class XPathMatcher {
             }
 
             // For element paths, verify we've used the entire path
-            if (!((stepFlags & FLAG_HAS_ATTRIBUTE_STEP) != 0)) {
-                if (!((stepFlags & FLAG_HAS_ABBREVIATED_STEP) != 0)) {
-                    if (!((stepFlags & FLAG_HAS_AXIS_STEP) != 0)) {
+            if ((stepFlags & FLAG_HAS_ATTRIBUTE_STEP) == 0) {
+                if ((stepFlags & FLAG_HAS_ABBREVIATED_STEP) == 0) {
+                    if ((stepFlags & FLAG_HAS_AXIS_STEP) == 0) {
                         return pathIdx == pathLength;
                     }
                 }
@@ -1154,7 +1162,7 @@ public class XPathMatcher {
         /**
          * Evaluate a predicate value expression.
          */
-        private Object evaluatePredicateValue(XPathParser.PredicateValueContext predicateValue,
+        private @Nullable Object evaluatePredicateValue(XPathParser.PredicateValueContext predicateValue,
                                               Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute,
                                               int position, int size) {
             if (predicateValue.functionCall() != null) {
@@ -1180,7 +1188,7 @@ public class XPathMatcher {
          * Convert value to boolean, treating numbers as positional predicates.
          * In XPath, [1] means position()=1, not a truthy check.
          */
-        private boolean toBoolOrPositional(Object value, int position) {
+        private boolean toBoolOrPositional(@Nullable Object value, int position) {
             if (value instanceof Number) {
                 // Numeric value is a positional predicate
                 return ((Number) value).intValue() == position;
@@ -1191,7 +1199,7 @@ public class XPathMatcher {
         /**
          * Evaluate function call in predicate context and return its value.
          */
-        private Object evaluatePredicateFunctionCall(XPathParser.FunctionCallContext funcCall,
+        private @Nullable Object evaluatePredicateFunctionCall(XPathParser.FunctionCallContext funcCall,
                                                      Xml.@Nullable Tag tag, Xml.@Nullable Attribute attribute,
                                                      int position, int size) {
             String funcName;
@@ -1239,7 +1247,7 @@ public class XPathMatcher {
                 case "string-length":
                 case "not":
                     // These need arguments - evaluate them
-                    List<Object> args = new ArrayList<>();
+                    List<@Nullable Object> args = new ArrayList<>();
                     if (funcCall.functionArgs() != null) {
                         for (XPathParser.FunctionArgContext arg : funcCall.functionArgs().functionArg()) {
                             args.add(evaluateFunctionArg(arg));
@@ -1254,7 +1262,7 @@ public class XPathMatcher {
         /**
          * Get attribute value for comparison.
          */
-        private Object getAttributeValue(XPathParser.AttributeStepContext attrStep, Xml.@Nullable Tag tag) {
+        private @Nullable Object getAttributeValue(XPathParser.AttributeStepContext attrStep, Xml.@Nullable Tag tag) {
             if (tag == null) {
                 return null;
             }
@@ -1270,7 +1278,7 @@ public class XPathMatcher {
         /**
          * Get value from relative path for comparison.
          */
-        private Object getRelativePathValue(XPathParser.RelativeLocationPathContext relPath, Xml.@Nullable Tag tag) {
+        private @Nullable Object getRelativePathValue(XPathParser.RelativeLocationPathContext relPath, Xml.@Nullable Tag tag) {
             if (tag == null) {
                 return null;
             }
@@ -1335,7 +1343,7 @@ public class XPathMatcher {
         /**
          * Get child element value for comparison.
          */
-        private Object getChildElementValue(XPathParser.ChildElementTestContext childTest, Xml.@Nullable Tag tag) {
+        private @Nullable Object getChildElementValue(XPathParser.ChildElementTestContext childTest, Xml.@Nullable Tag tag) {
             if (tag == null) {
                 return null;
             }
@@ -1369,45 +1377,6 @@ public class XPathMatcher {
                 return s.substring(1, s.length() - 1);
             }
             return s;
-        }
-
-        /**
-         * Get name from attribute step (handles QNAME, NCNAME, or WILDCARD).
-         */
-        private String getAttributeStepName(XPathParser.AttributeStepContext attrStep) {
-            if (attrStep.QNAME() != null) {
-                return attrStep.QNAME().getText();
-            } else if (attrStep.NCNAME() != null) {
-                return attrStep.NCNAME().getText();
-            } else {
-                return "*";
-            }
-        }
-
-        /**
-         * Get name from node test (handles QNAME, NCNAME, or WILDCARD).
-         */
-        private String getNodeTestName(XPathParser.NodeTestContext nodeTest) {
-            if (nodeTest.QNAME() != null) {
-                return nodeTest.QNAME().getText();
-            } else if (nodeTest.NCNAME() != null) {
-                return nodeTest.NCNAME().getText();
-            } else {
-                return "*";
-            }
-        }
-
-        /**
-         * Get name from child element test (handles QNAME, NCNAME, or WILDCARD).
-         */
-        private String getChildElementTestName(XPathParser.ChildElementTestContext childTest) {
-            if (childTest.QNAME() != null) {
-                return childTest.QNAME().getText();
-            } else if (childTest.NCNAME() != null) {
-                return childTest.NCNAME().getText();
-            } else {
-                return "*";
-            }
         }
 
         /**
@@ -1595,7 +1564,7 @@ public class XPathMatcher {
 
         // Predicates - kept as ANTLR context for complex evaluation
         // null means no predicates (common case - avoids empty list allocation)
-        final List<XPathParser.PredicateContext> predicates;
+        final @Nullable List<XPathParser.PredicateContext> predicates;
 
         // Step flags (bitmask)
         private static final int STEP_FLAG_NEEDS_POSITION = 1;
@@ -1605,7 +1574,7 @@ public class XPathMatcher {
 
         private CompiledStep(StepType type, boolean isDescendant, @Nullable String name,
                             AxisType axisType, NodeTypeTestType nodeTypeTestType,
-                            List<XPathParser.PredicateContext> predicates, int flags) {
+                            @Nullable List<XPathParser.PredicateContext> predicates, int flags) {
             this.type = type;
             this.isDescendant = isDescendant;
             this.name = name;
@@ -1652,7 +1621,7 @@ public class XPathMatcher {
             if (step.axisStep() != null) {
                 XPathParser.AxisStepContext axisStep = step.axisStep();
                 String axisName = axisStep.axisName().NCNAME().getText();
-                String nodeTestName = getNodeTestNameStatic(axisStep.nodeTest());
+                String nodeTestName = getNodeTestName(axisStep.nodeTest());
 
                 AxisType axisType;
                 switch (axisName) {
@@ -1675,7 +1644,7 @@ public class XPathMatcher {
 
             // Attribute step: @attr, @*
             if (step.attributeStep() != null) {
-                String attrName = getAttributeStepNameStatic(step.attributeStep());
+                String attrName = getAttributeStepName(step.attributeStep());
                 return new CompiledStep(StepType.ATTRIBUTE_STEP, isDescendant, attrName,
                         AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
             }
@@ -1720,7 +1689,7 @@ public class XPathMatcher {
          * Check if any predicate needs position/size info.
          * This includes: position(), last(), or numeric predicates like [1].
          */
-        private static boolean predicatesNeedPosition(List<XPathParser.PredicateContext> predicates) {
+        private static boolean predicatesNeedPosition(@Nullable List<XPathParser.PredicateContext> predicates) {
             if (predicates == null || predicates.isEmpty()) {
                 return false;
             }
@@ -1735,7 +1704,7 @@ public class XPathMatcher {
         /**
          * Recursively check if a predicate expression needs position info.
          */
-        private static boolean predicateNeedsPosition(XPathParser.PredicateExprContext expr) {
+        private static boolean predicateNeedsPosition(XPathParser.@Nullable PredicateExprContext expr) {
             if (expr == null || expr.orExpr() == null) {
                 return false;
             }
@@ -1774,9 +1743,7 @@ public class XPathMatcher {
                 XPathParser.FunctionCallContext fc = pv.functionCall();
                 if (fc.NCNAME() != null) {
                     String funcName = fc.NCNAME().getText();
-                    if ("position".equals(funcName) || "last".equals(funcName)) {
-                        return true;
-                    }
+                    return "position".equals(funcName) || "last".equals(funcName);
                 }
             }
             return false;
@@ -1792,9 +1759,9 @@ public class XPathMatcher {
     }
 
     /**
-     * Static helper to get node test name without visitor instance.
+     * Get name from node test (handles QNAME, NCNAME, or WILDCARD).
      */
-    private static String getNodeTestNameStatic(XPathParser.NodeTestContext nodeTest) {
+    private static String getNodeTestName(XPathParser.@Nullable NodeTestContext nodeTest) {
         if (nodeTest == null) {
             return "*";
         }
@@ -1805,9 +1772,9 @@ public class XPathMatcher {
     }
 
     /**
-     * Static helper to get attribute step name without visitor instance.
+     * Get name from attribute step (handles QNAME, NCNAME, or WILDCARD).
      */
-    private static String getAttributeStepNameStatic(XPathParser.AttributeStepContext attrStep) {
+    private static String getAttributeStepName(XPathParser.AttributeStepContext attrStep) {
         if (attrStep.WILDCARD() != null) {
             return "*";
         }
@@ -1816,6 +1783,19 @@ public class XPathMatcher {
         }
         if (attrStep.NCNAME() != null) {
             return attrStep.NCNAME().getText();
+        }
+        return "*";
+    }
+
+    /**
+     * Get name from child element test (handles QNAME, NCNAME, or WILDCARD).
+     */
+    private static String getChildElementTestName(XPathParser.ChildElementTestContext childTest) {
+        if (childTest.QNAME() != null) {
+            return childTest.QNAME().getText();
+        }
+        if (childTest.NCNAME() != null) {
+            return childTest.NCNAME().getText();
         }
         return "*";
     }
