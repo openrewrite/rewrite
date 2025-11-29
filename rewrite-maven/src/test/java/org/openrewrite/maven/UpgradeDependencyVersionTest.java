@@ -2537,4 +2537,64 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6322")
+    @Test
+    void upgradeMultipleBomImportsWithWildcards() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "*", "5.9.x", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-bom</artifactId>
+                              <version>5.8.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-bom</artifactId>
+                              <version>5.8.1</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-bom</artifactId>
+                              <version>5.9.3</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-bom</artifactId>
+                              <version>5.9.3</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
 }
