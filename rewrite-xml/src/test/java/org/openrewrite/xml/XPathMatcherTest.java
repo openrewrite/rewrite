@@ -338,6 +338,22 @@ class XPathMatcherTest {
     }
 
     @Test
+    void matchContainsInPredicate() {
+        // contains() in predicate with child element - matches dependency with groupId containing 'openrewrite'
+        assertThat(match("/dependencies/dependency[contains(groupId, 'openrewrite')]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[contains(groupId, 'rewrite')]", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency[contains(artifactId, 'rewrite')]", xmlDoc)).isTrue();
+
+        // negative cases
+        assertThat(match("/dependencies/dependency[contains(groupId, 'notfound')]", xmlDoc)).isFalse();
+        assertThat(match("/dependencies/dependency[contains(artifactId, 'notfound')]", xmlDoc)).isFalse();
+
+        // with descendant axis
+        assertThat(match("//dependency[contains(groupId, 'openrewrite')]", xmlDoc)).isTrue();
+        assertThat(match("//dependency[contains(artifactId, 'xml')]", xmlDoc)).isTrue();
+    }
+
+    @Test
     void matchNotFunction() {
         // not() with contains
         assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
@@ -766,4 +782,77 @@ class XPathMatcherTest {
         // Combined with other path steps
         assertThat(match("/dependencies/dependency/groupId/parent::dependency/artifactId", xmlDoc)).isTrue();
     }
+
+    @Test
+    void matchDescendantWithChildPath() {
+        // //plugins/plugin - descendant axis followed by child axis
+        // This is used by MavenPlugin matcher
+        assertThat(match("//plugins/plugin", pomXml1)).isTrue();
+        assertThat(match("//plugins/plugin/groupId", pomXml1)).isTrue();
+        assertThat(match("//plugins/plugin/artifactId", pomXml1)).isTrue();
+        assertThat(match("//plugins/plugin/configuration", pomXml1)).isTrue();
+        assertThat(match("//plugins/plugin/configuration/source", pomXml1)).isTrue();
+
+        // With pluginManagement
+        assertThat(match("//plugins/plugin", pomXml2)).isTrue();
+        assertThat(match("//pluginManagement/plugins/plugin", pomXml2)).isTrue();
+
+        // Negative cases
+        assertThat(match("//plugins/nonexistent", pomXml1)).isFalse();
+        assertThat(match("//nonexistent/plugin", pomXml1)).isFalse();
+    }
+
+    @Test
+    void matchDescendantStartingWithRootElement() {
+        // //project/build/... - descendant axis where first step matches root element
+        // This pattern is used by RemoveXmlTag and should match when root is <project>
+        assertThat(match("//project/build", pomXml1)).isTrue();
+        assertThat(match("//project/build/plugins", pomXml1)).isTrue();
+        assertThat(match("//project/build/plugins/plugin", pomXml1)).isTrue();
+        assertThat(match("//project/build/pluginManagement/plugins/plugin", pomXml2)).isTrue();
+
+        // Should not match if the path doesn't exist
+        assertThat(match("//project/build/pluginManagement", pomXml1)).isFalse();
+        assertThat(match("//project/nonexistent", pomXml1)).isFalse();
+    }
+
+    @Test
+    void matchRootElement() {
+        // Single-step absolute path should match the root element
+        assertThat(match("/project", pomXml1)).isTrue();
+        assertThat(match("/dependencies", xmlDoc)).isTrue();
+
+        // /project/parent should match the parent element
+        SourceFile pomWithParent = new XmlParser().parse(
+          """
+            <project>
+              <parent>
+                <groupId>com.example</groupId>
+              </parent>
+              <version>1.0</version>
+            </project>
+            """
+        ).toList().getFirst();
+        assertThat(match("/project/parent", pomWithParent)).isTrue();
+        assertThat(match("/project", pomWithParent)).isTrue();
+    }
+
+    @Test
+    void matchRelativePathFromContext() {
+        // Relative paths should match based on suffix, allowing match anywhere in document
+        // This is important for ChangeTagValue which uses paths like "version"
+        assertThat(match("version", pomXml1)).isTrue();
+        assertThat(match("groupId", pomXml1)).isTrue();
+        assertThat(match("artifactId", pomXml1)).isTrue();
+
+        // Multi-step relative paths
+        assertThat(match("configuration/source", pomXml1)).isTrue();
+        assertThat(match("plugin/configuration", pomXml1)).isTrue();
+        assertThat(match("plugins/plugin", pomXml1)).isTrue();
+
+        // Negative cases - element names that don't exist
+        assertThat(match("nonexistent", pomXml1)).isFalse();
+        assertThat(match("configuration/nonexistent", pomXml1)).isFalse();
+    }
+
 }

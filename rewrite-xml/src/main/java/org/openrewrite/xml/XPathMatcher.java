@@ -36,12 +36,10 @@ import static java.util.Collections.singleton;
 /**
  * Supports a limited set of XPath expressions, specifically those documented on <a
  * href="https://www.w3schools.com/xml/xpath_syntax.asp">this page</a>.
- * Additionally, supports `local-name()` and `namespace-uri()` conditions, `and`/`or` operators, and chained conditions.
+ * Additionally, supports `local-name()` and `namespace-uri()` conditions, `and`/`or` operators, chained conditions,
+ * and abbreviated syntax (`.` for self, `..` for parent within a path).
  * <p>
  * Used for checking whether a visitor's cursor meets a certain XPath expression.
- * <p>
- * The "current node" for XPath evaluation is always the root node of the document. As a result, '.' and '..' are not
- * recognized.
  */
 public class XPathMatcher {
 
@@ -64,7 +62,7 @@ public class XPathMatcher {
     private static final int EXPR_FILTER = 2;         // Filter expression (needs visitor)
 
     private final String expression;
-    private XPathParser.@Nullable XpathExpressionContext parsed;
+    private volatile XPathParser.@Nullable XpathExpressionContext parsed;
 
     // Pre-compiled step information (computed lazily on first parse)
     private CompiledStep @Nullable [] compiledSteps;
@@ -146,13 +144,16 @@ public class XPathMatcher {
         return visitor.visit(ctx);
     }
 
-    private XPathParser.XpathExpressionContext parse() {
+    private synchronized XPathParser.XpathExpressionContext parse() {
         if (parsed == null) {
             XPathLexer lexer = new XPathLexer(CharStreams.fromString(expression));
             XPathParser parser = new XPathParser(new CommonTokenStream(lexer));
-            parsed = parser.xpathExpression();
-            precompileSteps(parsed);
+            XPathParser.XpathExpressionContext ctx = parser.xpathExpression();
+            precompileSteps(ctx);
+            // Set parsed last to ensure precompilation is complete before other threads see it
+            parsed = ctx;
         }
+        //noinspection DataFlowIssue
         return parsed;
     }
 
@@ -242,7 +243,7 @@ public class XPathMatcher {
         private final Xml.Tag[] path;
         private final int pathLength;
         private final Cursor cursor;
-        private Xml.@Nullable Tag rootTag;
+        private @Nullable Cursor rootCursor;
 
         // Pre-compiled step information (may be null for complex expressions)
         private final CompiledStep @Nullable [] compiledSteps;
@@ -438,12 +439,23 @@ public class XPathMatcher {
         }
 
         /**
-         * Evaluate a function argument.
+         * Evaluate a function argument (no context tag - evaluates from root).
          */
         private @Nullable Object evaluateFunctionArg(XPathParser.FunctionArgContext arg) {
+            return evaluateFunctionArg(arg, null);
+        }
+
+        /**
+         * Evaluate a function argument with optional context tag for relative paths.
+         */
+        private @Nullable Object evaluateFunctionArg(XPathParser.FunctionArgContext arg, Xml.@Nullable Tag contextTag) {
             if (arg.absoluteLocationPath() != null) {
                 return evaluatePathExpression(arg.absoluteLocationPath(), null);
             } else if (arg.relativeLocationPath() != null) {
+                // If we have a context tag, evaluate relative path from it
+                if (contextTag != null) {
+                    return getRelativePathValue(arg.relativeLocationPath(), contextTag);
+                }
                 return evaluatePathExpression(null, arg.relativeLocationPath());
             } else if (arg.stringLiteral() != null) {
                 return unquote(arg.stringLiteral().STRING_LITERAL().getText());
@@ -485,21 +497,28 @@ public class XPathMatcher {
         }
 
         /**
-         * Get the root tag of the document, caching the result for performance.
+         * Get the cursor pointing to the root tag of the document, caching the result for performance.
          */
-        private Xml.@Nullable Tag getRootTag() {
-            if (rootTag == null) {
+        private @Nullable Cursor getRootCursor() {
+            if (rootCursor == null) {
                 // Find the root of the document from the cursor
-                Cursor rootCursor = cursor;
-                while (rootCursor.getParent() != null && !(rootCursor.getParent().getValue() instanceof Xml.Document)) {
-                    rootCursor = rootCursor.getParent();
+                Cursor c = cursor;
+                while (c.getParent() != null && !(c.getParent().getValue() instanceof Xml.Document)) {
+                    c = c.getParent();
                 }
-                Object root = rootCursor.getValue();
-                if (root instanceof Xml.Tag) {
-                    rootTag = (Xml.Tag) root;
+                if (c.getValue() instanceof Xml.Tag) {
+                    rootCursor = c;
                 }
             }
-            return rootTag;
+            return rootCursor;
+        }
+
+        /**
+         * Get the root tag of the document.
+         */
+        private Xml.@Nullable Tag getRootTag() {
+            Cursor rc = getRootCursor();
+            return rc != null ? (Xml.Tag) rc.getValue() : null;
         }
 
         /**
@@ -1246,11 +1265,11 @@ public class XPathMatcher {
                 case "ends-with":
                 case "string-length":
                 case "not":
-                    // These need arguments - evaluate them
+                    // These need arguments - evaluate them with context tag for relative paths
                     List<@Nullable Object> args = new ArrayList<>();
                     if (funcCall.functionArgs() != null) {
                         for (XPathParser.FunctionArgContext arg : funcCall.functionArgs().functionArg()) {
-                            args.add(evaluateFunctionArg(arg));
+                            args.add(evaluateFunctionArg(arg, tag));
                         }
                     }
                     return evaluateFunction(funcName, args);
