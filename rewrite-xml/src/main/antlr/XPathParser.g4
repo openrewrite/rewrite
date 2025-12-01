@@ -15,7 +15,8 @@
  */
 
 /**
- * XPath parser for a limited subset of XPath expressions.
+ * XPath parser following the XPath 1.0 specification grammar structure.
+ * See: https://www.w3.org/TR/1999/REC-xpath-19991116/
  *
  * Supports:
  * - Absolute paths: /root/child
@@ -29,59 +30,131 @@
  * - Positional predicates: /root/element[1], /root/element[last()]
  * - Parenthesized expressions with predicates: (/root/element)[1], (/root/a)[last()]
  * - XPath functions: local-name(), namespace-uri(), text(), contains(), position(), last(), etc.
- * - Logical operators in predicates: and, or
+ * - Logical operators: and, or
+ * - Comparison operators: =, !=, <, >, <=, >=
  * - Multiple predicates: /root/element[@attr='value'][local-name()='element']
- * - Top-level function expressions: contains(/root/element, 'value')
- * - Boolean expressions: not(contains(...)), string-length(...) > 2
  * - Abbreviated syntax: . (self), .. (parent)
- * - Parent axis: parent::node(), parent::element
+ * - Axis steps: parent::node(), parent::element
+ *
+ * Not yet implemented:
+ * - Union operator: |
+ * - Arithmetic operators: +, -, *, div, mod
+ * - Variable references: $var
  */
 parser grammar XPathParser;
 
 options { tokenVocab=XPathLexer; }
 
-// Entry point for XPath expression
+//==============================================================================
+// Entry point
+//==============================================================================
+
+// [14] Expr ::= OrExpr
 xpathExpression
-    : booleanExpr
-    | filterExpr
-    | absoluteLocationPath
-    | relativeLocationPath
+    : expr
     ;
 
-// Filter expression - parenthesized path with predicates and optional trailing path: (/root/a)[1]/child
+// Top-level expression - any expression type
+expr
+    : orExpr
+    ;
+
+//==============================================================================
+// Expression hierarchy (following XPath 1.0 spec precedence)
+//==============================================================================
+
+// [21] OrExpr ::= AndExpr | OrExpr 'or' AndExpr
+orExpr
+    : andExpr (OR andExpr)*
+    ;
+
+// [22] AndExpr ::= EqualityExpr | AndExpr 'and' EqualityExpr
+andExpr
+    : equalityExpr (AND equalityExpr)*
+    ;
+
+// [23] EqualityExpr ::= RelationalExpr | EqualityExpr '=' RelationalExpr | EqualityExpr '!=' RelationalExpr
+equalityExpr
+    : relationalExpr ((EQUALS | NOT_EQUALS) relationalExpr)*
+    ;
+
+// [24] RelationalExpr ::= AdditiveExpr | RelationalExpr '<' AdditiveExpr | ...
+// (Skipping AdditiveExpr/MultiplicativeExpr for now - going directly to UnaryExpr)
+relationalExpr
+    : unaryExpr ((LT | GT | LTE | GTE) unaryExpr)*
+    ;
+
+// [27] UnaryExpr ::= UnionExpr | '-' UnaryExpr
+// (Skipping '-' for now since we don't have arithmetic)
+unaryExpr
+    : unionExpr
+    ;
+
+// [18] UnionExpr ::= PathExpr | UnionExpr '|' PathExpr
+// (Union operator not yet implemented - going directly to PathExpr)
+unionExpr
+    : pathExpr
+    ;
+
+// [19] PathExpr ::= LocationPath | FilterExpr | FilterExpr '/' RelativeLocationPath | FilterExpr '//' RelativeLocationPath
+// Restructured to eliminate ambiguity: filterExpr alternatives are made explicit
+// The key distinction: function calls require LPAREN after the name, location paths don't
+pathExpr
+    : functionCallExpr (pathSeparator relativeLocationPath)?  // func() possibly followed by /path
+    | bracketedExpr (pathSeparator relativeLocationPath)?     // (expr) possibly followed by /path
+    | literalOrNumber (pathSeparator relativeLocationPath)?   // 'string' or 123 possibly followed by /path
+    | locationPath                                             // /a/b, a/b, //a, etc.
+    ;
+
+// [20] FilterExpr ::= PrimaryExpr | FilterExpr Predicate
+// Function call with optional predicates - requires LPAREN after name to disambiguate from locationPath
+functionCallExpr
+    : functionCall predicate*
+    ;
+
+// Bracketed expression with optional predicates
+bracketedExpr
+    : LPAREN expr RPAREN predicate*
+    ;
+
+// Literal or number with optional predicates
+literalOrNumber
+    : literal predicate*
+    | NUMBER predicate*
+    ;
+
+// Legacy filterExpr for backward compatibility (used in compileFilterExpr)
 filterExpr
-    : LPAREN (absoluteLocationPath | relativeLocationPath) RPAREN predicate+ (pathSeparator relativeLocationPath)?
+    : functionCallExpr
+    | bracketedExpr
+    | literalOrNumber
     ;
 
-// Boolean expression (function calls with optional comparison)
-booleanExpr
-    : functionCall comparisonOp comparand
+// [15] PrimaryExpr ::= VariableReference | '(' Expr ')' | Literal | Number | FunctionCall
+primaryExpr
+    : LPAREN expr RPAREN
+    | literal
+    | NUMBER
     | functionCall
     ;
 
-// Comparison operators
-comparisonOp
-    : EQUALS
-    | NOT_EQUALS
-    | LT
-    | GT
-    | LTE
-    | GTE
+//==============================================================================
+// Location paths
+//==============================================================================
+
+// [1] LocationPath ::= RelativeLocationPath | AbsoluteLocationPath
+locationPath
+    : absoluteLocationPath
+    | relativeLocationPath
     ;
 
-// Value to compare against
-comparand
-    : stringLiteral
-    | NUMBER
-    ;
-
-// Absolute path starting with / or //
+// [2] AbsoluteLocationPath ::= '/' RelativeLocationPath? | AbbreviatedAbsoluteLocationPath
 absoluteLocationPath
     : SLASH relativeLocationPath?
     | DOUBLE_SLASH relativeLocationPath
     ;
 
-// Relative path (series of steps)
+// [3] RelativeLocationPath ::= Step | RelativeLocationPath '/' Step | AbbreviatedRelativeLocationPath
 relativeLocationPath
     : step (pathSeparator step)*
     ;
@@ -92,123 +165,109 @@ pathSeparator
     | DOUBLE_SLASH
     ;
 
-// A single step in the path
+//==============================================================================
+// Location steps
+//==============================================================================
+
+// [4] Step ::= AxisSpecifier NodeTest Predicate* | AbbreviatedStep
+// Restructured to eliminate ambiguity: axis specifier is optional prefix
 step
-    : axisStep predicate*
-    | nodeTest predicate*
+    : axisSpecifier? nodeTest predicate*
     | attributeStep predicate*
-    | nodeTypeTest
     | abbreviatedStep
     ;
 
-// Axis step - explicit axis like parent::node()
-axisStep
-    : axisName AXIS_SEP nodeTest
+// [5] AxisSpecifier ::= AxisName '::' | AbbreviatedAxisSpecifier
+// Made as a separate rule to allow optional usage in step
+axisSpecifier
+    : axisName AXIS_SEP
     ;
 
-// Supported axis names (NCName - no namespace prefix)
+// [6] AxisName - validated at runtime
 axisName
-    : NCNAME  // parent, ancestor, self, child, etc. - validated at runtime
+    : NCNAME
     ;
 
-// Abbreviated step - . or ..
+// [12] AbbreviatedStep ::= '.' | '..'
 abbreviatedStep
-    : DOTDOT    // parent::node()
-    | DOT       // self::node()
+    : DOTDOT
+    | DOT
     ;
 
-// Node type test - text(), comment(), node(), processing-instruction()
-// Validation of which functions are valid node type tests happens at runtime
-nodeTypeTest
-    : NCNAME LPAREN RPAREN
-    ;
-
-// Attribute step (@attr, @ns:attr, or @*)
+// [13] AbbreviatedAxisSpecifier ::= '@'?
 attributeStep
     : AT (QNAME | NCNAME | WILDCARD)
     ;
 
-// Node test (element name, ns:element, or wildcard)
+//==============================================================================
+// Node tests
+//==============================================================================
+
+// [7] NodeTest ::= NameTest | NodeType '(' ')' | 'processing-instruction' '(' Literal ')'
 nodeTest
-    : QNAME
-    | NCNAME
-    | WILDCARD
+    : nameTest
+    | nodeType LPAREN RPAREN
     ;
 
-// Predicate in square brackets
+// [37] NameTest ::= '*' | NCName ':' '*' | QName
+nameTest
+    : WILDCARD
+    | QNAME
+    | NCNAME
+    ;
+
+// [38] NodeType ::= 'comment' | 'text' | 'processing-instruction' | 'node'
+// Uses specific tokens to avoid ambiguity with function calls
+nodeType
+    : TEXT
+    | COMMENT
+    | NODE
+    | PROCESSING_INSTRUCTION
+    ;
+
+//==============================================================================
+// Predicates
+//==============================================================================
+
+// [8] Predicate ::= '[' PredicateExpr ']'
 predicate
     : LBRACKET predicateExpr RBRACKET
     ;
 
-// Predicate expression (supports and/or)
+// [9] PredicateExpr ::= Expr
 predicateExpr
-    : orExpr
+    : expr
     ;
 
-// OR expression (lowest precedence)
-orExpr
-    : andExpr (OR andExpr)*
-    ;
+//==============================================================================
+// Functions
+//==============================================================================
 
-// AND expression (higher precedence than OR)
-andExpr
-    : primaryExpr (AND primaryExpr)*
-    ;
-
-// Primary expression in a predicate
-primaryExpr
-    : predicateValue comparisonOp comparand            // any value expression with comparison
-    | predicateValue                                   // standalone value (last(), position(), number, boolean)
-    ;
-
-// A value-producing expression in a predicate
-predicateValue
-    : functionCall                                     // local-name(), last(), position(), contains(), etc.
-    | attributeStep                                    // @attr, @*
-    | relativeLocationPath                             // bar/baz/text()
-    | childElementTest                                 // child, *
-    | NUMBER                                           // positional predicate [1], [2], etc.
-    ;
-
-// XPath function call - unified for both top-level and predicate use
-// Function names are NCNames (no namespace prefix in standard XPath 1.0)
-// Specific functions like local-name, namespace-uri, contains, etc. are
-// validated at runtime in the compiler via getFunctionType()
+// [16] FunctionCall ::= FunctionName '(' (Argument (',' Argument)*)? ')'
 functionCall
-    : NCNAME LPAREN functionArgs? RPAREN
+    : functionName LPAREN (argument (COMMA argument)*)? RPAREN
     ;
 
-// Function arguments (comma-separated)
-functionArgs
-    : functionArg (COMMA functionArg)*
+// [35] FunctionName ::= QName - NodeType
+// Node type tokens can also be function names (text(), comment(), node(), processing-instruction())
+functionName
+    : NCNAME
+    | TEXT
+    | COMMENT
+    | NODE
+    | PROCESSING_INSTRUCTION
     ;
 
-// A single function argument
-// Note: comparisonArg must come first to handle not(path = 'value')
-// functionCall must come before relativeLocationPath
-// because both can start with QNAME, but we need to check for '(' to distinguish them
-functionArg
-    : comparisonArg
-    | absoluteLocationPath
-    | functionCall
-    | relativeLocationPath
-    | stringLiteral
-    | NUMBER
+// [17] Argument ::= Expr
+argument
+    : expr
     ;
 
-// Comparison expression as function argument (for not(x = 'y'), etc.)
-comparisonArg
-    : (functionCall | relativeLocationPath | absoluteLocationPath) comparisonOp comparand
-    ;
+//==============================================================================
+// Literals
+//==============================================================================
 
-// Child element test in predicate (element name, ns:element, or wildcard)
-childElementTest
-    : QNAME
-    | NCNAME
-    | WILDCARD
-    ;
-
-// String literal value
-stringLiteral
+// [29] Literal ::= '"' [^"]* '"' | "'" [^']* "'"
+literal
     : STRING_LITERAL
     ;

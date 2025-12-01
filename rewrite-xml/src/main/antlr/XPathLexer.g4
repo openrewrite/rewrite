@@ -55,6 +55,13 @@ NUMBER : [0-9]+ ('.' [0-9]+)? ;
 AND : 'and' ;
 OR : 'or' ;
 
+// Node type keywords (must be before NCNAME to take precedence)
+// These are the only valid node types per XPath 1.0 spec [38]
+TEXT : 'text' ;
+COMMENT : 'comment' ;
+NODE : 'node' ;
+PROCESSING_INSTRUCTION : 'processing-instruction' ;
+
 // String literals
 STRING_LITERAL
     : '\'' (~['])* '\''

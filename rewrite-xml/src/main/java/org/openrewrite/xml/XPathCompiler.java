@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.Token;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.xml.internal.grammar.XPathLexer;
 import org.openrewrite.xml.internal.grammar.XPathParser;
@@ -60,36 +61,78 @@ final class XPathCompiler {
         XPathLexer lexer = new XPathLexer(CharStreams.fromString(expression));
         XPathParser parser = new XPathParser(new CommonTokenStream(lexer));
         XPathParser.XpathExpressionContext ctx = parser.xpathExpression();
-        return compileSteps(ctx);
+        return compileXPathExpression(ctx);
     }
 
     /**
-     * Pre-compile step information from parsed XPath context.
+     * Compile an XPath expression from the parse tree.
+     * Determines whether this is a path expression, boolean expression, or filter expression.
      */
-    private static CompiledXPath compileSteps(XPathParser.XpathExpressionContext ctx) {
-        // Determine expression type first
-        if (ctx.booleanExpr() != null) {
-            CompiledExpr boolExpr = compileBooleanExpr(ctx.booleanExpr());
-            return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_BOOLEAN, boolExpr, null);
-        } else if (ctx.filterExpr() != null) {
-            CompiledFilterExpr filterExpr = compileFilterExpr(ctx.filterExpr());
-            return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_FILTER, null, filterExpr);
+    private static CompiledXPath compileXPathExpression(XPathParser.XpathExpressionContext ctx) {
+        // xpathExpression : expr
+        // expr : orExpr
+        XPathParser.ExprContext exprCtx = ctx.expr();
+        if (exprCtx == null || exprCtx.orExpr() == null) {
+            return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_PATH, null, null);
         }
 
-        // Otherwise it's a path expression
+        // Try to extract a simple path expression
+        XPathParser.OrExprContext orExpr = exprCtx.orExpr();
+
+        // Check if this is a simple path (single andExpr with no OR)
+        if (orExpr.andExpr().size() == 1) {
+            XPathParser.AndExprContext andExpr = orExpr.andExpr(0);
+
+            // Check if this is a simple path (single equalityExpr with no AND)
+            if (andExpr.equalityExpr().size() == 1) {
+                XPathParser.EqualityExprContext eqExpr = andExpr.equalityExpr(0);
+
+                // Check if this is a simple path (single relationalExpr with no comparison)
+                if (eqExpr.relationalExpr().size() == 1) {
+                    XPathParser.RelationalExprContext relExpr = eqExpr.relationalExpr(0);
+
+                    // Check if this is a simple path (single unaryExpr with no relational op)
+                    if (relExpr.unaryExpr().size() == 1) {
+                        XPathParser.PathExprContext pathExpr = relExpr.unaryExpr(0).unionExpr().pathExpr();
+
+                        // If it's a locationPath, compile as a path expression
+                        if (pathExpr.locationPath() != null) {
+                            return compileLocationPath(pathExpr.locationPath());
+                        }
+
+                        // If it's a filter expression (function call, bracketed, or literal)
+                        if (pathExpr.functionCallExpr() != null ||
+                            pathExpr.bracketedExpr() != null ||
+                            pathExpr.literalOrNumber() != null) {
+                            return compileFilterExprAsXPath(pathExpr);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Otherwise it's a boolean expression
+        CompiledExpr boolExpr = compileOrExpr(orExpr);
+        return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_BOOLEAN, boolExpr, null);
+    }
+
+    /**
+     * Compile a location path (absolute or relative) into a path expression.
+     */
+    private static CompiledXPath compileLocationPath(XPathParser.LocationPathContext locationPath) {
         XPathParser.RelativeLocationPathContext relPath = null;
         int flags = 0;
 
-        if (ctx.absoluteLocationPath() != null) {
-            XPathParser.AbsoluteLocationPathContext absCtx = ctx.absoluteLocationPath();
+        if (locationPath.absoluteLocationPath() != null) {
+            XPathParser.AbsoluteLocationPathContext absCtx = locationPath.absoluteLocationPath();
             if (absCtx.DOUBLE_SLASH() != null) {
                 flags |= FLAG_DESCENDANT_OR_SELF;
             } else {
                 flags |= FLAG_ABSOLUTE_PATH;
             }
             relPath = absCtx.relativeLocationPath();
-        } else if (ctx.relativeLocationPath() != null) {
-            relPath = ctx.relativeLocationPath();
+        } else if (locationPath.relativeLocationPath() != null) {
+            relPath = locationPath.relativeLocationPath();
         }
 
         CompiledStep[] compiledSteps = EMPTY_STEPS;
@@ -148,6 +191,39 @@ final class XPathCompiler {
         compiledElementSteps = countElementSteps(compiledSteps);
 
         return new CompiledXPath(compiledSteps, flags, compiledElementSteps, EXPR_PATH, null, null);
+    }
+
+    /**
+     * Compile a filter expression (parenthesized path with predicates) as XPath.
+     */
+    private static CompiledXPath compileFilterExprAsXPath(XPathParser.PathExprContext pathExpr) {
+        // Check for bracketed expression like (/path/expr)[predicate]
+        if (pathExpr.bracketedExpr() != null) {
+            XPathParser.BracketedExprContext bracketed = pathExpr.bracketedExpr();
+
+            // Get the inner expression from parentheses
+            if (bracketed.LPAREN() != null && bracketed.expr() != null) {
+                String innerPath = bracketed.expr().getText();
+
+                // Compile predicates
+                CompiledExpr[] predicates = compilePredicates(bracketed.predicate());
+
+                // Check for trailing path
+                String trailingPath = null;
+                boolean trailingIsDescendant = false;
+                if (pathExpr.pathSeparator() != null && pathExpr.relativeLocationPath() != null) {
+                    trailingPath = pathExpr.relativeLocationPath().getText();
+                    trailingIsDescendant = pathExpr.pathSeparator().DOUBLE_SLASH() != null;
+                }
+
+                CompiledFilterExpr compiled = new CompiledFilterExpr(innerPath, predicates, trailingPath, trailingIsDescendant);
+                return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_FILTER, null, compiled);
+            }
+        }
+
+        // Not a parenthesized expression - treat as boolean expression
+        CompiledExpr boolExpr = compilePathExpr(pathExpr);
+        return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_BOOLEAN, boolExpr, null);
     }
 
     /**
@@ -301,59 +377,33 @@ final class XPathCompiler {
     }
 
     /**
-     * Compile a top-level boolean expression: functionCall [comparisonOp comparand]
+     * Get name from name test (handles QNAME, NCNAME, or WILDCARD).
      */
-    private static CompiledExpr compileBooleanExpr(XPathParser.BooleanExprContext ctx) {
-        CompiledExpr funcExpr = compileFunctionCall(ctx.functionCall());
-
-        if (ctx.comparisonOp() != null && ctx.comparand() != null) {
-            ComparisonOp op = compileComparisonOp(ctx.comparisonOp());
-            CompiledExpr comparand = compileComparand(ctx.comparand());
-            return CompiledExpr.comparison(funcExpr, op, comparand);
+    static String getNameTestName(XPathParser.@Nullable NameTestContext nameTest) {
+        if (nameTest == null) {
+            return "*";
         }
-
-        return funcExpr;
+        if (nameTest.WILDCARD() != null) {
+            return "*";
+        }
+        return nameTest.getText();
     }
 
     /**
-     * Compile a filter expression: (path)[predicate] [/trailing]
-     */
-    private static CompiledFilterExpr compileFilterExpr(XPathParser.FilterExprContext ctx) {
-        // Get the path expression (absolute or relative) - first one is inside parentheses
-        String pathExpr;
-        if (ctx.absoluteLocationPath() != null) {
-            pathExpr = ctx.absoluteLocationPath().getText();
-        } else if (!ctx.relativeLocationPath().isEmpty()) {
-            pathExpr = ctx.relativeLocationPath(0).getText();
-        } else {
-            pathExpr = "";
-        }
-
-        // Compile predicates
-        CompiledExpr[] predicates = compilePredicates(ctx.predicate());
-
-        // Check for trailing path
-        String trailingPath = null;
-        boolean trailingIsDescendant = false;
-        if (ctx.pathSeparator() != null && ctx.relativeLocationPath().size() > 1) {
-            trailingPath = ctx.relativeLocationPath(1).getText();
-            trailingIsDescendant = ctx.pathSeparator().DOUBLE_SLASH() != null;
-        }
-
-        return new CompiledFilterExpr(pathExpr, predicates, trailingPath, trailingIsDescendant);
-    }
-
-    /**
-     * Get name from node test (handles QNAME, NCNAME, or WILDCARD).
+     * Get name from node test (handles nameTest or nodeType()).
      */
     static String getNodeTestName(XPathParser.@Nullable NodeTestContext nodeTest) {
         if (nodeTest == null) {
             return "*";
         }
-        if (nodeTest.WILDCARD() != null) {
-            return "*";
+        if (nodeTest.nameTest() != null) {
+            return getNameTestName(nodeTest.nameTest());
         }
-        return nodeTest.getText();
+        // nodeType LPAREN RPAREN - return the type name for node type tests
+        if (nodeTest.nodeType() != null) {
+            return nodeTest.nodeType().getText();
+        }
+        return "*";
     }
 
     /**
@@ -368,19 +418,6 @@ final class XPathCompiler {
         }
         if (attrStep.NCNAME() != null) {
             return attrStep.NCNAME().getText();
-        }
-        return "*";
-    }
-
-    /**
-     * Get name from child element test (handles QNAME, NCNAME, or WILDCARD).
-     */
-    static String getChildElementTestName(XPathParser.ChildElementTestContext childTest) {
-        if (childTest.QNAME() != null) {
-            return childTest.QNAME().getText();
-        }
-        if (childTest.NCNAME() != null) {
-            return childTest.NCNAME().getText();
         }
         return "*";
     }
@@ -407,10 +444,20 @@ final class XPathCompiler {
      * Compile a single predicate.
      */
     static CompiledExpr compilePredicate(XPathParser.PredicateContext predicate) {
-        if (predicate.predicateExpr() == null || predicate.predicateExpr().orExpr() == null) {
+        if (predicate.predicateExpr() == null || predicate.predicateExpr().expr() == null) {
             return CompiledExpr.unsupported("empty predicate");
         }
-        return compileOrExpr(predicate.predicateExpr().orExpr());
+        return compileExpr(predicate.predicateExpr().expr());
+    }
+
+    /**
+     * Compile an expression (top-level entry point for expression compilation).
+     */
+    static CompiledExpr compileExpr(XPathParser.ExprContext expr) {
+        if (expr.orExpr() == null) {
+            return CompiledExpr.unsupported("empty expression");
+        }
+        return compileOrExpr(expr.orExpr());
     }
 
     /**
@@ -432,78 +479,191 @@ final class XPathCompiler {
      * Compile an AND expression (supports: expr and expr and ...)
      */
     static CompiledExpr compileAndExpr(XPathParser.AndExprContext andExpr) {
-        List<XPathParser.PrimaryExprContext> primaries = andExpr.primaryExpr();
-        if (primaries.isEmpty()) {
+        List<XPathParser.EqualityExprContext> eqExprs = andExpr.equalityExpr();
+        if (eqExprs.isEmpty()) {
             return CompiledExpr.unsupported("empty and expression");
         }
-        CompiledExpr result = compilePrimaryExpr(primaries.get(0));
-        for (int i = 1; i < primaries.size(); i++) {
-            result = CompiledExpr.and(result, compilePrimaryExpr(primaries.get(i)));
+        CompiledExpr result = compileEqualityExpr(eqExprs.get(0));
+        for (int i = 1; i < eqExprs.size(); i++) {
+            result = CompiledExpr.and(result, compileEqualityExpr(eqExprs.get(i)));
         }
         return result;
     }
 
     /**
-     * Compile a primary expression (predicateValue with optional comparison).
+     * Compile an equality expression (supports: expr = expr, expr != expr)
      */
-    static CompiledExpr compilePrimaryExpr(XPathParser.PrimaryExprContext primary) {
-        if (primary.predicateValue() == null) {
-            return CompiledExpr.unsupported("missing predicate value");
+    static CompiledExpr compileEqualityExpr(XPathParser.EqualityExprContext eqExpr) {
+        List<XPathParser.RelationalExprContext> relExprs = eqExpr.relationalExpr();
+        if (relExprs.isEmpty()) {
+            return CompiledExpr.unsupported("empty equality expression");
         }
 
-        CompiledExpr left = compilePredicateValue(primary.predicateValue());
+        CompiledExpr result = compileRelationalExpr(relExprs.get(0));
 
-        // Check for comparison
-        if (primary.comparisonOp() != null && primary.comparand() != null) {
-            ComparisonOp op = compileComparisonOp(primary.comparisonOp());
-            CompiledExpr right = compileComparand(primary.comparand());
-            return CompiledExpr.comparison(left, op, right);
+        // Handle chained equality operators
+        for (int i = 1; i < relExprs.size(); i++) {
+            // Determine the operator - tokens between relational expressions
+            // In the grammar: relationalExpr ((EQUALS | NOT_EQUALS) relationalExpr)*
+            // We need to look at the i-1 operator token
+            Token opToken = getEqualityOperator(eqExpr, i - 1);
+            ComparisonOp op = (opToken != null && opToken.getType() == XPathParser.NOT_EQUALS)
+                    ? ComparisonOp.NE : ComparisonOp.EQ;
+
+            CompiledExpr right = compileRelationalExpr(relExprs.get(i));
+            result = CompiledExpr.comparison(result, op, right);
         }
 
-        return left;
+        return result;
     }
 
     /**
-     * Compile a predicate value (function, attribute, child, number).
+     * Get the equality operator token at the given index.
      */
-    static CompiledExpr compilePredicateValue(XPathParser.PredicateValueContext pv) {
-        // Numeric predicate [1], [2], etc.
-        if (pv.NUMBER() != null) {
-            try {
-                int value = Integer.parseInt(pv.NUMBER().getText());
-                return CompiledExpr.numeric(value);
-            } catch (NumberFormatException e) {
-                return CompiledExpr.unsupported("invalid number: " + pv.NUMBER().getText());
+    private static @Nullable Token getEqualityOperator(XPathParser.EqualityExprContext ctx, int index) {
+        // EQUALS and NOT_EQUALS tokens appear between relational expressions
+        int tokenIndex = 0;
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            if (ctx.getChild(i) instanceof org.antlr.v4.runtime.tree.TerminalNode) {
+                org.antlr.v4.runtime.tree.TerminalNode term = (org.antlr.v4.runtime.tree.TerminalNode) ctx.getChild(i);
+                int type = term.getSymbol().getType();
+                if (type == XPathParser.EQUALS || type == XPathParser.NOT_EQUALS) {
+                    if (tokenIndex == index) {
+                        return term.getSymbol();
+                    }
+                    tokenIndex++;
+                }
             }
         }
-
-        // Function call: position(), last(), local-name(), contains(), etc.
-        if (pv.functionCall() != null) {
-            return compileFunctionCall(pv.functionCall());
-        }
-
-        // Attribute: @foo, @*
-        if (pv.attributeStep() != null) {
-            return CompiledExpr.attribute(getAttributeStepName(pv.attributeStep()));
-        }
-
-        // Child element test: foo, *
-        if (pv.childElementTest() != null) {
-            return CompiledExpr.child(getChildElementTestName(pv.childElementTest()));
-        }
-
-        // Relative path (e.g., bar/baz/text())
-        if (pv.relativeLocationPath() != null) {
-            return compileRelativePath(pv.relativeLocationPath());
-        }
-
-        return CompiledExpr.unsupported("unknown predicate value");
+        return null;
     }
 
     /**
-     * Compile a relative path in a predicate (e.g., bar/baz/text()).
+     * Compile a relational expression (supports: expr < expr, expr > expr, etc.)
      */
-    static CompiledExpr compileRelativePath(XPathParser.RelativeLocationPathContext relPath) {
+    static CompiledExpr compileRelationalExpr(XPathParser.RelationalExprContext relExpr) {
+        List<XPathParser.UnaryExprContext> unaryExprs = relExpr.unaryExpr();
+        if (unaryExprs.isEmpty()) {
+            return CompiledExpr.unsupported("empty relational expression");
+        }
+
+        CompiledExpr result = compileUnaryExpr(unaryExprs.get(0));
+
+        // Handle chained relational operators
+        for (int i = 1; i < unaryExprs.size(); i++) {
+            Token opToken = getRelationalOperator(relExpr, i - 1);
+            ComparisonOp op = ComparisonOp.EQ; // default
+            if (opToken != null) {
+                switch (opToken.getType()) {
+                    case XPathParser.LT:
+                        op = ComparisonOp.LT;
+                        break;
+                    case XPathParser.GT:
+                        op = ComparisonOp.GT;
+                        break;
+                    case XPathParser.LTE:
+                        op = ComparisonOp.LE;
+                        break;
+                    case XPathParser.GTE:
+                        op = ComparisonOp.GE;
+                        break;
+                }
+            }
+
+            CompiledExpr right = compileUnaryExpr(unaryExprs.get(i));
+            result = CompiledExpr.comparison(result, op, right);
+        }
+
+        return result;
+    }
+
+    /**
+     * Get the relational operator token at the given index.
+     */
+    private static @Nullable Token getRelationalOperator(XPathParser.RelationalExprContext ctx, int index) {
+        int tokenIndex = 0;
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            if (ctx.getChild(i) instanceof org.antlr.v4.runtime.tree.TerminalNode) {
+                org.antlr.v4.runtime.tree.TerminalNode term = (org.antlr.v4.runtime.tree.TerminalNode) ctx.getChild(i);
+                int type = term.getSymbol().getType();
+                if (type == XPathParser.LT || type == XPathParser.GT ||
+                    type == XPathParser.LTE || type == XPathParser.GTE) {
+                    if (tokenIndex == index) {
+                        return term.getSymbol();
+                    }
+                    tokenIndex++;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Compile a unary expression.
+     */
+    static CompiledExpr compileUnaryExpr(XPathParser.UnaryExprContext unaryExpr) {
+        // unaryExpr : unionExpr (currently no unary minus support)
+        return compileUnionExpr(unaryExpr.unionExpr());
+    }
+
+    /**
+     * Compile a union expression.
+     */
+    static CompiledExpr compileUnionExpr(XPathParser.UnionExprContext unionExpr) {
+        // unionExpr : pathExpr (currently no union | support)
+        return compilePathExpr(unionExpr.pathExpr());
+    }
+
+    /**
+     * Compile a path expression.
+     */
+    static CompiledExpr compilePathExpr(XPathParser.PathExprContext pathExpr) {
+        // pathExpr : functionCallExpr (...)? | bracketedExpr (...)? | literalOrNumber (...)? | locationPath
+        if (pathExpr.locationPath() != null) {
+            return compileLocationPathAsExpr(pathExpr.locationPath());
+        }
+
+        // Handle filter expressions: functionCallExpr, bracketedExpr, or literalOrNumber
+        CompiledExpr filterResult = null;
+
+        if (pathExpr.functionCallExpr() != null) {
+            filterResult = compileFunctionCallExpr(pathExpr.functionCallExpr());
+        } else if (pathExpr.bracketedExpr() != null) {
+            filterResult = compileBracketedExpr(pathExpr.bracketedExpr());
+        } else if (pathExpr.literalOrNumber() != null) {
+            filterResult = compileLiteralOrNumber(pathExpr.literalOrNumber());
+        }
+
+        if (filterResult != null) {
+            // Handle trailing path: expr / relativeLocationPath
+            if (pathExpr.pathSeparator() != null && pathExpr.relativeLocationPath() != null) {
+                // This is a complex expression like func()[pred]/path
+                // For now, return the filter result (trailing path handled at higher level)
+                return filterResult;
+            }
+            return filterResult;
+        }
+
+        return CompiledExpr.unsupported("unknown path expression");
+    }
+
+    /**
+     * Compile a location path as an expression (for use in predicates).
+     */
+    static CompiledExpr compileLocationPathAsExpr(XPathParser.LocationPathContext locationPath) {
+        if (locationPath.absoluteLocationPath() != null) {
+            return CompiledExpr.absolutePath(locationPath.getText());
+        }
+        if (locationPath.relativeLocationPath() != null) {
+            return compileRelativePathAsExpr(locationPath.relativeLocationPath());
+        }
+        return CompiledExpr.unsupported("unknown location path");
+    }
+
+    /**
+     * Compile a relative location path as an expression.
+     */
+    static CompiledExpr compileRelativePathAsExpr(XPathParser.RelativeLocationPathContext relPath) {
         List<XPathParser.StepContext> steps = relPath.step();
         if (steps.isEmpty()) {
             return CompiledExpr.unsupported("empty path");
@@ -514,15 +674,29 @@ final class XPathCompiler {
         FunctionType terminalFunction = null;
         int elementStepCount = steps.size();
 
-        if (lastStep.nodeTypeTest() != null) {
-            String funcName = lastStep.nodeTypeTest().NCNAME().getText();
-            terminalFunction = getFunctionType(funcName);
+        if (lastStep.nodeTest() != null && lastStep.nodeTest().nodeType() != null) {
+            String funcName = lastStep.nodeTest().nodeType().getText();
+            terminalFunction = getNodeTypeAsFunctionType(funcName);
             elementStepCount = steps.size() - 1;
         }
 
         // Single element step with no terminal function -> CHILD
-        if (elementStepCount == 1 && terminalFunction == null && steps.get(0).nodeTest() != null) {
-            return CompiledExpr.child(steps.get(0).nodeTest().getText());
+        if (elementStepCount == 1 && terminalFunction == null) {
+            XPathParser.StepContext step = steps.get(0);
+            if (step.abbreviatedStep() != null) {
+                if (step.abbreviatedStep().DOTDOT() != null) {
+                    return CompiledExpr.parent();
+                }
+                if (step.abbreviatedStep().DOT() != null) {
+                    return CompiledExpr.self();
+                }
+            }
+            if (step.nodeTest() != null) {
+                return CompiledExpr.child(getNodeTestName(step.nodeTest()));
+            }
+            if (step.attributeStep() != null) {
+                return CompiledExpr.attribute(getAttributeStepName(step.attributeStep()));
+            }
         }
 
         // Build array of child expressions for each element step
@@ -530,9 +704,16 @@ final class XPathCompiler {
         for (int i = 0; i < elementStepCount; i++) {
             XPathParser.StepContext step = steps.get(i);
             if (step.nodeTest() != null) {
-                pathSteps[i] = CompiledExpr.child(step.nodeTest().getText());
+                pathSteps[i] = CompiledExpr.child(getNodeTestName(step.nodeTest()));
+            } else if (step.abbreviatedStep() != null) {
+                if (step.abbreviatedStep().DOTDOT() != null) {
+                    pathSteps[i] = CompiledExpr.parent();
+                } else {
+                    pathSteps[i] = CompiledExpr.self();
+                }
+            } else if (step.attributeStep() != null) {
+                pathSteps[i] = CompiledExpr.attribute(getAttributeStepName(step.attributeStep()));
             } else {
-                // Can't handle complex steps in path
                 return CompiledExpr.unsupported("complex step in path");
             }
         }
@@ -541,24 +722,81 @@ final class XPathCompiler {
     }
 
     /**
+     * Map node type name to FunctionType.
+     */
+    private static @Nullable FunctionType getNodeTypeAsFunctionType(String name) {
+        switch (name) {
+            case "text":
+                return FunctionType.TEXT;
+            case "comment":
+                return FunctionType.COMMENT;
+            case "node":
+                return FunctionType.NODE;
+            case "processing-instruction":
+                return FunctionType.PROCESSING_INSTRUCTION;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Compile a function call expression: functionCall predicate*
+     */
+    static CompiledExpr compileFunctionCallExpr(XPathParser.FunctionCallExprContext fcExpr) {
+        CompiledExpr primary = compileFunctionCall(fcExpr.functionCall());
+        // predicates are handled at a higher level for now
+        return primary;
+    }
+
+    /**
+     * Compile a bracketed expression: LPAREN expr RPAREN predicate*
+     */
+    static CompiledExpr compileBracketedExpr(XPathParser.BracketedExprContext bracketed) {
+        if (bracketed.expr() != null) {
+            return compileExpr(bracketed.expr());
+        }
+        return CompiledExpr.unsupported("empty bracketed expression");
+    }
+
+    /**
+     * Compile a literal or number expression: literal predicate* | NUMBER predicate*
+     */
+    static CompiledExpr compileLiteralOrNumber(XPathParser.LiteralOrNumberContext literalOrNum) {
+        if (literalOrNum.literal() != null) {
+            return CompiledExpr.string(stripQuotes(literalOrNum.literal().getText()));
+        }
+        if (literalOrNum.NUMBER() != null) {
+            try {
+                int value = Integer.parseInt(literalOrNum.NUMBER().getText());
+                return CompiledExpr.numeric(value);
+            } catch (NumberFormatException e) {
+                return CompiledExpr.unsupported("invalid number: " + literalOrNum.NUMBER().getText());
+            }
+        }
+        return CompiledExpr.unsupported("unknown literal/number");
+    }
+
+    /**
      * Compile a function call.
-     * All functions are parsed as NCNAME and identified by name via getFunctionType().
      */
     static CompiledExpr compileFunctionCall(XPathParser.FunctionCallContext fc) {
-        if (fc.NCNAME() == null) {
+        if (fc.functionName() == null) {
             return CompiledExpr.unsupported("unknown function");
         }
 
-        String funcName = fc.NCNAME().getText();
+        String funcName = getFunctionNameText(fc.functionName());
+        if (funcName == null) {
+            return CompiledExpr.unsupported("unknown function");
+        }
         FunctionType type = getFunctionType(funcName);
 
         // Compile arguments if present
         CompiledExpr[] args = EMPTY_PREDICATES;
-        if (fc.functionArgs() != null) {
-            List<XPathParser.FunctionArgContext> argCtxs = fc.functionArgs().functionArg();
+        List<XPathParser.ArgumentContext> argCtxs = fc.argument();
+        if (argCtxs != null && !argCtxs.isEmpty()) {
             args = new CompiledExpr[argCtxs.size()];
             for (int i = 0; i < argCtxs.size(); i++) {
-                args[i] = compileFunctionArg(argCtxs.get(i));
+                args[i] = compileArgument(argCtxs.get(i));
             }
         }
 
@@ -566,107 +804,22 @@ final class XPathCompiler {
     }
 
     /**
-     * Compile a function argument.
+     * Compile a function argument: expr
      */
-    static CompiledExpr compileFunctionArg(XPathParser.FunctionArgContext arg) {
-        // Comparison expression as argument (for not(path = 'value'), etc.)
-        if (arg.comparisonArg() != null) {
-            return compileComparisonArg(arg.comparisonArg());
-        }
-        if (arg.stringLiteral() != null) {
-            return CompiledExpr.string(stripQuotes(arg.stringLiteral().getText()));
-        }
-        if (arg.NUMBER() != null) {
-            try {
-                return CompiledExpr.numeric(Integer.parseInt(arg.NUMBER().getText()));
-            } catch (NumberFormatException e) {
-                return CompiledExpr.unsupported("invalid number");
-            }
-        }
-        if (arg.functionCall() != null) {
-            return compileFunctionCall(arg.functionCall());
-        }
-        // Path arguments (for contains(path, 'str'), local-name(..), etc.)
-        if (arg.relativeLocationPath() != null) {
-            List<XPathParser.StepContext> steps = arg.relativeLocationPath().step();
-            if (steps.size() == 1) {
-                XPathParser.StepContext step = steps.get(0);
-                if (step.nodeTest() != null) {
-                    return CompiledExpr.child(step.nodeTest().getText());
-                }
-                // Handle abbreviated steps: .. (parent) and . (self)
-                if (step.abbreviatedStep() != null) {
-                    if (step.abbreviatedStep().DOTDOT() != null) {
-                        return CompiledExpr.parent();
-                    }
-                    if (step.abbreviatedStep().DOT() != null) {
-                        return CompiledExpr.self();
-                    }
-                }
-            }
-            return CompiledExpr.unsupported("complex path argument");
-        }
-        if (arg.absoluteLocationPath() != null) {
-            return CompiledExpr.absolutePath(arg.absoluteLocationPath().getText());
+    static CompiledExpr compileArgument(XPathParser.ArgumentContext arg) {
+        if (arg.expr() != null) {
+            return compileExpr(arg.expr());
         }
         return CompiledExpr.unsupported("unknown argument type");
     }
 
     /**
-     * Compile a comparison expression used as a function argument.
-     * Handles patterns like: not(path/text() = 'value')
+     * Get the text of a function name from the parse tree.
+     * Works for any token type in functionName rule (NCNAME, TEXT, COMMENT, NODE, PROCESSING_INSTRUCTION).
      */
-    static CompiledExpr compileComparisonArg(XPathParser.ComparisonArgContext cmp) {
-        CompiledExpr left;
-
-        // Compile the left side of the comparison
-        if (cmp.functionCall() != null) {
-            left = compileFunctionCall(cmp.functionCall());
-        } else if (cmp.relativeLocationPath() != null) {
-            left = compileRelativePath(cmp.relativeLocationPath());
-        } else if (cmp.absoluteLocationPath() != null) {
-            left = CompiledExpr.absolutePath(cmp.absoluteLocationPath().getText());
-        } else {
-            return CompiledExpr.unsupported("unknown comparison left side");
-        }
-
-        // Compile comparison operator
-        ComparisonOp op = compileComparisonOp(cmp.comparisonOp());
-
-        // Compile right side (comparand)
-        CompiledExpr right = compileComparand(cmp.comparand());
-
-        return CompiledExpr.comparison(left, op, right);
-    }
-
-    /**
-     * Compile a comparand (right side of comparison).
-     */
-    static CompiledExpr compileComparand(XPathParser.ComparandContext comparand) {
-        if (comparand.stringLiteral() != null) {
-            return CompiledExpr.string(stripQuotes(comparand.stringLiteral().getText()));
-        }
-        if (comparand.NUMBER() != null) {
-            try {
-                return CompiledExpr.numeric(Integer.parseInt(comparand.NUMBER().getText()));
-            } catch (NumberFormatException e) {
-                return CompiledExpr.unsupported("invalid number");
-            }
-        }
-        return CompiledExpr.unsupported("unknown comparand");
-    }
-
-    /**
-     * Compile a comparison operator.
-     */
-    static ComparisonOp compileComparisonOp(XPathParser.ComparisonOpContext op) {
-        if (op.EQUALS() != null) return ComparisonOp.EQ;
-        if (op.NOT_EQUALS() != null) return ComparisonOp.NE;
-        if (op.LT() != null) return ComparisonOp.LT;
-        if (op.LTE() != null) return ComparisonOp.LE;
-        if (op.GT() != null) return ComparisonOp.GT;
-        if (op.GTE() != null) return ComparisonOp.GE;
-        return ComparisonOp.EQ; // default
+    private static @Nullable String getFunctionNameText(XPathParser.FunctionNameContext fnCtx) {
+        // getText() returns the text of whatever token matched the rule
+        return fnCtx.getText();
     }
 
     /**
@@ -674,19 +827,38 @@ final class XPathCompiler {
      */
     static FunctionType getFunctionType(String name) {
         switch (name) {
-            case "position": return FunctionType.POSITION;
-            case "last": return FunctionType.LAST;
-            case "local-name": return FunctionType.LOCAL_NAME;
-            case "namespace-uri": return FunctionType.NAMESPACE_URI;
-            case "contains": return FunctionType.CONTAINS;
-            case "starts-with": return FunctionType.STARTS_WITH;
-            case "ends-with": return FunctionType.ENDS_WITH;
-            case "string-length": return FunctionType.STRING_LENGTH;
-            case "substring-before": return FunctionType.SUBSTRING_BEFORE;
-            case "substring-after": return FunctionType.SUBSTRING_AFTER;
-            case "count": return FunctionType.COUNT;
-            case "text": return FunctionType.TEXT;
-            case "not": return FunctionType.NOT;
+            case "position":
+                return FunctionType.POSITION;
+            case "last":
+                return FunctionType.LAST;
+            case "local-name":
+                return FunctionType.LOCAL_NAME;
+            case "namespace-uri":
+                return FunctionType.NAMESPACE_URI;
+            case "contains":
+                return FunctionType.CONTAINS;
+            case "starts-with":
+                return FunctionType.STARTS_WITH;
+            case "ends-with":
+                return FunctionType.ENDS_WITH;
+            case "string-length":
+                return FunctionType.STRING_LENGTH;
+            case "substring-before":
+                return FunctionType.SUBSTRING_BEFORE;
+            case "substring-after":
+                return FunctionType.SUBSTRING_AFTER;
+            case "count":
+                return FunctionType.COUNT;
+            case "text":
+                return FunctionType.TEXT;
+            case "not":
+                return FunctionType.NOT;
+            case "comment":
+                return FunctionType.COMMENT;
+            case "node":
+                return FunctionType.NODE;
+            case "processing-instruction":
+                return FunctionType.PROCESSING_INSTRUCTION;
             default:
                 throw new IllegalArgumentException("Unsupported XPath function: " + name + "()");
         }
@@ -904,11 +1076,19 @@ final class XPathCompiler {
                 }
             }
 
-            // Axis step: parent::node(), self::element, etc.
-            if (step.axisStep() != null) {
-                XPathParser.AxisStepContext axisStep = step.axisStep();
-                String axisName = axisStep.axisName().NCNAME().getText();
-                String nodeTestName = getNodeTestName(axisStep.nodeTest());
+            // Attribute step: @attr, @*
+            if (step.attributeStep() != null) {
+                String attrName = getAttributeStepName(step.attributeStep());
+                return new CompiledStep(StepType.ATTRIBUTE_STEP, isDescendant, attrName,
+                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+            }
+
+            // Axis step with specifier: parent::node(), self::element, etc.
+            // In the new grammar: step = axisSpecifier? nodeTest predicate*
+            if (step.axisSpecifier() != null && step.nodeTest() != null) {
+                XPathParser.AxisSpecifierContext axisSpec = step.axisSpecifier();
+                String axisName = axisSpec.axisName().NCNAME().getText();
+                String nodeTestName = getNodeTestName(step.nodeTest());
 
                 AxisType axisType;
                 switch (axisName) {
@@ -929,40 +1109,36 @@ final class XPathCompiler {
                         axisType, NodeTypeTestType.UNKNOWN, predicates, flags);
             }
 
-            // Attribute step: @attr, @*
-            if (step.attributeStep() != null) {
-                String attrName = getAttributeStepName(step.attributeStep());
-                return new CompiledStep(StepType.ATTRIBUTE_STEP, isDescendant, attrName,
-                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
-            }
-
-            // Node type test: text(), comment(), node(), processing-instruction()
-            if (step.nodeTypeTest() != null) {
-                String functionName = step.nodeTypeTest().NCNAME().getText();
-                NodeTypeTestType testType;
-                switch (functionName) {
-                    case "text":
-                        testType = NodeTypeTestType.TEXT;
-                        break;
-                    case "comment":
-                        testType = NodeTypeTestType.COMMENT;
-                        break;
-                    case "node":
-                        testType = NodeTypeTestType.NODE;
-                        break;
-                    case "processing-instruction":
-                        testType = NodeTypeTestType.PROCESSING_INSTRUCTION;
-                        break;
-                    default:
-                        testType = NodeTypeTestType.UNKNOWN;
-                }
-                return new CompiledStep(StepType.NODE_TYPE_TEST, isDescendant, null,
-                        AxisType.OTHER, testType, predicates, flags);
-            }
-
-            // Node test: element name or *
+            // Node test without axis: nameTest or nodeType()
             if (step.nodeTest() != null) {
-                String nodeName = step.nodeTest().getText();
+                XPathParser.NodeTestContext nodeTest = step.nodeTest();
+
+                // Check if it's a node type test: text(), comment(), node(), processing-instruction()
+                if (nodeTest.nodeType() != null) {
+                    String functionName = nodeTest.nodeType().getText();
+                    NodeTypeTestType testType;
+                    switch (functionName) {
+                        case "text":
+                            testType = NodeTypeTestType.TEXT;
+                            break;
+                        case "comment":
+                            testType = NodeTypeTestType.COMMENT;
+                            break;
+                        case "node":
+                            testType = NodeTypeTestType.NODE;
+                            break;
+                        case "processing-instruction":
+                            testType = NodeTypeTestType.PROCESSING_INSTRUCTION;
+                            break;
+                        default:
+                            testType = NodeTypeTestType.UNKNOWN;
+                    }
+                    return new CompiledStep(StepType.NODE_TYPE_TEST, isDescendant, null,
+                            AxisType.OTHER, testType, predicates, flags);
+                }
+
+                // It's a name test: element name or *
+                String nodeName = getNodeTestName(nodeTest);
                 return new CompiledStep(StepType.NODE_TEST, isDescendant, nodeName,
                         AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
             }
@@ -1037,7 +1213,10 @@ final class XPathCompiler {
         SUBSTRING_AFTER,    // substring-after(str, delim)
         COUNT,              // count(nodeset)
         TEXT,               // text()
-        NOT                 // not(expr)
+        NOT,                // not(expr)
+        COMMENT,            // comment()
+        NODE,               // node()
+        PROCESSING_INSTRUCTION  // processing-instruction()
     }
 
     /**

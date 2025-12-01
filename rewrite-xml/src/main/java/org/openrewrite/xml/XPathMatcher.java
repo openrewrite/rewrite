@@ -1267,7 +1267,8 @@ public class XPathMatcher {
                 if (compiled.filterExpr.trailingIsDescendant) {
                     findDescendants(filteredTag, compiled.filterExpr.trailingPath, trailingMatches);
                 } else {
-                    trailingMatches.addAll(findDirectChildren(filteredTag, compiled.filterExpr.trailingPath));
+                    // Handle multi-segment paths like "configuration/source"
+                    trailingMatches.addAll(findChildrenByPath(filteredTag, compiled.filterExpr.trailingPath));
                 }
             }
             return trailingMatches.contains(currentTag);
@@ -1454,6 +1455,22 @@ public class XPathMatcher {
             }
         }
         return result;
+    }
+
+    /**
+     * Find children by a path that may contain multiple segments (e.g., "configuration/source").
+     */
+    private Set<Xml.Tag> findChildrenByPath(Xml.Tag parent, String path) {
+        String[] steps = path.split("/");
+        Set<Xml.Tag> currentMatches = findDirectChildren(parent, steps[0]);
+        for (int i = 1; i < steps.length; i++) {
+            Set<Xml.Tag> nextMatches = new LinkedHashSet<>();
+            for (Xml.Tag match : currentMatches) {
+                nextMatches.addAll(findDirectChildren(match, steps[i]));
+            }
+            currentMatches = nextMatches;
+        }
+        return currentMatches;
     }
 
     /**

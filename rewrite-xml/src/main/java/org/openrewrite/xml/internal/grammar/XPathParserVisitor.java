@@ -32,29 +32,89 @@ public interface XPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitXpathExpression(XPathParser.XpathExpressionContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link XPathParser#expr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitExpr(XPathParser.ExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#orExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitOrExpr(XPathParser.OrExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#andExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitAndExpr(XPathParser.AndExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#equalityExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitEqualityExpr(XPathParser.EqualityExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#relationalExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitRelationalExpr(XPathParser.RelationalExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#unaryExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitUnaryExpr(XPathParser.UnaryExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#unionExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitUnionExpr(XPathParser.UnionExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#pathExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitPathExpr(XPathParser.PathExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#functionCallExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitFunctionCallExpr(XPathParser.FunctionCallExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#bracketedExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitBracketedExpr(XPathParser.BracketedExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#literalOrNumber}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitLiteralOrNumber(XPathParser.LiteralOrNumberContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link XPathParser#filterExpr}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitFilterExpr(XPathParser.FilterExprContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link XPathParser#booleanExpr}.
+	 * Visit a parse tree produced by {@link XPathParser#primaryExpr}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitBooleanExpr(XPathParser.BooleanExprContext ctx);
+	T visitPrimaryExpr(XPathParser.PrimaryExprContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link XPathParser#comparisonOp}.
+	 * Visit a parse tree produced by {@link XPathParser#locationPath}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitComparisonOp(XPathParser.ComparisonOpContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XPathParser#comparand}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitComparand(XPathParser.ComparandContext ctx);
+	T visitLocationPath(XPathParser.LocationPathContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link XPathParser#absoluteLocationPath}.
 	 * @param ctx the parse tree
@@ -80,11 +140,11 @@ public interface XPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitStep(XPathParser.StepContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link XPathParser#axisStep}.
+	 * Visit a parse tree produced by {@link XPathParser#axisSpecifier}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitAxisStep(XPathParser.AxisStepContext ctx);
+	T visitAxisSpecifier(XPathParser.AxisSpecifierContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link XPathParser#axisName}.
 	 * @param ctx the parse tree
@@ -98,12 +158,6 @@ public interface XPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitAbbreviatedStep(XPathParser.AbbreviatedStepContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link XPathParser#nodeTypeTest}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitNodeTypeTest(XPathParser.NodeTypeTestContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link XPathParser#attributeStep}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -115,6 +169,18 @@ public interface XPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitNodeTest(XPathParser.NodeTestContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#nameTest}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitNameTest(XPathParser.NameTestContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XPathParser#nodeType}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitNodeType(XPathParser.NodeTypeContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link XPathParser#predicate}.
 	 * @param ctx the parse tree
@@ -128,63 +194,27 @@ public interface XPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitPredicateExpr(XPathParser.PredicateExprContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link XPathParser#orExpr}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitOrExpr(XPathParser.OrExprContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XPathParser#andExpr}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitAndExpr(XPathParser.AndExprContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XPathParser#primaryExpr}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitPrimaryExpr(XPathParser.PrimaryExprContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XPathParser#predicateValue}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitPredicateValue(XPathParser.PredicateValueContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link XPathParser#functionCall}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitFunctionCall(XPathParser.FunctionCallContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link XPathParser#functionArgs}.
+	 * Visit a parse tree produced by {@link XPathParser#functionName}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitFunctionArgs(XPathParser.FunctionArgsContext ctx);
+	T visitFunctionName(XPathParser.FunctionNameContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link XPathParser#functionArg}.
+	 * Visit a parse tree produced by {@link XPathParser#argument}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitFunctionArg(XPathParser.FunctionArgContext ctx);
+	T visitArgument(XPathParser.ArgumentContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link XPathParser#comparisonArg}.
+	 * Visit a parse tree produced by {@link XPathParser#literal}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitComparisonArg(XPathParser.ComparisonArgContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XPathParser#childElementTest}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitChildElementTest(XPathParser.ChildElementTestContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XPathParser#stringLiteral}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitStringLiteral(XPathParser.StringLiteralContext ctx);
+	T visitLiteral(XPathParser.LiteralContext ctx);
 }
