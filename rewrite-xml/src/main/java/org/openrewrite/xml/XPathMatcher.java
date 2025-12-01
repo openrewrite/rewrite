@@ -172,7 +172,7 @@ public class XPathMatcher {
 
         // Match remaining steps going up the cursor chain
         Cursor parentCursor = getParentTagCursor(cursor);
-        return matchRemainingStepsBottomUp(parentCursor, compiled.steps.length - 2);
+        return matchRemainingStepsBottomUp(parentCursor, steps.length - 2);
     }
 
     /**
@@ -655,6 +655,19 @@ public class XPathMatcher {
                 // Tag context only
                 return tag != null ? resolvePathValue(expr, tag) : null;
 
+            case ABSOLUTE_PATH:
+                // Resolve path from document root
+                if (expr.stringValue != null) {
+                    Xml.Tag root = getRootTag(cursor);
+                    if (root != null) {
+                        Set<Xml.Tag> pathMatches = findTagsByPath(root, expr.stringValue);
+                        if (!pathMatches.isEmpty()) {
+                            return pathMatches.iterator().next().getValue().orElse("");
+                        }
+                    }
+                }
+                return "";
+
             case FUNCTION:
                 return resolveFunctionValue(expr, tag, attr, cursor, position, size);
 
@@ -693,6 +706,42 @@ public class XPathMatcher {
                 }
                 return false;
 
+            case STARTS_WITH:
+                if (expr.args != null && expr.args.length >= 2) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    String prefix = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    return str != null && prefix != null && str.startsWith(prefix);
+                }
+                return false;
+
+            case ENDS_WITH:
+                if (expr.args != null && expr.args.length >= 2) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    String suffix = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    return str != null && suffix != null && str.endsWith(suffix);
+                }
+                return false;
+
+            case STRING_LENGTH:
+                if (expr.args != null && expr.args.length > 0) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    return str != null && !str.isEmpty();
+                }
+                return false;
+
+            case COUNT:
+                if (expr.args != null && expr.args.length > 0) {
+                    CompiledExpr pathArg = expr.args[0];
+                    if (pathArg.type == ExprType.ABSOLUTE_PATH && pathArg.stringValue != null) {
+                        Xml.Tag root = getRootTag(cursor);
+                        if (root != null) {
+                            Set<Xml.Tag> matches = findTagsByPath(root, pathArg.stringValue);
+                            return !matches.isEmpty();
+                        }
+                    }
+                }
+                return false;
+
             case TEXT:
                 // text() as existence check - tag context only
                 return tag != null && tag.getValue().isPresent() && !tag.getValue().get().trim().isEmpty();
@@ -725,14 +774,10 @@ public class XPathMatcher {
 
             case LOCAL_NAME:
                 if (tag != null) {
-                    String tagName = tag.getName();
-                    int colonIdx = tagName.indexOf(':');
-                    return colonIdx >= 0 ? tagName.substring(colonIdx + 1) : tagName;
+                    return localName(tag.getName());
                 }
                 if (attr != null) {
-                    String attrName = attr.getKeyAsString();
-                    int colonIdx = attrName.indexOf(':');
-                    return colonIdx >= 0 ? attrName.substring(colonIdx + 1) : attrName;
+                    return localName(attr.getKeyAsString());
                 }
                 return null;
 
@@ -748,6 +793,68 @@ public class XPathMatcher {
             case TEXT:
                 // Tag context only
                 return tag != null ? tag.getValue().orElse("") : null;
+
+            case STRING_LENGTH:
+                if (expr.args != null && expr.args.length > 0) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    return str != null ? String.valueOf(str.length()) : "0";
+                }
+                return "0";
+
+            case SUBSTRING_BEFORE:
+                if (expr.args != null && expr.args.length >= 2) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    String delim = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    String result = substringBefore(str, delim);
+                    return result != null ? result : "";
+                }
+                return "";
+
+            case SUBSTRING_AFTER:
+                if (expr.args != null && expr.args.length >= 2) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    String delim = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    String result = substringAfter(str, delim);
+                    return result != null ? result : "";
+                }
+                return "";
+
+            case COUNT:
+                if (expr.args != null && expr.args.length > 0) {
+                    CompiledExpr pathArg = expr.args[0];
+                    if (pathArg.type == ExprType.ABSOLUTE_PATH && pathArg.stringValue != null) {
+                        Xml.Tag root = getRootTag(cursor);
+                        if (root != null) {
+                            Set<Xml.Tag> matches = findTagsByPath(root, pathArg.stringValue);
+                            return String.valueOf(matches.size());
+                        }
+                    }
+                }
+                return "0";
+
+            case CONTAINS:
+                if (expr.args != null && expr.args.length >= 2) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    String substr = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    return String.valueOf(str != null && substr != null && str.contains(substr));
+                }
+                return "false";
+
+            case STARTS_WITH:
+                if (expr.args != null && expr.args.length >= 2) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    String prefix = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    return String.valueOf(str != null && prefix != null && str.startsWith(prefix));
+                }
+                return "false";
+
+            case ENDS_WITH:
+                if (expr.args != null && expr.args.length >= 2) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    String suffix = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    return String.valueOf(str != null && suffix != null && str.endsWith(suffix));
+                }
+                return "false";
 
             default:
                 return null;
@@ -888,6 +995,31 @@ public class XPathMatcher {
         }
     }
 
+    // ==================== Static String Function Helpers ====================
+
+    private static @Nullable String substringBefore(@Nullable String str, @Nullable String delim) {
+        if (str == null || delim == null) {
+            return null;
+        }
+        int idx = str.indexOf(delim);
+        return idx >= 0 ? str.substring(0, idx) : "";
+    }
+
+    private static @Nullable String substringAfter(@Nullable String str, @Nullable String delim) {
+        if (str == null || delim == null) {
+            return null;
+        }
+        int idx = str.indexOf(delim);
+        return idx >= 0 ? str.substring(idx + delim.length()) : "";
+    }
+
+    private static String localName(String name) {
+        int colonIdx = name.indexOf(':');
+        return colonIdx >= 0 ? name.substring(colonIdx + 1) : name;
+    }
+
+    // ==================== Instance Helper Methods ====================
+
     /**
      * Check if tag has a child element with the given name.
      */
@@ -1001,12 +1133,14 @@ public class XPathMatcher {
             return false;
         }
 
-        Xml.Tag root = getRootTag(cursor);
-        if (root == null) {
+        Cursor rootCursor = getRootCursor(cursor);
+        if (rootCursor == null) {
             return false;
         }
+        Xml.Tag root = (Xml.Tag) rootCursor.getValue();
 
-        boolean result = evaluateBooleanExprAtRoot(compiled.booleanExpr, root);
+        // Evaluate using unified method with root context (position=1, size=1)
+        boolean result = evaluateExpr(compiled.booleanExpr, root, null, rootCursor, 1, 1);
 
         // Only match at the root element to avoid multiple matches
         int depth = 0;
@@ -1014,217 +1148,6 @@ public class XPathMatcher {
             if (c.getValue() instanceof Xml.Tag) depth++;
         }
         return result && depth == 1;
-    }
-
-    /**
-     * Evaluate a boolean expression at the document root.
-     */
-    @SuppressWarnings("DataFlowIssue")
-    private boolean evaluateBooleanExprAtRoot(CompiledExpr expr, Xml.Tag root) {
-        switch (expr.type) {
-            case COMPARISON:
-                String leftValue = resolveValueAtRoot(expr.left, root);
-                String rightValue = resolveValueAtRoot(expr.right, root);
-                if (leftValue == null || rightValue == null) {
-                    return false;
-                }
-                return compareValues(leftValue, rightValue, expr.op);
-
-            case FUNCTION:
-                return evaluateBooleanFunctionAtRoot(expr, root);
-
-            case BOOLEAN:
-                return expr.booleanValue;
-
-            default:
-                return false;
-        }
-    }
-
-    /**
-     * Resolve a compiled expression value at the document root.
-     */
-    @SuppressWarnings("ConstantValue")
-    private @Nullable String resolveValueAtRoot(CompiledExpr expr, Xml.Tag root) {
-        if (expr == null) {
-            return null;
-        }
-
-        switch (expr.type) {
-            case STRING:
-                return expr.stringValue;
-
-            case NUMERIC:
-                return String.valueOf(expr.numericValue);
-
-            case FUNCTION:
-                return resolveFunctionValueAtRoot(expr, root);
-
-            case CHILD:
-                Set<Xml.Tag> childMatches = findTagsByPath(root, expr.name != null ? expr.name : "*");
-                if (!childMatches.isEmpty()) {
-                    return childMatches.iterator().next().getValue().orElse("");
-                }
-                return "";
-
-            case ABSOLUTE_PATH:
-                if (expr.stringValue != null) {
-                    Set<Xml.Tag> pathMatches = findTagsByPath(root, expr.stringValue);
-                    if (!pathMatches.isEmpty()) {
-                        return pathMatches.iterator().next().getValue().orElse("");
-                    }
-                }
-                return "";
-
-            default:
-                return null;
-        }
-    }
-
-    /**
-     * Resolve a function value at the document root.
-     */
-    private @Nullable String resolveFunctionValueAtRoot(CompiledExpr expr, Xml.Tag root) {
-        if (expr.functionType == null) {
-            return null;
-        }
-
-        switch (expr.functionType) {
-            case TEXT:
-                return root.getValue().orElse("");
-
-            case LOCAL_NAME:
-                String tagName = root.getName();
-                int colonIdx = tagName.indexOf(':');
-                return colonIdx >= 0 ? tagName.substring(colonIdx + 1) : tagName;
-
-            case STRING_LENGTH:
-                if (expr.args != null && expr.args.length > 0) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    return str != null ? String.valueOf(str.length()) : "0";
-                }
-                return "0";
-
-            case SUBSTRING_BEFORE:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    String delim = resolveValueAtRoot(expr.args[1], root);
-                    if (str != null && delim != null) {
-                        int idx = str.indexOf(delim);
-                        return idx >= 0 ? str.substring(0, idx) : "";
-                    }
-                }
-                return "";
-
-            case SUBSTRING_AFTER:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    String delim = resolveValueAtRoot(expr.args[1], root);
-                    if (str != null && delim != null) {
-                        int idx = str.indexOf(delim);
-                        return idx >= 0 ? str.substring(idx + delim.length()) : "";
-                    }
-                }
-                return "";
-
-            case COUNT:
-                if (expr.args != null && expr.args.length > 0) {
-                    CompiledExpr pathArg = expr.args[0];
-                    if (pathArg.type == ExprType.ABSOLUTE_PATH && pathArg.stringValue != null) {
-                        Set<Xml.Tag> matches = findTagsByPath(root, pathArg.stringValue);
-                        return String.valueOf(matches.size());
-                    }
-                }
-                return "0";
-
-            case CONTAINS:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    String substr = resolveValueAtRoot(expr.args[1], root);
-                    return String.valueOf(str != null && substr != null && str.contains(substr));
-                }
-                return "false";
-
-            case STARTS_WITH:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    String prefix = resolveValueAtRoot(expr.args[1], root);
-                    return String.valueOf(str != null && prefix != null && str.startsWith(prefix));
-                }
-                return "false";
-
-            case ENDS_WITH:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    String suffix = resolveValueAtRoot(expr.args[1], root);
-                    return String.valueOf(str != null && suffix != null && str.endsWith(suffix));
-                }
-                return "false";
-
-            default:
-                return null;
-        }
-    }
-
-    /**
-     * Evaluate a boolean function at the document root.
-     */
-    private boolean evaluateBooleanFunctionAtRoot(CompiledExpr expr, Xml.Tag root) {
-        if (expr.functionType == null) {
-            return false;
-        }
-
-        switch (expr.functionType) {
-            case CONTAINS:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    String substr = resolveValueAtRoot(expr.args[1], root);
-                    return str != null && substr != null && str.contains(substr);
-                }
-                return false;
-
-            case STARTS_WITH:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    String prefix = resolveValueAtRoot(expr.args[1], root);
-                    return str != null && prefix != null && str.startsWith(prefix);
-                }
-                return false;
-
-            case ENDS_WITH:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    String suffix = resolveValueAtRoot(expr.args[1], root);
-                    return str != null && suffix != null && str.endsWith(suffix);
-                }
-                return false;
-
-            case STRING_LENGTH:
-                if (expr.args != null && expr.args.length > 0) {
-                    String str = resolveValueAtRoot(expr.args[0], root);
-                    return str != null && !str.isEmpty();
-                }
-                return false;
-
-            case COUNT:
-                if (expr.args != null && expr.args.length > 0) {
-                    CompiledExpr pathArg = expr.args[0];
-                    if (pathArg.type == ExprType.ABSOLUTE_PATH && pathArg.stringValue != null) {
-                        Set<Xml.Tag> matches = findTagsByPath(root, pathArg.stringValue);
-                        return !matches.isEmpty();
-                    }
-                }
-                return false;
-
-            case NOT:
-                if (expr.args != null && expr.args.length > 0) {
-                    return !evaluateBooleanExprAtRoot(expr.args[0], root);
-                }
-                return false;
-
-            default:
-                return false;
-        }
     }
 
     // ==================== Filter Expression Matching ====================
@@ -1351,9 +1274,7 @@ public class XPathMatcher {
                     return String.valueOf(size);
                 }
                 if (expr.functionType == FunctionType.LOCAL_NAME) {
-                    String name = tag.getName();
-                    int idx = name.indexOf(':');
-                    return idx >= 0 ? name.substring(idx + 1) : name;
+                    return localName(tag.getName());
                 }
                 return null;
             default:
@@ -1364,14 +1285,22 @@ public class XPathMatcher {
     // ==================== Tree Traversal Helpers ====================
 
     /**
-     * Get the root tag from a cursor by walking up to the document.
+     * Get the cursor at the root tag by walking up to the document.
      */
-    private Xml.@Nullable Tag getRootTag(Cursor cursor) {
+    private @Nullable Cursor getRootCursor(Cursor cursor) {
         Cursor c = cursor;
         while (c.getParent() != null && !(c.getParent().getValue() instanceof Xml.Document)) {
             c = c.getParent();
         }
-        return c.getValue() instanceof Xml.Tag ? (Xml.Tag) c.getValue() : null;
+        return c.getValue() instanceof Xml.Tag ? c : null;
+    }
+
+    /**
+     * Get the root tag from a cursor by walking up to the document.
+     */
+    private Xml.@Nullable Tag getRootTag(Cursor cursor) {
+        Cursor rootCursor = getRootCursor(cursor);
+        return rootCursor != null ? (Xml.Tag) rootCursor.getValue() : null;
     }
 
     /**
