@@ -542,35 +542,27 @@ final class XPathCompiler {
 
     /**
      * Compile a function call.
+     * All functions are parsed as NCNAME and identified by name via getFunctionType().
      */
     static CompiledExpr compileFunctionCall(XPathParser.FunctionCallContext fc) {
-        // Built-in function tokens
-        if (fc.LOCAL_NAME() != null) {
-            return CompiledExpr.function(FunctionType.LOCAL_NAME);
-        }
-        if (fc.NAMESPACE_URI() != null) {
-            return CompiledExpr.function(FunctionType.NAMESPACE_URI);
+        if (fc.NCNAME() == null) {
+            return CompiledExpr.unsupported("unknown function");
         }
 
-        // Named function (NCNAME)
-        if (fc.NCNAME() != null) {
-            String funcName = fc.NCNAME().getText();
-            FunctionType type = getFunctionType(funcName);
+        String funcName = fc.NCNAME().getText();
+        FunctionType type = getFunctionType(funcName);
 
-            // Compile arguments if present
-            CompiledExpr[] args = EMPTY_PREDICATES;
-            if (fc.functionArgs() != null) {
-                List<XPathParser.FunctionArgContext> argCtxs = fc.functionArgs().functionArg();
-                args = new CompiledExpr[argCtxs.size()];
-                for (int i = 0; i < argCtxs.size(); i++) {
-                    args[i] = compileFunctionArg(argCtxs.get(i));
-                }
+        // Compile arguments if present
+        CompiledExpr[] args = EMPTY_PREDICATES;
+        if (fc.functionArgs() != null) {
+            List<XPathParser.FunctionArgContext> argCtxs = fc.functionArgs().functionArg();
+            args = new CompiledExpr[argCtxs.size()];
+            for (int i = 0; i < argCtxs.size(); i++) {
+                args[i] = compileFunctionArg(argCtxs.get(i));
             }
-
-            return CompiledExpr.function(type, args);
         }
 
-        return CompiledExpr.unsupported("unknown function");
+        return CompiledExpr.function(type, args);
     }
 
     /**
@@ -590,11 +582,23 @@ final class XPathCompiler {
         if (arg.functionCall() != null) {
             return compileFunctionCall(arg.functionCall());
         }
-        // Path arguments (for contains(path, 'str'))
+        // Path arguments (for contains(path, 'str'), local-name(..), etc.)
         if (arg.relativeLocationPath() != null) {
             List<XPathParser.StepContext> steps = arg.relativeLocationPath().step();
-            if (steps.size() == 1 && steps.get(0).nodeTest() != null) {
-                return CompiledExpr.child(steps.get(0).nodeTest().getText());
+            if (steps.size() == 1) {
+                XPathParser.StepContext step = steps.get(0);
+                if (step.nodeTest() != null) {
+                    return CompiledExpr.child(step.nodeTest().getText());
+                }
+                // Handle abbreviated steps: .. (parent) and . (self)
+                if (step.abbreviatedStep() != null) {
+                    if (step.abbreviatedStep().DOTDOT() != null) {
+                        return CompiledExpr.parent();
+                    }
+                    if (step.abbreviatedStep().DOT() != null) {
+                        return CompiledExpr.self();
+                    }
+                }
             }
             return CompiledExpr.unsupported("complex path argument");
         }
@@ -1020,6 +1024,8 @@ final class XPathCompiler {
         PATH,           // Multi-step relative path (e.g., bar/baz/text())
         ABSOLUTE_PATH,  // Absolute path like /root/element1
         BOOLEAN,        // true/false
+        PARENT,         // .. (parent::node())
+        SELF,           // . (self::node())
     }
 
     /**
@@ -1098,6 +1104,14 @@ final class XPathCompiler {
 
         public static CompiledExpr child(@Nullable String name) {
             return new CompiledExpr(ExprType.CHILD, 0, null, null, null, null, null, null, name, false);
+        }
+
+        public static CompiledExpr parent() {
+            return new CompiledExpr(ExprType.PARENT, 0, null, null, null, null, null, null, null, false);
+        }
+
+        public static CompiledExpr self() {
+            return new CompiledExpr(ExprType.SELF, 0, null, null, null, null, null, null, null, false);
         }
 
         /**

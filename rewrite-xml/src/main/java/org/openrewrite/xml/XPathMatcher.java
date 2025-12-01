@@ -471,6 +471,17 @@ public class XPathMatcher {
     }
 
     /**
+     * Get the parent tag from the cursor, skipping non-tag nodes.
+     */
+    private Xml.@Nullable Tag getParentTag(Cursor cursor) {
+        Cursor parentCursor = getParentTagCursor(cursor);
+        if (parentCursor != null && parentCursor.getValue() instanceof Xml.Tag) {
+            return parentCursor.getValue();
+        }
+        return null;
+    }
+
+    /**
      * Check if a compiled step matches a tag.
      */
     private boolean matchStepAgainstTag(CompiledStep step, Xml.Tag tag, Cursor cursor) {
@@ -772,23 +783,50 @@ public class XPathMatcher {
             case LAST:
                 return String.valueOf(size);
 
-            case LOCAL_NAME:
-                if (tag != null) {
-                    return localName(tag.getName());
+            case LOCAL_NAME: {
+                // Handle arguments: local-name(..) means local-name of parent, local-name(.) means self
+                Xml.Tag targetTag = tag;
+                if (expr.args != null && expr.args.length > 0) {
+                    CompiledExpr argExpr = expr.args[0];
+                    if (argExpr.type == ExprType.PARENT) {
+                        targetTag = getParentTag(cursor);
+                    } else if (argExpr.type == ExprType.SELF) {
+                        targetTag = tag;
+                    }
                 }
-                if (attr != null) {
+                if (targetTag != null) {
+                    return localName(targetTag.getName());
+                }
+                if (attr != null && (expr.args == null || expr.args.length == 0)) {
                     return localName(attr.getKeyAsString());
                 }
                 return null;
+            }
 
-            case NAMESPACE_URI:
-                if (tag != null) {
-                    return resolveNamespaceUri(tag, cursor);
+            case NAMESPACE_URI: {
+                // Handle arguments: namespace-uri(..) means namespace-uri of parent, namespace-uri(.) means self
+                Xml.Tag targetTag = tag;
+                Cursor targetCursor = cursor;
+                if (expr.args != null && expr.args.length > 0) {
+                    CompiledExpr argExpr = expr.args[0];
+                    if (argExpr.type == ExprType.PARENT) {
+                        Cursor parentCursor = getParentTagCursor(cursor);
+                        if (parentCursor != null && parentCursor.getValue() instanceof Xml.Tag) {
+                            targetTag = parentCursor.getValue();
+                            targetCursor = parentCursor;
+                        } else {
+                            return null;
+                        }
+                    }
                 }
-                if (attr != null) {
+                if (targetTag != null) {
+                    return resolveNamespaceUri(targetTag, targetCursor);
+                }
+                if (attr != null && (expr.args == null || expr.args.length == 0)) {
                     return resolveAttributeNamespaceUri(attr, cursor);
                 }
                 return null;
+            }
 
             case TEXT:
                 // Tag context only

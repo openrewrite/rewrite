@@ -174,7 +174,7 @@ class XPathMatcherTest {
 
         // no / at start
         assertThat(match("element/test", xml)).isTrue();
-        assertThat(match("element[@foo='bar']/test", xml)).isTrue();
+        assertThat(match("element[local-name(..)='root']", xml)).isTrue();
         assertThat(match("element[@foo='baz']/test", xml)).isFalse();
         assertThat(match("element/@qux", xml)).isTrue();
         assertThat(match("dne[@foo='bar']/test", xml)).isFalse();
@@ -186,12 +186,11 @@ class XPathMatcherTest {
         assertThat(match("//element/@qux", xml)).isTrue();
         assertThat(match("//dne[@foo='bar']/test", xml)).isFalse();
 
-        // TODO // in the middle without / (or with //) at start (not currently supported)
-//        assertThat(match("root//element/test", xml)).isTrue();
-//        assertThat(match("root//element[@foo='bar']/test", xml)).isTrue();
-//        assertThat(match("root//element[@foo='baz']/test", xml)).isFalse();
-//        assertThat(match("root//element/@qux", xml)).isTrue();
-//        assertThat(match("root//dne[@foo='bar']/test", xml)).isFalse();
+        assertThat(match("root//element/test", xml)).isTrue();
+        assertThat(match("root//element[@foo='bar']/test", xml)).isTrue();
+        assertThat(match("root//element[@foo='baz']/test", xml)).isFalse();
+        assertThat(match("root//element/@qux", xml)).isTrue();
+        assertThat(match("root//dne[@foo='bar']/test", xml)).isFalse();
 
         // // in the middle with / at start
         assertThat(match("/root//element/test", xml)).isTrue();
@@ -671,7 +670,7 @@ class XPathMatcherTest {
         return matchCount(xpath, x) > 0;
     }
 
-    private int matchCount(String xpath, SourceFile x) {
+    private int matchCount(@Language("xpath") String xpath, SourceFile x) {
         XPathMatcher matcher = new XPathMatcher(xpath);
         return (new XmlVisitor<AtomicInteger>() {
             @Override

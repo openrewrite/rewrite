@@ -172,10 +172,10 @@ predicateValue
 
 // XPath function call - unified for both top-level and predicate use
 // Function names are NCNames (no namespace prefix in standard XPath 1.0)
+// Specific functions like local-name, namespace-uri, contains, etc. are
+// validated at runtime in the compiler via getFunctionType()
 functionCall
-    : LOCAL_NAME LPAREN RPAREN
-    | NAMESPACE_URI LPAREN RPAREN
-    | NCNAME LPAREN functionArgs? RPAREN
+    : NCNAME LPAREN functionArgs? RPAREN
     ;
 
 // Function arguments (comma-separated)

@@ -55,10 +55,6 @@ NUMBER : [0-9]+ ('.' [0-9]+)? ;
 AND : 'and' ;
 OR : 'or' ;
 
-// XPath functions
-LOCAL_NAME : 'local-name' ;
-NAMESPACE_URI : 'namespace-uri' ;
-
 // String literals
 STRING_LITERAL
     : '\'' (~['])* '\''
