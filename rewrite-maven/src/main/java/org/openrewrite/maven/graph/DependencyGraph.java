@@ -22,11 +22,17 @@ import java.util.List;
 
 public class DependencyGraph {
     public static String render(String scopeOrConfig, List<ResolvedDependency> dependencyPath) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < dependencyPath.size(); i++) {
-            appendIndentedLine(sb, i, formatDependency(dependencyPath.get(i).getGav()));
+        if (dependencyPath.isEmpty()) {
+            return "";
         }
-        appendIndentedLine(sb, dependencyPath.size(), scopeOrConfig);
+
+        StringBuilder sb = new StringBuilder();
+        ResolvedDependency directDependency = dependencyPath.get(0);
+        sb.append(formatDependency(directDependency.getGav()));
+        for (int i = 1; i < dependencyPath.size(); i++) {
+            appendIndentedLine(sb, i - 1, formatDependency(dependencyPath.get(i).getGav()));
+        }
+        appendIndentedLine(sb, dependencyPath.size() - 1, scopeOrConfig);
         return sb.toString();
     }
 
