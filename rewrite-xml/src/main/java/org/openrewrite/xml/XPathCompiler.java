@@ -652,7 +652,8 @@ final class XPathCompiler {
             case "count": return FunctionType.COUNT;
             case "text": return FunctionType.TEXT;
             case "not": return FunctionType.NOT;
-            default: return FunctionType.UNKNOWN;
+            default:
+                throw new IllegalArgumentException("Unsupported XPath function: " + name + "()");
         }
     }
 
@@ -1001,8 +1002,7 @@ final class XPathCompiler {
         SUBSTRING_AFTER,    // substring-after(str, delim)
         COUNT,              // count(nodeset)
         TEXT,               // text()
-        NOT,                // not(expr)
-        UNKNOWN             // unsupported function
+        NOT                 // not(expr)
     }
 
     /**
@@ -1020,7 +1020,6 @@ final class XPathCompiler {
         PATH,           // Multi-step relative path (e.g., bar/baz/text())
         ABSOLUTE_PATH,  // Absolute path like /root/element1
         BOOLEAN,        // true/false
-        // UNSUPPORTED was removed - now throws at compile time
     }
 
     /**

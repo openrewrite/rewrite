@@ -36,6 +36,7 @@ import static org.openrewrite.xml.XPathCompiler.FLAG_ABSOLUTE_PATH;
  * <p>
  * Used for checking whether a visitor's cursor meets a certain XPath expression.
  */
+@SuppressWarnings("BooleanMethodIsAlwaysInverted")
 public class XPathMatcher {
 
     private final String expression;
@@ -210,19 +211,7 @@ public class XPathMatcher {
      * Check if a tag has a direct child with the given name.
      */
     private boolean hasChildWithName(Xml.Tag parent, String childName) {
-        List<? extends Content> contents = parent.getContent();
-        if (contents == null) {
-            return false;
-        }
-        for (Content c : contents) {
-            if (c instanceof Xml.Tag) {
-                Xml.Tag child = (Xml.Tag) c;
-                if ("*".equals(childName) || child.getName().equals(childName)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return findChildTag(parent, childName) != null;
     }
 
     /**
@@ -266,7 +255,7 @@ public class XPathMatcher {
     private boolean evaluateAttributePredicatesBottomUp(CompiledExpr[] predicates,
                                                         Xml.Attribute attr, Cursor cursor) {
         for (CompiledExpr predicate : predicates) {
-            if (!evaluateAttributeExpr(predicate, attr, cursor, 1, 1)) {
+            if (!evaluateExpr(predicate, null, attr, cursor, 1, 1)) {
                 return false;
             }
         }
@@ -548,7 +537,7 @@ public class XPathMatcher {
         }
 
         for (CompiledExpr predicate : predicates) {
-            if (!evaluateTagExpr(predicate, tag, cursor, position, size)) {
+            if (!evaluateExpr(predicate, tag, null, cursor, position, size)) {
                 return false;
             }
         }
@@ -558,46 +547,210 @@ public class XPathMatcher {
     // ==================== Compiled Expression Evaluation ====================
 
     /**
-     * Evaluate a compiled expression against a tag.
+     * Unified expression evaluation for both tag and attribute contexts.
+     * Pass the relevant context (tag or attr), with the other as null.
+     * This is allocation-free - no context objects are created.
+     *
+     * @param expr     the compiled expression to evaluate
+     * @param tag      the tag context (null for attribute-only evaluation)
+     * @param attr     the attribute context (null for tag-only evaluation)
+     * @param cursor   the cursor position
+     * @param position the 1-based position among siblings
+     * @param size     the total number of siblings
+     * @return true if the expression evaluates to true
      */
     @SuppressWarnings("DataFlowIssue")
-    private boolean evaluateTagExpr(CompiledExpr expr, Xml.Tag tag, Cursor cursor, int position, int size) {
+    private boolean evaluateExpr(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
+                                 Cursor cursor, int position, int size) {
         switch (expr.type) {
             case NUMERIC:
                 // Positional predicate: [1], [2], etc.
                 return position == expr.numericValue;
 
             case AND:
-                return evaluateTagExpr(expr.left, tag, cursor, position, size) &&
-                        evaluateTagExpr(expr.right, tag, cursor, position, size);
+                return evaluateExpr(expr.left, tag, attr, cursor, position, size) &&
+                        evaluateExpr(expr.right, tag, attr, cursor, position, size);
 
             case OR:
-                return evaluateTagExpr(expr.left, tag, cursor, position, size) ||
-                        evaluateTagExpr(expr.right, tag, cursor, position, size);
+                return evaluateExpr(expr.left, tag, attr, cursor, position, size) ||
+                        evaluateExpr(expr.right, tag, attr, cursor, position, size);
 
             case COMPARISON:
-                return evaluateTagComparison(expr, tag, cursor, position, size);
+                return evaluateComparison(expr, tag, attr, cursor, position, size);
 
             case FUNCTION:
-                return evaluateTagFunction(expr, tag, cursor, position, size);
+                return evaluateFunction(expr, tag, attr, cursor, position, size);
 
             case CHILD:
-                // Existence check: [childName]
-                return hasChildElement(tag, expr.name);
+                // Existence check: [childName] - tag context only
+                return tag != null && hasChildElement(tag, expr.name);
 
             case PATH:
-                // Path existence check: [a/b/c] - check if path exists from this tag
-                return pathExists(tag, expr);
+                // Path existence check: [a/b/c] - tag context only
+                return tag != null && pathExists(tag, expr);
 
             case ATTRIBUTE:
-                // Existence check: [@attr]
-                return hasAttribute(tag, expr.name);
+                // Existence check: [@attr] - tag context only
+                return tag != null && hasAttribute(tag, expr.name);
 
             case BOOLEAN:
                 return expr.booleanValue;
 
             default:
                 return false;
+        }
+    }
+
+    /**
+     * Unified comparison evaluation for both tag and attribute contexts.
+     */
+    @SuppressWarnings("DataFlowIssue")
+    private boolean evaluateComparison(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
+                                       Cursor cursor, int position, int size) {
+        String leftValue = resolveValue(expr.left, tag, attr, cursor, position, size);
+        String rightValue = resolveValue(expr.right, tag, attr, cursor, position, size);
+
+        if (leftValue == null || rightValue == null) {
+            return false;
+        }
+
+        return compareValues(leftValue, rightValue, expr.op);
+    }
+
+    /**
+     * Unified value resolution for both tag and attribute contexts.
+     */
+    private @Nullable String resolveValue(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
+                                          Cursor cursor, int position, int size) {
+        switch (expr.type) {
+            case STRING:
+                return expr.stringValue;
+
+            case NUMERIC:
+                return String.valueOf(expr.numericValue);
+
+            case CHILD:
+                // Tag context only
+                return tag != null ? getChildElementValue(tag, expr.name) : null;
+
+            case ATTRIBUTE:
+                // In tag context, get attribute from tag
+                // In attribute context, get value from current attribute or parent tag
+                if (tag != null) {
+                    return getAttributeValue(tag, expr.name);
+                }
+                if (attr != null) {
+                    if (expr.name == null || "*".equals(expr.name)) {
+                        return attr.getValueAsString();
+                    }
+                    // For named attributes, check parent tag
+                    Cursor parentCursor = cursor.getParent();
+                    if (parentCursor != null && parentCursor.getValue() instanceof Xml.Tag) {
+                        return getAttributeValue(parentCursor.getValue(), expr.name);
+                    }
+                }
+                return null;
+
+            case PATH:
+                // Tag context only
+                return tag != null ? resolvePathValue(expr, tag) : null;
+
+            case FUNCTION:
+                return resolveFunctionValue(expr, tag, attr, cursor, position, size);
+
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Unified function evaluation as boolean for both contexts.
+     */
+    private boolean evaluateFunction(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
+                                     Cursor cursor, int position, int size) {
+        if (expr.functionType == null) {
+            return false;
+        }
+
+        switch (expr.functionType) {
+            case POSITION:
+                return position > 0;
+
+            case LAST:
+                return position == size;
+
+            case NOT:
+                if (expr.args != null && expr.args.length > 0) {
+                    return !evaluateExpr(expr.args[0], tag, attr, cursor, position, size);
+                }
+                return false;
+
+            case CONTAINS:
+                if (expr.args != null && expr.args.length >= 2) {
+                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    String substr = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    return str != null && substr != null && str.contains(substr);
+                }
+                return false;
+
+            case TEXT:
+                // text() as existence check - tag context only
+                return tag != null && tag.getValue().isPresent() && !tag.getValue().get().trim().isEmpty();
+
+            case LOCAL_NAME:
+            case NAMESPACE_URI:
+                // These return strings, not booleans - but as existence check they're truthy
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Unified function value resolution for both contexts.
+     */
+    private @Nullable String resolveFunctionValue(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
+                                                  Cursor cursor, int position, int size) {
+        if (expr.functionType == null) {
+            return null;
+        }
+
+        switch (expr.functionType) {
+            case POSITION:
+                return String.valueOf(position);
+
+            case LAST:
+                return String.valueOf(size);
+
+            case LOCAL_NAME:
+                if (tag != null) {
+                    String tagName = tag.getName();
+                    int colonIdx = tagName.indexOf(':');
+                    return colonIdx >= 0 ? tagName.substring(colonIdx + 1) : tagName;
+                }
+                if (attr != null) {
+                    String attrName = attr.getKeyAsString();
+                    int colonIdx = attrName.indexOf(':');
+                    return colonIdx >= 0 ? attrName.substring(colonIdx + 1) : attrName;
+                }
+                return null;
+
+            case NAMESPACE_URI:
+                if (tag != null) {
+                    return resolveNamespaceUri(tag, cursor);
+                }
+                if (attr != null) {
+                    return resolveAttributeNamespaceUri(attr, cursor);
+                }
+                return null;
+
+            case TEXT:
+                // Tag context only
+                return tag != null ? tag.getValue().orElse("") : null;
+
+            default:
+                return null;
         }
     }
 
@@ -646,95 +799,6 @@ public class XPathMatcher {
     }
 
     /**
-     * Evaluate a compiled expression against an attribute.
-     */
-    @SuppressWarnings("DataFlowIssue")
-    private boolean evaluateAttributeExpr(CompiledExpr expr, Xml.Attribute attr, Cursor cursor, int position, int size) {
-        switch (expr.type) {
-            case NUMERIC:
-                return position == expr.numericValue;
-
-            case AND:
-                return evaluateAttributeExpr(expr.left, attr, cursor, position, size) &&
-                        evaluateAttributeExpr(expr.right, attr, cursor, position, size);
-
-            case OR:
-                return evaluateAttributeExpr(expr.left, attr, cursor, position, size) ||
-                        evaluateAttributeExpr(expr.right, attr, cursor, position, size);
-
-            case COMPARISON:
-                return evaluateAttributeComparison(expr, attr, cursor, position, size);
-
-            case FUNCTION:
-                return evaluateAttributeFunction(expr, attr, cursor, position, size);
-
-            case BOOLEAN:
-                return expr.booleanValue;
-
-            default:
-                return false;
-        }
-    }
-
-    /**
-     * Evaluate a comparison expression against a tag.
-     */
-    @SuppressWarnings("DataFlowIssue")
-    private boolean evaluateTagComparison(CompiledExpr expr, Xml.Tag tag, Cursor cursor, int position, int size) {
-        String leftValue = resolveTagValue(expr.left, tag, cursor, position, size);
-        String rightValue = resolveTagValue(expr.right, tag, cursor, position, size);
-
-        if (leftValue == null || rightValue == null) {
-            return false;
-        }
-
-        return compareValues(leftValue, rightValue, expr.op);
-    }
-
-    /**
-     * Evaluate a comparison expression against an attribute.
-     */
-    @SuppressWarnings("DataFlowIssue")
-    private boolean evaluateAttributeComparison(CompiledExpr expr, Xml.Attribute attr, Cursor cursor, int position, int size) {
-        String leftValue = resolveAttributeValue(expr.left, attr, cursor, position, size);
-        String rightValue = resolveAttributeValue(expr.right, attr, cursor, position, size);
-
-        if (leftValue == null || rightValue == null) {
-            return false;
-        }
-
-        return compareValues(leftValue, rightValue, expr.op);
-    }
-
-    /**
-     * Resolve a value expression to a string in tag context.
-     */
-    private @Nullable String resolveTagValue(CompiledExpr expr, Xml.Tag tag, Cursor cursor, int position, int size) {
-        switch (expr.type) {
-            case STRING:
-                return expr.stringValue;
-
-            case NUMERIC:
-                return String.valueOf(expr.numericValue);
-
-            case CHILD:
-                return getChildElementValue(tag, expr.name);
-
-            case ATTRIBUTE:
-                return getAttributeValue(tag, expr.name);
-
-            case PATH:
-                return resolvePathValue(expr, tag);
-
-            case FUNCTION:
-                return resolveTagFunctionValue(expr, tag, cursor, position, size);
-
-            default:
-                return null;
-        }
-    }
-
-    /**
      * Resolve a PATH expression value by navigating child elements.
      */
     private @Nullable String resolvePathValue(CompiledExpr expr, Xml.Tag tag) {
@@ -753,7 +817,7 @@ public class XPathMatcher {
             if (step.type != ExprType.CHILD) {
                 return null;
             }
-            Xml.Tag child = findFirstChild(current, step.name);
+            Xml.Tag child = findChildTag(current, step.name);
             if (child == null) {
                 return null;
             }
@@ -767,200 +831,6 @@ public class XPathMatcher {
 
         // Default: return text value of target element
         return current.getValue().orElse("");
-    }
-
-    /**
-     * Find the first child element with the given name.
-     */
-    private Xml.@Nullable Tag findFirstChild(Xml.Tag parent, @Nullable String name) {
-        List<? extends Content> contents = parent.getContent();
-        if (contents == null) {
-            return null;
-        }
-        for (Content c : contents) {
-            if (c instanceof Xml.Tag) {
-                Xml.Tag child = (Xml.Tag) c;
-                if (name == null || "*".equals(name) || child.getName().equals(name)) {
-                    return child;
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Resolve a value expression to a string in attribute context.
-     */
-    private @Nullable String resolveAttributeValue(CompiledExpr expr, Xml.Attribute attr, Cursor cursor, int position, int size) {
-        switch (expr.type) {
-            case STRING:
-                return expr.stringValue;
-
-            case NUMERIC:
-                return String.valueOf(expr.numericValue);
-
-            case ATTRIBUTE:
-                // @attr in predicate on attribute step - refers to current attribute
-                if (expr.name == null || "*".equals(expr.name)) {
-                    return attr.getValueAsString();
-                }
-                // For named attributes, check parent tag
-                Cursor parentCursor = cursor.getParent();
-                if (parentCursor != null && parentCursor.getValue() instanceof Xml.Tag) {
-                    return getAttributeValue(parentCursor.getValue(), expr.name);
-                }
-                return null;
-
-            case FUNCTION:
-                return resolveAttributeFunctionValue(expr, attr, cursor, position, size);
-
-            default:
-                return null;
-        }
-    }
-
-    /**
-     * Evaluate a function expression as boolean against a tag.
-     */
-    private boolean evaluateTagFunction(CompiledExpr expr, Xml.Tag tag, Cursor cursor, int position, int size) {
-        if (expr.functionType == null) {
-            return false;
-        }
-
-        switch (expr.functionType) {
-            case POSITION:
-                // position() alone is truthy if > 0
-                return position > 0;
-
-            case LAST:
-                // last() as boolean - true if this is the last element
-                return position == size;
-
-            case NOT:
-                // not(expr)
-                if (expr.args != null && expr.args.length > 0) {
-                    return !evaluateTagExpr(expr.args[0], tag, cursor, position, size);
-                }
-                return false;
-
-            case CONTAINS:
-                // contains(str, substr) - returns boolean
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveTagValue(expr.args[0], tag, cursor, position, size);
-                    String substr = resolveTagValue(expr.args[1], tag, cursor, position, size);
-                    return str != null && substr != null && str.contains(substr);
-                }
-                return false;
-
-            case TEXT:
-                // text() as existence check
-                return tag.getValue().isPresent() && !tag.getValue().get().trim().isEmpty();
-
-            case LOCAL_NAME:
-            case NAMESPACE_URI:
-                // These return strings, not booleans - but as existence check they're truthy
-                return true;
-
-            default:
-                return false;
-        }
-    }
-
-    /**
-     * Evaluate a function expression as boolean against an attribute.
-     */
-    private boolean evaluateAttributeFunction(CompiledExpr expr, Xml.Attribute attr, Cursor cursor, int position, int size) {
-        if (expr.functionType == null) {
-            return false;
-        }
-
-        switch (expr.functionType) {
-            case POSITION:
-                return position > 0;
-
-            case LAST:
-                return position == size;
-
-            case NOT:
-                if (expr.args != null && expr.args.length > 0) {
-                    return !evaluateAttributeExpr(expr.args[0], attr, cursor, position, size);
-                }
-                return false;
-
-            case CONTAINS:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveAttributeValue(expr.args[0], attr, cursor, position, size);
-                    String substr = resolveAttributeValue(expr.args[1], attr, cursor, position, size);
-                    return str != null && substr != null && str.contains(substr);
-                }
-                return false;
-
-            case LOCAL_NAME:
-            case NAMESPACE_URI:
-                return true;
-
-            default:
-                return false;
-        }
-    }
-
-    /**
-     * Resolve a function to a string value in tag context.
-     */
-    private @Nullable String resolveTagFunctionValue(CompiledExpr expr, Xml.Tag tag, Cursor cursor, int position, int size) {
-        if (expr.functionType == null) {
-            return null;
-        }
-
-        switch (expr.functionType) {
-            case POSITION:
-                return String.valueOf(position);
-
-            case LAST:
-                return String.valueOf(size);
-
-            case LOCAL_NAME:
-                String tagName = tag.getName();
-                int colonIdx = tagName.indexOf(':');
-                return colonIdx >= 0 ? tagName.substring(colonIdx + 1) : tagName;
-
-            case NAMESPACE_URI:
-                return resolveNamespaceUri(tag, cursor);
-
-            case TEXT:
-                return tag.getValue().orElse("");
-
-            default:
-                return null;
-        }
-    }
-
-    /**
-     * Resolve a function to a string value in attribute context.
-     */
-    private @Nullable String resolveAttributeFunctionValue(CompiledExpr expr, Xml.Attribute attr, Cursor cursor, int position, int size) {
-        if (expr.functionType == null) {
-            return null;
-        }
-
-        switch (expr.functionType) {
-            case POSITION:
-                return String.valueOf(position);
-
-            case LAST:
-                return String.valueOf(size);
-
-            case LOCAL_NAME:
-                String attrName = attr.getKeyAsString();
-                int colonIdx = attrName.indexOf(':');
-                return colonIdx >= 0 ? attrName.substring(colonIdx + 1) : attrName;
-
-            case NAMESPACE_URI:
-                return resolveAttributeNamespaceUri(attr, cursor);
-
-            default:
-                return null;
-        }
     }
 
     /**
@@ -1022,38 +892,15 @@ public class XPathMatcher {
      * Check if tag has a child element with the given name.
      */
     private boolean hasChildElement(Xml.Tag tag, @Nullable String name) {
-        List<? extends Content> contents = tag.getContent();
-        if (contents == null) {
-            return false;
-        }
-        for (Content c : contents) {
-            if (c instanceof Xml.Tag) {
-                Xml.Tag child = (Xml.Tag) c;
-                if (name == null || "*".equals(name) || child.getName().equals(name)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return findChildTag(tag, name) != null;
     }
 
     /**
      * Get the text value of a child element.
      */
     private @Nullable String getChildElementValue(Xml.Tag tag, @Nullable String name) {
-        List<? extends Content> contents = tag.getContent();
-        if (contents == null) {
-            return null;
-        }
-        for (Content c : contents) {
-            if (c instanceof Xml.Tag) {
-                Xml.Tag child = (Xml.Tag) c;
-                if (name == null || "*".equals(name) || child.getName().equals(name)) {
-                    return child.getValue().orElse("");
-                }
-            }
-        }
-        return null;
+        Xml.Tag child = findChildTag(tag, name);
+        return child != null ? child.getValue().orElse("") : null;
     }
 
     /**
