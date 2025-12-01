@@ -557,22 +557,24 @@ class XPathMatcherTest {
             <test>
               <foo>bar</foo>
               <foo>notBar</foo>
-              <foo>
-                <bar>bla</bar>
-              </foo>
-              <foo>
-                <bar>
-                  <baz>bla</baz>
-                </bar>
-              </foo>
+              <one>
+                <two>two</two>
+              </one>
+              <one>
+                <two>
+                  <three>three</three>
+                </two>
+              </one>
               <foo/>
             </test>
             """
         ).toList().getFirst();
 
         // text() predicate should only match element with specific text content
-        assertThat(match("/test/foo[bar/baz/text()='bla']", xml)).isTrue();
-        assertThat(match("/test/foo[bar/text()='bla']", xml)).isTrue();
+        assertThat(match("/test/one[two/three/text()='three']", xml)).isTrue();
+        assertThat(match("/test/one[two/three/text()='notthree']", xml)).isFalse();
+        assertThat(match("/test/one[two/text()='two']", xml)).isTrue();
+        assertThat(match("/test/one[two/text()='nottwo']", xml)).isFalse();
         assertThat(match("/test/foo[text()='bar']", xml)).isTrue();
         assertThat(match("/test/foo[text()='notBar']", xml)).isTrue();
         assertThat(match("/test/foo[text()='nonexistent']", xml)).isFalse();
