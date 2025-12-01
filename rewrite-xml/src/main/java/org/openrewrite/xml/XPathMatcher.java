@@ -1154,8 +1154,8 @@ public class XPathMatcher {
         // Pure absolute paths only: only match at root element
         // Check if cursor is at root (parent is Document or no parent tag)
         Cursor parentCursor = cursor.getParent();
-        while (parentCursor != null && !(parentCursor.getValue() instanceof Xml.Tag)
-               && !(parentCursor.getValue() instanceof Xml.Document)) {
+        while (parentCursor != null && !(parentCursor.getValue() instanceof Xml.Tag) &&
+               !(parentCursor.getValue() instanceof Xml.Document)) {
             parentCursor = parentCursor.getParent();
         }
         if (parentCursor == null || !(parentCursor.getValue() instanceof Xml.Document)) {
