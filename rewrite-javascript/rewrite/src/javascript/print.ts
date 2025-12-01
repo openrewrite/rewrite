@@ -1878,9 +1878,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         p.append(before);
         await this.visitRightPaddedLocal(container.elements, suffixBetween, p);
-        await this.afterSyntaxMarkers(container.markers, p);
-
         p.append(after === null ? "" : after);
+        await this.afterSyntaxMarkers(container.markers, p);
     }
 
     override async visitMarker<M extends Marker>(marker: M, p: PrintOutputCapture): Promise<M> {
