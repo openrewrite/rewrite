@@ -569,6 +569,10 @@ final class XPathCompiler {
      * Compile a function argument.
      */
     static CompiledExpr compileFunctionArg(XPathParser.FunctionArgContext arg) {
+        // Comparison expression as argument (for not(path = 'value'), etc.)
+        if (arg.comparisonArg() != null) {
+            return compileComparisonArg(arg.comparisonArg());
+        }
         if (arg.stringLiteral() != null) {
             return CompiledExpr.string(stripQuotes(arg.stringLiteral().getText()));
         }
@@ -606,6 +610,33 @@ final class XPathCompiler {
             return CompiledExpr.absolutePath(arg.absoluteLocationPath().getText());
         }
         return CompiledExpr.unsupported("unknown argument type");
+    }
+
+    /**
+     * Compile a comparison expression used as a function argument.
+     * Handles patterns like: not(path/text() = 'value')
+     */
+    static CompiledExpr compileComparisonArg(XPathParser.ComparisonArgContext cmp) {
+        CompiledExpr left;
+
+        // Compile the left side of the comparison
+        if (cmp.functionCall() != null) {
+            left = compileFunctionCall(cmp.functionCall());
+        } else if (cmp.relativeLocationPath() != null) {
+            left = compileRelativePath(cmp.relativeLocationPath());
+        } else if (cmp.absoluteLocationPath() != null) {
+            left = CompiledExpr.absolutePath(cmp.absoluteLocationPath().getText());
+        } else {
+            return CompiledExpr.unsupported("unknown comparison left side");
+        }
+
+        // Compile comparison operator
+        ComparisonOp op = compileComparisonOp(cmp.comparisonOp());
+
+        // Compile right side (comparand)
+        CompiledExpr right = compileComparand(cmp.comparand());
+
+        return CompiledExpr.comparison(left, op, right);
     }
 
     /**

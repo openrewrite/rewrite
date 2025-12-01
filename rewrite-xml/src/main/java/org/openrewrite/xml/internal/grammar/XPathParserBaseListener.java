@@ -320,6 +320,18 @@ public class XPathParserBaseListener implements XPathParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterComparisonArg(XPathParser.ComparisonArgContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitComparisonArg(XPathParser.ComparisonArgContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterChildElementTest(XPathParser.ChildElementTestContext ctx) { }
 	/**
 	 * {@inheritDoc}

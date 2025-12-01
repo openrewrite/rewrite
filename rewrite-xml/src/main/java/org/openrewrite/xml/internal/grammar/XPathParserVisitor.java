@@ -170,6 +170,12 @@ public interface XPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitFunctionArg(XPathParser.FunctionArgContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link XPathParser#comparisonArg}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitComparisonArg(XPathParser.ComparisonArgContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link XPathParser#childElementTest}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

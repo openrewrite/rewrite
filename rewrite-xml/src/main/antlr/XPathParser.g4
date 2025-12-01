@@ -184,14 +184,21 @@ functionArgs
     ;
 
 // A single function argument
-// Note: functionCall must come before relativeLocationPath
+// Note: comparisonArg must come first to handle not(path = 'value')
+// functionCall must come before relativeLocationPath
 // because both can start with QNAME, but we need to check for '(' to distinguish them
 functionArg
-    : absoluteLocationPath
+    : comparisonArg
+    | absoluteLocationPath
     | functionCall
     | relativeLocationPath
     | stringLiteral
     | NUMBER
+    ;
+
+// Comparison expression as function argument (for not(x = 'y'), etc.)
+comparisonArg
+    : (functionCall | relativeLocationPath | absoluteLocationPath) comparisonOp comparand
     ;
 
 // Child element test in predicate (element name, ns:element, or wildcard)

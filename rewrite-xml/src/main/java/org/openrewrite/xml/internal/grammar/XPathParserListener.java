@@ -263,6 +263,16 @@ public interface XPathParserListener extends ParseTreeListener {
 	 */
 	void exitFunctionArg(XPathParser.FunctionArgContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link XPathParser#comparisonArg}.
+	 * @param ctx the parse tree
+	 */
+	void enterComparisonArg(XPathParser.ComparisonArgContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XPathParser#comparisonArg}.
+	 * @param ctx the parse tree
+	 */
+	void exitComparisonArg(XPathParser.ComparisonArgContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link XPathParser#childElementTest}.
 	 * @param ctx the parse tree
 	 */

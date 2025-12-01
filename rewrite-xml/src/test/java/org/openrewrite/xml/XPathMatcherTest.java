@@ -666,6 +666,32 @@ class XPathMatcherTest {
         assertThat(match("//*[local-name()='element4' or local-name()='dne' and namespace-uri()='http://www.example.com/namespaceX']", namespacedXml)).isTrue();
     }
 
+    @Test
+    void matchNotWithComparisonArgument() {
+        SourceFile xml = new XmlParser().parse(
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <web-app>
+              <listener>
+                <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+              </listener>
+              <listener>
+                <listener-class>com.example.OtherListener</listener-class>
+              </listener>
+            </web-app>
+            """
+        ).toList().getFirst();
+
+        // not() with comparison expression as argument
+        assertThat(matchCount("/web-app/listener[not(listener-class/text() = 'org.springframework.web.context.ContextLoaderListener')]", xml)).isEqualTo(1);
+        assertThat(matchCount("/web-app/listener[listener-class/text() = 'org.springframework.web.context.ContextLoaderListener']", xml)).isEqualTo(1);
+        assertThat(matchCount("/web-app/listener[not(listener-class/text() = 'com.example.OtherListener')]", xml)).isEqualTo(1);
+        assertThat(matchCount("/web-app/listener", xml)).isEqualTo(2);
+
+        // not() with different comparison operators
+        assertThat(matchCount("/web-app/listener[not(listener-class/text() != 'com.example.OtherListener')]", xml)).isEqualTo(1);
+    }
+
     private boolean match(@Language("xpath") String xpath, SourceFile x) {
         return matchCount(xpath, x) > 0;
     }
