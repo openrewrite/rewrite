@@ -21,10 +21,7 @@ import org.openrewrite.xml.XPathCompiler.*;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static org.openrewrite.xml.XPathCompiler.FLAG_ABSOLUTE_PATH;
 
@@ -618,8 +615,8 @@ public class XPathMatcher {
     @SuppressWarnings("DataFlowIssue")
     private boolean evaluateComparison(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
                                        Cursor cursor, int position, int size) {
-        String leftValue = resolveValue(expr.left, tag, attr, cursor, position, size);
-        String rightValue = resolveValue(expr.right, tag, attr, cursor, position, size);
+        Object leftValue = resolveValue(expr.left, tag, attr, cursor, position, size);
+        Object rightValue = resolveValue(expr.right, tag, attr, cursor, position, size);
 
         if (leftValue == null || rightValue == null) {
             return false;
@@ -630,15 +627,16 @@ public class XPathMatcher {
 
     /**
      * Unified value resolution for both tag and attribute contexts.
+     * Returns the natural type: Integer for numbers, Boolean for predicates, String for strings.
      */
-    private @Nullable String resolveValue(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
+    private @Nullable Object resolveValue(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
                                           Cursor cursor, int position, int size) {
         switch (expr.type) {
             case STRING:
                 return expr.stringValue;
 
             case NUMERIC:
-                return String.valueOf(expr.numericValue);
+                return expr.numericValue;
 
             case CHILD:
                 // Tag context only
@@ -710,48 +708,21 @@ public class XPathMatcher {
                 return false;
 
             case CONTAINS:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    String substr = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    return str != null && substr != null && str.contains(substr);
-                }
-                return false;
-
             case STARTS_WITH:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    String prefix = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    return str != null && prefix != null && str.startsWith(prefix);
-                }
-                return false;
-
             case ENDS_WITH:
-                if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    String suffix = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    return str != null && suffix != null && str.endsWith(suffix);
-                }
-                return false;
+                // These functions return Boolean - delegate to resolveFunctionValue
+                Object boolResult = resolveFunctionValue(expr, tag, attr, cursor, position, size);
+                return Boolean.TRUE.equals(boolResult);
 
             case STRING_LENGTH:
-                if (expr.args != null && expr.args.length > 0) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    return str != null && !str.isEmpty();
-                }
-                return false;
+                // In boolean context, string-length is truthy if > 0
+                Object lenResult = resolveFunctionValue(expr, tag, attr, cursor, position, size);
+                return lenResult instanceof Number && ((Number) lenResult).intValue() > 0;
 
             case COUNT:
-                if (expr.args != null && expr.args.length > 0) {
-                    CompiledExpr pathArg = expr.args[0];
-                    if (pathArg.type == ExprType.ABSOLUTE_PATH && pathArg.stringValue != null) {
-                        Xml.Tag root = getRootTag(cursor);
-                        if (root != null) {
-                            Set<Xml.Tag> matches = findTagsByPath(root, pathArg.stringValue);
-                            return !matches.isEmpty();
-                        }
-                    }
-                }
-                return false;
+                // In boolean context, count is truthy if > 0
+                Object countResult = resolveFunctionValue(expr, tag, attr, cursor, position, size);
+                return countResult instanceof Number && ((Number) countResult).intValue() > 0;
 
             case TEXT:
                 // text() as existence check - tag context only
@@ -769,8 +740,9 @@ public class XPathMatcher {
 
     /**
      * Unified function value resolution for both contexts.
+     * Returns the natural type: Integer for numeric functions, Boolean for predicates, String for string functions.
      */
-    private @Nullable String resolveFunctionValue(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
+    private @Nullable Object resolveFunctionValue(CompiledExpr expr, Xml.@Nullable Tag tag, Xml.@Nullable Attribute attr,
                                                   Cursor cursor, int position, int size) {
         if (expr.functionType == null) {
             return null;
@@ -778,10 +750,10 @@ public class XPathMatcher {
 
         switch (expr.functionType) {
             case POSITION:
-                return String.valueOf(position);
+                return position;
 
             case LAST:
-                return String.valueOf(size);
+                return size;
 
             case LOCAL_NAME: {
                 // Handle arguments: local-name(..) means local-name of parent, local-name(.) means self
@@ -790,8 +762,6 @@ public class XPathMatcher {
                     CompiledExpr argExpr = expr.args[0];
                     if (argExpr.type == ExprType.PARENT) {
                         targetTag = getParentTag(cursor);
-                    } else if (argExpr.type == ExprType.SELF) {
-                        targetTag = tag;
                     }
                 }
                 if (targetTag != null) {
@@ -834,15 +804,18 @@ public class XPathMatcher {
 
             case STRING_LENGTH:
                 if (expr.args != null && expr.args.length > 0) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    return str != null ? String.valueOf(str.length()) : "0";
+                    Object val = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    String str = val != null ? val.toString() : null;
+                    return str != null ? str.length() : 0;
                 }
-                return "0";
+                return 0;
 
             case SUBSTRING_BEFORE:
                 if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    String delim = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    String str = val0 != null ? val0.toString() : null;
+                    String delim = val1 != null ? val1.toString() : null;
                     String result = substringBefore(str, delim);
                     return result != null ? result : "";
                 }
@@ -850,8 +823,10 @@ public class XPathMatcher {
 
             case SUBSTRING_AFTER:
                 if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    String delim = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    String str = val0 != null ? val0.toString() : null;
+                    String delim = val1 != null ? val1.toString() : null;
                     String result = substringAfter(str, delim);
                     return result != null ? result : "";
                 }
@@ -864,35 +839,41 @@ public class XPathMatcher {
                         Xml.Tag root = getRootTag(cursor);
                         if (root != null) {
                             Set<Xml.Tag> matches = findTagsByPath(root, pathArg.stringValue);
-                            return String.valueOf(matches.size());
+                            return matches.size();
                         }
                     }
                 }
-                return "0";
+                return 0;
 
             case CONTAINS:
                 if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    String substr = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    return String.valueOf(str != null && substr != null && str.contains(substr));
+                    Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    String str = val0 != null ? val0.toString() : null;
+                    String substr = val1 != null ? val1.toString() : null;
+                    return str != null && substr != null && str.contains(substr);
                 }
-                return "false";
+                return false;
 
             case STARTS_WITH:
                 if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    String prefix = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    return String.valueOf(str != null && prefix != null && str.startsWith(prefix));
+                    Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    String str = val0 != null ? val0.toString() : null;
+                    String prefix = val1 != null ? val1.toString() : null;
+                    return str != null && prefix != null && str.startsWith(prefix);
                 }
-                return "false";
+                return false;
 
             case ENDS_WITH:
                 if (expr.args != null && expr.args.length >= 2) {
-                    String str = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    String suffix = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    return String.valueOf(str != null && suffix != null && str.endsWith(suffix));
+                    Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
+                    Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
+                    String str = val0 != null ? val0.toString() : null;
+                    String suffix = val1 != null ? val1.toString() : null;
+                    return str != null && suffix != null && str.endsWith(suffix);
                 }
-                return "false";
+                return false;
 
             default:
                 return null;
@@ -980,26 +961,66 @@ public class XPathMatcher {
 
     /**
      * Compare two values using the given comparison operator.
+     * Handles type-aware comparison: Number vs Number uses numeric comparison,
+     * Boolean vs Boolean uses boolean comparison, otherwise uses string comparison.
      * Package-private so XPathMatcherVisitor can share this logic.
      */
-    static boolean compareValues(String left, String right, @Nullable ComparisonOp op) {
+    static boolean compareValues(Object left, Object right, @Nullable ComparisonOp op) {
         if (op == null) {
             return left.equals(right);
         }
 
+        // If both are numbers, use numeric comparison
+        if (left instanceof Number && right instanceof Number) {
+            double leftNum = ((Number) left).doubleValue();
+            double rightNum = ((Number) right).doubleValue();
+            switch (op) {
+                case EQ:
+                    return leftNum == rightNum;
+                case NE:
+                    return leftNum != rightNum;
+                case LT:
+                    return leftNum < rightNum;
+                case LE:
+                    return leftNum <= rightNum;
+                case GT:
+                    return leftNum > rightNum;
+                case GE:
+                    return leftNum >= rightNum;
+                default:
+                    return false;
+            }
+        }
+
+        // If both are booleans, use boolean comparison
+        if (left instanceof Boolean && right instanceof Boolean) {
+            switch (op) {
+                case EQ:
+                    return left.equals(right);
+                case NE:
+                    return !left.equals(right);
+                default:
+                    return false; // relational operators don't apply to booleans
+            }
+        }
+
+        // Convert to strings for comparison
+        String leftStr = left.toString();
+        String rightStr = right.toString();
+
         switch (op) {
             case EQ:
-                return left.equals(right);
+                return leftStr.equals(rightStr);
             case NE:
-                return !left.equals(right);
+                return !leftStr.equals(rightStr);
             case LT:
             case LE:
             case GT:
             case GE:
-                // Try numeric comparison
+                // Try numeric comparison for string values that look like numbers
                 try {
-                    double leftNum = Double.parseDouble(left);
-                    double rightNum = Double.parseDouble(right);
+                    double leftNum = Double.parseDouble(leftStr);
+                    double rightNum = Double.parseDouble(rightStr);
                     switch (op) {
                         case LT:
                             return leftNum < rightNum;
@@ -1014,7 +1035,7 @@ public class XPathMatcher {
                     }
                 } catch (NumberFormatException e) {
                     // Fall back to string comparison
-                    int cmp = left.compareTo(right);
+                    int cmp = leftStr.compareTo(rightStr);
                     switch (op) {
                         case LT:
                             return cmp < 0;
@@ -1265,7 +1286,7 @@ public class XPathMatcher {
             Set<Xml.Tag> trailingMatches = new LinkedHashSet<>();
             for (Xml.Tag filteredTag : filteredMatches) {
                 if (compiled.filterExpr.trailingIsDescendant) {
-                    findDescendants(filteredTag, compiled.filterExpr.trailingPath, trailingMatches);
+                    trailingMatches.addAll(findDescendants(filteredTag, compiled.filterExpr.trailingPath));
                 } else {
                     // Handle multi-segment paths like "configuration/source"
                     trailingMatches.addAll(findChildrenByPath(filteredTag, compiled.filterExpr.trailingPath));
@@ -1297,8 +1318,8 @@ public class XPathMatcher {
 
             case COMPARISON:
                 // For filter predicates, comparisons often involve position()/last()
-                String leftValue = resolveFilterValue(expr.left, tag, position, size);
-                String rightValue = resolveFilterValue(expr.right, tag, position, size);
+                Object leftValue = resolveFilterValue(expr.left, tag, position, size);
+                Object rightValue = resolveFilterValue(expr.right, tag, position, size);
                 if (leftValue == null || rightValue == null) {
                     return false;
                 }
@@ -1311,22 +1332,23 @@ public class XPathMatcher {
 
     /**
      * Resolve a value for filter predicate evaluation.
+     * Returns the natural type: Integer for numbers, String for strings.
      */
     @SuppressWarnings("ConstantValue")
-    private @Nullable String resolveFilterValue(CompiledExpr expr, Xml.Tag tag, int position, int size) {
+    private @Nullable Object resolveFilterValue(CompiledExpr expr, Xml.Tag tag, int position, int size) {
         if (expr == null) return null;
 
         switch (expr.type) {
             case STRING:
                 return expr.stringValue;
             case NUMERIC:
-                return String.valueOf(expr.numericValue);
+                return expr.numericValue;
             case FUNCTION:
                 if (expr.functionType == FunctionType.POSITION) {
-                    return String.valueOf(position);
+                    return position;
                 }
                 if (expr.functionType == FunctionType.LAST) {
-                    return String.valueOf(size);
+                    return size;
                 }
                 if (expr.functionType == FunctionType.LOCAL_NAME) {
                     return localName(tag.getName());
@@ -1340,22 +1362,14 @@ public class XPathMatcher {
     // ==================== Tree Traversal Helpers ====================
 
     /**
-     * Get the cursor at the root tag by walking up to the document.
+     * Get the root tag from a cursor by walking up to the document.
      */
-    private @Nullable Cursor getRootCursor(Cursor cursor) {
+    private Xml.@Nullable Tag getRootTag(Cursor cursor) {
         Cursor c = cursor;
         while (c.getParent() != null && !(c.getParent().getValue() instanceof Xml.Document)) {
             c = c.getParent();
         }
-        return c.getValue() instanceof Xml.Tag ? c : null;
-    }
-
-    /**
-     * Get the root tag from a cursor by walking up to the document.
-     */
-    private Xml.@Nullable Tag getRootTag(Cursor cursor) {
-        Cursor rootCursor = getRootCursor(cursor);
-        return rootCursor != null ? (Xml.Tag) rootCursor.getValue() : null;
+        return c.getValue() instanceof Xml.Tag ? (Xml.Tag) c.getValue() : null;
     }
 
     /**
@@ -1363,16 +1377,13 @@ public class XPathMatcher {
      * Supports absolute paths (/a/b), descendant paths (//a), and relative paths (a/b).
      */
     private Set<Xml.Tag> findTagsByPath(Xml.Tag startTag, String pathExpr) {
-        Set<Xml.Tag> result = new LinkedHashSet<>();
-
         // Handle descendant-or-self axis (//)
         if (pathExpr.startsWith("//")) {
             String elementName = pathExpr.substring(2);
             if (elementName.contains("/")) {
                 elementName = elementName.substring(0, elementName.indexOf('/'));
             }
-            findDescendants(startTag, elementName, result);
-            return result;
+            return findDescendants(startTag, elementName);
         }
 
         // Handle absolute path
@@ -1383,7 +1394,7 @@ public class XPathMatcher {
 
         String[] steps = pathExpr.split("/");
         if (steps.length == 0) {
-            return result;
+            return Collections.emptySet();
         }
 
         Set<Xml.Tag> currentMatches = new LinkedHashSet<>();
@@ -1423,7 +1434,13 @@ public class XPathMatcher {
     /**
      * Find all descendant tags matching the given element name.
      */
-    private void findDescendants(Xml.Tag tag, String elementName, Set<Xml.Tag> result) {
+    private Set<Xml.Tag> findDescendants(Xml.Tag tag, String elementName) {
+        Set<Xml.Tag> result = new LinkedHashSet<>();
+        findDescendantsRecursive(tag, elementName, result);
+        return result;
+    }
+
+    private void findDescendantsRecursive(Xml.Tag tag, String elementName, Set<Xml.Tag> result) {
         if ("*".equals(elementName) || tag.getName().equals(elementName)) {
             result.add(tag);
         }
@@ -1431,7 +1448,7 @@ public class XPathMatcher {
         if (contents != null) {
             for (Content content : contents) {
                 if (content instanceof Xml.Tag) {
-                    findDescendants((Xml.Tag) content, elementName, result);
+                    findDescendantsRecursive((Xml.Tag) content, elementName, result);
                 }
             }
         }

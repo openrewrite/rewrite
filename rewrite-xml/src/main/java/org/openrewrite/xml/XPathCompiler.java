@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.xml.internal.grammar.XPathLexer;
 import org.openrewrite.xml.internal.grammar.XPathParser;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -254,7 +255,7 @@ final class XPathCompiler {
         }
 
         // Build normalized step list
-        java.util.ArrayList<CompiledStep> result = new java.util.ArrayList<>();
+        ArrayList<CompiledStep> result = new ArrayList<>();
         int i = 0;
 
         while (i < steps.length) {
