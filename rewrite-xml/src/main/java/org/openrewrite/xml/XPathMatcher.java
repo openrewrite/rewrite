@@ -51,10 +51,15 @@ public class XPathMatcher {
     private static final int FLAG_HAS_AXIS_STEP = 1 << 4;
     private static final int FLAG_HAS_ATTRIBUTE_STEP = 1 << 5;
     private static final int FLAG_HAS_NODE_TYPE_TEST = 1 << 6;
+    private static final int FLAG_HAS_PREDICATES = 1 << 7;
     // Combined mask: features that prevent early path length rejection
     private static final int FLAGS_VARIABLE_PATH_LENGTH =
             FLAG_HAS_DESCENDANT | FLAG_HAS_ABBREVIATED_STEP | FLAG_HAS_AXIS_STEP |
             FLAG_HAS_ATTRIBUTE_STEP | FLAG_HAS_NODE_TYPE_TEST;
+    // Features that prevent bottom-up matching (require path array or complex logic)
+    private static final int FLAGS_PREVENT_BOTTOM_UP =
+            FLAG_HAS_ABBREVIATED_STEP | FLAG_HAS_AXIS_STEP | FLAG_HAS_ATTRIBUTE_STEP |
+            FLAG_HAS_NODE_TYPE_TEST | FLAG_HAS_PREDICATES;
 
     // Expression type constants
     private static final int EXPR_PATH = 0;           // Simple path (compiled)
@@ -86,6 +91,553 @@ public class XPathMatcher {
      * @return true if the expression matches the cursor, false otherwise
      */
     public boolean matches(Cursor cursor) {
+        // Ensure expression is parsed and steps are compiled
+        XPathParser.XpathExpressionContext ctx = parse();
+
+        // Fast path: use bottom-up matching for compiled path expressions
+        // unless the path has patterns that require top-down matching
+        if (exprType == EXPR_PATH && compiledSteps != null && compiledSteps.length > 0 && !requiresTopDownMatching()) {
+            return matchBottomUp(cursor);
+        }
+
+        // Complex expressions (boolean, filter) or paths with consecutive parent steps
+        // need the full visitor with path array
+        return matchWithPathArray(cursor, ctx);
+    }
+
+    /**
+     * Check if the path requires top-down (path array) matching.
+     * This includes patterns like consecutive .. steps.
+     */
+    private boolean requiresTopDownMatching() {
+        if (compiledSteps == null || compiledSteps.length < 2) {
+            return false;
+        }
+
+        // Check for consecutive .. or parent:: steps
+        boolean prevWasParent = false;
+        for (CompiledStep step : compiledSteps) {
+            boolean isParent = step.type == StepType.ABBREVIATED_DOTDOT ||
+                    (step.type == StepType.AXIS_STEP && step.axisType == AxisType.PARENT);
+
+            if (isParent && prevWasParent) {
+                return true;
+            }
+            prevWasParent = isParent;
+        }
+        return false;
+    }
+
+    /**
+     * Bottom-up matching: work backwards through compiled steps from the cursor.
+     * This avoids building a path array and fails fast on mismatches.
+     */
+    private boolean matchBottomUp(Cursor cursor) {
+        // Early reject: for absolute paths without any //, if cursor depth exceeds element steps, can't match
+        // e.g., /a/b has 2 element steps, so cursor at depth 3+ can never match
+        // But /a//b can match at any depth due to the // so we can't apply this optimization
+        if ((stepFlags & FLAG_ABSOLUTE_PATH) != 0 &&
+                (stepFlags & FLAG_HAS_DESCENDANT) == 0 &&
+                compiledElementSteps > 0) {
+            int depth = 0;
+            for (Cursor c = cursor; c != null; c = c.getParent()) {
+                if (c.getValue() instanceof Xml.Tag) {
+                    depth++;
+                    if (depth > compiledElementSteps) {
+                        return false;  // Too deep
+                    }
+                }
+            }
+        }
+
+        // Get current element
+        Object cursorValue = cursor.getValue();
+
+        // Match last step against current cursor position
+        CompiledStep lastStep = compiledSteps[compiledSteps.length - 1];
+
+        // Handle attribute matching
+        if (lastStep.type == StepType.ATTRIBUTE_STEP) {
+            if (!(cursorValue instanceof Xml.Attribute)) {
+                return false;
+            }
+            Xml.Attribute attr = (Xml.Attribute) cursorValue;
+            if (!"*".equals(lastStep.name) && !attr.getKeyAsString().equals(lastStep.name)) {
+                return false;
+            }
+            // Check predicates on attribute
+            if (lastStep.predicates != null && !lastStep.predicates.isEmpty()) {
+                if (!evaluateAttributePredicatesBottomUp(lastStep.predicates, attr, cursor)) {
+                    return false;
+                }
+            }
+            // For attributes, continue matching from parent tag
+            Cursor parentCursor = cursor.getParent();
+            if (parentCursor == null || !(parentCursor.getValue() instanceof Xml.Tag)) {
+                return false;
+            }
+            return matchRemainingStepsBottomUp(parentCursor, compiledSteps.length - 2);
+        }
+
+        // Handle node type test (text(), comment(), etc.)
+        if (lastStep.type == StepType.NODE_TYPE_TEST) {
+            return matchNodeTypeTestBottomUp(lastStep, cursor, compiledSteps.length - 2);
+        }
+
+        // Handle parent axis (parent::node()) or abbreviated parent (..) as last step
+        // This means the cursor should be at a parent position, and we need to verify
+        // the step before this exists as a child
+        if (lastStep.type == StepType.ABBREVIATED_DOTDOT ||
+                (lastStep.type == StepType.AXIS_STEP && lastStep.axisType == AxisType.PARENT)) {
+            return matchParentStepAsLast(lastStep, cursor, compiledSteps.length - 2);
+        }
+
+        // Handle self axis (self::node() or .) as last step
+        if (lastStep.type == StepType.ABBREVIATED_DOT ||
+                (lastStep.type == StepType.AXIS_STEP && lastStep.axisType == AxisType.SELF)) {
+            // . or self:: means current position - cursor must be a tag matching the name test (if any)
+            if (!(cursorValue instanceof Xml.Tag)) {
+                return false;
+            }
+            Xml.Tag tag = (Xml.Tag) cursorValue;
+            if (lastStep.type == StepType.AXIS_STEP && lastStep.name != null &&
+                    !"*".equals(lastStep.name) && !"node".equals(lastStep.name) &&
+                    !tag.getName().equals(lastStep.name)) {
+                return false;
+            }
+            // Continue matching from current position (don't go up)
+            return matchRemainingStepsBottomUp(cursor, compiledSteps.length - 2);
+        }
+
+        // For element matching, cursor must be a tag
+        if (!(cursorValue instanceof Xml.Tag)) {
+            return false;
+        }
+        Xml.Tag currentTag = (Xml.Tag) cursorValue;
+
+        // Check last step matches current tag
+        if (!matchStepAgainstTag(lastStep, currentTag, cursor)) {
+            return false;
+        }
+
+        // Match remaining steps going up the cursor chain
+        Cursor parentCursor = getParentTagCursor(cursor);
+        return matchRemainingStepsBottomUp(parentCursor, compiledSteps.length - 2);
+    }
+
+    /**
+     * Handle parent step (.. or parent::) as the last step.
+     * This means we're at a parent position, and we need to verify the child exists.
+     */
+    private boolean matchParentStepAsLast(CompiledStep parentStep, Cursor cursor, int prevStepIdx) {
+        Object cursorValue = cursor.getValue();
+        if (!(cursorValue instanceof Xml.Tag)) {
+            return false;
+        }
+        Xml.Tag currentTag = (Xml.Tag) cursorValue;
+
+        // Check node test name for parent:: axis
+        if (parentStep.type == StepType.AXIS_STEP && parentStep.name != null &&
+                !"*".equals(parentStep.name) && !"node".equals(parentStep.name) &&
+                !currentTag.getName().equals(parentStep.name)) {
+            return false;
+        }
+
+        // If there's a previous step, verify it exists as a child
+        if (prevStepIdx >= 0) {
+            CompiledStep prevStep = compiledSteps[prevStepIdx];
+            // The previous step should exist as a child of current position
+            if (prevStep.type == StepType.NODE_TEST && prevStep.name != null) {
+                if (!hasChildWithName(currentTag, prevStep.name)) {
+                    return false;
+                }
+            }
+            // Continue matching from current position, skipping the child verification step
+            return matchRemainingStepsBottomUp(cursor, prevStepIdx - 1);
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if a tag has a direct child with the given name.
+     */
+    private boolean hasChildWithName(Xml.Tag parent, String childName) {
+        List<? extends Content> contents = parent.getContent();
+        if (contents == null) {
+            return false;
+        }
+        for (Content c : contents) {
+            if (c instanceof Xml.Tag) {
+                Xml.Tag child = (Xml.Tag) c;
+                if ("*".equals(childName) || child.getName().equals(childName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Handle .. (parent step) in the middle of a path.
+     * The step at prevStepIdx should be checked as a child existence test.
+     */
+    private boolean matchParentStepInMiddle(@Nullable Cursor cursor, int prevStepIdx) {
+        if (cursor == null || !(cursor.getValue() instanceof Xml.Tag)) {
+            return false;
+        }
+        Xml.Tag currentTag = (Xml.Tag) cursor.getValue();
+
+        if (prevStepIdx < 0) {
+            // No more steps - verify we're at root
+            if ((stepFlags & FLAG_ABSOLUTE_PATH) != 0 && !compiledSteps[0].isDescendant) {
+                Cursor parentCursor = getParentTagCursor(cursor);
+                return parentCursor == null || !(parentCursor.getValue() instanceof Xml.Tag);
+            }
+            return true;
+        }
+
+        CompiledStep prevStep = compiledSteps[prevStepIdx];
+
+        // The previous step should exist as a child (this is the "detour" we took before going up)
+        if (prevStep.type == StepType.NODE_TEST && prevStep.name != null) {
+            if (!hasChildWithName(currentTag, prevStep.name)) {
+                return false;
+            }
+            // Skip the child verification step and continue matching
+            return matchRemainingStepsBottomUp(cursor, prevStepIdx - 1);
+        }
+
+        // For other step types, just continue (shouldn't normally happen)
+        return matchRemainingStepsBottomUp(cursor, prevStepIdx - 1);
+    }
+
+    /**
+     * Evaluate attribute predicates in bottom-up context.
+     */
+    private boolean evaluateAttributePredicatesBottomUp(List<XPathParser.PredicateContext> predicates,
+                                                         Xml.Attribute attr, Cursor cursor) {
+        Xml.Tag[] path = buildPathArray(cursor.getParent());
+        XPathMatcherVisitor visitor = new XPathMatcherVisitor(path, path.length, cursor,
+                compiledSteps, stepFlags, compiledElementSteps);
+        for (XPathParser.PredicateContext predicate : predicates) {
+            if (!visitor.evaluateAttributePredicate(predicate, attr, 1, 1)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Match node type test in bottom-up context.
+     */
+    private boolean matchNodeTypeTestBottomUp(CompiledStep step, Cursor cursor, int nextStepIdx) {
+        Object cursorValue = cursor.getValue();
+
+        switch (step.nodeTypeTestType) {
+            case TEXT:
+                // text() can match:
+                // 1. When cursor is on Xml.CharData - continue from parent tag
+                // 2. When cursor is on a tag that has text content - continue from same position
+                //    (text() verifies content exists, doesn't change traversal level)
+                if (cursorValue instanceof Xml.CharData) {
+                    Cursor parentCursor = getParentTagCursor(cursor);
+                    return matchRemainingStepsBottomUp(parentCursor, nextStepIdx);
+                }
+                if (cursorValue instanceof Xml.Tag) {
+                    Xml.Tag tag = (Xml.Tag) cursorValue;
+                    if (tag.getValue().isPresent()) {
+                        // Tag has text content - continue from SAME position
+                        return matchRemainingStepsBottomUp(cursor, nextStepIdx);
+                    }
+                }
+                return false;
+
+            case COMMENT:
+                if (cursorValue instanceof Xml.Comment) {
+                    Cursor parentCursor = getParentTagCursor(cursor);
+                    return matchRemainingStepsBottomUp(parentCursor, nextStepIdx);
+                }
+                return false;
+
+            case NODE:
+                // node() matches any node
+                Cursor parentCursor = getParentTagCursor(cursor);
+                return matchRemainingStepsBottomUp(parentCursor, nextStepIdx);
+
+            case PROCESSING_INSTRUCTION:
+                if (cursorValue instanceof Xml.ProcessingInstruction) {
+                    Cursor parentCursorPi = getParentTagCursor(cursor);
+                    return matchRemainingStepsBottomUp(parentCursorPi, nextStepIdx);
+                }
+                return false;
+
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Recursively match remaining steps going up the cursor chain.
+     *
+     * @param cursor Current position in the document (may be null if we've reached root)
+     * @param stepIdx Index of the step to match (going backwards from end)
+     * @return true if all remaining steps match
+     */
+    private boolean matchRemainingStepsBottomUp(@Nullable Cursor cursor, int stepIdx) {
+        // All steps matched - verify root condition
+        if (stepIdx < 0) {
+            if ((stepFlags & FLAG_ABSOLUTE_PATH) != 0) {
+                // Absolute path (starts with /) - must have reached root (no more tag ancestors)
+                return cursor == null || !(cursor.getValue() instanceof Xml.Tag);
+            }
+            // Relative path or descendant path (starts with //) - any position is fine
+            return true;
+        }
+
+        CompiledStep step = compiledSteps[stepIdx];
+
+        // Handle special step types that don't consume parent levels normally
+        switch (step.type) {
+            case ABBREVIATED_DOT:
+                // . means "self" - don't move up, just continue matching from same position
+                return matchRemainingStepsBottomUp(cursor, stepIdx - 1);
+
+            case ABBREVIATED_DOTDOT:
+                // .. means "parent" - in bottom-up, the step BEFORE .. should be checked
+                // as a child existence test (not a direct match)
+                return matchParentStepInMiddle(cursor, stepIdx - 1);
+
+            case AXIS_STEP:
+                return matchAxisStepBottomUp(step, cursor, stepIdx);
+
+            case NODE_TYPE_TEST:
+                // Node type test in the middle of a path
+                return matchNodeTypeStepBottomUp(step, cursor, stepIdx);
+
+            default:
+                // Regular element step (NODE_TEST)
+                break;
+        }
+
+        // Check how this step relates to the step we just matched (stepIdx + 1)
+        // The step at stepIdx+1 tells us the relationship via isDescendant
+        CompiledStep nextStep = compiledSteps[stepIdx + 1];
+
+        if (nextStep.isDescendant) {
+            // The step we just matched can be a descendant of current step
+            // So current step can be ANY ancestor - scan upward with backtracking
+            Cursor pos = cursor;
+            while (pos != null && pos.getValue() instanceof Xml.Tag) {
+                Xml.Tag tag = (Xml.Tag) pos.getValue();
+                if (matchStepAgainstTag(step, tag, pos)) {
+                    // Found a candidate - try to match remaining prefix
+                    Cursor nextParent = getParentTagCursor(pos);
+                    if (matchRemainingStepsBottomUp(nextParent, stepIdx - 1)) {
+                        return true;  // This candidate worked
+                    }
+                    // Continue scanning for another candidate (backtracking)
+                }
+                pos = getParentTagCursor(pos);
+            }
+            return false;  // No valid candidate found
+        } else {
+            // Direct parent relationship - current step must be at cursor exactly
+            if (cursor == null || !(cursor.getValue() instanceof Xml.Tag)) {
+                return false;
+            }
+            Xml.Tag tag = (Xml.Tag) cursor.getValue();
+            if (!matchStepAgainstTag(step, tag, cursor)) {
+                return false;
+            }
+            Cursor nextParent = getParentTagCursor(cursor);
+            return matchRemainingStepsBottomUp(nextParent, stepIdx - 1);
+        }
+    }
+
+    /**
+     * Match axis step in bottom-up context.
+     */
+    private boolean matchAxisStepBottomUp(CompiledStep step, @Nullable Cursor cursor, int stepIdx) {
+        switch (step.axisType) {
+            case PARENT:
+                // parent::node() or parent::element - similar to ..
+                // Check node test name first
+                if (cursor != null && cursor.getValue() instanceof Xml.Tag) {
+                    Xml.Tag tag = (Xml.Tag) cursor.getValue();
+                    String nodeTestName = step.name;
+                    if (nodeTestName != null && !"*".equals(nodeTestName) && !"node".equals(nodeTestName) &&
+                            !tag.getName().equals(nodeTestName)) {
+                        return false;
+                    }
+                }
+                // The step before parent:: should be verified as a child
+                return matchParentStepInMiddle(cursor, stepIdx - 1);
+
+            case SELF:
+                // self::node() or self::element - matches current position
+                // In bottom-up, we need to check the next step's cursor position
+                // Actually, self:: doesn't consume a level - it's like . with a name test
+                if (cursor != null && cursor.getValue() instanceof Xml.Tag) {
+                    Xml.Tag tag = (Xml.Tag) cursor.getValue();
+                    String nodeTestName = step.name;
+                    if (nodeTestName != null && !"*".equals(nodeTestName) && !"node".equals(nodeTestName) &&
+                            !tag.getName().equals(nodeTestName)) {
+                        return false;
+                    }
+                }
+                return matchRemainingStepsBottomUp(cursor, stepIdx - 1);
+
+            case CHILD:
+                // child:: is the default - same as normal element step
+                if (cursor == null || !(cursor.getValue() instanceof Xml.Tag)) {
+                    return false;
+                }
+                Xml.Tag tag = (Xml.Tag) cursor.getValue();
+                if (!matchStepAgainstTag(step, tag, cursor)) {
+                    return false;
+                }
+                return matchRemainingStepsBottomUp(getParentTagCursor(cursor), stepIdx - 1);
+
+            default:
+                // Unsupported axis
+                return false;
+        }
+    }
+
+    /**
+     * Match node type test step in bottom-up context (not as last step).
+     */
+    private boolean matchNodeTypeStepBottomUp(CompiledStep step, @Nullable Cursor cursor, int stepIdx) {
+        // Node type tests in the middle of a path need special handling
+        switch (step.nodeTypeTestType) {
+            case NODE:
+                // node() matches anything - don't consume extra level
+                return matchRemainingStepsBottomUp(cursor, stepIdx - 1);
+
+            case TEXT:
+            case COMMENT:
+            case PROCESSING_INSTRUCTION:
+                // These typically don't appear in the middle of element paths
+                // Fall through to default handling
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Get the parent cursor that contains a tag, skipping non-tag nodes.
+     */
+    private @Nullable Cursor getParentTagCursor(@Nullable Cursor cursor) {
+        if (cursor == null) return null;
+        Cursor parent = cursor.getParent();
+        while (parent != null && !(parent.getValue() instanceof Xml.Tag)) {
+            if (parent.getValue() instanceof Xml.Document) {
+                return null;
+            }
+            parent = parent.getParent();
+        }
+        return parent;
+    }
+
+    /**
+     * Check if a compiled step matches a tag.
+     */
+    private boolean matchStepAgainstTag(CompiledStep step, Xml.Tag tag, Cursor cursor) {
+        // Handle different step types
+        switch (step.type) {
+            case NODE_TEST:
+                // Element name or wildcard
+                if (!"*".equals(step.name) && !tag.getName().equals(step.name)) {
+                    return false;
+                }
+                break;
+            case ABBREVIATED_DOT:
+                // . matches current - always true for tags
+                break;
+            case ABBREVIATED_DOTDOT:
+                // .. is handled differently - this shouldn't be called directly
+                return false;
+            case NODE_TYPE_TEST:
+                // text(), comment(), node() - these don't match tags
+                if (step.nodeTypeTestType != NodeTypeTestType.NODE) {
+                    return false;
+                }
+                break;
+            default:
+                // Other step types not supported in bottom-up yet
+                return false;
+        }
+
+        // Check predicates if present
+        if (step.predicates != null && !step.predicates.isEmpty()) {
+            return evaluatePredicates(step.predicates, tag, cursor);
+        }
+
+        return true;
+    }
+
+    // Empty path array for predicate evaluation (predicates don't use path array)
+    private static final Xml.Tag[] EMPTY_PATH = new Xml.Tag[0];
+
+    /**
+     * Evaluate predicates against a tag.
+     * Optimized: doesn't build path array since predicates only need cursor for namespace lookups.
+     */
+    private boolean evaluatePredicates(List<XPathParser.PredicateContext> predicates, Xml.Tag tag, Cursor cursor) {
+        // Calculate position/size once by looking at parent's children
+        int position = 1;
+        int size = 1;
+        Cursor parentCursor = cursor.getParent();
+        if (parentCursor != null && parentCursor.getValue() instanceof Xml.Tag) {
+            Xml.Tag parent = parentCursor.getValue();
+            List<? extends Content> contents = parent.getContent();
+            if (contents != null) {
+                int count = 0;
+                for (Content c : contents) {
+                    if (c instanceof Xml.Tag) {
+                        Xml.Tag child = (Xml.Tag) c;
+                        if (child.getName().equals(tag.getName())) {
+                            count++;
+                            if (child == tag) {
+                                position = count;
+                            }
+                        }
+                    }
+                }
+                size = count > 0 ? count : 1;
+            }
+        }
+
+        // Create visitor once with empty path (predicates only need cursor for namespace lookups)
+        XPathMatcherVisitor visitor = new XPathMatcherVisitor(EMPTY_PATH, 0, cursor,
+                compiledSteps, stepFlags, compiledElementSteps);
+
+        for (XPathParser.PredicateContext predicate : predicates) {
+            if (!visitor.evaluatePredicate(predicate, tag, position, size)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Build path array from cursor (used for top-down matching fallback).
+     */
+    private Xml.Tag[] buildPathArray(Cursor cursor) {
+        java.util.List<Xml.Tag> tags = new java.util.ArrayList<>();
+        for (Cursor c = cursor; c != null; c = c.getParent()) {
+            if (c.getValue() instanceof Xml.Tag) {
+                tags.add(0, c.getValue());
+            }
+        }
+        return tags.toArray(new Xml.Tag[0]);
+    }
+
+    /**
+     * Fall back to path-array-based matching for complex expressions.
+     */
+    private boolean matchWithPathArray(Cursor cursor, XPathParser.XpathExpressionContext ctx) {
         // Single pass: collect tags into cached array (in reverse/cursor order)
         Xml.Tag[] cached = PATH_CACHE.get();
         int tagCount = 0;
@@ -96,6 +648,15 @@ public class XPathMatcher {
                 }
                 tagCount++;
             }
+        }
+
+        // Early reject: for absolute paths without any //, cursor depth can't exceed number of element steps
+        // e.g., /a/b/c has 3 element steps, so cursor at depth 4+ can never match
+        // But /a//b can match at any depth due to the // so we can't apply this optimization
+        if ((stepFlags & FLAG_ABSOLUTE_PATH) != 0 &&
+                (stepFlags & FLAG_HAS_DESCENDANT) == 0 &&
+                compiledElementSteps > 0 && tagCount > compiledElementSteps) {
+            return false;
         }
 
         // Build path in root-first order
@@ -122,23 +683,6 @@ public class XPathMatcher {
             }
         }
 
-        XPathParser.XpathExpressionContext ctx = parse();
-
-        // Fast path: for compiled path expressions, bypass the visitor entirely
-        if (exprType == EXPR_PATH && compiledSteps != null) {
-            // Early rejection for simple absolute paths: if path length doesn't match expected elements, fail fast
-            if ((stepFlags & FLAG_ABSOLUTE_PATH) != 0 &&
-                (stepFlags & FLAGS_VARIABLE_PATH_LENGTH) == 0 &&
-                pathLength != compiledElementSteps) {
-                return false;
-            }
-
-            XPathMatcherVisitor visitor = new XPathMatcherVisitor(path, pathLength, cursor,
-                    compiledSteps, stepFlags, compiledElementSteps);
-            return visitor.matchCompiledPath();
-        }
-
-        // Complex expressions (boolean, filter) still need the visitor
         XPathMatcherVisitor visitor = new XPathMatcherVisitor(path, pathLength, cursor,
                 compiledSteps, stepFlags, compiledElementSteps);
         return visitor.visit(ctx);
@@ -231,6 +775,7 @@ public class XPathMatcher {
                     s.setNextIsBacktrack();
                 }
             }
+
         }
         this.stepFlags = flags;
     }
