@@ -15,15 +15,13 @@
  */
 package org.openrewrite.xml;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -114,51 +112,48 @@ class XPathMatcherTest {
 
     @Test
     void matchAbsolute() {
-        assertThat(match("/dependencies/dependency", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/*/artifactId", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/*", xmlDoc)).isTrue();
-        assertThat(match("/dependencies//dependency", xmlDoc)).isTrue();
-        assertThat(match("/dependencies//dependency//groupId", xmlDoc)).isTrue();
+        assertThat(matchCount("/dependencies/dependency", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies/*/artifactId", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies/*", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies//dependency", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies//dependency//groupId", xmlDoc)).isEqualTo(1);
 
         // negative matches
-        assertThat(match("/dependencies/dne", xmlDoc)).isFalse();
-        assertThat(match("/dependencies//dne", xmlDoc)).isFalse();
-        assertThat(match("/dependencies//dependency//dne", xmlDoc)).isFalse();
+        assertThat(matchCount("/dependencies/dne", xmlDoc)).isEqualTo(0);
+        assertThat(matchCount("/dependencies//dne", xmlDoc)).isEqualTo(0);
+        assertThat(matchCount("/dependencies//dependency//dne", xmlDoc)).isEqualTo(0);
     }
 
     @Test
     void matchAbsoluteAttribute() {
-        assertThat(match("/dependencies/dependency/artifactId/@scope", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency/artifactId/@scope", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency/artifactId/@*", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency/groupId/@*", xmlDoc)).isFalse();
-        assertThat(match("/dependencies//dependency//@scope", xmlDoc)).isTrue();
-        assertThat(match("/dependencies//dependency//artifactId//@scope", xmlDoc)).isTrue();
-        assertThat(match("/dependencies//dependency//@*", xmlDoc)).isTrue();
-        assertThat(match("/dependencies//dependency//artifactId//@*", xmlDoc)).isTrue();
+        assertThat(matchCount("/dependencies/dependency/artifactId/@scope", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies/dependency/artifactId/@*", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies/dependency/groupId/@*", xmlDoc)).isEqualTo(0);
+        assertThat(matchCount("/dependencies//dependency//@scope", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies//dependency//artifactId//@scope", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies//dependency//@*", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies//dependency//artifactId//@*", xmlDoc)).isEqualTo(2);
 
         // negative matches
-        assertThat(match("/dependencies/dependency/artifactId/@dne", xmlDoc)).isFalse();
-        assertThat(match("/dependencies/dependency/artifactId/@dne", xmlDoc)).isFalse();
-        assertThat(match("/dependencies//dependency//@dne", xmlDoc)).isFalse();
-        assertThat(match("/dependencies//dependency//artifactId//@dne", xmlDoc)).isFalse();
-
+        assertThat(matchCount("/dependencies/dependency/artifactId/@dne", xmlDoc)).isEqualTo(0);
+        assertThat(matchCount("/dependencies//dependency//@dne", xmlDoc)).isEqualTo(0);
+        assertThat(matchCount("/dependencies//dependency//artifactId//@dne", xmlDoc)).isEqualTo(0);
     }
 
     @Test
     void matchRelative() {
-        assertThat(match("dependencies", xmlDoc)).isTrue();
-        assertThat(match("dependency", xmlDoc)).isTrue();
-        assertThat(match("//dependency", xmlDoc)).isTrue();
-        assertThat(match("dependency/*", xmlDoc)).isTrue();
-        assertThat(match("dne", xmlDoc)).isFalse();
+        assertThat(matchCount("dependencies", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("dependency", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("dependency/*", xmlDoc)).isEqualTo(3); // 1 groupId + 2 artifactId
+        assertThat(matchCount("dne", xmlDoc)).isEqualTo(0);
     }
 
     @Test
     void matchRelativeAttribute() {
-        assertThat(match("dependency/artifactId/@scope", xmlDoc)).isTrue();
-        assertThat(match("dependency/artifactId/@*", xmlDoc)).isTrue();
-        assertThat(match("//dependency/artifactId/@scope", xmlDoc)).isTrue();
+        assertThat(matchCount("dependency/artifactId/@scope", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("dependency/artifactId/@*", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency/artifactId/@scope", xmlDoc)).isEqualTo(2);
     }
 
     @Test
@@ -654,25 +649,29 @@ class XPathMatcherTest {
         assertThat(match("//*[local-name()='element4' or local-name()='dne' and namespace-uri()='http://www.example.com/namespaceX']", namespacedXml)).isTrue();
     }
 
-    private boolean match(String xpath, SourceFile x) {
+    private boolean match(@Language("xpath") String xpath, SourceFile x) {
+        return matchCount(xpath, x) > 0;
+    }
+
+    private int matchCount(String xpath, SourceFile x) {
         XPathMatcher matcher = new XPathMatcher(xpath);
-        return !TreeVisitor.collect(new XmlVisitor<>() {
+        return (new XmlVisitor<AtomicInteger>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml visitTag(Xml.Tag tag, AtomicInteger ctx) {
                 if (matcher.matches(getCursor())) {
-                    return SearchResult.found(tag);
+                    ctx.incrementAndGet();
                 }
                 return super.visitTag(tag, ctx);
             }
 
             @Override
-            public Xml visitAttribute(Xml.Attribute attribute, ExecutionContext ctx) {
+            public Xml visitAttribute(Xml.Attribute attribute, AtomicInteger ctx) {
                 if (matcher.matches(getCursor())) {
-                    return SearchResult.found(attribute);
+                    ctx.incrementAndGet();
                 }
                 return super.visitAttribute(attribute, ctx);
             }
-        }, x, new ArrayList<>()).isEmpty();
+        }).reduce(x, new AtomicInteger()).get();
     }
 
     @Test
@@ -687,83 +686,83 @@ class XPathMatcherTest {
     void matchPositionalPredicates() {
         // xmlDoc has two <dependency> elements under <dependencies>
         // [1] selects the first dependency
-        assertThat(match("/dependencies/dependency[1]", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[2]", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[3]", xmlDoc)).isFalse(); // only 2 dependencies
+        assertThat(matchCount("/dependencies/dependency[1]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/dependency[2]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/dependency[3]", xmlDoc)).isEqualTo(0); // only 2 dependencies
 
         // [last()] selects the last element
-        assertThat(match("/dependencies/dependency[last()]", xmlDoc)).isTrue();
+        assertThat(matchCount("/dependencies/dependency[last()]", xmlDoc)).isEqualTo(1);
 
         // position() function
-        assertThat(match("/dependencies/dependency[position()=1]", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[position()=2]", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[position()=3]", xmlDoc)).isFalse();
+        assertThat(matchCount("/dependencies/dependency[position()=1]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/dependency[position()=2]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/dependency[position()=3]", xmlDoc)).isEqualTo(0);
 
         // Combining positional with other predicates
         // The first dependency has groupId, the second doesn't
-        assertThat(match("/dependencies/dependency[1]/groupId", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[2]/groupId", xmlDoc)).isFalse();
+        assertThat(matchCount("/dependencies/dependency[1]/groupId", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/dependency[2]/groupId", xmlDoc)).isEqualTo(0);
 
         // position() with comparison operators
-        assertThat(match("/dependencies/dependency[position()>1]", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[position()<2]", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[position()>=1]", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[position()<=2]", xmlDoc)).isTrue();
+        assertThat(matchCount("/dependencies/dependency[position()>1]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/dependency[position()<2]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/dependency[position()>=1]", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies/dependency[position()<=2]", xmlDoc)).isEqualTo(2);
     }
 
     @Test
     void matchPositionalWithOtherConditions() {
         // Combining positional predicates with attribute/element conditions
         // First dependency's artifactId has scope="compile", second has scope="test"
-        assertThat(match("/dependencies/dependency[1]/artifactId[@scope='compile']", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[2]/artifactId[@scope='test']", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency[1]/artifactId[@scope='test']", xmlDoc)).isFalse();
+        assertThat(matchCount("/dependencies/dependency[1]/artifactId[@scope='compile']", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/dependency[2]/artifactId[@scope='test']", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/dependency[1]/artifactId[@scope='test']", xmlDoc)).isEqualTo(0);
     }
 
     @Test
     void matchParenthesizedPathExpressions() {
         // Parenthesized path expressions apply predicates to the entire result set
         // (/dependencies/dependency)[1] - first dependency from the entire document
-        assertThat(match("(/dependencies/dependency)[1]", xmlDoc)).isTrue();
-        assertThat(match("(/dependencies/dependency)[2]", xmlDoc)).isTrue();
-        assertThat(match("(/dependencies/dependency)[3]", xmlDoc)).isFalse();
+        assertThat(matchCount("(/dependencies/dependency)[1]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(/dependencies/dependency)[2]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(/dependencies/dependency)[3]", xmlDoc)).isEqualTo(0);
 
         // (/dependencies/dependency)[last()] - last dependency
-        assertThat(match("(/dependencies/dependency)[last()]", xmlDoc)).isTrue();
+        assertThat(matchCount("(/dependencies/dependency)[last()]", xmlDoc)).isEqualTo(1);
 
         // With position() function
-        assertThat(match("(/dependencies/dependency)[position()=1]", xmlDoc)).isTrue();
-        assertThat(match("(/dependencies/dependency)[position()=2]", xmlDoc)).isTrue();
+        assertThat(matchCount("(/dependencies/dependency)[position()=1]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(/dependencies/dependency)[position()=2]", xmlDoc)).isEqualTo(1);
 
         // Descendant axis in parenthesized expression
-        assertThat(match("(//dependency)[1]", xmlDoc)).isTrue();
-        assertThat(match("(//dependency)[last()]", xmlDoc)).isTrue();
+        assertThat(matchCount("(//dependency)[1]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(//dependency)[last()]", xmlDoc)).isEqualTo(1);
     }
 
     @Test
     void matchAdvancedFilterExpressions() {
         // (/path/expr)[predicate]/trailing - filter expression with trailing path
-        assertThat(match("(/project/build/plugins/plugin)[1]/groupId", pomXml1)).isTrue();
-        assertThat(match("(/project/build/plugins/plugin)[1]/artifactId", pomXml1)).isTrue();
-        assertThat(match("(/project/build/plugins/plugin)[1]/configuration", pomXml1)).isTrue();
-        assertThat(match("(/project/build/plugins/plugin)[1]/configuration/source", pomXml1)).isTrue();
+        assertThat(matchCount("(/project/build/plugins/plugin)[1]/groupId", pomXml1)).isEqualTo(1);
+        assertThat(matchCount("(/project/build/plugins/plugin)[1]/artifactId", pomXml1)).isEqualTo(1);
+        assertThat(matchCount("(/project/build/plugins/plugin)[1]/configuration", pomXml1)).isEqualTo(1);
+        assertThat(matchCount("(/project/build/plugins/plugin)[1]/configuration/source", pomXml1)).isEqualTo(1);
 
         // Test with attribute access in trailing path (not yet supported)
-        // assertThat(match("(/dependencies/dependency)[1]/artifactId/@scope", xmlDoc)).isTrue();
+        // assertThat(matchCount("(/dependencies/dependency)[1]/artifactId/@scope", xmlDoc)).isEqualTo(1);
     }
 
     @Test
     void matchAbbreviatedSyntax() {
         // . means self (current node)
-        assertThat(match("/dependencies/./dependency", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency/.", xmlDoc)).isTrue();
+        assertThat(matchCount("/dependencies/./dependency", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies/dependency/.", xmlDoc)).isEqualTo(2);
 
         // .. means parent
-        assertThat(match("/dependencies/dependency/groupId/..", xmlDoc)).isTrue();
-        assertThat(match("/dependencies/dependency/groupId/../artifactId", xmlDoc)).isTrue();
+        assertThat(matchCount("/dependencies/dependency/groupId/..", xmlDoc)).isEqualTo(1); // only first dependency has groupId
+        assertThat(matchCount("/dependencies/dependency/groupId/../artifactId", xmlDoc)).isEqualTo(1);
 
         // Multiple parent references
-        assertThat(match("/dependencies/dependency/groupId/../../dependency", xmlDoc)).isTrue();
+        assertThat(matchCount("/dependencies/dependency/groupId/../../dependency", xmlDoc)).isEqualTo(2);
     }
 
     @Test
@@ -819,8 +818,8 @@ class XPathMatcherTest {
     @Test
     void matchRootElement() {
         // Single-step absolute path should match the root element
-        assertThat(match("/project", pomXml1)).isTrue();
-        assertThat(match("/dependencies", xmlDoc)).isTrue();
+        assertThat(matchCount("/project", pomXml1)).isEqualTo(1);
+        assertThat(matchCount("/dependencies", xmlDoc)).isEqualTo(1);
 
         // /project/parent should match the parent element
         SourceFile pomWithParent = new XmlParser().parse(
@@ -833,8 +832,8 @@ class XPathMatcherTest {
             </project>
             """
         ).toList().getFirst();
-        assertThat(match("/project/parent", pomWithParent)).isTrue();
-        assertThat(match("/project", pomWithParent)).isTrue();
+        assertThat(matchCount("/project/parent", pomWithParent)).isEqualTo(1);
+        assertThat(matchCount("/project", pomWithParent)).isEqualTo(1);
     }
 
     @Test
