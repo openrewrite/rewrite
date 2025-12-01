@@ -459,6 +459,22 @@ class XPathMatcherTest {
     }
 
     @Test
+    void matchBooleanExpressionWithRelativePath() {
+        // Relative paths in boolean expressions are evaluated from the cursor's context element
+        // contains(element1, 'content1') matches at <root> because it has a child <element1> containing 'content1'
+        assertThat(matchCount("contains(element1, 'content1')", namespacedXml)).isEqualTo(1); // matches at <root>
+
+        // xmlDoc: <dependencies><dependency><groupId>org.openrewrite</groupId>...</dependency>...</dependencies>
+        // contains(groupId, 'openrewrite') matches at <dependency> elements that have child <groupId> containing 'openrewrite'
+        assertThat(matchCount("contains(groupId, 'openrewrite')", xmlDoc)).isEqualTo(1); // matches at first <dependency>
+        assertThat(matchCount("contains(groupId, 'notfound')", xmlDoc)).isEqualTo(0); // no matches
+
+        // Absolute paths: only match at root element
+        // contains(/dependencies/dependency/groupId, 'openrewrite') - matches only at <dependencies> (root)
+        assertThat(matchCount("contains(/dependencies/dependency/groupId, 'openrewrite')", xmlDoc)).isEqualTo(1);
+    }
+
+    @Test
     void matchLocalNameFunctionCondition() {
         assertThat(match("/*[local-name()='root']", namespacedXml)).isTrue();
         assertThat(match("/*[local-name()='element1']", namespacedXml)).isFalse();

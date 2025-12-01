@@ -1125,7 +1125,11 @@ public class XPathMatcher {
 
     /**
      * Match a boolean expression like contains(/root/element, 'value').
-     * These are evaluated at the document root and match only at the root element.
+     * <p>
+     * For expressions with pure absolute paths (/foo/bar): cursor must be at the root element.
+     * <p>
+     * For expressions with descendant paths (//foo) or relative paths (foo/bar):
+     * evaluated from cursor context, matches at any position where the expression is true.
      */
     @SuppressWarnings("DataFlowIssue")
     private boolean matchBooleanExpr(Cursor cursor) {
@@ -1133,21 +1137,33 @@ public class XPathMatcher {
             return false;
         }
 
-        Cursor rootCursor = getRootCursor(cursor);
-        if (rootCursor == null) {
+        // Cursor must be at a tag
+        if (!(cursor.getValue() instanceof Xml.Tag)) {
             return false;
         }
-        Xml.Tag root = (Xml.Tag) rootCursor.getValue();
+        Xml.Tag currentTag = cursor.getValue();
 
-        // Evaluate using unified method with root context (position=1, size=1)
-        boolean result = evaluateExpr(compiled.booleanExpr, root, null, rootCursor, 1, 1);
-
-        // Only match at the root element to avoid multiple matches
-        int depth = 0;
-        for (Cursor c = cursor; c != null; c = c.getParent()) {
-            if (c.getValue() instanceof Xml.Tag) depth++;
+        // Check if expression contains relative paths or descendant paths
+        // Relative paths (foo/bar) and descendant paths (//foo) can match at any cursor position
+        // Only pure absolute paths (/foo/bar) require cursor to be at root
+        if (compiled.booleanExpr.hasRelativePath() || !compiled.booleanExpr.hasPureAbsolutePath()) {
+            // Relative or descendant paths: evaluate from cursor context at any position
+            return evaluateExpr(compiled.booleanExpr, currentTag, null, cursor, 1, 1);
         }
-        return result && depth == 1;
+
+        // Pure absolute paths only: only match at root element
+        // Check if cursor is at root (parent is Document or no parent tag)
+        Cursor parentCursor = cursor.getParent();
+        while (parentCursor != null && !(parentCursor.getValue() instanceof Xml.Tag)
+               && !(parentCursor.getValue() instanceof Xml.Document)) {
+            parentCursor = parentCursor.getParent();
+        }
+        if (parentCursor == null || !(parentCursor.getValue() instanceof Xml.Document)) {
+            return false; // Not at root element
+        }
+
+        // Evaluate the expression from current (root) context
+        return evaluateExpr(compiled.booleanExpr, currentTag, null, cursor, 1, 1);
     }
 
     // ==================== Filter Expression Matching ====================

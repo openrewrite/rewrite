@@ -1155,6 +1155,100 @@ final class XPathCompiler {
                    (name == null || "*".equals(name));
         }
 
+        /**
+         * Check if this expression contains any relative paths (CHILD or PATH types).
+         * Relative paths should be evaluated from the cursor context, not from root.
+         * ABSOLUTE_PATH expressions are not considered relative.
+         */
+        public boolean hasRelativePath() {
+            switch (type) {
+                case CHILD:
+                case PATH:
+                    return true;
+                case COMPARISON:
+                case AND:
+                case OR:
+                    return (left != null && left.hasRelativePath()) ||
+                           (right != null && right.hasRelativePath());
+                case FUNCTION:
+                    if (args != null) {
+                        for (CompiledExpr arg : args) {
+                            if (arg.hasRelativePath()) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        /**
+         * Check if this expression contains only pure absolute paths (starting with / but not //).
+         * Pure absolute paths like /foo/bar require cursor to be at root.
+         * Descendant paths like //foo can match at any cursor position.
+         * Returns true if the expression has at least one ABSOLUTE_PATH and all are pure absolute.
+         */
+        public boolean hasPureAbsolutePath() {
+            switch (type) {
+                case ABSOLUTE_PATH:
+                    // Check if path starts with // (descendant) vs / (pure absolute)
+                    return stringValue != null && stringValue.startsWith("/") && !stringValue.startsWith("//");
+                case COMPARISON:
+                case AND:
+                case OR:
+                    // Both sides must have pure absolute paths (if they have any paths)
+                    boolean leftPure = left == null || !left.hasAnyAbsolutePath() || left.hasPureAbsolutePath();
+                    boolean rightPure = right == null || !right.hasAnyAbsolutePath() || right.hasPureAbsolutePath();
+                    boolean hasAny = (left != null && left.hasAnyAbsolutePath()) ||
+                                     (right != null && right.hasAnyAbsolutePath());
+                    return hasAny && leftPure && rightPure;
+                case FUNCTION:
+                    if (args != null) {
+                        boolean anyAbsolute = false;
+                        for (CompiledExpr arg : args) {
+                            if (arg.hasAnyAbsolutePath()) {
+                                anyAbsolute = true;
+                                if (!arg.hasPureAbsolutePath()) {
+                                    return false; // Has descendant path
+                                }
+                            }
+                        }
+                        return anyAbsolute;
+                    }
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        /**
+         * Check if this expression contains any ABSOLUTE_PATH expressions.
+         */
+        private boolean hasAnyAbsolutePath() {
+            switch (type) {
+                case ABSOLUTE_PATH:
+                    return true;
+                case COMPARISON:
+                case AND:
+                case OR:
+                    return (left != null && left.hasAnyAbsolutePath()) ||
+                           (right != null && right.hasAnyAbsolutePath());
+                case FUNCTION:
+                    if (args != null) {
+                        for (CompiledExpr arg : args) {
+                            if (arg.hasAnyAbsolutePath()) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
         public ExprType getType() {
             return type;
         }
