@@ -1001,9 +1001,21 @@ final class XPathCompiler {
 
         int flags;
 
+        // Matching strategy - precomputed for optimal evaluation order
+        // Strategies encode assumptions about name/predicate presence to skip runtime checks
+        static final byte STRATEGY_NAME_ONLY = 0;           // Specific name, no predicates (most common)
+        static final byte STRATEGY_NAME_THEN_PRED = 1;      // Specific name, then predicates
+        static final byte STRATEGY_WILDCARD = 2;            // Wildcard name, no predicates (always matches)
+        static final byte STRATEGY_PRED_ONLY = 3;           // Wildcard name, predicates only (name provides no selectivity)
+        static final byte STRATEGY_DOT = 4;                 // . (self) - always matches current tag
+        static final byte STRATEGY_NODE_TYPE = 5;           // node() type test
+        static final byte STRATEGY_OTHER = 6;               // Fallback for complex cases
+
+        final byte strategy;
+
         private CompiledStep(StepType type, boolean isDescendant, @Nullable String name,
                              AxisType axisType, NodeTypeTestType nodeTypeTestType,
-                             CompiledExpr[] predicates, int flags) {
+                             CompiledExpr[] predicates, int flags, byte strategy) {
             this.type = type;
             this.isDescendant = isDescendant;
             this.name = name;
@@ -1011,6 +1023,33 @@ final class XPathCompiler {
             this.nodeTypeTestType = nodeTypeTestType;
             this.predicates = predicates;
             this.flags = flags;
+            this.strategy = strategy;
+        }
+
+        /**
+         * Compute the optimal matching strategy based on step characteristics.
+         */
+        private static byte computeStrategy(StepType type, @Nullable String name, CompiledExpr[] predicates) {
+            switch (type) {
+                case NODE_TEST:
+                    boolean isWildcard = "*".equals(name);
+                    boolean hasPredicates = predicates.length > 0;
+                    if (isWildcard) {
+                        return hasPredicates ? STRATEGY_PRED_ONLY : STRATEGY_WILDCARD;
+                    } else {
+                        return hasPredicates ? STRATEGY_NAME_THEN_PRED : STRATEGY_NAME_ONLY;
+                    }
+                case ABBREVIATED_DOT:
+                    return STRATEGY_DOT;
+                case NODE_TYPE_TEST:
+                    return STRATEGY_NODE_TYPE;
+                default:
+                    return STRATEGY_OTHER;
+            }
+        }
+
+        public byte getStrategy() {
+            return strategy;
         }
 
         public StepType getType() {
@@ -1060,10 +1099,12 @@ final class XPathCompiler {
             if (step.abbreviatedStep() != null) {
                 if (step.abbreviatedStep().DOTDOT() != null) {
                     return new CompiledStep(StepType.ABBREVIATED_DOTDOT, isDescendant, null,
-                            AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                            AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                            computeStrategy(StepType.ABBREVIATED_DOTDOT, null, predicates));
                 } else {
                     return new CompiledStep(StepType.ABBREVIATED_DOT, isDescendant, null,
-                            AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                            AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                            computeStrategy(StepType.ABBREVIATED_DOT, null, predicates));
                 }
             }
 
@@ -1071,7 +1112,8 @@ final class XPathCompiler {
             if (step.attributeStep() != null) {
                 String attrName = getAttributeStepName(step.attributeStep());
                 return new CompiledStep(StepType.ATTRIBUTE_STEP, isDescendant, attrName,
-                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                        computeStrategy(StepType.ATTRIBUTE_STEP, attrName, predicates));
             }
 
             // Axis step with specifier: parent::node(), self::element, etc.
@@ -1097,7 +1139,8 @@ final class XPathCompiler {
                 }
 
                 return new CompiledStep(StepType.AXIS_STEP, isDescendant, nodeTestName,
-                        axisType, NodeTypeTestType.UNKNOWN, predicates, flags);
+                        axisType, NodeTypeTestType.UNKNOWN, predicates, flags,
+                        computeStrategy(StepType.AXIS_STEP, nodeTestName, predicates));
             }
 
             // Node test without axis: nameTest or nodeType()
@@ -1125,18 +1168,21 @@ final class XPathCompiler {
                             testType = NodeTypeTestType.UNKNOWN;
                     }
                     return new CompiledStep(StepType.NODE_TYPE_TEST, isDescendant, null,
-                            AxisType.OTHER, testType, predicates, flags);
+                            AxisType.OTHER, testType, predicates, flags,
+                            computeStrategy(StepType.NODE_TYPE_TEST, null, predicates));
                 }
 
                 // It's a name test: element name or *
                 String nodeName = getNodeTestName(nodeTest);
                 return new CompiledStep(StepType.NODE_TEST, isDescendant, nodeName,
-                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                        computeStrategy(StepType.NODE_TEST, nodeName, predicates));
             }
 
             // Shouldn't reach here - return a non-matching step
             return new CompiledStep(StepType.NODE_TEST, isDescendant, null,
-                    AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                    AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                    computeStrategy(StepType.NODE_TEST, null, predicates));
         }
 
         /**
@@ -1170,7 +1216,9 @@ final class XPathCompiler {
             if (predicate.needsPosition()) {
                 newFlags |= STEP_FLAG_NEEDS_POSITION;
             }
-            return new CompiledStep(type, isDescendant, name, axisType, nodeTypeTestType, newPredicates, newFlags);
+            // Recompute strategy since predicates changed
+            return new CompiledStep(type, isDescendant, name, axisType, nodeTypeTestType, newPredicates, newFlags,
+                    computeStrategy(type, name, newPredicates));
         }
     }
 

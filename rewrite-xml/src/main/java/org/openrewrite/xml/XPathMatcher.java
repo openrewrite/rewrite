@@ -466,38 +466,75 @@ public class XPathMatcher {
 
     /**
      * Check if a compiled step matches a tag.
+     * Uses precomputed strategy for optimal evaluation order.
      */
     private boolean matchStepAgainstTag(CompiledStep step, Xml.Tag tag, Cursor cursor) {
-        // Handle different step types
+        // Strategy-based dispatch - each strategy makes assumptions about
+        // name/predicate presence to skip unnecessary runtime checks
+        switch (step.strategy) {
+            case CompiledStep.STRATEGY_NAME_ONLY:
+                // Most common: specific element name, no predicates
+                // Single string comparison, no predicate check needed
+                //noinspection DataFlowIssue
+                return step.name.equals(tag.getName());
+
+            case CompiledStep.STRATEGY_NAME_THEN_PRED:
+                // Specific name with predicates - check name first (selective)
+                //noinspection DataFlowIssue
+                if (!step.name.equals(tag.getName())) {
+                    return false;
+                }
+                return evaluatePredicates(step.predicates, tag, cursor);
+
+            case CompiledStep.STRATEGY_WILDCARD:
+                // Wildcard without predicates - always matches any tag
+                return true;
+
+            case CompiledStep.STRATEGY_PRED_ONLY:
+                // Wildcard with predicates - skip name check (provides no selectivity)
+                // Go directly to predicate evaluation
+                return evaluatePredicates(step.predicates, tag, cursor);
+
+            case CompiledStep.STRATEGY_DOT:
+                // . (self) - always matches current tag
+                return true;
+
+            case CompiledStep.STRATEGY_NODE_TYPE:
+                // node() type test - matches tags only if it's node()
+                return step.nodeTypeTestType == NodeTypeTestType.NODE;
+
+            case CompiledStep.STRATEGY_OTHER:
+            default:
+                // Fallback for complex/unsupported cases
+                return matchStepAgainstTagGeneric(step, tag, cursor);
+        }
+    }
+
+    /**
+     * Generic fallback matcher for complex step types.
+     */
+    private boolean matchStepAgainstTagGeneric(CompiledStep step, Xml.Tag tag, Cursor cursor) {
         switch (step.type) {
             case NODE_TEST:
-                // Element name or wildcard
                 if (!matchesName(step.name, tag.getName())) {
                     return false;
                 }
                 break;
             case ABBREVIATED_DOT:
-                // . matches current - always true for tags
                 break;
-            case ABBREVIATED_DOTDOT:
-                // .. is handled differently - this shouldn't be called directly
-                return false;
             case NODE_TYPE_TEST:
-                // text(), comment(), node() - these don't match tags
                 if (step.nodeTypeTestType != NodeTypeTestType.NODE) {
                     return false;
                 }
                 break;
+            case ABBREVIATED_DOTDOT:
             default:
-                // Other step types not supported in bottom-up yet
                 return false;
         }
 
-        // Check predicates if present
         if (step.predicates.length > 0) {
             return evaluatePredicates(step.predicates, tag, cursor);
         }
-
         return true;
     }
 
