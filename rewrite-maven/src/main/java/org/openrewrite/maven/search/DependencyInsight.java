@@ -243,7 +243,7 @@ public class DependencyInsight extends Recipe {
 
             Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
             for (Map.Entry<Scope, Set<GroupArtifactVersion>> entry : scopeToDirectDependency.entrySet()) {
-                if (tagScope.equals(entry.getKey()) || tagScope.isInClasspathOf(entry.getKey())) {
+                if (tagScope == entry.getKey() || tagScope.isInClasspathOf(entry.getKey())) {
                     return new MavenDependency.Matcher().get(getCursor()).map(dependency -> {
                         ResolvedGroupArtifactVersion gav = dependency.getResolvedDependency().getGav();
                         Optional<GroupArtifactVersion> scopeGav = entry.getValue().stream()
