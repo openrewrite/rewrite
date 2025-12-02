@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.graph;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
@@ -33,36 +34,36 @@ import java.util.*;
 public class DependencyTreeWalker {
 
     /**
-     * Callback interface for handling matched dependencies.
+     * Callback interface for handling dependencies during tree traversal.
      */
     @FunctionalInterface
-    public interface MatchCallback {
+    public interface Callback {
         /**
-         * Called when a dependency matches the matcher.
+         * Called when a dependency is visited or matches a pattern.
          * <p>
          * <b>IMPORTANT:</b> The {@code path} deque is only valid during this callback invocation.
          * It will be modified after the callback returns. If you need to retain the path,
          * create a copy (e.g., {@code new ArrayList<>(path)}).
          * <p>
-         * The path is in <b>leaf-to-root order</b>: {@code path.getFirst()} returns the matched
+         * The path is in <b>leaf-to-root order</b>: {@code path.getFirst()} returns the current
          * dependency, {@code path.getLast()} returns the direct (root) dependency.
          *
-         * @param matched the dependency that matched
-         * @param path    the path from matched dependency to direct dependency (leaf-to-root order);
-         *                use {@code getLast()} for the direct dependency, iterate normally for leaf-to-root
+         * @param dependency the current dependency being visited/matched
+         * @param path       the path from this dependency to direct dependency (leaf-to-root order);
+         *                   use {@code getLast()} for the direct dependency, iterate normally for leaf-to-root
          */
-        void onMatch(ResolvedDependency matched, Deque<ResolvedDependency> path);
+        void accept(ResolvedDependency dependency, Deque<ResolvedDependency> path);
     }
 
     /**
      * Walks the dependency tree starting from the given roots, calling the callback
-     * for each dependency that matches the matcher.
+     * for each dependency that matches the matcher (or all dependencies if matcher is null).
      *
      * @param roots    the direct dependencies to start traversal from
-     * @param matcher  the matcher to test dependencies against
+     * @param matcher  the matcher to test dependencies against, or null to visit all
      * @param callback called for each matching dependency with its path
      */
-    public static void walk(List<ResolvedDependency> roots, DependencyMatcher matcher, MatchCallback callback) {
+    public static void walk(List<ResolvedDependency> roots, @Nullable DependencyMatcher matcher, Callback callback) {
         Deque<ResolvedDependency> path = new ArrayDeque<>();
         for (ResolvedDependency root : roots) {
             walkRecursive(root, matcher, path, callback);
@@ -73,19 +74,19 @@ public class DependencyTreeWalker {
      * Walks a single dependency tree, calling the callback for each match.
      *
      * @param root     the direct dependency to start traversal from
-     * @param matcher  the matcher to test dependencies against
+     * @param matcher  the matcher to test dependencies against, or null to visit all
      * @param callback called for each matching dependency with its path
      */
-    public static void walk(ResolvedDependency root, DependencyMatcher matcher, MatchCallback callback) {
+    public static void walk(ResolvedDependency root, @Nullable DependencyMatcher matcher, Callback callback) {
         Deque<ResolvedDependency> path = new ArrayDeque<>();
         walkRecursive(root, matcher, path, callback);
     }
 
     private static void walkRecursive(
             ResolvedDependency dependency,
-            DependencyMatcher matcher,
+            @Nullable DependencyMatcher matcher,
             Deque<ResolvedDependency> path,
-            MatchCallback callback
+            Callback callback
     ) {
         // Cycle detection - check if we've already visited this dependency in the current path
         if (containsDependency(path, dependency)) {
@@ -99,11 +100,11 @@ public class DependencyTreeWalker {
             walkRecursive(child, matcher, path, callback);
         }
 
-        // Check if this dependency matches
-        if (matcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
-            // Pass the deque directly - callback must not retain reference (documented in MatchCallback)
+        // Check if this dependency matches (or matcher is null for visit-all mode)
+        if (matcher == null || matcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
+            // Pass the deque directly - callback must not retain reference (documented in Callback)
             // Path is in leaf-to-root order: getFirst() = matched, getLast() = direct dependency
-            callback.onMatch(dependency, path);
+            callback.accept(dependency, path);
         }
 
         path.removeFirst();
@@ -192,7 +193,7 @@ public class DependencyTreeWalker {
          * @param matcher    the matcher to test dependencies against
          * @param callback   optional callback for additional per-match processing (may be null)
          */
-        public void collect(S scope, ResolvedDependency root, DependencyMatcher matcher, MatchCallback callback) {
+        public void collect(S scope, ResolvedDependency root, DependencyMatcher matcher, @Nullable Callback callback) {
             walk(root, matcher, (matched, path) -> {
                 // path is in leaf-to-root order: getLast() gives direct dependency
                 ResolvedDependency directDependency = path.getLast();
@@ -203,7 +204,7 @@ public class DependencyTreeWalker {
                 directDependencyToTargetDependency.computeIfAbsent(directGav, __ -> new HashSet<>()).add(matchedGav);
 
                 if (callback != null) {
-                    callback.onMatch(matched, path);
+                    callback.accept(matched, path);
                 }
             });
         }
