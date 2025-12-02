@@ -25,7 +25,7 @@ import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
-import org.openrewrite.maven.graph.DependencyGraph;
+import org.openrewrite.maven.graph.DependencyTreeWalker;
 import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
@@ -36,7 +36,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
-import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
 /**
@@ -69,8 +68,8 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Version",
             description = "Match only dependencies with the specified version. " +
-                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
-                          "All versions are searched by default.",
+                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                    "All versions are searched by default.",
             example = "1.x",
             required = false)
     @Nullable
@@ -113,7 +112,7 @@ public class DependencyInsight extends Recipe {
     @Override
     public String getDescription() {
         return "Find direct and transitive dependencies matching a group, artifact, and scope. " +
-               "Results include dependencies that either directly match or transitively include a matching dependency.";
+                "Results include dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override
@@ -132,74 +131,43 @@ public class DependencyInsight extends Recipe {
                         .map(JavaSourceSet::getName)
                         .orElse("main");
 
-                Map<Scope, Set<GroupArtifactVersion>> scopeToDirectDependency = new HashMap<>();
-                Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency = new HashMap<>();
+                DependencyTreeWalker.Matches<Scope> matches = new DependencyTreeWalker.Matches<>();
+                collectMatchingDependencies(projectName, sourceSetName, getResolutionResult(), requestedScope, matches, ctx);
 
-                findMatchingDependencies(projectName, sourceSetName, getResolutionResult(), requestedScope, scopeToDirectDependency, directDependencyToTargetDependency, ctx);
-
-                // Only proceed with marking if we actually processed some dependencies with paths
-                if (directDependencyToTargetDependency.isEmpty()) {
+                if (matches.isEmpty()) {
                     return document;
                 }
 
-                return (Xml.Document) new MarkIndividualDependency(onlyDirect, scopeToDirectDependency, directDependencyToTargetDependency).visitNonNull(document, ctx);
+                return (Xml.Document) new MarkIndividualDependency(onlyDirect, matches.byScope(), matches.byDirectDependency()).visitNonNull(document, ctx);
             }
 
-            private void findMatchingDependencies(
+            private void collectMatchingDependencies(
                     String projectName,
                     String sourceSetName,
                     MavenResolutionResult resolutionResult,
                     @Nullable Scope requestedScope,
-                    Map<Scope, Set<GroupArtifactVersion>> scopeToDirectDependency,
-                    Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency,
+                    DependencyTreeWalker.Matches<Scope> matches,
                     ExecutionContext ctx
             ) {
-                @Nullable VersionComparator versionComparator = version != null ? Semver.validate(version, null).getValue() : null;
+                VersionComparator versionComparator = version != null ? Semver.validate(version, null).getValue() : null;
                 DependencyMatcher dependencyMatcher = new DependencyMatcher(groupIdPattern, artifactIdPattern, versionComparator);
 
                 if (requestedScope != null) {
                     for (ResolvedDependency dependency : resolutionResult.getDependencies().get(requestedScope)) {
-                        findMatchingDependencies0(projectName, sourceSetName, requestedScope, dependencyMatcher, dependency, scopeToDirectDependency, directDependencyToTargetDependency, new ArrayDeque<>(), ctx);
+                        matches.collect(requestedScope, dependency, dependencyMatcher,
+                                (matched, path) ->
+                                        createDataTableRow(projectName, sourceSetName, requestedScope, matched.getGav(), path, ctx));
                     }
                 } else {
                     for (Map.Entry<Scope, List<ResolvedDependency>> entry : resolutionResult.getDependencies().entrySet()) {
+                        Scope scope = entry.getKey();
                         for (ResolvedDependency dependency : entry.getValue()) {
-                            findMatchingDependencies0(projectName, sourceSetName, entry.getKey(), dependencyMatcher, dependency, scopeToDirectDependency, directDependencyToTargetDependency, new ArrayDeque<>(), ctx);
+                            matches.collect(scope, dependency, dependencyMatcher,
+                                    (matched, path) ->
+                                            createDataTableRow(projectName, sourceSetName, scope, matched.getGav(), path, ctx));
                         }
                     }
                 }
-            }
-
-            private void findMatchingDependencies0(
-                    String projectName,
-                    String sourceSetName,
-                    Scope mavenScope,
-                    DependencyMatcher dependencyMatcher,
-                    ResolvedDependency resolvedDependency,
-                    Map<Scope, Set<GroupArtifactVersion>> scopeToDirectDependency,
-                    Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency,
-                    Deque<ResolvedDependency> deque,
-                    ExecutionContext ctx
-            ) {
-                if (deque.contains(resolvedDependency)) {
-                    return;
-                }
-
-                deque.addFirst(resolvedDependency);
-
-                for (ResolvedDependency next : resolvedDependency.getDependencies()) {
-                    findMatchingDependencies0(projectName, sourceSetName, mavenScope, dependencyMatcher, next, scopeToDirectDependency, directDependencyToTargetDependency, deque, ctx);
-                }
-
-                if (dependencyMatcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion())) {
-                    ResolvedDependency directDependency = requireNonNull(deque.peekLast());
-                    GroupArtifactVersion requestedGav = directDependency.getGav().asGroupArtifactVersion();
-                    scopeToDirectDependency.computeIfAbsent(mavenScope, __ -> new HashSet<>()).add(requestedGav);
-                    directDependencyToTargetDependency.computeIfAbsent(requestedGav, __ -> new HashSet<>()).add(resolvedDependency.getGav().asGroupArtifactVersion());
-                    createDataTableRow(projectName, sourceSetName, mavenScope, resolvedDependency.getGav(), new ArrayList<>(deque), ctx);
-                }
-
-                deque.removeFirst();
             }
 
             private void createDataTableRow(
@@ -207,10 +175,10 @@ public class DependencyInsight extends Recipe {
                     String sourceSetName,
                     Scope scope,
                     ResolvedGroupArtifactVersion gav,
-                    List<ResolvedDependency> dependencyPath,
+                    Deque<ResolvedDependency> dependencyPath,
                     ExecutionContext ctx
             ) {
-                String dependencyGraph = DependencyGraph.render(scope.name().toLowerCase(), dependencyPath);
+                String dependencyGraph = DependencyTreeWalker.renderPath(scope.name().toLowerCase(), dependencyPath);
                 dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                         projectName,
                         sourceSetName,
