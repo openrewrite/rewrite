@@ -16,6 +16,7 @@
 import {
     findNodeResolutionResult,
     npm,
+    Npmrc,
     NpmrcScope,
     packageJson,
     PackageJsonParser,
@@ -367,8 +368,8 @@ empty-value=
                 'registry=https://test.registry.com/'
             );
 
-            const configs = readNpmrcConfigs(dir.path);
-            const projectConfig = configs.find(c => c.scope === NpmrcScope.Project);
+            const configs = await readNpmrcConfigs(dir.path);
+            const projectConfig = configs.find((c: Npmrc) => c.scope === NpmrcScope.Project);
             expect(projectConfig).toBeDefined();
             expect(projectConfig!.properties['registry']).toBe('https://test.registry.com/');
         }, {unsafeCleanup: true});

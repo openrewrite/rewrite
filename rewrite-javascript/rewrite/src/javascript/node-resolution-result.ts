@@ -19,7 +19,7 @@ import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {castDraft, createDraft, finishDraft} from "immer";
 import * as semver from "semver";
-import * as fs from "fs";
+import * as fsp from "fs/promises";
 import * as path from "path";
 import {homedir} from "os";
 
@@ -390,14 +390,18 @@ export function createNodeResolutionResultMarker(
             }
         }
 
-        // If no exact match, return the highest version as fallback
-        return candidates.sort((a, b) => {
+        // If no exact match, return the highest version as fallback (O(n) linear scan)
+        let maxCandidate = candidates[0];
+        for (let i = 1; i < candidates.length; i++) {
             try {
-                return semver.compare(b.version, a.version);
+                if (semver.compare(candidates[i].version, maxCandidate.version) > 0) {
+                    maxCandidate = candidates[i];
+                }
             } catch {
-                return 0;
+                // Invalid semver, skip comparison
             }
-        })[0];
+        }
+        return maxCandidate;
     }
 
     /**
@@ -413,12 +417,16 @@ export function createNodeResolutionResultMarker(
         versionConstraint: string,
         contextPath: string
     ): Dependency {
-        // Include context in cache key to handle different resolutions of same constraint
-        const key = `${name}@${versionConstraint}@${contextPath}`;
+        // Resolve first to determine the actual resolved version
+        const resolved = resolveFromContext(name, versionConstraint, contextPath);
+
+        // Key by name, constraint, and resolved version (not context path).
+        // This allows sharing Dependency objects when different contexts resolve to the same version.
+        const resolvedKey = resolved ? `${resolved.name}@${resolved.version}` : 'unresolved';
+        const key = `${name}@${versionConstraint}@${resolvedKey}`;
+
         let dep = dependencyCache.get(key);
         if (!dep) {
-            // Resolve using path-based lookup with semver fallback
-            const resolved = resolveFromContext(name, versionConstraint, contextPath);
             dep = asRef({
                 kind: DependencyKind,
                 name,
@@ -485,7 +493,11 @@ export function createNodeResolutionResultMarker(
             }
         }
 
-        // Second pass: Populate dependencies using path-based resolution
+        // Second pass: Populate dependencies using path-based resolution.
+        // Note: Using castDraft here is safe because all objects are created within this
+        // parsing context and haven't been returned to callers yet. The objects in
+        // resolvedDependencyCache are plain JS objects marked with asRef() for RPC
+        // reference deduplication, not frozen Immer drafts.
         for (const {path: pkgPath, name, version, entry} of packageInfos) {
             const key = `${name}@${version}`;
             const resolved = resolvedDependencyCache.get(key);
@@ -586,6 +598,18 @@ function parseNpmrc(content: string): Record<string, string> {
 }
 
 /**
+ * Helper to check if a file exists asynchronously.
+ */
+async function fileExists(filePath: string): Promise<boolean> {
+    try {
+        await fsp.access(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Reads .npmrc configurations from all scope levels.
  * Returns an array of Npmrc objects, one for each scope that has configuration.
  *
@@ -596,9 +620,9 @@ function parseNpmrc(content: string): Record<string, string> {
  * - Env: npm_config_* environment variables
  *
  * @param projectDir The project directory containing package.json
- * @returns Array of Npmrc objects for each scope with configuration
+ * @returns Promise resolving to array of Npmrc objects for each scope with configuration
  */
-export function readNpmrcConfigs(projectDir: string): Npmrc[] {
+export async function readNpmrcConfigs(projectDir: string): Promise<Npmrc[]> {
     const configs: Npmrc[] = [];
 
     // 1. Global config: $PREFIX/etc/npmrc
@@ -618,9 +642,9 @@ export function readNpmrcConfigs(projectDir: string): Npmrc[] {
     }
 
     for (const globalPath of globalNpmrcPaths) {
-        if (fs.existsSync(globalPath)) {
+        if (await fileExists(globalPath)) {
             try {
-                const content = fs.readFileSync(globalPath, 'utf-8');
+                const content = await fsp.readFile(globalPath, 'utf-8');
                 const properties = parseNpmrc(content);
                 if (Object.keys(properties).length > 0) {
                     configs.push({
@@ -638,9 +662,9 @@ export function readNpmrcConfigs(projectDir: string): Npmrc[] {
 
     // 2. User config: $HOME/.npmrc
     const userNpmrcPath = process.env.NPM_CONFIG_USERCONFIG || path.join(homedir(), '.npmrc');
-    if (fs.existsSync(userNpmrcPath)) {
+    if (await fileExists(userNpmrcPath)) {
         try {
-            const content = fs.readFileSync(userNpmrcPath, 'utf-8');
+            const content = await fsp.readFile(userNpmrcPath, 'utf-8');
             const properties = parseNpmrc(content);
             if (Object.keys(properties).length > 0) {
                 configs.push({
@@ -656,9 +680,9 @@ export function readNpmrcConfigs(projectDir: string): Npmrc[] {
 
     // 3. Project config: .npmrc in project root
     const projectNpmrcPath = path.join(projectDir, '.npmrc');
-    if (fs.existsSync(projectNpmrcPath)) {
+    if (await fileExists(projectNpmrcPath)) {
         try {
-            const content = fs.readFileSync(projectNpmrcPath, 'utf-8');
+            const content = await fsp.readFile(projectNpmrcPath, 'utf-8');
             const properties = parseNpmrc(content);
             if (Object.keys(properties).length > 0) {
                 configs.push({

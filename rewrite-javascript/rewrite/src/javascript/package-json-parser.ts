@@ -28,7 +28,7 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
-import {execSync} from "child_process";
+import {spawnSync} from "child_process";
 
 /**
  * Bun.lock package entry metadata.
@@ -199,7 +199,7 @@ export class PackageJsonParser extends Parser {
 
             // Read .npmrc configurations from all scopes
             const projectDir = this.relativeTo || dir;
-            const npmrcConfigs = readNpmrcConfigs(projectDir);
+            const npmrcConfigs = await readNpmrcConfigs(projectDir);
 
             return createNodeResolutionResultMarker(
                 relativePath,
@@ -216,79 +216,60 @@ export class PackageJsonParser extends Parser {
     }
 
     /**
+     * Lock file detection configuration.
+     * Priority order determines which package manager is detected when multiple lock files exist.
+     */
+    private static readonly LOCK_FILE_CONFIG: ReadonlyArray<{
+        filename: string;
+        packageManager: PackageManager | ((content: string) => PackageManager);
+        /** If true, prefer walking node_modules over parsing lock file */
+        preferNodeModules?: boolean;
+    }> = [
+        { filename: 'package-lock.json', packageManager: PackageManager.Npm },
+        { filename: 'bun.lock', packageManager: PackageManager.Bun },
+        { filename: 'pnpm-lock.yaml', packageManager: PackageManager.Pnpm, preferNodeModules: true },
+        // yarn.lock omits transitive dependency details (engines/license), so prefer node_modules
+        { filename: 'yarn.lock', packageManager: (content) =>
+            content.includes('__metadata:') ? PackageManager.YarnBerry : PackageManager.YarnClassic,
+            preferNodeModules: true
+        },
+    ];
+
+    /**
      * Attempts to read and parse a lock file from the given directory.
      * Supports npm (package-lock.json), bun (bun.lock), pnpm, and yarn.
      *
      * @returns Object with parsed lock file content and detected package manager, or undefined if no lock file found
      */
     private async tryReadLockFile(dir: string): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
-        // Try package-lock.json (npm) - already JSON
-        const npmLockPath = path.join(dir, 'package-lock.json');
-        if (fs.existsSync(npmLockPath)) {
-            try {
-                const content = await fsp.readFile(npmLockPath, 'utf-8');
-                return { content: JSON.parse(content), packageManager: PackageManager.Npm };
-            } catch (error) {
-                console.debug?.(`Failed to parse package-lock.json: ${error}`);
+        // Detect which lock file exists (first match wins based on priority)
+        for (const config of PackageJsonParser.LOCK_FILE_CONFIG) {
+            const lockPath = path.join(dir, config.filename);
+            if (!fs.existsSync(lockPath)) {
+                continue;
             }
-        }
 
-        // Try bun.lock (text format, JSONC)
-        // Note: bun.lockb (binary format) is not supported - use `bun install --save-text-lockfile`
-        const bunLockPath = path.join(dir, 'bun.lock');
-        if (fs.existsSync(bunLockPath)) {
             try {
-                const fileContent = await fsp.readFile(bunLockPath, 'utf-8');
-                const bunLock = this.parseJsonc(fileContent) as BunLockContent;
-                const content = this.convertBunLockToNpmFormat(bunLock);
+                const fileContent = await fsp.readFile(lockPath, 'utf-8');
+                const packageManager = typeof config.packageManager === 'function'
+                    ? config.packageManager(fileContent)
+                    : config.packageManager;
+
+                // For package managers where lock file omits details, prefer node_modules
+                if (config.preferNodeModules) {
+                    const parsed = await this.walkNodeModules(dir);
+                    if (parsed) {
+                        return { content: parsed, packageManager };
+                    }
+                }
+
+                // Parse lock file based on package manager
+                const content = await this.parseLockFileContent(config.filename, fileContent, dir);
                 if (content) {
-                    return { content, packageManager: PackageManager.Bun };
+                    return { content, packageManager };
                 }
             } catch (error) {
-                console.debug?.(`Failed to parse bun.lock: ${error}`);
-            }
-        }
-
-        // Try pnpm-lock.yaml (pnpm) - prefer node_modules, fall back to CLI
-        const pnpmLockPath = path.join(dir, 'pnpm-lock.yaml');
-        if (fs.existsSync(pnpmLockPath)) {
-            try {
-                // Try node_modules first for 100% accuracy
-                const parsed = await this.walkNodeModules(dir);
-                if (parsed) {
-                    return { content: parsed, packageManager: PackageManager.Pnpm };
-                }
-                // Fall back to pnpm CLI
-                const cliParsed = this.getPnpmDependencies(dir);
-                if (cliParsed) {
-                    return { content: cliParsed, packageManager: PackageManager.Pnpm };
-                }
-            } catch (error) {
-                console.debug?.(`Failed to parse pnpm dependencies: ${error}`);
-            }
-        }
-
-        // Try yarn.lock (yarn) - prefer node_modules, fall back to lock file parsing
-        const yarnLockPath = path.join(dir, 'yarn.lock');
-        if (fs.existsSync(yarnLockPath)) {
-            try {
-                const content = await fsp.readFile(yarnLockPath, 'utf-8');
-                // Detect yarn version for packageManager field
-                const isYarnBerry = content.includes('__metadata:');
-                const packageManager = isYarnBerry ? PackageManager.YarnBerry : PackageManager.YarnClassic;
-
-                // Try node_modules first for 100% accuracy
-                const parsed = await this.walkNodeModules(dir);
-                if (parsed) {
-                    return { content: parsed, packageManager };
-                }
-                // Fall back to parsing lock file directly
-                const lockParsed = this.parseYarnLock(content);
-                if (lockParsed) {
-                    return { content: lockParsed, packageManager };
-                }
-            } catch (error) {
-                console.debug?.(`Failed to parse yarn.lock: ${error}`);
+                console.debug?.(`Failed to parse ${config.filename}: ${error}`);
             }
         }
 
@@ -296,7 +277,35 @@ export class PackageJsonParser extends Parser {
     }
 
     /**
+     * Parses lock file content based on the lock file type.
+     */
+    private async parseLockFileContent(
+        filename: string,
+        content: string,
+        dir: string
+    ): Promise<PackageLockContent | undefined> {
+        switch (filename) {
+            case 'package-lock.json':
+                return JSON.parse(content);
+            case 'bun.lock':
+                return this.convertBunLockToNpmFormat(this.parseJsonc(content) as BunLockContent);
+            case 'pnpm-lock.yaml':
+                // Fall back to pnpm CLI when node_modules unavailable
+                return this.getPnpmDependencies(dir);
+            case 'yarn.lock':
+                return this.parseYarnLock(content);
+            default:
+                return undefined;
+        }
+    }
+
+    /**
      * Parses JSONC (JSON with Comments and trailing commas) content.
+     *
+     * Note: This is a simple regex-based approach that works for bun.lock files but doesn't
+     * handle edge cases like comment-like sequences inside strings (e.g., "// not a comment").
+     * For lock files this is acceptable since they don't contain such patterns. If broader
+     * JSONC support is needed, consider using a proper parser like `jsonc-parser`.
      */
     private parseJsonc(content: string): Record<string, any> {
         // Remove single-line comments (// ...)
@@ -547,14 +556,19 @@ export class PackageJsonParser extends Parser {
      * Uses `pnpm list --json --depth=Infinity` to get the full dependency tree.
      */
     private getPnpmDependencies(dir: string): Record<string, any> | undefined {
-        const output = execSync('pnpm list --json --depth=Infinity', {
+        // Use spawnSync with array args to avoid shell injection risks
+        const result = spawnSync('pnpm', ['list', '--json', '--depth=Infinity'], {
             cwd: dir,
             encoding: 'utf-8',
             stdio: ['pipe', 'pipe', 'pipe'],
             timeout: 30000
         });
 
-        const pnpmList = JSON.parse(output);
+        if (result.error || result.status !== 0) {
+            return undefined;
+        }
+
+        const pnpmList = JSON.parse(result.stdout);
         return this.convertPnpmListToNpmFormat(pnpmList);
     }
 
