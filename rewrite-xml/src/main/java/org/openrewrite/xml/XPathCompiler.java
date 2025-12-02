@@ -15,6 +15,8 @@
  */
 package org.openrewrite.xml;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Token;
@@ -25,11 +27,17 @@ import org.openrewrite.xml.internal.grammar.XPathParser;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Parses and compiles XPath expressions into an optimized representation
  * for efficient matching against XML cursor positions.
  */
 final class XPathCompiler {
+
+    private static final Cache<String, CompiledXPath> CACHE = Caffeine.newBuilder()
+            .maximumSize(256)
+            .build();
 
     // Step characteristic flags (bitmask)
     static final int FLAG_ABSOLUTE_PATH = 1;
@@ -54,15 +62,19 @@ final class XPathCompiler {
 
     /**
      * Compile an XPath expression into an optimized representation.
+     * Results are cached to avoid repeated parsing of the same expression.
      *
      * @param expression the XPath expression to compile
      * @return the compiled XPath representation
      */
     public static CompiledXPath compile(String expression) {
+        return requireNonNull(CACHE.get(expression, XPathCompiler::compileInternal));
+    }
+
+    private static CompiledXPath compileInternal(String expression) {
         XPathLexer lexer = new XPathLexer(CharStreams.fromString(expression));
         XPathParser parser = new XPathParser(new CommonTokenStream(lexer));
-        XPathParser.XpathExpressionContext ctx = parser.xpathExpression();
-        return compileXPathExpression(ctx);
+        return compileXPathExpression(parser.xpathExpression());
     }
 
     /**
@@ -74,7 +86,7 @@ final class XPathCompiler {
         // expr : orExpr
         XPathParser.ExprContext exprCtx = ctx.expr();
         if (exprCtx == null || exprCtx.orExpr() == null) {
-            return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_PATH, null, null);
+            return new CompiledXPath(EMPTY_STEPS, 0, EXPR_PATH, null, null);
         }
 
         // Try to extract a simple path expression
@@ -114,7 +126,7 @@ final class XPathCompiler {
 
         // Otherwise it's a boolean expression
         CompiledExpr boolExpr = compileOrExpr(orExpr);
-        return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_BOOLEAN, boolExpr, null);
+        return new CompiledXPath(EMPTY_STEPS, 0, EXPR_BOOLEAN, boolExpr, null);
     }
 
     /**
@@ -137,7 +149,6 @@ final class XPathCompiler {
         }
 
         CompiledStep[] compiledSteps = EMPTY_STEPS;
-        int compiledElementSteps = 0;
 
         if (relPath != null) {
             // Extract steps
@@ -172,9 +183,6 @@ final class XPathCompiler {
                     case NODE_TYPE_TEST:
                         flags |= FLAG_HAS_NODE_TYPE_TEST;
                         break;
-                    case NODE_TEST:
-                        compiledElementSteps++;
-                        break;
                 }
 
                 // Set nextIsBacktrack for lookahead optimization
@@ -187,11 +195,10 @@ final class XPathCompiler {
         // Normalize mid-path parent steps (.. or parent::) to existence predicates
         compiledSteps = normalizeParentSteps(compiledSteps);
 
-        // Recompute flags and element count after normalization
+        // Recompute flags after normalization
         flags = recomputeFlags(compiledSteps, flags);
-        compiledElementSteps = countElementSteps(compiledSteps);
 
-        return new CompiledXPath(compiledSteps, flags, compiledElementSteps, EXPR_PATH, null, null);
+        return new CompiledXPath(compiledSteps, flags, EXPR_PATH, null, null);
     }
 
     /**
@@ -218,13 +225,13 @@ final class XPathCompiler {
                 }
 
                 CompiledFilterExpr compiled = new CompiledFilterExpr(innerPath, predicates, trailingPath, trailingIsDescendant);
-                return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_FILTER, null, compiled);
+                return new CompiledXPath(EMPTY_STEPS, 0, EXPR_FILTER, null, compiled);
             }
         }
 
         // Not a parenthesized expression - treat as boolean expression
         CompiledExpr boolExpr = compilePathExpr(pathExpr);
-        return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_BOOLEAN, boolExpr, null);
+        return new CompiledXPath(EMPTY_STEPS, 0, EXPR_BOOLEAN, boolExpr, null);
     }
 
     /**
@@ -362,19 +369,6 @@ final class XPathCompiler {
             }
         }
         return flags;
-    }
-
-    /**
-     * Count element steps (NODE_TEST type).
-     */
-    private static int countElementSteps(CompiledStep[] steps) {
-        int count = 0;
-        for (CompiledStep s : steps) {
-            if (s.type == StepType.NODE_TEST) {
-                count++;
-            }
-        }
-        return count;
     }
 
     /**
@@ -744,9 +738,8 @@ final class XPathCompiler {
      * Compile a function call expression: functionCall predicate*
      */
     static CompiledExpr compileFunctionCallExpr(XPathParser.FunctionCallExprContext fcExpr) {
-        CompiledExpr primary = compileFunctionCall(fcExpr.functionCall());
         // predicates are handled at a higher level for now
-        return primary;
+        return compileFunctionCall(fcExpr.functionCall());
     }
 
     /**
@@ -884,7 +877,6 @@ final class XPathCompiler {
     public static final class CompiledXPath {
         final CompiledStep[] steps;
         final int flags;
-        final int elementStepCount;
         final int exprType;
 
         // For EXPR_BOOLEAN: compiled boolean expression
@@ -895,13 +887,11 @@ final class XPathCompiler {
 
         CompiledXPath(CompiledStep[] steps,
                       int flags,
-                      int elementStepCount,
                       int exprType,
                       @Nullable CompiledExpr booleanExpr,
                       @Nullable CompiledFilterExpr filterExpr) {
             this.steps = steps;
             this.flags = flags;
-            this.elementStepCount = elementStepCount;
             this.exprType = exprType;
             this.booleanExpr = booleanExpr;
             this.filterExpr = filterExpr;
@@ -1011,9 +1001,21 @@ final class XPathCompiler {
 
         int flags;
 
+        // Matching strategy - precomputed for optimal evaluation order
+        // Strategies encode assumptions about name/predicate presence to skip runtime checks
+        static final byte STRATEGY_NAME_ONLY = 0;           // Specific name, no predicates (most common)
+        static final byte STRATEGY_NAME_THEN_PRED = 1;      // Specific name, then predicates
+        static final byte STRATEGY_WILDCARD = 2;            // Wildcard name, no predicates (always matches)
+        static final byte STRATEGY_PRED_ONLY = 3;           // Wildcard name, predicates only (name provides no selectivity)
+        static final byte STRATEGY_DOT = 4;                 // . (self) - always matches current tag
+        static final byte STRATEGY_NODE_TYPE = 5;           // node() type test
+        static final byte STRATEGY_OTHER = 6;               // Fallback for complex cases
+
+        final byte strategy;
+
         private CompiledStep(StepType type, boolean isDescendant, @Nullable String name,
                              AxisType axisType, NodeTypeTestType nodeTypeTestType,
-                             CompiledExpr[] predicates, int flags) {
+                             CompiledExpr[] predicates, int flags, byte strategy) {
             this.type = type;
             this.isDescendant = isDescendant;
             this.name = name;
@@ -1021,6 +1023,33 @@ final class XPathCompiler {
             this.nodeTypeTestType = nodeTypeTestType;
             this.predicates = predicates;
             this.flags = flags;
+            this.strategy = strategy;
+        }
+
+        /**
+         * Compute the optimal matching strategy based on step characteristics.
+         */
+        private static byte computeStrategy(StepType type, @Nullable String name, CompiledExpr[] predicates) {
+            switch (type) {
+                case NODE_TEST:
+                    boolean isWildcard = "*".equals(name);
+                    boolean hasPredicates = predicates.length > 0;
+                    if (isWildcard) {
+                        return hasPredicates ? STRATEGY_PRED_ONLY : STRATEGY_WILDCARD;
+                    } else {
+                        return hasPredicates ? STRATEGY_NAME_THEN_PRED : STRATEGY_NAME_ONLY;
+                    }
+                case ABBREVIATED_DOT:
+                    return STRATEGY_DOT;
+                case NODE_TYPE_TEST:
+                    return STRATEGY_NODE_TYPE;
+                default:
+                    return STRATEGY_OTHER;
+            }
+        }
+
+        public byte getStrategy() {
+            return strategy;
         }
 
         public StepType getType() {
@@ -1070,10 +1099,12 @@ final class XPathCompiler {
             if (step.abbreviatedStep() != null) {
                 if (step.abbreviatedStep().DOTDOT() != null) {
                     return new CompiledStep(StepType.ABBREVIATED_DOTDOT, isDescendant, null,
-                            AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                            AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                            computeStrategy(StepType.ABBREVIATED_DOTDOT, null, predicates));
                 } else {
                     return new CompiledStep(StepType.ABBREVIATED_DOT, isDescendant, null,
-                            AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                            AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                            computeStrategy(StepType.ABBREVIATED_DOT, null, predicates));
                 }
             }
 
@@ -1081,7 +1112,8 @@ final class XPathCompiler {
             if (step.attributeStep() != null) {
                 String attrName = getAttributeStepName(step.attributeStep());
                 return new CompiledStep(StepType.ATTRIBUTE_STEP, isDescendant, attrName,
-                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                        computeStrategy(StepType.ATTRIBUTE_STEP, attrName, predicates));
             }
 
             // Axis step with specifier: parent::node(), self::element, etc.
@@ -1107,7 +1139,8 @@ final class XPathCompiler {
                 }
 
                 return new CompiledStep(StepType.AXIS_STEP, isDescendant, nodeTestName,
-                        axisType, NodeTypeTestType.UNKNOWN, predicates, flags);
+                        axisType, NodeTypeTestType.UNKNOWN, predicates, flags,
+                        computeStrategy(StepType.AXIS_STEP, nodeTestName, predicates));
             }
 
             // Node test without axis: nameTest or nodeType()
@@ -1135,18 +1168,21 @@ final class XPathCompiler {
                             testType = NodeTypeTestType.UNKNOWN;
                     }
                     return new CompiledStep(StepType.NODE_TYPE_TEST, isDescendant, null,
-                            AxisType.OTHER, testType, predicates, flags);
+                            AxisType.OTHER, testType, predicates, flags,
+                            computeStrategy(StepType.NODE_TYPE_TEST, null, predicates));
                 }
 
                 // It's a name test: element name or *
                 String nodeName = getNodeTestName(nodeTest);
                 return new CompiledStep(StepType.NODE_TEST, isDescendant, nodeName,
-                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                        AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                        computeStrategy(StepType.NODE_TEST, nodeName, predicates));
             }
 
             // Shouldn't reach here - return a non-matching step
             return new CompiledStep(StepType.NODE_TEST, isDescendant, null,
-                    AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags);
+                    AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
+                    computeStrategy(StepType.NODE_TEST, null, predicates));
         }
 
         /**
@@ -1180,7 +1216,9 @@ final class XPathCompiler {
             if (predicate.needsPosition()) {
                 newFlags |= STEP_FLAG_NEEDS_POSITION;
             }
-            return new CompiledStep(type, isDescendant, name, axisType, nodeTypeTestType, newPredicates, newFlags);
+            // Recompute strategy since predicates changed
+            return new CompiledStep(type, isDescendant, name, axisType, nodeTypeTestType, newPredicates, newFlags,
+                    computeStrategy(type, name, newPredicates));
         }
     }
 

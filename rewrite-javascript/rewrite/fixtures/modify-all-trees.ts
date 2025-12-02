@@ -41,9 +41,9 @@ class ModifyAllTrees extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends TreeVisitor<Tree, ExecutionContext> {
             protected async preVisit(tree: Tree, p: ExecutionContext): Promise<Tree> {
-                return this.produceTree(tree, p, draft => {
+                return (await this.produceTree(tree, p, draft => {
                     draft.markers.markers.push(changed);
-                });
+                }))!;
             }
         };
     }
