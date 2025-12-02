@@ -15,6 +15,8 @@
  */
 package org.openrewrite.xml;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Token;
@@ -25,11 +27,17 @@ import org.openrewrite.xml.internal.grammar.XPathParser;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Parses and compiles XPath expressions into an optimized representation
  * for efficient matching against XML cursor positions.
  */
 final class XPathCompiler {
+
+    private static final Cache<String, CompiledXPath> CACHE = Caffeine.newBuilder()
+            .maximumSize(256)
+            .build();
 
     // Step characteristic flags (bitmask)
     static final int FLAG_ABSOLUTE_PATH = 1;
@@ -54,15 +62,19 @@ final class XPathCompiler {
 
     /**
      * Compile an XPath expression into an optimized representation.
+     * Results are cached to avoid repeated parsing of the same expression.
      *
      * @param expression the XPath expression to compile
      * @return the compiled XPath representation
      */
     public static CompiledXPath compile(String expression) {
+        return requireNonNull(CACHE.get(expression, XPathCompiler::compileInternal));
+    }
+
+    private static CompiledXPath compileInternal(String expression) {
         XPathLexer lexer = new XPathLexer(CharStreams.fromString(expression));
         XPathParser parser = new XPathParser(new CommonTokenStream(lexer));
-        XPathParser.XpathExpressionContext ctx = parser.xpathExpression();
-        return compileXPathExpression(ctx);
+        return compileXPathExpression(parser.xpathExpression());
     }
 
     /**
@@ -744,9 +756,8 @@ final class XPathCompiler {
      * Compile a function call expression: functionCall predicate*
      */
     static CompiledExpr compileFunctionCallExpr(XPathParser.FunctionCallExprContext fcExpr) {
-        CompiledExpr primary = compileFunctionCall(fcExpr.functionCall());
         // predicates are handled at a higher level for now
-        return primary;
+        return compileFunctionCall(fcExpr.functionCall());
     }
 
     /**
