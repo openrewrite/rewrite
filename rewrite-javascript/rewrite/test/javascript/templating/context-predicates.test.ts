@@ -17,16 +17,16 @@ import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {_, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {isIf, isMethodDeclaration, J} from "../../../src/java";
 
-describe('Context Predicates on RewriteRule', () => {
+describe('preMatch and postMatch Predicates on RewriteRule', () => {
     const spec = new RecipeSpec();
 
-    describe('where predicate', () => {
-        test('only applies transformation in matching context', () => {
+    describe('preMatch predicate', () => {
+        test('filters before pattern matching based on context', () => {
             const rule = rewrite(() => ({
                 before: pattern`console.log(${_('msg')})`,
                 after: template`logger.info(${_('msg')})`,
-                where: (node, cursor) => {
-                    // Only apply inside functions named 'handleError'
+                preMatch: (node, {cursor}) => {
+                    // Only attempt matching inside functions named 'handleError'
                     const method = cursor.firstEnclosing(isMethodDeclaration);
                     return method?.name.simpleName === 'handleError';
                 }
@@ -63,14 +63,11 @@ describe('Context Predicates on RewriteRule', () => {
             );
         });
 
-        test('does not apply when where predicate returns false', () => {
+        test('skips pattern matching when preMatch returns false', () => {
             const rule = rewrite(() => ({
                 before: pattern`${_('x')} + ${_('y')}`,
                 after: template`${_('y')} + ${_('x')}`,
-                where: (node, cursor) => {
-                    // Never apply
-                    return false;
-                }
+                preMatch: () => false // Never match
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
@@ -84,17 +81,15 @@ describe('Context Predicates on RewriteRule', () => {
                 typescript('const a = x + y'), // No change expected
             );
         });
-    });
 
-    describe('whereNot predicate', () => {
-        test('excludes transformation in excluded context', () => {
+        test('excludes specific contexts with negated condition', () => {
             const rule = rewrite(() => ({
                 before: pattern`console.log(${_('msg')})`,
                 after: template`logger.info(${_('msg')})`,
-                whereNot: (node, cursor) => {
+                preMatch: (node, {cursor}) => {
                     // Don't apply inside 'debugFunction'
                     const method = cursor.firstEnclosing(isMethodDeclaration);
-                    return method?.name.simpleName === 'debugFunction';
+                    return method?.name.simpleName !== 'debugFunction';
                 }
             }));
 
@@ -129,92 +124,11 @@ describe('Context Predicates on RewriteRule', () => {
             );
         });
 
-        test('applies when whereNot predicate returns false', () => {
-            const rule = rewrite(() => ({
-                before: pattern`${_('x')} + ${_('y')}`,
-                after: template`${_('y')} + ${_('x')}`,
-                whereNot: (node, cursor) => {
-                    // Always apply (never exclude)
-                    return false;
-                }
-            }));
-
-            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, binary) || binary;
-                }
-            });
-
-            return spec.rewriteRun(
-                //language=typescript
-                typescript('const a = x + y', 'const a = y + x'),
-            );
-        });
-    });
-
-    describe('where and whereNot together', () => {
-        test('applies only when where is true AND whereNot is false', () => {
-            const rule = rewrite(() => ({
-                before: pattern`console.log(${_('msg')})`,
-                after: template`logger.info(${_('msg')})`,
-                where: (node, cursor) => {
-                    // Apply inside functions starting with 'handle'
-                    const method = cursor.firstEnclosing(isMethodDeclaration);
-                    return method?.name.simpleName.startsWith('handle') || false;
-                },
-                whereNot: (node, cursor) => {
-                    // But not inside 'handleDebug'
-                    const method = cursor.firstEnclosing(isMethodDeclaration);
-                    return method?.name.simpleName === 'handleDebug';
-                }
-            }));
-
-            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, method) || method;
-                }
-            });
-
-            return spec.rewriteRun(
-                //language=typescript
-                typescript(
-                    `
-                        function handleError(err) {
-                            console.log(err);
-                        }
-
-                        function handleDebug(msg) {
-                            console.log(msg);
-                        }
-
-                        function otherFunction() {
-                            console.log("test");
-                        }
-                    `,
-                    `
-                        function handleError(err) {
-                            logger.info(err);
-                        }
-
-                        function handleDebug(msg) {
-                            console.log(msg);
-                        }
-
-                        function otherFunction() {
-                            console.log("test");
-                        }
-                    `
-                )
-            );
-        });
-    });
-
-    describe('context checking with cursor API', () => {
         test('checks for ancestor node types', () => {
             const rule = rewrite(() => ({
                 before: pattern`${_('x')}`,
                 after: template`wrapped(${_('x')})`,
-                where: (node, cursor) => {
+                preMatch: (node, {cursor}) => {
                     // Only apply inside if statements
                     return cursor.firstEnclosing(isIf) !== undefined;
                 }
@@ -247,17 +161,167 @@ describe('Context Predicates on RewriteRule', () => {
                 )
             );
         });
+
+        test('supports async preMatch predicate', async () => {
+            const rule = rewrite(() => ({
+                before: pattern`${_('x')} + ${_('y')}`,
+                after: template`${_('y')} + ${_('x')}`,
+                preMatch: async () => {
+                    // Simulate async operation
+                    await Promise.resolve();
+                    return true;
+                }
+            }));
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, binary) || binary;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript('const a = x + y', 'const a = y + x'),
+            );
+        });
     });
 
-    describe('multiple patterns with context predicates', () => {
-        test('tries each pattern with its context until one succeeds', () => {
+    describe('postMatch predicate', () => {
+        test('filters after pattern matching based on captures', () => {
+            const rule = rewrite(() => ({
+                before: pattern`${_('x')} + ${_('y')}`,
+                after: template`${_('y')} + ${_('x')}`,
+                postMatch: (node, {captures}) => {
+                    // Only swap if 'x' is the identifier 'a'
+                    const x = captures.get('x') as J.Identifier;
+                    return x?.simpleName === 'a';
+                }
+            }));
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, binary) || binary;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const r1 = a + b;
+                        const r2 = x + y;
+                    `,
+                    `
+                        const r1 = b + a;
+                        const r2 = x + y;
+                    `
+                )
+            );
+        });
+
+        test('skips transformation when postMatch returns false', () => {
+            const rule = rewrite(() => ({
+                before: pattern`${_('x')} + ${_('y')}`,
+                after: template`${_('y')} + ${_('x')}`,
+                postMatch: () => false // Never apply
+            }));
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, binary) || binary;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript('const a = x + y'), // No change expected
+            );
+        });
+
+        test('supports async postMatch predicate', async () => {
+            const rule = rewrite(() => ({
+                before: pattern`${_('x')} + ${_('y')}`,
+                after: template`${_('y')} + ${_('x')}`,
+                postMatch: async () => {
+                    // Simulate async operation
+                    await Promise.resolve();
+                    return true;
+                }
+            }));
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, binary) || binary;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript('const a = x + y', 'const a = y + x'),
+            );
+        });
+    });
+
+    describe('preMatch and postMatch together', () => {
+        test('applies preMatch first, then postMatch after pattern match', () => {
+            const rule = rewrite(() => ({
+                before: pattern`console.log(${_('msg')})`,
+                after: template`logger.info(${_('msg')})`,
+                preMatch: (node, {cursor}) => {
+                    // Only attempt matching inside functions starting with 'handle'
+                    const method = cursor.firstEnclosing(isMethodDeclaration);
+                    return method?.name.simpleName.startsWith('handle') || false;
+                },
+                postMatch: (node, {captures}) => {
+                    // Only apply if the message is a string literal
+                    const msg = captures.get('msg') as J.Literal;
+                    return typeof msg?.value === 'string';
+                }
+            }));
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, method) || method;
+                }
+            });
+
+            return spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        function handleError(err) {
+                            console.log("error message");
+                            console.log(err);
+                        }
+
+                        function otherFunction() {
+                            console.log("test");
+                        }
+                    `,
+                    `
+                        function handleError(err) {
+                            logger.info("error message");
+                            console.log(err);
+                        }
+
+                        function otherFunction() {
+                            console.log("test");
+                        }
+                    `
+                )
+            );
+        });
+    });
+
+    describe('multiple patterns with preMatch', () => {
+        test('preMatch is evaluated once, then each pattern is tried', () => {
             const rule = rewrite(() => ({
                 before: [
                     pattern`console.log(${_('msg')})`,
                     pattern`console.error(${_('msg')})`
                 ],
                 after: template`logger.info(${_('msg')})`,
-                where: (node, cursor) => {
+                preMatch: (node, {cursor}) => {
                     // Only inside 'safeFunction'
                     const method = cursor.firstEnclosing(isMethodDeclaration);
                     return method?.name.simpleName === 'safeFunction';
@@ -301,11 +365,11 @@ describe('Context Predicates on RewriteRule', () => {
     });
 
     describe('composition with andThen', () => {
-        test('context predicates on first rule are respected', () => {
+        test('preMatch on first rule is respected', () => {
             const rule1 = rewrite(() => ({
                 before: pattern`${_('a')} + ${_('b')}`,
                 after: template`${_('b')} + ${_('a')}`,
-                where: (node, cursor) => {
+                preMatch: (node, {cursor}) => {
                     // Only swap in 'swapFunction'
                     const method = cursor.firstEnclosing(isMethodDeclaration);
                     return method?.name.simpleName === 'swapFunction';
@@ -352,11 +416,11 @@ describe('Context Predicates on RewriteRule', () => {
     });
 
     describe('composition with orElse', () => {
-        test('tries second rule with its context when first rule context fails', () => {
+        test('tries second rule when first rule preMatch fails', () => {
             const specificRule = rewrite(() => ({
                 before: pattern`console.log(${_('msg')})`,
                 after: template`logger.debug(${_('msg')})`,
-                where: (node, cursor) => {
+                preMatch: (node, {cursor}) => {
                     // Only in 'debugFunction'
                     const method = cursor.firstEnclosing(isMethodDeclaration);
                     return method?.name.simpleName === 'debugFunction';
@@ -366,7 +430,7 @@ describe('Context Predicates on RewriteRule', () => {
             const generalRule = rewrite(() => ({
                 before: pattern`console.log(${_('msg')})`,
                 after: template`logger.info(${_('msg')})`,
-                where: (node, cursor) => {
+                preMatch: (node, {cursor}) => {
                     // In all other functions
                     const method = cursor.firstEnclosing(isMethodDeclaration);
                     return method?.name.simpleName !== 'debugFunction';
@@ -403,54 +467,6 @@ describe('Context Predicates on RewriteRule', () => {
                         }
                     `
                 )
-            );
-        });
-    });
-
-    describe('async predicates', () => {
-        test('supports async where predicate', async () => {
-            const rule = rewrite(() => ({
-                before: pattern`${_('x')} + ${_('y')}`,
-                after: template`${_('y')} + ${_('x')}`,
-                where: async (node, cursor) => {
-                    // Simulate async operation
-                    await Promise.resolve();
-                    return true;
-                }
-            }));
-
-            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, binary) || binary;
-                }
-            });
-
-            return spec.rewriteRun(
-                //language=typescript
-                typescript('const a = x + y', 'const a = y + x'),
-            );
-        });
-
-        test('supports async whereNot predicate', async () => {
-            const rule = rewrite(() => ({
-                before: pattern`${_('x')} + ${_('y')}`,
-                after: template`${_('y')} + ${_('x')}`,
-                whereNot: async (node, cursor) => {
-                    // Simulate async operation
-                    await Promise.resolve();
-                    return false;
-                }
-            }));
-
-            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, binary) || binary;
-                }
-            });
-
-            return spec.rewriteRun(
-                //language=typescript
-                typescript('const a = x + y', 'const a = y + x'),
             );
         });
     });

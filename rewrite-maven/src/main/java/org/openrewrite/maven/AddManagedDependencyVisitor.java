@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.Markers;
@@ -27,9 +28,9 @@ import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.IntStream;
 
 import static java.util.Collections.emptyList;
 
@@ -138,69 +139,113 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
                         "</dependency>"
                 );
 
-                doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
+                // Add the dependency with optional comment in a single operation to ensure
+                // the comment stays with its associated dependency regardless of sorting order
+                doAfterVisit(new AddDependencyWithCommentVisitor(tag, dependencyTag, because,
                         new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
-
-                // If because is provided, add a visitor to prepend the comment before the dependency
-                if (because != null) {
-                    doAfterVisit(new AddCommentBeforeDependency(groupId, artifactId, because));
-                }
             }
-            return super.
-
-                    visitTag(tag, ctx);
+            return super.visitTag(tag, ctx);
         }
     }
 
     @RequiredArgsConstructor
-    private static class AddCommentBeforeDependency extends MavenIsoVisitor<ExecutionContext> {
-        private final String groupId;
-        private final String artifactId;
+    private static class AddDependencyWithCommentVisitor extends MavenIsoVisitor<ExecutionContext> {
+        private final Xml.Tag scope;
+        private final Xml.Tag dependencyTag;
+        @Nullable
         private final String because;
+        private final Comparator<Content> tagComparator;
 
         @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor()) && tag.getContent() != null) {
-                List<Content> contents = new ArrayList<>(tag.getContent());
+        public Xml.Tag visitTag(Xml.Tag t, ExecutionContext ctx) {
+            if (scope.isScope(t)) {
+                t = ensureClosingTag(t, ctx);
+                Xml.Tag formattedDependencyTag = formatDependencyTag(ctx);
 
-                return IntStream.range(0, contents.size())
-                        .filter(i -> contents.get(i) instanceof Xml.Tag)
-                        .mapToObj(i -> new IndexedTag(i, (Xml.Tag) contents.get(i)))
-                        .filter(pair -> matchesDependency(pair.tag, groupId, artifactId))
-                        .findFirst()
-                        .map(pair -> addComment(tag, contents, pair))
-                        .orElse(tag);
+                List<Content> content = t.getContent() == null ? new ArrayList<>() : new ArrayList<>(t.getContent());
+                int insertIndex = findInsertIndex(content);
+
+                if (because != null) {
+                    addComment(content, insertIndex, because, formattedDependencyTag.getPrefix());
+                    addDependency(content, insertIndex + 1, formattedDependencyTag);
+                } else {
+                    addDependency(content, insertIndex, formattedDependencyTag);
+                }
+
+                t = t.withContent(content);
             }
-            return super.visitTag(tag, ctx);
+
+            return super.visitTag(t, ctx);
         }
 
-        private Xml.Tag addComment(Xml.Tag tag, List<Content> contents, IndexedTag pair) {
-            // Extract the prefix (should be like "\n            ")
-            String prefix = pair.tag.getPrefix();
+        /**
+         * Ensures the tag has a proper closing tag (not self-closing) with a newline prefix.
+         */
+        private Xml.Tag ensureClosingTag(Xml.Tag t, ExecutionContext ctx) {
+            if (t.getClosing() == null) {
+                t = t.withClosing(autoFormat(new Xml.Tag.Closing(Tree.randomId(), "\n",
+                                Markers.EMPTY, t.getName(), ""), null, ctx, getCursor()))
+                        .withBeforeTagDelimiterPrefix("");
+            }
+            if (!t.getClosing().getPrefix().contains("\n")) {
+                t = t.withClosing(t.getClosing().withPrefix("\n"));
+            }
+            return t;
+        }
 
-            // Create comment with the same prefix as the dependency tag
-            // Add spaces around the comment text for proper XML formatting
+        /**
+         * Formats the dependency tag with proper newline prefix and indentation.
+         */
+        private Xml.Tag formatDependencyTag(ExecutionContext ctx) {
+            Xml.Tag formatted = dependencyTag;
+            if (!formatted.getPrefix().contains("\n")) {
+                formatted = formatted.withPrefix("\n");
+            }
+            return autoFormat(formatted, null, ctx, getCursor());
+        }
+
+        /**
+         * Find the insertion position by comparing only with dependency tags.
+         * This ensures we don't insert between a comment and its associated dependency.
+         */
+        private int findInsertIndex(List<Content> content) {
+            for (int i = 0; i < content.size(); i++) {
+                Content item = content.get(i);
+                // Only compare with dependency tags, skip comments
+                if (item instanceof Xml.Tag && tagComparator.compare(item, dependencyTag) > 0) {
+                    // Found a dependency that should come after ours.
+                    // We want to insert before this dependency AND any preceding comments.
+                    return findInsertPositionBeforePrecedingComments(content, i);
+                }
+            }
+            return content.size();
+        }
+
+        private void addComment(List<Content> content, int insertIndex, String because, String prefix) {
             Xml.Comment comment = new Xml.Comment(
                     Tree.randomId(),
                     prefix,
                     Markers.EMPTY,
                     " " + because + " "
             );
-
-            // Insert comment before the dependency
-            contents.add(pair.index, comment);
-
-            // Update the dependency to have the same prefix (newline + indentation)
-            // so it appears on the next line after the comment
-            contents.set(pair.index + 1, pair.tag.withPrefix(prefix));
-
-            return tag.withContent(contents);
+            content.add(insertIndex, comment);
         }
 
-        @RequiredArgsConstructor
-        private static class IndexedTag {
-            final int index;
-            final Xml.Tag tag;
+        private void addDependency(List<Content> content, int insertIndex, Xml.Tag dependencyTag) {
+            content.add(insertIndex, dependencyTag);
+        }
+
+        /**
+         * Given an index of a dependency tag, find the insertion position that's before
+         * any preceding comments that belong to that dependency.
+         */
+        private int findInsertPositionBeforePrecedingComments(List<Content> content, int tagIndex) {
+            int insertPos = tagIndex;
+            // Walk backwards from the tag, skipping any immediately preceding comments
+            while (insertPos > 0 && content.get(insertPos - 1) instanceof Xml.Comment) {
+                insertPos--;
+            }
+            return insertPos;
         }
     }
 }

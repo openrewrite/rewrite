@@ -37,8 +37,7 @@ public class RecipeMarketplaceContentValidator {
     public Validated<RecipeMarketplace> validate(RecipeMarketplace marketplace) {
         Validated<RecipeMarketplace> validation = Validated.none();
         List<String> categoryPath = new ArrayList<>();
-        validation = validate(marketplace.getRoot(), validation, categoryPath);
-        return validation;
+        return validate(marketplace.getRoot(), validation, categoryPath);
     }
 
     private Validated<RecipeMarketplace> validate(RecipeMarketplace.Category category,

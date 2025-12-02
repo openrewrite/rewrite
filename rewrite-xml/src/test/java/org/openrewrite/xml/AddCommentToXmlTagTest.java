@@ -30,7 +30,7 @@ class AddCommentToXmlTagTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(
             new AddCommentToXmlTag(
-              "/project/dependencies/",
+              "/project/dependencies",
               " Comment text "
             )
           ),
