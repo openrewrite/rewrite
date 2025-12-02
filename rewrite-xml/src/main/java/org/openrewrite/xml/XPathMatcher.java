@@ -84,20 +84,6 @@ public class XPathMatcher {
      */
     private boolean matchBottomUp(Cursor cursor) {
         CompiledStep[] steps = compiled.steps;
-        // Early reject: for absolute paths without any //, if cursor depth exceeds element steps, can't match
-        // e.g., /a/b has 2 element steps, so cursor at depth 3+ can never match
-        // But /a//b can match at any depth due to the // so we can't apply this optimization
-        if (compiled.hasAbsolutePath() && !compiled.hasDescendant() && compiled.elementStepCount > 0) {
-            int depth = 0;
-            for (Cursor c = cursor; c != null; c = c.getParent()) {
-                if (c.getValue() instanceof Xml.Tag) {
-                    depth++;
-                    if (depth > compiled.elementStepCount) {
-                        return false;  // Too deep
-                    }
-                }
-            }
-        }
 
         // Get current element
         Object cursorValue = cursor.getValue();

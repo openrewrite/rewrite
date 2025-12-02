@@ -86,7 +86,7 @@ final class XPathCompiler {
         // expr : orExpr
         XPathParser.ExprContext exprCtx = ctx.expr();
         if (exprCtx == null || exprCtx.orExpr() == null) {
-            return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_PATH, null, null);
+            return new CompiledXPath(EMPTY_STEPS, 0, EXPR_PATH, null, null);
         }
 
         // Try to extract a simple path expression
@@ -126,7 +126,7 @@ final class XPathCompiler {
 
         // Otherwise it's a boolean expression
         CompiledExpr boolExpr = compileOrExpr(orExpr);
-        return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_BOOLEAN, boolExpr, null);
+        return new CompiledXPath(EMPTY_STEPS, 0, EXPR_BOOLEAN, boolExpr, null);
     }
 
     /**
@@ -149,7 +149,6 @@ final class XPathCompiler {
         }
 
         CompiledStep[] compiledSteps = EMPTY_STEPS;
-        int compiledElementSteps = 0;
 
         if (relPath != null) {
             // Extract steps
@@ -184,9 +183,6 @@ final class XPathCompiler {
                     case NODE_TYPE_TEST:
                         flags |= FLAG_HAS_NODE_TYPE_TEST;
                         break;
-                    case NODE_TEST:
-                        compiledElementSteps++;
-                        break;
                 }
 
                 // Set nextIsBacktrack for lookahead optimization
@@ -199,11 +195,10 @@ final class XPathCompiler {
         // Normalize mid-path parent steps (.. or parent::) to existence predicates
         compiledSteps = normalizeParentSteps(compiledSteps);
 
-        // Recompute flags and element count after normalization
+        // Recompute flags after normalization
         flags = recomputeFlags(compiledSteps, flags);
-        compiledElementSteps = countElementSteps(compiledSteps);
 
-        return new CompiledXPath(compiledSteps, flags, compiledElementSteps, EXPR_PATH, null, null);
+        return new CompiledXPath(compiledSteps, flags, EXPR_PATH, null, null);
     }
 
     /**
@@ -230,13 +225,13 @@ final class XPathCompiler {
                 }
 
                 CompiledFilterExpr compiled = new CompiledFilterExpr(innerPath, predicates, trailingPath, trailingIsDescendant);
-                return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_FILTER, null, compiled);
+                return new CompiledXPath(EMPTY_STEPS, 0, EXPR_FILTER, null, compiled);
             }
         }
 
         // Not a parenthesized expression - treat as boolean expression
         CompiledExpr boolExpr = compilePathExpr(pathExpr);
-        return new CompiledXPath(EMPTY_STEPS, 0, 0, EXPR_BOOLEAN, boolExpr, null);
+        return new CompiledXPath(EMPTY_STEPS, 0, EXPR_BOOLEAN, boolExpr, null);
     }
 
     /**
@@ -374,19 +369,6 @@ final class XPathCompiler {
             }
         }
         return flags;
-    }
-
-    /**
-     * Count element steps (NODE_TEST type).
-     */
-    private static int countElementSteps(CompiledStep[] steps) {
-        int count = 0;
-        for (CompiledStep s : steps) {
-            if (s.type == StepType.NODE_TEST) {
-                count++;
-            }
-        }
-        return count;
     }
 
     /**
@@ -895,7 +877,6 @@ final class XPathCompiler {
     public static final class CompiledXPath {
         final CompiledStep[] steps;
         final int flags;
-        final int elementStepCount;
         final int exprType;
 
         // For EXPR_BOOLEAN: compiled boolean expression
@@ -906,13 +887,11 @@ final class XPathCompiler {
 
         CompiledXPath(CompiledStep[] steps,
                       int flags,
-                      int elementStepCount,
                       int exprType,
                       @Nullable CompiledExpr booleanExpr,
                       @Nullable CompiledFilterExpr filterExpr) {
             this.steps = steps;
             this.flags = flags;
-            this.elementStepCount = elementStepCount;
             this.exprType = exprType;
             this.booleanExpr = booleanExpr;
             this.filterExpr = filterExpr;
