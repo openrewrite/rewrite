@@ -17,35 +17,25 @@ package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Arrays;
-import java.util.List;
-
-import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.style.LineWrapSetting.*;
-import static org.openrewrite.style.StyleHelper.fromStyles;
+import static org.openrewrite.style.LineWrapSetting.ChopIfTooLong;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class WrapMethodInvocationArgumentsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new WrapMethodInvocationArguments<>(new WrappingAndBracesStyle(
-          120,
-          new WrappingAndBracesStyle.IfStatement(false),
-          new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
-          new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
-          new WrappingAndBracesStyle.MethodCallArguments(WrapAlways, false, true, false),
-          new WrappingAndBracesStyle.Annotations(WrapAlways),
-          new WrappingAndBracesStyle.Annotations(WrapAlways),
-          new WrappingAndBracesStyle.Annotations(WrapAlways),
-          new WrappingAndBracesStyle.Annotations(DoNotWrap),
-          new WrappingAndBracesStyle.Annotations(DoNotWrap),
-          new WrappingAndBracesStyle.Annotations(DoNotWrap)))));
+        spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
+          IntelliJ.spaces(),
+          IntelliJ.wrappingAndBraces()
+            .withMethodCallArguments(IntelliJ.wrappingAndBraces().getMethodCallArguments().withWrap(WrapAlways).withAlignWhenMultiline(false).withOpenNewLine(true)),
+          IntelliJ.tabsAndIndents(),
+          null, true)));
     }
 
     @DocumentExample
@@ -60,19 +50,21 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method("hello", 42, true);
                   }
               
-                  void method(String s, int i, boolean b) {}
+                  void method(String s, int i, boolean b) {
+                  }
               }
               """,
             """
               class Test {
                   void test() {
                       method(
-              "hello",
-              42,
-              true);
+                              "hello",
+                              42,
+                              true);
                   }
               
-                  void method(String s, int i, boolean b) {}
+                  void method(String s, int i, boolean b) {
+                  }
               }
               """
           )
@@ -90,18 +82,20 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method("name", 25);
                   }
               
-                  void method(String name, int age) {}
+                  void method(String name, int age) {
+                  }
               }
               """,
             """
               class Test {
                   void test() {
                       method(
-              "name",
-              25);
+                              "name",
+                              25);
                   }
               
-                  void method(String name, int age) {}
+                  void method(String name, int age) {
+                  }
               }
               """
           )
@@ -122,7 +116,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                               true);
                   }
               
-                  void method(String s, int i, boolean b) {}
+                  void method(String s, int i, boolean b) {
+                  }
               }
               """
           )
@@ -142,7 +137,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method(Arrays.asList("a", "b"), 42 + 10, true && false);
                   }
               
-                  void method(Object list, int value, boolean flag) {}
+                  void method(Object list, int value, boolean flag) {
+                  }
               }
               """,
             """
@@ -151,14 +147,15 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               class Test {
                   void test() {
                       method(
-              Arrays.asList(              
-              "a",
-              "b"),
-              42 + 10,
-              true && false);
+                              Arrays.asList(
+                                      "a",
+                                      "b"),
+                              42 + 10,
+                              true && false);
                   }
               
-                  void method(Object list, int value, boolean flag) {}
+                  void method(Object list, int value, boolean flag) {
+                  }
               }
               """
           )
@@ -185,8 +182,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               class Test {
                   void test() {
                       String result = getString().substring(
-              0,
-              5).toUpperCase();
+                              0,
+                              5).toUpperCase();
                   }
               
                   String getString() {
@@ -205,7 +202,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
           java(
             """
               class Person {
-                  Person(String name, int age, boolean active) {}
+                  Person(String name, int age, boolean active) {
+                  }
               }
               
               class Test {
@@ -216,15 +214,16 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               """,
             """
               class Person {
-                  Person(String name, int age, boolean active) {}
+                  Person(String name, int age, boolean active) {
+                  }
               }
               
               class Test {
                   void test() {
                       Person p = new Person(
-              "John",
-              30,
-              true);
+                              "John",
+                              30,
+                              true);
                   }
               }
               """
@@ -243,19 +242,21 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       staticMethod("hello", 42, true);
                   }
               
-                  static void staticMethod(String s, int i, boolean b) {}
+                  static void staticMethod(String s, int i, boolean b) {
+                  }
               }
               """,
             """
               class Test {
                   void test() {
                       staticMethod(
-              "hello",
-              42,
-              true);
+                              "hello",
+                              42,
+                              true);
                   }
               
-                  static void staticMethod(String s, int i, boolean b) {}
+                  static void staticMethod(String s, int i, boolean b) {
+                  }
               }
               """
           )
@@ -273,20 +274,22 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method("prefix", 1, 2, 3);
                   }
               
-                  void method(String prefix, int... values) {}
+                  void method(String prefix, int... values) {
+                  }
               }
               """,
             """
               class Test {
                   void test() {
                       method(
-              "prefix",
-              1,
-              2,
-              3);
+                              "prefix",
+                              1,
+                              2,
+                              3);
                   }
               
-                  void method(String prefix, int... values) {}
+                  void method(String prefix, int... values) {
+                  }
               }
               """
           )
@@ -304,19 +307,21 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method("hello", /* age */ 42, true);
                   }
               
-                  void method(String s, int i, boolean b) {}
+                  void method(String s, int i, boolean b) {
+                  }
               }
               """,
             """
               class Test {
                   void test() {
                       method(
-              "hello", /* age */
-              42,
-              true);
+                              "hello", /* age */
+                              42,
+                              true);
                   }
               
-                  void method(String s, int i, boolean b) {}
+                  void method(String s, int i, boolean b) {
+                  }
               }
               """
           )
@@ -334,22 +339,28 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       outer(inner("value", 10), 42);
                   }
               
-                  void outer(String s, int i) {}
-                  String inner(String s, int i) { return s; }
+                  void outer(String s, int i) {
+                  }
+                  String inner(String s, int i) {
+                      return s;
+                  }
               }
               """,
             """
               class Test {
                   void test() {
                       outer(
-              inner(
-              "value",
-              10),
-              42);
+                              inner(
+                                      "value",
+                                      10),
+                              42);
                   }
               
-                  void outer(String s, int i) {}
-                  String inner(String s, int i) { return s; }
+                  void outer(String s, int i) {
+                  }
+                  String inner(String s, int i) {
+                      return s;
+                  }
               }
               """
           )
@@ -367,18 +378,20 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method(new String[]{"a", "b"}, new int[]{1, 2});
                   }
               
-                  void method(String[] names, int[] values) {}
+                  void method(String[] names, int[] values) {
+                  }
               }
               """,
             """
               class Test {
                   void test() {
                       method(
-              new String[]{"a", "b"},
-              new int[]{1, 2});
+                              new String[]{"a", "b"},
+                              new int[]{1, 2});
                   }
               
-                  void method(String[] names, int[] values) {}
+                  void method(String[] names, int[] values) {
+                  }
               }
               """
           )
@@ -398,7 +411,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method(x -> x.toString(), y -> y * 2);
                   }
               
-                  void method(Function<Object, String> f1, Function<Integer, Integer> f2) {}
+                  void method(Function<Object, String> f1, Function<Integer, Integer> f2) {
+                  }
               }
               """,
             """
@@ -407,11 +421,12 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               class Test {
                   void test() {
                       method(
-              x -> x.toString(),
-              y -> y * 2);
+                              x -> x.toString(),
+                              y -> y * 2);
                   }
               
-                  void method(Function<Object, String> f1, Function<Integer, Integer> f2) {}
+                  void method(Function<Object, String> f1, Function<Integer, Integer> f2) {
+                  }
               }
               """
           )
@@ -429,7 +444,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method();
                   }
               
-                  void method() {}
+                  void method() {
+                  }
               }
               """
           )
@@ -447,7 +463,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method("hello");
                   }
               
-                  void method(String s) {}
+                  void method(String s) {
+                  }
               }
               """
           )
@@ -469,24 +486,26 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method("world", 100);
                   }
               
-                  void method(String s, int i) {}
+                  void method(String s, int i) {
+                  }
               }
               """,
             """
               class Test {
                   void test1() {
                       method(
-              "hello",
-              42);
+                              "hello",
+                              42);
                   }
               
                   void test2() {
                       method(
-              "world",
-              100);
+                              "world",
+                              100);
                   }
               
-                  void method(String s, int i) {}
+                  void method(String s, int i) {
+                  }
               }
               """
           )
@@ -498,21 +517,13 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         //language=java
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  65,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, emptyList(), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(ChopIfTooLong, false, false, true),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap)))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withHardWrapAt(65)
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways))
+              .withMethodCallArguments(IntelliJ.wrappingAndBraces().getMethodCallArguments().withWrap(ChopIfTooLong).withAlignWhenMultiline(false).withCloseNewLine(true)),
+            IntelliJ.tabsAndIndents(),
+            null, true))),
           java(
             """
               class Test {
@@ -521,8 +532,10 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       veryLongMethodNameThatExceedsTheLimits("hello", 42, true);
                   }
               
-                  void shortMethod(String s, int i) {}
-                  void veryLongMethodNameThatExceedsTheLimits(String s, int i, boolean b) {}
+                  void shortMethod(String s, int i) {
+                  }
+                  void veryLongMethodNameThatExceedsTheLimits(String s, int i, boolean b) {
+                  }
               }
               """,
             """
@@ -530,15 +543,15 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                   void test() {
                       shortMethod("a", 1);
                       veryLongMethodNameThatExceedsTheLimits("hello",
-              42,
-              true
-              );
+                              42,
+                              true
+                      );
                   }
               
                   void shortMethod(String s, int i) {
-              }
+                  }
                   void veryLongMethodNameThatExceedsTheLimits(String s, int i, boolean b) {
-              }
+                  }
               }
               """
           )
@@ -550,21 +563,12 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         //language=java
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, emptyList(), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(ChopIfTooLong, false, false, false),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap)))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways))
+              .withMethodCallArguments(IntelliJ.wrappingAndBraces().getMethodCallArguments().withWrap(ChopIfTooLong).withAlignWhenMultiline(false)),
+            IntelliJ.tabsAndIndents(),
+            null, true))),
           java(
             """
               class Test {
@@ -573,7 +577,7 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                   }
               
                   void method(String name, int age) {
-              }
+                  }
               }
               """
           )
@@ -585,21 +589,12 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
         //language=java
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, emptyList(), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(WrapAlways, false, false, true),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap)))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways))
+              .withMethodCallArguments(IntelliJ.wrappingAndBraces().getMethodCallArguments().withWrap(WrapAlways).withAlignWhenMultiline(false).withCloseNewLine(true)),
+            IntelliJ.tabsAndIndents(),
+            null, true))),
           java(
             """
               class Test {
@@ -608,20 +603,20 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                   }
               
                   void method(String s, int i, boolean b) {
-              }
+                  }
               }
               """,
             """
               class Test {
                   void test() {
                       method("hello",
-              42,
-              true
-              );
+                              42,
+                              true
+                      );
                   }
               
                   void method(String s, int i, boolean b) {
-              }
+                  }
               }
               """
           )
@@ -637,11 +632,12 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               class Test {
                   void test() {
                       method(
-                          "hello",
-                          42);
+                              "hello",
+                              42);
                   }
               
-                  void method(String s, int i) {}
+                  void method(String s, int i) {
+                  }
               }
               """
           )
@@ -657,22 +653,24 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               class Test {
                   void test() {
                       method("hello",
-                          42, true);
+                              42, true);
                   }
               
-                  void method(String s, int i, boolean b) {}
+                  void method(String s, int i, boolean b) {
+                  }
               }
               """,
             """
               class Test {
                   void test() {
                       method(
-              "hello",
-                          42,
-              true);
+                              "hello",
+                              42,
+                              true);
                   }
               
-                  void method(String s, int i, boolean b) {}
+                  void method(String s, int i, boolean b) {
+                  }
               }
               """
           )
@@ -692,7 +690,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       this.<String>method("hello", 42);
                   }
               
-                  <T> void method(T value, int count) {}
+                  <T> void method(T value, int count) {
+                  }
               }
               """,
             """
@@ -701,11 +700,12 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               class Test {
                   void test() {
                       this.<String>method(
-              "hello",
-              42);
+                              "hello",
+                              42);
                   }
               
-                  <T> void method(T value, int count) {}
+                  <T> void method(T value, int count) {
+                  }
               }
               """
           )
@@ -719,7 +719,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
           java(
             """
               class Base {
-                  void method(String s, int i) {}
+                  void method(String s, int i) {
+                  }
               }
               
               class Test extends Base {
@@ -730,14 +731,15 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               """,
             """
               class Base {
-                  void method(String s, int i) {}
+                  void method(String s, int i) {
+                  }
               }
               
               class Test extends Base {
                   void test() {
                       super.method(
-              "hello",
-              42);
+                              "hello",
+                              42);
                   }
               }
               """
@@ -758,7 +760,8 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
                       method(String::valueOf, Integer::parseInt);
                   }
               
-                  void method(Function<Integer, String> f1, Function<String, Integer> f2) {}
+                  void method(Function<Integer, String> f1, Function<String, Integer> f2) {
+                  }
               }
               """,
             """
@@ -767,11 +770,12 @@ class WrapMethodInvocationArgumentsTest implements RewriteTest {
               class Test {
                   void test() {
                       method(
-              String::valueOf,
-              Integer::parseInt);
+                              String::valueOf,
+                              Integer::parseInt);
                   }
               
-                  void method(Function<Integer, String> f1, Function<String, Integer> f2) {}
+                  void method(Function<Integer, String> f1, Function<String, Integer> f2) {
+                  }
               }
               """
           )

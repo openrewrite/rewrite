@@ -22,7 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -31,8 +30,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.style.LineWrapSetting.*;
-import static org.openrewrite.style.StyleHelper.fromStyles;
+import static org.openrewrite.style.LineWrapSetting.ChopIfTooLong;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class WrapMethodChainsTest implements RewriteTest {
@@ -54,22 +53,12 @@ class WrapMethodChainsTest implements RewriteTest {
             }
             """))
           .recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(WrapAlways),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                  new WrappingAndBracesStyle.Annotations(DoNotWrap)))
-            ),
-            null)));
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(Arrays.asList("builder", "newBuilder"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true)));
     }
 
     @Test
@@ -87,9 +76,9 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
-              .name("test")
-              .age(25)
-              .build();
+                              .name("test")
+                              .age(25)
+                              .build();
                   }
               }
               """
@@ -112,9 +101,9 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       MyObject obj = MyObject.newBuilder()
-              .name("test")
-              .age(25)
-              .build();
+                              .name("test")
+                              .age(25)
+                              .build();
                   }
               }
               """
@@ -141,7 +130,7 @@ class WrapMethodChainsTest implements RewriteTest {
     }
 
     @Test
-    void formatAlreadyNewlinedBuilder() {
+    void reindentShortIndented() {
         rewriteRun(
           java(
             """
@@ -153,13 +142,23 @@ class WrapMethodChainsTest implements RewriteTest {
                           .build();
                   }
               }
+              """,
+            """
+              class Test {
+                  void test() {
+                      MyObject obj = MyObject.builder()
+                              .name("test")
+                              .age(25)
+                              .build();
+                  }
+              }
               """
           )
         );
     }
 
     @Test
-    void reindentIncorrectlyIndented() {
+    void reindentLongIndented() {
         rewriteRun(
           java(
             """
@@ -169,6 +168,16 @@ class WrapMethodChainsTest implements RewriteTest {
                                              .name("test")
                                              .age(25)
                                              .build();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      MyObject obj = MyObject.builder()
+                              .name("test")
+                              .age(25)
+                              .build();
                   }
               }
               """
@@ -191,11 +200,11 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
-              .name("test")
-              .nested(MyObject.builder()
-              .name("nested")
-              .build())
-              .build();
+                              .name("test")
+                              .nested(MyObject.builder()
+                                      .name("nested")
+                                      .build())
+                              .build();
                   }
               }
               """
@@ -215,9 +224,9 @@ class WrapMethodChainsTest implements RewriteTest {
             """
               class Test {
                   private final MyObject value = MyObject.builder()
-              .name("hello")
-              .age(30)
-              .build();
+                          .name("hello")
+                          .age(30)
+                          .build();
               }
               """
           )
@@ -239,9 +248,9 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   MyObject test() {
                       return MyObject.builder()
-              .name("hello")
-              .age(30)
-              .build();
+                              .name("hello")
+                              .age(30)
+                              .build();
                   }
               }
               """
@@ -264,7 +273,7 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
-              .build();
+                              .build();
                   }
               }
               """
@@ -287,9 +296,9 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
-              .name("hello") /* comment */
-              .age(30)
-              .build();
+                              .name("hello") /* comment */
+                              .age(30)
+                              .build();
                   }
               }
               """
@@ -316,9 +325,9 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       Supplier<MyObject> supplier = () -> MyObject.builder()
-              .name("hello")
-              .age(30)
-              .build();
+                              .name("hello")
+                              .age(30)
+                              .build();
                   }
               }
               """
@@ -339,6 +348,18 @@ class WrapMethodChainsTest implements RewriteTest {
                       String sb = new StringBuilder().append("a")
               .append("b")
               .toString();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      String result = "hello".toUpperCase()
+                              .substring(1)
+                              .trim();
+                      String sb = new StringBuilder().append("a")
+                              .append("b")
+                              .toString();
                   }
               }
               """
@@ -362,13 +383,13 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       MyObject s1 = MyObject.builder()
-              .name("a")
-              .age(1)
-              .build();
+                              .name("a")
+                              .age(1)
+                              .build();
                       MyObject s2 = MyObject.newBuilder()
-              .name("b")
-              .age(2)
-              .build();
+                              .name("b")
+                              .age(2)
+                              .build();
                   }
               }
               """
@@ -395,9 +416,9 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
-              .name("test")
-              .items(Arrays.asList("a", "b", "c"))
-              .build();
+                              .name("test")
+                              .items(Arrays.asList("a", "b", "c"))
+                              .build();
                   }
               }
               """
@@ -420,11 +441,11 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       MyObject obj = MyObject.builder()
-              .name("test")
-              .nested(MyObject.builder()
-              .build())
-              .age(30)
-              .build();
+                              .name("test")
+                              .nested(MyObject.builder()
+                                      .build())
+                              .age(30)
+                              .build();
                   }
               }
               """
@@ -436,21 +457,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamChain() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.List;
@@ -471,10 +483,10 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test(List<String> list) {
                       List<String> result = list.stream()
-              .filter(s -> s.length() > 3)
-                      .map(String::toUpperCase)
-              .sorted()
-                      .collect(Collectors.toList());
+                              .filter(s -> s.length() > 3)
+                              .map(String::toUpperCase)
+                              .sorted()
+                              .collect(Collectors.toList());
                   }
               }
               """
@@ -506,20 +518,20 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   void test() {
                       MyObject root = MyObject.builder()
-              .name("root")
-              .nested(MyObject.builder()
-              .name("level1")
-              .nested(MyObject.builder()
-              .name("level2")
-              .nested(MyObject.builder()
-              .name("level3")
-              .nested(MyObject.builder()
-              .name("level4")
+                              .name("root")
+                              .nested(MyObject.builder()
+                                      .name("level1")
+                                      .nested(MyObject.builder()
+                                              .name("level2")
+                                              .nested(MyObject.builder()
+                                                      .name("level3")
+                                                      .nested(MyObject.builder()
+                                                              .name("level4")
+                                                              .build())
+                                                      .build())
+                                              .build())
                                       .build())
-                                  .build())
-                              .build())
-                          .build())
-                      .build();
+                              .build();
                   }
               }
               """
@@ -531,21 +543,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithMultilineFilterLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.Collection;
@@ -562,10 +565,8 @@ class WrapMethodChainsTest implements RewriteTest {
                           return false;
                       }).findFirst();
                   }
-              
                   boolean someCondition(Item item) { return true; }
                   boolean otherCondition(Item item) { return false; }
-              
                   static class Item {}
               }
               """,
@@ -576,26 +577,24 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   Optional<Item> findItem(Collection<Item> collection) {
                       return collection.stream()
-              .filter(item -> {
-                          if (someCondition(item)) {
-                              return true;
-                          } else if (otherCondition(item)) {
-                              return true;
-                          }
-                          return false;
-                      })
-              .findFirst();
+                              .filter(item -> {
+                                  if (someCondition(item)) {
+                                      return true;
+                                  } else if (otherCondition(item)) {
+                                      return true;
+                                  }
+                                  return false;
+                              })
+                              .findFirst();
                   }
-              
                   boolean someCondition(Item item) {
-              return true;
-              }
+                      return true;
+                  }
                   boolean otherCondition(Item item) {
-              return false;
-              }
-              
+                      return false;
+                  }
                   static class Item {
-              }
+                  }
               }
               """
           )
@@ -606,21 +605,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithMultipleMultilineLambdas() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.List;
@@ -640,7 +630,6 @@ class WrapMethodChainsTest implements RewriteTest {
                           return result.toUpperCase();
                       }).collect(Collectors.toList());
                   }
-              
                   static class Item {
                       boolean isValid() { return true; }
                   }
@@ -653,25 +642,24 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   List<String> process(List<Item> items) {
                       return items.stream()
-              .filter(item -> {
-                          boolean valid = item.isValid();
-                          if (valid) {
-                              System.out.println("Valid: " + item);
-                          }
-                          return valid;
-                      })
-              .map(item -> {
-                          String result = item.toString();
-                          System.out.println("Mapping: " + result);
-                          return result.toUpperCase();
-                      })
-              .collect(Collectors.toList());
+                              .filter(item -> {
+                                  boolean valid = item.isValid();
+                                  if (valid) {
+                                      System.out.println("Valid: " + item);
+                                  }
+                                  return valid;
+                              })
+                              .map(item -> {
+                                  String result = item.toString();
+                                  System.out.println("Mapping: " + result);
+                                  return result.toUpperCase();
+                              })
+                              .collect(Collectors.toList());
                   }
-              
                   static class Item {
                       boolean isValid() {
-              return true;
-              }
+                          return true;
+                      }
                   }
               }
               """
@@ -683,21 +671,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithMixedLambdaStyles() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.List;
@@ -722,17 +701,17 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   List<Integer> process(List<String> items) {
                       return items.stream()
-              .filter(s -> s.length() > 3)
-              .map(s -> {
-                          try {
-                              return Integer.parseInt(s);
-                          } catch (NumberFormatException e) {
-                              return 0;
-                          }
-                      })
-              .filter(i -> i > 0)
-              .sorted()
-              .collect(Collectors.toList());
+                              .filter(s -> s.length() > 3)
+                              .map(s -> {
+                                  try {
+                                      return Integer.parseInt(s);
+                                  } catch (NumberFormatException e) {
+                                      return 0;
+                                  }
+                              })
+                              .filter(i -> i > 0)
+                              .sorted()
+                              .collect(Collectors.toList());
                   }
               }
               """
@@ -744,21 +723,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithComplexNestedLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.List;
@@ -773,12 +743,10 @@ class WrapMethodChainsTest implements RewriteTest {
                               .map(emp -> dept.name + ": " + emp.name);
                       }).sorted().distinct().collect(Collectors.toList());
                   }
-              
                   static class Department {
                       String name;
                       List<Employee> employees;
                   }
-              
                   static class Employee {
                       String name;
                       boolean active;
@@ -792,22 +760,20 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   List<String> process(List<Department> departments) {
                       return departments.stream()
-              .flatMap(dept -> {
-                          System.out.println("Processing department: " + dept.name);
-                          return dept.employees.stream()
-                              .filter(emp -> emp.active)
-                              .map(emp -> dept.name + ": " + emp.name);
-                      })
-              .sorted()
-              .distinct()
-              .collect(Collectors.toList());
+                              .flatMap(dept -> {
+                                  System.out.println("Processing department: " + dept.name);
+                                  return dept.employees.stream()
+                                          .filter(emp -> emp.active)
+                                          .map(emp -> dept.name + ": " + emp.name);
+                              })
+                              .sorted()
+                              .distinct()
+                              .collect(Collectors.toList());
                   }
-              
                   static class Department {
                       String name;
                       List<Employee> employees;
                   }
-              
                   static class Employee {
                       String name;
                       boolean active;
@@ -822,21 +788,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithMethodReferencesAndLambdas() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.List;
@@ -849,7 +806,6 @@ class WrapMethodChainsTest implements RewriteTest {
                           return processed.toUpperCase();
                       }).sorted(String::compareTo).collect(Collectors.toList());
                   }
-              
                   boolean isValid(String s) { return s != null && !s.isEmpty(); }
                   String preprocess(String s) { return s.trim(); }
               }
@@ -861,21 +817,20 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   List<String> process(List<String> items) {
                       return items.stream()
-              .filter(this::isValid)
-              .map(s -> {
-                          String processed = preprocess(s);
-                          return processed.toUpperCase();
-                      })
-              .sorted(String::compareTo)
-              .collect(Collectors.toList());
+                              .filter(this::isValid)
+                              .map(s -> {
+                                  String processed = preprocess(s);
+                                  return processed.toUpperCase();
+                              })
+                              .sorted(String::compareTo)
+                              .collect(Collectors.toList());
                   }
-              
                   boolean isValid(String s) {
-              return s != null && !s.isEmpty();
-              }
+                      return s != null && !s.isEmpty();
+                  }
                   String preprocess(String s) {
-              return s.trim();
-              }
+                      return s.trim();
+                  }
               }
               """
           )
@@ -886,21 +841,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithPeekAndMultilineLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.List;
@@ -924,15 +870,15 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   List<String> process(List<String> items) {
                       return items.stream()
-              .peek(item -> {
-                          System.out.println("Before: " + item);
-                          if (item.length() > 10) {
-                              System.out.println("Long item detected");
-                          }
-                      })
-              .map(String::toUpperCase)
-              .peek(System.out::println)
-              .collect(Collectors.toList());
+                              .peek(item -> {
+                                  System.out.println("Before: " + item);
+                                  if (item.length() > 10) {
+                                      System.out.println("Long item detected");
+                                  }
+                              })
+                              .map(String::toUpperCase)
+                              .peek(System.out::println)
+                              .collect(Collectors.toList());
                   }
               }
               """
@@ -944,21 +890,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void preserveAlreadyFormattedStreamWithMultilineLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.Collection;
@@ -977,10 +914,8 @@ class WrapMethodChainsTest implements RewriteTest {
                               })
                               .findFirst();
                   }
-              
                   boolean someCondition(Item item) { return true; }
                   boolean otherCondition(Item item) { return false; }
-              
                   static class Item {}
               }
               """,
@@ -1001,16 +936,14 @@ class WrapMethodChainsTest implements RewriteTest {
                               })
                               .findFirst();
                   }
-              
                   boolean someCondition(Item item) {
-              return true;
-              }
+                      return true;
+                  }
                   boolean otherCondition(Item item) {
-              return false;
-              }
-              
+                      return false;
+                  }
                   static class Item {
-              }
+                  }
               }
               """
           )
@@ -1021,21 +954,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamWithReduceMultilineLambda() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.List;
@@ -1056,12 +980,12 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   Integer sum(List<Integer> numbers) {
                       return numbers.stream()
-              .filter(n -> n > 0)
-              .reduce(0, (a, b) -> {
-                          int sum = a + b;
-                          System.out.println("Current sum: " + sum);
-                          return sum;
-                      });
+                              .filter(n -> n > 0)
+                              .reduce(0, (a, b) -> {
+                                  int sum = a + b;
+                                  System.out.println("Current sum: " + sum);
+                                  return sum;
+                              });
                   }
               }
               """
@@ -1073,21 +997,12 @@ class WrapMethodChainsTest implements RewriteTest {
     void formatStreamInBuilderArgument() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(Arrays.asList("builder", "stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               import java.util.List;
@@ -1106,12 +1021,12 @@ class WrapMethodChainsTest implements RewriteTest {
               class Test {
                   MyObject process(List<String> items) {
                       return MyObject.builder()
-              .items(items.stream()
-              .filter(s -> s.length() > 3)
-              .map(String::toUpperCase)
-              .collect(Collectors.toList()))
-              .name("name")
-              .build();
+                              .items(items.stream()
+                                      .filter(s -> s.length() > 3)
+                                      .map(String::toUpperCase)
+                                      .collect(Collectors.toList()))
+                              .name("name")
+                              .build();
                   }
               }
               """
@@ -1127,20 +1042,13 @@ class WrapMethodChainsTest implements RewriteTest {
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext p) {
                   J.CompilationUnit formatted = (J.CompilationUnit) new SpacesVisitor<>(IntelliJ.spaces(), true, null).visit(cu, p, getCursor().getParent());
                   formatted = (J.CompilationUnit) new WrappingAndBracesVisitor<>(
-                    List.of(fromStyles(
-                      new WrappingAndBracesStyle(
-                        79,
-                        new WrappingAndBracesStyle.IfStatement(false),
-                        new WrappingAndBracesStyle.ChainedMethodCalls(ChopIfTooLong, Arrays.asList("builder", "stream"), false),
-                        new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                        new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null))),
-                    null).visit(formatted, p, getCursor().getParent());
+                    IntelliJ.spaces(),
+                    IntelliJ.wrappingAndBraces()
+                      .withHardWrapAt(79)
+                      .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(ChopIfTooLong).withBuilderMethods(Arrays.asList("builder", "stream")).withAlignWhenMultiline(false)),
+                    IntelliJ.tabsAndIndents(),
+                    null,
+                    true).visit(formatted, p, getCursor().getParent());
                   return (J.CompilationUnit) new MergeSpacesVisitor().visit(cu, formatted);
               }
           })),
@@ -1157,12 +1065,10 @@ class WrapMethodChainsTest implements RewriteTest {
             """
               class Test {
                   void test() {
-                      String ob1 = new StringBuilder().append("test")
-              .append("25")
-              .toString();
-                      String ob2 = new StringBuilder().append("test")
-              .append("25")
-              .toString();
+                      String ob1 = new StringBuilder().append("test").append("25")
+                              .toString();
+                      String ob2 = new StringBuilder().append("test").append("25")
+                              .toString();
                   }
               }
               """
@@ -1175,21 +1081,13 @@ class WrapMethodChainsTest implements RewriteTest {
     void doNotChopIfNotTooLong(int length) {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  length,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(ChopIfTooLong, Arrays.asList("builder", "stream"), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+            IntelliJ.spaces(),
+            IntelliJ.wrappingAndBraces()
+              .withHardWrapAt(length)
+              .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(ChopIfTooLong).withBuilderMethods(Arrays.asList("builder", "stream"))),
+            IntelliJ.tabsAndIndents(),
+            null,
+            true))),
           java(
             """
               class Test {

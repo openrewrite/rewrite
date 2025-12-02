@@ -33,9 +33,9 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
 import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -45,19 +45,12 @@ class WrappingAndBracesTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
           IntelliJ.spaces(),
-          new WrappingAndBracesStyle(
-            120,
-            new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
-            new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-            new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-            new WrappingAndBracesStyle.Annotations(WrapAlways),
-            new WrappingAndBracesStyle.Annotations(WrapAlways),
-            new WrappingAndBracesStyle.Annotations(WrapAlways),
-            new WrappingAndBracesStyle.Annotations(DoNotWrap),
-            new WrappingAndBracesStyle.Annotations(DoNotWrap),
-            new WrappingAndBracesStyle.Annotations(DoNotWrap)),
-          null)));
+          IntelliJ.wrappingAndBraces()
+            .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(Arrays.asList("builder", "newBuilder")))
+            .withMethodDeclarationParameters(IntelliJ.wrappingAndBraces().getMethodDeclarationParameters().withWrap(WrapAlways)),
+          IntelliJ.tabsAndIndents(),
+          null,
+          true)));
     }
 
     @DocumentExample
@@ -76,7 +69,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   {
-              int n = 0;
+                      int n = 0;
                       n++;
                   }
               }
@@ -87,11 +80,12 @@ class WrappingAndBracesTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<SpacesStyle> spaces,
                                                           UnaryOperator<WrappingAndBracesStyle> wrapping) {
-        return spec -> spec.recipe(new AutoFormat(null, false))
+        return spec -> spec.recipe(new AutoFormat(null, true))
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
               List.of(
+
                 spaces.apply(IntelliJ.spaces()),
                 wrapping.apply(IntelliJ.wrappingAndBraces())
               )
@@ -234,6 +228,34 @@ class WrappingAndBracesTest implements RewriteTest {
                   @SuppressWarnings({"ALL"})
                   <T> T method() {
                       return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void blocksShouldCloseOnNextLine() {
+        rewriteRun(
+          java(
+            """
+              public class TestClass {}
+              """,
+            """
+              public class TestClass {
+              }
+              """
+          ),
+          java(
+            """
+              public class TestMethod {
+                  void method() {}
+              }
+              """,
+            """
+              public class TestMethod {
+                  void method() {
                   }
               }
               """
@@ -416,8 +438,8 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               public class Test {
-              int m; /* comment */
-              int n;
+                  int m; /* comment */
+                  int n;
               }
               """
           )
@@ -430,7 +452,7 @@ class WrappingAndBracesTest implements RewriteTest {
         rewriteRun(
           wrappingAndBraces(
             spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
-            wrap -> wrap.withIfStatement(new WrappingAndBracesStyle.IfStatement(true))),
+            wrap -> wrap.withIfStatement(IntelliJ.wrappingAndBraces().getIfStatement().withElseOnNewLine(true))),
           java(
             """
               public class Test {
@@ -470,7 +492,7 @@ class WrappingAndBracesTest implements RewriteTest {
         rewriteRun(
           wrappingAndBraces(
             spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
-            wrap -> wrap.withIfStatement(new WrappingAndBracesStyle.IfStatement(false))),
+            wrap -> wrap),
           java(
             """
               public class Test {
@@ -494,6 +516,44 @@ class WrappingAndBracesTest implements RewriteTest {
                           System.out.println("if");
                       } else if (arg0 == 1) {
                           System.out.println("else if");
+                      } else {
+                          System.out.println("else");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ifAlwaysForceBraces() {
+        rewriteRun(
+          wrappingAndBraces(spaces -> spaces,
+            wrap -> wrap.withIfStatement(wrap.getIfStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))),
+          java(
+            """
+              public class Test {
+                  void method(int arg0) {
+                      if (arg0 == 0)
+                          System.out.println("if");
+                      else if (arg0 == 1) {
+                          System.out.println("else if 1");
+                          System.out.println("else if 2");
+                      }
+                      else
+                          System.out.println("else");
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void method(int arg0) {
+                      if (arg0 == 0) {
+                          System.out.println("if");
+                      } else if (arg0 == 1) {
+                          System.out.println("else if 1");
+                          System.out.println("else if 2");
                       } else {
                           System.out.println("else");
                       }
@@ -568,11 +628,9 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
-              
                   @Foo
                   @Foo
-                  void method(
-                          @Foo @Foo int param) {
+                  void method(@Foo @Foo int param) {
                       @Foo @Foo int localVar;
                   }
               }
@@ -581,8 +639,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo @Foo VALUE
               }
               
-              record someRecord(
-                      @Foo @Foo String name) {
+              record someRecord(@Foo @Foo String name) {
               }
               """
           )
@@ -612,7 +669,6 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
-              
                   @Foo
                   @Foo
                   void method(@Foo @Foo int param) {
@@ -624,8 +680,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo @Foo VALUE
               }
               
-              record someRecord(
-                      @Foo @Foo String name) {
+              record someRecord(@Foo @Foo String name) {
               }
               """
           )
@@ -669,11 +724,9 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-              
                   @Foo
                   @Foo
-                  public void method(
-                          @Foo @Foo final int param) {
+                  public void method(@Foo @Foo final int param) {
                       @Foo @Foo final int localVar;
                   }
               }
@@ -698,7 +751,6 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             SourceSpec::skip),
           java(
-
             """
               @Foo
               @Foo
@@ -706,11 +758,9 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-              
                   @Foo
                   @Foo
-                  public void method(
-                          @Foo @Foo final int param) {
+                  public void method(@Foo @Foo final int param) {
                       @Foo @Foo final int localVar;
                   }
               }
@@ -761,17 +811,14 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-              
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
-              
                   @Foo
                   @Foo
-                  T method(
-                          @Foo @Foo T param) {
+                  T method(@Foo @Foo T param) {
                       @Foo @Foo T localVar;
                       return param;
                   }
@@ -804,17 +851,14 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-              
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
-              
                   @Foo
                   @Foo
-                  T method(
-                          @Foo @Foo T param) {
+                  T method(@Foo @Foo T param) {
                       @Foo @Foo T localVar;
                       return param;
                   }
@@ -846,20 +890,17 @@ class WrappingAndBracesTest implements RewriteTest {
                   String method1(){
                       return "test";
                   }
-              
                   @Foo /* comment
                   on multiple
                   lines */
                   String method2(){
                       return "test";
                   }
-              
                   @Foo
                   //comment
                   String method3(){
                       return "test";
                   }
-              
                   @Foo
                   /* comment
                   on multiple
@@ -895,20 +936,17 @@ class WrappingAndBracesTest implements RewriteTest {
                   final String method1(){
                       return "test";
                   }
-              
                   @Foo /* comment
                   on multiple
                   lines */
                   final String method2(){
                       return "test";
                   }
-              
                   @Foo
                   //comment
                   final String method3(){
                       return "test";
                   }
-              
                   @Foo
                   /* comment
                   on multiple
@@ -927,19 +965,11 @@ class WrappingAndBracesTest implements RewriteTest {
         rewriteRun(spec ->
             spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
               IntelliJ.spaces(),
-              new WrappingAndBracesStyle(
-                120,
-                new WrappingAndBracesStyle.IfStatement(false),
-                new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList(), false),
-                new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null),
-              null))),
+              IntelliJ.wrappingAndBraces()
+                .withMethodDeclarationParameters(IntelliJ.wrappingAndBraces().getMethodDeclarationParameters().withWrap(WrapAlways)),
+              IntelliJ.tabsAndIndents(),
+              null,
+              true))),
           java(
             """
               import java.lang.annotation.Repeatable;
@@ -959,26 +989,322 @@ class WrappingAndBracesTest implements RewriteTest {
                   final String method1(){
                       return "test";
                   }
-              
                   @Foo /* comment
                   on multiple
                   lines */
                   final String method2(){
                       return "test";
                   }
-              
                   @Foo
                   //comment
                   final String method3(){
                       return "test";
                   }
-              
                   @Foo
                   /* comment
                   on multiple
                   lines */
                   final String method4(){
                       return "test";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotWrapImplementsList() {
+        rewriteRun(
+          java("""
+            public class Interfaces {
+                public interface I1 {
+                }
+                public interface I2 {
+                }
+                public interface I3 {
+                }
+            }
+            """),
+          java(
+            """
+              public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alwaysWrapImplementsList() {
+        rewriteRun(spec ->
+            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
+              IntelliJ.spaces(),
+              IntelliJ.wrappingAndBraces()
+                .withExtendsImplementsPermitsList(IntelliJ.wrappingAndBraces().getExtendsImplementsPermitsList().withWrap(WrapAlways)),
+              IntelliJ.tabsAndIndents(),
+              null,
+              true))),
+          java("""
+            public class Interfaces {
+                public interface I1 {
+                }
+                public interface I2 {
+                }
+                public interface I3 {
+                }
+            }
+            """),
+          java(
+            """
+              public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
+              }
+              """,
+            """
+              public class Test implements Interfaces.I1,
+                      Interfaces.I2,
+                      Interfaces.I3 {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alignWrappedImplementsList() {
+        rewriteRun(spec ->
+            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
+              IntelliJ.spaces(),
+              IntelliJ.wrappingAndBraces()
+                .withExtendsImplementsPermitsList(IntelliJ.wrappingAndBraces().getExtendsImplementsPermitsList().withWrap(WrapAlways).withAlignWhenMultiline(true)),
+              IntelliJ.tabsAndIndents(),
+              null,
+              true))),
+          java("""
+            public class Interfaces {
+                public interface I1 {
+                }
+                public interface I2 {
+                }
+                public interface I3 {
+                }
+            }
+            """),
+          java(
+            """
+              public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
+              }
+              """,
+            """
+              public class Test implements Interfaces.I1,
+                                           Interfaces.I2,
+                                           Interfaces.I3 {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0;
+                           i < 10;
+                           i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forNoAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withAlignWhenMultiline(false))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0;
+                              i < 10;
+                              i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forOpenAndCloseOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
+            ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      for (
+                              int i = 0;
+                              i < 10;
+                              i++
+                      ) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forOnlyOpenAndCloseOnNewLineWhenWrapping() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withOpenNewLine(true).withCloseNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forWithForcedBlock() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++)
+                          System.out.println(i);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void whileWithForcedBlock() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withWhileStatement(wrap.getWhileStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      while (true)
+                          System.out.println("TESTING");
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      while (true) {
+                          System.out.println("TESTING");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doWhileWithForcedBlock() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withDoWhileStatement(wrap.getDoWhileStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      do
+                          System.out.println("TESTING");
+                      while (true);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      do {
+                          System.out.println("TESTING");
+                      } while (true);
                   }
               }
               """

@@ -34,7 +34,9 @@ import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
@@ -80,6 +82,34 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public @Nullable <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
+        if (container == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        setCursor(new Cursor(getCursor(), container));
+
+        Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+        Map<String, Object> messages = new HashMap<>();
+        messages.put("containerLocation", loc);
+        messages.put("empty", container.getElements().stream().allMatch(element -> element instanceof J.Empty));
+        messages.put("size", container.getElements().size());
+        List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), (index, t) -> {
+            messages.put("index", index);
+            setCursor(new Cursor(getCursor(), t, messages));
+            t = visitRightPadded(t, loc.getElementLocation(), p);
+            setCursor(getCursor().getParent());
+            return t;
+        });
+
+        setCursor(getCursor().getParent());
+
+        return js == container.getPadding().getElements() && before == container.getBefore() ?
+                container :
+                JContainer.build(before, js, container.getMarkers());
+    }
+
+    @Override
     public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
         if (right == null || !(right.getElement() instanceof J)) {
             return super.visitRightPadded(right, loc, p);
@@ -93,10 +123,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
         ContainerPosition beforePosition;
         ContainerPosition afterPosition;
-        JContainer.Location containerLocation = cursor.getMessage("location");
-        int index = -1;
-        int size = -1;
-        boolean emptyContainer = false;
+        JContainer.Location containerLocation = cursor.getMessage("containerLocation");
+        Integer index = cursor.getMessage("index");
+        Integer size = cursor.getMessage("size");
+        boolean emptyContainer = Boolean.TRUE.equals(cursor.getMessage("empty"));
 
         switch (loc) {
             case LANGUAGE_EXTENSION:
@@ -232,6 +262,14 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     after = "";
                 }
                 break;
+            case IF_ELSE:
+                if (right.getElement() instanceof J.If) {
+                    break;
+                }
+                //Falling through on purpose here
+            case IF_THEN:
+                before = " ";
+                break;
             case LAMBDA_PARAM:
                 parent = cursor.getValue();
                 index = ((J.Lambda.Parameters) parent).getParameters().indexOf(right.getElement());
@@ -247,19 +285,6 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     break;
                 }
                 //if not we can fall through to the container handling
-            case METHOD_DECLARATION_PARAMETER:
-            case RECORD_STATE_VECTOR:
-            case METHOD_INVOCATION_ARGUMENT:
-            case NEW_CLASS_ARGUMENTS:
-            case ANNOTATION_ARGUMENT:
-            case TYPE_BOUND:
-            case NEW_ARRAY_INITIALIZER:
-            case TRY_RESOURCE:
-                JContainer<J> container = cursor.getValue();
-                index = container.getElements().indexOf(right.getElement());
-                size = container.getElements().size();
-                emptyContainer = container.getElements().stream().allMatch(element -> element instanceof J.Empty);
-                break;
             case METHOD_SELECT:
                 after = "";
                 break;
@@ -267,6 +292,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 after = " ";
                 break;
             default:
+                if (containerLocation != null) {
+                    break;
+                }
                 if (hasLineBreakInSpace(right.getAfter())) {
                     after = right.getAfter().getWhitespace();
                     break;
@@ -275,7 +303,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
         }
 
-        if (index >= 0 && containerLocation != null) {
+        if (index != null && size != null && index >= 0 && containerLocation != null) {
             if (emptyContainer) {
                 before = getMinimizedWhitespaceWithin(containerLocation, ContainerPosition.EMPTY);
                 after = "";
@@ -295,7 +323,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         if (after != null) {
-            if (index != size - 1 && right.getElement() instanceof J.Try.Resource) {
+            if (index != null && size != null && index != size - 1 && right.getElement() instanceof J.Try.Resource) {
                 //noinspection unchecked, ConstantConditions
                 right = right.withElement((T) new JavaIsoVisitor<String>() {
 
@@ -309,7 +337,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        setCursor(new Cursor(getCursor(), right));
+        if (containerLocation == null) {
+            setCursor(new Cursor(getCursor(), right));
+        }
         if (before != null) {
             getCursor().putMessage("before", before);
         }
@@ -320,7 +350,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             t = visitAndCast((J) right.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        if (containerLocation == null) {
+            setCursor(getCursor().getParent());
+        }
         if (t == null) {
             //noinspection ConstantConditions
             return null;
@@ -385,9 +417,6 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public Space visitSpace(@Nullable Space space, Space.Location loc, P ctx) {
         if (space == null) {
             return super.visitSpace(null, loc, ctx);
-        }
-        if (getCursor().getValue() instanceof JContainer) {
-            Arrays.stream(JContainer.Location.values()).filter(l -> l.getBeforeLocation() == loc).findFirst().ifPresent(l -> getCursor().computeMessageIfAbsent("location", __ -> l));
         }
         String whitespace = null;
         String before = getCursor().pollNearestMessage("before");
@@ -606,17 +635,6 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                         whitespace = evaluate(() -> spacesStyle.getWithin().getCodeBraces(), false) ? " " : "";
                     }
                 }
-                if (block.getStatements().isEmpty()) {
-                    if (StringUtils.countOccurrences(block.getEnd().getWhitespace(), "\n") > 3) {
-                        space = space.withWhitespace("\n\n\n" + block.getEnd().getWhitespace().substring(block.getEnd().getWhitespace().lastIndexOf("\n") + 1));
-                    }
-                    space = space.withComments(ListUtils.map(space.getComments(), comment -> {
-                        if (StringUtils.countOccurrences(comment.getSuffix(), "\n") > 3) {
-                            comment = comment.withSuffix("\n\n\n" + comment.getSuffix().substring(comment.getSuffix().lastIndexOf("\n") + 1));
-                        }
-                        return comment;
-                    }));
-                }
                 break;
             case BINARY_OPERATOR:
                 J.Binary binary = getCursor().getParentTreeCursor().getValue();
@@ -794,10 +812,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private @Nullable String getMinimizedWhitespaceWithin(JContainer.Location loc, ContainerPosition containerPosition) {
-        if (loc != JContainer.Location.TYPE_BOUNDS && loc != JContainer.Location.TRY_RESOURCES && loc != JContainer.Location.TYPE_PARAMETERS && containerPosition == ContainerPosition.AFTER_SEPARATOR) {
+        List<JContainer.Location> ignoreCommaStyle = Arrays.asList(JContainer.Location.TYPE_BOUNDS, JContainer.Location.TRY_RESOURCES, JContainer.Location.TYPE_PARAMETERS, JContainer.Location.IMPLEMENTS, JContainer.Location.THROWS);
+        if (containerPosition == ContainerPosition.AFTER_SEPARATOR && !ignoreCommaStyle.contains(loc)) {
             return evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
         }
-        if (loc != JContainer.Location.TYPE_BOUNDS && loc != JContainer.Location.TRY_RESOURCES && loc != JContainer.Location.TYPE_PARAMETERS && containerPosition == ContainerPosition.BEFORE_SEPARATOR) {
+        if (containerPosition == ContainerPosition.BEFORE_SEPARATOR && !ignoreCommaStyle.contains(loc)) {
             return evaluate(() -> spacesStyle.getOther().getBeforeComma(), true) ? " " : "";
         }
         switch (loc) {
@@ -856,6 +875,12 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     return " ";
                 }
                 return "";
+            case IMPLEMENTS:
+            case THROWS:
+                if (containerPosition == ContainerPosition.OPEN || containerPosition == ContainerPosition.AFTER_SEPARATOR) {
+                    return " "; // there is no intelliJ style existing for this
+                }
+                return ""; // there is no intelliJ style existing for this
         }
         return null;
     }

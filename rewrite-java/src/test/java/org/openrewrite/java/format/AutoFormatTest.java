@@ -1625,7 +1625,7 @@ class AutoFormatTest implements RewriteTest {
                       boolean someCondition(Item item) {
                           return true;
                       }
-                      
+
                       boolean otherCondition(Item item) {
                           return false;
                       }

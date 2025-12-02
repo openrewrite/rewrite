@@ -17,6 +17,7 @@ package org.openrewrite.groovy.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.*;
 import org.openrewrite.internal.ListUtils;
@@ -193,6 +194,15 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
         r = r.getPadding().withInclusive(visitLeftPadded(r.getPadding().getInclusive(), GLeftPadded.Location.RANGE_INCLUSION, newRange.getPadding().getInclusive()));
         r = r.withTo(visitAndCast(r.getTo(), newRange.getTo()));
         return r.withType(visitType(r.getType(), newRange.getType()));
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, Object o) {
+        if (o instanceof J.Block && !(tree instanceof J.Block)) {
+            //Wrapping can introduce blocks
+            return super.visit((J.Block) o, o);
+        }
+        return super.visit(tree, o);
     }
 
     @Override

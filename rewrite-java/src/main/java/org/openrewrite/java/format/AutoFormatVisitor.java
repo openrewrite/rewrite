@@ -70,9 +70,9 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
         J t = new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
         t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
-        t = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new SpacesVisitor<>(activeStyles, removeCustomLineBreaks, stopAfter).visitNonNull(t, p, cursor.fork());
-        t = new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new WrappingAndBracesVisitor<>(activeStyles, stopAfter, removeCustomLineBreaks).visitNonNull(t, p, cursor.fork());
+        t = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(t, p, cursor.fork());
@@ -104,9 +104,9 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
             JavaSourceFile t = (JavaSourceFile) new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p);
             t = (JavaSourceFile) new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p);
-            t = (JavaSourceFile) new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new SpacesVisitor<>(activeStyles, removeCustomLineBreaks, stopAfter).visitNonNull(t, p);
-            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
+            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(activeStyles, stopAfter, removeCustomLineBreaks).visitNonNull(t, p);
+            t = (JavaSourceFile) new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(t, p);

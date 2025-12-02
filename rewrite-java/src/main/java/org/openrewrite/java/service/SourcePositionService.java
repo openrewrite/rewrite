@@ -150,17 +150,27 @@ public class SourcePositionService {
      * @param cursor the cursor to start searching from
      * @return the cursor pointing to the element with a newline prefix
      */
-    private Cursor computeNewLinedCursorElement(Cursor cursor) {
+    public Cursor computeNewLinedCursorElement(Cursor cursor) {
         Object cursorValue = cursor.getValue();
+        Cursor methodCursor = cursor;
         while (cursorValue instanceof J.MethodInvocation && ((J.MethodInvocation) cursorValue).getSelect() instanceof J.MethodInvocation) {
+            boolean hasNewLine = ((J.MethodInvocation) cursorValue).getPadding().getSelect().getAfter().getWhitespace().contains("\n") || ((J.MethodInvocation) cursorValue).getPadding().getSelect().getAfter().getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
+            if (hasNewLine) {
+                return methodCursor;
+            }
             cursorValue = ((J.MethodInvocation) cursorValue).getSelect();
+            methodCursor = new Cursor(methodCursor, ((J.MethodInvocation) cursorValue).getSelect());
         }
+        cursorValue = cursor.getValue();
         if (cursorValue instanceof J) {
             J j = (J) cursorValue;
             boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
-            Cursor parent = cursor.getParentTreeCursor();
-            boolean isCompilationUnit = parent.getValue() instanceof J.CompilationUnit;
-            if (!hasNewLine && !isCompilationUnit) {
+            Cursor parent = cursor.dropParentUntil(it -> (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded))); // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
+            if (!(parent.getValue() instanceof Tree)) {
+                parent = parent.getParentTreeCursor();
+            }
+            boolean isRootOrCompilationUnit = parent.getValue() instanceof J.CompilationUnit || parent.getValue() == Cursor.ROOT_VALUE;
+            if (!hasNewLine && !isRootOrCompilationUnit) {
                 return computeNewLinedCursorElement(parent);
             }
         }
@@ -181,8 +191,14 @@ public class SourcePositionService {
      * @return a cursor pointing to the element to align with, or null if no alignment is needed
      */
     private @Nullable Cursor alignsWith(Cursor cursor) {
-        J cursorValue = cursor.getValue();
         Cursor parent = cursor;
+        if (!(cursor.getValue() instanceof J)) {
+            parent = cursor.getParentTreeCursor();
+            if (parent.isRoot()) {
+                return null;
+            }
+        }
+        J cursorValue = parent.getValue();
 
         while (parent != null && !(parent.getValue() instanceof SourceFile)) {
             Object parentValue = parent.getValue();

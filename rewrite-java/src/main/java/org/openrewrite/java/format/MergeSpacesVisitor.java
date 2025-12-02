@@ -18,6 +18,7 @@ package org.openrewrite.java.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
@@ -37,6 +38,15 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
     @Override
     public String getLanguage() {
         return "java";
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, Object o) {
+        if (o instanceof J.Block && !(tree instanceof J.Block)) {
+            //Wrapping can introduce blocks
+            return super.visit((J.Block) o, o);
+        }
+        return super.visit(tree, o);
     }
 
     @Override

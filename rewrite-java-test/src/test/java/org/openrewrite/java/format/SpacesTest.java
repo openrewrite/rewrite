@@ -5024,6 +5024,35 @@ class SpacesTest implements RewriteTest {
     }
 
     @Test
+    void handleIfWithoutBlock() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String)
+                        return true;
+                    else if (o instanceof Character)
+                        return true;
+                    else
+                        return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) return true;
+                    else if (o instanceof Character) return true;
+                    else return false;
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
     void elseIfSplitBySpace() {
         rewriteRun(
           spaces(),
@@ -5121,45 +5150,6 @@ class SpacesTest implements RewriteTest {
             }
             """
           )
-        );
-    }
-
-    @Test
-    void tooMuchSpacesInBlock() {
-        rewriteRun(
-          spaces(),
-          java(
-            """
-            public class Test    {
-            
-            
-            
-            
-                    //test
-            
-            
-            
-            
-                //Testing
-            
-            
-            
-            
-            
-            }
-            """,
-            """
-            public class Test {
-            
-
-                    //test
-            
-            
-                //Testing
-
-
-            }
-            """)
         );
     }
 }
