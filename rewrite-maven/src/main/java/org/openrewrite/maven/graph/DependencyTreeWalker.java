@@ -25,7 +25,8 @@ import java.util.*;
 
 /**
  * Walks a dependency tree lazily, finding dependencies that match a given matcher.
- * Uses depth-first traversal with cycle detection to avoid infinite loops.
+ * Uses depth-first pre-order traversal with cycle detection to avoid infinite loops.
+ * Pre-order means parent dependencies are visited before their children.
  * <p>
  * This class encapsulates the common pattern used by dependency insight recipes
  * to traverse dependency trees without creating intermediate objects for
@@ -95,16 +96,17 @@ public class DependencyTreeWalker {
 
         path.addFirst(dependency);
 
-        // Recurse into children first (depth-first)
-        for (ResolvedDependency child : dependency.getDependencies()) {
-            walkRecursive(child, matcher, path, callback);
-        }
-
         // Check if this dependency matches (or matcher is null for visit-all mode)
+        // Pre-order: invoke callback before recursing into children
         if (matcher == null || matcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
             // Pass the deque directly - callback must not retain reference (documented in Callback)
             // Path is in leaf-to-root order: getFirst() = matched, getLast() = direct dependency
             callback.accept(dependency, path);
+        }
+
+        // Then recurse into children (depth-first pre-order)
+        for (ResolvedDependency child : dependency.getDependencies()) {
+            walkRecursive(child, matcher, path, callback);
         }
 
         path.removeFirst();
