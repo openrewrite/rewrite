@@ -227,12 +227,11 @@ public class DependencyInsight extends Recipe {
     }
 
     @EqualsAndHashCode(callSuper = false)
-    @RequiredArgsConstructor
-    @Data
+    @Value
     private static class MarkIndividualDependency extends MavenIsoVisitor<ExecutionContext> {
-        private final @Nullable Boolean onlyDirect;
-        private final Map<Scope, Set<GroupArtifactVersion>> scopeToDirectDependency;
-        private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
+        @Nullable Boolean onlyDirect;
+        Map<Scope, Set<GroupArtifactVersion>> scopeToDirectDependency;
+        Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
 
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {

@@ -43,7 +43,6 @@ import org.openrewrite.semver.VersionComparator;
 import java.util.*;
 import java.util.function.Function;
 
-import static java.util.Collections.newSetFromMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
@@ -248,12 +247,11 @@ public class DependencyInsight extends Recipe {
     }
 
     @EqualsAndHashCode(callSuper = false)
-    @RequiredArgsConstructor
-    @Data
+    @Value
     private static class MarkIndividualDependency extends JavaIsoVisitor<ExecutionContext> {
-        private final Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency;
-        private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
-        private final Set<GroupArtifactVersion> individuallyMarkedDependencies = new HashSet<>();
+        Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency;
+        Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
+        Set<GroupArtifactVersion> individuallyMarkedDependencies = new HashSet<>();
 
         public Tree attachMarkers(Tree before, ExecutionContext ctx) {
             Tree after = super.visitNonNull(before, ctx);
