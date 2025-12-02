@@ -54,7 +54,7 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~(com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava,com.google.guava:guava:29.0-jre,com.google.guava:failureaccess:1.0.1)~~>--><dependency>
+                  <!--~~(com.google.guava:failureaccess:1.0.1,com.google.guava:guava:29.0-jre,com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava)~~>--><dependency>
                       <groupId>com.google.guava</groupId>
                       <artifactId>guava</artifactId>
                       <version>29.0-jre</version>
@@ -182,7 +182,7 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~(org.openrewrite:rewrite-java:8.0.0,org.openrewrite:rewrite-core:8.0.0)~~>--><dependency>
+                  <!--~~(org.openrewrite:rewrite-core:8.0.0,org.openrewrite:rewrite-java:8.0.0)~~>--><dependency>
                       <groupId>org.openrewrite</groupId>
                       <artifactId>rewrite-java</artifactId>
                       <version>8.0.0</version>

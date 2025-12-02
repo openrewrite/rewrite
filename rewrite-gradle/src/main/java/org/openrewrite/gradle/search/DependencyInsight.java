@@ -186,7 +186,7 @@ public class DependencyInsight extends Recipe {
                         if (!resolvedDependency.isDirect()) {
                             continue;
                         }
-                        findMatchingDependencies0(projectName, sourceSetName, c.getName(), dependencyMatcher, resolvedDependency, configurationToDirectDependency, directDependencyToTargetDependency, new ArrayDeque<>(), newSetFromMap(new IdentityHashMap<>()), ctx);
+                        findMatchingDependencies0(projectName, sourceSetName, c.getName(), dependencyMatcher, resolvedDependency, configurationToDirectDependency, directDependencyToTargetDependency, new ArrayDeque<>(), ctx);
                     }
                 }
             }
@@ -200,17 +200,16 @@ public class DependencyInsight extends Recipe {
                     Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency,
                     Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency,
                     Deque<ResolvedDependency> deque,
-                    Set<ResolvedDependency> visited,
                     ExecutionContext ctx
             ) {
-                if (!visited.add(resolvedDependency)) {
+                if (deque.contains(resolvedDependency)) {
                     return;
                 }
 
                 deque.addFirst(resolvedDependency);
 
                 for (ResolvedDependency next : resolvedDependency.getDependencies()) {
-                    findMatchingDependencies0(projectName, sourceSetName, configurationName, dependencyMatcher, next, configurationToDirectDependency, directDependencyToTargetDependency, deque, visited, ctx);
+                    findMatchingDependencies0(projectName, sourceSetName, configurationName, dependencyMatcher, next, configurationToDirectDependency, directDependencyToTargetDependency, deque, ctx);
                 }
 
                 if (dependencyMatcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion())) {

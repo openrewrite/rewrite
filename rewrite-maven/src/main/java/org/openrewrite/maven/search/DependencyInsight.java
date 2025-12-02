@@ -23,7 +23,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.graph.DependencyGraph;
@@ -37,7 +36,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
-import static java.util.Collections.newSetFromMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
@@ -161,12 +159,12 @@ public class DependencyInsight extends Recipe {
 
                 if (requestedScope != null) {
                     for (ResolvedDependency dependency : resolutionResult.getDependencies().get(requestedScope)) {
-                        findMatchingDependencies0(projectName, sourceSetName, requestedScope, dependencyMatcher, dependency, scopeToDirectDependency, directDependencyToTargetDependency, new ArrayDeque<>(), newSetFromMap(new IdentityHashMap<>()), ctx);
+                        findMatchingDependencies0(projectName, sourceSetName, requestedScope, dependencyMatcher, dependency, scopeToDirectDependency, directDependencyToTargetDependency, new ArrayDeque<>(), ctx);
                     }
                 } else {
                     for (Map.Entry<Scope, List<ResolvedDependency>> entry : resolutionResult.getDependencies().entrySet()) {
                         for (ResolvedDependency dependency : entry.getValue()) {
-                            findMatchingDependencies0(projectName, sourceSetName, entry.getKey(), dependencyMatcher, dependency, scopeToDirectDependency, directDependencyToTargetDependency, new ArrayDeque<>(), newSetFromMap(new IdentityHashMap<>()), ctx);
+                            findMatchingDependencies0(projectName, sourceSetName, entry.getKey(), dependencyMatcher, dependency, scopeToDirectDependency, directDependencyToTargetDependency, new ArrayDeque<>(), ctx);
                         }
                     }
                 }
@@ -181,17 +179,16 @@ public class DependencyInsight extends Recipe {
                     Map<Scope, Set<GroupArtifactVersion>> scopeToDirectDependency,
                     Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency,
                     Deque<ResolvedDependency> deque,
-                    Set<ResolvedDependency> visited,
                     ExecutionContext ctx
             ) {
-                if (!visited.add(resolvedDependency)) {
+                if (deque.contains(resolvedDependency)) {
                     return;
                 }
 
                 deque.addFirst(resolvedDependency);
 
                 for (ResolvedDependency next : resolvedDependency.getDependencies()) {
-                    findMatchingDependencies0(projectName, sourceSetName, mavenScope, dependencyMatcher, next, scopeToDirectDependency, directDependencyToTargetDependency, deque, visited, ctx);
+                    findMatchingDependencies0(projectName, sourceSetName, mavenScope, dependencyMatcher, next, scopeToDirectDependency, directDependencyToTargetDependency, deque, ctx);
                 }
 
                 if (dependencyMatcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion())) {
@@ -213,7 +210,7 @@ public class DependencyInsight extends Recipe {
                     List<ResolvedDependency> dependencyPath,
                     ExecutionContext ctx
             ) {
-                String dependencyGraph = DependencyGraph.render(scope.name(), dependencyPath);
+                String dependencyGraph = DependencyGraph.render(scope.name().toLowerCase(), dependencyPath);
                 dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                         projectName,
                         sourceSetName,
@@ -221,7 +218,7 @@ public class DependencyInsight extends Recipe {
                         gav.getArtifactId(),
                         gav.getVersion(),
                         gav.getDatedSnapshotVersion(),
-                        scope.name(),
+                        scope.name().toLowerCase(),
                         dependencyPath.size() - 1,
                         dependencyGraph
                 ));
@@ -245,33 +242,35 @@ public class DependencyInsight extends Recipe {
             }
 
             Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
-            if (scopeToDirectDependency.containsKey(tagScope)) {
-                return new MavenDependency.Matcher().get(getCursor()).map(dependency -> {
-                    ResolvedGroupArtifactVersion gav = dependency.getResolvedDependency().getGav();
-                    Optional<GroupArtifactVersion> scopeGav = scopeToDirectDependency.get(tagScope).stream()
-                            .filter(dep -> dep.asGroupArtifact().equals(gav.asGroupArtifact()))
-                            .findAny();
-                    if (scopeGav.isPresent()) {
-                        Set<GroupArtifactVersion> mark = directDependencyToTargetDependency.get(gav.asGroupArtifactVersion());
-                        if (mark == null) {
-                            return null;
-                        }
-                        String resultText = mark.stream()
-                                .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
-                                .sorted()
-                                .collect(joining(","));
-                        if (!resultText.isEmpty()) {
-                            if (Boolean.TRUE.equals(onlyDirect)) {
-                                if (mark.stream().anyMatch(target -> gav.asGroupArtifactVersion().equals(target))) {
+            for (Map.Entry<Scope, Set<GroupArtifactVersion>> entry : scopeToDirectDependency.entrySet()) {
+                if (tagScope.equals(entry.getKey()) || tagScope.isInClasspathOf(entry.getKey())) {
+                    return new MavenDependency.Matcher().get(getCursor()).map(dependency -> {
+                        ResolvedGroupArtifactVersion gav = dependency.getResolvedDependency().getGav();
+                        Optional<GroupArtifactVersion> scopeGav = entry.getValue().stream()
+                                .filter(dep -> dep.asGroupArtifact().equals(gav.asGroupArtifact()))
+                                .findAny();
+                        if (scopeGav.isPresent()) {
+                            Set<GroupArtifactVersion> mark = directDependencyToTargetDependency.get(gav.asGroupArtifactVersion());
+                            if (mark == null) {
+                                return null;
+                            }
+                            String resultText = mark.stream()
+                                    .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
+                                    .sorted()
+                                    .collect(joining(","));
+                            if (!resultText.isEmpty()) {
+                                if (Boolean.TRUE.equals(onlyDirect)) {
+                                    if (mark.stream().anyMatch(target -> gav.asGroupArtifactVersion().equals(target))) {
+                                        return SearchResult.found(t, resultText);
+                                    }
+                                } else {
                                     return SearchResult.found(t, resultText);
                                 }
-                            } else {
-                                return SearchResult.found(t, resultText);
                             }
                         }
-                    }
-                    return null;
-                }).orElse(t);
+                        return null;
+                    }).orElse(t);
+                }
             }
             return t;
         }
