@@ -60,8 +60,7 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
             String tagValue = tag.getValue().orElse(null);
             // Only update if values are different, considering null values
             if (!Objects.equals(value, tagValue)) {
-                doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
-                maybeUpdateModel();
+                return (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(tag, ctx);
             }
         }
         return super.visitTag(tag, ctx);
