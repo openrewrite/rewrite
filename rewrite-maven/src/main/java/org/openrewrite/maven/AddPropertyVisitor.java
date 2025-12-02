@@ -61,6 +61,7 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
             // Only update if values are different, considering null values
             if (!Objects.equals(value, tagValue)) {
                 doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
+                maybeUpdateModel();
             }
         }
         return super.visitTag(tag, ctx);
