@@ -15,17 +15,11 @@
  */
 package org.openrewrite.marker;
 
-import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 
-import java.util.UUID;
-
 @Value
-@EqualsAndHashCode(callSuper = false)
 @With
-public class GitObject implements Marker {
-    UUID id;
-
-    String objectId;
+public class FileMode {
+    int mode;
 }
