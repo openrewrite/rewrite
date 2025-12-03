@@ -22,6 +22,12 @@ export const MarkersKind = {
     SearchResult: "org.openrewrite.marker.SearchResult",
     ParseExceptionResult: "org.openrewrite.ParseExceptionResult",
 
+    // Markup markers for errors, warnings, info, and debug messages
+    MarkupError: "org.openrewrite.marker.Markup$Error",
+    MarkupWarn: "org.openrewrite.marker.Markup$Warn",
+    MarkupInfo: "org.openrewrite.marker.Markup$Info",
+    MarkupDebug: "org.openrewrite.marker.Markup$Debug",
+
     /**
      * A generic marker that is sent/received as a bare map because the type hasn't been
      * defined in both Java and JavaScript.
@@ -154,4 +160,90 @@ export interface ParseExceptionResult extends Marker {
     readonly exceptionType: string
     readonly message: string
     readonly treeType?: string;
+}
+
+/**
+ * Base interface for Markup markers that attach messages to AST nodes.
+ * Used for errors, warnings, info, and debug messages.
+ */
+export interface Markup extends Marker {
+    readonly message: string;
+    readonly detail?: string;
+}
+
+export interface MarkupError extends Markup {
+    readonly kind: typeof MarkersKind.MarkupError;
+}
+
+export interface MarkupWarn extends Markup {
+    readonly kind: typeof MarkersKind.MarkupWarn;
+}
+
+export interface MarkupInfo extends Markup {
+    readonly kind: typeof MarkersKind.MarkupInfo;
+}
+
+export interface MarkupDebug extends Markup {
+    readonly kind: typeof MarkersKind.MarkupDebug;
+}
+
+/**
+ * Attaches an error marker to a tree node.
+ */
+export function markupError<T extends { markers: Markers }>(t: T, message: string, detail?: string): T {
+    return addMarkup(t, {
+        kind: MarkersKind.MarkupError,
+        id: randomId(),
+        message,
+        detail
+    });
+}
+
+/**
+ * Attaches a warning marker to a tree node.
+ */
+export function markupWarn<T extends { markers: Markers }>(t: T, message: string, detail?: string): T {
+    return addMarkup(t, {
+        kind: MarkersKind.MarkupWarn,
+        id: randomId(),
+        message,
+        detail
+    });
+}
+
+/**
+ * Attaches an info marker to a tree node.
+ */
+export function markupInfo<T extends { markers: Markers }>(t: T, message: string, detail?: string): T {
+    return addMarkup(t, {
+        kind: MarkersKind.MarkupInfo,
+        id: randomId(),
+        message,
+        detail
+    });
+}
+
+/**
+ * Attaches a debug marker to a tree node.
+ */
+export function markupDebug<T extends { markers: Markers }>(t: T, message: string, detail?: string): T {
+    return addMarkup(t, {
+        kind: MarkersKind.MarkupDebug,
+        id: randomId(),
+        message,
+        detail
+    });
+}
+
+/**
+ * Helper to add a markup marker to a tree node.
+ */
+function addMarkup<T extends { markers: Markers }>(t: T, markup: Markup): T {
+    return {
+        ...t,
+        markers: {
+            ...t.markers,
+            markers: [...t.markers.markers, markup]
+        }
+    } as T;
 }

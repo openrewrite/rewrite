@@ -35,7 +35,6 @@ export namespace MarkerPrinter {
                 let searchResult = marker as SearchResult;
                 return commentWrapper(searchResult.description == null ? "" : "(" + searchResult.description + ")");
             } else if (marker.kind.startsWith("org.openrewrite.marker.Markup$")) {
-                // TODO add markup marker types
                 return commentWrapper("(" + (marker as any).message + ")");
             }
             return "";

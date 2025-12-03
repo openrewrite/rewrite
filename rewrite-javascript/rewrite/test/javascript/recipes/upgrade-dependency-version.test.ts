@@ -24,14 +24,15 @@ import {
 import {Json} from "../../../src/json";
 import {RecipeSpec} from "../../../src/test";
 import {withDir} from "tmp-promise";
+import {findMarker, MarkersKind} from "../../../src/markers";
 
 describe("UpgradeDependencyVersion", () => {
 
     test("upgrades dependency version in package.json", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new UpgradeDependencyVersion({
-            packageName: "is-number",
-            newVersion: "^8.0.0"
+            packageName: "uuid",
+            newVersion: "^10.0.0"
         });
 
         await withDir(async (repo) => {
@@ -44,7 +45,7 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "dependencies": {
-                                "is-number": "^7.0.0"
+                                "uuid": "^9.0.0"
                             }
                         }
                     `, `
@@ -52,7 +53,7 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "dependencies": {
-                                "is-number": "^8.0.0"
+                                "uuid": "^10.0.0"
                             }
                         }
                     `)
@@ -116,8 +117,8 @@ describe("UpgradeDependencyVersion", () => {
     test("upgrades devDependency version", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new UpgradeDependencyVersion({
-            packageName: "is-number",
-            newVersion: "^8.0.0"
+            packageName: "uuid",
+            newVersion: "^10.0.0"
         });
 
         await withDir(async (repo) => {
@@ -130,7 +131,7 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "devDependencies": {
-                                "is-number": "^7.0.0"
+                                "uuid": "^9.0.0"
                             }
                         }
                     `, `
@@ -138,7 +139,7 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "devDependencies": {
-                                "is-number": "^8.0.0"
+                                "uuid": "^10.0.0"
                             }
                         }
                     `)
@@ -184,8 +185,8 @@ describe("UpgradeDependencyVersion", () => {
     test("updates NodeResolutionResult marker after upgrade", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new UpgradeDependencyVersion({
-            packageName: "is-number",
-            newVersion: "^8.0.0"
+            packageName: "uuid",
+            newVersion: "^10.0.0"
         });
 
         await withDir(async (repo) => {
@@ -199,7 +200,7 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "dependencies": {
-                                "is-number": "^7.0.0"
+                                "uuid": "^9.0.0"
                             }
                         }
                     `, `
@@ -207,15 +208,15 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "dependencies": {
-                                "is-number": "^8.0.0"
+                                "uuid": "^10.0.0"
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
                             const marker = findNodeResolutionResult(doc);
                             expect(marker).toBeDefined();
                             expect(marker!.dependencies).toHaveLength(1);
-                            expect(marker!.dependencies[0].name).toBe("is-number");
-                            expect(marker!.dependencies[0].versionConstraint).toBe("^8.0.0");
+                            expect(marker!.dependencies[0].name).toBe("uuid");
+                            expect(marker!.dependencies[0].versionConstraint).toBe("^10.0.0");
                         }
                     }
                 )
@@ -286,6 +287,48 @@ describe("UpgradeDependencyVersion", () => {
                             }
                         }
                     `)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
+    test("adds warning marker when version does not exist", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new UpgradeDependencyVersion({
+            packageName: "uuid",
+            newVersion: "^999.0.0" // Non-existent version
+        });
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    {
+                        // Version doesn't change, but warning marker is added
+                        ...packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "uuid": "^9.0.0"
+                            }
+                        }
+                    `, `
+                        /*~~(Failed to upgrade uuid to ^999.0.0)~~*/{
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "uuid": "^9.0.0"
+                            }
+                        }
+                    `), afterRecipe: async (doc: Json.Document) => {
+                            // Should have a warning marker
+                            const warnMarker = findMarker(doc, MarkersKind.MarkupWarn);
+                            expect(warnMarker).toBeDefined();
+                            expect((warnMarker as any).message).toContain("Failed to upgrade uuid");
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});

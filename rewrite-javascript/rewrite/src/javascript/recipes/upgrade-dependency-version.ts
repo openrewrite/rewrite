@@ -30,7 +30,7 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
-import {replaceMarkerByKind} from "../../markers";
+import {markupWarn, replaceMarkerByKind} from "../../markers";
 import {TreePrinters} from "../../print";
 import {
     getAllLockFileNames,
@@ -78,6 +78,9 @@ interface Accumulator {
 
     /** Track which projects have been processed (npm install has run) */
     processedProjects: Set<string>;
+
+    /** Track projects where npm install failed: packageJsonPath -> error message */
+    failedProjects: Map<string, string>;
 }
 
 /**
@@ -113,7 +116,8 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             projectsToUpdate: new Map(),
             updatedLockFiles: new Map(),
             updatedPackageJsons: new Map(),
-            processedProjects: new Set()
+            processedProjects: new Set(),
+            failedProjects: new Map()
         };
     }
 
@@ -187,10 +191,20 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                         return doc; // This package.json doesn't need updating
                     }
 
-                    // Run npm install if we haven't processed this project yet
+                    // Run package manager install if we haven't processed this project yet
                     if (!acc.processedProjects.has(sourcePath)) {
                         await recipe.runPackageManagerInstall(acc, updateInfo, ctx);
                         acc.processedProjects.add(sourcePath);
+                    }
+
+                    // Check if the install failed - if so, don't update, just add warning
+                    const failureMessage = acc.failedProjects.get(sourcePath);
+                    if (failureMessage) {
+                        return markupWarn(
+                            doc,
+                            `Failed to upgrade ${recipe.packageName} to ${recipe.newVersion}`,
+                            failureMessage
+                        );
                     }
 
                     // Modify the dependency version in the JSON tree
@@ -305,10 +319,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                 }
             }
 
-            // Store the modified package.json content (do this before install in case it fails)
-            acc.updatedPackageJsons.set(updateInfo.packageJsonPath, modifiedPackageJson);
-
-            // Run package manager install
+            // Run package manager install to validate the version exists
             const result = runInstall(pm, {
                 cwd: tempDir,
                 lockOnly: true,
@@ -316,6 +327,9 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             });
 
             if (result.success) {
+                // Version is valid - store the modified package.json
+                acc.updatedPackageJsons.set(updateInfo.packageJsonPath, modifiedPackageJson);
+
                 // Read back the updated lock file
                 const updatedLockPath = path.join(tempDir, lockFileName);
                 if (fs.existsSync(updatedLockPath)) {
@@ -324,8 +338,9 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                     acc.updatedLockFiles.set(lockFilePath, updatedLockContent);
                 }
             } else {
-                console.warn(`Package manager install failed: ${result.error || result.stderr}`);
-                // Continue without lock file update - package.json is already stored
+                // Track the failure - don't update package.json, the version likely doesn't exist
+                const errorMessage = result.error || result.stderr || 'Unknown error';
+                acc.failedProjects.set(updateInfo.packageJsonPath, errorMessage);
             }
 
         } finally {
