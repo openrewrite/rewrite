@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.graph;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -31,8 +32,27 @@ import java.util.*;
  * This class encapsulates the common pattern used by dependency insight recipes
  * to traverse dependency trees without creating intermediate objects for
  * non-matching dependencies, reducing GC pressure on large dependency graphs.
+ * <p>
+ * The walker uses caching to avoid re-traversing the same dependency subtrees when
+ * the same groupId:artifactId appears multiple times in the dependency graph.
+ * This is safe because Maven's conflict resolution ensures only one version of
+ * any groupId:artifactId exists in the resolved dependency tree.
  */
 public class DependencyTreeWalker {
+
+    /**
+     * Represents a match result found during traversal, including the matched dependency
+     * and its relative path from the cache point.
+     */
+    @Value
+    static class MatchResult {
+        ResolvedDependency dependency;
+        /**
+         * Path from the cached dependency to this match, in leaf-to-root order.
+         * Does not include the cached dependency itself.
+         */
+        List<ResolvedDependency> relativePath;
+    }
 
     /**
      * Callback interface for handling dependencies during tree traversal.
@@ -59,6 +79,7 @@ public class DependencyTreeWalker {
     /**
      * Walks the dependency tree starting from the given roots, calling the callback
      * for each dependency that matches the matcher (or all dependencies if matcher is null).
+     * Uses caching to avoid re-traversing duplicate dependencies.
      *
      * @param roots    the direct dependencies to start traversal from
      * @param matcher  the matcher to test dependencies against, or null to visit all
@@ -66,13 +87,15 @@ public class DependencyTreeWalker {
      */
     public static void walk(List<ResolvedDependency> roots, @Nullable DependencyMatcher matcher, Callback callback) {
         Deque<ResolvedDependency> path = new ArrayDeque<>();
+        Map<GroupArtifactVersion, List<MatchResult>> cache = new HashMap<>();
         for (ResolvedDependency root : roots) {
-            walkRecursive(root, matcher, path, callback);
+            walkRecursive(root, matcher, path, cache, callback);
         }
     }
 
     /**
      * Walks a single dependency tree, calling the callback for each match.
+     * Uses caching to avoid re-traversing duplicate dependencies.
      *
      * @param root     the direct dependency to start traversal from
      * @param matcher  the matcher to test dependencies against, or null to visit all
@@ -80,13 +103,15 @@ public class DependencyTreeWalker {
      */
     public static void walk(ResolvedDependency root, @Nullable DependencyMatcher matcher, Callback callback) {
         Deque<ResolvedDependency> path = new ArrayDeque<>();
-        walkRecursive(root, matcher, path, callback);
+        Map<GroupArtifactVersion, List<MatchResult>> cache = new HashMap<>();
+        walkRecursive(root, matcher, path, cache, callback);
     }
 
     private static void walkRecursive(
             ResolvedDependency dependency,
             @Nullable DependencyMatcher matcher,
             Deque<ResolvedDependency> path,
+            Map<GroupArtifactVersion, List<MatchResult>> cache,
             Callback callback
     ) {
         // Cycle detection - check if we've already visited this dependency in the current path
@@ -94,22 +119,109 @@ public class DependencyTreeWalker {
             return;
         }
 
-        path.addFirst(dependency);
+        GroupArtifactVersion gav = dependency.getGav().asGroupArtifactVersion();
 
-        // Check if this dependency matches (or matcher is null for visit-all mode)
-        // Pre-order: invoke callback before recursing into children
-        if (matcher == null || matcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
-            // Pass the deque directly - callback must not retain reference (documented in Callback)
-            // Path is in leaf-to-root order: getFirst() = matched, getLast() = direct dependency
-            callback.accept(dependency, path);
+        // Check if we've already traversed this dependency's subtree
+        List<MatchResult> cachedResults = cache.get(gav);
+        if (cachedResults != null) {
+            // Reuse cached results - replay all matches with updated paths
+            path.addFirst(dependency);
+            for (MatchResult result : cachedResults) {
+                // Reconstruct the full path by combining current path with cached relative path
+                Deque<ResolvedDependency> fullPath = new ArrayDeque<>(result.relativePath);
+                fullPath.addAll(path);
+                callback.accept(result.dependency, fullPath);
+            }
+            path.removeFirst();
+            return;
         }
 
-        // Then recurse into children (depth-first pre-order)
+        // First time seeing this dependency - traverse and cache results
+        List<MatchResult> matches = new ArrayList<>();
+        path.addFirst(dependency);
+
+        if (matcher == null || matcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
+            callback.accept(dependency, path);
+            matches.add(new MatchResult(dependency, Collections.emptyList()));
+        }
+
         for (ResolvedDependency child : dependency.getDependencies()) {
-            walkRecursive(child, matcher, path, callback);
+            walkRecursiveWithCapture(child, matcher, path, cache, callback, matches);
+        }
+        path.removeFirst();
+        cache.put(gav, matches);
+    }
+
+    /**
+     * Helper method that walks recursively while capturing match results for caching.
+     */
+    private static void walkRecursiveWithCapture(
+            ResolvedDependency dependency,
+            @Nullable DependencyMatcher matcher,
+            Deque<ResolvedDependency> path,
+            Map<GroupArtifactVersion, List<MatchResult>> cache,
+            Callback callback,
+            List<MatchResult> parentMatches
+    ) {
+        // Cycle detection - check if we've already visited this dependency in the current path
+        if (containsDependency(path, dependency)) {
+            return;
+        }
+
+        GroupArtifactVersion gav = dependency.getGav().asGroupArtifactVersion();
+
+        // Check if we've already traversed this dependency's subtree
+        List<MatchResult> cachedResults = cache.get(gav);
+        if (cachedResults != null) {
+            // Reuse cached results - replay all matches with updated paths
+            path.addFirst(dependency);
+            for (MatchResult result : cachedResults) {
+                // Reconstruct the full path by combining current path with cached relative path
+                Deque<ResolvedDependency> fullPath = new ArrayDeque<>(result.relativePath);
+                fullPath.addAll(path);
+                callback.accept(result.dependency, fullPath);
+
+                // Add to parent's matches with updated relative path
+                List<ResolvedDependency> parentRelativePath = new ArrayList<>(result.relativePath);
+                parentRelativePath.add(dependency);
+                parentMatches.add(new MatchResult(result.dependency, parentRelativePath));
+            }
+            path.removeFirst();
+            return;
+        }
+
+        // First time seeing this dependency - traverse and cache results
+        List<MatchResult> matches = new ArrayList<>();
+        path.addFirst(dependency);
+
+        // Check if this dependency itself matches
+        if (matcher == null || matcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
+            callback.accept(dependency, path);
+            // Cache this match with an empty relative path
+            matches.add(new MatchResult(dependency, Collections.emptyList()));
+            // Add to parent's matches with the dependency in the relative path
+            parentMatches.add(new MatchResult(dependency, Collections.singletonList(dependency)));
+        }
+
+        // Recurse into children
+        for (ResolvedDependency child : dependency.getDependencies()) {
+            walkRecursiveWithCapture(child, matcher, path, cache, callback, matches);
         }
 
         path.removeFirst();
+
+        // Update parent matches with proper relative paths
+        for (MatchResult match : matches) {
+            if (!match.dependency.equals(dependency)) {
+                // This is a transitive match - add current dependency to the path
+                List<ResolvedDependency> parentRelativePath = new ArrayList<>(match.relativePath);
+                parentRelativePath.add(dependency);
+                parentMatches.add(new MatchResult(match.dependency, parentRelativePath));
+            }
+        }
+
+        // Store results in cache
+        cache.put(gav, matches);
     }
 
     private static boolean containsDependency(Deque<ResolvedDependency> path, ResolvedDependency dependency) {
