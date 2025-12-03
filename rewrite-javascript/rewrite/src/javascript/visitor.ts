@@ -292,12 +292,15 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         functionCall = statement as JS.FunctionCall;
 
-        return this.produceJava(functionCall, p, async draft => {
-            draft.function = await this.visitOptionalRightPadded(functionCall.function, p);
-            draft.typeParameters = await this.visitOptionalContainer(functionCall.typeParameters, p);
-            draft.arguments = await this.visitContainer(functionCall.arguments, p);
-            draft.methodType = await this.visitType(functionCall.methodType, p) as Type.Method | undefined;
-        });
+        const updates: any = {
+            prefix: await this.visitSpace(functionCall.prefix, p),
+            markers: await this.visitMarkers(functionCall.markers, p),
+            function: await this.visitOptionalRightPadded(functionCall.function, p),
+            typeParameters: await this.visitOptionalContainer(functionCall.typeParameters, p),
+            arguments: await this.visitContainer(functionCall.arguments, p),
+            methodType: await this.visitType(functionCall.methodType, p) as Type.Method | undefined
+        };
+        return updateIfChanged(functionCall, updates);
     }
 
     protected async visitFunctionType(functionType: JS.FunctionType, p: P): Promise<J | undefined> {
