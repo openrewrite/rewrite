@@ -54,27 +54,7 @@ class SearchResultsTest implements RewriteTest {
     @Test
     void searchMarkersAreDetectedDuringRecipeRun() {
         rewriteRun(
-          spec -> spec
-            .recipeFromYaml(
-              //language=yml
-              """
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.SearchMarkerScraping
-                displayName: Find text and add the results to the global datatable
-                description: Hello world.
-                recipeList:
-                  - org.openrewrite.text.Find:
-                      find: hi
-                      caseSensitive: true
-                  - org.openrewrite.text.Find:
-                      find: SOME OTHER TEXT
-                  - org.openrewrite.text.Find:
-                      find: ([A-Z])\\w+
-                      regex: true
-                      caseSensitive: true
-                """,
-              "test.SearchMarkerScraping"
-            ).dataTable(SearchResults.Row.class, rows -> {
+          spec -> spec.dataTable(SearchResults.Row.class, rows -> {
                 assertThat(rows).extracting(
                     SearchResults.Row::getSourcePath,
                     SearchResults.Row::getResult,
@@ -188,24 +168,7 @@ class SearchResultsTest implements RewriteTest {
     @Test
     void multipleMarkersAddedByDifferentRecipesReported() {
         rewriteRun(
-          spec -> spec
-            .recipeFromYaml(
-              //language=yml
-              """
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.SearchMarkerScraping
-                displayName: Find text and add the results to the global datatable
-                description: Hello world.
-                recipeList:
-                  - org.openrewrite.text.Find:
-                      find: SOME OTHER TEXT
-                  - org.openrewrite.text.Find:
-                      find: ([A-Z])\\w+
-                      regex: true
-                      caseSensitive: true
-                """,
-              "test.SearchMarkerScraping"
-            ).dataTable(SearchResults.Row.class, rows -> {
+          spec -> spec.dataTable(SearchResults.Row.class, rows -> {
                 assertThat(rows).extracting(
                     SearchResults.Row::getSourcePath,
                     SearchResults.Row::getResult,
