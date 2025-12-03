@@ -65,6 +65,31 @@ export function findMarker<T extends Marker>(
     );
 }
 
+/**
+ * Replaces a marker in a Markers collection with a new marker.
+ * If the old marker is not found, the new marker is added.
+ *
+ * @param markers The markers collection to update
+ * @param oldMarker The marker to replace (matched by id)
+ * @param newMarker The new marker to insert
+ * @returns A new Markers object with the replacement applied
+ */
+export function replaceMarker(markers: Markers, oldMarker: Marker, newMarker: Marker): Markers {
+    const newMarkers = markers.markers.map(m =>
+        m.id === oldMarker.id ? newMarker : m
+    );
+
+    // If old marker wasn't found, add the new one
+    if (!markers.markers.some(m => m.id === oldMarker.id)) {
+        newMarkers.push(newMarker);
+    }
+
+    return {
+        ...markers,
+        markers: newMarkers
+    };
+}
+
 export const emptyMarkers: Markers = asRef({
     kind: MarkersKind.Markers,
     id: randomId(),
