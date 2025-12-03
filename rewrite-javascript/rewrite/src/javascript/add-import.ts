@@ -348,7 +348,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Add ES6 import (handles ES6Named, ES6Namespace, ES6Default)
-        return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
+        return this.produceJavaScript(compilationUnit, p, async draft => {
             // Find the position to insert the import
             const insertionIndex = this.findImportInsertionIndex(compilationUnit);
 
@@ -446,7 +446,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 }
 
                 // We found a matching import with named bindings - merge into it
-                return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
+                return this.produceJavaScript(compilationUnit, p, async draft => {
                     const namedImports = importClause.namedBindings as JS.NamedImports;
                     const existingElements = namedImports.elements.elements;
 
@@ -462,7 +462,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     if (insertIndex === -1) insertIndex = existingElements.length;
 
                     // Build the new elements array with proper spacing
-                    const updatedNamedImports: JS.NamedImports = await this.produceJavaScript<JS.NamedImports>(
+                    const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
                         namedImports, p, async namedDraft => {
                             const lastIndex = existingElements.length - 1;
                             const trailingSpace = existingElements[lastIndex].after;
@@ -498,9 +498,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     );
 
                     // Update the import with the new named imports
-                    const updatedImport: JS.Import = await this.produceJavaScript<JS.Import>(
+                    const updatedImport: JS.Import = await this.produceJavaScript(
                         jsImport, p, async importDraft => {
-                            importDraft.importClause = await this.produceJavaScript<JS.ImportClause>(
+                            importDraft.importClause = await this.produceJavaScript(
                                 importClause, p, async clauseDraft => {
                                     clauseDraft.namedBindings = updatedNamedImports;
                                 }
@@ -687,6 +687,64 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     }
 
     /**
+     * Extract the module name from a class type by traversing the owningClass chain
+     * or extracting it from the FQN.
+     */
+    private getModuleFromClassType(classType: Type.Class): string | undefined {
+        // Traverse owningClass chain to find the root
+        let current: Type.Class = classType;
+        while (current.owningClass && Type.isClass(current.owningClass)) {
+            current = current.owningClass as Type.Class;
+        }
+        // If there's still an owningClass (non-Class type), use it
+        if (current.owningClass) {
+            return Type.FullyQualified.getFullyQualifiedName(current.owningClass);
+        }
+        // For top-level classes, extract module from FQN (e.g., "zod.ZodError" -> "zod")
+        const fqn = current.fullyQualifiedName;
+        const dotIndex = fqn.lastIndexOf('.');
+        if (dotIndex > 0) {
+            return fqn.substring(0, dotIndex);
+        }
+        // The FQN itself might be the module (e.g., "zod" for z from zod)
+        return fqn;
+    }
+
+    /**
+     * Extract the module name from a type (method, class, or variable).
+     */
+    private getModuleFromType(type: Type | undefined, fieldType: Type | undefined): string | undefined {
+        if (type && Type.isMethod(type)) {
+            return Type.FullyQualified.getFullyQualifiedName((type as Type.Method).declaringType);
+        }
+        if (type && Type.isClass(type)) {
+            return this.getModuleFromClassType(type as Type.Class);
+        }
+        if (fieldType?.kind === Type.Kind.Variable) {
+            const variableType = fieldType as Type.Variable;
+            if (variableType.owner) {
+                return Type.FullyQualified.getFullyQualifiedName(variableType.owner);
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Check if a class type matches the expected module.
+     * Handles direct FQN match, owningClass chain match, and FQN prefix match.
+     */
+    private classTypeMatchesModule(classType: Type.Class, expectedModule: string): boolean {
+        const fqn = classType.fullyQualifiedName;
+        // Direct match: class FQN equals the expected module (e.g., z from zod where z's type FQN is "zod")
+        if (fqn === expectedModule) {
+            return true;
+        }
+        // Check via owningClass chain or FQN prefix
+        const moduleFromType = this.getModuleFromClassType(classType);
+        return moduleFromType === expectedModule;
+    }
+
+    /**
      * Check if the identifier is actually referenced in the file
      */
     private async checkIdentifierReferenced(compilationUnit: JS.CompilationUnit): Promise<boolean> {
@@ -736,21 +794,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 }
                             }
 
-                            // Try to extract declaring type from either type or fieldType
-                            if (identifier?.type && Type.isMethod(identifier.type)) {
-                                const methodType = identifier.type as Type.Method;
-                                expectedDeclaringType = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
-                                if (expectedDeclaringType) {
-                                    break;  // Found it!
-                                }
-                            } else if (identifier?.fieldType?.kind === Type.Kind.Variable) {
-                                const variableType = identifier.fieldType as Type.Variable;
-                                if (variableType.owner) {
-                                    expectedDeclaringType = Type.FullyQualified.getFullyQualifiedName(variableType.owner);
-                                    if (expectedDeclaringType) {
-                                        break;  // Found it!
-                                    }
-                                }
+                            expectedDeclaringType = this.getModuleFromType(identifier?.type, identifier?.fieldType);
+                            if (expectedDeclaringType) {
+                                break;  // Found it!
                             }
                         }
                     }
@@ -766,6 +812,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const targetName = this.alias || this.member;
         const targetModule = this.module;
         let found = false;
+        const self = this;
 
         // If no existing imports from this module, look for unresolved references
         // If there ARE existing imports, look for references with the expected declaring type
@@ -777,27 +824,26 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     const fieldType = identifier.fieldType;
                     if (expectedDeclaringType) {
                         // We have an expected declaring type - check for exact match
-                        // Check method type (for functions)
                         if (type && Type.isMethod(type)) {
-                            const methodType = type as Type.Method;
-                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName((type as Type.Method).declaringType);
                             if (declaringTypeName === expectedDeclaringType) {
                                 found = true;
                             }
                         }
-                        // Also check field type (for objects, variables, etc.)
-                        else if (fieldType?.kind === Type.Kind.Variable) {
-                            const variableType = fieldType as Type.Variable;
-                            // For variables, the owner is the declaring module/namespace
-                            if (variableType.owner) {
-                                const ownerTypeName = Type.FullyQualified.getFullyQualifiedName(variableType.owner);
-                                if (ownerTypeName === expectedDeclaringType) {
-                                    found = true;
-                                }
+                        else if (type && Type.isClass(type)) {
+                            if (self.classTypeMatchesModule(type as Type.Class, expectedDeclaringType)) {
+                                found = true;
                             }
                         }
-                        // Even with expectedDeclaringType, also check for unresolved references
-                        // This handles the case where the member isn't imported yet
+                        else if (fieldType?.kind === Type.Kind.Variable) {
+                            const ownerTypeName = (fieldType as Type.Variable).owner
+                                ? Type.FullyQualified.getFullyQualifiedName((fieldType as Type.Variable).owner!)
+                                : undefined;
+                            if (ownerTypeName === expectedDeclaringType) {
+                                found = true;
+                            }
+                        }
+                        // Also check for unresolved references (member isn't imported yet)
                         else if (!type && !fieldType) {
                             found = true;
                         }
