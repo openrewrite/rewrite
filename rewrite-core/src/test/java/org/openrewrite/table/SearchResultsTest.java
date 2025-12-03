@@ -54,18 +54,16 @@ class SearchResultsTest implements RewriteTest {
     @Test
     void searchMarkersAreDetectedDuringRecipeRun() {
         rewriteRun(
-          spec -> spec.dataTable(SearchResults.Row.class, rows -> {
-                assertThat(rows).extracting(
-                    SearchResults.Row::getSourcePath,
-                    SearchResults.Row::getResult,
-                    SearchResults.Row::getParentRecipe,
-                    SearchResults.Row::getRecipe)
-                  .containsExactlyInAnyOrder(
-                    tuple("matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`"),
-                    tuple("nested/matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`"),
-                    tuple("matched-inside", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`")
-                  );
-            }),
+          spec -> spec.dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
+              SearchResults.Row::getSourcePath,
+              SearchResults.Row::getResult,
+              SearchResults.Row::getParentRecipe,
+              SearchResults.Row::getRecipe)
+            .containsExactlyInAnyOrder(
+              tuple("matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`"),
+              tuple("nested/matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`"),
+              tuple("matched-inside", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`")
+            )),
           text(
             "hi",
             "~~>hi",
@@ -99,19 +97,17 @@ class SearchResultsTest implements RewriteTest {
     @Test
     void multipleMarkersAddedByRecipeReported() {
         rewriteRun(
-          spec -> spec.dataTable(SearchResults.Row.class, rows -> {
-              assertThat(rows).extracting(
-                  SearchResults.Row::getSourcePath,
-                  SearchResults.Row::getResult,
-                  SearchResults.Row::getParentRecipe,
-                  SearchResults.Row::getRecipe)
-                .containsExactlyInAnyOrder(
-                  tuple("match-capitalized-words", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                  tuple("match-capitalized-words", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                  tuple("match-capitalized-words", "File", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                  tuple("match-capitalized-words", "End", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`")
-                );
-          }),
+          spec -> spec.dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
+              SearchResults.Row::getSourcePath,
+              SearchResults.Row::getResult,
+              SearchResults.Row::getParentRecipe,
+              SearchResults.Row::getRecipe)
+            .containsExactlyInAnyOrder(
+              tuple("match-capitalized-words", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
+              tuple("match-capitalized-words", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
+              tuple("match-capitalized-words", "File", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
+              tuple("match-capitalized-words", "End", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`")
+            )),
           text(
             """
               We add all SearchMarkers that are found during recipe run.
@@ -147,16 +143,14 @@ class SearchResultsTest implements RewriteTest {
                       caseSensitive: true
                 """,
               "test.SearchMarkerScraping"
-            ).dataTable(SearchResults.Row.class, rows -> {
-                assertThat(rows).extracting(
-                    SearchResults.Row::getSourcePath,
-                    SearchResults.Row::getResult,
-                    SearchResults.Row::getParentRecipe,
-                    SearchResults.Row::getRecipe)
-                  .containsExactlyInAnyOrder(
-                    tuple("matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`")
-                  );
-            }),
+            ).dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
+                SearchResults.Row::getSourcePath,
+                SearchResults.Row::getResult,
+                SearchResults.Row::getParentRecipe,
+                SearchResults.Row::getRecipe)
+              .containsExactlyInAnyOrder(
+                tuple("matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`")
+              )),
           text(
             doesNotExist(),
             "t~~>his file matches",
@@ -168,18 +162,16 @@ class SearchResultsTest implements RewriteTest {
     @Test
     void multipleMarkersAddedByDifferentRecipesReported() {
         rewriteRun(
-          spec -> spec.dataTable(SearchResults.Row.class, rows -> {
-                assertThat(rows).extracting(
-                    SearchResults.Row::getSourcePath,
-                    SearchResults.Row::getResult,
-                    SearchResults.Row::getParentRecipe,
-                    SearchResults.Row::getRecipe)
-                  .containsExactlyInAnyOrder(
-                    tuple("different-recipes-matching", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                    tuple("different-recipes-matching", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                    tuple("different-recipes-matching", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`")
-                  );
-            }),
+          spec -> spec.dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
+              SearchResults.Row::getSourcePath,
+              SearchResults.Row::getResult,
+              SearchResults.Row::getParentRecipe,
+              SearchResults.Row::getRecipe)
+            .containsExactlyInAnyOrder(
+              tuple("different-recipes-matching", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
+              tuple("different-recipes-matching", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
+              tuple("different-recipes-matching", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`")
+            )),
           text(
             """
               We add all SearchMarkers that are found during recipe run.
@@ -227,22 +219,20 @@ class SearchResultsTest implements RewriteTest {
                       find: SOME OTHER TEXT
                 """,
               "test.SearchMarkerScraping"
-            ).dataTable(SearchResults.Row.class, rows -> {
-                assertThat(rows).extracting(
-                    SearchResults.Row::getSourcePath,
-                    SearchResults.Row::getResult,
-                    SearchResults.Row::getParentRecipe,
-                    SearchResults.Row::getRecipe)
-                  .containsExactlyInAnyOrder(
-                    tuple("different-recipes-matching", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                    tuple("different-recipes-matching", "We", "", "Find text and add the results to the global datatable"),
-                    tuple("different-recipes-matching", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                    //TODO: Question for Jonathan: Should we not report both instance name and recipe name? Searching for the recipe id from the String is not always "easy"
-                    tuple("different-recipes-matching", "SearchMarkers", "", "Find text and add the results to the global datatable"),
-                    tuple("different-recipes-matching", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`"),
-                    tuple("different-recipes-matching", "some other text", "", "Find text and add the results to the global datatable")
-                  );
-            }),
+            ).dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
+                SearchResults.Row::getSourcePath,
+                SearchResults.Row::getResult,
+                SearchResults.Row::getParentRecipe,
+                SearchResults.Row::getRecipe)
+              .containsExactlyInAnyOrder(
+                tuple("different-recipes-matching", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
+                tuple("different-recipes-matching", "We", "", "Find text and add the results to the global datatable"),
+                tuple("different-recipes-matching", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
+                //TODO: Question for Jonathan: Should we not report both instance name and recipe name? Searching for the recipe id from the String is not always "easy"
+                tuple("different-recipes-matching", "SearchMarkers", "", "Find text and add the results to the global datatable"),
+                tuple("different-recipes-matching", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`"),
+                tuple("different-recipes-matching", "some other text", "", "Find text and add the results to the global datatable")
+              )),
           text(
             """
               We add all SearchMarkers that are found during recipe run.
