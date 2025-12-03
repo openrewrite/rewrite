@@ -55,13 +55,13 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async produceJavaScript<J2 extends JS>(
-        before: JS | undefined,
+        before: J2,
         p: P,
         recipe?: (draft: Draft<J2>) =>
             ValidImmerRecipeReturnType<Draft<J2>> |
             PromiseLike<ValidImmerRecipeReturnType<Draft<J2>>>
     ): Promise<J2> {
-        const draft: Draft<J2> = createDraft(before as J2);
+        const draft: Draft<J2> = createDraft(before!);
         (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, p);
         (draft as Draft<J>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
@@ -292,12 +292,15 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         functionCall = statement as JS.FunctionCall;
 
-        return this.produceJava<JS.FunctionCall>(functionCall, p, async draft => {
-            draft.function = await this.visitOptionalRightPadded(functionCall.function, p);
-            draft.typeParameters = await this.visitOptionalContainer(functionCall.typeParameters, p);
-            draft.arguments = await this.visitContainer(functionCall.arguments, p);
-            draft.methodType = await this.visitType(functionCall.methodType, p) as Type.Method | undefined;
-        });
+        const updates: any = {
+            prefix: await this.visitSpace(functionCall.prefix, p),
+            markers: await this.visitMarkers(functionCall.markers, p),
+            function: await this.visitOptionalRightPadded(functionCall.function, p),
+            typeParameters: await this.visitOptionalContainer(functionCall.typeParameters, p),
+            arguments: await this.visitContainer(functionCall.arguments, p),
+            methodType: await this.visitType(functionCall.methodType, p) as Type.Method | undefined
+        };
+        return updateIfChanged(functionCall, updates);
     }
 
     protected async visitFunctionType(functionType: JS.FunctionType, p: P): Promise<J | undefined> {
