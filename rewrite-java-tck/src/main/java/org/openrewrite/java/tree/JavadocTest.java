@@ -2202,14 +2202,13 @@ class JavadocTest implements RewriteTest {
     }
 
     @Test
-    @MinimumJava25
     void redundantSpacing() {
         rewriteRun(
           java(
             """
             /**
             * <p>Some text.
-            * \s
+            *\s
             * <p>More text.
             */
             class SomeClass {}
