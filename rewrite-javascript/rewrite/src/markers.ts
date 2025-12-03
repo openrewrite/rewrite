@@ -90,6 +90,35 @@ export function replaceMarker(markers: Markers, oldMarker: Marker, newMarker: Ma
     };
 }
 
+/**
+ * Replaces the first marker with the same kind as the new marker, or adds it if not found.
+ * This is useful when there's typically only one marker of each kind.
+ *
+ * @param markers The markers collection to update
+ * @param newMarker The new marker to insert (its kind is used to find the marker to replace)
+ * @returns A new Markers object with the replacement applied
+ */
+export function replaceMarkerByKind(markers: Markers, newMarker: Marker): Markers {
+    let found = false;
+    const newMarkers = markers.markers.map(m => {
+        if (!found && m.kind === newMarker.kind) {
+            found = true;
+            return newMarker;
+        }
+        return m;
+    });
+
+    // If marker with kind wasn't found, add the new one
+    if (!found) {
+        newMarkers.push(newMarker);
+    }
+
+    return {
+        ...markers,
+        markers: newMarkers
+    };
+}
+
 export const emptyMarkers: Markers = asRef({
     kind: MarkersKind.Markers,
     id: randomId(),

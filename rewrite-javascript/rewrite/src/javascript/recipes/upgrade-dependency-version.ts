@@ -23,15 +23,20 @@ import {
     findNodeResolutionResult,
     PackageJsonContent,
     PackageLockContent,
+    PackageManager,
     readNpmrcConfigs
 } from "../node-resolution-result";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
-import {execSync} from "child_process";
-import {replaceMarker} from "../../markers";
+import {replaceMarkerByKind} from "../../markers";
 import {TreePrinters} from "../../print";
+import {
+    getAllLockFileNames,
+    getLockFileName,
+    runInstall
+} from "../package-manager";
 
 /**
  * Represents a dependency scope in package.json
@@ -54,6 +59,8 @@ interface ProjectUpdateInfo {
     currentVersion: string;
     /** New version constraint to apply */
     newVersion: string;
+    /** The package manager used by this project */
+    packageManager: PackageManager;
 }
 
 /**
@@ -140,13 +147,17 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                             // Get the project directory from the marker path
                             const projectDir = path.dirname(path.resolve(doc.sourcePath));
 
+                            // Use package manager from marker (set during parsing), default to npm
+                            const pm = marker.packageManager ?? PackageManager.Npm;
+
                             acc.projectsToUpdate.set(doc.sourcePath, {
                                 projectDir,
                                 packageJsonPath: doc.sourcePath,
                                 originalPackageJson: await this.printDocument(doc),
                                 dependencyScope: scope,
                                 currentVersion,
-                                newVersion: recipe.newVersion
+                                newVersion: recipe.newVersion,
+                                packageManager: pm
                             });
                         }
                         break; // Found the dependency, no need to check other scopes
@@ -191,16 +202,19 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                     return updatedDoc;
                 }
 
-                // Handle package-lock.json files
-                if (sourcePath.endsWith('package-lock.json')) {
-                    // Find the corresponding package.json path
-                    const packageJsonPath = sourcePath.replace('package-lock.json', 'package.json');
-                    const updateInfo = acc.projectsToUpdate.get(packageJsonPath);
+                // Handle lock files for all package managers
+                for (const lockFileName of getAllLockFileNames()) {
+                    if (sourcePath.endsWith(lockFileName)) {
+                        // Find the corresponding package.json path
+                        const packageJsonPath = sourcePath.replace(lockFileName, 'package.json');
+                        const updateInfo = acc.projectsToUpdate.get(packageJsonPath);
 
-                    if (updateInfo && acc.updatedLockFiles.has(sourcePath)) {
-                        // Parse the updated lock file content and return it
-                        const updatedContent = acc.updatedLockFiles.get(sourcePath)!;
-                        return this.parseUpdatedLockFile(doc, updatedContent);
+                        if (updateInfo && acc.updatedLockFiles.has(sourcePath)) {
+                            // Parse the updated lock file content and return it
+                            const updatedContent = acc.updatedLockFiles.get(sourcePath)!;
+                            return this.parseUpdatedLockFile(doc, updatedContent);
+                        }
+                        break;
                     }
                 }
 
@@ -252,15 +266,18 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     }
 
     /**
-     * Runs npm install in a temporary directory to update the lock file.
+     * Runs the package manager install in a temporary directory to update the lock file.
      */
     private async runPackageManagerInstall(
         acc: Accumulator,
         updateInfo: ProjectUpdateInfo,
         _ctx: ExecutionContext
     ): Promise<void> {
+        const pm = updateInfo.packageManager;
+        const lockFileName = getLockFileName(pm);
+
         // Create temp directory
-        const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-npm-'));
+        const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
 
         try {
             // Create modified package.json content
@@ -274,37 +291,40 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             await fsp.writeFile(path.join(tempDir, 'package.json'), modifiedPackageJson);
 
             // Copy existing lock file if present
-            const originalLockPath = path.join(updateInfo.projectDir, 'package-lock.json');
+            const originalLockPath = path.join(updateInfo.projectDir, lockFileName);
             if (fs.existsSync(originalLockPath)) {
-                await fsp.copyFile(originalLockPath, path.join(tempDir, 'package-lock.json'));
+                await fsp.copyFile(originalLockPath, path.join(tempDir, lockFileName));
             }
 
-            // Copy .npmrc if present (for registry configuration)
-            const npmrcPath = path.join(updateInfo.projectDir, '.npmrc');
-            if (fs.existsSync(npmrcPath)) {
-                await fsp.copyFile(npmrcPath, path.join(tempDir, '.npmrc'));
+            // Copy config files if present (for registry configuration and workspace setup)
+            const configFiles = ['.npmrc', '.yarnrc', '.yarnrc.yml', '.pnpmfile.cjs', 'pnpm-workspace.yaml'];
+            for (const configFile of configFiles) {
+                const configPath = path.join(updateInfo.projectDir, configFile);
+                if (fs.existsSync(configPath)) {
+                    await fsp.copyFile(configPath, path.join(tempDir, configFile));
+                }
             }
 
-            // Store the modified package.json content (do this before npm install in case it fails)
+            // Store the modified package.json content (do this before install in case it fails)
             acc.updatedPackageJsons.set(updateInfo.packageJsonPath, modifiedPackageJson);
 
-            // Run npm install
-            try {
-                execSync('npm install --package-lock-only', {
-                    cwd: tempDir,
-                    stdio: 'pipe',
-                    timeout: 120000 // 2 minute timeout
-                });
+            // Run package manager install
+            const result = runInstall(pm, {
+                cwd: tempDir,
+                lockOnly: true,
+                timeout: 120000 // 2 minute timeout
+            });
 
+            if (result.success) {
                 // Read back the updated lock file
-                const updatedLockPath = path.join(tempDir, 'package-lock.json');
+                const updatedLockPath = path.join(tempDir, lockFileName);
                 if (fs.existsSync(updatedLockPath)) {
                     const updatedLockContent = await fsp.readFile(updatedLockPath, 'utf-8');
-                    const lockFilePath = updateInfo.packageJsonPath.replace('package.json', 'package-lock.json');
+                    const lockFilePath = updateInfo.packageJsonPath.replace('package.json', lockFileName);
                     acc.updatedLockFiles.set(lockFilePath, updatedLockContent);
                 }
-            } catch (error: any) {
-                console.warn(`npm install failed: ${error.message}`);
+            } else {
+                console.warn(`Package manager install failed: ${result.error || result.stderr}`);
                 // Continue without lock file update - package.json is already stored
             }
 
@@ -351,8 +371,9 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
 
         // Parse the updated package.json and lock file to create new marker
         const updatedPackageJson = acc.updatedPackageJsons.get(updateInfo.packageJsonPath);
+        const lockFileName = getLockFileName(updateInfo.packageManager);
         const updatedLockFile = acc.updatedLockFiles.get(
-            updateInfo.packageJsonPath.replace('package.json', 'package-lock.json')
+            updateInfo.packageJsonPath.replace('package.json', lockFileName)
         );
 
         let packageJsonContent: PackageJsonContent;
@@ -388,7 +409,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         // Replace the marker in the document
         return {
             ...doc,
-            markers: replaceMarker(doc.markers, existingMarker, newMarker)
+            markers: replaceMarkerByKind(doc.markers, newMarker)
         };
     }
 }
