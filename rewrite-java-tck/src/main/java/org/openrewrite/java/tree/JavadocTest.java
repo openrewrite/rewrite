@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava11;
-import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
