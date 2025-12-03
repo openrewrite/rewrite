@@ -2208,27 +2208,11 @@ class JavadocTest implements RewriteTest {
           java(
             """
             /**
-            * <p>Java class for Property complex type.
+            * <p>Some text.
             * \s
-            * <p>The following schema fragment specifies the expected content contained within this class.
-            *
-            * <pre>
-            * &lt;complexType name="Property">
-            *   &lt;complexContent>
-            *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
-            *       &lt;sequence>
-            *         &lt;element name="PropName" type="{http://www.w3.org/2001/XMLSchema}string"/>
-            *         &lt;element name="PropValue" type="{http://www.w3.org/2001/XMLSchema}string"/>
-            *         &lt;element name="Secure" type="{http://www.w3.org/2001/XMLSchema}boolean" minOccurs="0"/>
-            *       &lt;/sequence>
-            *     &lt;/restriction>
-            *   &lt;/complexContent>
-            * &lt;/complexType>
-            * </pre>
-            *
-            *
+            * <p>More text.
             */
-            class Property {}
+            class SomeClass {}
             """
           )
         );
