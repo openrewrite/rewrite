@@ -15,13 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe, test, expect} from "@jest/globals";
+import {describe, expect, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
     ImportStyle,
     javascript,
     JavaScriptVisitor,
+    JS,
     maybeAddImport,
     npm,
     packageJson,
@@ -84,10 +85,9 @@ function createForceRemoveFirstImportThenAddVisitor(
     alias?: string
 ): JavaScriptVisitor<any> {
     return new class extends JavaScriptVisitor<any> {
-        override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
-            const jsCu = cu as any;
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
             // First, manually remove the first statement (the import)
-            let result: any = await this.produceJavaScript(jsCu, p, async (draft: any) => {
+            let result: any = await this.produceJavaScript(cu, p, async draft => {
                 if (draft.statements && draft.statements.length > 0) {
                     draft.statements = draft.statements.slice(1);
                     draft.statements[0].element.prefix = emptySpace;

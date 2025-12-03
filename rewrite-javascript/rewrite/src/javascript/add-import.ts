@@ -348,7 +348,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Add ES6 import (handles ES6Named, ES6Namespace, ES6Default)
-        return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
+        return this.produceJavaScript(compilationUnit, p, async draft => {
             // Find the position to insert the import
             const insertionIndex = this.findImportInsertionIndex(compilationUnit);
 
@@ -446,7 +446,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 }
 
                 // We found a matching import with named bindings - merge into it
-                return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
+                return this.produceJavaScript(compilationUnit, p, async draft => {
                     const namedImports = importClause.namedBindings as JS.NamedImports;
                     const existingElements = namedImports.elements.elements;
 
@@ -462,7 +462,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     if (insertIndex === -1) insertIndex = existingElements.length;
 
                     // Build the new elements array with proper spacing
-                    const updatedNamedImports: JS.NamedImports = await this.produceJavaScript<JS.NamedImports>(
+                    const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
                         namedImports, p, async namedDraft => {
                             const lastIndex = existingElements.length - 1;
                             const trailingSpace = existingElements[lastIndex].after;
@@ -498,9 +498,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     );
 
                     // Update the import with the new named imports
-                    const updatedImport: JS.Import = await this.produceJavaScript<JS.Import>(
+                    const updatedImport: JS.Import = await this.produceJavaScript(
                         jsImport, p, async importDraft => {
-                            importDraft.importClause = await this.produceJavaScript<JS.ImportClause>(
+                            importDraft.importClause = await this.produceJavaScript(
                                 importClause, p, async clauseDraft => {
                                     clauseDraft.namedBindings = updatedNamedImports;
                                 }
