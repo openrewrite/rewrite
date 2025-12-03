@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava11;
+import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -2196,6 +2197,39 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    @MinimumJava25
+    void redundantSpacing() {
+        rewriteRun(
+          java(
+            """
+            /**
+            * <p>Java class for Property complex type.
+            * \s
+            * <p>The following schema fragment specifies the expected content contained within this class.
+            *
+            * <pre>
+            * &lt;complexType name="Property">
+            *   &lt;complexContent>
+            *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
+            *       &lt;sequence>
+            *         &lt;element name="PropName" type="{http://www.w3.org/2001/XMLSchema}string"/>
+            *         &lt;element name="PropValue" type="{http://www.w3.org/2001/XMLSchema}string"/>
+            *         &lt;element name="Secure" type="{http://www.w3.org/2001/XMLSchema}boolean" minOccurs="0"/>
+            *       &lt;/sequence>
+            *     &lt;/restriction>
+            *   &lt;/complexContent>
+            * &lt;/complexType>
+            * </pre>
+            *
+            *
+            */
+            class Property {}
+            """
           )
         );
     }
