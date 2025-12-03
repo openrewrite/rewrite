@@ -193,7 +193,8 @@ describe("UpgradeDependencyVersion", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -210,12 +211,13 @@ describe("UpgradeDependencyVersion", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const marker = findNodeResolutionResult(doc);
-                        expect(marker).toBeDefined();
-                        expect(marker!.dependencies).toHaveLength(1);
-                        expect(marker!.dependencies[0].name).toBe("is-number");
-                        expect(marker!.dependencies[0].versionConstraint).toBe("^8.0.0");
-                    }}
+                            const marker = findNodeResolutionResult(doc);
+                            expect(marker).toBeDefined();
+                            expect(marker!.dependencies).toHaveLength(1);
+                            expect(marker!.dependencies[0].name).toBe("is-number");
+                            expect(marker!.dependencies[0].versionConstraint).toBe("^8.0.0");
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
@@ -284,6 +286,85 @@ describe("UpgradeDependencyVersion", () => {
                             }
                         }
                     `)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
+    test("updates package-lock.json when upgrading dependency", async () => {
+        const spec = new RecipeSpec();
+        // Use uuid which has real version 9.x and 10.x available
+        spec.recipe = new UpgradeDependencyVersion({
+            packageName: "uuid",
+            newVersion: "^10.0.0"
+        });
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "uuid": "^9.0.0"
+                            }
+                        }
+                    `, `
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "uuid": "^10.0.0"
+                            }
+                        }
+                    `),
+                    // Use validation function for lock file - returns actual if valid, error message if not
+                    packageLockJson(`
+                    {
+                        "name": "test-project",
+                        "version": "1.0.0",
+                        "lockfileVersion": 3,
+                        "requires": true,
+                        "packages": {
+                            "": {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                    "uuid": "^9.0.0"
+                                }
+                            },
+                            "node_modules/uuid": {
+                                "version": "9.0.0",
+                                "resolved": "https://registry.npmjs.org/uuid/-/uuid-9.0.0.tgz",
+                                "integrity": "sha512-MXcSTerfPa4uqyzStbRoTgt5XIe3x5+42+q1sDuy3R5MDk66URdLMOZe5aPX/SQd+kuYAh0FdP/pO28IkQyTeg=="
+                            }
+                        }
+                    }
+                    `, (actual: string) => {
+                        const lockData = JSON.parse(actual);
+
+                        // Verify lock file structure
+                        if (!lockData.packages) {
+                            throw new Error("Expected packages in lock file");
+                        }
+
+                        // The root package should now reference ^10.0.0
+                        const rootPkg = lockData.packages[""];
+                        if (rootPkg?.dependencies?.["uuid"] !== "^10.0.0") {
+                            throw new Error(`Expected root dependency uuid to be ^10.0.0, got ${rootPkg?.dependencies?.["uuid"]}`);
+                        }
+
+                        // The resolved package should be version 10.x
+                        const uuidPkg = lockData.packages["node_modules/uuid"];
+                        if (!uuidPkg?.version?.startsWith("10.")) {
+                            throw new Error(`Expected uuid version to start with 10., got ${uuidPkg?.version}`);
+                        }
+
+                        return actual;
+                    })
                 )
             );
         }, {unsafeCleanup: true});

@@ -17,18 +17,14 @@
 import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
-import {JsonVisitor} from "../../json/visitor";
-import {Json, JsonParser} from "../../json";
+import {Json, JsonParser, JsonVisitor} from "../../json";
 import {
     createNodeResolutionResultMarker,
     findNodeResolutionResult,
-    NodeResolutionResult,
     PackageJsonContent,
     PackageLockContent,
     readNpmrcConfigs
 } from "../node-resolution-result";
-import {randomId} from "../../uuid";
-import {produce} from "immer";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
