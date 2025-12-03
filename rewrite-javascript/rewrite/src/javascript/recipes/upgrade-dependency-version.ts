@@ -89,8 +89,13 @@ interface Accumulator {
  * This recipe:
  * 1. Finds package.json files containing the specified dependency
  * 2. Updates the version constraint to the new version
- * 3. Runs npm install to update package-lock.json
+ * 3. Runs the package manager to update the lock file
  * 4. Updates the NodeResolutionResult marker with new dependency info
+ *
+ * TODO: Consider adding a `resolveToLatestMatching` option that would use `npm install <pkg>@<version>`
+ * to let the package manager resolve the constraint to the latest matching version.
+ * For example, `^22.0.0` would become `^22.19.1` (the latest version satisfying ^22.0.0).
+ * This would be similar to how Maven's UpgradeDependencyVersion works with version selectors.
  */
 export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     readonly name = "org.openrewrite.javascript.dependencies.UpgradeDependencyVersion";
@@ -207,13 +212,16 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                         );
                     }
 
-                    // Modify the dependency version in the JSON tree
-                    const modifiedDoc = await this.updateDependencyVersion(doc, updateInfo);
+                    // Update the dependency version in the JSON AST (preserves formatting)
+                    const visitor = new UpdateVersionVisitor(
+                        recipe.packageName,
+                        updateInfo.newVersion,
+                        updateInfo.dependencyScope
+                    );
+                    const modifiedDoc = await visitor.visit(doc, undefined) as Json.Document;
 
                     // Update the NodeResolutionResult marker
-                    const updatedDoc = await recipe.updateMarker(modifiedDoc, updateInfo, acc);
-
-                    return updatedDoc;
+                    return recipe.updateMarker(modifiedDoc, updateInfo, acc);
                 }
 
                 // Handle lock files for all package managers
@@ -236,21 +244,6 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             }
 
             /**
-             * Updates the dependency version in the JSON tree.
-             */
-            private async updateDependencyVersion(
-                doc: Json.Document,
-                updateInfo: ProjectUpdateInfo
-            ): Promise<Json.Document> {
-                const visitor = new UpdateVersionVisitor(
-                    recipe.packageName,
-                    updateInfo.newVersion,
-                    updateInfo.dependencyScope
-                );
-                return await visitor.visit(doc, undefined) as Json.Document;
-            }
-
-            /**
              * Parses updated lock file content and creates a new document.
              */
             private async parseUpdatedLockFile(
@@ -266,7 +259,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                 }
 
                 if (parsed.length > 0) {
-                    // Preserve the original source path and markers (except NodeResolutionResult)
+                    // Preserve the original source path and markers
                     return {
                         ...parsed[0],
                         sourcePath: originalDoc.sourcePath,
@@ -280,7 +273,8 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     }
 
     /**
-     * Runs the package manager install in a temporary directory to update the lock file.
+     * Runs the package manager in a temporary directory to update the lock file.
+     * Writes a modified package.json with the new version, then runs install to update the lock file.
      */
     private async runPackageManagerInstall(
         acc: Accumulator,
@@ -294,14 +288,14 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
 
         try {
-            // Create modified package.json content
+            // Create modified package.json with the new version constraint
             const modifiedPackageJson = this.createModifiedPackageJson(
                 updateInfo.originalPackageJson,
                 updateInfo.dependencyScope,
                 updateInfo.newVersion
             );
 
-            // Write package.json to temp directory
+            // Write modified package.json to temp directory
             await fsp.writeFile(path.join(tempDir, 'package.json'), modifiedPackageJson);
 
             // Copy existing lock file if present
@@ -319,7 +313,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                 }
             }
 
-            // Run package manager install to validate the version exists
+            // Run package manager install to validate the version and update lock file
             const result = runInstall(pm, {
                 cwd: tempDir,
                 lockOnly: true,
@@ -327,7 +321,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             });
 
             if (result.success) {
-                // Version is valid - store the modified package.json
+                // Store the modified package.json (we'll use our visitor for actual output)
                 acc.updatedPackageJsons.set(updateInfo.packageJsonPath, modifiedPackageJson);
 
                 // Read back the updated lock file
@@ -355,6 +349,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
 
     /**
      * Creates a modified package.json with the updated dependency version.
+     * Used for the temp directory to validate the version exists.
      */
     private createModifiedPackageJson(
         originalContent: string,
@@ -367,7 +362,6 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             packageJson[scope][this.packageName] = newVersion;
         }
 
-        // Preserve original formatting as much as possible
         return JSON.stringify(packageJson, null, 2);
     }
 

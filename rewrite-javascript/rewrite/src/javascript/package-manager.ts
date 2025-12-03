@@ -67,7 +67,7 @@ const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
         listCommand: ['pnpm', 'list', '--json', '--depth=Infinity'],
     },
     [PackageManager.Bun]: {
-        lockFile: 'bun.lockb',
+        lockFile: 'bun.lock',
         // Bun doesn't have a lock-only mode, but is very fast anyway
         installLockOnlyCommand: ['bun', 'install', '--ignore-scripts'],
         installCommand: ['bun', 'install'],
@@ -202,6 +202,121 @@ export function runInstall(pm: PackageManager, options: InstallOptions): Package
     const config = PACKAGE_MANAGER_CONFIGS[pm];
     const command = options.lockOnly ? config.installLockOnlyCommand : config.installCommand;
     const [cmd, ...args] = command;
+
+    try {
+        const result = spawnSync(cmd, args, {
+            cwd: options.cwd,
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+            timeout: options.timeout ?? 120000,
+            env: options.env ? {...process.env, ...options.env} : process.env,
+        });
+
+        if (result.error) {
+            return {
+                success: false,
+                error: result.error.message,
+                stderr: result.stderr,
+            };
+        }
+
+        if (result.status !== 0) {
+            return {
+                success: false,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                error: `Command exited with code ${result.status}`,
+            };
+        }
+
+        return {
+            success: true,
+            stdout: result.stdout,
+            stderr: result.stderr,
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            error: error.message,
+        };
+    }
+}
+
+/**
+ * Options for adding/upgrading a package.
+ */
+export interface AddPackageOptions {
+    /** Working directory */
+    cwd: string;
+
+    /** Package name to add/upgrade */
+    packageName: string;
+
+    /** Version constraint (e.g., "^5.0.0") */
+    version: string;
+
+    /** If true, only update lock file without installing to node_modules */
+    lockOnly?: boolean;
+
+    /** Timeout in milliseconds (default: 120000 = 2 minutes) */
+    timeout?: number;
+
+    /** Additional environment variables */
+    env?: Record<string, string>;
+}
+
+/**
+ * Runs a package manager command to add or upgrade a package.
+ * This updates both package.json and the lock file.
+ *
+ * @param pm The package manager to use
+ * @param options Add package options
+ * @returns Result of the command
+ */
+export function runAddPackage(pm: PackageManager, options: AddPackageOptions): PackageManagerResult {
+    const packageSpec = `${options.packageName}@${options.version}`;
+
+    // Build command based on package manager
+    let cmd: string;
+    let args: string[];
+
+    switch (pm) {
+        case PackageManager.Npm:
+            cmd = 'npm';
+            args = ['install', packageSpec];
+            if (options.lockOnly) {
+                args.push('--package-lock-only');
+            }
+            break;
+        case PackageManager.YarnClassic:
+            cmd = 'yarn';
+            args = ['add', packageSpec];
+            if (options.lockOnly) {
+                args.push('--ignore-scripts');
+            }
+            break;
+        case PackageManager.YarnBerry:
+            cmd = 'yarn';
+            args = ['add', packageSpec];
+            if (options.lockOnly) {
+                args.push('--mode', 'skip-build');
+            }
+            break;
+        case PackageManager.Pnpm:
+            cmd = 'pnpm';
+            args = ['add', packageSpec];
+            if (options.lockOnly) {
+                args.push('--lockfile-only');
+            }
+            break;
+        case PackageManager.Bun:
+            cmd = 'bun';
+            args = ['add', packageSpec];
+            if (options.lockOnly) {
+                args.push('--ignore-scripts');
+            }
+            break;
+    }
 
     try {
         const result = spawnSync(cmd, args, {

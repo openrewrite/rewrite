@@ -413,4 +413,39 @@ describe("UpgradeDependencyVersion", () => {
         }, {unsafeCleanup: true});
     });
 
+    test("preserves original formatting (4-space indentation, trailing newline)", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new UpgradeDependencyVersion({
+            packageName: "uuid",
+            newVersion: "^10.0.0"
+        });
+
+        await withDir(async (repo) => {
+            // Note: 4-space indentation and trailing newline in the input
+            const before = `{
+    "name": "test-project",
+    "version": "1.0.0",
+    "dependencies": {
+        "uuid": "^9.0.0"
+    }
+}
+`;
+            const after = `{
+    "name": "test-project",
+    "version": "1.0.0",
+    "dependencies": {
+        "uuid": "^10.0.0"
+    }
+}
+`;
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    packageJson(before, after)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
 });

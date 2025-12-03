@@ -129,7 +129,7 @@ describe("getLockFileName", () => {
         expect(getLockFileName(PackageManager.Pnpm)).toBe("pnpm-lock.yaml");
         expect(getLockFileName(PackageManager.YarnClassic)).toBe("yarn.lock");
         expect(getLockFileName(PackageManager.YarnBerry)).toBe("yarn.lock");
-        expect(getLockFileName(PackageManager.Bun)).toBe("bun.lockb");
+        expect(getLockFileName(PackageManager.Bun)).toBe("bun.lock");
     });
 });
 
