@@ -253,6 +253,14 @@ export class PackageJsonParser extends Parser {
             }
         }
 
+        // Fallback: if node_modules exists but no lock file was found (e.g., symlinked from another workspace),
+        // walk node_modules to get resolved dependency information
+        const parsed = await this.walkNodeModules(dir);
+        if (parsed) {
+            // Assume npm as the default package manager when only node_modules exists
+            return { content: parsed, packageManager: PackageManager.Npm };
+        }
+
         return undefined;
     }
 

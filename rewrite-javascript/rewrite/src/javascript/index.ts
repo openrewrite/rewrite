@@ -30,6 +30,7 @@ export * from "./format";
 export * from "./add-import";
 export * from "./remove-import";
 export * from "./recipes/index";
+export * from "./search/index";
 
 import "./print";
 import "./rpc";
