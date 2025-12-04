@@ -191,7 +191,11 @@ export class PackageJsonParser extends Parser {
             let lockContent: PackageLockContent | undefined = undefined;
             let packageManager: PackageManager | undefined = undefined;
             if (!this.skipDependencyResolution) {
-                const lockResult = await this.tryReadLockFileWithWalkUp(dir, this.relativeTo);
+                // Resolve dir relative to relativeTo if dir is relative (e.g., '.' when package.json is at root)
+                const absoluteDir = this.relativeTo && !path.isAbsolute(dir)
+                    ? path.resolve(this.relativeTo, dir)
+                    : dir;
+                const lockResult = await this.tryReadLockFileWithWalkUp(absoluteDir, this.relativeTo);
                 lockContent = lockResult?.content;
                 packageManager = lockResult?.packageManager;
             }
