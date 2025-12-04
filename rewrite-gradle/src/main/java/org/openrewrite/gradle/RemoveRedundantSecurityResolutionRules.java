@@ -62,7 +62,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove redundant dependency resolution rules";
+        return "Remove redundant security resolution rules";
     }
 
     @Override
@@ -70,6 +70,11 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
         return "Remove `resolutionStrategy.eachDependency` rules that pin dependencies to versions that are already " +
                "being managed by a platform/BOM to equal or newer versions. Only removes rules that have a security " +
                "advisory identifier (CVE or GHSA) in the `because` clause, unless a custom pattern is specified.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("security");
     }
 
     @Override
@@ -82,72 +87,73 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
         JavaIsoVisitor<ExecutionContext> removeRulesVisitor = new JavaIsoVisitor<ExecutionContext>() {
             @Nullable
             GradleProject gradleProject;
+            @Nullable
+            UUID currentSourceFileId;
             final Map<String, List<ResolvedPom>> buildscriptPlatforms = new HashMap<>();
             final Map<String, List<ResolvedPom>> projectPlatforms = new HashMap<>();
-            boolean initialized;
             boolean insideBuildscript;
 
-            private void maybeInitialize(ExecutionContext ctx) {
-                if (initialized) {
+            private void maybeInitialize(JavaSourceFile sourceFile, ExecutionContext ctx) {
+                // Reset state when visiting a new source file
+                if (currentSourceFileId != null && currentSourceFileId.equals(sourceFile.getId())) {
                     return;
                 }
-                initialized = true;
+                currentSourceFileId = sourceFile.getId();
+                gradleProject = null;
+                buildscriptPlatforms.clear();
+                projectPlatforms.clear();
 
-                Cursor rootCursor = getCursor();
-                while (rootCursor.getParent() != null && rootCursor.getParent().getValue() != Cursor.ROOT_VALUE) {
-                    rootCursor = rootCursor.getParent();
-                }
-                Tree tree = rootCursor.getValue();
-                if (tree instanceof JavaSourceFile) {
-                    Optional<GradleProject> maybeGp = tree.getMarkers().findFirst(GradleProject.class);
-                    if (maybeGp.isPresent()) {
-                        gradleProject = maybeGp.get();
+                Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
+                if (maybeGp.isPresent()) {
+                    gradleProject = maybeGp.get();
 
-                        // Find all platforms and download their POMs to get managed versions
-                        // Use a custom visitor that properly tracks buildscript context
-                        MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                        new JavaIsoVisitor<ExecutionContext>() {
-                            boolean scannerInBuildscript;
+                    // Find all platforms and download their POMs to get managed versions
+                    // Use a custom visitor that properly tracks buildscript context
+                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                    new JavaIsoVisitor<ExecutionContext>() {
+                        boolean scannerInBuildscript;
 
-                            @Override
-                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                                boolean wasInBuildscript = scannerInBuildscript;
-                                if (METHOD_BUILDSCRIPT.equals(method.getSimpleName())) {
-                                    scannerInBuildscript = true;
-                                }
-
-                                J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
-
-                                // Check if this is a dependency declaration containing platforms
-                                GradleMultiDependency multiDep = GradleMultiDependency.matcher().get(getCursor()).orElse(null);
-                                if (multiDep != null) {
-                                    boolean inBuildscript = scannerInBuildscript;
-                                    multiDep.forEach(gradleDependency -> {
-                                        if (gradleDependency.isPlatform()) {
-                                            try {
-                                                ResolvedPom platformPom = mpd.download(
-                                                                gradleDependency.getGav(), null, null, gradleProject.getMavenRepositories())
-                                                        .resolve(emptyList(), mpd, executionContext);
-                                                Map<String, List<ResolvedPom>> targetMap = inBuildscript ? buildscriptPlatforms : projectPlatforms;
-                                                targetMap.computeIfAbsent(gradleDependency.getConfigurationName(), k -> new ArrayList<>())
-                                                        .add(platformPom);
-                                            } catch (MavenDownloadingException ignored) {
-                                            }
-                                        }
-                                    });
-                                }
-
-                                scannerInBuildscript = wasInBuildscript;
-                                return m;
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                            boolean wasInBuildscript = scannerInBuildscript;
+                            if (METHOD_BUILDSCRIPT.equals(method.getSimpleName())) {
+                                scannerInBuildscript = true;
                             }
-                        }.visit(tree, ctx, getCursor());
-                    }
+
+                            J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+
+                            // Check if this is a dependency declaration containing platforms
+                            GradleMultiDependency multiDep = GradleMultiDependency.matcher().get(getCursor()).orElse(null);
+                            if (multiDep != null) {
+                                boolean inBuildscript = scannerInBuildscript;
+                                multiDep.forEach(gradleDependency -> {
+                                    if (gradleDependency.isPlatform()) {
+                                        try {
+                                            ResolvedPom platformPom = mpd.download(
+                                                            gradleDependency.getGav(), null, null, gradleProject.getMavenRepositories())
+                                                    .resolve(emptyList(), mpd, executionContext);
+                                            Map<String, List<ResolvedPom>> targetMap = inBuildscript ? buildscriptPlatforms : projectPlatforms;
+                                            targetMap.computeIfAbsent(gradleDependency.getConfigurationName(), k -> new ArrayList<>())
+                                                    .add(platformPom);
+                                        } catch (MavenDownloadingException ignored) {
+                                        }
+                                    }
+                                });
+                            }
+
+                            scannerInBuildscript = wasInBuildscript;
+                            return m;
+                        }
+                    }.visit(sourceFile, ctx, getCursor());
                 }
             }
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                maybeInitialize(ctx);
+                JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                if (sourceFile != null) {
+                    maybeInitialize(sourceFile, ctx);
+                }
 
                 // Track when we enter/exit buildscript block
                 boolean wasInsideBuildscript = insideBuildscript;
