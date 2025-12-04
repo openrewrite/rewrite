@@ -32,7 +32,7 @@ describe('param() function', () => {
                         draft.value = 10;
                         draft.valueSource = '10';
                     });
-                    return tmpl.apply(this.cursor, literal, new Map([['value', ten]]));
+                    return tmpl.apply(literal, this.cursor, { values: new Map([['value', ten]]) });
                 }
                 return literal;
             }
@@ -50,7 +50,7 @@ describe('param() function', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 if (literal.valueSource === '7') {
-                    return tmpl.apply(this.cursor, literal, new Map([[value.getName(), literal]]));
+                    return tmpl.apply(literal, this.cursor, { values: new Map([[value.getName(), literal]]) });
                 }
                 return literal;
             }
@@ -69,10 +69,12 @@ describe('param() function', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                 if (binary.operator.element === J.Binary.Type.Addition) {
-                    return tmpl.apply(this.cursor, binary, new Map([
-                        ['left', binary.left],
-                        ['right', binary.right]
-                    ]));
+                    return tmpl.apply(binary, this.cursor, {
+                        values: new Map([
+                            ['left', binary.left],
+                            ['right', binary.right]
+                        ])
+                    });
                 }
                 return binary;
             }

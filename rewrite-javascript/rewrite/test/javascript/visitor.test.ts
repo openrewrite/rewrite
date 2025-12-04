@@ -33,7 +33,7 @@ describe('JavaScript visitor formatting', () => {
             ): Promise<J | undefined> {
                 const original = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
                 const altered = await produceAsync(original, async draft => {
-                    const newArg = await template`\`extra\``.apply(this.cursor, original) as Expression;
+                    const newArg = await template`\`extra\``.apply(original, this.cursor) as Expression;
 
                     draft.arguments.elements = [
                         ...draft.arguments.elements,
@@ -42,9 +42,9 @@ describe('JavaScript visitor formatting', () => {
                 });
 
                 if (formatMethod == 'maybeAutoFormat') {
-                    return maybeAutoFormat(original, altered, ctx);
+                    return maybeAutoFormat(original, altered!, ctx);
                 } else {
-                    return autoFormat(altered, ctx);
+                    return autoFormat(altered!, ctx);
                 }
             }
         }

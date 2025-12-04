@@ -257,6 +257,10 @@ export class JavaScriptParser extends Parser {
 
         const typeChecker = program.getTypeChecker();
 
+        // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
+        // This ensures that TypeScript types with the same type.id map to the same Type instance,
+        // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
+        const typeMapping = new JavaScriptTypeMapping(typeChecker);
 
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
@@ -280,7 +284,7 @@ export class JavaScriptParser extends Parser {
 
             try {
                 yield produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
+                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
@@ -310,8 +314,8 @@ export class JavaScriptParserVisitor {
     constructor(
         private readonly sourceFile: ts.SourceFile,
         private readonly sourcePath: string,
-        typeChecker: ts.TypeChecker) {
-        this.typeMapping = new JavaScriptTypeMapping(typeChecker);
+        typeMapping: JavaScriptTypeMapping) {
+        this.typeMapping = typeMapping;
     }
 
     visit = (node: ts.Node): any => {
@@ -362,6 +366,26 @@ export class JavaScriptParserVisitor {
             }
         }
 
+        let shebangStatement: J.RightPadded<JS.Shebang> | undefined;
+        if (prefix.whitespace?.startsWith('#!')) {
+            const newlineIndex = prefix.whitespace.indexOf('\n');
+            const shebangText = newlineIndex === -1 ? prefix.whitespace : prefix.whitespace.slice(0, newlineIndex);
+            const afterShebang = newlineIndex === -1 ? '' : '\n';
+            const remainingWhitespace = newlineIndex === -1 ? '' : prefix.whitespace.slice(newlineIndex + 1);
+
+            shebangStatement = this.rightPadded<JS.Shebang>({
+                kind: JS.Kind.Shebang,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                text: shebangText
+            }, {kind: J.Kind.Space, whitespace: afterShebang, comments: []}, emptyMarkers);
+
+            prefix = produce(prefix, draft => {
+                draft.whitespace = remainingWhitespace;
+            });
+        }
+
         return {
             kind: JS.Kind.CompilationUnit,
             id: randomId(),
@@ -370,7 +394,9 @@ export class JavaScriptParserVisitor {
             sourcePath: this.sourcePath,
             charsetName: bomAndTextEncoding.encoding,
             charsetBomMarked: bomAndTextEncoding.hasBom,
-            statements: this.semicolonPaddedStatementList(node.statements),
+            statements: shebangStatement
+                ? [shebangStatement, ...this.semicolonPaddedStatementList(node.statements)]
+                : this.semicolonPaddedStatementList(node.statements),
             eof: this.prefix(node.endOfFileToken)
         };
     }

@@ -54,7 +54,7 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~>--><dependency>
+                  <!--~~(com.google.guava:failureaccess:1.0.1,com.google.guava:guava:29.0-jre,com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava)~~>--><dependency>
                       <groupId>com.google.guava</groupId>
                       <artifactId>guava</artifactId>
                       <version>29.0-jre</version>
@@ -116,7 +116,7 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~(io.prometheus:simpleclient_common:0.9.0)~~>--><dependency>
+                  <!--~~(io.prometheus:simpleclient:0.9.0,io.prometheus:simpleclient_common:0.9.0)~~>--><dependency>
                       <groupId>io.micrometer</groupId>
                       <artifactId>micrometer-registry-prometheus</artifactId>
                       <version>1.6.3</version>
@@ -182,7 +182,7 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~>--><dependency>
+                  <!--~~(org.openrewrite:rewrite-core:8.0.0,org.openrewrite:rewrite-java:8.0.0)~~>--><dependency>
                       <groupId>org.openrewrite</groupId>
                       <artifactId>rewrite-java</artifactId>
                       <version>8.0.0</version>
@@ -239,7 +239,7 @@ class DependencyInsightTest implements RewriteTest {
                   <version>1.0.0</version>
     
                   <dependencies>
-                    <!--~~>--><dependency>
+                    <!--~~(org.springframework:spring-core:6.1.5,org.springframework:spring-jcl:6.1.5)~~>--><dependency>
                       <groupId>org.springframework</groupId>
                       <artifactId>spring-core</artifactId>
                       <version>6.1.5</version>
@@ -292,12 +292,12 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~>--><dependency>
+                  <!--~~(com.google.guava:guava:29.0-jre)~~>--><dependency>
                       <groupId>com.google.guava</groupId>
                       <artifactId>guava</artifactId>
                       <version>29.0-jre</version>
                   </dependency>
-                  <!--~~>--><dependency>
+                  <!--~~(org.projectlombok:lombok:1.18.42)~~>--><dependency>
                       <groupId>org.projectlombok</groupId>
                       <artifactId>lombok</artifactId>
                       <version>1.18.42</version>

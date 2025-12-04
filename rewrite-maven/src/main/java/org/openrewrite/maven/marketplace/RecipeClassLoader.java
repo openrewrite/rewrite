@@ -65,6 +65,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.FileAttributes",
             "org.openrewrite.PrintOutputCapture",
             "org.openrewrite.ipc.http.HttpSender",
+            "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
             "org.openrewrite.maven.MavenExecutionContextView",

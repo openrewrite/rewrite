@@ -17,14 +17,23 @@ package org.openrewrite.java.format;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
+
+import java.util.List;
+import java.util.function.Supplier;
 
 public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -32,6 +41,15 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     private final TabsAndIndentsStyle style;
 
+    public NormalizeTabsOrSpacesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
+    }
+
+    public NormalizeTabsOrSpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents), stopAfter);
+    }
+
+    @Deprecated
     public NormalizeTabsOrSpacesVisitor(TabsAndIndentsStyle style) {
         this(style, null);
     }
@@ -56,11 +74,10 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
                             return lineBreak.withMargin(normalize(lineBreak.getMargin(), true));
                         }
                     }.visitNonNull((Javadoc) c, 0);
-                } else {
-                    TextComment textComment = (TextComment) c;
-                    if (textComment.getText().contains("\t")) {
-                        c = textComment.withText(normalize(textComment.getText(), true));
-                    }
+                }
+                TextComment textComment = (TextComment) c;
+                if (textComment.getText().contains("\t")) {
+                    c = textComment.withText(normalize(textComment.getText(), true));
                 }
             }
 
@@ -136,5 +153,14 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
             return (J) tree;
         }
         return super.visit(tree, p);
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
     }
 }

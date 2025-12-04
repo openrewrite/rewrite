@@ -1265,13 +1265,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async produceJava<J2 extends J>(
-        before: J | undefined,
+        before: J2,
         p: P,
         recipe?: (draft: Draft<J2>) =>
             ValidImmerRecipeReturnType<Draft<J2>> |
             PromiseLike<ValidImmerRecipeReturnType<Draft<J2>>>
     ): Promise<J2> {
-        const draft: Draft<J2> = createDraft(before as J2);
+        const draft: Draft<J2> = createDraft(before);
         (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, p);
         (draft as Draft<J>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {

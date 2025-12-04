@@ -249,6 +249,11 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.Shebang visitShebang(JS.Shebang shebang, P p) {
+        return (JS.Shebang) super.visitShebang(shebang, p);
+    }
+
+    @Override
     public JS.StatementExpression visitStatementExpression(JS.StatementExpression expression, P p) {
         return (JS.StatementExpression) super.visitStatementExpression(expression, p);
     }

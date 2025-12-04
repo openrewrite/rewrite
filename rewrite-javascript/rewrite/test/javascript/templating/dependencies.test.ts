@@ -64,7 +64,7 @@ describe('template dependencies integration', () => {
         let foundMatch = false;
         await (new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await pat.match(method);
+                const match = await pat.match(method, this.cursor);
                 if (match && method.name.simpleName === 'v4') {
                     foundMatch = true;
                     // The match succeeded, which means the pattern's AST was properly parsed
@@ -95,7 +95,7 @@ describe('template dependencies integration', () => {
             override async visitVariable(variable: any, p: any): Promise<any> {
                 if (!replacementFound) {
                     // Apply the template to replace the initializer
-                    const replacement = await tmpl.apply(this.cursor, variable, new Map());
+                    const replacement = await tmpl.apply(variable, this.cursor, { values: new Map() });
                     replacementFound = true;
 
                     // Verify the replacement was created
@@ -141,9 +141,9 @@ describe('template dependencies integration', () => {
             override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if (method.name.simpleName === 'v4') {
                     // Try all three patterns
-                    const match1 = await pat1.match(method);
-                    const match2 = await pat2.match(method);
-                    const match3 = await pat3.match(method);
+                    const match1 = await pat1.match(method, this.cursor);
+                    const match2 = await pat2.match(method, this.cursor);
+                    const match3 = await pat3.match(method, this.cursor);
 
                     if (match1) matchCount++;
                     if (match2) matchCount++;
@@ -171,7 +171,7 @@ describe('template dependencies integration', () => {
         `;
 
         // Create workspace for parsing the test code (so it has type attribution)
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({'@types/uuid': '^9.0.0'});
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
@@ -186,7 +186,7 @@ describe('template dependencies integration', () => {
             override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
                 if (method.name.simpleName === 'v1') {
                     // The pattern should match (which implicitly uses its typed internal AST)
-                    const match = await pat.match(method);
+                    const match = await pat.match(method, this.cursor);
                     expect(match).toBeDefined();
 
                     // Verify the method has proper type attribution from dependencies
@@ -225,7 +225,7 @@ describe('template dependencies integration', () => {
         `;
 
         // Create workspace for parsing the test code
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({'@types/uuid': '^9.0.0'});
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
@@ -239,7 +239,7 @@ describe('template dependencies integration', () => {
                 if (method.name.simpleName === 'v1') {
                     foundV1Call = true;
                     // The pattern should NOT match because the types are different
-                    const match = await pat.match(method);
+                    const match = await pat.match(method, this.cursor);
                     if (match) {
                         patternMatched = true;
                     }
@@ -268,7 +268,7 @@ describe('template dependencies integration', () => {
         `;
 
         // Create workspace for parsing the test code
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({'@types/uuid': '^9.0.0'});
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
@@ -282,7 +282,7 @@ describe('template dependencies integration', () => {
                 if (method.name.simpleName === 'v1') {
                     foundV1Call = true;
                     // The pattern SHOULD match because the types are the same
-                    const match = await pat.match(method);
+                    const match = await pat.match(method, this.cursor);
                     if (match) {
                         patternMatched = true;
                     }
