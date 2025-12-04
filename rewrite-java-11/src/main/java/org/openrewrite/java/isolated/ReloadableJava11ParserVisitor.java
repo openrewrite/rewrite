@@ -1570,6 +1570,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         if (typeExpr == null) {
+            // `node.declaredUsingVar()` was only added around 11.0.15
             int nextTokenIdx = indexOfNextNonWhitespace(cursor, source);
             boolean nextTokenStartsWithVar = source.startsWith("var", nextTokenIdx);
             if (nextTokenStartsWithVar && Character.isWhitespace(source.charAt(nextTokenIdx + 3))) {
