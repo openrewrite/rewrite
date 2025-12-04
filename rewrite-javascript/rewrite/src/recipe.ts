@@ -171,16 +171,12 @@ export abstract class ScanningRecipe<P> extends Recipe {
             }
 
             async visit<R extends Tree>(tree: Tree, ctx: ExecutionContext, parent?: Cursor): Promise<R | undefined> {
-                // Set cursor before delegating, since delegateForCtx needs it
-                if (parent !== undefined) {
-                    this.cursor = parent;
-                }
-                return (await this.delegateForCtx(ctx)).visit(tree, ctx, parent);
+                return (await this.delegateForCtx(ctx, parent)).visit(tree, ctx, parent);
             }
 
-            private async delegateForCtx(ctx: ExecutionContext) {
+            private async delegateForCtx(ctx: ExecutionContext, parent?: Cursor) {
                 if (!this.delegate) {
-                    this.delegate = await editorWithContext(this.cursor, ctx);
+                    this.delegate = await editorWithContext(parent ?? this.cursor, ctx);
                 }
                 return this.delegate;
             }
