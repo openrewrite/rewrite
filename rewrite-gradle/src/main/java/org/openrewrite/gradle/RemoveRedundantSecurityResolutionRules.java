@@ -40,6 +40,14 @@ import static java.util.Collections.emptyList;
 public class RemoveRedundantSecurityResolutionRules extends Recipe {
 
     private static final String DEFAULT_SECURITY_PATTERN = "(CVE-\\d|GHSA-[a-z0-9])";
+    private static final String METHOD_ALL = "all";
+    private static final String METHOD_BECAUSE = "because";
+    private static final String METHOD_BUILDSCRIPT = "buildscript";
+    private static final String METHOD_CONFIGURATIONS = "configurations";
+    private static final String METHOD_EACH_DEPENDENCY = "eachDependency";
+    private static final String METHOD_NAMED = "named";
+    private static final String METHOD_RESOLUTION_STRATEGY = "resolutionStrategy";
+    private static final String METHOD_USE_VERSION = "useVersion";
 
     @Option(displayName = "Security pattern",
             description = "A regular expression pattern to identify security-related resolution rules by matching " +
@@ -103,7 +111,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                                 boolean wasInBuildscript = scannerInBuildscript;
-                                if ("buildscript".equals(method.getSimpleName())) {
+                                if (METHOD_BUILDSCRIPT.equals(method.getSimpleName())) {
                                     scannerInBuildscript = true;
                                 }
 
@@ -142,7 +150,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
 
                 // Track when we enter/exit buildscript block
                 boolean wasInsideBuildscript = insideBuildscript;
-                if ("buildscript".equals(method.getSimpleName())) {
+                if (METHOD_BUILDSCRIPT.equals(method.getSimpleName())) {
                     insideBuildscript = true;
                 }
 
@@ -371,12 +379,12 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, integer);
 
-                if ("useVersion".equals(m.getSimpleName()) && !m.getArguments().isEmpty()) {
+                if (METHOD_USE_VERSION.equals(m.getSimpleName()) && !m.getArguments().isEmpty()) {
                     Expression arg = m.getArguments().get(0);
                     if (arg instanceof J.Literal && ((J.Literal) arg).getValue() != null) {
                         version.set(((J.Literal) arg).getValue().toString());
                     }
-                } else if ("because".equals(m.getSimpleName()) && !m.getArguments().isEmpty()) {
+                } else if (METHOD_BECAUSE.equals(m.getSimpleName()) && !m.getArguments().isEmpty()) {
                     Expression arg = m.getArguments().get(0);
                     if (arg instanceof J.Literal && ((J.Literal) arg).getValue() != null) {
                         because.set(((J.Literal) arg).getValue().toString());
@@ -395,12 +403,12 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
     }
 
     private static boolean isEachDependency(J.MethodInvocation m, Cursor cursor) {
-        if (!"eachDependency".equals(m.getSimpleName())) {
+        if (!METHOD_EACH_DEPENDENCY.equals(m.getSimpleName())) {
             return false;
         }
         // Pattern 1: resolutionStrategy.eachDependency { }
         if (m.getSelect() instanceof J.Identifier &&
-            "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+            METHOD_RESOLUTION_STRATEGY.equals(((J.Identifier) m.getSelect()).getSimpleName())) {
             return true;
         }
         // Pattern 2: resolutionStrategy { eachDependency { } } - no select, inside resolutionStrategy block
@@ -414,7 +422,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
         Cursor parent = cursor.dropParentUntil(value ->
                 value == Cursor.ROOT_VALUE ||
                 (value instanceof J.MethodInvocation &&
-                 "resolutionStrategy".equals(((J.MethodInvocation) value).getSimpleName())));
+                 METHOD_RESOLUTION_STRATEGY.equals(((J.MethodInvocation) value).getSimpleName())));
         return parent.getValue() != Cursor.ROOT_VALUE;
     }
 
@@ -423,7 +431,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
         public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             // Track original statement count for configurations { } blocks
             int originalSize = -1;
-            if ("configurations".equals(method.getSimpleName()) &&
+            if (METHOD_CONFIGURATIONS.equals(method.getSimpleName()) &&
                 method.getArguments().size() == 1 &&
                 method.getArguments().get(0) instanceof J.Lambda) {
 
@@ -501,7 +509,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
         }
 
         private static boolean isEmptyAllBlock(J.MethodInvocation m) {
-            if (!"all".equals(m.getSimpleName())) {
+            if (!METHOD_ALL.equals(m.getSimpleName())) {
                 return false;
             }
             if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
@@ -536,9 +544,9 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
 
         private static boolean isEmptyResolutionStrategy(J.MethodInvocation m) {
             // Check for resolutionStrategy.eachDependency { } or resolutionStrategy { }
-            if ("eachDependency".equals(m.getSimpleName())) {
+            if (METHOD_EACH_DEPENDENCY.equals(m.getSimpleName())) {
                 if (m.getSelect() instanceof J.Identifier &&
-                    "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                    METHOD_RESOLUTION_STRATEGY.equals(((J.Identifier) m.getSelect()).getSimpleName())) {
                     if (m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
                         J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
                         if (lambda.getBody() instanceof J.Block) {
@@ -564,7 +572,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
          * Checks if this is an empty resolutionStrategy { } block.
          */
         private static boolean isEmptyResolutionStrategyBlock(J.MethodInvocation m) {
-            if (!"resolutionStrategy".equals(m.getSimpleName())) {
+            if (!METHOD_RESOLUTION_STRATEGY.equals(m.getSimpleName())) {
                 return false;
             }
             if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
@@ -594,7 +602,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 return false;
             }
             // Skip "all" - handled separately
-            if ("all".equals(m.getSimpleName())) {
+            if (METHOD_ALL.equals(m.getSimpleName())) {
                 return false;
             }
             if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
@@ -622,11 +630,11 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
         private static boolean isEmptyConfigurationsBlock(J.MethodInvocation m) {
             // Check if select is "configurations" identifier (e.g., configurations.compileClasspath { })
             if (!(m.getSelect() instanceof J.Identifier) ||
-                !"configurations".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                !METHOD_CONFIGURATIONS.equals(((J.Identifier) m.getSelect()).getSimpleName())) {
                 return false;
             }
             // Don't handle "all" here - that's handled by isEmptyConfigurationsAll
-            if ("all".equals(m.getSimpleName())) {
+            if (METHOD_ALL.equals(m.getSimpleName())) {
                 return false;
             }
             if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
@@ -649,7 +657,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
         }
 
         private static boolean isEmptyConfigurationsAll(J.MethodInvocation m, Cursor cursor) {
-            if (!"all".equals(m.getSimpleName())) {
+            if (!METHOD_ALL.equals(m.getSimpleName())) {
                 return false;
             }
             // Check for two patterns:
@@ -657,7 +665,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             // 2. all { } inside configurations { } block - select is null
             boolean isConfigurationsAll = false;
             if (m.getSelect() instanceof J.Identifier &&
-                "configurations".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                METHOD_CONFIGURATIONS.equals(((J.Identifier) m.getSelect()).getSimpleName())) {
                 isConfigurationsAll = true;
             } else if (m.getSelect() == null) {
                 // Check if we're inside a configurations { } block
@@ -689,7 +697,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             Cursor parent = cursor.dropParentUntil(value ->
                     value == Cursor.ROOT_VALUE ||
                     (value instanceof J.MethodInvocation &&
-                     "configurations".equals(((J.MethodInvocation) value).getSimpleName())));
+                     METHOD_CONFIGURATIONS.equals(((J.MethodInvocation) value).getSimpleName())));
             return parent.getValue() != Cursor.ROOT_VALUE;
         }
 
@@ -698,7 +706,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
          * Also handles named("...") { } inside a configurations { } block.
          */
         private static boolean isEmptyNamedConfigurationBlock(J.MethodInvocation m, Cursor cursor) {
-            if (!"named".equals(m.getSimpleName())) {
+            if (!METHOD_NAMED.equals(m.getSimpleName())) {
                 return false;
             }
             // Check for two patterns:
@@ -706,7 +714,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             // 2. named("...") { } inside configurations { } block - select is null
             boolean isConfigurationsNamed = false;
             if (m.getSelect() instanceof J.Identifier &&
-                "configurations".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                METHOD_CONFIGURATIONS.equals(((J.Identifier) m.getSelect()).getSimpleName())) {
                 isConfigurationsNamed = true;
             } else if (m.getSelect() == null) {
                 isConfigurationsNamed = isInsideConfigurationsBlock(cursor);
@@ -742,7 +750,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
          * Checks if this is an empty configurations { } block (method name is "configurations" with no select).
          */
         private static boolean isEmptyConfigurationsMethodBlock(J.MethodInvocation m) {
-            if (!"configurations".equals(m.getSimpleName())) {
+            if (!METHOD_CONFIGURATIONS.equals(m.getSimpleName())) {
                 return false;
             }
             // Only for configurations { } block (no select)
