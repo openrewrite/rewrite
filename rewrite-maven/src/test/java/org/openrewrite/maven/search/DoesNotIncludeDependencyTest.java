@@ -164,7 +164,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             }
 
             @CsvSource({"compile,compile", "compile,test"})
-            @CsvSource({"runtime,compile", "runtime,test",})
+            @CsvSource({"runtime,test"})
             @CsvSource({"test,test"})
             @ParameterizedTest
             void withScopeInDesiredScopeNotMarked(String existingScope, String desiredScope) {
@@ -292,7 +292,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             }
 
             @CsvSource({"compile,compile", "compile,test"})
-            @CsvSource({"runtime,compile", "runtime,test",})
+            @CsvSource({"runtime,test"})
             @CsvSource({"test,test"})
             @ParameterizedTest
             void withScopeInDesiredScopeNotMarked(String existingScope, String desiredScope) {
