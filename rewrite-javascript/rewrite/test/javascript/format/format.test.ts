@@ -153,6 +153,30 @@ describe('AutoformatVisitor', () => {
         )
     });
 
+    test('control structure with non-block body', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            if (condition)
+            doSomething();
+            while (running)
+            process();
+            for (let i = 0; i < 10; i++)
+            iterate();
+            `,
+            `
+            if (condition)
+                doSomething();
+            while (running)
+                process();
+            for (let i = 0; i < 10; i++)
+                iterate();
+            `)
+            // @formatter:on
+        )
+    });
+
     test('try catch-all', () => {
         return spec.rewriteRun(
             // @formatter:off
@@ -189,11 +213,10 @@ describe('AutoformatVisitor', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript("const x = { a: 1 };",
-                // TODO the leading space before `a` seems excessive
-                "const x = { a: 1};"
-                    // @formatter:on
-            ))
+            // Single-line object literals should preserve their whitespace
+            typescript("const x = { a: 1 };")
+            // @formatter:on
+        )
     });
 
     test('after unary not operator', () => {
@@ -314,6 +337,19 @@ describe('AutoformatVisitor', () => {
         )
     });
 
+    test('anonymous class', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const C = class extends Object {
+                }
+                `
+            )
+            // @formatter:on
+        )
+    });
+
     test.each([
         // @formatter:off
         `const short = {name: "Ivan Almeida", age: 36};`,
@@ -322,6 +358,91 @@ describe('AutoformatVisitor', () => {
         ])('do not wrap object literals - %s', async (code) => {
         // TODO we might eventually implement the "Chop down if long" setting for this
         return spec.rewriteRun(typescript(code));
+    });
+
+    test('single-line object literal should not get extra spaces before closing brace', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function test() {
+    const x = { a: 1 };
+}`,
+            )
+            // @formatter:on
+        )
+    });
+
+    test('inline comment should stay on the same line', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const recipe = findRecipe(registry, 'recipe', {});
+expect(recipe).toBeNull(); // Multiple matches`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('empty arrow function body expands to multiple lines', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const noop = () => {};`,
+                `const noop = () => {
+};`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('empty function body in method expands to multiple lines', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `jest.spyOn(console, 'error').mockImplementation(() => {});`,
+                `jest.spyOn(console, 'error').mockImplementation(() => {
+});`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('comment before argument should keep indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `await spec.rewriteRun(
+    //language=typescript
+    typescript('const x = 3 + 3;')
+);`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('multi-line method arguments inside arrow function should keep indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                    test('should detect usage as direct function call', async () => {
+                        const spec = new RecipeSpec();
+                        spec.recipe = fromVisitor(createAddImportWithTemplateVisitor(
+                            "promisify(fs.readFile)",
+                            "util",
+                            "promisify"
+                        ));
+                    });
+                    `
+            )
+            // @formatter:on
+        )
     });
 
     test('TSX', () => {

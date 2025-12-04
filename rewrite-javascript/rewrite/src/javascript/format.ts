@@ -15,7 +15,7 @@
  */
 import {isJavaScript, JS, JSX} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, isJava, J, Statement} from "../java";
+import {Comment, isJava, J, lastWhitespace, replaceLastWhitespace, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isScope, Tree} from "../tree";
 import {
@@ -67,6 +67,7 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
 
 export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
     // called NormalizeFormat in Java
+    // Ensures that whitespace is on the outermost AST element possible
 
     constructor(private stopAfter?: Tree) {
         super();
@@ -199,7 +200,11 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         return produce(ret, draft => {
             if (draft.elements.length > 1) {
                 for (let i = 1; i < draft.elements.length; i++) {
-                    draft.elements[i].element.prefix.whitespace = this.style.other.afterComma ? " " : "";
+                    const currentWs = draft.elements[i].element.prefix.whitespace;
+                    // Preserve original newlines - only adjust spacing when elements are on same line
+                    if (!currentWs.includes("\n")) {
+                        draft.elements[i].element.prefix.whitespace = this.style.other.afterComma ? " " : "";
+                    }
                 }
             }
         });
@@ -648,7 +653,10 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
             if (!draft.end.whitespace.includes("\n") && (draft.statements.length == 0 || !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n"))) {
-                if (this.cursor.parent?.value.kind !== J.Kind.NewClass) {
+                // Skip newline for object literals and empty lambda/function bodies
+                const parentKind = this.cursor.parent?.value.kind;
+                if (parentKind !== J.Kind.NewClass &&
+                    !(draft.statements.length === 0 && (parentKind === J.Kind.Lambda || parentKind === J.Kind.MethodDeclaration))) {
                     draft.end = this.withNewlineSpace(draft.end);
                 }
             }
@@ -753,9 +761,12 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
             first = false;
         }
 
-        c = produce(c, draft => {
-            this.ensureSpace(draft.name.prefix);
-        });
+        // anonymous classes have an empty name
+        if (c.name.simpleName !== "") {
+            c = produce(c, draft => {
+                this.ensureSpace(draft.name.prefix);
+            });
+        }
 
         if (c.typeParameters && c.typeParameters.elements.length > 0 && c.typeParameters.before.whitespace === "" && !first) {
             c = produce(c, draft => {
@@ -1044,7 +1055,9 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitBlock(block: J.Block, p: P): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
-            if (this.cursor.parent?.value.kind != J.Kind.NewClass) {
+            const parentKind = this.cursor.parent?.value.kind;
+            // Skip newline only for object literals (NewClass) - they should preserve single-line formatting
+            if (parentKind != J.Kind.NewClass) {
                 if (!draft.end.whitespace.includes("\n")) {
                     draft.end.whitespace = draft.end.whitespace.replace(/[ \t]+$/, '') + "\n";
                 }
@@ -1083,12 +1096,17 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     private ensurePrefixHasNewLine<T extends J>(node: Draft<J>) {
-        if (node.prefix && !node.prefix.whitespace.includes("\n")) {
-            if (node.kind === JS.Kind.ExpressionStatement) {
-                this.ensurePrefixHasNewLine((node as JS.ExpressionStatement).expression);
-            } else {
-                node.prefix.whitespace = "\n";
-            }
+        if (!node.prefix) return;
+
+        // Check if newline already exists in the effective last whitespace
+        if (lastWhitespace(node.prefix).includes("\n")) {
+            return; // Already has a newline
+        }
+
+        if (node.kind === JS.Kind.ExpressionStatement) {
+            this.ensurePrefixHasNewLine((node as JS.ExpressionStatement).expression);
+        } else {
+            node.prefix = replaceLastWhitespace(node.prefix, () => "\n");
         }
     }
 
@@ -1122,40 +1140,72 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
         let indentShouldIncrease =
             tree.kind === J.Kind.Block
+            || tree.kind === J.Kind.NewArray
             || this.cursor.parent?.parent?.parent?.value.kind == J.Kind.Case
             || (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration && tree.prefix.whitespace.includes("\n"))
             || tree.kind === JS.Kind.JsxTag;
 
-
-        const previousIndent = this.currentIndent;
+        const previousIndent = this.currentIndent ?? "";
 
         if (tree.kind === J.Kind.IfElse && this.cursor.getNearestMessage("else-indent") !== undefined) {
             this.cursor.messages.set("indentToUse", this.cursor.getNearestMessage("else-indent"));
         } else if (indentShouldIncrease) {
-            this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
+            this.cursor.messages.set("indentToUse", (this.currentIndent ?? "") + this.singleIndent);
         }
 
         if (tree.kind === JS.Kind.JsxTag) {
-            this.cursor.messages.set("jsxTagIndent", this.currentIndent);
+            this.cursor.messages.set("jsxTagIndent", this.currentIndent ?? "");
         }
 
         if (tree.kind === J.Kind.IfElse && this.cursor.messages.get("else-indent") !== undefined) {
             this.cursor.messages.set("indentToUse", this.cursor.messages.get("else-indent"));
             this.cursor.messages.delete("else-indent");
         }
-        const relativeIndent: string = this.currentIndent;
+        const relativeIndent: string | undefined = this.currentIndent;
 
         ret = produce(ret, draft => {
             if (draft.prefix == undefined) {
                 draft.prefix = {kind: J.Kind.Space, comments: [], whitespace: ""};
             }
             if (draft.prefix.whitespace.includes("\n")) {
-                draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
+                // Only apply indentation normalization for statements and block contents,
+                // not for continuations (like method arguments that span multiple lines)
+                const parentKind = this.cursor.parent?.value?.kind;
+                const grandparentKind = this.cursor.parent?.parent?.value?.kind;
+                // Top-level statements: direct children of CompilationUnit.statements
+                // Cursor structure: statement -> RightPadded -> CompilationUnit
+                const isTopLevelStatement = parentKind === J.Kind.RightPadded && grandparentKind === JS.Kind.CompilationUnit;
+                const isStatementInBlock = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Block;
+                // Control structure bodies: if/while/for non-block bodies
+                const isControlStructureBody = parentKind === J.Kind.RightPadded && (
+                    grandparentKind === J.Kind.If ||
+                    grandparentKind === J.Kind.WhileLoop ||
+                    grandparentKind === J.Kind.ForLoop ||
+                    grandparentKind === J.Kind.ForEachLoop
+                );
+                // Check if this is a continuation (like variable initializer on new line)
+                const isContinuation = parentKind === J.Kind.LeftPadded;
+                // Method arguments and array elements are inside a Container - preserve their existing indentation
+                const isInsideContainer = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Container;
+                // Check if we're inside a JSX tag (JSX children need indentation)
+                const isInsideJsxTag = this.cursor.firstEnclosing(
+                    (n: any): n is J => n.kind === JS.Kind.JsxTag
+                ) !== undefined;
+                // For top-level statements, always normalize to no indent (even when relativeIndent is undefined)
+                if (isTopLevelStatement) {
+                    draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, "");
+                } else if (!isInsideContainer && relativeIndent !== undefined && (isStatementInBlock || isControlStructureBody || isContinuation || isInsideJsxTag)) {
+                    draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
+                }
             }
             if (draft.kind === J.Kind.Block) {
                 const block = draft as Draft<J> as Draft<J.Block>;
-                const indentToUseInClosing = indentShouldIncrease ? previousIndent : relativeIndent;
-                block.end.whitespace = this.combineIndent(block.end.whitespace, indentToUseInClosing);
+                // Skip indentation for object literals (NewClass) - they should preserve their single-line formatting
+                const isObjectLiteral = this.cursor.parent?.value.kind === J.Kind.NewClass;
+                if (!isObjectLiteral && relativeIndent !== undefined) {
+                    const indentToUseInClosing = indentShouldIncrease ? previousIndent : relativeIndent;
+                    block.end = replaceLastWhitespace(block.end, (ws: string) => this.combineIndent(ws, indentToUseInClosing));
+                }
             }
         });
 
@@ -1181,7 +1231,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             indentShouldIncrease = true;
         }
         if (indentShouldIncrease) {
-            this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
+            this.cursor.messages.set("indentToUse", (this.currentIndent ?? "") + this.singleIndent);
         }
 
         return ret;
@@ -1221,10 +1271,10 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                     continue;
                 }
 
-                const lastWhitespace = space.comments.length > 0 ? space.comments[space.comments.length - 1].suffix : space.whitespace;
-                const idx = lastWhitespace.lastIndexOf('\n');
+                const ws = lastWhitespace(space);
+                const idx = ws.lastIndexOf('\n');
                 if (idx !== -1) {
-                    c.messages.set("indentToUse", lastWhitespace.substring(idx + 1));
+                    c.messages.set("indentToUse", ws.substring(idx + 1));
                     break;
                 }
             }
@@ -1237,15 +1287,19 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (ret == undefined) {
             return ret;
         }
+        const indent = this.currentIndent;
+        if (indent === undefined) {
+            return ret; // Preserve existing indentation when no indent level is set
+        }
         return produce(ret, draft => {
             if (draft.before.whitespace.includes("\n")) {
-                draft.before.whitespace = this.combineIndent(draft.before.whitespace, this.currentIndent);
+                draft.before.whitespace = this.combineIndent(draft.before.whitespace, indent);
             }
         });
     }
 
-    private get currentIndent(): string {
-        return this.cursor.getNearestMessage("indentToUse") ?? "";
+    private get currentIndent(): string | undefined {
+        return this.cursor.getNearestMessage("indentToUse");
     }
 
     private combineIndent(oldWs: string, relativeIndent: string): string {
