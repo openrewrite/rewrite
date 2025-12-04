@@ -259,6 +259,11 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
+    public JS.Shebang visitShebang(JS.Shebang shebang, P p) {
+        return shebang;
+    }
+
+    @Override
     public JS.StatementExpression visitStatementExpression(JS.StatementExpression statementExpression, P p) {
         visitAndValidateNonNull(statementExpression.getStatement(), Statement.class, p);
         return statementExpression;

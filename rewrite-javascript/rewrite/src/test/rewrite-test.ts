@@ -319,7 +319,7 @@ export function dedentAfter(s?: AfterRecipeText): AfterRecipeText {
         if (typeof s === "function") {
             return (actual: string): string | undefined => {
                 const raw = s(actual);
-                return raw ? dedent(raw) : undefined;
+                return raw;
             };
         }
         return () => dedent(s);

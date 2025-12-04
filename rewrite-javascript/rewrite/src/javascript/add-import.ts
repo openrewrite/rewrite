@@ -348,7 +348,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Add ES6 import (handles ES6Named, ES6Namespace, ES6Default)
-        return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
+        return this.produceJavaScript(compilationUnit, p, async draft => {
             // Find the position to insert the import
             const insertionIndex = this.findImportInsertionIndex(compilationUnit);
 
@@ -446,43 +446,61 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 }
 
                 // We found a matching import with named bindings - merge into it
-                return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
+                return this.produceJavaScript(compilationUnit, p, async draft => {
                     const namedImports = importClause.namedBindings as JS.NamedImports;
-
-                    // Create the new specifier with a space prefix (since it's not the first element)
-                    const newSpecifierBase = this.createImportSpecifier();
-                    const newSpecifier = {...newSpecifierBase, prefix: singleSpace};
-
-                    // Transfer the right padding from the element before the insertion point to the new element
-                    // Since we're appending, this is the last existing element
                     const existingElements = namedImports.elements.elements;
-                    const elementBeforeInsertion = existingElements[existingElements.length - 1];
-                    const paddingToTransfer = elementBeforeInsertion.after;
 
-                    // Add the new specifier to the elements
-                    const updatedNamedImports: JS.NamedImports = await this.produceJavaScript<JS.NamedImports>(
+                    // Find the correct insertion position (alphabetical, case-insensitive)
+                    const newName = (this.alias || this.member!).toLowerCase();
+                    let insertIndex = existingElements.findIndex(elem => {
+                        if (elem.element?.kind === JS.Kind.ImportSpecifier) {
+                            const name = this.getImportAlias(elem.element) || this.getImportName(elem.element);
+                            return newName.localeCompare(name.toLowerCase()) < 0;
+                        }
+                        return false;
+                    });
+                    if (insertIndex === -1) insertIndex = existingElements.length;
+
+                    // Build the new elements array with proper spacing
+                    const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
                         namedImports, p, async namedDraft => {
-                            // Update the element before insertion to have emptySpace as its right padding (before the comma)
-                            const updatedExistingElements = existingElements.slice(0, -1).concat({
-                                ...elementBeforeInsertion,
-                                after: emptySpace
+                            const lastIndex = existingElements.length - 1;
+                            const trailingSpace = existingElements[lastIndex].after;
+                            const newSpecifier = this.createImportSpecifier();
+
+                            const newElements = existingElements.flatMap((elem, j) => {
+                                const results: J.RightPadded<JS.ImportSpecifier>[] = [];
+                                if (j === insertIndex) {
+                                    // Insert new element here; first element gets no prefix, others get space
+                                    const prefix = j === 0 ? emptySpace : singleSpace;
+                                    results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
+                                }
+                                // Adjust existing element: first after insertion gets space prefix
+                                let adjusted = elem;
+                                if (j === 0 && insertIndex === 0 && elem.element) {
+                                    adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
+                                }
+                                // Last element before a new trailing element loses its trailing space
+                                if (j === lastIndex && insertIndex > lastIndex) {
+                                    adjusted = {...adjusted, after: emptySpace};
+                                }
+                                results.push(adjusted);
+                                return results;
                             });
 
-                            namedDraft.elements = {
-                                ...namedImports.elements,
-                                elements: [
-                                    ...updatedExistingElements,
-                                    // Transfer the padding to the new element (after the comma, before the closing brace)
-                                    rightPadded(newSpecifier, paddingToTransfer)
-                                ]
-                            };
+                            // Append at end if inserting after all existing elements
+                            if (insertIndex > lastIndex) {
+                                newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
+                            }
+
+                            namedDraft.elements = {...namedImports.elements, elements: newElements};
                         }
                     );
 
                     // Update the import with the new named imports
-                    const updatedImport: JS.Import = await this.produceJavaScript<JS.Import>(
+                    const updatedImport: JS.Import = await this.produceJavaScript(
                         jsImport, p, async importDraft => {
-                            importDraft.importClause = await this.produceJavaScript<JS.ImportClause>(
+                            importDraft.importClause = await this.produceJavaScript(
                                 importClause, p, async clauseDraft => {
                                     clauseDraft.namedBindings = updatedNamedImports;
                                 }
@@ -669,6 +687,64 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     }
 
     /**
+     * Extract the module name from a class type by traversing the owningClass chain
+     * or extracting it from the FQN.
+     */
+    private getModuleFromClassType(classType: Type.Class): string | undefined {
+        // Traverse owningClass chain to find the root
+        let current: Type.Class = classType;
+        while (current.owningClass && Type.isClass(current.owningClass)) {
+            current = current.owningClass as Type.Class;
+        }
+        // If there's still an owningClass (non-Class type), use it
+        if (current.owningClass) {
+            return Type.FullyQualified.getFullyQualifiedName(current.owningClass);
+        }
+        // For top-level classes, extract module from FQN (e.g., "zod.ZodError" -> "zod")
+        const fqn = current.fullyQualifiedName;
+        const dotIndex = fqn.lastIndexOf('.');
+        if (dotIndex > 0) {
+            return fqn.substring(0, dotIndex);
+        }
+        // The FQN itself might be the module (e.g., "zod" for z from zod)
+        return fqn;
+    }
+
+    /**
+     * Extract the module name from a type (method, class, or variable).
+     */
+    private getModuleFromType(type: Type | undefined, fieldType: Type | undefined): string | undefined {
+        if (type && Type.isMethod(type)) {
+            return Type.FullyQualified.getFullyQualifiedName((type as Type.Method).declaringType);
+        }
+        if (type && Type.isClass(type)) {
+            return this.getModuleFromClassType(type as Type.Class);
+        }
+        if (fieldType?.kind === Type.Kind.Variable) {
+            const variableType = fieldType as Type.Variable;
+            if (variableType.owner) {
+                return Type.FullyQualified.getFullyQualifiedName(variableType.owner);
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Check if a class type matches the expected module.
+     * Handles direct FQN match, owningClass chain match, and FQN prefix match.
+     */
+    private classTypeMatchesModule(classType: Type.Class, expectedModule: string): boolean {
+        const fqn = classType.fullyQualifiedName;
+        // Direct match: class FQN equals the expected module (e.g., z from zod where z's type FQN is "zod")
+        if (fqn === expectedModule) {
+            return true;
+        }
+        // Check via owningClass chain or FQN prefix
+        const moduleFromType = this.getModuleFromClassType(classType);
+        return moduleFromType === expectedModule;
+    }
+
+    /**
      * Check if the identifier is actually referenced in the file
      */
     private async checkIdentifierReferenced(compilationUnit: JS.CompilationUnit): Promise<boolean> {
@@ -718,12 +794,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 }
                             }
 
-                            if (identifier?.type && Type.isMethod(identifier.type)) {
-                                const methodType = identifier.type as Type.Method;
-                                expectedDeclaringType = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
-                                if (expectedDeclaringType) {
-                                    break;  // Found it!
-                                }
+                            expectedDeclaringType = this.getModuleFromType(identifier?.type, identifier?.fieldType);
+                            if (expectedDeclaringType) {
+                                break;  // Found it!
                             }
                         }
                     }
@@ -737,7 +810,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         // Step 2: Look for references that match
         const targetName = this.alias || this.member;
+        const targetModule = this.module;
         let found = false;
+        const self = this;
 
         // If no existing imports from this module, look for unresolved references
         // If there ARE existing imports, look for references with the expected declaring type
@@ -746,19 +821,65 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             override async visitIdentifier(identifier: J.Identifier, p: void): Promise<J | undefined> {
                 if (identifier.simpleName === targetName) {
                     const type = identifier.type;
+                    const fieldType = identifier.fieldType;
                     if (expectedDeclaringType) {
                         // We have an expected declaring type - check for exact match
                         if (type && Type.isMethod(type)) {
-                            const methodType = type as Type.Method;
-                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName((type as Type.Method).declaringType);
                             if (declaringTypeName === expectedDeclaringType) {
                                 found = true;
                             }
                         }
-                    } else {
-                        // No existing imports - look for unresolved references (no type)
-                        if (!type) {
+                        else if (type && Type.isClass(type)) {
+                            if (self.classTypeMatchesModule(type as Type.Class, expectedDeclaringType)) {
+                                found = true;
+                            }
+                        }
+                        else if (fieldType?.kind === Type.Kind.Variable) {
+                            const ownerTypeName = (fieldType as Type.Variable).owner
+                                ? Type.FullyQualified.getFullyQualifiedName((fieldType as Type.Variable).owner!)
+                                : undefined;
+                            if (ownerTypeName === expectedDeclaringType) {
+                                found = true;
+                            }
+                        }
+                        // Also check for unresolved references (member isn't imported yet)
+                        else if (!type && !fieldType) {
                             found = true;
+                        }
+                    } else {
+                        // No existing imports from this module - look for references that match
+                        // 1. Unresolved references (no type/unknown type and no fieldType)
+                        const isUnknownType = !type || type.kind === Type.Kind.Unknown;
+                        if (isUnknownType && !fieldType) {
+                            found = true;
+                        }
+                        // 2. References with fieldType matching the target module
+                        else if (fieldType?.kind === Type.Kind.Variable) {
+                            const variableType = fieldType as Type.Variable;
+                            if (variableType.owner && Type.isClass(variableType.owner)) {
+                                // Traverse owningClass chain to find the root module (handles nested namespaces)
+                                // For example: React.forwardRef -> owner is "React" namespace -> owningClass is "react" module
+                                let current: Type.Class = variableType.owner as Type.Class;
+
+                                // Walk up the owningClass chain until we reach the root
+                                while (current.owningClass && Type.isClass(current.owningClass)) {
+                                    current = current.owningClass as Type.Class;
+                                }
+
+                                const moduleName = Type.FullyQualified.getFullyQualifiedName(current);
+                                if (moduleName === targetModule) {
+                                    found = true;
+                                }
+                            }
+                        }
+                        // 3. References with method type matching the target module
+                        else if (type && Type.isMethod(type)) {
+                            const methodType = type as Type.Method;
+                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
+                            if (declaringTypeName === targetModule) {
+                                found = true;
+                            }
                         }
                     }
                 }
@@ -822,12 +943,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // For side-effect imports, use emptySpace since space comes from LeftPadded.before
         // For regular imports with import clause, use emptySpace since space comes from LeftPadded.before
         // However, the printer expects the space after 'from' in the literal's prefix
+        // Note: value contains the unquoted string, valueSource contains the quoted version for printing
         const moduleSpecifier: J.Literal = {
             id: randomId(),
             kind: J.Kind.Literal,
             prefix: this.sideEffectOnly ? emptySpace : singleSpace,
             markers: emptyMarkers,
-            value: `'${this.module}'`,
+            value: this.module,
             valueSource: `'${this.module}'`,
             unicodeEscapes: [],
             type: undefined

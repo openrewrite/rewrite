@@ -15,28 +15,28 @@
  */
 package org.openrewrite.maven.search;
 
+import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
-import org.openrewrite.maven.graph.DependencyGraph;
+import org.openrewrite.maven.graph.DependencyTreeWalker;
 import org.openrewrite.maven.table.DependenciesInUse;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.trait.MavenDependency;
+import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+
+import static java.util.stream.Collectors.joining;
 
 /**
  * Find direct and transitive dependencies, marking first order dependencies that
@@ -68,8 +68,8 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Version",
             description = "Match only dependencies with the specified version. " +
-                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
-                          "All versions are searched by default.",
+                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                    "All versions are searched by default.",
             example = "1.x",
             required = false)
     @Nullable
@@ -86,7 +86,13 @@ public class DependencyInsight extends Recipe {
     public Validated<Object> validate() {
         Validated<Object> v = super.validate()
                 .and(Validated.test("scope", "scope is a valid Maven scope", scope,
-                        s -> Scope.fromName(s) != Scope.Invalid));
+                        s -> Scope.fromName(s) != Scope.Invalid))
+                .and(Validated.test(
+                        "coordinates",
+                        "groupIdPattern AND artifactIdPattern must not both be generic wildcards",
+                        this,
+                        r -> !("*".equals(r.groupIdPattern) && "*".equals(artifactIdPattern))
+                ));
         if (version != null) {
             v = v.and(Semver.validate(version, null));
         }
@@ -106,7 +112,7 @@ public class DependencyInsight extends Recipe {
     @Override
     public String getDescription() {
         return "Find direct and transitive dependencies matching a group, artifact, and scope. " +
-               "Results include dependencies that either directly match or transitively include a matching dependency.";
+                "Results include dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override
@@ -114,95 +120,126 @@ public class DependencyInsight extends Recipe {
         Scope requestedScope = scope == null ? null : Scope.fromName(scope);
 
         return new MavenIsoVisitor<ExecutionContext>() {
-            final DependencyGraph dependencyGraph = new DependencyGraph();
-            final Map<String, Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>>> pathsByScope = new HashMap<>();
-
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                // Collect dependency paths for each scope separately to avoid non-deterministic HashMap iteration
-                if (requestedScope != null) {
-                    List<ResolvedDependency> dependencies = getResolutionResult().getDependencies().get(requestedScope);
-                    if (dependencies != null) {
-                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
-                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, requestedScope.name().toLowerCase());
-                        pathsByScope.put(requestedScope.name().toLowerCase(), projectPaths);
-                    }
-                } else {
-                    getResolutionResult().getDependencies().forEach((scope, dependencies) -> {
-                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
-                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, scope.name().toLowerCase());
-                        pathsByScope.put(scope.name().toLowerCase(), projectPaths);
-                    });
+                String projectName = document.getMarkers()
+                        .findFirst(JavaProject.class)
+                        .map(JavaProject::getProjectName)
+                        .orElse("");
+                String sourceSetName = document.getMarkers()
+                        .findFirst(JavaSourceSet.class)
+                        .map(JavaSourceSet::getName)
+                        .orElse("main");
+
+                DependencyTreeWalker.Matches<Scope> matches = new DependencyTreeWalker.Matches<>();
+                collectMatchingDependencies(projectName, sourceSetName, getResolutionResult(), requestedScope, matches, ctx);
+
+                if (matches.isEmpty()) {
+                    return document;
                 }
-                return super.visitDocument(document, ctx);
+
+                return (Xml.Document) new MarkIndividualDependency(onlyDirect, matches.byScope(), matches.byDirectDependency()).visitNonNull(document, ctx);
             }
 
-            @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = super.visitTag(tag, ctx);
-                if(!isDependencyTag()) {
-                    return t;
-                }
-                ResolvedDependency dependency = findDependency(t, requestedScope);
-                if(dependency == null) {
-                    return t;
-                }
-                ResolvedDependency match = dependency.findDependency(groupIdPattern, artifactIdPattern);
-                if(match == null) {
-                    return t;
-                }
-                if(version != null) {
-                    VersionComparator versionComparator = Semver.validate(version, null).getValue();
-                    if(versionComparator == null) {
-                        t = Markup.warn(t, new IllegalArgumentException("Could not construct a valid version comparator from " + version + "."));
-                    } else {
-                        if(!versionComparator.isValid(null, match.getVersion())) {
-                            return t;
+            private void collectMatchingDependencies(
+                    String projectName,
+                    String sourceSetName,
+                    MavenResolutionResult resolutionResult,
+                    @Nullable Scope requestedScope,
+                    DependencyTreeWalker.Matches<Scope> matches,
+                    ExecutionContext ctx
+            ) {
+                VersionComparator versionComparator = version != null ? Semver.validate(version, null).getValue() : null;
+                DependencyMatcher dependencyMatcher = new DependencyMatcher(groupIdPattern, artifactIdPattern, versionComparator);
+
+                if (requestedScope != null) {
+                    for (ResolvedDependency dependency : resolutionResult.getDependencies().get(requestedScope)) {
+                        matches.collect(requestedScope, dependency, dependencyMatcher,
+                                (matched, path) ->
+                                        createDataTableRow(projectName, sourceSetName, requestedScope, matched.getGav(), path, ctx));
+                    }
+                } else {
+                    for (Map.Entry<Scope, List<ResolvedDependency>> entry : resolutionResult.getDependencies().entrySet()) {
+                        Scope scope = entry.getKey();
+                        for (ResolvedDependency dependency : entry.getValue()) {
+                            matches.collect(scope, dependency, dependencyMatcher,
+                                    (matched, path) ->
+                                            createDataTableRow(projectName, sourceSetName, scope, matched.getGav(), path, ctx));
                         }
                     }
                 }
-                if (match == dependency) {
-                    t = SearchResult.found(t);
-                } else if (Boolean.TRUE.equals(onlyDirect)) {
-                    return t;
-                } else {
-                    t = SearchResult.found(t, match.getGav().toString());
-                }
+            }
 
-                Optional<JavaProject> javaProject = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
-                        .findFirst(JavaProject.class);
-                Optional<JavaSourceSet> javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
-                        .findFirst(JavaSourceSet.class);
-
-                Scope matchScope = Scope.fromName(match.getRequested().getScope());
-                String matchScopeName = matchScope.name().toLowerCase();
-
-                // Get the paths for this specific scope
-                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths =
-                        pathsByScope.getOrDefault(matchScopeName, new HashMap<>());
-
-                // Build the dependency graph string
-                String depGraph = dependencyGraph.buildDependencyGraph(
-                        match.getGav(),
-                        projectPaths,
-                        match.getDepth(),
-                        matchScopeName
-                );
-
+            private void createDataTableRow(
+                    String projectName,
+                    String sourceSetName,
+                    Scope scope,
+                    ResolvedGroupArtifactVersion gav,
+                    Deque<ResolvedDependency> dependencyPath,
+                    ExecutionContext ctx
+            ) {
+                String dependencyGraph = DependencyTreeWalker.renderPath(scope.name().toLowerCase(), dependencyPath);
                 dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
-                        javaProject.map(JavaProject::getProjectName).orElse(""),
-                        javaSourceSet.map(JavaSourceSet::getName).orElse("main"),
-                        match.getGroupId(),
-                        match.getArtifactId(),
-                        match.getVersion(),
-                        match.getDatedSnapshotVersion(),
-                        matchScopeName,
-                        match.getDepth(),
-                        depGraph
+                        projectName,
+                        sourceSetName,
+                        gav.getGroupId(),
+                        gav.getArtifactId(),
+                        gav.getVersion(),
+                        gav.getDatedSnapshotVersion(),
+                        scope.name().toLowerCase(),
+                        dependencyPath.size() - 1,
+                        dependencyGraph
                 ));
-
-                return t;
             }
         };
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Value
+    private static class MarkIndividualDependency extends MavenIsoVisitor<ExecutionContext> {
+        @Nullable Boolean onlyDirect;
+        Map<Scope, Set<GroupArtifactVersion>> scopeToDirectDependency;
+        Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
+
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            Xml.Tag t = super.visitTag(tag, ctx);
+            if (!isDependencyTag()) {
+                return t;
+            }
+
+            Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+            for (Map.Entry<Scope, Set<GroupArtifactVersion>> entry : scopeToDirectDependency.entrySet()) {
+                if (tagScope == entry.getKey() || tagScope.isInClasspathOf(entry.getKey())) {
+                    return new MavenDependency.Matcher().get(getCursor()).map(dependency -> {
+                        ResolvedGroupArtifactVersion gav = dependency.getResolvedDependency().getGav();
+                        Optional<GroupArtifactVersion> scopeGav = entry.getValue().stream()
+                                .filter(dep -> dep.asGroupArtifact().equals(gav.asGroupArtifact()))
+                                .findAny();
+                        if (scopeGav.isPresent()) {
+                            Set<GroupArtifactVersion> mark = directDependencyToTargetDependency.get(gav.asGroupArtifactVersion());
+                            if (mark == null) {
+                                return null;
+                            }
+                            String resultText = mark.stream()
+                                    .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
+                                    .sorted()
+                                    .collect(joining(","));
+                            if (!resultText.isEmpty()) {
+                                if (Boolean.TRUE.equals(onlyDirect)) {
+                                    if (mark.stream().anyMatch(target -> gav.asGroupArtifactVersion().equals(target))) {
+                                        return SearchResult.found(t, resultText);
+                                    }
+                                } else {
+                                    return SearchResult.found(t, resultText);
+                                }
+                            }
+                        }
+                        return null;
+                    }).orElse(t);
+                }
+            }
+            return t;
+        }
     }
 }

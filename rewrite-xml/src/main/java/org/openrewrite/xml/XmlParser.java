@@ -47,6 +47,7 @@ public class XmlParser implements Parser {
             "xslt",
             "xmi",
             "tld",
+            "jxb",
             "xjb",
             "jsp",
             // Datastage file formats that are all xml under the hood

@@ -366,6 +366,26 @@ export class JavaScriptParserVisitor {
             }
         }
 
+        let shebangStatement: J.RightPadded<JS.Shebang> | undefined;
+        if (prefix.whitespace?.startsWith('#!')) {
+            const newlineIndex = prefix.whitespace.indexOf('\n');
+            const shebangText = newlineIndex === -1 ? prefix.whitespace : prefix.whitespace.slice(0, newlineIndex);
+            const afterShebang = newlineIndex === -1 ? '' : '\n';
+            const remainingWhitespace = newlineIndex === -1 ? '' : prefix.whitespace.slice(newlineIndex + 1);
+
+            shebangStatement = this.rightPadded<JS.Shebang>({
+                kind: JS.Kind.Shebang,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                text: shebangText
+            }, {kind: J.Kind.Space, whitespace: afterShebang, comments: []}, emptyMarkers);
+
+            prefix = produce(prefix, draft => {
+                draft.whitespace = remainingWhitespace;
+            });
+        }
+
         return {
             kind: JS.Kind.CompilationUnit,
             id: randomId(),
@@ -374,7 +394,9 @@ export class JavaScriptParserVisitor {
             sourcePath: this.sourcePath,
             charsetName: bomAndTextEncoding.encoding,
             charsetBomMarked: bomAndTextEncoding.hasBom,
-            statements: this.semicolonPaddedStatementList(node.statements),
+            statements: shebangStatement
+                ? [shebangStatement, ...this.semicolonPaddedStatementList(node.statements)]
+                : this.semicolonPaddedStatementList(node.statements),
             eof: this.prefix(node.endOfFileToken)
         };
     }
