@@ -28,7 +28,7 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
-import {spawnSync} from "child_process";
+import {getLockFileDetectionConfig, runList} from "./package-manager";
 
 /**
  * Bun.lock package entry metadata.
@@ -216,34 +216,14 @@ export class PackageJsonParser extends Parser {
     }
 
     /**
-     * Lock file detection configuration.
-     * Priority order determines which package manager is detected when multiple lock files exist.
-     */
-    private static readonly LOCK_FILE_CONFIG: ReadonlyArray<{
-        filename: string;
-        packageManager: PackageManager | ((content: string) => PackageManager);
-        /** If true, prefer walking node_modules over parsing lock file */
-        preferNodeModules?: boolean;
-    }> = [
-        { filename: 'package-lock.json', packageManager: PackageManager.Npm },
-        { filename: 'bun.lock', packageManager: PackageManager.Bun },
-        { filename: 'pnpm-lock.yaml', packageManager: PackageManager.Pnpm, preferNodeModules: true },
-        // yarn.lock omits transitive dependency details (engines/license), so prefer node_modules
-        { filename: 'yarn.lock', packageManager: (content) =>
-            content.includes('__metadata:') ? PackageManager.YarnBerry : PackageManager.YarnClassic,
-            preferNodeModules: true
-        },
-    ];
-
-    /**
      * Attempts to read and parse a lock file from the given directory.
      * Supports npm (package-lock.json), bun (bun.lock), pnpm, and yarn.
      *
      * @returns Object with parsed lock file content and detected package manager, or undefined if no lock file found
      */
     private async tryReadLockFile(dir: string): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
-        // Detect which lock file exists (first match wins based on priority)
-        for (const config of PackageJsonParser.LOCK_FILE_CONFIG) {
+        // Use shared lock file detection config (first match wins based on priority)
+        for (const config of getLockFileDetectionConfig()) {
             const lockPath = path.join(dir, config.filename);
             if (!fs.existsSync(lockPath)) {
                 continue;
@@ -556,19 +536,12 @@ export class PackageJsonParser extends Parser {
      * Uses `pnpm list --json --depth=Infinity` to get the full dependency tree.
      */
     private getPnpmDependencies(dir: string): Record<string, any> | undefined {
-        // Use spawnSync with array args to avoid shell injection risks
-        const result = spawnSync('pnpm', ['list', '--json', '--depth=Infinity'], {
-            cwd: dir,
-            encoding: 'utf-8',
-            stdio: ['pipe', 'pipe', 'pipe'],
-            timeout: 30000
-        });
-
-        if (result.error || result.status !== 0) {
+        const output = runList(PackageManager.Pnpm, dir, 30000);
+        if (!output) {
             return undefined;
         }
 
-        const pnpmList = JSON.parse(result.stdout);
+        const pnpmList = JSON.parse(output);
         return this.convertPnpmListToNpmFormat(pnpmList);
     }
 
