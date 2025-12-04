@@ -62,6 +62,11 @@ interface ProjectUpdateInfo {
     newVersion: string;
     /** The package manager used by this project */
     packageManager: PackageManager;
+    /**
+     * If true, skip running the package manager because the resolved version
+     * already satisfies the new constraint. Only package.json needs updating.
+     */
+    skipInstall: boolean;
 }
 
 /**
@@ -194,6 +199,14 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                             // Use package manager from marker (set during parsing), default to npm
                             const pm = marker.packageManager ?? PackageManager.Npm;
 
+                            // Check if the resolved version already satisfies the new constraint.
+                            // If so, we can skip running the package manager entirely.
+                            const resolvedDep = marker.resolvedDependencies?.find(
+                                rd => rd.name === recipe.packageName
+                            );
+                            const skipInstall = resolvedDep !== undefined &&
+                                semver.satisfies(resolvedDep.version, recipe.newVersion);
+
                             acc.projectsToUpdate.set(doc.sourcePath, {
                                 projectDir,
                                 packageJsonPath: doc.sourcePath,
@@ -201,7 +214,8 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                                 dependencyScope: scope,
                                 currentVersion,
                                 newVersion: recipe.newVersion,
-                                packageManager: pm
+                                packageManager: pm,
+                                skipInstall
                             });
                         }
                         break; // Found the dependency, no need to check other scopes
@@ -232,7 +246,8 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                     }
 
                     // Run package manager install if we haven't processed this project yet
-                    if (!acc.processedProjects.has(sourcePath)) {
+                    // Skip if the resolved version already satisfies the new constraint
+                    if (!updateInfo.skipInstall && !acc.processedProjects.has(sourcePath)) {
                         await recipe.runPackageManagerInstall(acc, updateInfo, ctx);
                         acc.processedProjects.add(sourcePath);
                     }
@@ -413,6 +428,12 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             return doc;
         }
 
+        // If we skipped install, just update the versionConstraint in the marker
+        // The resolved version is already correct, we only changed the constraint
+        if (updateInfo.skipInstall) {
+            return this.updateMarkerVersionConstraint(doc, existingMarker, updateInfo);
+        }
+
         // Parse the updated package.json and lock file to create new marker
         const updatedPackageJson = acc.updatedPackageJsons.get(updateInfo.packageJsonPath);
         const lockFileName = getLockFileName(updateInfo.packageManager);
@@ -451,6 +472,37 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         );
 
         // Replace the marker in the document
+        return {
+            ...doc,
+            markers: replaceMarkerByKind(doc.markers, newMarker)
+        };
+    }
+
+    /**
+     * Updates just the versionConstraint in the marker for the target dependency.
+     * Used when skipInstall is true - the resolved version is unchanged.
+     */
+    private updateMarkerVersionConstraint(
+        doc: Json.Document,
+        existingMarker: any,
+        updateInfo: ProjectUpdateInfo
+    ): Json.Document {
+        // Create updated dependency lists with the new versionConstraint
+        const updateDeps = (deps: any[] | undefined) => {
+            if (!deps) return deps;
+            return deps.map(dep => {
+                if (dep.name === this.packageName) {
+                    return {...dep, versionConstraint: updateInfo.newVersion};
+                }
+                return dep;
+            });
+        };
+
+        const newMarker = {
+            ...existingMarker,
+            [updateInfo.dependencyScope]: updateDeps(existingMarker[updateInfo.dependencyScope])
+        };
+
         return {
             ...doc,
             markers: replaceMarkerByKind(doc.markers, newMarker)
