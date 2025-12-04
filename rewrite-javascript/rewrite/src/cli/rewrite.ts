@@ -17,9 +17,10 @@
 import {Command} from 'commander';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
+import {spawn} from 'child_process';
 import {RecipeRegistry} from '../recipe';
 import {ExecutionContext} from '../execution';
-import {scheduleRun} from '../run';
+import {scheduleRunStreaming} from '../run';
 import {TreePrinters} from '../print';
 import {activate} from '../index';
 import {
@@ -49,6 +50,7 @@ interface CliOptions {
     recipeDir?: string;
     option: string[];
     verbose: boolean;
+    debug: boolean;
 }
 
 async function main() {
@@ -61,11 +63,22 @@ async function main() {
         .option('-d, --recipe-dir <dir>', 'Directory for recipe installation', DEFAULT_RECIPE_DIR)
         .option('-o, --option <option...>', 'Recipe options in format "key=value"', [])
         .option('-v, --verbose', 'Enable verbose output', false)
+        .option('--debug', 'Start with Node.js debugger (--inspect-brk)', false)
         .parse();
 
     const recipeArg = program.args[0];
     const opts = program.opts() as CliOptions;
     opts.option = opts.option || [];
+
+    // Handle --debug by re-spawning with --inspect-brk
+    if (opts.debug) {
+        const args = process.argv.slice(2).filter(arg => arg !== '--debug');
+        const child = spawn(process.execPath, ['--inspect-brk', process.argv[1], ...args], {
+            stdio: 'inherit'
+        });
+        child.on('exit', (code) => process.exit(code ?? 0));
+        return;
+    }
 
     // Parse recipe specification
     const recipeSpec = parseRecipeSpec(recipeArg);
@@ -135,25 +148,24 @@ async function main() {
         return;
     }
 
-    // Run the recipe
+    // Run the recipe with streaming output
     const ctx = new ExecutionContext();
-    const {changeset} = await scheduleRun(recipe, parsedFiles, ctx);
+    let changeCount = 0;
 
-    if (changeset.length === 0) {
-        console.log('No changes to make.');
-        return;
-    }
-
-    console.log(`\n${changeset.length} file(s) ${opts.dryRun ? 'would be ' : ''}changed:\n`);
-
-    // Handle results
-    for (const result of changeset) {
+    for await (const result of scheduleRunStreaming(recipe, parsedFiles, ctx)) {
         if (opts.dryRun) {
-            // Print colorized diff
+            // Print colorized diff immediately (skip empty diffs)
             const diff = await result.diff();
-            console.log(colorizeDiff(diff));
+            const hasChanges = diff.split('\n').some(line =>
+                (line.startsWith('+') || line.startsWith('-')) &&
+                !line.startsWith('+++') && !line.startsWith('---')
+            );
+            if (hasChanges) {
+                changeCount++;
+                console.log(colorizeDiff(diff));
+            }
         } else {
-            // Apply changes
+            // Apply changes immediately
             if (result.after) {
                 const filePath = path.join(projectRoot, result.after.sourcePath);
                 const content = await TreePrinters.print(result.after);
@@ -162,6 +174,7 @@ async function main() {
                 await fsp.mkdir(path.dirname(filePath), {recursive: true});
                 await fsp.writeFile(filePath, content);
 
+                changeCount++;
                 if (result.before) {
                     console.log(`  Modified: ${result.after.sourcePath}`);
                 } else {
@@ -170,13 +183,18 @@ async function main() {
             } else if (result.before) {
                 const filePath = path.join(projectRoot, result.before.sourcePath);
                 await fsp.unlink(filePath);
+                changeCount++;
                 console.log(`  Deleted: ${result.before.sourcePath}`);
             }
         }
     }
 
-    if (!opts.dryRun) {
-        console.log('\nChanges applied successfully.');
+    if (changeCount === 0) {
+        console.log('No changes to make.');
+    } else if (opts.dryRun) {
+        console.log(`\n${changeCount} file(s) would be changed.`);
+    } else {
+        console.log(`\n${changeCount} file(s) changed.`);
     }
 }
 

@@ -61,7 +61,27 @@ async function recursiveOnComplete(recipe: Recipe, ctx: ExecutionContext): Promi
 }
 
 export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: ExecutionContext): Promise<RecipeRun> {
+    const changeset: Result[] = [];
+    for await (const result of scheduleRunStreaming(recipe, before, ctx)) {
+        changeset.push(result);
+    }
+    return { changeset };
+}
+
+/**
+ * Streaming version of scheduleRun that yields results as soon as each file is processed.
+ * This allows callers to print diffs immediately and free memory earlier.
+ *
+ * For scanning recipes, the scan phase completes on all files before yielding any results.
+ */
+export async function* scheduleRunStreaming(
+    recipe: Recipe,
+    before: SourceFile[],
+    ctx: ExecutionContext
+): AsyncGenerator<Result, void, undefined> {
     const cursor = rootCursor();
+
+    // Phase 1: Run scanners on all files (if any scanning recipes exist)
     if (await hasScanningRecipe(recipe)) {
         for (const b of before) {
             await recurseRecipeList(recipe, b, async (recipe, b2) => {
@@ -72,6 +92,7 @@ export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: Exe
         }
     }
 
+    // Phase 2: Collect generated files
     const generated = (await recurseRecipeList(recipe, [] as SourceFile[], async (recipe, generated) => {
         if (recipe instanceof ScanningRecipe) {
             generated.push(...await recipe.generate(recipe.accumulator(cursor, ctx), ctx));
@@ -79,25 +100,21 @@ export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: Exe
         return generated;
     }))!;
 
-    const changeset: Result[] = [];
-
+    // Phase 3: Edit existing files and yield results immediately
     for (const b of before) {
         const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
         if (editedB !== b) {
-            changeset.push(new Result(b, editedB));
+            yield new Result(b, editedB);
         }
     }
 
+    // Phase 4: Edit generated files and yield results
     for (const g of generated) {
         const editedG = await recurseRecipeList(recipe, g, async (recipe, g2) => (await recipe.editor()).visit(g2, ctx, cursor));
         if (editedG) {
-            changeset.push(new Result(undefined, editedG));
+            yield new Result(undefined, editedG);
         }
     }
 
     await recursiveOnComplete(recipe, ctx);
-
-    return {
-        changeset: changeset
-    };
 }
