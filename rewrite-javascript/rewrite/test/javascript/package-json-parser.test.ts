@@ -375,4 +375,71 @@ empty-value=
         }, {unsafeCleanup: true});
     });
 
+    test("should find lock file in subdirectory when relativeTo is parent directory", async () => {
+        // This tests the scenario where relativeTo is the Git root but package.json
+        // and its lock file are in a subdirectory (e.g., a workspace member)
+        await withDir(async (rootDir) => {
+            // Create a subdirectory structure: rootDir/subproject/
+            const subprojectDir = path.join(rootDir.path, 'subproject');
+            fs.mkdirSync(subprojectDir);
+
+            // Write package.json in subdirectory
+            const packageJsonContent = {
+                name: "subproject",
+                version: "1.0.0",
+                dependencies: {
+                    "lodash": "^4.17.0"
+                }
+            };
+            fs.writeFileSync(
+                path.join(subprojectDir, 'package.json'),
+                JSON.stringify(packageJsonContent, null, 2)
+            );
+
+            // Write package-lock.json in subdirectory (not at root)
+            const packageLock = {
+                name: "subproject",
+                version: "1.0.0",
+                lockfileVersion: 3,
+                packages: {
+                    "": {
+                        name: "subproject",
+                        version: "1.0.0",
+                        dependencies: {
+                            "lodash": "^4.17.0"
+                        }
+                    },
+                    "node_modules/lodash": {
+                        version: "4.17.21",
+                        license: "MIT"
+                    }
+                }
+            };
+            fs.writeFileSync(
+                path.join(subprojectDir, 'package-lock.json'),
+                JSON.stringify(packageLock, null, 2)
+            );
+
+            // Parse with relativeTo set to root directory (simulating Git root)
+            const parser = new PackageJsonParser({ relativeTo: rootDir.path });
+            const results: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(subprojectDir, 'package.json'))) {
+                results.push(result as Json.Document);
+            }
+
+            expect(results).toHaveLength(1);
+            const marker = findNodeResolutionResult(results[0]);
+            expect(marker).toBeDefined();
+            expect(marker!.name).toBe("subproject");
+            // Path should be relative to relativeTo
+            expect(marker!.path).toBe("subproject/package.json");
+            // Should have found the lock file in the subdirectory
+            expect(marker!.resolvedDependencies.length).toBeGreaterThan(0);
+            // Check that dependency is resolved
+            const lodashDep = marker!.dependencies.find(d => d.name === "lodash");
+            expect(lodashDep?.resolved).toBeDefined();
+            expect(lodashDep!.resolved!.version).toBe("4.17.21");
+        }, {unsafeCleanup: true});
+    });
+
 });

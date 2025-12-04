@@ -88,6 +88,9 @@ export class FindDependency extends Recipe {
 
     constructor(options: FindDependencyOptions) {
         super(options);
+        // Handle string values from RPC serialization (e.g., "false" instead of false)
+        // and default to true if not specified
+        this.onlyDirect = !(this.onlyDirect === false || (this.onlyDirect as any === "false"));
     }
 
     override instanceName(): string {
@@ -97,8 +100,7 @@ export class FindDependency extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const packageName = this.packageName;
         const version = this.version;
-        // Default to true if not specified (only search direct dependencies)
-        const onlyDirect = this.onlyDirect ?? true;
+        const onlyDirect = this.onlyDirect;
 
         // Create a picomatch matcher for the package name pattern
         // For patterns without '/', use { contains: true } so that '*jest*' matches '@types/jest'
