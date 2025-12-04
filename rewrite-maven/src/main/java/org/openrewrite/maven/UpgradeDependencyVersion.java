@@ -364,26 +364,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             private @Nullable TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency(Xml.Tag tag, ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
-                // For BOM imports, read the GAV directly from the tag. This handles the case where
-                // a BOM's dependencies overlap with dependencies managed by earlier BOMs.
-                // We check this FIRST because findManagedDependency might incorrectly match a dependency
-                // managed by another BOM that happens to have the same groupId/artifactId as this BOM import.
-                String tagType = tag.getChildValue("type").orElse(null);
-                String tagScope = tag.getChildValue("scope").orElse(null);
-                if ("pom".equals(tagType) && "import".equals(tagScope)) {
-                    String group = ofNullable(getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()))).orElse("");
-                    String artifact = ofNullable(getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""))).orElse("");
-                    String requestedVersion = tag.getChildValue("version").orElse(null);
-                    String resolvedVersion = requestedVersion != null ? getResolutionResult().getPom().getValue(requestedVersion) : null;
-                    if (resolvedVersion != null &&
-                        !accumulator.projectArtifacts.contains(new GroupArtifact(group, artifact)) &&
-                        matchesGlob(group, UpgradeDependencyVersion.this.groupId) &&
-                        matchesGlob(artifact, UpgradeDependencyVersion.this.artifactId)) {
-                        return upgradeVersion(ctx, t, requestedVersion, group, artifact, resolvedVersion);
-                    }
-                    return null;
-                }
-
                 ResolvedManagedDependency managedDependency = findManagedDependency(t);
                 if (managedDependency != null) {
                     String groupId = managedDependency.getGroupId();
@@ -394,6 +374,20 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         matchesGlob(groupId, UpgradeDependencyVersion.this.groupId) &&
                         matchesGlob(artifactId, UpgradeDependencyVersion.this.artifactId)) {
                         return upgradeVersion(ctx, t, managedDependency.getRequested().getVersion(), groupId, artifactId, version);
+                    }
+                } else {
+                    for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
+                        if (dm.getBomGav() != null) {
+                            String group = ofNullable(getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()))).orElse("");
+                            String artifactId = ofNullable(getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""))).orElse("");
+                            if (!accumulator.projectArtifacts.contains(new GroupArtifact(group, artifactId))) {
+                                ResolvedGroupArtifactVersion bom = dm.getBomGav();
+                                if (Objects.equals(group, bom.getGroupId()) &&
+                                    Objects.equals(artifactId, bom.getArtifactId())) {
+                                    return upgradeVersion(ctx, t, requireNonNull(dm.getRequestedBom()).getVersion(), bom.getGroupId(), bom.getArtifactId(), bom.getVersion());
+                                }
+                            }
+                        }
                     }
                 }
                 return null;
