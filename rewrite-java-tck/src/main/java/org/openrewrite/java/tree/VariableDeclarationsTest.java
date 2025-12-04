@@ -15,7 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava17;
@@ -279,6 +283,39 @@ class VariableDeclarationsTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/6372")
+    @MinimumJava11
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "(var j)",
+      "(Object j)",
+      "j",
+      "(j)",
+      "vari",
+      "(vari)"
+    })
+    void lambdaParameterVariableDeclarations(@Language("java") String variableDeclaration) {
+        @Language("java")
+        String java = String.format(
+          """
+            import java.util.function.Consumer;
+            
+            class Foo {
+                void main() {
+                    Consumer<Object> i = %s -> {};
+                }
+            }
+            """,
+          variableDeclaration
+        );
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          java(
+            java
           )
         );
     }
