@@ -15,7 +15,6 @@
  */
 package org.openrewrite.marker;
 
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -30,6 +29,5 @@ public class GitTreeEntry implements Marker {
 
     String objectId;
 
-    @JsonUnwrapped
-    FileMode fileMode;
+    int fileMode;
 }
