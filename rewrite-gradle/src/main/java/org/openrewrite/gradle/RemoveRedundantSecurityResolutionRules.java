@@ -34,7 +34,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
+import static java.util.Collections.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -74,7 +74,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("security");
+        return singleton("security");
     }
 
     @Override
@@ -198,7 +198,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                     return null;
                 }
 
-                return m.withArguments(Collections.singletonList(
+                return m.withArguments(singletonList(
                         closure.withBody(closureBody.withStatements(newStatements))
                 ));
             }
@@ -478,7 +478,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                         // Statements were removed - clean up whitespace
                         newBlock = cleanupBlockWhitespace(newBlock);
                         newLambda = newLambda.withBody(newBlock);
-                        m = m.withArguments(Collections.singletonList(newLambda));
+                        m = m.withArguments(singletonList(newLambda));
                     }
                 }
             }
