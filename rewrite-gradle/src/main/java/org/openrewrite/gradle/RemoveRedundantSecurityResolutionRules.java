@@ -510,66 +510,6 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             return block;
         }
 
-        private static boolean isEmptyAllBlock(J.MethodInvocation m) {
-            if (!METHOD_ALL.equals(m.getSimpleName())) {
-                return false;
-            }
-            if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
-                return false;
-            }
-            J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
-            if (!(lambda.getBody() instanceof J.Block)) {
-                return false;
-            }
-            J.Block block = (J.Block) lambda.getBody();
-            // Empty if no statements OR only contains an empty return statement
-            // OR only contains resolutionStrategy statements (which means they were emptied)
-            if (block.getStatements().isEmpty()) {
-                return true;
-            }
-            for (Statement stmt : block.getStatements()) {
-                if (stmt instanceof J.Return && ((J.Return) stmt).getExpression() == null) {
-                    continue; // empty return is okay
-                }
-                if (stmt instanceof J.MethodInvocation) {
-                    J.MethodInvocation mi = (J.MethodInvocation) stmt;
-                    // Check if this is resolutionStrategy.eachDependency with empty closure
-                    if (isEmptyResolutionStrategy(mi)) {
-                        continue;
-                    }
-                }
-                // Found a non-empty statement
-                return false;
-            }
-            return true;
-        }
-
-        private static boolean isEmptyResolutionStrategy(J.MethodInvocation m) {
-            // Check for resolutionStrategy.eachDependency { } or resolutionStrategy { }
-            if (METHOD_EACH_DEPENDENCY.equals(m.getSimpleName())) {
-                if (m.getSelect() instanceof J.Identifier &&
-                    METHOD_RESOLUTION_STRATEGY.equals(((J.Identifier) m.getSelect()).getSimpleName())) {
-                    if (m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
-                        J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
-                        if (lambda.getBody() instanceof J.Block) {
-                            J.Block block = (J.Block) lambda.getBody();
-                            // Empty or only empty returns
-                            if (block.getStatements().isEmpty()) {
-                                return true;
-                            }
-                            for (Statement stmt : block.getStatements()) {
-                                if (!(stmt instanceof J.Return) || ((J.Return) stmt).getExpression() != null) {
-                                    return false;
-                                }
-                            }
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
         /**
          * Checks if this is an empty resolutionStrategy { } block.
          */
@@ -577,22 +517,8 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             if (!METHOD_RESOLUTION_STRATEGY.equals(m.getSimpleName())) {
                 return false;
             }
-            if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
-                return false;
-            }
-            J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
-            if (!(lambda.getBody() instanceof J.Block)) {
-                return false;
-            }
-            J.Block block = (J.Block) lambda.getBody();
-            if (block.getStatements().isEmpty()) {
-                return true;
-            }
-            if (block.getStatements().size() == 1) {
-                Statement stmt = block.getStatements().get(0);
-                return stmt instanceof J.Return && ((J.Return) stmt).getExpression() == null;
-            }
-            return false;
+            J.Block block = getBlockFromLambdaArg(m, 0);
+            return block != null && isBlockEmptyOrOnlyEmptyReturns(block);
         }
 
         /**
@@ -607,22 +533,8 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             if (METHOD_ALL.equals(m.getSimpleName())) {
                 return false;
             }
-            if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
-                return false;
-            }
-            J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
-            if (!(lambda.getBody() instanceof J.Block)) {
-                return false;
-            }
-            J.Block block = (J.Block) lambda.getBody();
-            if (block.getStatements().isEmpty()) {
-                return true;
-            }
-            if (block.getStatements().size() == 1) {
-                Statement stmt = block.getStatements().get(0);
-                return stmt instanceof J.Return && ((J.Return) stmt).getExpression() == null;
-            }
-            return false;
+            J.Block block = getBlockFromLambdaArg(m, 0);
+            return block != null && isBlockEmptyOrOnlyEmptyReturns(block);
         }
 
         /**
@@ -639,23 +551,8 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             if (METHOD_ALL.equals(m.getSimpleName())) {
                 return false;
             }
-            if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
-                return false;
-            }
-            J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
-            if (!(lambda.getBody() instanceof J.Block)) {
-                return false;
-            }
-            J.Block block = (J.Block) lambda.getBody();
-            // Empty if no statements OR only contains an empty return statement
-            if (block.getStatements().isEmpty()) {
-                return true;
-            }
-            if (block.getStatements().size() == 1) {
-                Statement stmt = block.getStatements().get(0);
-                return stmt instanceof J.Return && ((J.Return) stmt).getExpression() == null;
-            }
-            return false;
+            J.Block block = getBlockFromLambdaArg(m, 0);
+            return block != null && isBlockEmptyOrOnlyEmptyReturns(block);
         }
 
         private static boolean isEmptyConfigurationsAll(J.MethodInvocation m, Cursor cursor) {
@@ -676,23 +573,8 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             if (!isConfigurationsAll) {
                 return false;
             }
-            if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
-                return false;
-            }
-            J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
-            if (!(lambda.getBody() instanceof J.Block)) {
-                return false;
-            }
-            J.Block block = (J.Block) lambda.getBody();
-            // Empty if no statements OR only contains an empty return statement
-            if (block.getStatements().isEmpty()) {
-                return true;
-            }
-            if (block.getStatements().size() == 1) {
-                Statement stmt = block.getStatements().get(0);
-                return stmt instanceof J.Return && ((J.Return) stmt).getExpression() == null;
-            }
-            return false;
+            J.Block block = getBlockFromLambdaArg(m, 0);
+            return block != null && isBlockEmptyOrOnlyEmptyReturns(block);
         }
 
         private static boolean isInsideConfigurationsBlock(Cursor cursor) {
@@ -725,27 +607,8 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 return false;
             }
             // named() takes a string argument and a lambda: named("configName") { }
-            if (m.getArguments().size() != 2) {
-                return false;
-            }
-            Expression lastArg = m.getArguments().get(1);
-            if (!(lastArg instanceof J.Lambda)) {
-                return false;
-            }
-            J.Lambda lambda = (J.Lambda) lastArg;
-            if (!(lambda.getBody() instanceof J.Block)) {
-                return false;
-            }
-            J.Block block = (J.Block) lambda.getBody();
-            // Empty if no statements OR only contains an empty return statement
-            if (block.getStatements().isEmpty()) {
-                return true;
-            }
-            if (block.getStatements().size() == 1) {
-                Statement stmt = block.getStatements().get(0);
-                return stmt instanceof J.Return && ((J.Return) stmt).getExpression() == null;
-            }
-            return false;
+            J.Block block = getBlockFromLambdaArg(m, 1);
+            return block != null && isBlockEmptyOrOnlyEmptyReturns(block);
         }
 
         /**
@@ -759,15 +622,33 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             if (m.getSelect() != null) {
                 return false;
             }
-            if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
-                return false;
+            J.Block block = getBlockFromLambdaArg(m, 0);
+            return block != null && isBlockEmptyOrOnlyEmptyReturns(block);
+        }
+
+        /**
+         * Extracts a J.Block from a lambda argument at the specified index.
+         * Returns null if the argument is not a lambda with a block body.
+         */
+        private static J.@Nullable Block getBlockFromLambdaArg(J.MethodInvocation m, int argIndex) {
+            if (m.getArguments().size() <= argIndex) {
+                return null;
             }
-            J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
+            Expression arg = m.getArguments().get(argIndex);
+            if (!(arg instanceof J.Lambda)) {
+                return null;
+            }
+            J.Lambda lambda = (J.Lambda) arg;
             if (!(lambda.getBody() instanceof J.Block)) {
-                return false;
+                return null;
             }
-            J.Block block = (J.Block) lambda.getBody();
-            // Empty if no statements OR only contains an empty return statement
+            return (J.Block) lambda.getBody();
+        }
+
+        /**
+         * Checks if a block is empty or contains only empty return statements.
+         */
+        private static boolean isBlockEmptyOrOnlyEmptyReturns(J.Block block) {
             if (block.getStatements().isEmpty()) {
                 return true;
             }
