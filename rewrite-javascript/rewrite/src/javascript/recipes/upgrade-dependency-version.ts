@@ -98,9 +98,9 @@ interface Accumulator {
  * This would be similar to how Maven's UpgradeDependencyVersion works with version selectors.
  */
 export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
-    readonly name = "org.openrewrite.javascript.dependencies.UpgradeDependencyVersion";
+    readonly name = "org.openrewrite.javascript.dependencies.upgrade-dependency-version";
     readonly displayName = "Upgrade npm dependency version";
-    readonly description = "Upgrades the version of a dependency in package.json and updates the lock file by running the package manager.";
+    readonly description = "Upgrades the version of a dependency in `package.json` and updates the lock file by running the package manager.";
 
     @Option({
         displayName: "Package name",

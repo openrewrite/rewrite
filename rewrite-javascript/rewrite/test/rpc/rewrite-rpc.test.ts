@@ -208,6 +208,16 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("runScanningRecipeThatEdits", async () => {
+        // This test verifies that the accumulator from the scanning phase
+        // is correctly passed to the editor phase over RPC.
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.scanning-editor");
+        await spec.rewriteRun(
+            text("file1", "file1 (count: 2)"),
+            text("file2", "file2 (count: 2)")
+        );
+    });
+
     test("runRecipeWithPreconditions", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier-with-path", {
             identifier: "hello",

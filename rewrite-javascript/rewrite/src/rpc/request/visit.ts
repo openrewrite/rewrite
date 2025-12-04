@@ -96,6 +96,17 @@ export class Visit {
             if (!recipe) {
                 throw new Error(`No editing recipe found for key: ${recipeKey}`);
             }
+            // For ScanningRecipe, we need to use the same cursor that was used during scanning
+            // to retrieve the accumulator that was stored there
+            if (recipe instanceof ScanningRecipe) {
+                let cursor = recipeCursors.get(recipe);
+                if (!cursor) {
+                    cursor = rootCursor();
+                    recipeCursors.set(recipe, cursor);
+                }
+                const acc = recipe.accumulator(cursor, p);
+                return recipe.editorWithData(acc);
+            }
             return await recipe.editor();
         } else {
             return Reflect.construct(

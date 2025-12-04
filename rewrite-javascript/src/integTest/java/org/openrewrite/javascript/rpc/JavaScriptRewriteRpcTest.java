@@ -373,6 +373,21 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Test
+    void runScanningRecipeThatEdits() {
+        // This test verifies that the accumulator from the scanning phase
+        // is correctly passed to the editor phase over RPC.
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.text.scanning-editor", Map.of()))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          text("file1", "file1 (count: 2)"),
+          text("file2", "file2 (count: 2)")
+        );
+    }
+
     private void installRecipes() {
         File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
         assertThat(exampleRecipes).exists();

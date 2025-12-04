@@ -53,7 +53,7 @@ export class Generate {
                             cursor = rootCursor();
                             recipeCursors.set(recipe, cursor);
                         }
-                        const ctx = getObject(request.p) as ExecutionContext;
+                        const ctx = await getObject(request.p) as ExecutionContext;
                         const acc = recipe.accumulator(cursor, ctx);
                         const generated = await recipe.generate(acc, ctx)
 
