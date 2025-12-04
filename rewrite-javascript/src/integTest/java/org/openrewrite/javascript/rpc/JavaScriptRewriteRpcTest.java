@@ -346,6 +346,12 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             .relativeTo(projectDir),
           npm(
             projectDir,
+            java(
+              """
+                /** Javadoc */
+                class Foo {}
+                """
+            ),
             packageJson(
               """
                 {
