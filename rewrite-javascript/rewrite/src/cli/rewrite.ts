@@ -23,13 +23,14 @@ import {scheduleRun} from '../run';
 import {TreePrinters} from '../print';
 import {activate} from '../index';
 import {
-    parseRecipeSpec,
-    parseRecipeOptions,
+    colorizeDiff,
+    discoverFiles,
+    findRecipe,
     installRecipePackage,
     loadLocalRecipes,
-    findRecipe,
-    discoverFiles,
-    parseFiles
+    parseFiles,
+    parseRecipeOptions,
+    parseRecipeSpec
 } from './cli-utils';
 
 // Import language modules to register printers
@@ -148,9 +149,9 @@ async function main() {
     // Handle results
     for (const result of changeset) {
         if (opts.dryRun) {
-            // Print diff
+            // Print colorized diff
             const diff = await result.diff();
-            console.log(diff);
+            console.log(colorizeDiff(diff));
         } else {
             // Apply changes
             if (result.after) {
