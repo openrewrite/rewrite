@@ -337,7 +337,7 @@ class RemoveRedundantSecurityResolutionRulesTest implements RewriteTest {
 
     /**
      * Verifies that a configurations block with only custom configuration declarations
-     * (no resolutionStrategy) is left unchanged by the recipe.
+     * (no resolution strategy) is left unchanged by the recipe.
      */
     @Test
     void keepConfigurationsBlockWithoutResolutionStrategy() {
@@ -352,6 +352,86 @@ class RemoveRedundantSecurityResolutionRulesTest implements RewriteTest {
                   customOne
                   customTwo
               }
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                  implementation 'com.fasterxml.jackson.core:jackson-databind'
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Removes the resolution rule defined on a specific configuration ({@code compileClasspath}) rather than
+     * {@code configurations.all}. The recipe should handle resolution strategies on any resolvable configuration.
+     */
+    @Test
+    void removeRedundantRuleOnSpecificConfiguration() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              configurations.compileClasspath {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-databind') {
+                          details.useVersion('2.12.5')
+                          details.because('CVE-2024-BAD')
+                      }
+                  }
+              }
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                  implementation 'com.fasterxml.jackson.core:jackson-databind'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                  implementation 'com.fasterxml.jackson.core:jackson-databind'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeRedundantRuleOnNestedConfiguration() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              configurations {
+                  compileClasspath {
+                      resolutionStrategy {
+                          eachDependency { details ->
+                              if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-databind') {
+                                  details.useVersion('2.12.5')
+                                  details.because('CVE-2024-BAD')
+                              }
+                          }
+                      }
+                  }
+              }
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                  implementation 'com.fasterxml.jackson.core:jackson-databind'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
               dependencies {
                   implementation platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
                   implementation 'com.fasterxml.jackson.core:jackson-databind'
