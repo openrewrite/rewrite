@@ -240,6 +240,60 @@ class RemoveRedundantSecurityResolutionRulesGroovyTest implements RewriteTest {
         );
     }
 
+    /**
+     * Removes the resolution rule from buildscript because the Spring Boot BOM (3.3.3) manages
+     * jackson-databind to version 2.17.2, which is newer than the pinned version 2.12.5.
+     * Since the platform is declared in the buildscript dependencies, the manual version
+     * constraint is redundant and can be safely removed.
+     */
+    @Test
+    void removeBuildscriptRuleWhenPlatformInBuildscript() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript {
+                  repositories { mavenCentral() }
+                  configurations.all {
+                      resolutionStrategy.eachDependency { details ->
+                          if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-databind') {
+                              details.useVersion('2.12.5')
+                              details.because('CVE-2024-BAD')
+                          }
+                      }
+                  }
+                  dependencies {
+                      classpath platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                      classpath 'com.fasterxml.jackson.core:jackson-databind'
+                  }
+              }
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+              }
+              """,
+            """
+              buildscript {
+                  repositories { mavenCentral() }
+                  dependencies {
+                      classpath platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                      classpath 'com.fasterxml.jackson.core:jackson-databind'
+                  }
+              }
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void keepRuleWithoutBecauseClause() {
         rewriteRun(
