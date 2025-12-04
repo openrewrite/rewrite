@@ -441,9 +441,10 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             // 2. resolutionStrategy { } blocks
             // 3. Nested configuration blocks inside configurations { }
             // 4. Empty configurations { } block itself
+            // 5. configurations.named("...") { } (Kotlin DSL)
             if (isEmptyConfigurationsAll(m, getCursor()) || isEmptyConfigurationsBlock(m) ||
                 isEmptyResolutionStrategyBlock(m) || isEmptyNestedConfigurationBlock(m, getCursor()) ||
-                isEmptyConfigurationsMethodBlock(m)) {
+                isEmptyConfigurationsMethodBlock(m) || isEmptyNamedConfigurationBlock(m, getCursor())) {
                 return null;
             }
 
@@ -690,6 +691,51 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                     (value instanceof J.MethodInvocation &&
                      "configurations".equals(((J.MethodInvocation) value).getSimpleName())));
             return parent.getValue() != Cursor.ROOT_VALUE;
+        }
+
+        /**
+         * Checks if this is an empty configurations.named("...") { } block (Kotlin DSL pattern).
+         * Also handles named("...") { } inside a configurations { } block.
+         */
+        private static boolean isEmptyNamedConfigurationBlock(J.MethodInvocation m, Cursor cursor) {
+            if (!"named".equals(m.getSimpleName())) {
+                return false;
+            }
+            // Check for two patterns:
+            // 1. configurations.named("...") { } - select is "configurations" identifier
+            // 2. named("...") { } inside configurations { } block - select is null
+            boolean isConfigurationsNamed = false;
+            if (m.getSelect() instanceof J.Identifier &&
+                "configurations".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                isConfigurationsNamed = true;
+            } else if (m.getSelect() == null) {
+                isConfigurationsNamed = isInsideConfigurationsBlock(cursor);
+            }
+            if (!isConfigurationsNamed) {
+                return false;
+            }
+            // named() takes a string argument and a lambda: named("configName") { }
+            if (m.getArguments().size() != 2) {
+                return false;
+            }
+            Expression lastArg = m.getArguments().get(1);
+            if (!(lastArg instanceof J.Lambda)) {
+                return false;
+            }
+            J.Lambda lambda = (J.Lambda) lastArg;
+            if (!(lambda.getBody() instanceof J.Block)) {
+                return false;
+            }
+            J.Block block = (J.Block) lambda.getBody();
+            // Empty if no statements OR only contains an empty return statement
+            if (block.getStatements().isEmpty()) {
+                return true;
+            }
+            if (block.getStatements().size() == 1) {
+                Statement stmt = block.getStatements().get(0);
+                return stmt instanceof J.Return && ((J.Return) stmt).getExpression() == null;
+            }
+            return false;
         }
 
         /**

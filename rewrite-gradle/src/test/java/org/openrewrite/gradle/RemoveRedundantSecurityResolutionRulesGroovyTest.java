@@ -24,7 +24,7 @@ import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
-class RemoveRedundantSecurityResolutionRulesTest implements RewriteTest {
+class RemoveRedundantSecurityResolutionRulesGroovyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
