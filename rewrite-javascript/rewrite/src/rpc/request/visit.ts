@@ -24,6 +24,10 @@ export interface VisitResponse {
     modified: boolean
 }
 
+// Tracks the last phase (scan or edit) for each recipe to detect cycle transitions
+type RecipePhase = 'scan' | 'edit';
+const recipePhases: WeakMap<Recipe, RecipePhase> = new WeakMap();
+
 export class Visit {
     constructor(private readonly visitor: string,
                 private readonly sourceFileType: string,
@@ -77,6 +81,13 @@ export class Visit {
             if (!recipe) {
                 throw new Error(`No scanning recipe found for key: ${recipeKey}`);
             }
+            // If we're transitioning from edit back to scan, this is a new cycle.
+            // Clear the cursor so a fresh accumulator is created.
+            if (recipePhases.get(recipe) === 'edit') {
+                recipeCursors.delete(recipe);
+            }
+            recipePhases.set(recipe, 'scan');
+
             let cursor = recipeCursors.get(recipe);
             if (!cursor) {
                 cursor = rootCursor();
@@ -96,6 +107,8 @@ export class Visit {
             if (!recipe) {
                 throw new Error(`No editing recipe found for key: ${recipeKey}`);
             }
+            recipePhases.set(recipe, 'edit');
+
             // For ScanningRecipe, we need to use the same cursor that was used during scanning
             // to retrieve the accumulator that was stored there
             if (recipe instanceof ScanningRecipe) {

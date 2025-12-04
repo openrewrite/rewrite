@@ -30,6 +30,7 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
+import * as semver from "semver";
 import {markupWarn, replaceMarkerByKind} from "../../markers";
 import {TreePrinters} from "../../print";
 import {
@@ -126,6 +127,39 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         };
     }
 
+    /**
+     * Determines if the dependency should be upgraded from currentVersion to newVersion.
+     * Returns true only if the new version constraint represents a strictly newer version.
+     *
+     * This prevents:
+     * - Re-applying the same version (idempotency)
+     * - Downgrading to an older version
+     *
+     * @param currentVersion Current version constraint (e.g., "^4.17.20")
+     * @param newVersion New version constraint to apply (e.g., "^4.17.21")
+     * @returns true if upgrade should proceed, false otherwise
+     */
+    shouldUpgrade(currentVersion: string, newVersion: string): boolean {
+        // If they're identical strings, no upgrade needed
+        if (currentVersion === newVersion) {
+            return false;
+        }
+
+        // Extract the minimum version from each constraint
+        // semver.minVersion returns the lowest version that could match the range
+        const currentMin = semver.minVersion(currentVersion);
+        const newMin = semver.minVersion(newVersion);
+
+        // If either constraint is invalid, fall back to string comparison
+        // (will upgrade if strings differ)
+        if (!currentMin || !newMin) {
+            return currentVersion !== newVersion;
+        }
+
+        // Only upgrade if new minimum version is strictly greater than current
+        return semver.gt(newMin, currentMin);
+    }
+
     async scanner(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
 
@@ -151,8 +185,9 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                     if (dep) {
                         const currentVersion = dep.versionConstraint;
 
-                        // Check if version needs updating
-                        if (currentVersion !== recipe.newVersion) {
+                        // Check if version needs updating using semver comparison
+                        // Only upgrade if the new version is strictly newer than current
+                        if (recipe.shouldUpgrade(currentVersion, recipe.newVersion)) {
                             // Get the project directory from the marker path
                             const projectDir = path.dirname(path.resolve(doc.sourcePath));
 

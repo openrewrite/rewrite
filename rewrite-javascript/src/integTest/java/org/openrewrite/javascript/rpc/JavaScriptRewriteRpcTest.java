@@ -60,6 +60,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           .log(tempDir.resolve("rpc.log"))
           .traceRpcMessages()
 //          .inspectBrk(Path.of("rewrite"))
+//          .timeout(Duration.ofHours(1))
         );
     }
 
@@ -335,6 +336,40 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parsePackageJsonWithNodeResolutionResult(@TempDir Path projectDir) {
+        installRecipes(new File("rewrite/dist"));
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.javascript.dependencies.upgrade-dependency-version",
+              Map.of("packageName", "lodash", "newVersion", "^4.17.21")))
+            .relativeTo(projectDir),
+          npm(
+            projectDir,
+            packageJson(
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "lodash": "^4.17.20"
+                  }
+                }
+                """,
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "lodash": "^4.17.21"
+                  }
+                }
+                """
+            )
+          )
+        );
+    }
+
     @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
     @Test
     void javaTypeAcrossRpcBoundary(@TempDir Path projectDir) {
@@ -390,6 +425,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     private void installRecipes() {
         File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
+        installRecipes(exampleRecipes);
+    }
+
+    private void installRecipes(File exampleRecipes) {
         assertThat(exampleRecipes).exists();
         assertThat(client().installRecipes(exampleRecipes)).isGreaterThan(0);
     }
