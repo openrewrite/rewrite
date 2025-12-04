@@ -155,6 +155,34 @@ describe("FindDependency", () => {
         }, {unsafeCleanup: true});
     });
 
+    test("should match scoped package with pattern not containing slash", async () => {
+        // *node* should match @types/node because we normalize * to ** for patterns without /
+        const spec = new RecipeSpec();
+        spec.recipe = new FindDependency({packageName: "*node*"});
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    packageJson(
+                        `{
+                            "name": "test-project",
+                            "devDependencies": {
+                                "@types/node": "^20.0.0"
+                            }
+                        }`,
+                        `{
+                            "name": "test-project",
+                            "devDependencies": {
+                                /*~~>*/"@types/node": "^20.0.0"
+                            }
+                        }`
+                    )
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
     test("should match version constraint", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "lodash", version: ">=4.0.0"});

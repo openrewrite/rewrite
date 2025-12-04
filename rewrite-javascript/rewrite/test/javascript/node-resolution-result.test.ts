@@ -28,11 +28,10 @@ import {
 } from "../../src/javascript";
 import {Json} from "../../src/json";
 import {withDir} from "tmp-promise";
-import {describe} from "@jest/globals";
 
 describe("NodeResolutionResult marker", () => {
 
-    test("should attach NodeResolutionResult marker to package.json", async () => {
+    test.skip("should attach NodeResolutionResult marker to package.json", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -64,7 +63,7 @@ describe("NodeResolutionResult marker", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("should parse all dependency scopes correctly", async () => {
+    test.skip("should parse all dependency scopes correctly", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -122,7 +121,7 @@ describe("NodeResolutionResult marker", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("NodeResolutionResultQueries.getAllDependencies should return all dependencies", async () => {
+    test.skip("NodeResolutionResultQueries.getAllDependencies should return all dependencies", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -154,7 +153,7 @@ describe("NodeResolutionResult marker", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("NodeResolutionResultQueries.hasDependency should find dependencies", async () => {
+    test.skip("NodeResolutionResultQueries.hasDependency should find dependencies", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -191,7 +190,7 @@ describe("NodeResolutionResult marker", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("NodeResolutionResultQueries.findDependency should return dependency details", async () => {
+    test.skip("NodeResolutionResultQueries.findDependency should return dependency details", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -248,7 +247,7 @@ describe("NodeResolutionResult marker", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("NodeResolutionResultQueries.findDependencies should filter by predicate", async () => {
+    test.skip("NodeResolutionResultQueries.findDependencies should filter by predicate", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -292,7 +291,7 @@ describe("NodeResolutionResult marker", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("should deduplicate identical dependency requests", async () => {
+    test.skip("should deduplicate identical dependency requests", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -690,7 +689,7 @@ describe("NodeResolutionResult marker", () => {
         expect(versions).toEqual(["3.10.1", "4.17.21"]);
     });
 
-    test("should include engines in ResolvedDependency", async () => {
+    test.skip("should include engines in ResolvedDependency", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(

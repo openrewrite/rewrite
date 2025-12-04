@@ -84,11 +84,10 @@ export class FindDependency extends Recipe {
         example: "true",
         required: false
     })
-    onlyDirect: boolean;
+    onlyDirect?: boolean;
 
     constructor(options: FindDependencyOptions) {
         super(options);
-        this.onlyDirect ??= true;
     }
 
     override instanceName(): string {
@@ -98,12 +97,16 @@ export class FindDependency extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const packageName = this.packageName;
         const version = this.version;
-        const onlyDirect = this.onlyDirect;
+        // Default to true if not specified (only search direct dependencies)
+        const onlyDirect = this.onlyDirect ?? true;
 
         // Create a picomatch matcher for the package name pattern
+        // For patterns without '/', use { contains: true } so that '*jest*' matches '@types/jest'
+        // (by default, '*' doesn't match '/' in glob patterns, but for package names this is more intuitive)
+        const matchOptions = packageName.includes('/') ? {} : { contains: true };
         const matcher: picomatch.Matcher = picomatch.default
-            ? picomatch.default(packageName)
-            : (picomatch as any)(packageName);
+            ? picomatch.default(packageName, matchOptions)
+            : (picomatch as any)(packageName, matchOptions);
 
         return new class extends JsonVisitor<ExecutionContext> {
             private resolution: NodeResolutionResult | undefined;
