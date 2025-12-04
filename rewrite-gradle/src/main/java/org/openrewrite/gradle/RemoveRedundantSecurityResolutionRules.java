@@ -26,6 +26,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.LatestIntegration;
 
@@ -247,13 +248,14 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 }
 
                 // Find the managed version from platforms
-                String managedVersion = findManagedVersion(ruleInfo.groupId, ruleInfo.artifactId, platforms);
+                GroupArtifactVersion gav = ruleInfo.gav;
+                String managedVersion = findManagedVersion(gav.getGroupId(), gav.getArtifactId(), platforms);
                 if (managedVersion == null) {
                     return false;
                 }
 
                 // Remove if managed version >= pinned version
-                int comparison = new LatestIntegration(null).compare(null, managedVersion, ruleInfo.version);
+                int comparison = new LatestIntegration(null).compare(null, managedVersion, gav.getVersion());
                 return comparison >= 0;
             }
 
@@ -304,9 +306,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
 
     @Value
     static class ResolutionRuleInfo {
-        String groupId;
-        String artifactId;
-        String version;
+        GroupArtifactVersion gav;
         @Nullable String because;
     }
 
@@ -399,7 +399,9 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             return null;
         }
 
-        return new ResolutionRuleInfo(groupId.get(), artifactId.get(), version.get(), because.get());
+        return new ResolutionRuleInfo(
+                new GroupArtifactVersion(groupId.get(), artifactId.get(), version.get()),
+                because.get());
     }
 
     private static boolean isEachDependency(J.MethodInvocation m, Cursor cursor) {
