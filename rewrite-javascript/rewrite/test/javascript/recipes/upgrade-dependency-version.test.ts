@@ -315,7 +315,7 @@ describe("UpgradeDependencyVersion", () => {
                             }
                         }
                     `, `
-                        /*~~(Failed to upgrade uuid to ^999.0.0)~~*/{
+                        /*~~(Failed to upgrade uuid to ^999.0.0)~~>*/{
                             "name": "test-project",
                             "version": "1.0.0",
                             "dependencies": {

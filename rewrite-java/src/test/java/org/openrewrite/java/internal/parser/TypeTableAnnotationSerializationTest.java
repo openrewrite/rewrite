@@ -475,34 +475,67 @@ class TypeTableAnnotationSerializationTest {
     }
 
     @Test
+    void specialFloatingPointValues() {
+        // Test Double.POSITIVE_INFINITY
+        AnnotationInfo posInf = AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=DInfinity)");
+        assertThat(posInf.getAttributes()).hasSize(1);
+        assertThat(posInf.getAttributes().getFirst().getValue()).isEqualTo(Double.POSITIVE_INFINITY);
+
+        // Test Double.NEGATIVE_INFINITY
+        AnnotationInfo negInf = AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=D-Infinity)");
+        assertThat(negInf.getAttributes()).hasSize(1);
+        assertThat(negInf.getAttributes().getFirst().getValue()).isEqualTo(Double.NEGATIVE_INFINITY);
+
+        // Test Double.NaN
+        AnnotationInfo nan = AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=DNaN)");
+        assertThat(nan.getAttributes()).hasSize(1);
+        assertThat(nan.getAttributes().getFirst().getValue()).isEqualTo(Double.NaN);
+
+        // Test Float.POSITIVE_INFINITY
+        AnnotationInfo floatPosInf = AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=FInfinity)");
+        assertThat(floatPosInf.getAttributes()).hasSize(1);
+        assertThat(floatPosInf.getAttributes().getFirst().getValue()).isEqualTo(Float.POSITIVE_INFINITY);
+
+        // Test Float.NEGATIVE_INFINITY
+        AnnotationInfo floatNegInf = AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=F-Infinity)");
+        assertThat(floatNegInf.getAttributes()).hasSize(1);
+        assertThat(floatNegInf.getAttributes().getFirst().getValue()).isEqualTo(Float.NEGATIVE_INFINITY);
+
+        // Test Float.NaN
+        AnnotationInfo floatNan = AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=FNaN)");
+        assertThat(floatNan.getAttributes()).hasSize(1);
+        assertThat(floatNan.getAttributes().getFirst().getValue()).isEqualTo(Float.NaN);
+    }
+
+    @Test
     void testParserErrorPositioning() {
         // Test malformed annotation - missing closing parenthesis
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/springframework/retry/annotation/Backoff;("))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("at position 48, but reached end of input")
-          .hasMessageContaining("Input string: @Lorg/springframework/retry/annotation/Backoff;(")
-          .hasMessageContaining("Position indicator:                                           ^");
+          .hasMessageContaining("Input string:       @Lorg/springframework/retry/annotation/Backoff;(")
+          .hasMessageContaining("Position indicator:                                                 ^");
 
         // Test malformed annotation - invalid character at specific position  
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=I123$)"))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("at position 30")
           .hasMessageContaining("but found '$'")
-          .hasMessageContaining("Input string: @Lorg/example/Test;(value=I123$)")
-          .hasMessageContaining("Position indicator:                         ^");
+          .hasMessageContaining("Input string:       @Lorg/example/Test;(value=I123$)")
+          .hasMessageContaining("Position indicator:                               ^");
 
         // Test missing attribute value
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(name=)"))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("Unknown value format at position 25")
-          .hasMessageContaining("Input string: @Lorg/example/Test;(name=)")
-          .hasMessageContaining("Position indicator:                    ^");
+          .hasMessageContaining("Input string:       @Lorg/example/Test;(name=)")
+          .hasMessageContaining("Position indicator:                          ^");
 
         // Test missing attribute value
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(0name=)"))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("Expected identifier at position 20 but found '0'")
-          .hasMessageContaining("Input string: @Lorg/example/Test;(0name=)")
-          .hasMessageContaining("Position indicator:               ^");
+          .hasMessageContaining("Input string:       @Lorg/example/Test;(0name=)")
+          .hasMessageContaining("Position indicator:                     ^");
     }
 }

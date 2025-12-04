@@ -1736,6 +1736,74 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void changeAnnotationProcessorPathGroupIdAndArtifactId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.hibernate",
+            "hibernate-jpamodelgen",
+            "org.hibernate.orm",
+            "hibernate-processor",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.14.1</version>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.hibernate</groupId>
+                                          <artifactId>hibernate-jpamodelgen</artifactId>
+                                          <version>7.1.10.Final</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.14.1</version>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.hibernate.orm</groupId>
+                                          <artifactId>hibernate-processor</artifactId>
+                                          <version>7.1.10.Final</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void changeDependencyGroupIdAndArtifactIdWithVersionProperty() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
