@@ -43,7 +43,19 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         const [parentMyIndent, parentIndentKind] = this.getParentIndentContext(cursor);
         const myIndent = this.computeMyIndent(tree, parentMyIndent, parentIndentKind);
         cursor.messages.set("myIndent", myIndent);
-        cursor.messages.set("indentKind", this.computeIndentKind(tree));
+
+        // For Binary, behavior depends on whether it's already on a continuation line
+        if (tree.kind === J.Kind.Binary) {
+            const hasNewline = tree.prefix?.whitespace?.includes("\n") ||
+                tree.prefix?.comments?.some(c => c.suffix.includes("\n"));
+            // If Binary has newline, children align. Otherwise, children get continuation.
+            cursor.messages.set("indentKind", hasNewline ? 'align' : 'continuation');
+            // For LeftPadded children (like operator), same rule applies
+            cursor.messages.set("leftPaddedContinuation", hasNewline ? 'align' : 'propagate');
+        } else {
+            cursor.messages.set("indentKind", this.computeIndentKind(tree));
+            cursor.messages.set("leftPaddedContinuation", 'propagate');
+        }
     }
 
     private getParentIndentContext(cursor: Cursor): [string, IndentKind] {
@@ -167,11 +179,29 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         left: J.LeftPadded<T>,
         p: P
     ): Promise<J.LeftPadded<T> | undefined> {
+        const parentIndent = this.cursor.messages.get("myIndent") as string ?? "";
+        const continuation = this.cursor.messages.get("leftPaddedContinuation") as string ?? 'propagate';
+        const hasNewline = left.before.whitespace.includes("\n");
+        const shouldPropagate = hasNewline && continuation === 'propagate';
+
+        // For 'propagate' mode, update myIndent for children so nested structures get proper indent
+        const savedMyIndent = this.cursor.messages.get("myIndent");
+        if (shouldPropagate) {
+            this.cursor.messages.set("myIndent", parentIndent + this.singleIndent);
+        }
+
         const ret = await super.visitLeftPadded(left, p);
-        if (ret === undefined || !ret.before.whitespace.includes("\n")) {
+
+        // Restore myIndent
+        if (savedMyIndent !== undefined) {
+            this.cursor.messages.set("myIndent", savedMyIndent);
+        } else if (shouldPropagate) {
+            this.cursor.messages.delete("myIndent");
+        }
+
+        if (ret === undefined || !hasNewline) {
             return ret;
         }
-        const parentIndent = this.cursor.messages.get("myIndent") as string ?? "";
         return produce(ret, draft => {
             draft.before.whitespace = this.combineIndent(draft.before.whitespace, parentIndent + this.singleIndent);
         });

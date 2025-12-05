@@ -14,7 +14,14 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {autoFormat, AutoformatVisitor, JavaScriptVisitor, tsx, typescript} from "../../../src/javascript";
+import {
+    autoFormat,
+    AutoformatVisitor,
+    JavaScriptVisitor,
+    SpacesVisitor,
+    tsx,
+    typescript
+} from "../../../src/javascript";
 
 
 describe('AutoformatVisitor', () => {
@@ -614,4 +621,31 @@ buf.slice();`
             // @formatter:on
         )
     })
+
+    test('ternary with template literal should not get extra space before colon', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            // Complex template literal with expressions - should not add extra space before colon
+            typescript(
+                "const info = cond ? `value=${x}` : 'default';",
+                "const info = cond ? `value=${x}` : 'default';"
+            )
+            // @formatter:on
+        )
+    })
+
+    test('multi-line assignment with newline after = should preserve newline', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                const hasExpectedProperties =
+                    memberNames.includes('innerHTML') &&
+                    memberNames.includes('outerHTML');
+                `
+            )
+            // @formatter:on
+        )});
 });

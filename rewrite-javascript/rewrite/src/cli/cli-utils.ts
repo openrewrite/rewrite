@@ -454,16 +454,21 @@ export function isAcceptedFile(filePath: string): boolean {
 
 export type ProgressCallback = (current: number, total: number, filePath: string) => void;
 
+export interface ParseFilesOptions {
+    verbose?: boolean;
+    onProgress?: ProgressCallback;
+}
+
 /**
- * Parse source files using appropriate parsers
+ * Parse source files using appropriate parsers (streaming version).
+ * Yields source files as they are parsed, allowing immediate processing.
  */
-export async function parseFiles(
+export async function* parseFilesStreaming(
     filePaths: string[],
     projectRoot: string,
-    verbose: boolean = false,
-    onProgress?: ProgressCallback
-): Promise<SourceFile[]> {
-    const parsed: SourceFile[] = [];
+    options: ParseFilesOptions = {}
+): AsyncGenerator<SourceFile, void, undefined> {
+    const { verbose = false, onProgress } = options;
     const total = filePaths.length;
     let current = 0;
 
@@ -494,7 +499,7 @@ export async function parseFiles(
         for await (const sf of jsParser.parse(...jsFiles)) {
             current++;
             onProgress?.(current, total, sf.sourcePath);
-            parsed.push(sf);
+            yield sf;
         }
     }
 
@@ -507,7 +512,7 @@ export async function parseFiles(
         for await (const sf of pkgParser.parse(...packageJsonFiles)) {
             current++;
             onProgress?.(current, total, sf.sourcePath);
-            parsed.push(sf);
+            yield sf;
         }
     }
 
@@ -520,9 +525,23 @@ export async function parseFiles(
         for await (const sf of jsonParser.parse(...jsonFiles)) {
             current++;
             onProgress?.(current, total, sf.sourcePath);
-            parsed.push(sf);
+            yield sf;
         }
     }
+}
 
+/**
+ * Parse source files using appropriate parsers.
+ * Collects all parsed files into an array.
+ */
+export async function parseFiles(
+    filePaths: string[],
+    projectRoot: string,
+    options: ParseFilesOptions = {}
+): Promise<SourceFile[]> {
+    const parsed: SourceFile[] = [];
+    for await (const sf of parseFilesStreaming(filePaths, projectRoot, options)) {
+        parsed.push(sf);
+    }
     return parsed;
 }

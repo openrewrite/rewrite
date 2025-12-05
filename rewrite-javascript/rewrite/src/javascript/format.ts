@@ -464,8 +464,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         }
         return produceAsync(ret, async draft => {
             if (draft.initializer) {
-                draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
-                draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                // Preserve newlines - only modify if no newlines present
+                if (!draft.initializer.before.whitespace.includes("\n")) {
+                    draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                }
+                if (!draft.initializer.element.prefix.whitespace.includes("\n")) {
+                    draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                }
             }
         });
     }

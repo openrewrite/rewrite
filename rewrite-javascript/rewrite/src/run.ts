@@ -68,51 +68,87 @@ export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: Exe
     return { changeset };
 }
 
+export type ProgressCallback = (phase: 'parsing' | 'scanning' | 'processing', current: number, total: number, sourcePath: string) => void;
+
 /**
  * Streaming version of scheduleRun that yields results as soon as each file is processed.
  * This allows callers to print diffs immediately and free memory earlier.
  *
+ * Accepts either an array or an async iterable of source files. When the recipe is not
+ * a scanning recipe, files are processed immediately as they're yielded from the iterable,
+ * avoiding the need to collect all files into memory first.
+ *
  * For scanning recipes, the scan phase completes on all files before yielding any results.
+ *
+ * @param onProgress Optional callback for progress updates during parsing, scanning, and processing phases.
  */
 export async function* scheduleRunStreaming(
     recipe: Recipe,
-    before: SourceFile[],
-    ctx: ExecutionContext
+    before: SourceFile[] | AsyncIterable<SourceFile>,
+    ctx: ExecutionContext,
+    onProgress?: ProgressCallback
 ): AsyncGenerator<Result, void, undefined> {
     const cursor = rootCursor();
+    const isScanning = await hasScanningRecipe(recipe);
 
-    // Phase 1: Run scanners on all files (if any scanning recipes exist)
-    if (await hasScanningRecipe(recipe)) {
-        for (const b of before) {
+    if (isScanning) {
+        // For scanning recipes, we need to collect all files first for the scan phase
+        const files: SourceFile[] = Array.isArray(before) ? [...before] : [];
+        if (!Array.isArray(before)) {
+            let parseCount = 0;
+            for await (const sf of before) {
+                files.push(sf);
+                parseCount++;
+                onProgress?.('parsing', parseCount, -1, sf.sourcePath); // -1 = unknown total
+            }
+        }
+
+        const totalFiles = files.length;
+
+        // Phase 1: Run scanners on all files
+        for (let i = 0; i < files.length; i++) {
+            const b = files[i];
+            onProgress?.('scanning', i + 1, totalFiles, b.sourcePath);
             await recurseRecipeList(recipe, b, async (recipe, b2) => {
                 if (recipe instanceof ScanningRecipe) {
                     return (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor)
                 }
             });
         }
-    }
 
-    // Phase 2: Collect generated files
-    const generated = (await recurseRecipeList(recipe, [] as SourceFile[], async (recipe, generated) => {
-        if (recipe instanceof ScanningRecipe) {
-            generated.push(...await recipe.generate(recipe.accumulator(cursor, ctx), ctx));
+        // Phase 2: Collect generated files
+        const generated = (await recurseRecipeList(recipe, [] as SourceFile[], async (recipe, generated) => {
+            if (recipe instanceof ScanningRecipe) {
+                generated.push(...await recipe.generate(recipe.accumulator(cursor, ctx), ctx));
+            }
+            return generated;
+        }))!;
+
+        // Phase 3: Edit existing files and yield results immediately
+        for (let i = 0; i < files.length; i++) {
+            const b = files[i];
+            onProgress?.('processing', i + 1, totalFiles, b.sourcePath);
+            const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
+            // Always yield a result so the caller knows when each file is processed
+            yield new Result(b, editedB !== b ? editedB : b);
+            // Clear array entry to allow GC to free memory for this file
+            (files as any)[i] = null;
         }
-        return generated;
-    }))!;
 
-    // Phase 3: Edit existing files and yield results immediately
-    for (const b of before) {
-        const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
-        if (editedB !== b) {
-            yield new Result(b, editedB);
+        // Phase 4: Edit generated files and yield results
+        for (const g of generated) {
+            const editedG = await recurseRecipeList(recipe, g, async (recipe, g2) => (await recipe.editor()).visit(g2, ctx, cursor));
+            if (editedG) {
+                yield new Result(undefined, editedG);
+            }
         }
-    }
-
-    // Phase 4: Edit generated files and yield results
-    for (const g of generated) {
-        const editedG = await recurseRecipeList(recipe, g, async (recipe, g2) => (await recipe.editor()).visit(g2, ctx, cursor));
-        if (editedG) {
-            yield new Result(undefined, editedG);
+    } else {
+        // For non-scanning recipes, process files immediately as they come in
+        const iterable = Array.isArray(before) ? before : before;
+        for await (const b of iterable) {
+            const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
+            // Always yield a result so the caller knows when each file is processed
+            yield new Result(b, editedB !== b ? editedB : b);
         }
     }
 

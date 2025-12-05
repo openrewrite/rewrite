@@ -1764,7 +1764,9 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             head: this.visit(node.head),
-            spans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
+            // Use emptySpace for the last span's after - any trailing whitespace belongs to the outer context
+            spans: node.templateSpans.map((s, i, arr) =>
+                this.rightPadded(this.visit(s), i === arr.length - 1 ? emptySpace : this.suffix(s))),
             type: this.mapType(node)
         }
     }
@@ -2496,7 +2498,9 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             head: this.visit(node.head),
-            spans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
+            // Use emptySpace for the last span's after - any trailing whitespace belongs to the outer context
+            spans: node.templateSpans.map((s, i, arr) =>
+                this.rightPadded(this.visit(s), i === arr.length - 1 ? emptySpace : this.suffix(s))),
             type: this.mapType(node)
         }
     }

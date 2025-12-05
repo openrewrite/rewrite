@@ -689,4 +689,23 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     })
+
+    test('nested ternary should preserve continuation indent', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                const mappedType = isTupleType
+                    ? elementTypes.length > 1
+                        ? 'union'  // Tuples often have union element types
+                        : 'tuple'
+                    : 'array';
+                `
+            )
+            // @formatter:on
+        )
+    })
 });
