@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -27,7 +28,9 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -59,47 +62,16 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                 J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
 
                 // Skip if not extending InputStream
-                if (!isInputStreamSubclass(cd)) {
+                if (cd.getExtends() == null || !TypeUtils.isAssignableTo("java.io.InputStream", cd.getType())) {
                     return cd;
                 }
 
                 // Skip FilterInputStream subclasses (they already delegate bulk reads)
-                if (isFilterInputStreamSubclass(cd)) {
+                if (TypeUtils.isAssignableTo("java.io.FilterInputStream", cd.getType())) {
                     return cd;
                 }
 
-                // Find read() method and check for bulk read
-                AnalysisResult result = analyzeClass(cd.getBody().getStatements());
-                if (result == null) {
-                    return cd;
-                }
-
-                if (result.hasBulkRead) {
-                    return cd;
-                }
-
-                // No delegate found or complex body - add marker for manual implementation
-                if (result.delegate == null || result.isComplex) {
-                    return SearchResult.found(cd, MARKER_MESSAGE);
-                }
-
-                // Simple delegation - add bulk read method
-                Statement bulkMethod = createBulkReadMethod(result.delegate, result.hasNullCheck, result.usesIfStyle, cd.getBody());
-                if (bulkMethod == null) {
-                    return cd;
-                }
-
-                final J.MethodDeclaration targetMethod = result.readMethod;
-                cd = cd.withBody(cd.getBody().withStatements(
-                        ListUtils.flatMap(cd.getBody().getStatements(), stmt -> {
-                            if (stmt == targetMethod) {
-                                return Arrays.asList(stmt, bulkMethod);
-                            }
-                            return singletonList(stmt);
-                        })
-                ));
-
-                return cd;
+                return processInputStreamClass(cd, cd.getBody());
             }
 
             @Override
@@ -121,49 +93,43 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                     return nc;
                 }
 
-                // Analyze the class
-                AnalysisResult result = analyzeClass(nc.getBody().getStatements());
-                if (result == null) {
-                    return nc;
-                }
+                return processInputStreamClass(nc, nc.getBody());
+            }
 
-                if (result.hasBulkRead) {
-                    return nc;
+            @SuppressWarnings("unchecked")
+            private <T extends J> T processInputStreamClass(T tree, J.Block body) {
+                AnalysisResult result = analyzeClass(body.getStatements());
+                if (result == null || result.isHasBulkRead()) {
+                    return tree;
                 }
 
                 // No delegate found or complex body - add marker for manual implementation
-                if (result.delegate == null || result.isComplex) {
-                    return SearchResult.found(nc, MARKER_MESSAGE);
+                if (result.getDelegate() == null || result.isComplex()) {
+                    return (T) SearchResult.found(tree, MARKER_MESSAGE);
                 }
 
                 // Simple delegation - add bulk read method
-                Statement bulkMethod = createBulkReadMethod(result.delegate, result.hasNullCheck, result.usesIfStyle, nc.getBody());
+                Statement bulkMethod = createBulkReadMethod(result.getDelegate(), result.isHasNullCheck(), result.isUsesIfStyle(), body);
                 if (bulkMethod == null) {
-                    return nc;
+                    return tree;
                 }
 
-                final J.MethodDeclaration targetMethod = result.readMethod;
-                nc = nc.withBody(nc.getBody().withStatements(
-                        ListUtils.flatMap(nc.getBody().getStatements(), stmt -> {
+                J.MethodDeclaration targetMethod = result.getReadMethod();
+                J.Block newBody = body.withStatements(
+                        ListUtils.flatMap(body.getStatements(), stmt -> {
                             if (stmt == targetMethod) {
                                 return Arrays.asList(stmt, bulkMethod);
                             }
                             return singletonList(stmt);
                         })
-                ));
+                );
 
-                return nc;
-            }
-
-            private boolean isInputStreamSubclass(J.ClassDeclaration classDecl) {
-                if (classDecl.getExtends() == null) {
-                    return false;
+                if (tree instanceof J.ClassDeclaration) {
+                    return (T) ((J.ClassDeclaration) tree).withBody(newBody);
+                } else if (tree instanceof J.NewClass) {
+                    return (T) ((J.NewClass) tree).withBody(newBody);
                 }
-                return TypeUtils.isAssignableTo("java.io.InputStream", classDecl.getType());
-            }
-
-            private boolean isFilterInputStreamSubclass(J.ClassDeclaration classDecl) {
-                return TypeUtils.isAssignableTo("java.io.FilterInputStream", classDecl.getType());
+                return tree;
             }
 
             private @Nullable AnalysisResult analyzeClass(List<Statement> statements) {
@@ -204,7 +170,6 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                 boolean hasNullCheck = nullCheckVar != null && nullCheckVar.equals(delegate);
 
                 // Detect if null check uses if-statement style vs ternary style
-                // Check the read() method body, not the class body
                 List<Statement> readMethodStatements = readMethod.getBody() != null ?
                         readMethod.getBody().getStatements() : emptyList();
                 boolean usesIfStyle = readMethodStatements.size() == 2 && readMethodStatements.get(0) instanceof J.If;
@@ -393,8 +358,7 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                     return null;
                 }
 
-                // Use a visitor to search the entire method body
-                final java.util.Set<String> foundDelegates = new java.util.HashSet<>();
+                Set<String> foundDelegates = new HashSet<>();
                 new JavaIsoVisitor<Integer>() {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation mi, Integer p) {
@@ -411,8 +375,6 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                     }
                 }.visit(method.getBody(), 0);
 
-                // Return null if multiple different delegates found (intentional design)
-                // Return the single delegate if only one found
                 return foundDelegates.size() == 1 ? foundDelegates.iterator().next() : null;
             }
 
@@ -525,22 +487,13 @@ public class AddInputStreamBulkReadMethod extends Recipe {
         };
     }
 
+    @Value
     private static class AnalysisResult {
-        final J.MethodDeclaration readMethod;
-        final boolean hasBulkRead;
-        final @Nullable String delegate;
-        final boolean hasNullCheck;
-        final boolean usesIfStyle;
-        final boolean isComplex;
-
-        AnalysisResult(J.MethodDeclaration readMethod, boolean hasBulkRead, @Nullable String delegate,
-                       boolean hasNullCheck, boolean usesIfStyle, boolean isComplex) {
-            this.readMethod = readMethod;
-            this.hasBulkRead = hasBulkRead;
-            this.delegate = delegate;
-            this.hasNullCheck = hasNullCheck;
-            this.usesIfStyle = usesIfStyle;
-            this.isComplex = isComplex;
-        }
+        J.MethodDeclaration readMethod;
+        boolean hasBulkRead;
+        @Nullable String delegate;
+        boolean hasNullCheck;
+        boolean usesIfStyle;
+        boolean complex;
     }
 }

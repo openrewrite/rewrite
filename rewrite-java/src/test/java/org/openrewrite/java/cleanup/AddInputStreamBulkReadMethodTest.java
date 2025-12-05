@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
     }
 
     @Nested
-    class ShouldTransform {
+    class Transform {
 
         @DocumentExample
         @Test
@@ -583,7 +583,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
     }
 
     @Nested
-    class ShouldNotTransform {
+    class NoChange {
 
         @Test
         void alreadyHasBulkReadMethod() {
@@ -693,7 +693,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
     }
 
     @Nested
-    class ShouldMarkForReview {
+    class MarkForReview {
         // These tests verify that complex cases with identifiable delegates
         // get a search marker so developers can manually review them
 
