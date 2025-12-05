@@ -16,7 +16,6 @@
 package org.openrewrite.table;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -50,7 +49,6 @@ class SearchResultsTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void searchMarkersAreDetectedDuringRecipeRun() {
         rewriteRun(
@@ -61,8 +59,7 @@ class SearchResultsTest implements RewriteTest {
               SearchResults.Row::getRecipe)
             .containsExactlyInAnyOrder(
               tuple("matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`"),
-              tuple("nested/matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`"),
-              tuple("matched-inside", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`")
+              tuple("nested/matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`")
             )),
           text(
             "hi",
@@ -77,19 +74,6 @@ class SearchResultsTest implements RewriteTest {
             "hi",
             "~~>hi",
             spec -> spec.path("nested/matched")
-          ),
-          text(
-            """
-              we also search through entire files
-              file contains some other text somewhere in the middle.
-              end of file
-              """,
-            """
-              we also search through entire files
-              file contains ~~>some other text somewhere in the middle.
-              end of file
-              """,
-            spec -> spec.path("matched-inside")
           )
         );
     }
@@ -113,11 +97,12 @@ class SearchResultsTest implements RewriteTest {
               We add all SearchMarkers that are found during recipe run.
               File contains capitalized words.
               End of file
-              """, """
-              ~~>We add all ~~>SearchMarkers that are found during recipe run.
-              ~~>File contains capitalized words.
-              ~~>End of file
               """,
+              """
+                ~~>We add all ~~>SearchMarkers that are found during recipe run.
+                ~~>File contains capitalized words.
+                ~~>End of file
+                """,
             spec -> spec.path("match-capitalized-words")
           )
         );
@@ -176,10 +161,11 @@ class SearchResultsTest implements RewriteTest {
             """
               We add all SearchMarkers that are found during recipe run.
               file contains some other text somewhere in the middle resulting in 2 different recipes matches.
-              """, """
-              ~~>We add all ~~>SearchMarkers that are found during recipe run.
-              file contains ~~>some other text somewhere in the middle resulting in 2 different recipes matches.
               """,
+              """
+                ~~>We add all ~~>SearchMarkers that are found during recipe run.
+                file contains ~~>some other text somewhere in the middle resulting in 2 different recipes matches.
+                """,
             spec -> spec.path("different-recipes-matching")
           )
         );
@@ -228,7 +214,6 @@ class SearchResultsTest implements RewriteTest {
                 tuple("different-recipes-matching", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
                 tuple("different-recipes-matching", "We", "", "Find text and add the results to the global datatable"),
                 tuple("different-recipes-matching", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                //TODO: Question for Jonathan: Should we not report both instance name and recipe name? Searching for the recipe id from the String is not always "easy"
                 tuple("different-recipes-matching", "SearchMarkers", "", "Find text and add the results to the global datatable"),
                 tuple("different-recipes-matching", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`"),
                 tuple("different-recipes-matching", "some other text", "", "Find text and add the results to the global datatable")
@@ -237,10 +222,11 @@ class SearchResultsTest implements RewriteTest {
             """
               We add all SearchMarkers that are found during recipe run.
               file contains some other text somewhere in the middle resulting in 2 different recipes matches.
-              """, """
-              ~~>We add all ~~>SearchMarkers that are found during recipe run.
-              file contains ~~>some other text somewhere in the middle resulting in 2 different recipes matches.
               """,
+              """
+                ~~>We add all ~~>SearchMarkers that are found during recipe run.
+                file contains ~~>some other text somewhere in the middle resulting in 2 different recipes matches.
+                """,
             spec -> spec.path("different-recipes-matching")
           )
         );

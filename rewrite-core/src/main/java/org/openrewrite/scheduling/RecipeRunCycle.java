@@ -100,9 +100,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                         Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
                                         assert maybeMutated == source || !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
                                                 "Edits made from within ScanningRecipe.getScanner() are discarded. " +
-                                                        "The purpose of a scanner is to aggregate information for use in subsequent phases. " +
-                                                        "Use ScanningRecipe.getVisitor() for making edits. " +
-                                                        "To disable this warning set TypeValidation.immutableScanning to false in your tests.";
+                                                "The purpose of a scanner is to aggregate information for use in subsequent phases. " +
+                                                "Use ScanningRecipe.getVisitor() for making edits. " +
+                                                "To disable this warning set TypeValidation.immutableScanning to false in your tests.";
                                     }
                                     return source;
                                 });
@@ -229,7 +229,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             after = handleError(recipe, source, after, t);
                         }
                         if (after != null && after != source) {
-                            //TODO: question for Jonathan: should we not do the handling of searchResults here instead or is it impossible that a throwable was thrown and that a search result is present or are we not interested in these results?
                             after = addRecipesThatMadeChanges(recipeStack, after);
                         }
                         return after;
@@ -262,11 +261,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
         List<String> searchMarkers = collectSearchResults(before, after);
         for (String searchResult : searchMarkers) {
-            searchResults.insertRow(ctx, new SearchResults.Row(afterPath, searchResult, parentInstanceName, recipe.getInstanceName()));
+            searchResults.insertRow(ctx, new SearchResults.Row(beforePath, afterPath, searchResult, parentInstanceName, recipe.getInstanceName()));
         }
 
         if (hierarchical) {
-            //TODO: Question for Jonathan: Do we need this "overhead" of having an entry per recipe in the stack like we have for SourceFileResults?
             recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, searchMarkers, ctx);
         }
     }
@@ -295,7 +293,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 effortSeconds,
                 cycle));
         for (String searchResult : searchMarkers) {
-            searchResults.insertRow(ctx, new SearchResults.Row(afterPath, searchResult, parentInstanceName, recipe.getInstanceName()));
+            searchResults.insertRow(ctx, new SearchResults.Row(beforePath, afterPath, searchResult, parentInstanceName, recipe.getInstanceName()));
         }
         recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, searchMarkers, ctx);
     }
@@ -333,7 +331,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     @NonFinal
     @Nullable
     transient Boolean isScanningRecipe;
-
     private boolean isScanningRequired() {
         if (isScanningRecipe == null) {
             isScanningRecipe = isScanningRequired(recipe);
@@ -345,7 +342,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         if (recipe instanceof ScanningRecipe) {
             // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
             // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
-            if (recipe instanceof DeclarativeRecipe) {
+            if(recipe instanceof DeclarativeRecipe) {
                 for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
                     if (isScanningRequired(precondition)) {
                         return true;
@@ -386,7 +383,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         cursor = cursor.getParentTreeCursor();
                     }
                     if (cursor.getValue() instanceof Tree) {
-                        //TODO: Question for Jonathan: what should the truncation length be?
                         ctx.add(((Tree) cursor.getValue()).print(getCursor(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)));
                     }
                 }

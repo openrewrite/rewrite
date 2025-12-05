@@ -30,20 +30,20 @@ public class SearchResults extends DataTable<SearchResults.Row> {
 
     @Value
     public static class Row {
-        //TODO: Question for Jonathan: should we not (similar to SourcesFileErrors) have a afterSourcePath and represent both?
-        // What if a recipe changes the path and adds markers? Do we need both?
-        // If a later recipe removed the sourcefile, we will not have the markers anymore. Not foreseeing that as an issue as typically search and edit/delete will not go together.
-        @Column(displayName = "Source path of search result",
+        @Column(displayName = "Source path of search result before the run",
                 description = "The source path of the file with the search result markers present.")
         @Nullable
         String sourcePath;
 
-        //TODO: Question for Jonathan: what should the truncation length be?
+        @Column(displayName = "Source path of search result after run the run",
+                description = "A recipe may modify the source path. This is the path after the run. `null` when a source file was deleted during the run.")
+        @Nullable
+        String afterSourcePath;
+
         @Column(displayName = "Result",
-                description = "The trimmed printed tree of the LST element that the marker is attached to. Truncated after 1000 chars if longer.")
+                description = "The trimmed printed tree of the LST element that the marker is attached to.")
         String result;
 
-        //TODO: Question for Jonathan: Should we not report both instance name and recipe name? Searching for the recipe id from the String is not always "easy" (see also the unit tests)
         @Column(displayName = "Parent of the recipe that had the search marker added",
                 description = "In a hierarchical recipe, the parent of the recipe that made a change. Empty if " +
                         "this is the root of a hierarchy or if the recipe is not hierarchical at all.")
