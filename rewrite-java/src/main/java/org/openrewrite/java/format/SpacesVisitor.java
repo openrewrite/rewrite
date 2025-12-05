@@ -286,9 +286,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     index = params.getTypeParameters().indexOf(right.getElement());
                     size = params.getTypeParameters().size();
                     containerLocation = JContainer.Location.TYPE_PARAMETERS;
-                    break;
                 }
-                //if not we can fall through to the container handling
+                break;
             case BLOCK_STATEMENT:
             case METHOD_SELECT:
                 after = "";
