@@ -18,19 +18,40 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Preconditions;
+import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.marker.GradleBuildscript;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.LatestIntegration;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
@@ -53,6 +74,8 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
     @Option(displayName = "Security pattern",
             description = "A regular expression pattern to identify security-related resolution rules by matching " +
                           "against the `because` clause. Rules matching this pattern will be considered for removal. " +
+                          "The pattern is searched within the clause, so a `because` containing multiple identifiers " +
+                          "(e.g., `CVE-2024-1234, GHSA-abcd-1234-efgh`) will match if any identifier matches. " +
                           "Default pattern matches CVE identifiers (e.g., `CVE-2024-1234`) and GitHub Security " +
                           "Advisory identifiers (e.g., `GHSA-xxxx-xxxx-xxxx`).",
             example = "(CVE-\\d|GHSA-[a-z0-9])",
@@ -107,8 +130,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 if (maybeGp.isPresent()) {
                     gradleProject = maybeGp.get();
 
-                    // Find all platforms and download their POMs to get managed versions
-                    // Use a custom visitor that properly tracks buildscript context
+                    // Find all platforms and download their POMs to get managed versions (fallback for constraint simulation)
                     MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                     new JavaIsoVisitor<ExecutionContext>() {
                         boolean scannerInBuildscript;
@@ -183,11 +205,8 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 J.Lambda closure = (J.Lambda) maybeClosure;
                 J.Block closureBody = (J.Block) closure.getBody();
 
-                // Determine which platform map to use based on context
-                Map<String, List<ResolvedPom>> platforms = currentlyInBuildscript ? buildscriptPlatforms : projectPlatforms;
-
                 // Process each if statement to check if it should be removed
-                List<Statement> newStatements = processStatements(closureBody.getStatements(), platforms);
+                List<Statement> newStatements = processStatements(closureBody.getStatements(), currentlyInBuildscript, ctx);
 
                 if (newStatements.equals(closureBody.getStatements())) {
                     return m;
@@ -203,24 +222,24 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 ));
             }
 
-            private List<Statement> processStatements(List<Statement> statements, Map<String, List<ResolvedPom>> platforms) {
+            private List<Statement> processStatements(List<Statement> statements, boolean inBuildscript, ExecutionContext ctx) {
                 return ListUtils.flatMap(statements, statement -> {
                     if (statement instanceof J.If) {
-                        return processIfStatement((J.If) statement, platforms);
+                        return processIfStatement((J.If) statement, inBuildscript, ctx);
                     }
                     return statement;
                 });
             }
 
             @SuppressWarnings("NullableProblems")
-            private J.If processIfStatement(J.If ifStatement, Map<String, List<ResolvedPom>> platforms) {
+            private J.If processIfStatement(J.If ifStatement, boolean inBuildscript, ExecutionContext ctx) {
                 ResolutionRuleInfo ruleInfo = extractRuleInfo(ifStatement);
-                if (ruleInfo != null && shouldRemoveRule(ruleInfo, platforms)) {
+                if (ruleInfo != null && shouldRemoveRule(ruleInfo, inBuildscript, ctx)) {
                     // If there's an else-if chain, promote the else part
                     if (ifStatement.getElsePart() != null) {
                         Statement elseBody = ifStatement.getElsePart().getBody();
                         if (elseBody instanceof J.If) {
-                            return processIfStatement((J.If) elseBody, platforms);
+                            return processIfStatement((J.If) elseBody, inBuildscript, ctx);
                         } else if (elseBody instanceof J.Block) {
                             return null;
                         }
@@ -232,7 +251,7 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 if (ifStatement.getElsePart() != null) {
                     Statement elseBody = ifStatement.getElsePart().getBody();
                     if (elseBody instanceof J.If) {
-                        J.If processedElseIf = processIfStatement((J.If) elseBody, platforms);
+                        J.If processedElseIf = processIfStatement((J.If) elseBody, inBuildscript, ctx);
                         if (processedElseIf == null) {
                             J.If originalElseIf = (J.If) elseBody;
                             if (originalElseIf.getElsePart() != null && !(originalElseIf.getElsePart().getBody() instanceof J.If)) {
@@ -247,29 +266,46 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 return ifStatement;
             }
 
-            private boolean shouldRemoveRule(ResolutionRuleInfo ruleInfo, Map<String, List<ResolvedPom>> platforms) {
+            private boolean shouldRemoveRule(ResolutionRuleInfo ruleInfo, boolean inBuildscript, ExecutionContext ctx) {
                 // Only remove rules matching the security pattern
                 if (!isSecurityRelated(ruleInfo.because)) {
                     return false;
                 }
 
-                // Find the managed version from platforms
+                // Can't evaluate without GradleProject marker
+                if (gradleProject == null) {
+                    return false;
+                }
+
+                // Use constraint-based simulation: remove the resolution strategy constraint and check the resulting version.
+                // The constraints list only contains resolution strategy rules, not platform/BOM constraints.
+                // After removing the constraint, re-resolution will use versions from platforms, BOMs, or direct dependencies.
                 GroupArtifactVersion gav = ruleInfo.gav;
-                String managedVersion = findManagedVersion(gav.getGroupId(), gav.getArtifactId(), platforms);
-                if (managedVersion == null) {
+                Map<String, List<ResolvedPom>> platforms = inBuildscript ? buildscriptPlatforms : projectPlatforms;
+
+                String resolvedVersion;
+                if (inBuildscript && gradleProject.getBuildscript() != null) {
+                    // For buildscript, simulate on buildscript configurations
+                    resolvedVersion = findResolvedVersionWithoutConstraint(
+                            gradleProject.getBuildscript(), gav, ctx);
+                } else {
+                    // Simulate removal of the resolution rule constraint on project configurations
+                    GradleProject simulatedProject = removeResolutionStrategyConstraint(gradleProject, gav, ctx);
+                    resolvedVersion = findResolvedVersion(simulatedProject, gav.getGroupId(), gav.getArtifactId());
+                }
+
+                // Fallback: if constraint-based simulation didn't find a version, check platform managed versions
+                if (resolvedVersion == null) {
+                    resolvedVersion = findManagedVersion(gav.getGroupId(), gav.getArtifactId(), platforms);
+                }
+
+                if (resolvedVersion == null) {
                     return false;
                 }
 
-                // Remove if managed version >= pinned version
-                int comparison = new LatestIntegration(null).compare(null, managedVersion, gav.getVersion());
+                // Remove if resolved version (without security constraint) >= pinned version
+                int comparison = new LatestIntegration(null).compare(null, resolvedVersion, gav.getVersion());
                 return comparison >= 0;
-            }
-
-            private boolean isSecurityRelated(@Nullable String because) {
-                if (because == null || because.isEmpty()) {
-                    return false;
-                }
-                return compiledPattern.matcher(because).find();
             }
 
             private @Nullable String findManagedVersion(String groupId, String artifactId, Map<String, List<ResolvedPom>> platforms) {
@@ -279,6 +315,53 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                         String managedVersion = platform.getManagedVersion(groupId, artifactId, null, null);
                         if (managedVersion != null) {
                             return managedVersion;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            /**
+             * Removes resolution strategy constraints for the given GAV.
+             * Platform/BOM constraints are not stored in the constraints list, so this only removes
+             * resolution strategy constraints while platform versions remain available during re-resolution.
+             */
+            private GradleProject removeResolutionStrategyConstraint(GradleProject project, GroupArtifactVersion gav, ExecutionContext ctx) {
+                GroupArtifact ga = new GroupArtifact(gav.getGroupId(), gav.getArtifactId());
+                return project.removeConstraints(singleton(ga), ctx);
+            }
+
+            private boolean isSecurityRelated(@Nullable String because) {
+                if (because == null || because.isEmpty()) {
+                    return false;
+                }
+                return compiledPattern.matcher(because).find();
+            }
+
+            private @Nullable String findResolvedVersion(GradleProject project, String groupId, String artifactId) {
+                // Look through all resolvable configurations for the resolved dependency
+                for (GradleDependencyConfiguration config : project.getConfigurations()) {
+                    if (config.isCanBeResolved()) {
+                        ResolvedDependency resolved = config.findResolvedDependency(groupId, artifactId);
+                        if (resolved != null) {
+                            return resolved.getVersion();
+                        }
+                    }
+                }
+                return null;
+            }
+
+            private @Nullable String findResolvedVersionWithoutConstraint(
+                    GradleBuildscript buildscript, GroupArtifactVersion gav, ExecutionContext ctx) {
+                // Simulate constraint removal on each buildscript configuration
+                GroupArtifact ga = new GroupArtifact(gav.getGroupId(), gav.getArtifactId());
+                for (GradleDependencyConfiguration config : buildscript.getConfigurations()) {
+                    if (config.isCanBeResolved()) {
+                        GradleDependencyConfiguration simulated = config.removeConstraints(
+                                singleton(ga), buildscript.getMavenRepositories(), ctx);
+                        ResolvedDependency resolved = simulated.findResolvedDependency(gav.getGroupId(), gav.getArtifactId());
+                        if (resolved != null) {
+                            return resolved.getVersion();
                         }
                     }
                 }

@@ -318,8 +318,14 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
         );
     }
 
+    /**
+     * Removes the resolution rule because the direct dependency provides version 2.17.0,
+     * which is newer than the pinned version 2.12.5. With constraint-based simulation,
+     * removing the resolution rule would result in version 2.17.0 being resolved,
+     * which already addresses the vulnerability.
+     */
     @Test
-    void keepRuleWhenNoPlatformPresent() {
+    void removeRuleWhenDirectDependencyProvidesNewerVersion() {
         rewriteRun(
           buildGradleKts(
             """
@@ -335,6 +341,15 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
                       }
                   }
               }
+              dependencies {
+                  implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+              repositories { mavenCentral() }
               dependencies {
                   implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
               }
