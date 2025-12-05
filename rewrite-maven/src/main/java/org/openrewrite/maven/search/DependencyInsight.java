@@ -15,7 +15,9 @@
  */
 package org.openrewrite.maven.search;
 
+import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -151,26 +153,18 @@ public class DependencyInsight extends Recipe {
                 DependencyMatcher dependencyMatcher = new DependencyMatcher(groupIdPattern, artifactIdPattern, versionComparator);
 
                 if (requestedScope != null) {
-                    Set<ResolvedGroupArtifactVersion> gavs = new HashSet<>();
                     for (ResolvedDependency dependency : resolutionResult.getDependencies().get(requestedScope)) {
                         matches.collect(requestedScope, dependency, dependencyMatcher,
-                                (matched, path) -> {
-                                    if (gavs.add(matched.getGav())) {
-                                        createDataTableRow(projectName, sourceSetName, requestedScope, matched.getGav(), path, ctx);
-                                    }
-                                });
+                                (matched, path) ->
+                                        createDataTableRow(projectName, sourceSetName, requestedScope, matched.getGav(), path, ctx));
                     }
                 } else {
                     for (Map.Entry<Scope, List<ResolvedDependency>> entry : resolutionResult.getDependencies().entrySet()) {
-                        Set<ResolvedGroupArtifactVersion> gavs = new HashSet<>();
                         Scope scope = entry.getKey();
                         for (ResolvedDependency dependency : entry.getValue()) {
                             matches.collect(scope, dependency, dependencyMatcher,
-                                    (matched, path) -> {
-                                        if (gavs.add(matched.getGav())) {
-                                            createDataTableRow(projectName, sourceSetName, scope, matched.getGav(), path, ctx);
-                                        }
-                                    });
+                                    (matched, path) ->
+                                            createDataTableRow(projectName, sourceSetName, scope, matched.getGav(), path, ctx));
                         }
                     }
                 }
