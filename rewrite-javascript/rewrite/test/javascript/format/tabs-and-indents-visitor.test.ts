@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {IntelliJ, TabsAndIndentsStyle, TabsAndIndentsVisitor, typescript} from "../../../src/javascript";
+import {IntelliJ, TabsAndIndentsStyle, TabsAndIndentsVisitor, tsx, typescript} from "../../../src/javascript";
 import {Draft, produce} from "immer";
 import {Style} from "../../../src";
 
@@ -342,6 +342,54 @@ describe('TabsAndIndentsVisitor', () => {
         )
     });
 
+    test('nested if block inside function should get correct indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                function example() {
+                    if (true) {
+                readFile();
+                    }
+                }
+                `,
+                `
+                function example() {
+                    if (true) {
+                        readFile();
+                    }
+                }
+                `)
+            // @formatter:on
+        )
+    });
+
+    test('class inside arrow function block should get correct indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                describe('test', () => {
+                class TestClass {
+                name: string;
+                }
+                });
+                `,
+                `
+                describe('test', () => {
+                    class TestClass {
+                        name: string;
+                    }
+                });
+                `)
+            // @formatter:on
+        )
+    });
+
     // TabsAndIndentsVisitor doesn't add newlines - it only normalizes existing indentation
     // Single-line empty blocks should remain unchanged
     test('empty arrow function body inside block should remain unchanged (no newlines to normalize)', () => {
@@ -441,6 +489,202 @@ describe('TabsAndIndentsVisitor', () => {
         )
     );
 }, {unsafeCleanup: true});`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('array literal inside method call should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const result = parseRecipeOptions([
+    'text=hello',
+    'verbose',
+    'count=5'
+]);`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('spread operator in object literal should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test("name", async () => spec.rewriteRun({
+    //language=typescript
+    ...typescript('before', 'after'),
+}))`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('spread with afterRecipe callback should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test("name", async () => spec.rewriteRun({
+    //language=typescript
+    ...typescript('before', 'after'),
+    afterRecipe: async (cu) => {
+        console.log(cu);
+    }
+}))`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('comment before closing paren should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `fn(
+    arg1,
+    arg2
+    // trailing comment
+)`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('inline comment after last argument should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `typescriptWithSpacesRemoved(
+    'const response = await fetch("url");',
+    'const response=await fetch("url");'
+    // @formatter:on
+)`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('arrow function with object literal and spread should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+            `
+                test('plus', () =>
+                    spec.rewriteRun({
+                        //language=typescript
+                        ...typescript(
+                            '1 + 2'
+                        ),
+                        afterRecipe: (cu) => {
+                            const binary = cu.statements[0].element.expression;
+                            expect(binary.type).toBe(Type.Primitive.Double);
+                        }
+                    }));
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('describe with nested test and arrow functions should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `describe('class mapping', () => {
+    const spec = new RecipeSpec();
+
+    test('empty', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('blabla')
+        ));
+});`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('indent initializer when on new line', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                    const x =
+                    function () {
+                        return 136;
+                    };
+                    `,
+                `
+                    const x =
+                        function () {
+                            return 136;
+                        };
+                    `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('TSX', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            tsx(
+                `
+                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
+                    const handleClick = () => {
+                        console.log('clicked');
+                    };
+
+                    return (
+                    <div ref={ref} onClick={handleClick}>
+                    <h1>{props.title}</h1>
+                    <p>{props.content}</p>
+                    </div>
+                    );
+                };
+                `,
+                `
+                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
+                    const handleClick = () => {
+                        console.log('clicked');
+                    };
+
+                    return (
+                        <div ref={ref} onClick={handleClick}>
+                            <h1>{props.title}</h1>
+                            <p>{props.content}</p>
+                        </div>
+                    );
+                };
+                `
             )
             // @formatter:on
         )

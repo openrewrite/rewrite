@@ -449,9 +449,11 @@ expect(recipe).toBeNull(); // Multiple matches`
             // @formatter:off
             //language=typescript
             typescript(
-                `const baseContent = start > 0
-    ? content.substring(0, start)
-    : content;`
+            `
+                const baseContent = start > 0
+                    ? content.substring(0, start)
+                    : content;
+                `
             )
             // @formatter:on
         )
@@ -477,10 +479,12 @@ expect(recipe).toBeNull(); // Multiple matches`
             // @formatter:off
             //language=typescript
             typescript(
-                `const valid = typeof node.value === 'number' &&
-    aValue !== undefined &&
-    typeof aValue.value === 'number' &&
-    node.value > aValue.value;`
+            `
+                const valid = typeof node.value === 'number' &&
+                    aValue !== undefined &&
+                    typeof aValue.value === 'number' &&
+                    node.value > aValue.value;
+                `
             )
             // @formatter:on
         )
@@ -515,44 +519,6 @@ expect(recipe).toBeNull(); // Multiple matches`
             // @formatter:on
         )
     });
-
-    test('TSX', () => {
-        return spec.rewriteRun(
-            // @formatter:off
-            //language=typescript
-            tsx(
-                `
-                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
-                    const handleClick = () => {
-                        console.log('clicked');
-                    };
-
-                    return (
-                    <div ref={ref} onClick={handleClick}>
-                    <h1>{props.title}</h1>
-                    <p>{props.content}</p>
-                    </div>
-                    );
-                };
-                `,
-                `
-                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
-                    const handleClick = () => {
-                        console.log('clicked');
-                    };
-
-                    return (
-                        <div ref={ref} onClick={handleClick}>
-                            <h1>{props.title}</h1>
-                            <p>{props.content}</p>
-                        </div>
-                    );
-                };
-                `
-            )
-            // @formatter:on
-        )
-    })
 
     test('generator function should have space after asterisk (default style)', () => {
         return spec.rewriteRun(
@@ -598,6 +564,34 @@ expect(recipe).toBeNull(); // Multiple matches`
         yield 1;
     }
 }`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('maybeAutoFormat on top-level expression preserves no indent', async () => {
+        // This test verifies that when template replaces a top-level method invocation,
+        // the result doesn't get incorrectly indented.
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+                // Only format the slice() call
+                if (methodInvocation.name?.simpleName === 'slice') {
+                    // Format just this subtree - simulates template replacement
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent);
+                }
+                return super.visitMethodInvocation(methodInvocation, p);
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const buf = Buffer.alloc(10);
+buf.slice();`
             )
             // @formatter:on
         )

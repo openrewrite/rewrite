@@ -734,19 +734,19 @@ describe('AddImport visitor', () => {
             await spec.rewriteRun(
                 typescript(
                     `
-                        import * as fs from 'fs';
+                    import * as fs from 'fs';
 
-                        function example() {
-                            placeholder();
-                        }
+                    function example() {
+                        placeholder();
+                    }
                     `,
                     `
-                        import * as fs from 'fs';
-                        import {promisify} from 'util';
+                    import * as fs from 'fs';
+                    import {promisify} from 'util';
 
-                        function example() {
-                            promisify(fs.readFile);
-                        }
+                    function example() {
+                        promisify(fs.readFile);
+                    }
                     `
                 )
             );
