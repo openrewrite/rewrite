@@ -1167,9 +1167,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
         const previousIndent = this.currentIndent ?? "";
 
-        if (tree.kind === J.Kind.IfElse && this.cursor.getNearestMessage("else-indent") !== undefined) {
-            this.cursor.messages.set("indentToUse", this.cursor.getNearestMessage("else-indent"));
-        } else if (indentShouldIncrease) {
+        if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", (this.currentIndent ?? "") + this.singleIndent);
         }
 
@@ -1177,11 +1175,20 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             this.cursor.messages.set("jsxTagIndent", this.currentIndent ?? "");
         }
 
-        if (tree.kind === J.Kind.IfElse && this.cursor.messages.get("else-indent") !== undefined) {
-            this.cursor.messages.set("indentToUse", this.cursor.messages.get("else-indent"));
-            this.cursor.messages.delete("else-indent");
+        // For IfElse: when the parent If has non-block thenPart, the indent was increased.
+        // Reset to the parent's indent so the else aligns with the if.
+        let relativeIndent: string | undefined = this.currentIndent;
+        if (tree.kind === J.Kind.IfElse) {
+            const parentIf = this.cursor.firstEnclosing((n: any): n is J.If => n.kind === J.Kind.If);
+            if (parentIf && parentIf.thenPart.element.kind !== J.Kind.Block) {
+                // The If added singleIndent for the thenPart - subtract it back for the else
+                const currentLen = (this.currentIndent ?? "").length;
+                const singleLen = this.singleIndent.length;
+                relativeIndent = currentLen > singleLen
+                    ? (this.currentIndent ?? "").substring(0, currentLen - singleLen)
+                    : "";
+            }
         }
-        const relativeIndent: string | undefined = this.currentIndent;
 
         ret = produce(ret, draft => {
             if (draft.prefix == undefined) {
@@ -1210,6 +1217,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 // Control structure bodies: if/while/for non-block bodies
                 const isControlStructureBody = parentKind === J.Kind.RightPadded && (
                     grandparentKind === J.Kind.If ||
+                    grandparentKind === J.Kind.IfElse ||
                     grandparentKind === J.Kind.WhileLoop ||
                     grandparentKind === J.Kind.ForLoop ||
                     grandparentKind === J.Kind.ForEachLoop
@@ -1227,10 +1235,12 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 // Statements in a case body (Container parent is Case) need normalization
                 const isStatementInCaseBody = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Container &&
                     greatGrandparentKind === J.Kind.Case;
+                // IfElse (else part) needs normalization to align with the parent If
+                const isIfElse = tree.kind === J.Kind.IfElse;
                 // For top-level statements, always normalize to no indent (even when relativeIndent is undefined)
                 if (isTopLevelStatement) {
                     draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, "");
-                } else if (!isInsideContainer && relativeIndent !== undefined && (isStatementInBlock || isControlStructureBody || isContinuation || isInsideJsxTag || isStatementInCaseBody)) {
+                } else if (!isInsideContainer && relativeIndent !== undefined && (isStatementInBlock || isControlStructureBody || isContinuation || isInsideJsxTag || isStatementInCaseBody || isIfElse)) {
                     draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
                 }
             }
@@ -1263,7 +1273,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             const ifStmt = tree as J.If;
             if (ifStmt.thenPart.element.kind !== J.Kind.Block) {
                 indentShouldIncrease = true;
-                this.cursor.messages.set("else-indent", this.currentIndent);
             }
         } else if (tree.kind === J.Kind.WhileLoop) {
             const whileLoop = tree as J.WhileLoop;
@@ -1280,6 +1289,25 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         }
         if (indentShouldIncrease) {
             this.cursor.messages.set("indentToUse", (this.currentIndent ?? "") + this.singleIndent);
+        }
+
+        // Reset indent when entering the else part of an If with non-block thenPart
+        // The If increased indent for the thenPart body, but the else body needs different handling
+        if (tree.kind === J.Kind.IfElse) {
+            const parentIf = this.cursor.firstEnclosing((n: any): n is J.If => n.kind === J.Kind.If);
+            if (parentIf && parentIf.thenPart.element.kind !== J.Kind.Block) {
+                const elseStmt = tree as J.If.Else;
+                if (elseStmt.body.element.kind === J.Kind.Block) {
+                    // Else body is a Block - reset indent so Block can add its own +singleIndent
+                    const currentLen = (this.currentIndent ?? "").length;
+                    const singleLen = this.singleIndent.length;
+                    const parentIndent = currentLen > singleLen
+                        ? (this.currentIndent ?? "").substring(0, currentLen - singleLen)
+                        : "";
+                    this.cursor.messages.set("indentToUse", parentIndent);
+                }
+                // If else body is NOT a Block, keep the If's increased indent for the statement
+            }
         }
 
         return ret;
@@ -1334,12 +1362,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         // cursor.value is the parent node when visitLeftPadded is called
         // Check if the parent is a Ternary - must check BEFORE super call since super resets the cursor
         const parentIsTernary = this.cursor.value?.kind === J.Kind.Ternary;
-        // For else parts, use saved else-indent (set by If with non-block then body)
-        const isElsePart = (left.element as any)?.kind === J.Kind.IfElse;
-        // Try both the current cursor and getNearestMessage to find else-indent
-        const elseIndent = isElsePart
-            ? (this.cursor.messages.get("else-indent") ?? this.cursor.getNearestMessage("else-indent"))
-            : undefined;
 
         const ret = await super.visitLeftPadded(left, p);
         if (ret == undefined) {
@@ -1349,8 +1371,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (parentIsTernary) {
             return ret;
         }
-        // Use else-indent for else parts, otherwise use current indent
-        const indent = elseIndent ?? this.currentIndent;
+        const indent = this.currentIndent;
         if (indent === undefined) {
             return ret; // Preserve existing indentation when no indent level is set
         }
