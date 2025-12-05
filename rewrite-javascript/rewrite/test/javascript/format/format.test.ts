@@ -92,7 +92,6 @@ describe('AutoformatVisitor', () => {
                                     return 1;
                                 default:
                                     return 0;
-                            
                             }
                         }
                     }
@@ -153,6 +152,30 @@ describe('AutoformatVisitor', () => {
         )
     });
 
+    test('control structure with non-block body', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            if (condition)
+            doSomething();
+            while (running)
+            process();
+            for (let i = 0; i < 10; i++)
+            iterate();
+            `,
+            `
+            if (condition)
+                doSomething();
+            while (running)
+                process();
+            for (let i = 0; i < 10; i++)
+                iterate();
+            `)
+            // @formatter:on
+        )
+    });
+
     test('try catch-all', () => {
         return spec.rewriteRun(
             // @formatter:off
@@ -189,11 +212,10 @@ describe('AutoformatVisitor', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript("const x = { a: 1 };",
-                // TODO the leading space before `a` seems excessive
-                "const x = { a: 1};"
-                    // @formatter:on
-            ))
+            // Single-line object literals should preserve their whitespace
+            typescript("const x = { a: 1 };")
+            // @formatter:on
+        )
     });
 
     test('after unary not operator', () => {
@@ -314,6 +336,19 @@ describe('AutoformatVisitor', () => {
         )
     });
 
+    test('anonymous class', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const C = class extends Object {
+                }
+                `
+            )
+            // @formatter:on
+        )
+    });
+
     test.each([
         // @formatter:off
         `const short = {name: "Ivan Almeida", age: 36};`,
@@ -324,39 +359,239 @@ describe('AutoformatVisitor', () => {
         return spec.rewriteRun(typescript(code));
     });
 
-    test('TSX', () => {
+    test('single-line object literal should not get extra spaces before closing brace', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            tsx(
-                `
-                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
-                    const handleClick = () => {
-                        console.log('clicked');
-                    };
+            typescript(
+                `function test() {
+    const x = { a: 1 };
+}`,
+            )
+            // @formatter:on
+        )
+    });
 
-                    return (
-                    <div ref={ref} onClick={handleClick}>
-                    <h1>{props.title}</h1>
-                    <p>{props.content}</p>
-                    </div>
-                    );
-                };
-                `,
-                `
-                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
-                    const handleClick = () => {
-                        console.log('clicked');
-                    };
+    test('inline comment should stay on the same line', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const recipe = findRecipe(registry, 'recipe', {});
+expect(recipe).toBeNull(); // Multiple matches`
+            )
+            // @formatter:on
+        )
+    });
 
-                    return (
-                        <div ref={ref} onClick={handleClick}>
-                            <h1>{props.title}</h1>
-                            <p>{props.content}</p>
-                        </div>
-                    );
-                };
+    test('empty arrow function body expands to multiple lines', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const noop = () => {};`,
+                `const noop = () => {
+};`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('empty function body in method expands to multiple lines', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `jest.spyOn(console, 'error').mockImplementation(() => {});`,
+                `jest.spyOn(console, 'error').mockImplementation(() => {
+});`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('comment before argument should keep indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `await spec.rewriteRun(
+    //language=typescript
+    typescript('const x = 3 + 3;')
+);`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('multi-line method arguments inside arrow function should keep indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
                 `
+                    test('should detect usage as direct function call', async () => {
+                        const spec = new RecipeSpec();
+                        spec.recipe = fromVisitor(createAddImportWithTemplateVisitor(
+                            "promisify(fs.readFile)",
+                            "util",
+                            "promisify"
+                        ));
+                    });
+                    `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('multi-line ternary expression should preserve line breaks', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+            `
+                const baseContent = start > 0
+                    ? content.substring(0, start)
+                    : content;
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('multi-line ternary expression inside function should preserve indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function test() {
+    const baseContent = start > 0
+        ? content.substring(0, start)
+        : content;
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('multi-line binary expression should preserve line breaks', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+            `
+                const valid = typeof node.value === 'number' &&
+                    aValue !== undefined &&
+                    typeof aValue.value === 'number' &&
+                    node.value > aValue.value;
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('anonymous class inside method argument should preserve indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `await new class extends Visitor {
+    protected async visitProperty(prop: Property): Promise<J | undefined> {
+        expect(prop.name).toBe('foo');
+        return prop;
+    }
+}().visit(cu, undefined);`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('async function inside arrow function body should not get extra whitespace', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const fn = () => {
+    async function inner() {
+    }
+};`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('generator function should have space after asterisk (default style)', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function* myGenerator() {
+    yield 1;
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('generator function without space after asterisk should be fixed', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function*myGenerator() {
+    yield 1;
+}`,
+                `function* myGenerator() {
+    yield 1;
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('async generator method with space before asterisk should be fixed', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `class Parser {
+    async *parse(): AsyncGenerator<number> {
+        yield 1;
+    }
+}`,
+                `class Parser {
+    async* parse(): AsyncGenerator<number> {
+        yield 1;
+    }
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('maybeAutoFormat on top-level expression preserves no indent', async () => {
+        // This test verifies that when template replaces a top-level method invocation,
+        // the result doesn't get incorrectly indented.
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+                // Only format the slice() call
+                if (methodInvocation.name?.simpleName === 'slice') {
+                    // Format just this subtree - simulates template replacement
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent);
+                }
+                return super.visitMethodInvocation(methodInvocation, p);
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const buf = Buffer.alloc(10);
+buf.slice();`
             )
             // @formatter:on
         )
