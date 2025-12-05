@@ -28,6 +28,7 @@ import {
 } from "./style";
 import {produceAsync} from "../visitor";
 import {findMarker} from "../markers";
+import {Generator} from "./markers";
 
 export const maybeAutoFormat = async <J2 extends J, P>(before: J2, after: J2, p: P, stopAfter?: J, parent?: Cursor): Promise<J2> => {
     if (before !== after) {
@@ -323,6 +324,16 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.parameters.elements[0] = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.parameters.elements[0], this.style.within.functionDeclarationParentheses), false);
             }
             draft.parameters = await this.spaceBeforeContainer(draft.parameters, this.style.beforeParentheses.functionDeclarationParentheses);
+
+            // Handle generator asterisk spacing
+            // - space before * is in the Generator marker's prefix
+            // - space after * is in the method name's prefix
+            const generatorIndex = ret.markers.markers.findIndex(m => m.kind === JS.Markers.Generator);
+            if (generatorIndex >= 0) {
+                const generator = draft.markers.markers[generatorIndex] as Draft<Generator>;
+                generator.prefix.whitespace = this.style.other.beforeAsteriskInGenerator ? " " : "";
+                draft.name.prefix.whitespace = this.style.other.afterAsteriskInGenerator ? " " : "";
+            }
 
             // TODO typeParameters handling - see visitClassDeclaration
         });

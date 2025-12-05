@@ -553,4 +553,67 @@ expect(recipe).toBeNull(); // Multiple matches`
             // @formatter:on
         )
     })
+
+    test('generator function should have space after asterisk (default style)', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function* myGenerator() {
+    yield 1;
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('generator function without space after asterisk should be fixed', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function*myGenerator() {
+    yield 1;
+}`,
+                `function* myGenerator() {
+    yield 1;
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('async generator method with space before asterisk should be fixed', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `class Parser {
+    async *parse(): AsyncGenerator<number> {
+        yield 1;
+    }
+}`,
+                `class Parser {
+    async* parse(): AsyncGenerator<number> {
+        yield 1;
+    }
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('closing braces after method call should be indented correctly', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test('name', () => {
+    return spec.rewriteRun(
+        typescript(\`code\`)
+    )});`
+            )
+            // @formatter:on
+        )
+    })
 });
