@@ -173,7 +173,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     maybeUpdateModel();
                     return t;
                 }
-                if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId)) {
+                if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId) || isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
                     String groupId = newGroupId;
                     if (groupId != null) {
                         t = changeChildTagValue(t, "groupId", groupId, ctx);

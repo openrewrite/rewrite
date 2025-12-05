@@ -294,7 +294,7 @@ describe('JavaScript type mapping', () => {
                         element = div;
                     `,
                     `
-                        let element: /*~~(HTMLElement (235 members))~~>*/HTMLElement;
+                        let element: /*~~(HTMLElement (246 members))~~>*/HTMLElement;
                         const div = document.createElement('div');
                         element = div;
                     `

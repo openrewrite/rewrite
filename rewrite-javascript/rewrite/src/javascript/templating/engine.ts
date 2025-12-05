@@ -136,7 +136,7 @@ class TemplateCache {
         // the same dependencies will automatically share the same workspace
         let workspaceDir: string | undefined;
         if (dependencies && Object.keys(dependencies).length > 0) {
-            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
         }
 
         // Prepend context statements for type attribution context

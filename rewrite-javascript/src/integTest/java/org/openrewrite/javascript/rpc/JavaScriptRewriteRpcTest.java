@@ -28,6 +28,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
@@ -58,7 +59,8 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           .metricsCsv(tempDir.resolve("rpc.csv"))
           .log(tempDir.resolve("rpc.log"))
           .traceRpcMessages()
-//          .inspectBrk()
+//          .inspectBrk(Path.of("rewrite"))
+//          .timeout(Duration.ofHours(1))
         );
     }
 
@@ -298,13 +300,90 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parsePackageJsonWithNodeResolutionResultMarker(@TempDir Path projectDir) {
+        rewriteRun(
+          spec -> spec.relativeTo(projectDir),
+          npm(
+            projectDir,
+            packageJson(
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "lodash": "^4.17.21"
+                  }
+                }
+                """,
+              spec -> spec.beforeRecipe(doc -> {
+                  NodeResolutionResult marker = doc.getMarkers().findFirst(NodeResolutionResult.class).orElseThrow();
+                  assertThat(marker.getName()).isEqualTo("test-project");
+                  assertThat(marker.getVersion()).isEqualTo("1.0.0");
+                  assertThat(marker.getDependencies()).hasSize(1);
+                  assertThat(marker.getDependencies().getFirst().getName()).isEqualTo("lodash");
+
+                  // Check resolved dependencies from lock file
+                  assertThat(marker.getResolvedDependencies()).isNotEmpty();
+                  NodeResolutionResult.ResolvedDependency resolvedLodash = marker.getResolvedDependency("lodash");
+                  assertThat(resolvedLodash).isNotNull();
+                  assertThat(resolvedLodash.getName()).isEqualTo("lodash");
+                  assertThat(resolvedLodash.getVersion()).startsWith("4.17.");
+                  assertThat(resolvedLodash.getLicense()).isEqualTo("MIT");
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void parsePackageJsonWithNodeResolutionResult(@TempDir Path projectDir) {
+        installRecipes(new File("rewrite/dist"));
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.javascript.dependencies.upgrade-dependency-version",
+              Map.of("packageName", "lodash", "newVersion", "^4.17.21")))
+            .relativeTo(projectDir),
+          npm(
+            projectDir,
+            java(
+              """
+                /** Javadoc */
+                class Foo {}
+                """
+            ),
+            packageJson(
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "lodash": "^4.17.20"
+                  }
+                }
+                """,
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "lodash": "^4.17.21"
+                  }
+                }
+                """
+            )
+          )
+        );
+    }
+
     @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
     @Test
     void javaTypeAcrossRpcBoundary(@TempDir Path projectDir) {
         installRecipes();
         rewriteRun(
           spec -> spec
-            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.mark-class-types", Map.of())),
+            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.mark-class-types", Map.of()))
+            .relativeTo(projectDir),
           npm(
             projectDir,
             typescript(
@@ -335,8 +414,27 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Test
+    void runScanningRecipeThatEdits() {
+        // This test verifies that the accumulator from the scanning phase
+        // is correctly passed to the editor phase over RPC.
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.text.scanning-editor", Map.of()))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          text("file1", "file1 (count: 2)"),
+          text("file2", "file2 (count: 2)")
+        );
+    }
+
     private void installRecipes() {
         File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
+        installRecipes(exampleRecipes);
+    }
+
+    private void installRecipes(File exampleRecipes) {
         assertThat(exampleRecipes).exists();
         assertThat(client().installRecipes(exampleRecipes)).isGreaterThan(0);
     }
