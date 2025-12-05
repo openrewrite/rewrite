@@ -21,6 +21,7 @@ export * from "./style";
 export * from "./markers";
 export * from "./node-resolution-result";
 export * from "./package-json-parser";
+export * from "./package-manager";
 export * from "./preconditions";
 export * from "./templating/index";
 export * from "./method-matcher";
@@ -28,6 +29,8 @@ export * from "./format";
 
 export * from "./add-import";
 export * from "./remove-import";
+export * from "./recipes/index";
+export * from "./search/index";
 
 import "./print";
 import "./rpc";

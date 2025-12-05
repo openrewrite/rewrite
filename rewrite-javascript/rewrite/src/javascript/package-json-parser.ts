@@ -28,7 +28,7 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
-import {spawnSync} from "child_process";
+import {getLockFileDetectionConfig, runList} from "./package-manager";
 
 /**
  * Bun.lock package entry metadata.
@@ -187,12 +187,15 @@ export class PackageJsonParser extends Parser {
                 : filePath;
 
             // Try to read lock file if dependency resolution is not skipped
-            // Use relativeTo directory if available (for tests), otherwise use the directory from input path
+            // First try the directory containing the package.json, then walk up toward relativeTo
             let lockContent: PackageLockContent | undefined = undefined;
             let packageManager: PackageManager | undefined = undefined;
             if (!this.skipDependencyResolution) {
-                const lockDir = this.relativeTo || dir;
-                const lockResult = await this.tryReadLockFile(lockDir);
+                // Resolve dir relative to relativeTo if dir is relative (e.g., '.' when package.json is at root)
+                const absoluteDir = this.relativeTo && !path.isAbsolute(dir)
+                    ? path.resolve(this.relativeTo, dir)
+                    : dir;
+                const lockResult = await this.tryReadLockFileWithWalkUp(absoluteDir, this.relativeTo);
                 lockContent = lockResult?.content;
                 packageManager = lockResult?.packageManager;
             }
@@ -216,24 +219,48 @@ export class PackageJsonParser extends Parser {
     }
 
     /**
-     * Lock file detection configuration.
-     * Priority order determines which package manager is detected when multiple lock files exist.
+     * Attempts to find and read a lock file by walking up the directory tree.
+     * Starts from the directory containing the package.json and walks up toward
+     * the root directory (or relativeTo if specified).
+     *
+     * This handles both standalone projects (lock file next to package.json) and
+     * workspace scenarios (lock file at workspace root).
+     *
+     * @param startDir The directory containing the package.json being parsed
+     * @param rootDir Optional root directory to stop walking at (e.g., relativeTo/git root)
+     * @returns Object with parsed lock file content and detected package manager, or undefined if none found
      */
-    private static readonly LOCK_FILE_CONFIG: ReadonlyArray<{
-        filename: string;
-        packageManager: PackageManager | ((content: string) => PackageManager);
-        /** If true, prefer walking node_modules over parsing lock file */
-        preferNodeModules?: boolean;
-    }> = [
-        { filename: 'package-lock.json', packageManager: PackageManager.Npm },
-        { filename: 'bun.lock', packageManager: PackageManager.Bun },
-        { filename: 'pnpm-lock.yaml', packageManager: PackageManager.Pnpm, preferNodeModules: true },
-        // yarn.lock omits transitive dependency details (engines/license), so prefer node_modules
-        { filename: 'yarn.lock', packageManager: (content) =>
-            content.includes('__metadata:') ? PackageManager.YarnBerry : PackageManager.YarnClassic,
-            preferNodeModules: true
-        },
-    ];
+    private async tryReadLockFileWithWalkUp(
+        startDir: string,
+        rootDir?: string
+    ): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
+        // Normalize paths for comparison
+        const normalizedRoot = rootDir ? path.resolve(rootDir) : undefined;
+        let currentDir = path.resolve(startDir);
+
+        // Walk up the directory tree looking for a lock file
+        while (true) {
+            const result = await this.tryReadLockFile(currentDir);
+            if (result) {
+                return result;
+            }
+
+            // If we've reached rootDir, stop walking (don't go above it)
+            if (normalizedRoot && currentDir === normalizedRoot) {
+                break;
+            }
+
+            // Check if we've reached the filesystem root
+            const parentDir = path.dirname(currentDir);
+            if (parentDir === currentDir) {
+                break;
+            }
+
+            currentDir = parentDir;
+        }
+
+        return undefined;
+    }
 
     /**
      * Attempts to read and parse a lock file from the given directory.
@@ -242,8 +269,8 @@ export class PackageJsonParser extends Parser {
      * @returns Object with parsed lock file content and detected package manager, or undefined if no lock file found
      */
     private async tryReadLockFile(dir: string): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
-        // Detect which lock file exists (first match wins based on priority)
-        for (const config of PackageJsonParser.LOCK_FILE_CONFIG) {
+        // Use shared lock file detection config (first match wins based on priority)
+        for (const config of getLockFileDetectionConfig()) {
             const lockPath = path.join(dir, config.filename);
             if (!fs.existsSync(lockPath)) {
                 continue;
@@ -271,6 +298,14 @@ export class PackageJsonParser extends Parser {
             } catch (error) {
                 console.debug?.(`Failed to parse ${config.filename}: ${error}`);
             }
+        }
+
+        // Fallback: if node_modules exists but no lock file was found (e.g., symlinked from another workspace),
+        // walk node_modules to get resolved dependency information
+        const parsed = await this.walkNodeModules(dir);
+        if (parsed) {
+            // Assume npm as the default package manager when only node_modules exists
+            return { content: parsed, packageManager: PackageManager.Npm };
         }
 
         return undefined;
@@ -556,19 +591,12 @@ export class PackageJsonParser extends Parser {
      * Uses `pnpm list --json --depth=Infinity` to get the full dependency tree.
      */
     private getPnpmDependencies(dir: string): Record<string, any> | undefined {
-        // Use spawnSync with array args to avoid shell injection risks
-        const result = spawnSync('pnpm', ['list', '--json', '--depth=Infinity'], {
-            cwd: dir,
-            encoding: 'utf-8',
-            stdio: ['pipe', 'pipe', 'pipe'],
-            timeout: 30000
-        });
-
-        if (result.error || result.status !== 0) {
+        const output = runList(PackageManager.Pnpm, dir, 30000);
+        if (!output) {
             return undefined;
         }
 
-        const pnpmList = JSON.parse(result.stdout);
+        const pnpmList = JSON.parse(output);
         return this.convertPnpmListToNpmFormat(pnpmList);
     }
 

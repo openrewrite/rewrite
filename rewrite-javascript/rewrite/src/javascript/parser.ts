@@ -3431,6 +3431,8 @@ export class JavaScriptParserVisitor {
     }
 
     visitCaseBlock(node: ts.CaseBlock): J.Block {
+        // consume end space so it gets assigned to the block's `end`
+        const end = this.prefix(node.getLastToken()!);
         return {
             kind: J.Kind.Block,
             id: randomId(),
@@ -3442,7 +3444,7 @@ export class JavaScriptParserVisitor {
                     this.visit(clause),
                     this.suffix(clause)
                 )),
-            end: this.prefix(node.getLastToken()!)
+            end: end
         }
     }
 

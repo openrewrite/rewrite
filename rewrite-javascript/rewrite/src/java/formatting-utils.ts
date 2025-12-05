@@ -18,6 +18,37 @@ import {J} from "../java";
 import {produce} from "immer";
 
 /**
+ * Gets the effective last whitespace from a Space.
+ * When there are comments, the last whitespace is the suffix of the last comment.
+ * When there are no comments, it's the whitespace property.
+ */
+export function lastWhitespace(space: J.Space): string {
+    if (space.comments.length > 0) {
+        return space.comments[space.comments.length - 1].suffix;
+    }
+    return space.whitespace;
+}
+
+/**
+ * Replaces the effective last whitespace in a Space using a transform function.
+ * When there are comments, updates the suffix of the last comment.
+ * When there are no comments, updates the whitespace property.
+ *
+ * @param space The Space to modify (Immer draft)
+ * @param transform Function that receives the current last whitespace and returns the new value
+ */
+export function replaceLastWhitespace(space: J.Space, transform: (ws: string) => string): J.Space {
+    return produce(space, draft => {
+        if (draft.comments.length > 0) {
+            const lastComment = draft.comments[draft.comments.length - 1];
+            lastComment.suffix = transform(lastComment.suffix);
+        } else {
+            draft.whitespace = transform(draft.whitespace);
+        }
+    });
+}
+
+/**
  * Handles element removal from lists while preserving LST formatting.
  * Automatically applies prefixes from removed elements to the next kept element,
  * handling whitespace and comment preservation.

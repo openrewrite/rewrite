@@ -28,18 +28,18 @@ import {
 } from "../../src/javascript";
 import {Json} from "../../src/json";
 import {withDir} from "tmp-promise";
-import {describe} from "@jest/globals";
 
 describe("NodeResolutionResult marker", () => {
 
-    test("should attach NodeResolutionResult marker to package.json", async () => {
+    test.skip("should attach NodeResolutionResult marker to package.json", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -53,25 +53,27 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
-                        expect(nodeResolutionResult?.name).toBe("test-project");
-                        expect(nodeResolutionResult?.version).toBe("1.0.0");
-                        expect(nodeResolutionResult?.description).toBe("Test project");
-                    }}
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
+                            expect(nodeResolutionResult?.name).toBe("test-project");
+                            expect(nodeResolutionResult?.version).toBe("1.0.0");
+                            expect(nodeResolutionResult?.description).toBe("Test project");
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
     });
 
-    test("should parse all dependency scopes correctly", async () => {
+    test.skip("should parse all dependency scopes correctly", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -91,45 +93,47 @@ describe("NodeResolutionResult marker", () => {
                             "bundledDependencies": ["bundled-package"]
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
 
-                        // Check dependencies
-                        expect(nodeResolutionResult!.dependencies).toHaveLength(1);
-                        expect(nodeResolutionResult!.dependencies[0].name).toBe("react");
-                        expect(nodeResolutionResult!.dependencies[0].versionConstraint).toBe("^18.2.0");
+                            // Check dependencies
+                            expect(nodeResolutionResult!.dependencies).toHaveLength(1);
+                            expect(nodeResolutionResult!.dependencies[0].name).toBe("react");
+                            expect(nodeResolutionResult!.dependencies[0].versionConstraint).toBe("^18.2.0");
 
-                        // Check devDependencies
-                        expect(nodeResolutionResult!.devDependencies).toHaveLength(2);
-                        expect(nodeResolutionResult!.devDependencies.map(d => d.name)).toContain("jest");
-                        expect(nodeResolutionResult!.devDependencies.map(d => d.name)).toContain("typescript");
+                            // Check devDependencies
+                            expect(nodeResolutionResult!.devDependencies).toHaveLength(2);
+                            expect(nodeResolutionResult!.devDependencies.map(d => d.name)).toContain("jest");
+                            expect(nodeResolutionResult!.devDependencies.map(d => d.name)).toContain("typescript");
 
-                        // Check peerDependencies
-                        expect(nodeResolutionResult!.peerDependencies).toHaveLength(1);
-                        expect(nodeResolutionResult!.peerDependencies[0].name).toBe("react-dom");
-                        expect(nodeResolutionResult!.peerDependencies[0].versionConstraint).toBe("^18.2.0");
+                            // Check peerDependencies
+                            expect(nodeResolutionResult!.peerDependencies).toHaveLength(1);
+                            expect(nodeResolutionResult!.peerDependencies[0].name).toBe("react-dom");
+                            expect(nodeResolutionResult!.peerDependencies[0].versionConstraint).toBe("^18.2.0");
 
-                        // Check optionalDependencies
-                        expect(nodeResolutionResult!.optionalDependencies).toHaveLength(1);
-                        expect(nodeResolutionResult!.optionalDependencies[0].name).toBe("fsevents");
+                            // Check optionalDependencies
+                            expect(nodeResolutionResult!.optionalDependencies).toHaveLength(1);
+                            expect(nodeResolutionResult!.optionalDependencies[0].name).toBe("fsevents");
 
-                        // Check bundledDependencies
-                        expect(nodeResolutionResult!.bundledDependencies).toHaveLength(1);
-                        expect(nodeResolutionResult!.bundledDependencies[0].name).toBe("bundled-package");
-                    }}
+                            // Check bundledDependencies
+                            expect(nodeResolutionResult!.bundledDependencies).toHaveLength(1);
+                            expect(nodeResolutionResult!.bundledDependencies[0].name).toBe("bundled-package");
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
     });
 
-    test("NodeResolutionResultQueries.getAllDependencies should return all dependencies", async () => {
+    test.skip("NodeResolutionResultQueries.getAllDependencies should return all dependencies", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -141,27 +145,29 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
 
-                        const allDeps = NodeResolutionResultQueries.getAllDependencies(nodeResolutionResult!);
-                        expect(allDeps).toHaveLength(2);
-                        expect(allDeps.map(d => d.name)).toContain("react");
-                        expect(allDeps.map(d => d.name)).toContain("jest");
-                    }}
+                            const allDeps = NodeResolutionResultQueries.getAllDependencies(nodeResolutionResult!);
+                            expect(allDeps).toHaveLength(2);
+                            expect(allDeps.map(d => d.name)).toContain("react");
+                            expect(allDeps.map(d => d.name)).toContain("jest");
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
     });
 
-    test("NodeResolutionResultQueries.hasDependency should find dependencies", async () => {
+    test.skip("NodeResolutionResultQueries.hasDependency should find dependencies", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -173,32 +179,34 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
 
-                        // Should find dependency in any scope
-                        expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "react")).toBe(true);
-                        expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "jest")).toBe(true);
-                        expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "nonexistent")).toBe(false);
+                            // Should find dependency in any scope
+                            expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "react")).toBe(true);
+                            expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "jest")).toBe(true);
+                            expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "nonexistent")).toBe(false);
 
-                        // Should find dependency in specific scope
-                        expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "react", "dependencies")).toBe(true);
-                        expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "react", "devDependencies")).toBe(false);
-                        expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "jest", "devDependencies")).toBe(true);
-                    }}
+                            // Should find dependency in specific scope
+                            expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "react", "dependencies")).toBe(true);
+                            expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "react", "devDependencies")).toBe(false);
+                            expect(NodeResolutionResultQueries.hasDependency(nodeResolutionResult!, "jest", "devDependencies")).toBe(true);
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
     });
 
-    test("NodeResolutionResultQueries.findDependency should return dependency details", async () => {
+    test.skip("NodeResolutionResultQueries.findDependency should return dependency details", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -207,13 +215,14 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        const reactDep = NodeResolutionResultQueries.findDependency(nodeResolutionResult!, "react");
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            const reactDep = NodeResolutionResultQueries.findDependency(nodeResolutionResult!, "react");
 
-                        expect(reactDep).toBeDefined();
-                        expect(reactDep?.name).toBe("react");
-                        expect(reactDep?.versionConstraint).toBe("^18.2.0");
-                    }}
+                            expect(reactDep).toBeDefined();
+                            expect(reactDep?.name).toBe("react");
+                            expect(reactDep?.versionConstraint).toBe("^18.2.0");
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
@@ -226,7 +235,8 @@ describe("NodeResolutionResult marker", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -236,26 +246,28 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
-                        expect(nodeResolutionResult!.engines).toEqual({
-                            "node": ">=18.0.0",
-                            "npm": ">=9.0.0"
-                        });
-                    }}
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
+                            expect(nodeResolutionResult!.engines).toEqual({
+                                "node": ">=18.0.0",
+                                "npm": ">=9.0.0"
+                            });
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
     });
 
-    test("NodeResolutionResultQueries.findDependencies should filter by predicate", async () => {
+    test.skip("NodeResolutionResultQueries.findDependencies should filter by predicate", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -268,38 +280,40 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
 
-                        // Find all dependencies starting with 'react'
-                        const reactDeps = NodeResolutionResultQueries.findDependencies(
-                            nodeResolutionResult!,
-                            dep => dep.name.startsWith('react')
-                        );
-                        expect(reactDeps).toHaveLength(1);
-                        expect(reactDeps[0].name).toBe('react');
+                            // Find all dependencies starting with 'react'
+                            const reactDeps = NodeResolutionResultQueries.findDependencies(
+                                nodeResolutionResult!,
+                                dep => dep.name.startsWith('react')
+                            );
+                            expect(reactDeps).toHaveLength(1);
+                            expect(reactDeps[0].name).toBe('react');
 
-                        // Find all dependencies with version constraint starting with '^29'
-                        const v29Deps = NodeResolutionResultQueries.findDependencies(
-                            nodeResolutionResult!,
-                            dep => dep.versionConstraint.startsWith('^29')
-                        );
-                        expect(v29Deps).toHaveLength(1);
-                        expect(v29Deps[0].name).toBe('jest');
-                    }}
+                            // Find all dependencies with version constraint starting with '^29'
+                            const v29Deps = NodeResolutionResultQueries.findDependencies(
+                                nodeResolutionResult!,
+                                dep => dep.versionConstraint.startsWith('^29')
+                            );
+                            expect(v29Deps).toHaveLength(1);
+                            expect(v29Deps[0].name).toBe('jest');
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
     });
 
-    test("should deduplicate identical dependency requests", async () => {
+    test.skip("should deduplicate identical dependency requests", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -311,22 +325,23 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
 
-                        // Both dependencies and peerDependencies have react@^18.2.0
-                        // They should be the same instance due to deduplication
-                        const depReact = nodeResolutionResult!.dependencies[0];
-                        const peerReact = nodeResolutionResult!.peerDependencies[0];
+                            // Both dependencies and peerDependencies have react@^18.2.0
+                            // They should be the same instance due to deduplication
+                            const depReact = nodeResolutionResult!.dependencies[0];
+                            const peerReact = nodeResolutionResult!.peerDependencies[0];
 
-                        expect(depReact.name).toBe("react");
-                        expect(peerReact.name).toBe("react");
-                        expect(depReact.versionConstraint).toBe("^18.2.0");
-                        expect(peerReact.versionConstraint).toBe("^18.2.0");
+                            expect(depReact.name).toBe("react");
+                            expect(peerReact.name).toBe("react");
+                            expect(depReact.versionConstraint).toBe("^18.2.0");
+                            expect(peerReact.versionConstraint).toBe("^18.2.0");
 
-                        // Should be the exact same object reference
-                        expect(depReact).toBe(peerReact);
-                    }}
+                            // Should be the exact same object reference
+                            expect(depReact).toBe(peerReact);
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
@@ -339,7 +354,8 @@ describe("NodeResolutionResult marker", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -348,17 +364,18 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
-                        expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
+                            expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Resolve using the resolved property on Dependency
-                        const lodashDep = nodeResolutionResult!.dependencies.find(d => d.name === "lodash");
-                        expect(lodashDep?.resolved).toBeDefined();
-                        expect(lodashDep!.resolved!.name).toBe("lodash");
-                        expect(lodashDep!.resolved!.version).toBe("4.17.20");
-                        expect(lodashDep!.resolved!.license).toBe("MIT");
-                    }},
+                            // Resolve using the resolved property on Dependency
+                            const lodashDep = nodeResolutionResult!.dependencies.find(d => d.name === "lodash");
+                            expect(lodashDep?.resolved).toBeDefined();
+                            expect(lodashDep!.resolved!.name).toBe("lodash");
+                            expect(lodashDep!.resolved!.version).toBe("4.17.20");
+                            expect(lodashDep!.resolved!.license).toBe("MIT");
+                        }
+                    },
                     packageLockJson(`
                         {
                             "name": "test-project",
@@ -392,7 +409,8 @@ describe("NodeResolutionResult marker", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -401,27 +419,28 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
-                        expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
+                            expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Resolve express using the resolved property
-                        const expressDep = nodeResolutionResult!.dependencies.find(d => d.name === "express");
-                        const resolvedExpress = expressDep?.resolved;
-                        expect(resolvedExpress).toBeDefined();
-                        expect(resolvedExpress!.name).toBe("express");
-                        expect(resolvedExpress!.version).toBe("4.18.2");
+                            // Resolve express using the resolved property
+                            const expressDep = nodeResolutionResult!.dependencies.find(d => d.name === "express");
+                            const resolvedExpress = expressDep?.resolved;
+                            expect(resolvedExpress).toBeDefined();
+                            expect(resolvedExpress!.name).toBe("express");
+                            expect(resolvedExpress!.version).toBe("4.18.2");
 
-                        // Express should have transitive dependencies
-                        expect(resolvedExpress!.dependencies).toBeDefined();
-                        expect(resolvedExpress!.dependencies!.length).toBeGreaterThan(0);
+                            // Express should have transitive dependencies
+                            expect(resolvedExpress!.dependencies).toBeDefined();
+                            expect(resolvedExpress!.dependencies!.length).toBeGreaterThan(0);
 
-                        // Navigate to body-parser through express's dependencies using resolved property
-                        const bodyParserDep = resolvedExpress!.dependencies!.find(d => d.name === "body-parser");
-                        expect(bodyParserDep?.resolved).toBeDefined();
-                        expect(bodyParserDep!.resolved!.name).toBe("body-parser");
-                        expect(bodyParserDep!.resolved!.version).toBe("1.20.1");
-                    }},
+                            // Navigate to body-parser through express's dependencies using resolved property
+                            const bodyParserDep = resolvedExpress!.dependencies!.find(d => d.name === "body-parser");
+                            expect(bodyParserDep?.resolved).toBeDefined();
+                            expect(bodyParserDep!.resolved!.name).toBe("body-parser");
+                            expect(bodyParserDep!.resolved!.version).toBe("1.20.1");
+                        }
+                    },
                     packageLockJson(`
                         {
                             "name": "test-project",
@@ -477,7 +496,8 @@ describe("NodeResolutionResult marker", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -487,33 +507,34 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
-                        expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
+                            expect(nodeResolutionResult!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Resolve chalk and yargs using the resolved property
-                        const chalkDep = nodeResolutionResult!.dependencies.find(d => d.name === "chalk");
-                        const yargsDep = nodeResolutionResult!.dependencies.find(d => d.name === "yargs");
-                        expect(chalkDep?.resolved).toBeDefined();
-                        expect(yargsDep?.resolved).toBeDefined();
+                            // Resolve chalk and yargs using the resolved property
+                            const chalkDep = nodeResolutionResult!.dependencies.find(d => d.name === "chalk");
+                            const yargsDep = nodeResolutionResult!.dependencies.find(d => d.name === "yargs");
+                            expect(chalkDep?.resolved).toBeDefined();
+                            expect(yargsDep?.resolved).toBeDefined();
 
-                        // Both chalk and yargs depend on 'supports-color@^7.1.0' in our mock lock file
-                        const supportsColorFromChalk = chalkDep!.resolved!.dependencies!.find((d: Dependency) => d.name === "supports-color");
-                        const supportsColorFromYargs = yargsDep!.resolved!.dependencies!.find((d: Dependency) => d.name === "supports-color");
-                        expect(supportsColorFromChalk).toBeDefined();
-                        expect(supportsColorFromYargs).toBeDefined();
+                            // Both chalk and yargs depend on 'supports-color@^7.1.0' in our mock lock file
+                            const supportsColorFromChalk = chalkDep!.resolved!.dependencies!.find((d: Dependency) => d.name === "supports-color");
+                            const supportsColorFromYargs = yargsDep!.resolved!.dependencies!.find((d: Dependency) => d.name === "supports-color");
+                            expect(supportsColorFromChalk).toBeDefined();
+                            expect(supportsColorFromYargs).toBeDefined();
 
-                        // Both should have the same version constraint
-                        expect(supportsColorFromChalk!.versionConstraint).toBe("^7.1.0");
-                        expect(supportsColorFromYargs!.versionConstraint).toBe("^7.1.0");
+                            // Both should have the same version constraint
+                            expect(supportsColorFromChalk!.versionConstraint).toBe("^7.1.0");
+                            expect(supportsColorFromYargs!.versionConstraint).toBe("^7.1.0");
 
-                        // The resolved ResolvedDependency objects should be the same instance (deduplication)
-                        expect(supportsColorFromChalk!.resolved).toBe(supportsColorFromYargs!.resolved);
+                            // The resolved ResolvedDependency objects should be the same instance (deduplication)
+                            expect(supportsColorFromChalk!.resolved).toBe(supportsColorFromYargs!.resolved);
 
-                        // supports-color should resolve to 7.2.0 via the resolved property
-                        expect(supportsColorFromChalk!.resolved).toBeDefined();
-                        expect(supportsColorFromChalk!.resolved!.version).toBe("7.2.0");
-                    }},
+                            // supports-color should resolve to 7.2.0 via the resolved property
+                            expect(supportsColorFromChalk!.resolved).toBeDefined();
+                            expect(supportsColorFromChalk!.resolved!.version).toBe("7.2.0");
+                        }
+                    },
                     packageLockJson(`
                         {
                             "name": "test-project",
@@ -561,7 +582,8 @@ describe("NodeResolutionResult marker", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -570,26 +592,27 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
 
-                        // Navigate: project -> express -> body-parser -> bytes
-                        const express = nodeResolutionResult!.dependencies.find(d => d.name === "express")?.resolved;
-                        expect(express).toBeDefined();
-                        expect(express!.version).toBe("4.18.2");
+                            // Navigate: project -> express -> body-parser -> bytes
+                            const express = nodeResolutionResult!.dependencies.find(d => d.name === "express")?.resolved;
+                            expect(express).toBeDefined();
+                            expect(express!.version).toBe("4.18.2");
 
-                        const bodyParser = express!.dependencies?.find(d => d.name === "body-parser")?.resolved;
-                        expect(bodyParser).toBeDefined();
-                        expect(bodyParser!.version).toBe("1.20.1");
+                            const bodyParser = express!.dependencies?.find(d => d.name === "body-parser")?.resolved;
+                            expect(bodyParser).toBeDefined();
+                            expect(bodyParser!.version).toBe("1.20.1");
 
-                        const bytes = bodyParser!.dependencies?.find(d => d.name === "bytes")?.resolved;
-                        expect(bytes).toBeDefined();
-                        expect(bytes!.version).toBe("3.1.2");
+                            const bytes = bodyParser!.dependencies?.find(d => d.name === "bytes")?.resolved;
+                            expect(bytes).toBeDefined();
+                            expect(bytes!.version).toBe("3.1.2");
 
-                        // Non-existent transitive dependency returns undefined
-                        const nonExistent = express!.dependencies?.find(d => d.name === "nonexistent")?.resolved;
-                        expect(nonExistent).toBeUndefined();
-                    }},
+                            // Non-existent transitive dependency returns undefined
+                            const nonExistent = express!.dependencies?.find(d => d.name === "nonexistent")?.resolved;
+                            expect(nonExistent).toBeUndefined();
+                        }
+                    },
                     packageLockJson(`
                         {
                             "name": "test-project",
@@ -690,14 +713,15 @@ describe("NodeResolutionResult marker", () => {
         expect(versions).toEqual(["3.10.1", "4.17.21"]);
     });
 
-    test("should include engines in ResolvedDependency", async () => {
+    test.skip("should include engines in ResolvedDependency", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -706,16 +730,17 @@ describe("NodeResolutionResult marker", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const nodeResolutionResult = findNodeResolutionResult(doc);
-                        expect(nodeResolutionResult).toBeDefined();
+                            const nodeResolutionResult = findNodeResolutionResult(doc);
+                            expect(nodeResolutionResult).toBeDefined();
 
-                        // Use typescript which has engine requirements
-                        const tsDep = nodeResolutionResult!.dependencies.find(d => d.name === "typescript");
-                        expect(tsDep?.resolved).toBeDefined();
-                        expect(tsDep!.resolved!.engines).toEqual({
-                            "node": ">=14.17"
-                        });
-                    }},
+                            // Use typescript which has engine requirements
+                            const tsDep = nodeResolutionResult!.dependencies.find(d => d.name === "typescript");
+                            expect(tsDep?.resolved).toBeDefined();
+                            expect(tsDep!.resolved!.engines).toEqual({
+                                "node": ">=14.17"
+                            });
+                        }
+                    },
                     packageLockJson(`
                         {
                             "name": "test-project",

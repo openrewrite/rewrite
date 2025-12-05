@@ -80,12 +80,12 @@ public class Assertions {
         return SourceSpecs.dir(relativeTo.toString(), sources);
     }
 
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before) {
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before) {
         return packageJson(before, s -> {
         });
     }
 
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before,
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before,
                                           Consumer<SourceSpec<Json.Document>> spec) {
         SourceSpec<Json.Document> json = new SourceSpec<>(
                 Json.Document.class, null, PackageJsonParser.builder(), before,
@@ -98,12 +98,12 @@ public class Assertions {
         return json;
     }
 
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after) {
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before, @Language("json5") @Nullable String after) {
         return packageJson(before, after, s -> {
         });
     }
 
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before, @Language("json5") @Nullable String after,
                                           Consumer<SourceSpec<Json.Document>> spec) {
         SourceSpec<Json.Document> json = new SourceSpec<>(
                 Json.Document.class, null, PackageJsonParser.builder(), before,
