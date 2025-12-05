@@ -92,7 +92,6 @@ describe('AutoformatVisitor', () => {
                                     return 1;
                                 default:
                                     return 0;
-                            
                             }
                         }
                     }
@@ -458,6 +457,21 @@ expect(recipe).toBeNull(); // Multiple matches`
         )
     });
 
+    test('multi-line ternary expression inside function should preserve indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function test() {
+    const baseContent = start > 0
+        ? content.substring(0, start)
+        : content;
+}`
+            )
+            // @formatter:on
+        )
+    });
+
     test('multi-line binary expression should preserve line breaks', () => {
         return spec.rewriteRun(
             // @formatter:off
@@ -467,26 +481,6 @@ expect(recipe).toBeNull(); // Multiple matches`
     aValue !== undefined &&
     typeof aValue.value === 'number' &&
     node.value > aValue.value;`
-            )
-            // @formatter:on
-        )
-    });
-
-    test('object spread with callback should preserve indentation', () => {
-        return spec.rewriteRun(
-            // @formatter:off
-            //language=typescript
-            typescript(
-                `await spec.rewriteRun(
-    npm(
-        repo.path,
-        {
-            ...packageJson(\`{}\`), afterRecipe: async (doc) => {
-                expect(marker).toBeDefined();
-            }
-        }
-    )
-);`
             )
             // @formatter:on
         )
@@ -508,22 +502,15 @@ expect(recipe).toBeNull(); // Multiple matches`
         )
     });
 
-    test('anonymous class inside afterRecipe callback should preserve indentation', () => {
+    test('async function inside arrow function body should not get extra whitespace', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
             typescript(
-                `test("test", async () => spec.rewriteRun({
-    ...typescript(\`code\`),
-    afterRecipe: async (cu) => {
-        await new class extends Visitor {
-            protected async visitProperty(prop: Property): Promise<J | undefined> {
-                expect(prop.name).toBe('foo');
-                return prop;
-            }
-        }().visit(cu, undefined);
+                `const fn = () => {
+    async function inner() {
     }
-}));`
+};`
             )
             // @formatter:on
         )

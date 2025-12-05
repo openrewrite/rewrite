@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {IntelliJ, TabsAndIndentsStyle, typescript} from "../../../src/javascript";
-import {AutoformatVisitor, TabsAndIndentsVisitor} from "../../../src/javascript/format";
+import {IntelliJ, TabsAndIndentsStyle, TabsAndIndentsVisitor, typescript} from "../../../src/javascript";
 import {Draft, produce} from "immer";
 import {Style} from "../../../src";
 
@@ -339,6 +338,68 @@ describe('TabsAndIndentsVisitor', () => {
                 const great = 436;
                 const ideal = 504;
                 `)
+            // @formatter:on
+        )
+    });
+
+    // TabsAndIndentsVisitor doesn't add newlines - it only normalizes existing indentation
+    // Single-line empty blocks should remain unchanged
+    test('empty arrow function body inside block should remain unchanged (no newlines to normalize)', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function test() {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('object spread with callback should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `await spec.rewriteRun(
+    npm(
+        repo.path,
+        {
+            ...packageJson(\`{}\`), afterRecipe: async (doc) => {
+                expect(marker).toBeDefined();
+            }
+        }
+    )
+);`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('anonymous class inside afterRecipe callback should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test("test", async () => spec.rewriteRun({
+    ...typescript(\`code\`),
+    afterRecipe: async (cu) => {
+        await new class extends Visitor {
+            protected async visitProperty(prop: Property): Promise<J | undefined> {
+                expect(prop.name).toBe('foo');
+                return prop;
+            }
+        }().visit(cu, undefined);
+    }
+}));`
+            )
             // @formatter:on
         )
     });

@@ -27,6 +27,7 @@ import {
     WrappingAndBracesStyle
 } from "./style";
 import {produceAsync} from "../visitor";
+import {findMarker} from "../markers";
 
 export const maybeAutoFormat = async <J2 extends J, P>(before: J2, after: J2, p: P, stopAfter?: J, parent?: Cursor): Promise<J2> => {
     if (before !== after) {
@@ -808,10 +809,6 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         let m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
         let first = m.leadingAnnotations.length === 0;
 
-        if (method.markers.markers.find(x => x.kind == JS.Markers.FunctionDeclaration)) {
-            first = false;
-        }
-
         if (m.modifiers.length > 0) {
             if (!first && m.modifiers[0].prefix.whitespace === "") {
                 m = produce(m, draft => {
@@ -823,6 +820,12 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
                     this.ensureSpace(draft.modifiers[i].prefix);
                 }
             });
+            first = false;
+        }
+
+        // FunctionDeclaration marker check must come AFTER modifiers processing
+        // to avoid adding unwanted space before the first modifier (e.g., 'async')
+        if (findMarker(method, JS.Markers.FunctionDeclaration)) {
             first = false;
         }
 
@@ -1146,6 +1149,13 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     protected async preVisit(tree: J, p: P): Promise<J | undefined> {
         let ret = await super.preVisit(tree, p)! as J;
 
+        // Capture the tree's prefix indent if it has a newline - this establishes the base indent for children
+        // This must happen BEFORE computing previousIndent so that blocks get the correct parent indent
+        if (tree.prefix?.whitespace?.includes("\n") && this.cursor.getNearestMessage("indentToUse") === undefined) {
+            const prefixIndent = tree.prefix.whitespace.substring(tree.prefix.whitespace.lastIndexOf("\n") + 1);
+            this.cursor.messages.set("indentToUse", prefixIndent);
+        }
+
         // Check if this block is an object literal body (NewClass) - don't increase indent for those
         const isObjectLiteralBlock = tree.kind === J.Kind.Block && this.cursor.parent?.value?.kind === J.Kind.NewClass;
         let indentShouldIncrease =
@@ -1185,16 +1195,18 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 // Top-level statements: direct children of CompilationUnit.statements
                 // Cursor structure: statement -> RightPadded -> CompilationUnit
                 const isTopLevelStatement = parentKind === J.Kind.RightPadded && grandparentKind === JS.Kind.CompilationUnit;
-                // Statements in a block, but only normalize if:
-                // - Not in an object literal (NewClass)
-                // - Not nested inside a Lambda that's inside a Container (method argument callback)
+                // Statements in a block, but only normalize if not in an object literal (NewClass)
                 const greatGrandparentKind = this.cursor.parent?.parent?.parent?.value?.kind;
-                // Check if we're anywhere inside a Lambda that's inside a Container
-                const enclosingLambda = this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Lambda);
-                const isInsideLambdaInContainer = enclosingLambda !== undefined &&
+                const hasEnclosingLambda = this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Lambda) !== undefined;
+                const isInLambdaInsideContainer = hasEnclosingLambda &&
                     this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Container) !== undefined;
+                // For statements in lambdas inside containers: only normalize if existing indent is less than computed
+                // This preserves properly-indented callbacks while fixing under-indented ones
+                const existingIndent = draft.prefix.whitespace.substring(draft.prefix.whitespace.lastIndexOf("\n") + 1);
+                const shouldSkipDueToExistingIndent = isInLambdaInsideContainer &&
+                    relativeIndent !== undefined && existingIndent.length >= relativeIndent.length;
                 const isStatementInBlock = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Block &&
-                    greatGrandparentKind !== J.Kind.NewClass && !isInsideLambdaInContainer;
+                    greatGrandparentKind !== J.Kind.NewClass && !shouldSkipDueToExistingIndent;
                 // Control structure bodies: if/while/for non-block bodies
                 const isControlStructureBody = parentKind === J.Kind.RightPadded && (
                     grandparentKind === J.Kind.If ||
@@ -1205,15 +1217,20 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 // Check if this is a continuation (like variable initializer on new line)
                 const isContinuation = parentKind === J.Kind.LeftPadded;
                 // Method arguments and array elements are inside a Container - preserve their existing indentation
-                const isInsideContainer = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Container;
+                // But case body statements (Container parent is Case) need normalization
+                const isInsideContainer = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Container &&
+                    greatGrandparentKind !== J.Kind.Case;
                 // Check if we're inside a JSX tag (JSX children need indentation)
                 const isInsideJsxTag = this.cursor.firstEnclosing(
                     (n: any): n is J => n.kind === JS.Kind.JsxTag
                 ) !== undefined;
+                // Statements in a case body (Container parent is Case) need normalization
+                const isStatementInCaseBody = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Container &&
+                    greatGrandparentKind === J.Kind.Case;
                 // For top-level statements, always normalize to no indent (even when relativeIndent is undefined)
                 if (isTopLevelStatement) {
                     draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, "");
-                } else if (!isInsideContainer && relativeIndent !== undefined && (isStatementInBlock || isControlStructureBody || isContinuation || isInsideJsxTag)) {
+                } else if (!isInsideContainer && relativeIndent !== undefined && (isStatementInBlock || isControlStructureBody || isContinuation || isInsideJsxTag || isStatementInCaseBody)) {
                     draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
                 }
             }
@@ -1221,13 +1238,21 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 const block = draft as Draft<J> as Draft<J.Block>;
                 // Skip indentation for object literals (NewClass) - they should preserve their single-line formatting
                 const isObjectLiteral = this.cursor.parent?.value.kind === J.Kind.NewClass;
-                // Skip indentation for blocks inside Lambdas that are inside Containers (method argument callbacks)
+                // Skip closing brace normalization for non-empty blocks inside lambdas that are inside containers
+                // (preserve callback indentation), but DO normalize empty blocks
                 const hasEnclosingLambda = this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Lambda) !== undefined;
-                const isBlockInsideLambdaInContainer = hasEnclosingLambda &&
-                    this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Container) !== undefined;
-                if (!isObjectLiteral && !isBlockInsideLambdaInContainer && relativeIndent !== undefined) {
+                const isNonEmptyBlockInsideLambdaInContainer = hasEnclosingLambda &&
+                    this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Container) !== undefined &&
+                    block.statements.length > 0;
+                if (!isObjectLiteral && !isNonEmptyBlockInsideLambdaInContainer && relativeIndent !== undefined) {
                     const indentToUseInClosing = indentShouldIncrease ? previousIndent : relativeIndent;
-                    block.end = replaceLastWhitespace(block.end, (ws: string) => this.combineIndent(ws, indentToUseInClosing));
+                    block.end = replaceLastWhitespace(block.end, (ws: string) => {
+                        // Only normalize if there's a newline - don't add indent to single-line blocks
+                        if (ws.includes("\n")) {
+                            return this.combineIndent(ws, indentToUseInClosing);
+                        }
+                        return ws;
+                    });
                 }
             }
         });
@@ -1306,11 +1331,26 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T> | undefined> {
+        // cursor.value is the parent node when visitLeftPadded is called
+        // Check if the parent is a Ternary - must check BEFORE super call since super resets the cursor
+        const parentIsTernary = this.cursor.value?.kind === J.Kind.Ternary;
+        // For else parts, use saved else-indent (set by If with non-block then body)
+        const isElsePart = (left.element as any)?.kind === J.Kind.IfElse;
+        // Try both the current cursor and getNearestMessage to find else-indent
+        const elseIndent = isElsePart
+            ? (this.cursor.messages.get("else-indent") ?? this.cursor.getNearestMessage("else-indent"))
+            : undefined;
+
         const ret = await super.visitLeftPadded(left, p);
         if (ret == undefined) {
             return ret;
         }
-        const indent = this.currentIndent;
+        // Don't normalize indentation for ternary expression parts - preserve continuation indent
+        if (parentIsTernary) {
+            return ret;
+        }
+        // Use else-indent for else parts, otherwise use current indent
+        const indent = elseIndent ?? this.currentIndent;
         if (indent === undefined) {
             return ret; // Preserve existing indentation when no indent level is set
         }
