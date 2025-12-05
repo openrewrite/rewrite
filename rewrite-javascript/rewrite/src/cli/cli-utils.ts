@@ -452,15 +452,20 @@ export function isAcceptedFile(filePath: string): boolean {
     return false;
 }
 
+export type ProgressCallback = (current: number, total: number, filePath: string) => void;
+
 /**
  * Parse source files using appropriate parsers
  */
 export async function parseFiles(
     filePaths: string[],
     projectRoot: string,
-    verbose: boolean = false
+    verbose: boolean = false,
+    onProgress?: ProgressCallback
 ): Promise<SourceFile[]> {
     const parsed: SourceFile[] = [];
+    const total = filePaths.length;
+    let current = 0;
 
     // Group files by type
     const jsFiles: string[] = [];
@@ -487,6 +492,8 @@ export async function parseFiles(
         }
         const jsParser = new JavaScriptParser({relativeTo: projectRoot});
         for await (const sf of jsParser.parse(...jsFiles)) {
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
             parsed.push(sf);
         }
     }
@@ -498,6 +505,8 @@ export async function parseFiles(
         }
         const pkgParser = new PackageJsonParser({relativeTo: projectRoot});
         for await (const sf of pkgParser.parse(...packageJsonFiles)) {
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
             parsed.push(sf);
         }
     }
@@ -509,6 +518,8 @@ export async function parseFiles(
         }
         const jsonParser = new JsonParser({relativeTo: projectRoot});
         for await (const sf of jsonParser.parse(...jsonFiles)) {
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
             parsed.push(sf);
         }
     }

@@ -596,4 +596,22 @@ buf.slice();`
             // @formatter:on
         )
     })
+
+    test('inline comment after last statement in block should stay on same line', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `async function getMarkerOrSkip(fixtureSubDir: string): Promise<NodeResolutionResult> {
+    const marker = await parseAndGetMarker(fixtureSubDir);
+    if (!marker || marker.resolvedDependencies.length === 0) {
+        // Skip test if we couldn't resolve dependencies (CLI not available or packages not installed)
+        return null as any; // Will be caught by the conditional skip
+    }
+    return marker;
+}`
+            )
+            // @formatter:on
+        )
+    })
 });

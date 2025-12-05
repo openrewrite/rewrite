@@ -1083,9 +1083,9 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             const parentKind = this.cursor.parent?.value.kind;
             // Skip newline only for object literals (NewClass) - they should preserve single-line formatting
             if (parentKind != J.Kind.NewClass) {
-                if (!draft.end.whitespace.includes("\n")) {
-                    draft.end.whitespace = draft.end.whitespace.replace(/[ \t]+$/, '') + "\n";
-                }
+                draft.end = replaceLastWhitespace(draft.end, ws =>
+                    ws.includes("\n") ? ws : ws.replace(/[ \t]+$/, '') + "\n"
+                );
             }
         });
     }

@@ -34,6 +34,44 @@ import {
     parseRecipeSpec
 } from './cli-utils';
 
+const isTTY = process.stdout.isTTY ?? false;
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+class Spinner {
+    private frameIndex = 0;
+    private interval: NodeJS.Timeout | null = null;
+    private message = '';
+
+    start(message: string): void {
+        if (!isTTY) return;
+        this.message = message;
+        this.render();
+        this.interval = setInterval(() => this.render(), 80);
+    }
+
+    update(message: string): void {
+        this.message = message;
+        if (!isTTY) return;
+        this.render();
+    }
+
+    private render(): void {
+        const frame = SPINNER_FRAMES[this.frameIndex];
+        this.frameIndex = (this.frameIndex + 1) % SPINNER_FRAMES.length;
+        process.stdout.write(`\r\x1b[K${frame} ${this.message}`);
+    }
+
+    stop(): void {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+        if (isTTY) {
+            process.stdout.write('\r\x1b[K');
+        }
+    }
+}
+
 // Import language modules to register printers
 import '../text';
 import '../json';
@@ -127,9 +165,13 @@ async function main() {
         console.log(`Running recipe: ${recipe.name}`);
     }
 
-    // Discover source files
+    const spinner = new Spinner();
     const projectRoot = process.cwd();
+
+    // Discover source files
+    spinner.start('Discovering source files...');
     const sourceFiles = await discoverFiles(projectRoot, opts.verbose);
+    spinner.stop();
 
     if (sourceFiles.length === 0) {
         console.log('No source files found to process.');
@@ -141,7 +183,11 @@ async function main() {
     }
 
     // Parse all source files
-    const parsedFiles = await parseFiles(sourceFiles, projectRoot, opts.verbose);
+    spinner.start(`Parsing ${sourceFiles.length} files...`);
+    const parsedFiles = await parseFiles(sourceFiles, projectRoot, opts.verbose, (current, total, filePath) => {
+        spinner.update(`Parsing [${current}/${total}] ${filePath}`);
+    });
+    spinner.stop();
 
     if (parsedFiles.length === 0) {
         console.log('No files could be parsed.');
@@ -151,8 +197,18 @@ async function main() {
     // Run the recipe with streaming output
     const ctx = new ExecutionContext();
     let changeCount = 0;
+    let processedCount = 0;
+    const totalFiles = parsedFiles.length;
+
+    spinner.start(`Running recipe on ${totalFiles} files...`);
 
     for await (const result of scheduleRunStreaming(recipe, parsedFiles, ctx)) {
+        processedCount++;
+        const currentPath = result.after?.sourcePath ?? result.before?.sourcePath ?? '';
+        spinner.update(`Processing [${processedCount}/${totalFiles}] ${currentPath}`);
+
+        const statusMsg = `Processing [${processedCount}/${totalFiles}] ${currentPath}`;
+
         if (opts.dryRun) {
             // Print colorized diff immediately (skip empty diffs)
             const diff = await result.diff();
@@ -162,7 +218,9 @@ async function main() {
             );
             if (hasChanges) {
                 changeCount++;
+                spinner.stop();
                 console.log(colorizeDiff(diff));
+                spinner.start(statusMsg);
             }
         } else {
             // Apply changes immediately
@@ -175,19 +233,25 @@ async function main() {
                 await fsp.writeFile(filePath, content);
 
                 changeCount++;
+                spinner.stop();
                 if (result.before) {
                     console.log(`  Modified: ${result.after.sourcePath}`);
                 } else {
                     console.log(`  Created: ${result.after.sourcePath}`);
                 }
+                spinner.start(statusMsg);
             } else if (result.before) {
                 const filePath = path.join(projectRoot, result.before.sourcePath);
                 await fsp.unlink(filePath);
                 changeCount++;
+                spinner.stop();
                 console.log(`  Deleted: ${result.before.sourcePath}`);
+                spinner.start(statusMsg);
             }
         }
     }
+
+    spinner.stop();
 
     if (changeCount === 0) {
         console.log('No changes to make.');
