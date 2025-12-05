@@ -39,7 +39,8 @@ describe("PackageJsonParser", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -52,18 +53,19 @@ describe("PackageJsonParser", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const marker = findNodeResolutionResult(doc);
-                        expect(marker).toBeDefined();
-                        expect(marker!.name).toBe("test-project");
-                        expect(marker!.version).toBe("1.0.0");
-                        expect(marker!.description).toBe("A test project");
+                            const marker = findNodeResolutionResult(doc);
+                            expect(marker).toBeDefined();
+                            expect(marker!.name).toBe("test-project");
+                            expect(marker!.version).toBe("1.0.0");
+                            expect(marker!.description).toBe("A test project");
 
-                        // Check dependencies
-                        expect(marker!.dependencies).toHaveLength(1);
-                        expect(marker!.dependencies[0].name).toBe("lodash");
-                        expect(marker!.devDependencies).toHaveLength(1);
-                        expect(marker!.devDependencies[0].name).toBe("typescript");
-                    }}
+                            // Check dependencies
+                            expect(marker!.dependencies).toHaveLength(1);
+                            expect(marker!.dependencies[0].name).toBe("lodash");
+                            expect(marker!.devDependencies).toHaveLength(1);
+                            expect(marker!.devDependencies[0].name).toBe("typescript");
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
@@ -76,7 +78,8 @@ describe("PackageJsonParser", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -85,16 +88,17 @@ describe("PackageJsonParser", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const marker = findNodeResolutionResult(doc);
-                        expect(marker).toBeDefined();
-                        expect(marker!.resolvedDependencies.length).toBeGreaterThan(0);
+                            const marker = findNodeResolutionResult(doc);
+                            expect(marker).toBeDefined();
+                            expect(marker!.resolvedDependencies.length).toBeGreaterThan(0);
 
-                        // Check resolved dependency using the resolved property
-                        const lodashDep = marker!.dependencies.find(d => d.name === "lodash");
-                        expect(lodashDep?.resolved).toBeDefined();
-                        expect(lodashDep!.resolved!.version).toBe("4.17.21");
-                        expect(lodashDep!.resolved!.license).toBe("MIT");
-                    }},
+                            // Check resolved dependency using the resolved property
+                            const lodashDep = marker!.dependencies.find(d => d.name === "lodash");
+                            expect(lodashDep?.resolved).toBeDefined();
+                            expect(lodashDep!.resolved!.version).toBe("4.17.21");
+                            expect(lodashDep!.resolved!.license).toBe("MIT");
+                        }
+                    },
                     packageLockJson(`
                         {
                             "name": "test-project",
@@ -423,7 +427,7 @@ empty-value=
             );
 
             // Parse with relativeTo set to root directory (simulating Git root)
-            const parser = new PackageJsonParser({ relativeTo: rootDir.path });
+            const parser = new PackageJsonParser({relativeTo: rootDir.path});
             const results: Json.Document[] = [];
             for await (const result of parser.parse(path.join(subprojectDir, 'package.json'))) {
                 results.push(result as Json.Document);
