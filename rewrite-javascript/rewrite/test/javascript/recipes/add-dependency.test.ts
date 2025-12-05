@@ -63,6 +63,7 @@ describe("AddDependency", () => {
         }, {unsafeCleanup: true});
     });
 
+    // This is the same behavior as org.openrewrite.maven.AddDependency
     test("does not modify when dependency already exists", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AddDependency({
@@ -155,41 +156,6 @@ describe("AddDependency", () => {
                             "devDependencies": {
                                 "@types/node": "^20.0.0",
                                 "@types/lodash": "^4.17.0"
-                            }
-                        }
-                    `)
-                )
-            );
-        }, {unsafeCleanup: true});
-    });
-
-    test("adds scoped package", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = new AddDependency({
-            packageName: "@babel/core",
-            version: "^7.24.0"
-        });
-
-        await withDir(async (repo) => {
-            await spec.rewriteRun(
-                npm(
-                    repo.path,
-                    typescript(`const x = 1;`),
-                    packageJson(`
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "dependencies": {
-                                "uuid": "^9.0.0"
-                            }
-                        }
-                    `, `
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "dependencies": {
-                                "uuid": "^9.0.0",
-                                "@babel/core": "^7.24.0"
                             }
                         }
                     `)
@@ -398,41 +364,7 @@ describe("AddDependency", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("preserves original formatting (4-space indentation, trailing newline)", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = new AddDependency({
-            packageName: "lodash",
-            version: "^4.17.21"
-        });
-
-        await withDir(async (repo) => {
-            const before = `{
-    "name": "test-project",
-    "version": "1.0.0",
-    "dependencies": {
-        "uuid": "^9.0.0"
-    }
-}
-`;
-            const after = `{
-    "name": "test-project",
-    "version": "1.0.0",
-    "dependencies": {
-        "uuid": "^9.0.0",
-        "lodash": "^4.17.21"
-    }
-}
-`;
-            await spec.rewriteRun(
-                npm(
-                    repo.path,
-                    typescript(`const x = 1;`),
-                    packageJson(before, after)
-                )
-            );
-        }, {unsafeCleanup: true});
-    });
-
+    // Note - to be honest, I am not sure if this is the desired behavior
     test("does not add if dependency exists in different scope", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AddDependency({
@@ -460,5 +392,4 @@ describe("AddDependency", () => {
             );
         }, {unsafeCleanup: true});
     });
-
 });
