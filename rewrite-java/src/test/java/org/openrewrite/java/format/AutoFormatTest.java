@@ -1024,6 +1024,35 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
+    @Test
+    void commentsAreHandled() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  @Override
+                  // Note: This means any two pairs with null for both values will match each
+                  // other but what can I do?  This is due to stupid type erasure.
+                      public
+                      int hashCode() {
+                      return (0);
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  @Override
+                  // Note: This means any two pairs with null for both values will match each
+                  // other but what can I do?  This is due to stupid type erasure.
+                  public int hashCode() {
+                      return (0);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class MethodChains {
 

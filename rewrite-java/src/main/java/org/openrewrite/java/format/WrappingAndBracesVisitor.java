@@ -36,6 +36,7 @@ import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -320,9 +321,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 case IMPLEMENTS:
                 case PERMITS:
                     wrap = evaluate(() -> style.getExtendsImplementsPermitsKeyword().getWrap(), DoNotWrap);
-                    if (wrap == WrapIfTooLong || wrap == WrapAlways) {
+                    if (evaluate(wrap, w -> w == WrapIfTooLong, false) || wrap == WrapAlways) {
                         newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        if (wrap == WrapIfTooLong) {
+                        if (evaluate(wrap, w -> w == WrapIfTooLong, false)) {
                             isLong = sourceFile.service(SourcePositionService.class).positionOf(newLinedCursorElement, ((J.ClassDeclaration) getCursor().getParentTreeCursor().getValue()).getBody()).getStartColumn() >= style.getHardWrapAt();
                         }
                         if (isLong || wrap == WrapAlways) {
@@ -427,19 +428,21 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     }
                     break;
                 case MODIFIER_PREFIX:
-                case TYPE_PARAMETERS_PREFIX:
-                case IDENTIFIER_PREFIX:
                     if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         if (space.getComments().isEmpty() || !space.getComments().get(space.getComments().size() - 1).isMultiline()) {
                             space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
                         }
                     }
                     break;
+                case TYPE_PARAMETERS_PREFIX:
+                case IDENTIFIER_PREFIX:
+                    if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
+                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
+                    }
+                    break;
                 default:
                     if (getCursor().getValue() instanceof TypeTree && Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
-                        if (space.getComments().isEmpty() || !space.getComments().get(space.getComments().size() - 1).isMultiline()) {
-                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
-                        }
+                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
                     }
                     break;
             }
@@ -529,7 +532,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                             }
                         }
                         //Reduce to single new line
-                        return comment.withSuffix(comment.getSuffix().substring(comment.getSuffix().lastIndexOf('\n')));
+                        return comment.withSuffix(whitespace.substring(whitespace.lastIndexOf('\n')));
                     }
                     return comment;
                 })
@@ -561,7 +564,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 if (index == 0) {
                     openNewLine = evaluate(() -> style.getRecordComponents().getOpenNewLine(), false);
                 }
-                wrap = evaluate(() -> style.getRecordComponents().getWrap(), WrapIfTooLong);
+                wrap = evaluate(() -> style.getRecordComponents().getWrap(), () -> WrapIfTooLong, DoNotWrap);
                 break;
             case IMPLEMENTS:
             case PERMITS:
@@ -679,7 +682,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case RECORD_STATE_VECTOR:
                 closeOnNewLine = evaluate(() -> style.getRecordComponents().getCloseNewLine(), false);
-                wrap = evaluate(() -> style.getRecordComponents().getWrap(), WrapIfTooLong);
+                wrap = evaluate(() -> style.getRecordComponents().getWrap(), () -> WrapIfTooLong, DoNotWrap);
                 break;
             case TRY_RESOURCES:
                 closeOnNewLine = evaluate(() -> style.getTryWithResources().getCloseNewLine(), false);
@@ -739,12 +742,30 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return chainStarter;
     }
 
+    private <I, O> O evaluate(I in, Function<I, O> supplier, O defaultValue) {
+        try {
+            return supplier.apply(in);
+        } catch (NoSuchMethodError | NoSuchFieldError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
+    }
+
     private <T> T evaluate(Supplier<T> supplier, T defaultValue) {
         try {
             return supplier.get();
-        } catch (NoSuchMethodError e) {
+        } catch (NoSuchMethodError | NoSuchFieldError e) {
             // Handle newly introduced method calls on style that are not part of lst yet
             return defaultValue;
+        }
+    }
+
+    private <T> T evaluate(Supplier<T> supplier, Supplier<T> defaultValueSupplier, T fallback) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError | NoSuchFieldError ignored1) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return evaluate(defaultValueSupplier, fallback);
         }
     }
 
