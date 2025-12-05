@@ -14,4 +14,6 @@
  * limitations under the License.
  */
 
+export * from "./add-dependency";
+export * from "./dependency-utils";
 export * from "./upgrade-dependency-version";

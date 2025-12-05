@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 import {
+    AddDependency,
     findNodeResolutionResult,
     npm,
     packageJson,
     packageLockJson,
-    typescript,
-    UpgradeDependencyVersion
+    typescript
 } from "../../../src/javascript";
 import {Json} from "../../../src/json";
 import {RecipeSpec} from "../../../src/test";
 import {withDir} from "tmp-promise";
 import {findMarker, MarkersKind} from "../../../src/markers";
 
-describe("UpgradeDependencyVersion", () => {
+describe("AddDependency", () => {
 
-    test("upgrades dependency version in package.json", async () => {
+    test("adds dependency to package.json", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
-            packageName: "uuid",
-            newVersion: "^10.0.0"
+        spec.recipe = new AddDependency({
+            packageName: "lodash",
+            version: "^4.17.21"
         });
 
         await withDir(async (repo) => {
@@ -53,7 +53,8 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "dependencies": {
-                                "uuid": "^10.0.0"
+                                "uuid": "^9.0.0",
+                                "lodash": "^4.17.21"
                             }
                         }
                     `)
@@ -62,63 +63,12 @@ describe("UpgradeDependencyVersion", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("does not modify when dependency not present", async () => {
+    // This is the same behavior as org.openrewrite.maven.AddDependency
+    test("does not modify when dependency already exists", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
-            packageName: "nonexistent-package",
-            newVersion: "^2.0.0"
-        });
-
-        await withDir(async (repo) => {
-            await spec.rewriteRun(
-                npm(
-                    repo.path,
-                    typescript(`const x = 1;`),
-                    packageJson(`
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "dependencies": {
-                                "is-number": "^7.0.0"
-                            }
-                        }
-                    `)
-                )
-            );
-        }, {unsafeCleanup: true});
-    });
-
-    test("does not modify when version already matches", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
-            packageName: "is-number",
-            newVersion: "^7.0.0"
-        });
-
-        await withDir(async (repo) => {
-            await spec.rewriteRun(
-                npm(
-                    repo.path,
-                    typescript(`const x = 1;`),
-                    packageJson(`
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "dependencies": {
-                                "is-number": "^7.0.0"
-                            }
-                        }
-                    `)
-                )
-            );
-        }, {unsafeCleanup: true});
-    });
-
-    test("upgrades devDependency version", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
+        spec.recipe = new AddDependency({
             packageName: "uuid",
-            newVersion: "^10.0.0"
+            version: "^10.0.0"
         });
 
         await withDir(async (repo) => {
@@ -130,7 +80,34 @@ describe("UpgradeDependencyVersion", () => {
                         {
                             "name": "test-project",
                             "version": "1.0.0",
-                            "devDependencies": {
+                            "dependencies": {
+                                "uuid": "^9.0.0"
+                            }
+                        }
+                    `)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
+    test("adds devDependency when scope is specified", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new AddDependency({
+            packageName: "@types/lodash",
+            version: "^4.17.0",
+            scope: "devDependencies"
+        });
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
                                 "uuid": "^9.0.0"
                             }
                         }
@@ -138,8 +115,11 @@ describe("UpgradeDependencyVersion", () => {
                         {
                             "name": "test-project",
                             "version": "1.0.0",
+                            "dependencies": {
+                                "uuid": "^9.0.0"
+                            },
                             "devDependencies": {
-                                "uuid": "^10.0.0"
+                                "@types/lodash": "^4.17.0"
                             }
                         }
                     `)
@@ -148,11 +128,12 @@ describe("UpgradeDependencyVersion", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("upgrades scoped package version", async () => {
+    test("adds to existing devDependencies section", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
-            packageName: "@types/node",
-            newVersion: "^22.0.0"
+        spec.recipe = new AddDependency({
+            packageName: "@types/lodash",
+            version: "^4.17.0",
+            scope: "devDependencies"
         });
 
         await withDir(async (repo) => {
@@ -173,7 +154,8 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "devDependencies": {
-                                "@types/node": "^22.0.0"
+                                "@types/node": "^20.0.0",
+                                "@types/lodash": "^4.17.0"
                             }
                         }
                     `)
@@ -182,11 +164,11 @@ describe("UpgradeDependencyVersion", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("updates NodeResolutionResult marker after upgrade", async () => {
+    test("updates NodeResolutionResult marker after adding dependency", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
-            packageName: "uuid",
-            newVersion: "^10.0.0"
+        spec.recipe = new AddDependency({
+            packageName: "lodash",
+            version: "^4.17.21"
         });
 
         await withDir(async (repo) => {
@@ -208,15 +190,18 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "dependencies": {
-                                "uuid": "^10.0.0"
+                                "uuid": "^9.0.0",
+                                "lodash": "^4.17.21"
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
                             const marker = findNodeResolutionResult(doc);
                             expect(marker).toBeDefined();
-                            expect(marker!.dependencies).toHaveLength(1);
-                            expect(marker!.dependencies[0].name).toBe("uuid");
-                            expect(marker!.dependencies[0].versionConstraint).toBe("^10.0.0");
+                            expect(marker!.dependencies).toHaveLength(2);
+
+                            const lodashDep = marker!.dependencies.find(d => d.name === "lodash");
+                            expect(lodashDep).toBeDefined();
+                            expect(lodashDep!.versionConstraint).toBe("^4.17.21");
                         }
                     }
                 )
@@ -224,11 +209,12 @@ describe("UpgradeDependencyVersion", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("handles peerDependencies", async () => {
+    test("adds peerDependency when scope is specified", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
+        spec.recipe = new AddDependency({
             packageName: "react",
-            newVersion: "^19.0.0"
+            version: "^18.0.0",
+            scope: "peerDependencies"
         });
 
         await withDir(async (repo) => {
@@ -240,63 +226,32 @@ describe("UpgradeDependencyVersion", () => {
                         {
                             "name": "test-project",
                             "version": "1.0.0",
+                            "dependencies": {
+                                "uuid": "^9.0.0"
+                            }
+                        }
+                    `, `
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "uuid": "^9.0.0"
+                            },
                             "peerDependencies": {
                                 "react": "^18.0.0"
                             }
                         }
-                    `, `
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "peerDependencies": {
-                                "react": "^19.0.0"
-                            }
-                        }
                     `)
                 )
             );
         }, {unsafeCleanup: true});
     });
 
-    test("handles optionalDependencies", async () => {
+    test("adds warning marker when package does not exist", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
-            packageName: "fsevents",
-            newVersion: "^3.0.0"
-        });
-
-        await withDir(async (repo) => {
-            await spec.rewriteRun(
-                npm(
-                    repo.path,
-                    typescript(`const x = 1;`),
-                    packageJson(`
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "optionalDependencies": {
-                                "fsevents": "^2.3.0"
-                            }
-                        }
-                    `, `
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "optionalDependencies": {
-                                "fsevents": "^3.0.0"
-                            }
-                        }
-                    `)
-                )
-            );
-        }, {unsafeCleanup: true});
-    });
-
-    test("adds warning marker when version does not exist", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
-            packageName: "uuid",
-            newVersion: "^999.0.0" // Non-existent version
+        spec.recipe = new AddDependency({
+            packageName: "this-package-does-not-exist-12345",
+            version: "^1.0.0"
         });
 
         await withDir(async (repo) => {
@@ -305,7 +260,6 @@ describe("UpgradeDependencyVersion", () => {
                     repo.path,
                     typescript(`const x = 1;`),
                     {
-                        // Version doesn't change, but warning marker is added
                         ...packageJson(`
                         {
                             "name": "test-project",
@@ -315,7 +269,7 @@ describe("UpgradeDependencyVersion", () => {
                             }
                         }
                     `, `
-                        /*~~(Failed to upgrade uuid to ^999.0.0)~~>*/{
+                        /*~~(Failed to add this-package-does-not-exist-12345 to ^1.0.0)~~>*/{
                             "name": "test-project",
                             "version": "1.0.0",
                             "dependencies": {
@@ -323,10 +277,9 @@ describe("UpgradeDependencyVersion", () => {
                             }
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                            // Should have a warning marker
                             const warnMarker = findMarker(doc, MarkersKind.MarkupWarn);
                             expect(warnMarker).toBeDefined();
-                            expect((warnMarker as any).message).toContain("Failed to upgrade uuid");
+                            expect((warnMarker as any).message).toContain("Failed to add this-package-does-not-exist-12345");
                         }
                     }
                 )
@@ -334,12 +287,11 @@ describe("UpgradeDependencyVersion", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("updates package-lock.json when upgrading dependency", async () => {
+    test("updates package-lock.json when adding dependency", async () => {
         const spec = new RecipeSpec();
-        // Use uuid which has real version 9.x and 10.x available
-        spec.recipe = new UpgradeDependencyVersion({
-            packageName: "uuid",
-            newVersion: "^10.0.0"
+        spec.recipe = new AddDependency({
+            packageName: "lodash",
+            version: "^4.17.21"
         });
 
         await withDir(async (repo) => {
@@ -360,11 +312,11 @@ describe("UpgradeDependencyVersion", () => {
                             "name": "test-project",
                             "version": "1.0.0",
                             "dependencies": {
-                                "uuid": "^10.0.0"
+                                "uuid": "^9.0.0",
+                                "lodash": "^4.17.21"
                             }
                         }
                     `),
-                    // Use validation function for lock file - returns actual if valid, error message if not
                     packageLockJson(`
                     {
                         "name": "test-project",
@@ -389,21 +341,20 @@ describe("UpgradeDependencyVersion", () => {
                     `, (actual: string) => {
                         const lockData = JSON.parse(actual);
 
-                        // Verify lock file structure
                         if (!lockData.packages) {
                             throw new Error("Expected packages in lock file");
                         }
 
-                        // The root package should now reference ^10.0.0
+                        // The root package should now include lodash
                         const rootPkg = lockData.packages[""];
-                        if (rootPkg?.dependencies?.["uuid"] !== "^10.0.0") {
-                            throw new Error(`Expected root dependency uuid to be ^10.0.0, got ${rootPkg?.dependencies?.["uuid"]}`);
+                        if (rootPkg?.dependencies?.["lodash"] !== "^4.17.21") {
+                            throw new Error(`Expected root dependency lodash to be ^4.17.21, got ${rootPkg?.dependencies?.["lodash"]}`);
                         }
 
-                        // The resolved package should be version 10.x
-                        const uuidPkg = lockData.packages["node_modules/uuid"];
-                        if (!uuidPkg?.version?.startsWith("10.")) {
-                            throw new Error(`Expected uuid version to start with 10., got ${uuidPkg?.version}`);
+                        // lodash should be in node_modules
+                        const lodashPkg = lockData.packages["node_modules/lodash"];
+                        if (!lodashPkg?.version?.startsWith("4.17.")) {
+                            throw new Error(`Expected lodash version to start with 4.17., got ${lodashPkg?.version}`);
                         }
 
                         return actual;
@@ -413,85 +364,30 @@ describe("UpgradeDependencyVersion", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("preserves original formatting (4-space indentation, trailing newline)", async () => {
+    // Note - to be honest, I am not sure if this is the desired behavior
+    test("does not add if dependency exists in different scope", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
+        spec.recipe = new AddDependency({
             packageName: "uuid",
-            newVersion: "^10.0.0"
+            version: "^10.0.0",
+            scope: "devDependencies"
         });
 
         await withDir(async (repo) => {
-            // Note: 4-space indentation and trailing newline in the input
-            const before = `{
-    "name": "test-project",
-    "version": "1.0.0",
-    "dependencies": {
-        "uuid": "^9.0.0"
-    }
-}
-`;
-            const after = `{
-    "name": "test-project",
-    "version": "1.0.0",
-    "dependencies": {
-        "uuid": "^10.0.0"
-    }
-}
-`;
+            // uuid exists in dependencies, so shouldn't add to devDependencies
             await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    packageJson(before, after)
-                )
-            );
-        }, {unsafeCleanup: true});
-    });
-
-    test("skips npm install when resolved version already satisfies new constraint", async () => {
-        // Scenario: package.json has ^4.17.20, npm resolves to 4.17.21 (latest)
-        // If we upgrade to ^4.17.21, the resolved version 4.17.21 already satisfies it,
-        // so we should only update package.json, not run npm install
-        const spec = new RecipeSpec();
-        spec.recipe = new UpgradeDependencyVersion({
-            packageName: "lodash",
-            newVersion: "^4.17.21"
-        });
-
-        await withDir(async (repo) => {
-            await spec.rewriteRun(
-                npm(
-                    repo.path,
-                    typescript(`const x = 1;`),
-                    // package.json should be updated from ^4.17.20 to ^4.17.21
-                    {
-                        ...packageJson(`
-                            {
-                                "name": "test-project",
-                                "version": "1.0.0",
-                                "dependencies": {
-                                    "lodash": "^4.17.20"
-                                }
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "uuid": "^9.0.0"
                             }
-                        `, `
-                            {
-                                "name": "test-project",
-                                "version": "1.0.0",
-                                "dependencies": {
-                                    "lodash": "^4.17.21"
-                                }
-                            }
-                        `),
-                        afterRecipe: async (doc: Json.Document) => {
-                            // Verify marker was updated with new versionConstraint
-                            const marker = findNodeResolutionResult(doc);
-                            expect(marker).toBeDefined();
-                            expect(marker!.dependencies[0].versionConstraint).toBe("^4.17.21");
-                            // The resolved version should still be 4.17.21 (unchanged)
-                            // This proves we didn't run npm install - just updated the constraint
-                            expect(marker!.resolvedDependencies?.[0]?.version).toBe("4.17.21");
                         }
-                    }
+                    `)
                 )
             );
         }, {unsafeCleanup: true});
