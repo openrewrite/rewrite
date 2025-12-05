@@ -15,9 +15,7 @@
  */
 package org.openrewrite.gradle.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -183,9 +181,16 @@ public class DependencyInsight extends Recipe {
                         if (!resolvedDependency.isDirect()) {
                             continue;
                         }
+                        // There can be many different paths to a given dependency in a graph
+                        // Exhaustively recording all of them is overwhelming and simply not useful
+                        // Without filtering, the single module project rewrite-thirdparty records over 2000 rows for jackson-core alone
+                        Set<ResolvedGroupArtifactVersion> gavs = new HashSet<>();
                         matches.collect(configName, resolvedDependency, dependencyMatcher,
-                                (matched, path) ->
-                                        createDataTableRow(projectName, sourceSetName, configName, matched.getGav(), path, ctx));
+                                (matched, path) -> {
+                                    if (gavs.add(matched.getGav())) {
+                                        createDataTableRow(projectName, sourceSetName, configName, matched.getGav(), path, ctx);
+                                    }
+                                });
                     }
                 }
             }
