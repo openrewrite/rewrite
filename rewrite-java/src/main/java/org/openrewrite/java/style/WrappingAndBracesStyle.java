@@ -76,23 +76,23 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Nullable
     EnumConstants enumConstants; // Not yet implemented
     @Nullable
-    Annotations classAnnotations; // Not yet implemented
+    Annotations classAnnotations;
     @Nullable
-    Annotations methodAnnotations; // Not yet implemented
+    Annotations methodAnnotations;
     @Nullable
-    FieldAnnotations fieldAnnotations; // Not yet implemented
+    FieldAnnotations fieldAnnotations;
     @Nullable
-    ParameterAnnotations parameterAnnotations; // Not yet implemented
+    ParameterAnnotations parameterAnnotations;
     @Nullable
-    Annotations localVariableAnnotations; // Not yet implemented
+    Annotations localVariableAnnotations;
     @Nullable
-    Annotations enumFieldAnnotations; // Not yet implemented
+    Annotations enumFieldAnnotations;
     @Nullable
     AnnotationParameters annotationParameters; // Not yet implemented
     @Nullable
     TextBlocks textBlocks; // Not yet implemented
     @Nullable
-    RecordComponents recordComponents; // Not yet implemented
+    RecordComponents recordComponents;
     @Nullable
     DeconstructionPatterns deconstructionPatterns; // Not yet implemented
 

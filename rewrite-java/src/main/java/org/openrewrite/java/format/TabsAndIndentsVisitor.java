@@ -154,7 +154,12 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
         }
 
-        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null || loc == Space.Location.TRY_RESOURCE || loc == Space.Location.TRY_RESOURCE_SUFFIX) {
+        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null) {
+            return space;
+        }
+
+        // These are allready correctly calculated in the WrappingAndBracesVisitor
+        if (loc == Space.Location.TRY_RESOURCE || loc == Space.Location.TRY_RESOURCE_SUFFIX || loc == Space.Location.ANNOTATION_PREFIX || loc == Space.Location.IDENTIFIER_PREFIX) {
             return space;
         }
 

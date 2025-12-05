@@ -40,7 +40,6 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
 import static org.openrewrite.style.LineWrapSetting.*;
 
@@ -79,7 +78,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
-        int size = container.getElements().size();
+        int size = container.getElements().stream().allMatch(it -> it instanceof J.Empty) ? 0 : container.getElements().size();
         List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), (index, right) -> {
             J jElement = right.getElement();
             if (shouldWrap(index, size, (JContainer<J>) container, loc)) {
@@ -379,6 +378,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     parentTreeCursor = getCursor().getParentTreeCursor();
                     parent = parentTreeCursor.getValue();
                     List<J.Annotation> annotations = null;
+                    boolean doNotWrapSingle = false;
                     if (parent instanceof J.ClassDeclaration) {
                         wrap = evaluate(() -> style.getClassAnnotations().getWrap(), WrapAlways);
                         annotations = ((J.ClassDeclaration) parent).getLeadingAnnotations();
@@ -388,52 +388,57 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     } else if (parent instanceof J.VariableDeclarations) {
                         if (parentTreeCursor.getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
                             wrap = evaluate(() -> style.getParameterAnnotations().getWrap(), DoNotWrap);
+                            doNotWrapSingle = evaluate(() -> style.getParameterAnnotations().getDoNotWrapAfterSingleAnnotation(), false);
                         } else if (parentTreeCursor.getParentTreeCursor().getValue() instanceof J.Block) {
                             if (parentTreeCursor.getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
                                 wrap = evaluate(() -> style.getFieldAnnotations().getWrap(), WrapAlways);
+                                doNotWrapSingle = evaluate(() -> style.getFieldAnnotations().getDoNotWrapAfterSingleAnnotation(), false);
                             } else {
                                 wrap = evaluate(() -> style.getLocalVariableAnnotations().getWrap(), DoNotWrap);
                             }
+                        } else if (parentTreeCursor.getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
+                            wrap = evaluate(() -> style.getRecordComponents().getNewLineForAnnotations(), false) ? WrapAlways : DoNotWrap;
                         }
                         annotations = ((J.VariableDeclarations) parent).getLeadingAnnotations();
                     } else if (parent instanceof J.EnumValue) {
                         wrap = evaluate(() -> style.getEnumFieldAnnotations().getWrap(), DoNotWrap);
                         annotations = ((J.EnumValue) parent).getAnnotations();
                     }
-                    if (wrap != null && annotations != null) {
+                    if (wrap != null && annotations != null && (!doNotWrapSingle || annotations.size() > 1)) {
                         parentTreeCursor.computeMessageIfAbsent("annotations-wrapped", __ -> false);
                         switch (wrap) {
                             case ChopIfTooLong:
                             case WrapIfTooLong:
-                                if (sourceFile.service(SourcePositionService.class).positionOf(getCursor()).getMaxColumn() < style.getHardWrapAt()) {
+                                if (positionService.positionOf(getCursor()).getMaxColumn() < style.getHardWrapAt()) {
                                     break;
                                 }
                             case WrapAlways:
                                 parentTreeCursor.putMessage("annotations-wrapped", true);
                                 //TODO update the cursor for length calculations of subsequent calculations
                                 if (annotations.indexOf(getCursor().getValue()) > 0) {
-                                    space = withWhitespace(space, "\n" + StringUtils.repeat(" ", parent.getPrefix().getIndent().length()));
+                                    space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor(), annotations.get(0)).getStartColumn() - 1));
                                 }
                         }
                     }
                     break;
                 case CLASS_KIND:
                     if (Boolean.TRUE.equals(getCursor().pollMessage("annotations-wrapped"))) {
-                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) getCursor().getValue()).getPrefix().getIndent().length()));
+                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
                     }
                     break;
                 case MODIFIER_PREFIX:
                 case TYPE_PARAMETERS_PREFIX:
+                case IDENTIFIER_PREFIX:
                     if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         if (space.getComments().isEmpty() || !space.getComments().get(space.getComments().size() - 1).isMultiline()) {
-                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) getCursor().getParentTreeCursor().getValue()).getPrefix().getIndent().length()));
+                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
                         }
                     }
                     break;
                 default:
                     if (getCursor().getValue() instanceof TypeTree && Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         if (space.getComments().isEmpty() || !space.getComments().get(space.getComments().size() - 1).isMultiline()) {
-                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) getCursor().getParentTreeCursor().getValue()).getPrefix().getIndent().length()));
+                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
                         }
                     }
                     break;
@@ -495,10 +500,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return prefix;
     }
 
-    private List<J.Modifier> withNewline(List<J.Modifier> modifiers, String whitespace, WrappingAndBracesStyle.@Nullable Annotations annotationsStyle) {
-        return ListUtils.mapFirst(modifiers, mod -> requireNonNull(mod).withPrefix(wrapElement(mod.getPrefix(), whitespace, annotationsStyle)));
-    }
-
     private Space withWhitespaceSkipComments(Space space, String whitespace) {
         if (space.getComments().isEmpty()) {
             if (!removeCustomLineBreaks && StringUtils.hasLineBreak(space.getWhitespace())) {
@@ -536,6 +537,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private boolean shouldWrap(int index, int size, JContainer<J> container, JContainer.Location location) {
+        if (size == 0) {
+            return false;
+        }
+
         LineWrapSetting wrap = null;
         boolean openNewLine = false;
         switch (location) {
@@ -576,8 +581,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     if (size <= 1) {
                         return false;
                     }
-                    if (!openNewLine && index == 0) {
-                        return false;
+                    if (index == 0) {
+                        return openNewLine;
                     }
                     return true;
                 case ChopIfTooLong:
@@ -590,9 +595,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                     if (sourceFile != null) {
                         boolean isLong = sourceFile.service(SourcePositionService.class).positionOf(getCursor(), container).getMaxColumn() >= style.getHardWrapAt();
-                        if (!isLong || (!openNewLine && index != 0)) {
-                            return false;
-                        } else if (openNewLine) {
+                        if (isLong) {
+                            if (index == 0) {
+                                return openNewLine;
+                            }
                             return true;
                         }
                         //TODO we should check the current position for the length of the current item to see if we have to wrap.

@@ -1022,6 +1022,118 @@ class WrappingAndBracesTest implements RewriteTest {
     }
 
     @Test
+    void annotationWrappingRecords() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              record someRecord(
+                      @Foo
+                      @Foo
+                      String name,
+                      @Foo
+                      @Foo
+                      String place
+                      ) {
+              }
+              """,
+            """
+              record someRecord(@Foo @Foo String name, @Foo @Foo String place) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingRecordsWithOpenNewLineAndCloseNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withRecordComponents(wrap.getRecordComponents().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
+          ),
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              record someRecord(@Foo
+                                @Foo
+                                String name,
+                                @Foo
+                                @Foo
+                                String place) {
+              }
+              """,
+            """
+              record someRecord(
+                      @Foo @Foo String name,
+                      @Foo @Foo String place
+              ) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingRecordsWithNewLineAnnotations() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withRecordComponents(wrap.getRecordComponents().withWrap(WrapAlways).withNewLineForAnnotations(true))
+          ),
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              record someRecord(@Foo @Foo String name, @Foo @Foo String place) {
+              }
+              """,
+            """
+              record someRecord(@Foo
+                                @Foo
+                                String name,
+                                @Foo
+                                @Foo
+                                String place) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotWrapImplementsList() {
         rewriteRun(
           java("""
