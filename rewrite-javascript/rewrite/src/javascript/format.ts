@@ -171,8 +171,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 throw new Error("Unsupported operator type " + ret.operator.element.valueOf());
         }
         return produce(ret, draft => {
-            draft.operator.before.whitespace = property ? " " : "";
-            draft.right.prefix.whitespace = property ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.operator.before.whitespace.includes("\n")) {
+                draft.operator.before.whitespace = property ? " " : "";
+            }
+            if (!draft.right.prefix.whitespace.includes("\n")) {
+                draft.right.prefix.whitespace = property ? " " : "";
+            }
         }) as J.Binary;
     }
 
@@ -478,7 +483,10 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     private async spaceBeforeLeftPaddedElement<T extends J>(left: J.LeftPadded<T>, spaceBeforePadding: boolean, spaceBeforeElement: boolean): Promise<J.LeftPadded<T>> {
         return (await produceAsync(left, async draft => {
             if (draft.before.comments.length == 0) {
-                draft.before.whitespace = spaceBeforePadding ? " " : "";
+                // Preserve newlines - only modify if no newlines present
+                if (!draft.before.whitespace.includes("\n")) {
+                    draft.before.whitespace = spaceBeforePadding ? " " : "";
+                }
             }
             draft.element = await this.spaceBefore(left.element, spaceBeforeElement) as Draft<T>;
         }))!;
@@ -1138,8 +1146,10 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     protected async preVisit(tree: J, p: P): Promise<J | undefined> {
         let ret = await super.preVisit(tree, p)! as J;
 
+        // Check if this block is an object literal body (NewClass) - don't increase indent for those
+        const isObjectLiteralBlock = tree.kind === J.Kind.Block && this.cursor.parent?.value?.kind === J.Kind.NewClass;
         let indentShouldIncrease =
-            tree.kind === J.Kind.Block
+            (tree.kind === J.Kind.Block && !isObjectLiteralBlock)
             || tree.kind === J.Kind.NewArray
             || this.cursor.parent?.parent?.parent?.value.kind == J.Kind.Case
             || (tree.kind === JS.Kind.StatementExpression && (tree as JS.StatementExpression).statement.kind == J.Kind.MethodDeclaration && tree.prefix.whitespace.includes("\n"))
@@ -1175,7 +1185,16 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 // Top-level statements: direct children of CompilationUnit.statements
                 // Cursor structure: statement -> RightPadded -> CompilationUnit
                 const isTopLevelStatement = parentKind === J.Kind.RightPadded && grandparentKind === JS.Kind.CompilationUnit;
-                const isStatementInBlock = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Block;
+                // Statements in a block, but only normalize if:
+                // - Not in an object literal (NewClass)
+                // - Not nested inside a Lambda that's inside a Container (method argument callback)
+                const greatGrandparentKind = this.cursor.parent?.parent?.parent?.value?.kind;
+                // Check if we're anywhere inside a Lambda that's inside a Container
+                const enclosingLambda = this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Lambda);
+                const isInsideLambdaInContainer = enclosingLambda !== undefined &&
+                    this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Container) !== undefined;
+                const isStatementInBlock = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Block &&
+                    greatGrandparentKind !== J.Kind.NewClass && !isInsideLambdaInContainer;
                 // Control structure bodies: if/while/for non-block bodies
                 const isControlStructureBody = parentKind === J.Kind.RightPadded && (
                     grandparentKind === J.Kind.If ||
@@ -1202,7 +1221,11 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 const block = draft as Draft<J> as Draft<J.Block>;
                 // Skip indentation for object literals (NewClass) - they should preserve their single-line formatting
                 const isObjectLiteral = this.cursor.parent?.value.kind === J.Kind.NewClass;
-                if (!isObjectLiteral && relativeIndent !== undefined) {
+                // Skip indentation for blocks inside Lambdas that are inside Containers (method argument callbacks)
+                const hasEnclosingLambda = this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Lambda) !== undefined;
+                const isBlockInsideLambdaInContainer = hasEnclosingLambda &&
+                    this.cursor.firstEnclosing((n: any): n is J => n.kind === J.Kind.Container) !== undefined;
+                if (!isObjectLiteral && !isBlockInsideLambdaInContainer && relativeIndent !== undefined) {
                     const indentToUseInClosing = indentShouldIncrease ? previousIndent : relativeIndent;
                     block.end = replaceLastWhitespace(block.end, (ws: string) => this.combineIndent(ws, indentToUseInClosing));
                 }

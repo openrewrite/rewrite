@@ -445,6 +445,90 @@ expect(recipe).toBeNull(); // Multiple matches`
         )
     });
 
+    test('multi-line ternary expression should preserve line breaks', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const baseContent = start > 0
+    ? content.substring(0, start)
+    : content;`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('multi-line binary expression should preserve line breaks', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const valid = typeof node.value === 'number' &&
+    aValue !== undefined &&
+    typeof aValue.value === 'number' &&
+    node.value > aValue.value;`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('object spread with callback should preserve indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `await spec.rewriteRun(
+    npm(
+        repo.path,
+        {
+            ...packageJson(\`{}\`), afterRecipe: async (doc) => {
+                expect(marker).toBeDefined();
+            }
+        }
+    )
+);`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('anonymous class inside method argument should preserve indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `await new class extends Visitor {
+    protected async visitProperty(prop: Property): Promise<J | undefined> {
+        expect(prop.name).toBe('foo');
+        return prop;
+    }
+}().visit(cu, undefined);`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('anonymous class inside afterRecipe callback should preserve indentation', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test("test", async () => spec.rewriteRun({
+    ...typescript(\`code\`),
+    afterRecipe: async (cu) => {
+        await new class extends Visitor {
+            protected async visitProperty(prop: Property): Promise<J | undefined> {
+                expect(prop.name).toBe('foo');
+                return prop;
+            }
+        }().visit(cu, undefined);
+    }
+}));`
+            )
+            // @formatter:on
+        )
+    });
+
     test('TSX', () => {
         return spec.rewriteRun(
             // @formatter:off

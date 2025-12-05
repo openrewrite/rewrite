@@ -253,7 +253,8 @@ describe("PackageJsonParser", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {...packageJson(`
+                    {
+                        ...packageJson(`
                         {
                             "name": "full-deps-project",
                             "version": "1.0.0",
@@ -264,14 +265,15 @@ describe("PackageJsonParser", () => {
                             "bundledDependencies": ["bundled-pkg"]
                         }
                     `), afterRecipe: async (doc: Json.Document) => {
-                        const marker = findNodeResolutionResult(doc);
-                        expect(marker).toBeDefined();
-                        expect(marker!.dependencies).toHaveLength(1);
-                        expect(marker!.devDependencies).toHaveLength(1);
-                        expect(marker!.peerDependencies).toHaveLength(1);
-                        expect(marker!.optionalDependencies).toHaveLength(1);
-                        expect(marker!.bundledDependencies).toHaveLength(1);
-                    }}
+                            const marker = findNodeResolutionResult(doc);
+                            expect(marker).toBeDefined();
+                            expect(marker!.dependencies).toHaveLength(1);
+                            expect(marker!.devDependencies).toHaveLength(1);
+                            expect(marker!.peerDependencies).toHaveLength(1);
+                            expect(marker!.optionalDependencies).toHaveLength(1);
+                            expect(marker!.bundledDependencies).toHaveLength(1);
+                        }
+                    }
                 )
             );
         }, {unsafeCleanup: true});
