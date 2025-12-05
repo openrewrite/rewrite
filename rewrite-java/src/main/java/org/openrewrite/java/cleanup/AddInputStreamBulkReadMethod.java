@@ -27,8 +27,10 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 public class AddInputStreamBulkReadMethod extends Recipe {
 
@@ -93,7 +95,7 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                             if (stmt == targetMethod) {
                                 return Arrays.asList(stmt, bulkMethod);
                             }
-                            return Collections.singletonList(stmt);
+                            return singletonList(stmt);
                         })
                 ));
 
@@ -146,7 +148,7 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                             if (stmt == targetMethod) {
                                 return Arrays.asList(stmt, bulkMethod);
                             }
-                            return Collections.singletonList(stmt);
+                            return singletonList(stmt);
                         })
                 ));
 
@@ -204,7 +206,7 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                 // Detect if null check uses if-statement style vs ternary style
                 // Check the read() method body, not the class body
                 List<Statement> readMethodStatements = readMethod.getBody() != null ?
-                        readMethod.getBody().getStatements() : Collections.emptyList();
+                        readMethod.getBody().getStatements() : emptyList();
                 boolean usesIfStyle = readMethodStatements.size() == 2 && readMethodStatements.get(0) instanceof J.If;
 
                 return new AnalysisResult(readMethod, hasBulkRead, delegate, hasNullCheck, usesIfStyle, isComplex);
@@ -510,7 +512,7 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                         .imports("java.io.IOException")
                         .build();
 
-                J.Block newBody = body.withStatements(Collections.emptyList());
+                J.Block newBody = body.withStatements(emptyList());
                 J.Block withNewMethod = template.apply(
                         new Cursor(getCursor(), newBody),
                         newBody.getCoordinates().lastStatement());
