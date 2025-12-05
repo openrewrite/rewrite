@@ -86,7 +86,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 if (sourceFile != null) {
                     SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
-                    if (index != 0 && alignWhenMultiline(loc)) {
+                    if (index != 0 && !opensOnNewLine(loc) && alignWhenMultiline(loc)) {
                         int startColumn = positionService.positionOf(getCursor(), container.getElements().get(0)).getStartColumn();
                         right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", startColumn - 1)))); //since position is index-1-based
                     } else {
@@ -284,7 +284,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             Cursor newLinedCursorElement;
             Cursor parentTreeCursor;
             J parent;
-            LineWrapSetting wrap;
+            LineWrapSetting wrap = null;
             int column;
             boolean isLong = false;
             switch (loc) {
@@ -350,73 +350,96 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     }
 
                     break;
+                case WHILE_CONDITION:
+                    if (evaluate(() -> style.getDoWhileStatement().getWhileOnNewLine(), false)) {
+                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
+                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
+                    }
+                    break;
+                case CATCH_PREFIX:
+                    if (evaluate(() -> style.getTryStatement().getCatchOnNewLine(), false)) {
+                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
+                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
+                    }
+                    break;
+                case TRY_FINALLY:
+                    if (evaluate(() -> style.getTryStatement().getFinallyOnNewLine(), false)) {
+                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
+                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
+                    }
+                    break;
+                case CLASS_DECLARATION_PREFIX:
+                case METHOD_DECLARATION_PREFIX:
+                case VARIABLE_DECLARATIONS_PREFIX:
+                    if (space.getLastWhitespace().contains("\n")) {
+                        space = withWhitespace(space, "\n" + space.getIndent());
+                    }
+                    break;
+                case ANNOTATION_PREFIX:
+                    parentTreeCursor = getCursor().getParentTreeCursor();
+                    parent = parentTreeCursor.getValue();
+                    List<J.Annotation> annotations = null;
+                    if (parent instanceof J.ClassDeclaration) {
+                        wrap = evaluate(() -> style.getClassAnnotations().getWrap(), WrapAlways);
+                        annotations = ((J.ClassDeclaration) parent).getLeadingAnnotations();
+                    } else if (parent instanceof J.MethodDeclaration) {
+                        wrap = evaluate(() -> style.getMethodAnnotations().getWrap(), WrapAlways);
+                        annotations = ((J.MethodDeclaration) parent).getLeadingAnnotations();
+                    } else if (parent instanceof J.VariableDeclarations) {
+                        if (parentTreeCursor.getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                            wrap = evaluate(() -> style.getParameterAnnotations().getWrap(), DoNotWrap);
+                        } else if (parentTreeCursor.getParentTreeCursor().getValue() instanceof J.Block) {
+                            if (parentTreeCursor.getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
+                                wrap = evaluate(() -> style.getFieldAnnotations().getWrap(), WrapAlways);
+                            } else {
+                                wrap = evaluate(() -> style.getLocalVariableAnnotations().getWrap(), DoNotWrap);
+                            }
+                        }
+                        annotations = ((J.VariableDeclarations) parent).getLeadingAnnotations();
+                    } else if (parent instanceof J.EnumValue) {
+                        wrap = evaluate(() -> style.getEnumFieldAnnotations().getWrap(), DoNotWrap);
+                        annotations = ((J.EnumValue) parent).getAnnotations();
+                    }
+                    if (wrap != null && annotations != null) {
+                        parentTreeCursor.computeMessageIfAbsent("annotations-wrapped", __ -> false);
+                        switch (wrap) {
+                            case ChopIfTooLong:
+                            case WrapIfTooLong:
+                                if (sourceFile.service(SourcePositionService.class).positionOf(getCursor()).getMaxColumn() < style.getHardWrapAt()) {
+                                    break;
+                                }
+                            case WrapAlways:
+                                parentTreeCursor.putMessage("annotations-wrapped", true);
+                                //TODO update the cursor for length calculations of subsequent calculations
+                                if (annotations.indexOf(getCursor().getValue()) > 0) {
+                                    space = withWhitespace(space, "\n" + StringUtils.repeat(" ", parent.getPrefix().getIndent().length()));
+                                }
+                        }
+                    }
+                    break;
+                case CLASS_KIND:
+                    if (Boolean.TRUE.equals(getCursor().pollMessage("annotations-wrapped"))) {
+                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) getCursor().getValue()).getPrefix().getIndent().length()));
+                    }
+                    break;
+                case MODIFIER_PREFIX:
+                case TYPE_PARAMETERS_PREFIX:
+                    if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
+                        if (space.getComments().isEmpty() || !space.getComments().get(space.getComments().size() - 1).isMultiline()) {
+                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) getCursor().getParentTreeCursor().getValue()).getPrefix().getIndent().length()));
+                        }
+                    }
+                    break;
+                default:
+                    if (getCursor().getValue() instanceof TypeTree && Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
+                        if (space.getComments().isEmpty() || !space.getComments().get(space.getComments().size() - 1).isMultiline()) {
+                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) getCursor().getParentTreeCursor().getValue()).getPrefix().getIndent().length()));
+                        }
+                    }
+                    break;
             }
         }
         return super.visitSpace(space, loc, p);
-    }
-
-    @Override
-    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
-        J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
-        String whitespace = variableDeclarations.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
-        WrappingAndBracesStyle.Annotations annotationsStyle = null;
-        Cursor possiblyBlock = getCursor().dropParentUntil(J.class::isInstance);
-        if (possiblyBlock.getValue() instanceof J.Block) {
-            if (possiblyBlock.getParent() != null && possiblyBlock.getParent().getValue() instanceof J.ClassDeclaration) {
-                annotationsStyle = style.getFieldAnnotations();
-            } else {
-                annotationsStyle = style.getLocalVariableAnnotations();
-            }
-            variableDeclarations = variableDeclarations.withLeadingAnnotations(wrapAnnotations(variableDeclarations.getLeadingAnnotations(), whitespace, annotationsStyle));
-        } else if (getCursor().getParent(3) != null && (getCursor().getParent(3).getValue() instanceof J.ClassDeclaration || getCursor().getParent(3).getValue() instanceof J.MethodDeclaration)) {
-            annotationsStyle = style.getParameterAnnotations();
-            variableDeclarations = variableDeclarations.withLeadingAnnotations(wrapAnnotations(variableDeclarations.getLeadingAnnotations(), whitespace, annotationsStyle));
-        }
-        if (!variableDeclarations.getLeadingAnnotations().isEmpty() && annotationsStyle != null) {
-            if (!variableDeclarations.getModifiers().isEmpty()) {
-                variableDeclarations = variableDeclarations.withModifiers(withNewline(variableDeclarations.getModifiers(), whitespace, annotationsStyle));
-            } else {
-                variableDeclarations = variableDeclarations.withTypeExpression(variableDeclarations.getTypeExpression().withPrefix(wrapElement(variableDeclarations.getTypeExpression().getPrefix(), whitespace, annotationsStyle)));
-            }
-        }
-        return variableDeclarations;
-    }
-
-    @Override
-    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
-        J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
-        String whitespace = m.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
-        m = m.withLeadingAnnotations(wrapAnnotations(m.getLeadingAnnotations(), whitespace, style.getMethodAnnotations()));
-        if (!m.getLeadingAnnotations().isEmpty() && style.getMethodAnnotations() != null) {
-            if (!m.getModifiers().isEmpty()) {
-                m = m.withModifiers(withNewline(m.getModifiers(), whitespace, style.getMethodAnnotations()));
-            } else if (m.getAnnotations().getTypeParameters() != null) {
-                m = m.getAnnotations().withTypeParameters(m.getAnnotations().getTypeParameters().withPrefix(wrapElement(m.getAnnotations().getTypeParameters().getPrefix(), whitespace, style.getMethodAnnotations())));
-            } else if (m.getReturnTypeExpression() != null) {
-                m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(wrapElement(m.getReturnTypeExpression().getPrefix(), whitespace, style.getMethodAnnotations())));
-            } else {
-                m = m.withName(m.getName().withPrefix(wrapElement(m.getName().getPrefix(), whitespace, style.getMethodAnnotations())));
-            }
-        }
-        return m;
-    }
-
-    @Override
-    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
-        J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
-        String whitespace = j.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
-        j = j.withLeadingAnnotations(wrapAnnotations(j.getLeadingAnnotations(), whitespace, style.getClassAnnotations()));
-        if (!j.getLeadingAnnotations().isEmpty() && style.getClassAnnotations() != null) {
-            if (!j.getModifiers().isEmpty()) {
-                j = j.withModifiers(withNewline(j.getModifiers(), whitespace, style.getClassAnnotations()));
-            } else {
-                J.ClassDeclaration.Kind kind = j.getPadding().getKind();
-                if (!hasLineBreak(kind.getPrefix().getWhitespace())) {
-                    j = j.getPadding().withKind(kind.withPrefix(wrapElement(kind.getPrefix(), whitespace, style.getClassAnnotations())));
-                }
-            }
-        }
-        return j;
     }
 
     @Override
@@ -539,6 +562,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             case PERMITS:
                 wrap = evaluate(() -> style.getExtendsImplementsPermitsList().getWrap(), DoNotWrap);
                 break;
+            case TRY_RESOURCES:
+                if (index == 0) {
+                    openNewLine = evaluate(() -> style.getTryWithResources().getOpenNewLine(), false);
+                }
+                wrap = evaluate(() -> style.getTryWithResources().getWrap(), DoNotWrap);
+                break;
         }
         JavaSourceFile sourceFile;
         if (wrap != null) {
@@ -611,6 +640,21 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return false;
     }
 
+    private boolean opensOnNewLine(JContainer.Location location) {
+        switch (location) {
+            case METHOD_DECLARATION_PARAMETERS:
+                return evaluate(() -> style.getMethodDeclarationParameters().getOpenNewLine(), false);
+            case METHOD_INVOCATION_ARGUMENTS:
+            case NEW_CLASS_ARGUMENTS:
+                return evaluate(() -> style.getMethodCallArguments().getOpenNewLine(), false);
+            case RECORD_STATE_VECTOR:
+                return evaluate(() -> style.getRecordComponents().getOpenNewLine(), false);
+            case TRY_RESOURCES:
+                return evaluate(() -> style.getTryWithResources().getOpenNewLine(), false);
+        }
+        return false;
+    }
+
     private <T> JRightPadded<T> closeOnNewLine(int index, int size, JRightPadded<T> right, JContainer.Location location) {
         if (index != size - 1 || (!(right.getElement() instanceof J))) {
             return right;
@@ -630,6 +674,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             case RECORD_STATE_VECTOR:
                 closeOnNewLine = evaluate(() -> style.getRecordComponents().getCloseNewLine(), false);
                 wrap = evaluate(() -> style.getRecordComponents().getWrap(), WrapIfTooLong);
+                break;
+            case TRY_RESOURCES:
+                closeOnNewLine = evaluate(() -> style.getTryWithResources().getCloseNewLine(), false);
+                wrap = evaluate(() -> style.getTryWithResources().getWrap(), DoNotWrap);
                 break;
         }
 
@@ -660,7 +708,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     private boolean alignWhenMultiline(JContainer.Location location) {
         switch (location) {
             case METHOD_DECLARATION_PARAMETERS:
-                return evaluate(() -> style.getMethodDeclarationParameters().getAlignWhenMultiline(), false);
+                return evaluate(() -> style.getMethodDeclarationParameters().getAlignWhenMultiline(), true);
             case METHOD_INVOCATION_ARGUMENTS:
             case NEW_CLASS_ARGUMENTS:
                 return evaluate(() -> style.getMethodCallArguments().getAlignWhenMultiline(), false);
@@ -669,6 +717,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             case IMPLEMENTS:
             case PERMITS:
                 return evaluate(() -> style.getExtendsImplementsPermitsList().getAlignWhenMultiline(), false);
+            case TRY_RESOURCES:
+                return evaluate(() -> style.getTryWithResources().getAlignWhenMultiline(), true);
         }
         return false;
     }

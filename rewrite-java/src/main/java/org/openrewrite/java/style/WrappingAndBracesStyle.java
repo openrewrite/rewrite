@@ -52,13 +52,13 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Nullable
     WhileStatement whileStatement;
     @Nullable
-    DoWhileStatement doWhileStatement; // Not yet implemented
+    DoWhileStatement doWhileStatement;
     @Nullable
-    SwitchStatement switchStatement; // Not yet implemented
+    SwitchStatement switchStatement;
     @Nullable
-    TryWithResources tryWithResources; // Not yet implemented
+    TryWithResources tryWithResources;
     @Nullable
-    TryStatement tryStatement; // Not yet implemented
+    TryStatement tryStatement;
     @Nullable
     BinaryExpressions binaryExpressions; // Not yet implemented
     @Nullable
@@ -248,7 +248,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @With
     public static class SwitchStatement {
         @Nullable
-        LineWrapSetting wrap;
+        LineWrapSetting wrap; // Not yet implemented
         @Nullable
         Boolean indentCaseBranches;
         @Nullable
@@ -264,6 +264,8 @@ public class WrappingAndBracesStyle implements JavaStyle {
         Boolean alignWhenMultiline;
         @Nullable
         Boolean openNewLine;
+        @Nullable
+        Boolean closeNewLine;
     }
 
     @Value
@@ -274,9 +276,9 @@ public class WrappingAndBracesStyle implements JavaStyle {
         @Nullable
         Boolean finallyOnNewLine;
         @Nullable
-        LineWrapSetting typesInMulticatch;
+        LineWrapSetting typesInMulticatch; // Not yet implemented
         @Nullable
-        Boolean alignTypesInMultiCatch;
+        Boolean alignTypesInMultiCatch; // Not yet implemented
     }
 
     @Value

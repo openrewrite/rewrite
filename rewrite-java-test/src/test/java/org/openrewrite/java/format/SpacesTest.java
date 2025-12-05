@@ -2526,6 +2526,8 @@ class SpacesTest implements RewriteTest {
                   }
                   void baz(    /*c3*/    int z    /*c4*/    ) {
                   }
+                  void bat(    int   /*c4*/    z    ) {
+                  }
               }
               """,
             """
@@ -2535,6 +2537,8 @@ class SpacesTest implements RewriteTest {
                   void bar( int y    /*c2*/ ) {
                   }
                   void baz(    /*c3*/    int z    /*c4*/ ) {
+                  }
+                  void bat( int   /*c4*/    z ) {
                   }
               }
               """
@@ -4565,6 +4569,60 @@ class SpacesTest implements RewriteTest {
     }
 
     @Test
+    void otherBeforeAndAfterTryResourcesSemicolon() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withBeforeForSemicolon(true).withAfterForSemicolon(true))),
+          java(
+            """
+              import java.io.*;
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");BufferedReader br = new BufferedReader(fr);FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt") ; BufferedReader br = new BufferedReader(fr) ; FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void otherNotBeforeAndAfterTryResourcesSemicolon() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withBeforeForSemicolon(false).withAfterForSemicolon(false))),
+          java(
+            """
+              import java.io.*;
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt") ; BufferedReader br = new BufferedReader(fr) ; FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");BufferedReader br = new BufferedReader(fr);FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void otherInsideOneLineEnumBracesTrue() {
         rewriteRun(
           spaces(style -> style.withOther(style.getOther().withInsideOneLineEnumBraces(true))),
@@ -5026,7 +5084,8 @@ class SpacesTest implements RewriteTest {
     @Test
     void handleIfWithoutBlock() {
         rewriteRun(
-          spaces(),
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new SpacesVisitor<>(IntelliJ.spaces(), true, null))),
           java(
             """
             class Test {

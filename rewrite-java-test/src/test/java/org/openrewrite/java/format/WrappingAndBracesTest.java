@@ -43,14 +43,11 @@ class WrappingAndBracesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-          IntelliJ.spaces(),
-          IntelliJ.wrappingAndBraces()
-            .withChainedMethodCalls(IntelliJ.wrappingAndBraces().getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(Arrays.asList("builder", "newBuilder")))
-            .withMethodDeclarationParameters(IntelliJ.wrappingAndBraces().getMethodDeclarationParameters().withWrap(WrapAlways)),
-          IntelliJ.tabsAndIndents(),
-          null,
-          true)));
+        wrappingAndBraces(
+          spaces -> spaces,
+          wrapping -> wrapping
+            .withChainedMethodCalls(wrapping.getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(Arrays.asList("builder", "newBuilder")))
+            .withMethodDeclarationParameters(wrapping.getMethodDeclarationParameters().withWrap(WrapAlways))).accept(spec);
     }
 
     @DocumentExample
@@ -85,7 +82,6 @@ class WrappingAndBracesTest implements RewriteTest {
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
               List.of(
-
                 spaces.apply(IntelliJ.spaces()),
                 wrapping.apply(IntelliJ.wrappingAndBraces())
               )
@@ -628,6 +624,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
+                  
                   @Foo
                   @Foo
                   void method(@Foo @Foo int param) {
@@ -669,17 +666,18 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
+
                   @Foo
                   @Foo
                   void method(@Foo @Foo int param) {
                       @Foo @Foo int localVar;
                   }
               }
-              
+
               enum MyEnum {
                   @Foo @Foo VALUE
               }
-              
+
               record someRecord(@Foo @Foo String name) {
               }
               """
@@ -724,6 +722,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
+
                   @Foo
                   @Foo
                   public void method(@Foo @Foo final int param) {
@@ -758,6 +757,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
+                  
                   @Foo
                   @Foo
                   public void method(@Foo @Foo final int param) {
@@ -811,11 +811,13 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
+
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
+
                   @Foo
                   @Foo
                   T method(@Foo @Foo T param) {
@@ -851,11 +853,13 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
+
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
+
                   @Foo
                   @Foo
                   T method(@Foo @Foo T param) {
@@ -887,25 +891,28 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               class Test {
                   @Foo //comment
-                  String method1(){
+                  String method1() {
                       return "test";
                   }
+
                   @Foo /* comment
                   on multiple
                   lines */
-                  String method2(){
+                  String method2() {
                       return "test";
                   }
+
                   @Foo
                   //comment
-                  String method3(){
+                  String method3() {
                       return "test";
                   }
+
                   @Foo
                   /* comment
                   on multiple
                   lines */
-                  String method4(){
+                  String method4() {
                       return "test";
                   }
               }
@@ -933,25 +940,26 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               class Test {
                   @Foo //comment
-                  final String method1(){
+                  final String method1() {
                       return "test";
                   }
+
                   @Foo /* comment
                   on multiple
-                  lines */
-                  final String method2(){
+                  lines */ final String method2() {
                       return "test";
                   }
+
                   @Foo
                   //comment
-                  final String method3(){
+                  final String method3() {
                       return "test";
                   }
+
                   @Foo
                   /* comment
                   on multiple
-                  lines */
-                  final String method4(){
+                  lines */ final String method4() {
                       return "test";
                   }
               }
@@ -1020,8 +1028,10 @@ class WrappingAndBracesTest implements RewriteTest {
             public class Interfaces {
                 public interface I1 {
                 }
+
                 public interface I2 {
                 }
+
                 public interface I3 {
                 }
             }
@@ -1305,6 +1315,263 @@ class WrappingAndBracesTest implements RewriteTest {
                       do {
                           System.out.println("TESTING");
                       } while (true);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doWhileWithWhileOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withDoWhileStatement(wrap.getDoWhileStatement().withWhileOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      do {
+                          System.out.println("TESTING");
+                      } while (true);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      do {
+                          System.out.println("TESTING");
+                      }
+                      while (true);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");
+                           BufferedReader br = new BufferedReader(fr);
+                           FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesNoAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withAlignWhenMultiline(false))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");
+                              BufferedReader br = new BufferedReader(fr);
+                              FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesOpenAndCloseOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (
+                              FileReader fr = new FileReader("input.txt");
+                              BufferedReader br = new BufferedReader(fr);
+                              FileWriter fw = new FileWriter("output.txt")
+                      ) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesOpenAndCloseOnNewLineOnlyWhenWrapping() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withOpenNewLine(true).withCloseNewLine(true))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryStatement(wrap.getTryStatement().withCatchOnNewLine(true).withFinallyOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      try {
+                          System.out.println("try");
+                      } catch (RuntimeException e) {
+                          System.out.println("catch");
+                      } catch (Exception e) {
+                          System.out.println("exception");
+                      } catch (Throwable | Error e) {
+                          System.out.println("error or throwable");
+                      } finally {
+                          System.out.println("finally");
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      try {
+                          System.out.println("try");
+                      }
+                      catch (RuntimeException e) {
+                          System.out.println("catch");
+                      }
+                      catch (Exception e) {
+                          System.out.println("exception");
+                      }
+                      catch (Throwable | Error e) {
+                          System.out.println("error or throwable");
+                      }
+                      finally {
+                          System.out.println("finally");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchNotOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryStatement(wrap.getTryStatement().withCatchOnNewLine(false).withFinallyOnNewLine(false))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      try {
+                          System.out.println("try");
+                      }
+                      catch (RuntimeException e) {
+                          System.out.println("catch");
+                      }
+                      catch (Exception e) {
+                          System.out.println("exception");
+                      }
+                      catch (Throwable | Error e) {
+                          System.out.println("error or throwable");
+                      }
+                      finally {
+                          System.out.println("finally");
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      try {
+                          System.out.println("try");
+                      } catch (RuntimeException e) {
+                          System.out.println("catch");
+                      } catch (Exception e) {
+                          System.out.println("exception");
+                      } catch (Throwable | Error e) {
+                          System.out.println("error or throwable");
+                      } finally {
+                          System.out.println("finally");
+                      }
                   }
               }
               """

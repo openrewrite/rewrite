@@ -421,12 +421,12 @@ class AutoFormatTest implements RewriteTest {
               public class Test {
                   void test() {
                       int i;
-                      if (1 < 3) { /* multiline comment */
+                      if (1 < 1) { /* multiline comment */
                           i = 1;
                       }
-                      if (1 < 3) /* multiline comment */
-                          i = 1;
-                      if (1 < 3) /* multiline comment */ i = 1;
+                      if (1 < 2) /* multiline comment */
+                          i = 2;
+                      if (1 < 3) /* multiline comment */ i = 3;
                   }
               }
               """,
@@ -434,11 +434,11 @@ class AutoFormatTest implements RewriteTest {
               public class Test {
                   void test() {
                       int i;
-                      if (1 < 3) { /* multiline comment */
+                      if (1 < 1) { /* multiline comment */
                           i = 1;
                       }
-                      if (1 < 3) /* multiline comment */ i = 1;
-                      if (1 < 3) /* multiline comment */ i = 1;
+                      if (1 < 2) /* multiline comment */ i = 2;
+                      if (1 < 3) /* multiline comment */ i = 3;
                   }
               }
               """
@@ -1015,8 +1015,7 @@ class AutoFormatTest implements RewriteTest {
                   @Foo
                   /* comment
                   on multiple
-                  lines */
-                  final String method4() {
+                  lines */ final String method4() {
                       return "test";
                   }
               }

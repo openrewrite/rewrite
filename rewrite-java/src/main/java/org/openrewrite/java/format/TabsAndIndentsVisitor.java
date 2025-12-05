@@ -154,7 +154,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
         }
 
-        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null || loc == Space.Location.TRY_RESOURCE) {
+        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null || loc == Space.Location.TRY_RESOURCE || loc == Space.Location.TRY_RESOURCE_SUFFIX) {
             return space;
         }
 
@@ -362,40 +362,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
                         break;
-                    case TRY_RESOURCE:
-                        // Align subsequent resources with the first resource in try-with-resources
-                        JContainer<J> resources = getCursor().getParentOrThrow().getValue();
-                        List<JRightPadded<J>> resourceElements = resources.getPadding().getElements();
-                        if (resourceElements.size() > 1 && resourceElements.get(0) != right && elem.getPrefix().getLastWhitespace().contains("\n")) {
-                            // For resources after the first one, align with the first resource
-                            J firstResource = resourceElements.get(0).getElement();
-                            if (!firstResource.getPrefix().getLastWhitespace().contains("\n")) {
-                                // First resource is on the same line as try(
-                                // We need to calculate the indent based on the try statement position
-                                // For now, let's use a simplified approach - align with the opening parenthesis
-                                // Count the column position by looking at the try statement prefix and "try ("
-                                J.Try tryStatement = getCursor().firstEnclosing(J.Try.class);
-                                String tryPrefix = tryStatement.getPrefix().getWhitespace();
-                                int tryIndent = getLengthOfWhitespace(tryPrefix.substring(tryPrefix.lastIndexOf('\n') + 1));
-                                // Add 3 for "try" and 1 for "(" and optionally one for space in between
-                                int firstResourceColumn = tryIndent + 4 + (spacesStyle.getBeforeParentheses().getTryParentheses() ? 1 : 0);
-                                elem = elem.withPrefix(indentTo(elem.getPrefix(), firstResourceColumn, Space.Location.TRY_RESOURCE));
-                                elem = visitAndCast(elem, p);
-                                after = right.getAfter();
-                            } else {
-                                // First resource is on a new line, align with it
-                                String firstResourcePrefix = firstResource.getPrefix().getWhitespace();
-                                int firstResourceIndent = getLengthOfWhitespace(firstResourcePrefix.substring(firstResourcePrefix.lastIndexOf('\n') + 1));
-                                elem = elem.withPrefix(indentTo(elem.getPrefix(), firstResourceIndent, Space.Location.TRY_RESOURCE));
-                                elem = visitAndCast(elem, p);
-                                after = right.getAfter();
-                            }
-                        } else {
-                            // For the first resource or single resource, use default handling
-                            elem = visitAndCast(elem, p);
-                            after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-                        }
-                        break;
                     default:
                         elem = visitAndCast(elem, p);
                         if (right.getAfter().getLastWhitespace().contains("\n") && alignWhenMultiple(loc)) {
@@ -554,7 +520,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             case FOR_UPDATE:
             case METHOD_DECLARATION_PARAMETER:
             case RECORD_STATE_VECTOR:
-            case TRY_RESOURCE:
                 isAlignedWhenMultipleFromStyle = () -> null;
                 intelliJDefault = true;
                 break;

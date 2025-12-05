@@ -262,7 +262,8 @@ public class SourcePositionService {
         JRightPadded<J> findJRightPadded;
         if (child instanceof J) {
             findJContainer = null;
-            findJ = (J) child;
+            //JavaPrinter does not call visitContainer for Try-resources so resources themselves are not visited.
+            findJ = child instanceof J.Try.Resource ? ((J.Try.Resource) child).getVariableDeclarations() : (J) child;
             findJRightPadded = null;
         } else if (child instanceof JContainer) {
             findJContainer = (JContainer<J>) child;
