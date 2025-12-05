@@ -729,7 +729,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
                   import java.io.IOException;
                   import java.io.InputStream;
                   
-                  /*~~(Missing bulk read method - complex read() logic requires manual implementation)~~>*/class CountingInputStream extends InputStream {
+                  /*~~(Missing bulk read method may cause significant performance degradation)~~>*/class CountingInputStream extends InputStream {
                       private final InputStream delegate;
                       private long bytesRead = 0;
                   
@@ -786,7 +786,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
                       private long count = 0;
 
                       InputStream getWrappedStream() {
-                          return /*~~(Missing bulk read method - complex read() logic requires manual implementation)~~>*/new InputStream() {
+                          return /*~~(Missing bulk read method may cause significant performance degradation)~~>*/new InputStream() {
                               @Override
                               public int read() throws IOException {
                                   int b = delegate.read();
@@ -827,7 +827,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
                   import java.io.IOException;
                   import java.io.InputStream;
 
-                  /*~~(Missing bulk read method - complex read() logic requires manual implementation)~~>*/class LoggingInputStream extends InputStream {
+                  /*~~(Missing bulk read method may cause significant performance degradation)~~>*/class LoggingInputStream extends InputStream {
                       private final InputStream delegate;
 
                       LoggingInputStream(InputStream delegate) {
@@ -873,7 +873,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
                   import java.io.IOException;
                   import java.io.InputStream;
 
-                  /*~~(Missing bulk read method - complex read() logic requires manual implementation)~~>*/class XorInputStream extends InputStream {
+                  /*~~(Missing bulk read method may cause significant performance degradation)~~>*/class XorInputStream extends InputStream {
                       private final InputStream delegate;
                       private final int xorKey;
 
@@ -922,7 +922,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
                   import java.io.IOException;
                   import java.io.InputStream;
 
-                  /*~~(Missing bulk read method - complex read() logic requires manual implementation)~~>*/class SafeInputStream extends InputStream {
+                  /*~~(Missing bulk read method may cause significant performance degradation)~~>*/class SafeInputStream extends InputStream {
                       private final InputStream delegate;
 
                       SafeInputStream(InputStream delegate) {
@@ -972,7 +972,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
 
                   class Example {
                       InputStream getStream() {
-                          return /*~~(Missing bulk read method - no delegate stream detected)~~>*/new InputStream() {
+                          return /*~~(Missing bulk read method may cause significant performance degradation)~~>*/new InputStream() {
                               private int position = 0;
                               private byte[] data = new byte[100];
 
@@ -1017,7 +1017,7 @@ class AddInputStreamBulkReadMethodTest implements RewriteTest {
                   import java.io.IOException;
                   import java.io.InputStream;
 
-                  /*~~(Missing bulk read method - no delegate stream detected)~~>*/class ConditionalInputStream extends InputStream {
+                  /*~~(Missing bulk read method may cause significant performance degradation)~~>*/class ConditionalInputStream extends InputStream {
                       private final InputStream primary;
                       private final InputStream fallback;
                       private boolean usePrimary = true;

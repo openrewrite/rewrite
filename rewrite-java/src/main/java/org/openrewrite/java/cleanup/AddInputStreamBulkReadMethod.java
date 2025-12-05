@@ -32,8 +32,7 @@ import java.util.List;
 
 public class AddInputStreamBulkReadMethod extends Recipe {
 
-    private static final String MARKER_COMPLEX = "Missing bulk read method - complex read() logic requires manual implementation";
-    private static final String MARKER_NO_DELEGATE = "Missing bulk read method - no delegate stream detected";
+    private static final String MARKER_MESSAGE = "Missing bulk read method may cause significant performance degradation";
 
     @Override
     public String getDisplayName() {
@@ -77,14 +76,9 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                     return cd;
                 }
 
-                // No delegate found - add marker for manual implementation
-                if (result.delegate == null) {
-                    return SearchResult.found(cd, MARKER_NO_DELEGATE);
-                }
-
-                // Complex body - add search marker for manual review
-                if (result.isComplex) {
-                    return SearchResult.found(cd, MARKER_COMPLEX);
+                // No delegate found or complex body - add marker for manual implementation
+                if (result.delegate == null || result.isComplex) {
+                    return SearchResult.found(cd, MARKER_MESSAGE);
                 }
 
                 // Simple delegation - add bulk read method
@@ -135,14 +129,9 @@ public class AddInputStreamBulkReadMethod extends Recipe {
                     return nc;
                 }
 
-                // No delegate found - add marker for manual implementation
-                if (result.delegate == null) {
-                    return SearchResult.found(nc, MARKER_NO_DELEGATE);
-                }
-
-                // Complex body - add search marker for manual review
-                if (result.isComplex) {
-                    return SearchResult.found(nc, MARKER_COMPLEX);
+                // No delegate found or complex body - add marker for manual implementation
+                if (result.delegate == null || result.isComplex) {
+                    return SearchResult.found(nc, MARKER_MESSAGE);
                 }
 
                 // Simple delegation - add bulk read method
