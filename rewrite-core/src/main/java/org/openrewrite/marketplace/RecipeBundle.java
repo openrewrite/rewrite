@@ -18,14 +18,22 @@ package org.openrewrite.marketplace;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.rpc.request.RpcRequest;
 
 @Data
 @AllArgsConstructor
-public class RecipeBundle {
+public class RecipeBundle implements RpcRequest {
     String packageEcosystem;
     String packageName;
     String version;
 
     @Nullable
     String team;
+
+    /**
+     * @return Bundle that corresponds to {@link org.openrewrite.config.Environment.Builder#scanRuntimeClasspath(String...)}.
+     */
+    public static RecipeBundle runtimeClasspath() {
+        return new RecipeBundle("runtime", "", "", null);
+    }
 }

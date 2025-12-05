@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -78,17 +79,17 @@ public class RecipeDescriptor {
      * replacing individual segments of the display name with category descriptor names when those
      * are defined to the provided environment.
      */
-    public List<String> inferCategoriesFromName(Environment env) {
+    public List<CategoryDescriptor> inferCategoriesFromName(Environment env) {
         // Extract package from recipe name (everything before the last dot)
-        int lastDot = displayName.lastIndexOf('.');
+        int lastDot = name.lastIndexOf('.');
         if (lastDot == -1) {
             return emptyList();
         }
 
-        String packageName = displayName.substring(0, lastDot);
+        String packageName = name.substring(0, lastDot);
 
         String[] parts = packageName.split("\\.");
-        List<String> categories = new ArrayList<>(parts.length);
+        List<CategoryDescriptor> categories = new ArrayList<>(parts.length);
 
         nextPart:
         for (int i = 0; i < parts.length; i++) {
@@ -101,14 +102,15 @@ public class RecipeDescriptor {
                     if (categoryDescriptor.isRoot()) {
                         continue nextPart;
                     }
-                    categories.add(categoryDescriptor.getDisplayName());
+                    categories.add(categoryDescriptor);
                     continue nextPart;
                 }
             }
 
             if (!part.isEmpty()) {
                 String capitalized = Character.toUpperCase(part.charAt(0)) + part.substring(1);
-                categories.add(capitalized);
+                categories.add(new CategoryDescriptor(capitalized, partialPackage, "", emptySet(),
+                        false, 0, false));
             }
         }
 

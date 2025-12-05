@@ -56,6 +56,7 @@ public class RecipeMarketplaceWriter {
             int maxOptions = calculateMaxOptions(marketplace.getRoot());
             boolean hasVersion = hasAnyVersion(marketplace);
             boolean hasTeam = hasAnyTeam(marketplace);
+            boolean hasCategoryDescription = hasAnyCategoryDescription(marketplace.getRoot());
 
             List<String> headers = new ArrayList<>();
             headers.add("ecosystem");
@@ -72,6 +73,13 @@ public class RecipeMarketplaceWriter {
                 headers.add("category" + i);
             }
 
+            // Add category description headers if any category has a description
+            if (hasCategoryDescription) {
+                for (int i = 1; i <= maxCategoryDepth; i++) {
+                    headers.add("category" + i + "Description");
+                }
+            }
+
             for (int i = 1; i <= maxOptions; i++) {
                 headers.add("option" + i + "Name");
                 headers.add("option" + i + "DisplayName");
@@ -83,16 +91,17 @@ public class RecipeMarketplaceWriter {
             }
 
             csv.writeHeaders(headers);
-            writeCsvRecursive(csv, marketplace.getRoot(), emptyList(),
-                    maxCategoryDepth, maxOptions, hasTeam, hasVersion);
+            writeCsvRecursive(csv, marketplace.getRoot(), emptyList(), emptyList(),
+                    maxCategoryDepth, maxOptions, hasTeam, hasVersion, hasCategoryDescription);
         } finally {
             csv.close();
         }
     }
 
     private void writeCsvRecursive(CsvWriter csv, RecipeMarketplace.Category category,
-                                   List<String> categoryPath, int maxCategoryDepth,
-                                   int maxOptions, boolean hasTeam, boolean hasVersion) {
+                                   List<String> categoryPath, List<String> categoryDescriptionPath,
+                                   int maxCategoryDepth, int maxOptions, boolean hasTeam,
+                                   boolean hasVersion, boolean hasCategoryDescription) {
         for (RecipeListing recipe : category.getRecipes()) {
             List<String> row = new ArrayList<>();
             RecipeBundle bundle = recipe.getBundle();
@@ -112,6 +121,17 @@ public class RecipeMarketplaceWriter {
                     row.add("");
                 } else {
                     row.add(categoryPath.get(i - padding));
+                }
+            }
+
+            // Category description columns (if any category has a description)
+            if (hasCategoryDescription) {
+                for (int i = 0; i < maxCategoryDepth; i++) {
+                    if (i < padding) {
+                        row.add("");
+                    } else {
+                        row.add(categoryDescriptionPath.get(i - padding));
+                    }
                 }
             }
 
@@ -140,7 +160,10 @@ public class RecipeMarketplaceWriter {
         for (RecipeMarketplace.Category child : category.getCategories()) {
             List<String> childPath = new ArrayList<>(categoryPath);
             childPath.add(0, child.getDisplayName());
-            writeCsvRecursive(csv, child, childPath, maxCategoryDepth, maxOptions, hasTeam, hasVersion);
+            List<String> childDescriptionPath = new ArrayList<>(categoryDescriptionPath);
+            childDescriptionPath.add(0, child.getDescription() != null ? child.getDescription() : "");
+            writeCsvRecursive(csv, child, childPath, childDescriptionPath, maxCategoryDepth, maxOptions,
+                    hasTeam, hasVersion, hasCategoryDescription);
         }
     }
 
@@ -178,6 +201,28 @@ public class RecipeMarketplaceWriter {
         for (RecipeListing recipe : marketplace.getAllRecipes()) {
             RecipeBundle bundle = recipe.getBundle();
             if (StringUtils.isNotBlank(bundle.getVersion())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasAnyCategoryDescription(RecipeMarketplace.Category root) {
+        // Skip root description, only check child categories
+        for (RecipeMarketplace.Category child : root.getCategories()) {
+            if (hasAnyCategoryDescriptionRecursive(child)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasAnyCategoryDescriptionRecursive(RecipeMarketplace.Category category) {
+        if (StringUtils.isNotBlank(category.getDescription())) {
+            return true;
+        }
+        for (RecipeMarketplace.Category child : category.getCategories()) {
+            if (hasAnyCategoryDescriptionRecursive(child)) {
                 return true;
             }
         }

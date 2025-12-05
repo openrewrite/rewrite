@@ -132,6 +132,61 @@ class RecipeMarketplaceReaderTest {
         assertThat(marketplace.getCategories()).isEmpty();
     }
 
+    @Test
+    void readMarketplaceWithCategoryDescriptions() {
+        @Language("csv") String csv = """
+          name,category1,category1Description,category2,category2Description,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Cleanup,Remove redundant code,Java,Java-related recipes,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.format.AutoFormat,Formatting,Auto-format your code,Java,Java-related recipes,maven,org.openrewrite:rewrite-java
+          """;
+
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
+
+        // category2 = Java (root level), category1 = Cleanup/Formatting (deeper)
+        RecipeMarketplace.Category java = findCategory(marketplace.getRoot(), "Java");
+        assertThat(java.getDescription()).isEqualTo("Java-related recipes");
+
+        RecipeMarketplace.Category cleanup = findCategory(java, "Cleanup");
+        assertThat(cleanup.getDescription()).isEqualTo("Remove redundant code");
+
+        RecipeMarketplace.Category formatting = findCategory(java, "Formatting");
+        assertThat(formatting.getDescription()).isEqualTo("Auto-format your code");
+    }
+
+    @Test
+    void roundTripWithCategoryDescriptions() {
+        @Language("csv") String csv = """
+          name,category1,category1Description,category2,category2Description,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Cleanup,Remove redundant code,Java,Java-related recipes,maven,org.openrewrite:rewrite-java
+          """;
+
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        // Parse the written CSV again
+        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(writtenCsv);
+
+        RecipeMarketplace.Category java = findCategory(roundTripped.getRoot(), "Java");
+        assertThat(java.getDescription()).isEqualTo("Java-related recipes");
+
+        RecipeMarketplace.Category cleanup = findCategory(java, "Cleanup");
+        assertThat(cleanup.getDescription()).isEqualTo("Remove redundant code");
+    }
+
+    @Test
+    void writerOmitsCategoryDescriptionsWhenNonePresent() {
+        @Language("csv") String csv = """
+          name,category1,category2,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Cleanup,Java,maven,org.openrewrite:rewrite-java
+          """;
+
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        // Should not contain "Description" headers since no descriptions were provided
+        assertThat(writtenCsv).doesNotContain("Description");
+    }
+
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {
         return category.getCategories().stream()
           .filter(c -> c.getDisplayName().equals(name))

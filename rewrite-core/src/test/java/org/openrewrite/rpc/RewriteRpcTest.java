@@ -37,6 +37,7 @@ import java.util.concurrent.CountDownLatch;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -55,10 +56,10 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env)
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
 
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env)
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
     }
 
@@ -100,8 +101,8 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void getRecipes() {
-        assertThat(client.getRecipes()).isNotEmpty();
+    void getMarketplace() {
+        assertThat(client.getMarketplace().getAllRecipes()).isNotEmpty();
     }
 
     @Test

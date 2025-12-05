@@ -17,16 +17,14 @@
 import {Recipe} from "../recipe";
 import {produceAsync, TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
-import {JavaScriptVisitor, JS} from "../javascript";
+import {AutoformatVisitor, JavaScriptVisitor, JS} from "../javascript";
 import {J} from "../java";
 import {Draft, produce} from "immer";
-import {AutoformatVisitor} from "../javascript/format";
 
 export class OrderImports extends Recipe {
-    name = "org.openrewrite.OrderImports";
+    name = "org.openrewrite.order-imports";
     displayName = "Order imports";
     description = "Sort top-level imports alphabetically within groups: no qualifier, asterisk, multiple, single.";
-
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
@@ -65,7 +63,7 @@ export class OrderImports extends Recipe {
                 });
                 return produce(cuWithImportsSorted!, draft => {
                     for (let i = 0; i < importCount; i++) {
-                       draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
+                        draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
                     }
                     // TODO deal with comments in the whitespace around imports
                 });
@@ -182,7 +180,7 @@ export class OrderImports extends Recipe {
                         });
                         const formatted = await new AutoformatVisitor().visit(importSorted, {}) as JS.Import;
                         ret.push(produce(importPadded, draft => {
-                           draft.element = formatted;
+                            draft.element = formatted;
                         }));
                     } else {
                         ret.push(importPadded);

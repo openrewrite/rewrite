@@ -14,4 +14,12 @@
  * limitations under the License.
  */
 
+import {CategoryDescriptor} from "../../../marketplace";
+import {Migrate} from "../index";
+
 export {ExportAssignmentToExportDefault} from "./export-assignment-to-export-default";
+
+export const MigrateTypeScript: CategoryDescriptor[] = [...Migrate, {
+    displayName: "TypeScript",
+    description: "Migrate JavaScript code to TypeScript."
+}]

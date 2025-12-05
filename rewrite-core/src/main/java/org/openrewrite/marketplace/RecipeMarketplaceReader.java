@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.config.CategoryDescriptor;
 import org.openrewrite.internal.StringUtils;
 
 import java.io.*;
@@ -129,7 +130,8 @@ public class RecipeMarketplaceReader {
         String packageName = null;
         String version = null;
         String team = null;
-        List<String> categories = new ArrayList<>();
+        Map<Integer, String> categoryDisplayNames = new TreeMap<>();
+        Map<Integer, String> categoryDescriptions = new TreeMap<>();
         Map<Integer, RecipeListing.Option> options = new TreeMap<>();
 
         for (int i = 0; i < row.length && i < headers.size(); i++) {
@@ -165,7 +167,14 @@ public class RecipeMarketplaceReader {
                     break;
                 case CATEGORY:
                     if (value != null) {
-                        categories.add(value);
+                        int categoryIndex = column.getIndex();
+                        categoryDisplayNames.put(categoryIndex, value);
+                    }
+                    break;
+                case CATEGORY_DESCRIPTION:
+                    if (value != null) {
+                        int categoryIndex = column.getIndex();
+                        categoryDescriptions.put(categoryIndex, value);
                     }
                     break;
                 case ECOSYSTEM:
@@ -224,8 +233,26 @@ public class RecipeMarketplaceReader {
                 bundle
         );
 
-        Collections.reverse(categories);
-        marketplace.install(listing, categories);
+        // Convert category maps to CategoryDescriptor list
+        // Categories are stored with index (1, 2, 3, ...) representing depth from deepest to shallowest
+        // But we need to reverse them to get shallowest to deepest order for install
+        List<CategoryDescriptor> categoryPath = new ArrayList<>();
+        for (Map.Entry<Integer, String> entry : categoryDisplayNames.entrySet()) {
+            int index = entry.getKey();
+            String catDisplayName = entry.getValue();
+            String catDescription = categoryDescriptions.getOrDefault(index, "");
+            categoryPath.add(new CategoryDescriptor(
+                    catDisplayName,
+                    "", // packageName not used for marketplace categories
+                    catDescription,
+                    Collections.emptySet(),
+                    false,
+                    CategoryDescriptor.LOWEST_PRECEDENCE,
+                    true // synthetic
+            ));
+        }
+        Collections.reverse(categoryPath);
+        marketplace.install(listing, categoryPath);
     }
 
     @Getter
@@ -236,6 +263,7 @@ public class RecipeMarketplaceReader {
         DESCRIPTION("description"),
         ESTIMATED_EFFORT_PER_OCCURRENCE("estimatedEffortPerOccurrence"),
         CATEGORY("category"),
+        CATEGORY_DESCRIPTION("categoryDescription"),
         ECOSYSTEM("ecosystem"),
         PACKAGE_NAME("packageName"),
         VERSION("version"),
@@ -247,16 +275,28 @@ public class RecipeMarketplaceReader {
 
         private final String columnName;
 
+        private static final Pattern CATEGORY_PATTERN = Pattern.compile("category(\\d*)", Pattern.CASE_INSENSITIVE);
+        private static final Pattern CATEGORY_DESCRIPTION_PATTERN = Pattern.compile("category(\\d*)Description", Pattern.CASE_INSENSITIVE);
         private static final Pattern OPTION_NAME_PATTERN = Pattern.compile("option(\\d+)Name", Pattern.CASE_INSENSITIVE);
         private static final Pattern OPTION_DISPLAY_NAME_PATTERN = Pattern.compile("option(\\d+)DisplayName", Pattern.CASE_INSENSITIVE);
         private static final Pattern OPTION_DESCRIPTION_PATTERN = Pattern.compile("option(\\d+)Description", Pattern.CASE_INSENSITIVE);
 
         public static NamedColumn fromString(String key) {
-            String lowerKey = key.toLowerCase();
+            // Check for category description columns first (category1Description, category2Description, ...)
+            // Must check before category pattern since "category1Description" starts with "category"
+            Matcher categoryDescriptionMatcher = CATEGORY_DESCRIPTION_PATTERN.matcher(key);
+            if (categoryDescriptionMatcher.matches()) {
+                String indexStr = categoryDescriptionMatcher.group(1);
+                int index = indexStr.isEmpty() ? 1 : Integer.parseInt(indexStr);
+                return new NamedColumn(CATEGORY_DESCRIPTION, key, index);
+            }
 
             // Check for category columns (category, category1, category2, ...)
-            if (lowerKey.startsWith("category")) {
-                return new NamedColumn(CATEGORY, key, -1);
+            Matcher categoryMatcher = CATEGORY_PATTERN.matcher(key);
+            if (categoryMatcher.matches()) {
+                String indexStr = categoryMatcher.group(1);
+                int index = indexStr.isEmpty() ? 1 : Integer.parseInt(indexStr);
+                return new NamedColumn(CATEGORY, key, index);
             }
 
             // Check for option columns with patterns

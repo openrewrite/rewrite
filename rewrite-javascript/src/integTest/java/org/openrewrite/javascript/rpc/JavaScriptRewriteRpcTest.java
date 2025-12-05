@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -54,10 +55,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @BeforeEach
     void before() {
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-          .recipeInstallDir(tempDir)
-          .metricsCsv(tempDir.resolve("rpc.csv"))
-          .log(tempDir.resolve("rpc.log"))
-          .traceRpcMessages()
+            .recipeInstallDir(tempDir)
+            .metricsCsv(tempDir.resolve("rpc.csv"))
+            .log(tempDir.resolve("rpc.log"))
+            .traceRpcMessages()
 //          .inspectBrk()
         );
     }
@@ -188,20 +189,18 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @Test
     void installRecipesFromNpm() {
         assertThat(client().installRecipes("@openrewrite/recipes-npm")).isEqualTo(1);
-        assertThat(client().getRecipes()).satisfiesExactly(
+        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", "", null)).getAllRecipes()).satisfiesExactly(
           d -> {
               assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`");
-              assertThat(d.getOptions()).satisfiesExactly(
-                o -> assertThat(o.isRequired()).isTrue()
-              );
           }
         );
     }
 
     @Test
-    void getRecipes() {
+    void getMarketplace() {
         installRecipes();
-        assertThat(client().getRecipes()).isNotEmpty();
+        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", "", null))
+          .getAllRecipes()).isNotEmpty();
     }
 
     @Test

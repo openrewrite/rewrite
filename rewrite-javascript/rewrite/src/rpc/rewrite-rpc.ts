@@ -16,13 +16,13 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
 import {Cursor, isSourceFile, isTree, rootCursor, SourceFile, Tree} from "../tree";
-import {Recipe, RecipeDescriptor, RecipeRegistry} from "../recipe";
+import {Recipe} from "../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {
     Generate,
     GenerateResponse,
     GetObject,
-    GetRecipes,
+    GetMarketplace,
     Parse,
     PrepareRecipe,
     PrepareRecipeResponse,
@@ -39,6 +39,7 @@ import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes"
 import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
+import {RecipeMarketplace} from "../marketplace";
 
 export class RewriteRpc {
     private static _global?: RewriteRpc;
@@ -61,9 +62,9 @@ export class RewriteRpc {
                     new rpc.StreamMessageReader(process.stdin),
                     new rpc.StreamMessageWriter(process.stdout),
                 ),
-                private readonly options: {
+                options: {
                     batchSize?: number,
-                    registry?: RecipeRegistry,
+                    registry?: RecipeMarketplace,
                     logger?: rpc.Logger,
                     metricsCsv?: string,
                     recipeInstallDir?: string
@@ -80,13 +81,13 @@ export class RewriteRpc {
         const getCursor = (cursorIds: string[] | undefined, sourceFileType?: string) => this.getCursor(cursorIds, sourceFileType);
         const traceGetObject = () => this.traceGetObject.send;
 
-        const registry = options.registry || new RecipeRegistry();
+        const registry = options.registry || new RecipeMarketplace();
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
-        GetRecipes.handle(this.connection, registry, options.metricsCsv);
+        GetMarketplace.handle(this.connection, registry, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
@@ -186,12 +187,6 @@ export class RewriteRpc {
             );
         }
         return this.remoteLanguages;
-    }
-
-    async recipes(): Promise<({ name: string } & RecipeDescriptor)[]> {
-        return await this.connection.sendRequest(
-            new rpc.RequestType0<({ name: string } & RecipeDescriptor)[], Error>("GetRecipes")
-        );
     }
 
     async prepareRecipe(id: string, options?: any): Promise<RpcRecipe> {

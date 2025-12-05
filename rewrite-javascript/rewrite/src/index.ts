@@ -16,7 +16,7 @@
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
 import {createDraft, Draft, finishDraft} from "immer";
 import {MarkersKind, ParseExceptionResult} from "./markers";
-import {RecipeRegistry} from "./recipe";
+import {JavaScript, RecipeMarketplace} from "./marketplace";
 
 export * from "./data-table";
 export * from "./execution";
@@ -32,17 +32,28 @@ export * from "./uuid";
 export * from "./util";
 export * from "./recipe";
 export * from "./run";
+export * from "./marketplace";
 
-// register all recipes in this package
-export async function activate(registry: RecipeRegistry): Promise<void> {
+// Install all recipes in this package
+export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     const {OrderImports} = await import("./recipe/index.js");
-    const {ModernizeOctalEscapeSequences, ModernizeOctalLiterals, RemoveDuplicateObjectKeys} = await import("./javascript/migrate/es6/index.js");
-    const {ExportAssignmentToExportDefault} = await import("./javascript/migrate/typescript/index.js");
-    registry.register(ExportAssignmentToExportDefault);
-    registry.register(OrderImports);
-    registry.register(ModernizeOctalEscapeSequences);
-    registry.register(ModernizeOctalLiterals);
-    registry.register(RemoveDuplicateObjectKeys);
+    marketplace.install(OrderImports, JavaScript);
+
+    const {
+        ExportAssignmentToExportDefault,
+        MigrateTypeScript
+    } = await import("./javascript/migrate/typescript/index.js");
+    marketplace.install(ExportAssignmentToExportDefault, MigrateTypeScript);
+
+    const {
+        ModernizeOctalEscapeSequences,
+        ModernizeOctalLiterals,
+        RemoveDuplicateObjectKeys,
+        MigrateES6
+    } = await import("./javascript/migrate/es6/index.js");
+    marketplace.install(ModernizeOctalEscapeSequences, MigrateES6);
+    marketplace.install(ModernizeOctalLiterals, MigrateES6);
+    marketplace.install(RemoveDuplicateObjectKeys, MigrateES6);
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {

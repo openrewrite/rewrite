@@ -17,11 +17,9 @@ package org.openrewrite.maven.marketplace;
 
 import org.apache.commons.lang3.StringUtils;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.marketplace.RecipeBundle;
-import org.openrewrite.marketplace.RecipeBundleReader;
-import org.openrewrite.marketplace.RecipeBundleResolver;
-import org.openrewrite.marketplace.ThrowingRecipeBundleReader;
+import org.openrewrite.marketplace.*;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -36,6 +34,8 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
     private final MavenArtifactDownloader downloader;
     private final RecipeClassLoaderFactory classLoaderFactory;
 
+    private transient @Nullable MavenRecipeBundleReader reader;
+
     public MavenRecipeBundleResolver(ExecutionContext ctx, MavenArtifactDownloader downloader, RecipeClassLoaderFactory classLoaderFactory) {
         this.ctx = ctx;
         this.downloader = downloader;
@@ -49,19 +49,23 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
 
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
-        if (StringUtils.isBlank(bundle.getVersion())) {
-            return new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to read a Maven recipe bundle that has no version"));
+        if (reader == null) {
+            if (StringUtils.isBlank(bundle.getVersion())) {
+                return new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to read a Maven recipe bundle that has no version"));
+            }
+            String[] ga = bundle.getPackageName().split(":");
+            GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
+            return resolveDependencies(gav)
+                    .map(mrr -> {
+                        ResolvedDependency resolvedDependency = mrr.getDependencies().get(Scope.Runtime).stream().filter(ResolvedDependency::isDirect)
+                                .findFirst().orElseThrow(() -> new IllegalStateException("Failed to find direct dependency for " + gav));
+                        bundle.setVersion(resolvedDependency.getVersion());
+                        reader = new MavenRecipeBundleReader(bundle, mrr, downloader, classLoaderFactory);
+                        return (RecipeBundleReader) reader;
+                    })
+                    .orElseGet(() -> new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to resolve recipe " + gav)));
         }
-        String[] ga = bundle.getPackageName().split(":");
-        GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
-        return resolveDependencies(gav)
-                .map(mrr -> {
-                    ResolvedDependency resolvedDependency = mrr.getDependencies().get(Scope.Runtime).stream().filter(ResolvedDependency::isDirect)
-                            .findFirst().orElseThrow(() -> new IllegalStateException("Failed to find direct dependency for " + gav));
-                    bundle.setVersion(resolvedDependency.getVersion());
-                    return (RecipeBundleReader) new MavenRecipeBundleReader(bundle, mrr, downloader, classLoaderFactory);
-                })
-                .orElseGet(() -> new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to resolve recipe " + gav)));
+        return reader;
     }
 
     private Optional<MavenResolutionResult> resolveDependencies(GroupArtifactVersion gav) {

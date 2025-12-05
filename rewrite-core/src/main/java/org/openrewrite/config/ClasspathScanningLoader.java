@@ -70,9 +70,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     /**
-     * Construct a ClasspathScanningLoader scans the provided classload for recipes
+     * Construct a ClasspathScanningLoader scans the provided classloader for recipes
      *
-     * @param properties  Yaml placeholder properties
+     * @param properties  YAML placeholder properties
      * @param classLoader Limit scan to classes loadable by this classloader
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
@@ -163,15 +163,15 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 Class<?> styleClass = classInfo.loadClass();
-                    Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
-                    if (constructor != null) {
-                        constructor.setAccessible(true);
-                        try {
-                            styles.add((NamedStyles) constructor.newInstance());
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
+                Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
+                if (constructor != null) {
+                    constructor.setAccessible(true);
+                    try {
+                        styles.add((NamedStyles) constructor.newInstance());
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
+                }
 
             }
         }
