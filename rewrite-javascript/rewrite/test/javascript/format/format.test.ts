@@ -602,18 +602,4 @@ expect(recipe).toBeNull(); // Multiple matches`
             // @formatter:on
         )
     })
-
-    test('closing braces after method call should be indented correctly', () => {
-        return spec.rewriteRun(
-            // @formatter:off
-            //language=typescript
-            typescript(
-                `test('name', () => {
-    return spec.rewriteRun(
-        typescript(\`code\`)
-    )});`
-            )
-            // @formatter:on
-        )
-    })
 });

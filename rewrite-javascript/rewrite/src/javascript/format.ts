@@ -1160,9 +1160,22 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     protected async preVisit(tree: J, p: P): Promise<J | undefined> {
         let ret = await super.preVisit(tree, p)! as J;
 
+        // Save the parent's indent BEFORE any local capture - needed for Container element continuation
+        const parentIndent = this.currentIndent;
+
+        // Check if this element is inside a Container (method arguments, array elements)
+        // Exclude case body statements - they use block-level indent, not continuation
+        const parentKind = this.cursor.parent?.value?.kind;
+        const grandparentKind = this.cursor.parent?.parent?.value?.kind;
+        const greatGrandparentKind = this.cursor.parent?.parent?.parent?.value?.kind;
+        const isContainerElement = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Container &&
+            greatGrandparentKind !== J.Kind.Case;
+
         // Capture the tree's prefix indent if it has a newline - this establishes the base indent for children
         // This must happen BEFORE computing previousIndent so that blocks get the correct parent indent
-        if (tree.prefix?.whitespace?.includes("\n") && this.cursor.getNearestMessage("indentToUse") === undefined) {
+        // For Container elements, always capture (even if parent has indent) so nested containers work correctly
+        if (tree.prefix?.whitespace?.includes("\n") &&
+            (this.cursor.getNearestMessage("indentToUse") === undefined || isContainerElement)) {
             const prefixIndent = tree.prefix.whitespace.substring(tree.prefix.whitespace.lastIndexOf("\n") + 1);
             this.cursor.messages.set("indentToUse", prefixIndent);
         }
@@ -1235,8 +1248,8 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 );
                 // Check if this is a continuation (like variable initializer on new line)
                 const isContinuation = parentKind === J.Kind.LeftPadded;
-                // Method arguments and array elements are inside a Container - preserve their existing indentation
-                // But case body statements (Container parent is Case) need normalization
+                // Method arguments and array elements are inside a Container - they need continuation indent
+                // But case body statements (Container parent is Case) need block-level normalization
                 const isInsideContainer = parentKind === J.Kind.RightPadded && grandparentKind === J.Kind.Container &&
                     greatGrandparentKind !== J.Kind.Case;
                 // Check if we're inside a JSX tag (JSX children need indentation)
@@ -1251,7 +1264,12 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 // For top-level statements, always normalize to no indent (even when relativeIndent is undefined)
                 if (isTopLevelStatement) {
                     draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, "");
-                } else if (!isInsideContainer && relativeIndent !== undefined && (isStatementInBlock || isControlStructureBody || isContinuation || isInsideJsxTag || isStatementInCaseBody || isIfElse)) {
+                } else if (isInsideContainer && parentIndent !== undefined) {
+                    // Container elements (method arguments, array elements) get continuation indent
+                    // Use parentIndent (before local capture) to avoid doubling the indent
+                    const continuationIndent = parentIndent + this.singleIndent;
+                    draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, continuationIndent);
+                } else if (relativeIndent !== undefined && (isStatementInBlock || isControlStructureBody || isContinuation || isInsideJsxTag || isStatementInCaseBody || isIfElse)) {
                     draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
                 }
             }
@@ -1391,6 +1409,23 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 draft.before.whitespace = this.combineIndent(draft.before.whitespace, indent);
             }
         });
+    }
+
+    public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+        const ret = await super.visitContainer(container, p);
+        const indent = this.currentIndent;
+        if (indent === undefined || ret.elements.length === 0) {
+            return ret;
+        }
+        // Normalize the last element's after space (closing paren/bracket) to the base indent level
+        const lastElement = ret.elements[ret.elements.length - 1];
+        if (lastElement.after.whitespace.includes("\n")) {
+            return produce(ret, draft => {
+                const lastIdx = draft.elements.length - 1;
+                draft.elements[lastIdx].after.whitespace = this.combineIndent(lastElement.after.whitespace, indent);
+            });
+        }
+        return ret;
     }
 
     private get currentIndent(): string | undefined {

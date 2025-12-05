@@ -360,7 +360,7 @@ describe('TabsAndIndentsVisitor', () => {
     });
 
     test('object spread with callback should preserve indentation', () => {
-        const spec = new RecipeSpec()
+        const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(
             // @formatter:off
@@ -403,4 +403,46 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('closing braces after method call should be indented correctly', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test('name', () => {
+    return spec.rewriteRun(
+        typescript(\`code\`)
+    )
+    });`,
+                `test('name', () => {
+    return spec.rewriteRun(
+        typescript(\`code\`)
+    )
+});`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('nested method calls with arrow function should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `await withDir(async (repo) => {
+    await spec.rewriteRun(
+        npm(
+            repo.path,
+            packageJson('before', 'after')
+        )
+    );
+}, {unsafeCleanup: true});`
+            )
+            // @formatter:on
+        )
+    })
 });
