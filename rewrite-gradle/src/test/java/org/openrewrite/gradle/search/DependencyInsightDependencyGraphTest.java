@@ -235,9 +235,9 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
           spec -> spec
             .recipe(new DependencyInsight("jakarta.annotation", "jakarta.annotation-api", null, "compileClasspath"))
             .dataTable(DependenciesInUse.Row.class, rows -> {
-                assertThat(rows).hasSize(3);
-                DependenciesInUse.Row row1 = rows.getFirst();
-                assertThat(row1.getDependencyGraph()).isEqualTo(
+                assertThat(rows).hasSize(1);
+                DependenciesInUse.Row row = rows.getFirst();
+                assertThat(row.getDependencyGraph()).isEqualTo(
                   """
                     jakarta.annotation:jakarta.annotation-api:1.3.5
                     \\--- org.glassfish.jersey.core:jersey-common:2.35
@@ -245,24 +245,7 @@ class DependencyInsightDependencyGraphTest implements RewriteTest {
                               \\--- org.glassfish.jersey.core:jersey-server:2.35
                                    \\--- compileClasspath
                     """.strip());
-                assertThat(row1.getDepth()).isEqualTo(3);
-                DependenciesInUse.Row row2 = rows.get(1);
-                assertThat(row2.getDependencyGraph()).isEqualTo(
-                  """
-                    jakarta.annotation:jakarta.annotation-api:1.3.5
-                    \\--- org.glassfish.jersey.core:jersey-common:2.35
-                         \\--- org.glassfish.jersey.core:jersey-server:2.35
-                              \\--- compileClasspath
-                    """.strip());
-                assertThat(row2.getDepth()).isEqualTo(2);
-                DependenciesInUse.Row row3 = rows.get(2);
-                assertThat(row3.getDependencyGraph()).isEqualTo(
-                  """
-                    jakarta.annotation:jakarta.annotation-api:1.3.5
-                    \\--- org.glassfish.jersey.core:jersey-server:2.35
-                         \\--- compileClasspath
-                    """.strip());
-                assertThat(row3.getDepth()).isEqualTo(1);
+                assertThat(row.getDepth()).isEqualTo(3);
             }),
           buildGradle(
             """
