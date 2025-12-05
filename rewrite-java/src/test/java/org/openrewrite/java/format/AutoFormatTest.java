@@ -462,6 +462,9 @@ class AutoFormatTest implements RewriteTest {
                               return -1;
                           case 5: /* multiline comment */
                           case 6: /* multiline comment */ return -2;
+                          case 7: {
+                              return -2;
+                          }
                           default:
                               return 0;
                       }
@@ -482,6 +485,9 @@ class AutoFormatTest implements RewriteTest {
                           case 5: /* multiline comment */
                           case 6: /* multiline comment */
                               return -2;
+                          case 7: {
+                              return -2;
+                          }
                           default:
                               return 0;
                       }

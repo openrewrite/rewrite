@@ -198,8 +198,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 }
                 break;
             case CASE:
-                newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getIndentSize()))));
+                if (!(right.getElement() instanceof J.Block)) {
+                    newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
+                    wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getIndentSize()))));
+                }
                 break;
             case IF_ELSE:
                 if (wrappedRight.getElement() instanceof J.If) {
