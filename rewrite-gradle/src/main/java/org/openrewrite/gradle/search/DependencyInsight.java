@@ -15,9 +15,7 @@
  */
 package org.openrewrite.gradle.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -198,7 +196,6 @@ public class DependencyInsight extends Recipe {
                     Deque<ResolvedDependency> dependencyPath,
                     ExecutionContext ctx
             ) {
-                String dependencyGraph = DependencyTreeWalker.renderPath(configurationName, dependencyPath);
                 dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                         projectName,
                         sourceSetName,
@@ -207,8 +204,7 @@ public class DependencyInsight extends Recipe {
                         gav.getVersion(),
                         gav.getDatedSnapshotVersion(),
                         configurationName,
-                        dependencyPath.size() - 1,
-                        dependencyGraph
+                        dependencyPath.size() - 1
                 ));
             }
         };

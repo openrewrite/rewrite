@@ -15,9 +15,7 @@
  */
 package org.openrewrite.maven.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -68,8 +66,8 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Version",
             description = "Match only dependencies with the specified version. " +
-                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
-                    "All versions are searched by default.",
+                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                          "All versions are searched by default.",
             example = "1.x",
             required = false)
     @Nullable
@@ -112,7 +110,7 @@ public class DependencyInsight extends Recipe {
     @Override
     public String getDescription() {
         return "Find direct and transitive dependencies matching a group, artifact, and scope. " +
-                "Results include dependencies that either directly match or transitively include a matching dependency.";
+               "Results include dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override
@@ -178,7 +176,6 @@ public class DependencyInsight extends Recipe {
                     Deque<ResolvedDependency> dependencyPath,
                     ExecutionContext ctx
             ) {
-                String dependencyGraph = DependencyTreeWalker.renderPath(scope.name().toLowerCase(), dependencyPath);
                 dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                         projectName,
                         sourceSetName,
@@ -187,8 +184,7 @@ public class DependencyInsight extends Recipe {
                         gav.getVersion(),
                         gav.getDatedSnapshotVersion(),
                         scope.name().toLowerCase(),
-                        dependencyPath.size() - 1,
-                        dependencyGraph
+                        dependencyPath.size() - 1
                 ));
             }
         };
