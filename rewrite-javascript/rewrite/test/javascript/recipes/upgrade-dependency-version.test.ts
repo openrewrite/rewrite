@@ -496,6 +496,4 @@ describe("UpgradeDependencyVersion", () => {
             );
         }, {unsafeCleanup: true});
     });
-
 });
-[]
