@@ -24,6 +24,7 @@ import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
@@ -58,8 +59,9 @@ public class Generate implements RpcRequest {
             if (ctx.getMessage(CURRENT_RECIPE) == null) {
                 WatchableExecutionContext wctx = new WatchableExecutionContext(ctx);
                 wctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), wctx,
-                        new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
-                        new SourcesFileErrors(Recipe.noop()), LargeSourceSet::edit));
+                        new RecipeRunStats(Recipe.noop()), new SearchResults(Recipe.noop()),
+                        new SourcesFileResults(Recipe.noop()), new SourcesFileErrors(Recipe.noop()),
+                        LargeSourceSet::edit));
                 ctx.putCurrentRecipe(recipe);
             }
 
