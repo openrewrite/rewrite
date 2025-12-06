@@ -23,8 +23,10 @@ import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.graph.DependencyGraph;
 import org.openrewrite.maven.graph.DependencyTreeWalker;
 import org.openrewrite.maven.table.DependenciesInUse;
+import org.openrewrite.maven.table.ExplainDependenciesInUse;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.DependencyMatcher;
@@ -45,6 +47,7 @@ import static java.util.stream.Collectors.joining;
 @Value
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
+    transient ExplainDependenciesInUse explainDependenciesInUse = new ExplainDependenciesInUse(this);
 
     @Option(displayName = "Group pattern",
             description = "Group glob pattern used to match dependencies.",
@@ -129,11 +132,28 @@ public class DependencyInsight extends Recipe {
                         .map(JavaSourceSet::getName)
                         .orElse("main");
 
+                Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByScope = new HashMap<>();
                 DependencyTreeWalker.Matches<Scope> matches = new DependencyTreeWalker.Matches<>();
-                collectMatchingDependencies(projectName, sourceSetName, getResolutionResult(), requestedScope, matches, ctx);
+                collectMatchingDependencies(projectName, sourceSetName, getResolutionResult(), dependencyPathsByScope, requestedScope, matches, ctx);
 
                 if (matches.isEmpty()) {
                     return document;
+                }
+
+                for (Map.Entry<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> scopeEntry : dependencyPathsByScope.entrySet()) {
+                    for (Map.Entry<ResolvedGroupArtifactVersion, DependencyGraph> entry : scopeEntry.getValue().entrySet()) {
+                        ResolvedGroupArtifactVersion gav = entry.getKey();
+                        explainDependenciesInUse.insertRow(ctx, new ExplainDependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                gav.getGroupId(),
+                                gav.getArtifactId(),
+                                gav.getVersion(),
+                                gav.getDatedSnapshotVersion(),
+                                scopeEntry.getKey(),
+                                entry.getValue().print()
+                        ));
+                    }
                 }
 
                 return (Xml.Document) new MarkIndividualDependency(onlyDirect, matches.byScope(), matches.byDirectDependency()).visitNonNull(document, ctx);
@@ -143,6 +163,7 @@ public class DependencyInsight extends Recipe {
                     String projectName,
                     String sourceSetName,
                     MavenResolutionResult resolutionResult,
+                    Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByConfiguration,
                     @Nullable Scope requestedScope,
                     DependencyTreeWalker.Matches<Scope> matches,
                     ExecutionContext ctx
@@ -150,20 +171,18 @@ public class DependencyInsight extends Recipe {
                 VersionComparator versionComparator = version != null ? Semver.validate(version, null).getValue() : null;
                 DependencyMatcher dependencyMatcher = new DependencyMatcher(groupIdPattern, artifactIdPattern, versionComparator);
 
-                if (requestedScope != null) {
-                    for (ResolvedDependency dependency : resolutionResult.getDependencies().get(requestedScope)) {
-                        matches.collect(requestedScope, dependency, dependencyMatcher,
-                                (matched, path) ->
-                                        createDataTableRow(projectName, sourceSetName, requestedScope, matched.getGav(), path, ctx));
+                for (Map.Entry<Scope, List<ResolvedDependency>> entry : resolutionResult.getDependencies().entrySet()) {
+                    Scope scope = entry.getKey();
+                    if (requestedScope != null && requestedScope != scope) {
+                        continue;
                     }
-                } else {
-                    for (Map.Entry<Scope, List<ResolvedDependency>> entry : resolutionResult.getDependencies().entrySet()) {
-                        Scope scope = entry.getKey();
-                        for (ResolvedDependency dependency : entry.getValue()) {
-                            matches.collect(scope, dependency, dependencyMatcher,
-                                    (matched, path) ->
-                                            createDataTableRow(projectName, sourceSetName, scope, matched.getGav(), path, ctx));
-                        }
+                    for (ResolvedDependency dependency : entry.getValue()) {
+                        matches.collect(scope, dependency, dependencyMatcher,
+                                (matched, path) -> {
+                                    dependencyPathsByConfiguration.computeIfAbsent(scope.name().toLowerCase(), __ -> new HashMap<>())
+                                            .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(scope.name().toLowerCase(), path);
+                                    createDataTableRow(projectName, sourceSetName, scope, matched.getGav(), path, ctx);
+                                });
                     }
                 }
             }
