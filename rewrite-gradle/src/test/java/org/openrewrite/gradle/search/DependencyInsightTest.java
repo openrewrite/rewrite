@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.search;
 
+import org.assertj.core.api.Condition;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.maven.table.DependenciesInUse;
+import org.openrewrite.maven.table.ExplainDependenciesInUse;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
@@ -529,6 +531,35 @@ class DependencyInsightTest implements RewriteTest {
                     "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
                     "jackson-core".equals(row.getArtifactId()) &&
                     row.getDepth() == 3);
+            })
+            .dataTable(ExplainDependenciesInUse.Row.class, rows -> {
+                assertThat(rows).isNotEmpty();
+                assertThat(rows).haveExactly(1, new Condition<>(row ->
+                  "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
+                    "jackson-core".equals(row.getArtifactId()) &&
+                    "compileClasspath".equals(row.getScope()) &&
+                    """
+                      com.fasterxml.jackson.core:jackson-core:2.13.2
+                      +--- com.fasterxml.jackson.core:jackson-databind:2.13.2.2
+                      |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2
+                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6
+                      |    |         \\--- org.springframework.boot:spring-boot-starter-web:2.6.6
+                      |    |              \\--- compileClasspath
+                      |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2
+                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                      |    +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2
+                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                      |    +--- io.pivotal.cfenv:java-cfenv:2.5.0
+                      |    |    +--- io.pivotal.cfenv:java-cfenv-boot:2.5.0
+                      |    |    |    \\--- compileClasspath
+                      |    |    \\--- io.pivotal.cfenv:java-cfenv-jdbc:2.5.0
+                      |    |         \\--- io.pivotal.cfenv:java-cfenv-boot:2.5.0 (*)
+                      |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                      +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2 (*)
+                      +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2 (*)
+                      +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2 (*)
+                      \\--- io.pivotal.cfenv:java-cfenv:2.5.0 (*)
+                      """.equals(row.getDependencyGraph()), "jackson-core dependency graph"));
             }),
           buildGradle(
             """

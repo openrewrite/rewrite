@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,10 +24,17 @@ import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 
 @JsonIgnoreType
-public class DependenciesInUse extends DataTable<DependenciesInUse.@NonNull Row> {
+public class ExplainDependenciesInUse extends DataTable<ExplainDependenciesInUse.@NonNull Row> {
 
-    public DependenciesInUse(Recipe recipe) {
-        super(recipe, "Dependencies in use", "Direct and transitive dependencies in use.");
+    public ExplainDependenciesInUse(Recipe recipe) {
+        super(
+                recipe,
+                "Explain dependencies in use",
+                "A dependency graph explainer similar to that shown by " +
+                "`gradle dependencyInsight` for each matching dependency. " +
+                "This table will contain a row per matching dependency per configuration " +
+                "per (sub)project."
+        );
     }
 
     @Value
@@ -62,8 +69,8 @@ public class DependenciesInUse extends DataTable<DependenciesInUse.@NonNull Row>
                               "specified in the POM.")
         String scope;
 
-        @Column(displayName = "Depth",
-                description = "How many levels removed from a direct dependency. This will be 0 for direct dependencies.")
-        Integer depth;
+        @Column(displayName = "Dependency graph",
+                description = "The dependency paths that requested the dependency.")
+        String dependencyGraph;
     }
 }
