@@ -237,6 +237,19 @@ describe('AutoformatVisitor', () => {
         )
     });
 
+    test('unary negative should not have space', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                // Should not change -1 to - 1
+                `if (obj === -1) {
+                }`,
+            )
+            // @formatter:on
+        )
+    });
+
     test('nested method invocation preserves indentation when formatting subtree', () => {
         // This test simulates what happens when the templating system replaces a node
         // and calls maybeAutoFormat() on just that subtree

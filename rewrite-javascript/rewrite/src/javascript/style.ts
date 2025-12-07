@@ -234,7 +234,7 @@ export namespace IntelliJ {
                     additive: true,
                     multiplicative: true,
                     shift: true,
-                    unary: true,
+                    unary: false,
                     arrowFunction: true,
                     beforeUnaryNotAndNotNull: false,
                     afterUnaryNotAndNotNull: false
@@ -378,7 +378,7 @@ export namespace IntelliJ {
                     additive: true,
                     multiplicative: true,
                     shift: true,
-                    unary: true,
+                    unary: false,
                     arrowFunction: true,
                     beforeUnaryNotAndNotNull: false,
                     afterUnaryNotAndNotNull: false
