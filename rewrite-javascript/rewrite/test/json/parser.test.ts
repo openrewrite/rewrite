@@ -64,4 +64,16 @@ describe('JSON parsing', () => {
             `
         )
     ));
+
+    test('parses JSON with empty arrays', () => spec.rewriteRun(
+        //language=json
+        json(
+            `
+              {
+                "deny": [],
+                "ask": []
+              }
+            `
+        )
+    ));
 });

@@ -19,7 +19,7 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import {spawn} from 'child_process';
-import {RecipeRegistry} from '../recipe';
+import {Recipe, RecipeRegistry} from '../recipe';
 import {ExecutionContext} from '../execution';
 import {ProgressCallback, scheduleRunStreaming} from '../run';
 import {TreePrinters} from '../print';
@@ -35,6 +35,7 @@ import {
     parseRecipeOptions,
     parseRecipeSpec
 } from './cli-utils';
+import {ValidateParsingRecipe} from './validate-parsing-recipe';
 
 const isTTY = process.stdout.isTTY ?? false;
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -180,47 +181,59 @@ async function main() {
         return;
     }
 
-    // Parse recipe specification
-    const recipeSpec = parseRecipeSpec(recipeArg);
-    if (!recipeSpec) {
-        console.error(`Invalid recipe format: ${recipeArg}`);
-        console.error('Expected format: "package:recipe" (e.g., "@openrewrite/recipes-nodejs:replace-deprecated-slice")');
-        process.exit(1);
-    }
+    // Handle special built-in recipes
+    let recipe: Recipe;
+    let validateParsingRecipe: ValidateParsingRecipe | undefined;
 
-    if (opts.verbose) {
-        console.log(`Package: ${recipeSpec.packageName}`);
-        console.log(`Recipe: ${recipeSpec.recipeName}`);
-    }
-
-    // Parse recipe options
-    const recipeOptions = parseRecipeOptions(opts.option);
-    if (opts.verbose && Object.keys(recipeOptions).length > 0) {
-        console.log(`Options: ${JSON.stringify(recipeOptions)}`);
-    }
-
-    // Set up recipe registry
-    const registry = new RecipeRegistry();
-
-    // Register built-in recipes
-    await activate(registry);
-
-    // Load recipes from local path or install from NPM
-    try {
-        if (recipeSpec.isLocalPath) {
-            await loadLocalRecipes(recipeSpec.packageName, registry, opts.verbose);
-        } else {
-            await installRecipePackage(recipeSpec.packageName, opts.recipeDir || DEFAULT_RECIPE_DIR, registry, opts.verbose);
+    if (recipeArg === 'validate-parsing') {
+        // Special recipe to validate parsing and check idempotence
+        validateParsingRecipe = new ValidateParsingRecipe();
+        recipe = validateParsingRecipe;
+    } else {
+        // Parse recipe specification
+        const recipeSpec = parseRecipeSpec(recipeArg);
+        if (!recipeSpec) {
+            console.error(`Invalid recipe format: ${recipeArg}`);
+            console.error('Expected format: "package:recipe" (e.g., "@openrewrite/recipes-nodejs:replace-deprecated-slice")');
+            console.error('Or use "validate-parsing" to check for parse errors and idempotence.');
+            process.exit(1);
         }
-    } catch (e: any) {
-        console.error(`Failed to load recipes: ${e.message}`);
-        process.exit(1);
-    }
 
-    // Find the recipe
-    const recipe = findRecipe(registry, recipeSpec.recipeName, recipeOptions);
-    if (!recipe) {
-        process.exit(1);
+        if (opts.verbose) {
+            console.log(`Package: ${recipeSpec.packageName}`);
+            console.log(`Recipe: ${recipeSpec.recipeName}`);
+        }
+
+        // Parse recipe options
+        const recipeOptions = parseRecipeOptions(opts.option);
+        if (opts.verbose && Object.keys(recipeOptions).length > 0) {
+            console.log(`Options: ${JSON.stringify(recipeOptions)}`);
+        }
+
+        // Set up recipe registry
+        const registry = new RecipeRegistry();
+
+        // Register built-in recipes
+        await activate(registry);
+
+        // Load recipes from local path or install from NPM
+        try {
+            if (recipeSpec.isLocalPath) {
+                await loadLocalRecipes(recipeSpec.packageName, registry, opts.verbose);
+            } else {
+                await installRecipePackage(recipeSpec.packageName, opts.recipeDir || DEFAULT_RECIPE_DIR, registry, opts.verbose);
+            }
+        } catch (e: any) {
+            console.error(`Failed to load recipes: ${e.message}`);
+            process.exit(1);
+        }
+
+        // Find the recipe
+        const foundRecipe = findRecipe(registry, recipeSpec.recipeName, recipeOptions);
+        if (!foundRecipe) {
+            process.exit(1);
+        }
+        recipe = foundRecipe;
     }
 
     if (opts.verbose) {
@@ -296,6 +309,11 @@ async function main() {
         console.log(`Found ${uniqueSourceFiles.length} source files`);
     }
 
+    // Set project root for validate-parsing recipe if active
+    if (validateParsingRecipe) {
+        validateParsingRecipe.setProjectRoot(projectRoot);
+    }
+
     // Create streaming parser - files are parsed on-demand as they're consumed
     const totalFiles = uniqueSourceFiles.length;
     const sourceFileStream = parseFilesStreaming(uniqueSourceFiles, projectRoot, {
@@ -342,21 +360,21 @@ async function main() {
                 await fsp.writeFile(filePath, content);
 
                 changeCount++;
-                spinner.stop();
+                if (!opts.verbose) spinner.stop();
                 const displayPath = toCwdRelative(result.after.sourcePath, projectRoot);
                 if (result.before) {
                     console.log(`  Modified: ${displayPath}`);
                 } else {
                     console.log(`  Created: ${displayPath}`);
                 }
-                spinner.start(statusMsg);
+                if (!opts.verbose) spinner.start(statusMsg);
             } else if (result.before) {
                 const filePath = path.join(projectRoot, result.before.sourcePath);
                 await fsp.unlink(filePath);
                 changeCount++;
-                spinner.stop();
+                if (!opts.verbose) spinner.stop();
                 console.log(`  Deleted: ${toCwdRelative(result.before.sourcePath, projectRoot)}`);
-                spinner.start(statusMsg);
+                if (!opts.verbose) spinner.start(statusMsg);
             }
         } else {
             // Dry-run mode: show diff or just list paths
@@ -367,7 +385,7 @@ async function main() {
             );
             if (hasChanges) {
                 changeCount++;
-                spinner.stop();
+                if (!opts.verbose) spinner.stop();
                 if (opts.list) {
                     // Just list the path
                     const displayPath = toCwdRelative(
@@ -379,12 +397,20 @@ async function main() {
                     // Show the diff with CWD-relative paths
                     console.log(colorizeDiff(transformDiffPaths(diff, projectRoot)));
                 }
-                spinner.start(statusMsg);
+                if (!opts.verbose) spinner.start(statusMsg);
             }
         }
     }
 
-    spinner.stop();
+    if (!opts.verbose) spinner.stop();
+
+    // For validate-parsing recipe, check for errors and exit accordingly
+    if (validateParsingRecipe) {
+        if (!validateParsingRecipe.hasErrors) {
+            console.log('All files parsed successfully.');
+        }
+        process.exit(validateParsingRecipe.hasErrors ? 1 : 0);
+    }
 
     if (changeCount === 0) {
         console.log('No changes to make.');
