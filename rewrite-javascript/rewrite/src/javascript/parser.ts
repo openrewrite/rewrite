@@ -367,11 +367,14 @@ export class JavaScriptParserVisitor {
         }
 
         let shebangStatement: J.RightPadded<JS.Shebang> | undefined;
+        let shebangTrailingSpace: J.Space | undefined;
         if (prefix.whitespace?.startsWith('#!')) {
             const newlineIndex = prefix.whitespace.indexOf('\n');
             const shebangText = newlineIndex === -1 ? prefix.whitespace : prefix.whitespace.slice(0, newlineIndex);
-            // Include all whitespace after shebang (including blank lines) in the shebang's after space
-            const afterShebang = newlineIndex === -1 ? '' : prefix.whitespace.slice(newlineIndex);
+            // Shebang's after only contains the newline that terminates the shebang line
+            // The remaining whitespace and comments go into the first statement's prefix
+            const afterShebangNewline = newlineIndex === -1 ? '' : '\n';
+            const remainingWhitespace = newlineIndex === -1 ? '' : prefix.whitespace.slice(newlineIndex + 1);
 
             shebangStatement = this.rightPadded<JS.Shebang>({
                 kind: JS.Kind.Shebang,
@@ -379,12 +382,36 @@ export class JavaScriptParserVisitor {
                 prefix: emptySpace,
                 markers: emptyMarkers,
                 text: shebangText
-            }, {kind: J.Kind.Space, whitespace: afterShebang, comments: []}, emptyMarkers);
+            }, {kind: J.Kind.Space, whitespace: afterShebangNewline, comments: []}, emptyMarkers);
+
+            // Store the trailing whitespace and comments to prepend to first statement
+            if (remainingWhitespace || prefix.comments.length > 0) {
+                shebangTrailingSpace = {kind: J.Kind.Space, whitespace: remainingWhitespace, comments: prefix.comments};
+            }
 
             // CU prefix should be empty when there's a shebang
             prefix = produce(prefix, draft => {
                 draft.whitespace = '';
+                draft.comments = [];
             });
+        }
+
+        let statements = this.semicolonPaddedStatementList(node.statements);
+
+        // If there's trailing whitespace/comments after the shebang, prepend to first statement's prefix
+        if (shebangTrailingSpace && statements.length > 0) {
+            const firstStmt = statements[0];
+            statements = [
+                produce(firstStmt, draft => {
+                    const existingPrefix = draft.element.prefix;
+                    draft.element.prefix = {
+                        kind: J.Kind.Space,
+                        whitespace: shebangTrailingSpace!.whitespace + existingPrefix.whitespace,
+                        comments: [...shebangTrailingSpace!.comments, ...existingPrefix.comments]
+                    };
+                }),
+                ...statements.slice(1)
+            ];
         }
 
         return {
@@ -396,8 +423,8 @@ export class JavaScriptParserVisitor {
             charsetName: bomAndTextEncoding.encoding,
             charsetBomMarked: bomAndTextEncoding.hasBom,
             statements: shebangStatement
-                ? [shebangStatement, ...this.semicolonPaddedStatementList(node.statements)]
-                : this.semicolonPaddedStatementList(node.statements),
+                ? [shebangStatement, ...statements]
+                : statements,
             eof: this.prefix(node.endOfFileToken)
         };
     }
@@ -3788,15 +3815,29 @@ export class JavaScriptParserVisitor {
     }
 
     visitJsxExpression(node: ts.JsxExpression): JSX.EmbeddedExpression {
+        let expr: Expression;
+        if (node.expression) {
+            if (node.dotDotDotToken) {
+                expr = produce(this.convert<Expression>(node.expression), draft => {
+                    draft.markers.markers.push({
+                        kind: JS.Markers.Spread,
+                        id: randomId(),
+                        prefix: this.prefix(node.dotDotDotToken!)
+                    } satisfies Spread as Spread);
+                });
+            } else {
+                expr = this.convert<Expression>(node.expression);
+            }
+        } else {
+            expr = this.newEmpty();
+        }
         return {
             kind: JS.Kind.JsxEmbeddedExpression,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
             expression: this.rightPadded(
-                node.expression ?
-                    this.convert<Expression>(node.expression) :
-                    this.newEmpty(),
+                expr,
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseBraceToken)!)
             )
         };

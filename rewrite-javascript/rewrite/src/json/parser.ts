@@ -79,21 +79,38 @@ class ParseJsonReader extends ParserSourceReader {
         }
         if (Array.isArray(parsed)) {
             this.cursor++; // skip '['
-            const values = parsed.map((p, i) => {
-                const element = this.json(p) as Json.Value;
+            let values: Json.RightPadded<Json.Value>[];
+            if (parsed.length === 0) {
+                // Empty array - capture whitespace in an Empty element
                 const afterWhitespace = this.whitespace();
-                // Check if there's a comma after this element
-                const hasComma = this.source[this.cursor] === ',';
-                if (hasComma) {
-                    this.cursor++; // skip ','
-                }
-                return {
+                values = [{
                     kind: Json.Kind.RightPadded,
-                    element,
+                    element: {
+                        kind: Json.Kind.Empty,
+                        id: randomId(),
+                        prefix: emptySpace,
+                        markers: emptyMarkers
+                    } satisfies Json.Empty as Json.Empty,
                     after: space(afterWhitespace),
                     markers: emptyMarkers
-                } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>;
-            });
+                } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>];
+            } else {
+                values = parsed.map((p, i) => {
+                    const element = this.json(p) as Json.Value;
+                    const afterWhitespace = this.whitespace();
+                    // Check if there's a comma after this element
+                    const hasComma = this.source[this.cursor] === ',';
+                    if (hasComma) {
+                        this.cursor++; // skip ','
+                    }
+                    return {
+                        kind: Json.Kind.RightPadded,
+                        element,
+                        after: space(afterWhitespace),
+                        markers: emptyMarkers
+                    } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>;
+                });
+            }
             this.cursor++; // skip ']'
             return {
                 kind: Json.Kind.Array,
@@ -103,21 +120,38 @@ class ParseJsonReader extends ParserSourceReader {
         } else if (parsed !== null && typeof parsed === "object") {
             this.cursor++; // skip '{'
             const keys = Object.keys(parsed);
-            const members = keys.map((key, i) => {
-                const element = this.member(parsed, key);
+            let members: Json.RightPadded<Json.Member>[];
+            if (keys.length === 0) {
+                // Empty object - capture whitespace in an Empty element
                 const afterWhitespace = this.whitespace();
-                // Check if there's a comma after this element
-                const hasComma = this.source[this.cursor] === ',';
-                if (hasComma) {
-                    this.cursor++; // skip ','
-                }
-                return {
+                members = [{
                     kind: Json.Kind.RightPadded,
-                    element,
+                    element: {
+                        kind: Json.Kind.Empty,
+                        id: randomId(),
+                        prefix: emptySpace,
+                        markers: emptyMarkers
+                    } satisfies Json.Empty as Json.Empty as unknown as Json.Member,
                     after: space(afterWhitespace),
                     markers: emptyMarkers
-                } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>;
-            });
+                } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>];
+            } else {
+                members = keys.map((key, i) => {
+                    const element = this.member(parsed, key);
+                    const afterWhitespace = this.whitespace();
+                    // Check if there's a comma after this element
+                    const hasComma = this.source[this.cursor] === ',';
+                    if (hasComma) {
+                        this.cursor++; // skip ','
+                    }
+                    return {
+                        kind: Json.Kind.RightPadded,
+                        element,
+                        after: space(afterWhitespace),
+                        markers: emptyMarkers
+                    } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>;
+                });
+            }
             this.cursor++; // skip '}'
             return {
                 kind: Json.Kind.Object,
@@ -147,11 +181,22 @@ class ParseJsonReader extends ParserSourceReader {
                 value: parsed
             } satisfies Json.Literal as Json.Literal;
         } else if (typeof parsed === "number") {
-            this.cursor += parsed.toString().length;
+            // Extract original source to preserve precision for large numbers
+            const sourceStart = this.cursor;
+            // Numbers can have optional sign, digits, decimal point, and exponent
+            while (this.cursor < this.source.length) {
+                const char = this.source[this.cursor];
+                if (/[\d.eE+\-]/.test(char)) {
+                    this.cursor++;
+                } else {
+                    break;
+                }
+            }
+            const source = this.source.slice(sourceStart, this.cursor);
             return {
                 kind: Json.Kind.Literal,
                 ...base,
-                source: parsed.toString(),
+                source,
                 value: parsed,
             } satisfies Json.Literal as Json.Literal;
         } else if (typeof parsed === "boolean") {

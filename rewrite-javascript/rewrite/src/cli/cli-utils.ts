@@ -391,9 +391,10 @@ export async function discoverFiles(projectRoot: string, verbose: boolean = fals
         return files.filter(isAcceptedFile);
     }
 
-    // Filter to accepted file types
+    // Filter to accepted file types that exist on disk
+    // (git ls-files returns deleted files that are still tracked)
     for (const file of trackedFiles) {
-        if (!ignoredFiles.has(file) && isAcceptedFile(file)) {
+        if (!ignoredFiles.has(file) && isAcceptedFile(file) && fs.existsSync(file)) {
             files.push(file);
         }
     }

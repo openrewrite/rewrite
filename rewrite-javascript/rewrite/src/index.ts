@@ -35,16 +35,16 @@ export * from "./run";
 
 // register all recipes in this package
 export async function activate(registry: RecipeRegistry): Promise<void> {
-    const {OrderImports} = await import("./recipe/index.js");
     const {ModernizeOctalEscapeSequences, ModernizeOctalLiterals, RemoveDuplicateObjectKeys} = await import("./javascript/migrate/es6/index.js");
     const {ExportAssignmentToExportDefault} = await import("./javascript/migrate/typescript/index.js");
     const {UseObjectPropertyShorthand, PreferOptionalChain, AddParseIntRadix} = await import("./javascript/cleanup/index.js");
-    const {AsyncCallbackInSyncArrayMethod, UpgradeDependencyVersion} = await import("./javascript/recipes/index.js");
+    const {AsyncCallbackInSyncArrayMethod, UpgradeDependencyVersion, OrderImports, ChangeImport} = await import("./javascript/recipes/index.js");
     const {FindDependency} = await import("./javascript/search/index.js");
 
     registry.register(ExportAssignmentToExportDefault);
     registry.register(FindDependency);
     registry.register(OrderImports);
+    registry.register(ChangeImport);
     registry.register(ModernizeOctalEscapeSequences);
     registry.register(ModernizeOctalLiterals);
     registry.register(RemoveDuplicateObjectKeys);

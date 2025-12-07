@@ -299,4 +299,19 @@ describe("jsx mapping", () => {
             //language=tsx
             tsx(`< ArrowUpRight className='h-3 w-3' />`)
         ));
+
+    test("jsx with spread children", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`
+                const groups = { a: [1, 2], b: [3, 4] };
+                <div>
+                    {...Object.entries(groups).map(([key, value]) => (
+                        <span key={key}>
+                            {...value.map(v => <i>{v}</i>)}
+                        </span>
+                    ))}
+                </div>
+            `)
+        ));
 });

@@ -78,6 +78,39 @@ describe('JSON parsing', () => {
         )
     ));
 
+    test('parses JSON with empty arrays containing whitespace', () => spec.rewriteRun(
+        //language=json
+        json(
+            `{
+  "parameterConfig": [
+
+  ]
+}`
+        )
+    ));
+
+    test('parses JSON with empty objects containing whitespace', () => spec.rewriteRun(
+        //language=json
+        json(
+            `{
+  "healthChecker": {
+  }
+}`
+        )
+    ));
+
+    test('parses JSON with decimal numbers', () => spec.rewriteRun(
+        //language=json
+        json(
+            `{
+  "pi": 3.14159,
+  "negative": -2.5,
+  "scientific": 1.23e10,
+  "scientificNeg": 6.022e-23
+}`
+        )
+    ));
+
     test('returns ParseError for JSONC (JSON with comments)', async () => {
         const parser = new JsonParser();
         const jsonc = `{

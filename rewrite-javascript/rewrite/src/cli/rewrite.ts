@@ -176,7 +176,7 @@ async function main() {
     program
         .name('rewrite')
         .description('Run OpenRewrite recipes on your codebase')
-        .argument('<recipe>', 'Recipe to run in format "package:recipe" (e.g., "@openrewrite/recipes-nodejs:replace-deprecated-slice")')
+        .argument('<recipe>', 'Recipe to run in format "package:recipe" or "path:recipe" (e.g., "@openrewrite/recipes-nodejs:replace-deprecated-slice" or "./dist:my-recipe")')
         .argument('[paths...]', 'Files or directories to process (defaults to project root)')
         .option('--apply', 'Apply changes to files (default is dry-run showing diffs)', false)
         .option('-l, --list', 'Only list paths of files that would be changed', false)
@@ -212,6 +212,7 @@ async function main() {
         if (!recipeSpec) {
             console.error(`Invalid recipe format: ${recipeArg}`);
             console.error('Expected format: "package:recipe" (e.g., "@openrewrite/recipes-nodejs:replace-deprecated-slice")');
+            console.error('The package can also be a path to a local directory (e.g., "./dist:my-recipe" or "/path/to/recipes:my-recipe")');
             console.error('Or use "builtin:recipe" for built-in recipes (e.g., "builtin:prefer-optional-chain")');
             console.error('Or use "validate-parsing" to check for parse errors and idempotence.');
             process.exit(1);
