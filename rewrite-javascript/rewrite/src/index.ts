@@ -39,7 +39,7 @@ export async function activate(registry: RecipeRegistry): Promise<void> {
     const {ModernizeOctalEscapeSequences, ModernizeOctalLiterals, RemoveDuplicateObjectKeys} = await import("./javascript/migrate/es6/index.js");
     const {ExportAssignmentToExportDefault} = await import("./javascript/migrate/typescript/index.js");
     const {UseObjectPropertyShorthand, PreferOptionalChain, AddParseIntRadix} = await import("./javascript/cleanup/index.js");
-    const {UpgradeDependencyVersion} = await import("./javascript/recipes/index.js");
+    const {AsyncCallbackInSyncArrayMethod, UpgradeDependencyVersion} = await import("./javascript/recipes/index.js");
     const {FindDependency} = await import("./javascript/search/index.js");
 
     registry.register(ExportAssignmentToExportDefault);
@@ -51,6 +51,7 @@ export async function activate(registry: RecipeRegistry): Promise<void> {
     registry.register(UseObjectPropertyShorthand);
     registry.register(PreferOptionalChain);
     registry.register(AddParseIntRadix);
+    registry.register(AsyncCallbackInSyncArrayMethod);
     registry.register(UpgradeDependencyVersion);
 }
 
