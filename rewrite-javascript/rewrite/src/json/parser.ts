@@ -13,20 +13,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers} from "../markers";
-import {Parser, ParserInput, ParserSourceReader} from "../parser";
+import {emptyMarkers, markers, MarkersKind, ParseExceptionResult} from "../markers";
+import {Parser, ParserInput, parserInputRead, ParserSourceReader} from "../parser";
 import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
 import {emptySpace, Json, space} from "./tree";
+import {ParseError, ParseErrorKind} from "../parse-error";
 
 export class JsonParser extends Parser {
 
     async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile> {
         for (const sourcePath of sourcePaths) {
-            yield {
-                ...new ParseJsonReader(sourcePath).parse(),
-                sourcePath: this.relativePath(sourcePath)
-            };
+            try {
+                yield {
+                    ...new ParseJsonReader(sourcePath).parse(),
+                    sourcePath: this.relativePath(sourcePath)
+                };
+            } catch (e: any) {
+                // Return a ParseError for files that can't be parsed (e.g., JSONC with comments)
+                const text = parserInputRead(sourcePath);
+                const parseError: ParseError = {
+                    kind: ParseErrorKind,
+                    id: randomId(),
+                    markers: markers({
+                        kind: MarkersKind.ParseExceptionResult,
+                        id: randomId(),
+                        parserType: "JsonParser",
+                        exceptionType: e.name || "Error",
+                        message: e.message || "Unknown parse error"
+                    } satisfies ParseExceptionResult as ParseExceptionResult),
+                    sourcePath: this.relativePath(sourcePath),
+                    text
+                };
+                yield parseError;
+            }
         }
     }
 }
