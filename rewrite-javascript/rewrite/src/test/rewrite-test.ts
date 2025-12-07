@@ -257,7 +257,7 @@ export type AfterRecipeText = string | ((actual: string) => string | undefined) 
  * - `  code\n` → `code` (trailing newline removed)
  * - `  code\n\n` → `code\n` (first trailing newline removed, second preserved)
  */
-function dedent(s: string): string {
+export function dedent(s: string): string {
     if (!s) return s;
 
     // Remove single leading newline for ergonomics

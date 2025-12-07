@@ -14,31 +14,66 @@
  * limitations under the License.
  */
 
-import {Recipe} from "../../recipe";
+import {ScanningRecipe} from "../../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {AutoformatVisitor} from "../format";
+import {Autodetect, Detector} from "../autodetect";
+import {JavaScriptVisitor} from "../visitor";
+import {JS} from "../tree";
+import {J} from "../../java";
+
+/**
+ * Accumulator for the AutoFormat scanning recipe.
+ * Holds the Detector that collects formatting statistics during the scan phase.
+ */
+interface AutoFormatAccumulator {
+    detector: Detector;
+    detectedStyles?: Autodetect;
+}
 
 /**
  * Formats JavaScript/TypeScript code using a comprehensive set of formatting rules.
  *
- * This recipe applies the following formatting:
- * - Normalizes whitespace
- * - Ensures minimum viable spacing
- * - Applies blank line rules
- * - Applies wrapping and braces rules
- * - Applies spacing rules
- * - Applies tabs and indentation rules
+ * This is a scanning recipe that:
+ * 1. Scans all source files to detect the project's existing formatting style
+ * 2. Applies consistent formatting based on the detected style
  *
- * The formatting rules are determined by the style settings attached to the source file,
- * or defaults to IntelliJ IDEA style if no custom style is specified.
+ * The detected formatting includes:
+ * - Tabs vs spaces preference
+ * - Indent size (2, 4, etc.)
+ * - ES6 import/export brace spacing
+ *
+ * If no clear style is detected, defaults to IntelliJ IDEA style.
  */
-export class AutoFormat extends Recipe {
+export class AutoFormat extends ScanningRecipe<AutoFormatAccumulator> {
     readonly name = "org.openrewrite.javascript.format.auto-format";
     readonly displayName = "Auto-format JavaScript/TypeScript code";
-    readonly description = "Format JavaScript and TypeScript code using a comprehensive set of formatting rules based on the project's style settings.";
+    readonly description = "Format JavaScript and TypeScript code using formatting rules auto-detected from the project's existing code style.";
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-        return new AutoformatVisitor();
+    initialValue(_ctx: ExecutionContext): AutoFormatAccumulator {
+        return {
+            detector: Autodetect.detector()
+        };
+    }
+
+    async scanner(acc: AutoFormatAccumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+        return new class extends JavaScriptVisitor<ExecutionContext> {
+            protected async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
+                await acc.detector.sample(cu);
+                return cu;
+            }
+        };
+    }
+
+    async editorWithData(acc: AutoFormatAccumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+        // Build detected styles once (lazily on first edit)
+        if (!acc.detectedStyles) {
+            acc.detectedStyles = acc.detector.build();
+        }
+
+        // Pass detected styles to the AutoformatVisitor
+        // Autodetect is a NamedStyles, so pass it as an array
+        return new AutoformatVisitor(undefined, [acc.detectedStyles]);
     }
 }

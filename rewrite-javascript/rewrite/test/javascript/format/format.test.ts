@@ -13,6 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for AutoformatVisitor - the full formatting pipeline.
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    formatting scenarios into a single test with multiple variations in the source text.
+ *    For example, test type annotations, shorthand properties, and related features together.
+ *
+ * 2. VISITOR-SPECIFIC TESTS: If your test targets a specific visitor's behavior, put it in
+ *    that visitor's dedicated test file instead:
+ *    - SpacesVisitor tests → spaces-visitor.test.ts
+ *    - BlankLinesVisitor tests → blank-lines-visitor.test.ts
+ *    - TabsAndIndentsVisitor tests → tabs-and-indents-visitor.test.ts
+ *    - MinimumViableSpacingVisitor tests → minimum-viable-space-visitor.test.ts
+ *
+ *    This file (format.test.ts) should test the formatter as a whole, focusing on
+ *    integration scenarios and end-to-end formatting behavior.
+ */
+
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     autoFormat,
@@ -661,4 +683,43 @@ buf.slice();`
             )
             // @formatter:on
         )});
+
+    test('type annotation and shorthand property spacing', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            // Type annotation should have space after colon (fixed from req:Request)
+            // Shorthand properties should preserve their brace spacing
+            typescript(
+                `function test(req:Request): Response {
+    const withSpaces = { headers };
+    const noSpaces = {headers};
+    return req;
+}`,
+                `function test(req: Request): Response {
+    const withSpaces = { headers };
+    const noSpaces = {headers};
+    return req;
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('multi-line import preserves structure', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            // Multi-line imports should preserve their newlines, not collapse to single line
+            typescript(
+                `import {
+    foo,
+    bar,
+    baz,
+} from "module"
+const x = 1;`
+            )
+            // @formatter:on
+        )
+    });
 });

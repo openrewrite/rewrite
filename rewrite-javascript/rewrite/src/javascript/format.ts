@@ -18,14 +18,8 @@ import {JavaScriptVisitor} from "./visitor";
 import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isScope, Tree} from "../tree";
-import {
-    BlankLinesStyle,
-    SpacesStyle,
-    styleFromSourceFile,
-    StyleKind,
-    TabsAndIndentsStyle,
-    WrappingAndBracesStyle
-} from "./style";
+import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "./style";
+import {NamedStyles} from "../style";
 import {produceAsync} from "../visitor";
 import {findMarker} from "../markers";
 import {Generator} from "./markers";
@@ -40,22 +34,33 @@ export const maybeAutoFormat = async <J2 extends J, P>(before: J2, after: J2, p:
     return after;
 }
 
-export const autoFormat = async <J2 extends J, P>(j: J2, p: P, stopAfter?: J, parent?: Cursor): Promise<J2> =>
-    (await new AutoformatVisitor(stopAfter).visit(j, p, parent) as J2);
+export const autoFormat = async <J2 extends J, P>(j: J2, p: P, stopAfter?: J, parent?: Cursor, styles?: NamedStyles[]): Promise<J2> =>
+    (await new AutoformatVisitor(stopAfter, styles).visit(j, p, parent) as J2);
 
+/**
+ * Formats JavaScript/TypeScript code using a comprehensive set of formatting rules.
+ *
+ * Style resolution order (first match wins):
+ * 1. Styles passed to the constructor
+ * 2. Styles from source file markers (NamedStyles)
+ * 3. IntelliJ defaults
+ */
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
-    constructor(private stopAfter?: Tree) {
+    private readonly styles?: NamedStyles[];
+
+    constructor(private stopAfter?: Tree, styles?: NamedStyles[]) {
         super();
+        this.styles = styles;
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
         const visitors = [
             new NormalizeWhitespaceVisitor(this.stopAfter),
             new MinimumViableSpacingVisitor(this.stopAfter),
-            new BlankLinesVisitor(styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle, this.stopAfter),
-            new WrappingAndBracesVisitor(styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle, this.stopAfter),
-            new SpacesVisitor(styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle, this.stopAfter),
-            new TabsAndIndentsVisitor(styleFromSourceFile(StyleKind.TabsAndIndentsStyle, tree) as TabsAndIndentsStyle, this.stopAfter),
+            new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, tree, this.styles) as BlankLinesStyle, this.stopAfter),
+            new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, tree, this.styles) as WrappingAndBracesStyle, this.stopAfter),
+            new SpacesVisitor(getStyle(StyleKind.SpacesStyle, tree, this.styles) as SpacesStyle, this.stopAfter),
+            new TabsAndIndentsVisitor(getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle, this.stopAfter),
         ]
 
         let t: R | undefined = tree as R;
@@ -228,8 +233,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 if (draft.exportClause.kind == JS.Kind.NamedExports) {
                     const ne = (draft.exportClause as Draft<JS.NamedExports>);
                     if (ne.elements.elements.length > 0) {
-                        ne.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
-                        ne.elements.elements[ne.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        // Check if this is a multi-line export (any element's prefix has a newline)
+                        const isMultiLine = ne.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
+                        // Only adjust brace spacing for single-line exports
+                        if (!isMultiLine) {
+                            ne.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                            ne.elements.elements[ne.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        }
                     }
                 }
             }
@@ -290,8 +300,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                     draft.importClause.namedBindings.prefix.whitespace = " ";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
-                        ni.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
-                        ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        // Check if this is a multi-line import (any element's prefix has a newline)
+                        const isMultiLine = ni.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
+                        // Only adjust brace spacing for single-line imports
+                        if (!isMultiLine) {
+                            ni.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                            ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        }
                     }
                 }
             }
@@ -363,9 +378,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, p: P): Promise<J | undefined> {
         const pa = await super.visitPropertyAssignment(propertyAssignment, p) as JS.PropertyAssignment;
-        return produceAsync(pa, draft => {
-            draft.name.after.whitespace = this.style.other.beforePropertyNameValueSeparator ? " " : "";
-        });
+        // Only adjust the space before the colon if there's an initializer (not a shorthand property)
+        // For shorthand properties like { headers }, name.after.whitespace is the space before }
+        if (pa.initializer) {
+            return produceAsync(pa, draft => {
+                draft.name.after.whitespace = this.style.other.beforePropertyNameValueSeparator ? " " : "";
+            });
+        }
+        return pa;
     }
 
     protected async visitSwitch(switchNode: J.Switch, p: P): Promise<J | undefined> {

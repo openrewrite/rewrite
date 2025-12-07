@@ -13,6 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for SpacesVisitor - handles spacing around operators, braces, parentheses, etc.
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    spacing scenarios into a single test with multiple variations in the source text.
+ *
+ * 2. SCOPE: This file should contain tests specific to SpacesVisitor behavior and
+ *    SpacesStyle settings. For full formatter integration tests, use format.test.ts.
+ */
+
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {BlankLinesStyle, IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../../src/javascript";
 import {AutoformatVisitor, SpacesVisitor} from "../../../src/javascript/format";

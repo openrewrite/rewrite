@@ -345,7 +345,7 @@ describe('variadic pattern matching in containers', () => {
             //language=typescript
             typescript(
                 `myFunc(props)`,
-                `myFunc({ ...props})`
+                `myFunc({ ...props })`
             )
         );
     });

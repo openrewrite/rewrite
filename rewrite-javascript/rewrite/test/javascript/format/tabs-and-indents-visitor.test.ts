@@ -13,6 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for TabsAndIndentsVisitor - handles indentation (tabs vs spaces, indent size, etc.).
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    indentation scenarios into a single test with multiple variations in the source text.
+ *
+ * 2. SCOPE: This file should contain tests specific to TabsAndIndentsVisitor behavior and
+ *    TabsAndIndentsStyle settings. For full formatter integration tests, use format.test.ts.
+ */
+
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {IntelliJ, TabsAndIndentsStyle, TabsAndIndentsVisitor, tsx, typescript} from "../../../src/javascript";
 import {Draft, produce} from "immer";
