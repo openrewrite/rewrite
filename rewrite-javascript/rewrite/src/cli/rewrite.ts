@@ -204,13 +204,15 @@ async function main() {
     // Handle special built-in recipes
     let recipe: Recipe | undefined;
     const isValidateParsing = recipeArg === 'validate-parsing';
+    const isBuiltinRecipe = recipeArg.startsWith('builtin:');
 
-    if (!isValidateParsing) {
+    if (!isValidateParsing && !isBuiltinRecipe) {
         // Parse recipe specification
         const recipeSpec = parseRecipeSpec(recipeArg);
         if (!recipeSpec) {
             console.error(`Invalid recipe format: ${recipeArg}`);
             console.error('Expected format: "package:recipe" (e.g., "@openrewrite/recipes-nodejs:replace-deprecated-slice")');
+            console.error('Or use "builtin:recipe" for built-in recipes (e.g., "builtin:prefer-optional-chain")');
             console.error('Or use "validate-parsing" to check for parse errors and idempotence.');
             process.exit(1);
         }
@@ -253,6 +255,30 @@ async function main() {
 
         if (opts.verbose) {
             console.log(`Running recipe: ${recipe.name}`);
+        }
+    } else if (isBuiltinRecipe) {
+        // Handle builtin: prefix for built-in recipes
+        const recipeName = recipeArg.substring('builtin:'.length);
+
+        // Parse recipe options
+        const recipeOptions = parseRecipeOptions(opts.option);
+        if (opts.verbose && Object.keys(recipeOptions).length > 0) {
+            console.log(`Options: ${JSON.stringify(recipeOptions)}`);
+        }
+
+        // Set up recipe registry with only built-in recipes
+        const registry = new RecipeRegistry();
+        await activate(registry);
+
+        // Find the recipe
+        const foundRecipe = findRecipe(registry, recipeName, recipeOptions);
+        if (!foundRecipe) {
+            process.exit(1);
+        }
+        recipe = foundRecipe;
+
+        if (opts.verbose) {
+            console.log(`Running built-in recipe: ${recipe.name}`);
         }
     }
 

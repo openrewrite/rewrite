@@ -15,3 +15,4 @@
  */
 
 export {UseObjectPropertyShorthand} from "./use-object-property-shorthand";
+export {PreferOptionalChain} from "./prefer-optional-chain";
