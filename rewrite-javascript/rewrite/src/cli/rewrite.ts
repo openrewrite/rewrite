@@ -37,17 +37,19 @@ import {
 } from './cli-utils';
 import {ValidateParsingRecipe} from './validate-parsing-recipe';
 
-const isTTY = process.stdout.isTTY ?? false;
+const isTTY = process.stderr.isTTY ?? false;
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 class Spinner {
     private frameIndex = 0;
     private interval: NodeJS.Timeout | null = null;
     private message = '';
+    private running = false;
 
     start(message: string): void {
         if (!isTTY) return;
         this.message = message;
+        this.running = true;
         this.render();
         this.interval = setInterval(() => this.render(), 80);
     }
@@ -61,16 +63,34 @@ class Spinner {
     private render(): void {
         const frame = SPINNER_FRAMES[this.frameIndex];
         this.frameIndex = (this.frameIndex + 1) % SPINNER_FRAMES.length;
-        process.stdout.write(`\r\x1b[K${frame} ${this.message}`);
+        process.stderr.write(`\r\x1b[K${frame} ${this.message}`);
+    }
+
+    /**
+     * Temporarily clear the spinner line for other output.
+     * Call resume() to restore it.
+     */
+    clear(): void {
+        if (!isTTY || !this.running) return;
+        process.stderr.write('\r\x1b[K');
+    }
+
+    /**
+     * Resume the spinner after clear().
+     */
+    resume(): void {
+        if (!isTTY || !this.running) return;
+        this.render();
     }
 
     stop(): void {
+        this.running = false;
         if (this.interval) {
             clearInterval(this.interval);
             this.interval = null;
         }
         if (isTTY) {
-            process.stdout.write('\r\x1b[K');
+            process.stderr.write('\r\x1b[K');
         }
     }
 }
@@ -182,14 +202,10 @@ async function main() {
     }
 
     // Handle special built-in recipes
-    let recipe: Recipe;
-    let validateParsingRecipe: ValidateParsingRecipe | undefined;
+    let recipe: Recipe | undefined;
+    const isValidateParsing = recipeArg === 'validate-parsing';
 
-    if (recipeArg === 'validate-parsing') {
-        // Special recipe to validate parsing and check idempotence
-        validateParsingRecipe = new ValidateParsingRecipe();
-        recipe = validateParsingRecipe;
-    } else {
+    if (!isValidateParsing) {
         // Parse recipe specification
         const recipeSpec = parseRecipeSpec(recipeArg);
         if (!recipeSpec) {
@@ -234,10 +250,10 @@ async function main() {
             process.exit(1);
         }
         recipe = foundRecipe;
-    }
 
-    if (opts.verbose) {
-        console.log(`Running recipe: ${recipe.name}`);
+        if (opts.verbose) {
+            console.log(`Running recipe: ${recipe.name}`);
+        }
     }
 
     const spinner = new Spinner();
@@ -309,9 +325,20 @@ async function main() {
         console.log(`Found ${uniqueSourceFiles.length} source files`);
     }
 
-    // Set project root for validate-parsing recipe if active
-    if (validateParsingRecipe) {
-        validateParsingRecipe.setProjectRoot(projectRoot);
+    // Create validate-parsing recipe now that we know the project root
+    if (isValidateParsing) {
+        const validateRecipe = new ValidateParsingRecipe({projectRoot});
+        // Set up reporting callback that coordinates with spinner
+        validateRecipe.onReport = (message: string) => {
+            if (!opts.verbose) {
+                spinner.clear();
+            }
+            console.log(message);
+            if (!opts.verbose) {
+                spinner.resume();
+            }
+        };
+        recipe = validateRecipe;
     }
 
     // Create streaming parser - files are parsed on-demand as they're consumed
@@ -337,7 +364,7 @@ async function main() {
         spinner.start(`Processing ${totalFiles} files...`);
     }
 
-    for await (const result of scheduleRunStreaming(recipe, sourceFileStream, ctx, onProgress)) {
+    for await (const result of scheduleRunStreaming(recipe!, sourceFileStream, ctx, onProgress)) {
         processedCount++;
         const currentPath = result.after?.sourcePath ?? result.before?.sourcePath ?? '';
 
@@ -405,11 +432,11 @@ async function main() {
     if (!opts.verbose) spinner.stop();
 
     // For validate-parsing recipe, check for errors and exit accordingly
-    if (validateParsingRecipe) {
-        if (!validateParsingRecipe.hasErrors) {
+    if (recipe instanceof ValidateParsingRecipe) {
+        if (!recipe.hasErrors) {
             console.log('All files parsed successfully.');
         }
-        process.exit(validateParsingRecipe.hasErrors ? 1 : 0);
+        process.exit(recipe.hasErrors ? 1 : 0);
     }
 
     if (changeCount === 0) {

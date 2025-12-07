@@ -370,8 +370,8 @@ export class JavaScriptParserVisitor {
         if (prefix.whitespace?.startsWith('#!')) {
             const newlineIndex = prefix.whitespace.indexOf('\n');
             const shebangText = newlineIndex === -1 ? prefix.whitespace : prefix.whitespace.slice(0, newlineIndex);
-            const afterShebang = newlineIndex === -1 ? '' : '\n';
-            const remainingWhitespace = newlineIndex === -1 ? '' : prefix.whitespace.slice(newlineIndex + 1);
+            // Include all whitespace after shebang (including blank lines) in the shebang's after space
+            const afterShebang = newlineIndex === -1 ? '' : prefix.whitespace.slice(newlineIndex);
 
             shebangStatement = this.rightPadded<JS.Shebang>({
                 kind: JS.Kind.Shebang,
@@ -381,8 +381,9 @@ export class JavaScriptParserVisitor {
                 text: shebangText
             }, {kind: J.Kind.Space, whitespace: afterShebang, comments: []}, emptyMarkers);
 
+            // CU prefix should be empty when there's a shebang
             prefix = produce(prefix, draft => {
-                draft.whitespace = remainingWhitespace;
+                draft.whitespace = '';
             });
         }
 
@@ -3704,7 +3705,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            openName: this.leftPadded(this.prefix(node.openingElement), this.visit(node.openingElement.tagName)),
+            openName: this.leftPadded(this.prefix(node.openingElement.tagName), this.visit(node.openingElement.tagName)),
             typeArguments: node.openingElement.typeArguments && this.mapTypeArguments(this.suffix(node.openingElement.tagName), node.openingElement.typeArguments),
             afterName: attrs.length === 0 ?
                 this.prefix(this.findLastChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :

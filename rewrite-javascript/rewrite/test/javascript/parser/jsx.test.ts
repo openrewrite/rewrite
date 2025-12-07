@@ -293,4 +293,10 @@ describe("jsx mapping", () => {
                 `
             )
         ));
+
+    test("jsx with space after opening angle bracket", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`< ArrowUpRight className='h-3 w-3' />`)
+        ));
 });

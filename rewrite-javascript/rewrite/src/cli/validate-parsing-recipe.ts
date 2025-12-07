@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Recipe} from '../recipe';
+import {Option, Recipe} from '../recipe';
 import {TreeVisitor} from '../visitor';
 import {ExecutionContext} from '../execution';
 import {SourceFile, Tree} from '../tree';
@@ -23,6 +23,12 @@ import {TreePrinters} from '../print';
 import {createTwoFilesPatch} from 'diff';
 import * as fs from 'fs';
 import * as path from 'path';
+
+/**
+ * Callback for reporting validation results.
+ * @param message The message to report
+ */
+export type ReportCallback = (message: string) => void;
 
 /**
  * A recipe that validates parsing by:
@@ -36,13 +42,27 @@ export class ValidateParsingRecipe extends Recipe {
     displayName = 'Validate parsing';
     description = 'Validates that all source files parse correctly and that parse-to-print is idempotent. Reports parse errors and shows diffs for idempotence failures.';
 
-    private projectRoot: string = process.cwd();
+    @Option({
+        displayName: 'Project root',
+        description: 'The root directory of the project, used to resolve source file paths for idempotence checking.',
+        required: false
+    })
+    projectRoot!: string;
+
+    /**
+     * Optional callback for reporting messages. If not set, uses console.log.
+     */
+    onReport?: ReportCallback;
+
     private parseErrorCount = 0;
     private idempotenceFailureCount = 0;
 
-    setProjectRoot(root: string): this {
-        this.projectRoot = root;
-        return this;
+    private report(message: string): void {
+        if (this.onReport) {
+            this.onReport(message);
+        } else {
+            console.log(message);
+        }
     }
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
@@ -59,7 +79,7 @@ export class ValidateParsingRecipe extends Recipe {
                         m => m.kind === MarkersKind.ParseExceptionResult
                     ) as ParseExceptionResult | undefined;
                     const message = parseException?.message ?? 'Unknown parse error';
-                    console.error(`Parse error in ${sourceFile.sourcePath}: ${message}`);
+                    recipe.report(`Parse error in ${sourceFile.sourcePath}: ${message}`);
                     recipe.parseErrorCount++;
                     return tree as R;
                 }
@@ -72,7 +92,7 @@ export class ValidateParsingRecipe extends Recipe {
 
                     if (printed !== original) {
                         recipe.idempotenceFailureCount++;
-                        console.error(`Parse-to-print idempotence failure in ${sourceFile.sourcePath}:`);
+                        recipe.report(`Parse-to-print idempotence failure in ${sourceFile.sourcePath}:`);
 
                         // Generate and print diff
                         const diff = createTwoFilesPatch(
@@ -84,11 +104,11 @@ export class ValidateParsingRecipe extends Recipe {
                             'printed',
                             {context: 3}
                         );
-                        console.error(diff);
+                        recipe.report(diff);
                     }
                 } catch (e: any) {
                     recipe.idempotenceFailureCount++;
-                    console.error(`Failed to check idempotence for ${sourceFile.sourcePath}: ${e.message}`);
+                    recipe.report(`Failed to check idempotence for ${sourceFile.sourcePath}: ${e.message}`);
                 }
 
                 return tree as R;
@@ -98,12 +118,12 @@ export class ValidateParsingRecipe extends Recipe {
 
     async onComplete(_ctx: ExecutionContext): Promise<void> {
         if (this.parseErrorCount > 0 || this.idempotenceFailureCount > 0) {
-            console.error('');
+            this.report('');
             if (this.parseErrorCount > 0) {
-                console.error(`${this.parseErrorCount} file(s) had parse errors.`);
+                this.report(`${this.parseErrorCount} file(s) had parse errors.`);
             }
             if (this.idempotenceFailureCount > 0) {
-                console.error(`${this.idempotenceFailureCount} file(s) had parse-to-print idempotence failures.`);
+                this.report(`${this.idempotenceFailureCount} file(s) had parse-to-print idempotence failures.`);
             }
         }
     }
