@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {json} from "../../src/json";
+import {json, JsonParser} from "../../src/json";
+import {findMarker, isParseError, MarkersKind, ParseExceptionResult} from "../../src";
 
 describe('JSON parsing', () => {
     const spec = new RecipeSpec();
@@ -34,4 +35,106 @@ describe('JSON parsing', () => {
             `
         )
     ));
+
+    test('parses JSON with escaped quotes, Unicode, and emojis', () => spec.rewriteRun(
+        //language=json
+        json(
+            `
+              {
+                "emoji": "Hello 👋 World 🌍",
+                "japanese": "こんにちは",
+                "mixed": "Test 🎉 with \\"quotes\\" and ü"
+              }
+            `
+        )
+    ));
+
+    test('parses JSON with booleans and null', () => spec.rewriteRun(
+        //language=json
+        json(
+            `
+              {
+                "enabled": true,
+                "disabled": false,
+                "nothing": null,
+                "nested": {
+                  "flag": true,
+                  "empty": null
+                }
+              }
+            `
+        )
+    ));
+
+    test('parses JSON with empty arrays', () => spec.rewriteRun(
+        //language=json
+        json(
+            `
+              {
+                "deny": [],
+                "ask": []
+              }
+            `
+        )
+    ));
+
+    test('parses JSON with empty arrays containing whitespace', () => spec.rewriteRun(
+        //language=json
+        json(
+            `{
+  "parameterConfig": [
+
+  ]
+}`
+        )
+    ));
+
+    test('parses JSON with empty objects containing whitespace', () => spec.rewriteRun(
+        //language=json
+        json(
+            `{
+  "healthChecker": {
+  }
+}`
+        )
+    ));
+
+    test('parses JSON with decimal numbers', () => spec.rewriteRun(
+        //language=json
+        json(
+            `{
+  "pi": 3.14159,
+  "negative": -2.5,
+  "scientific": 1.23e10,
+  "scientificNeg": 6.022e-23
+}`
+        )
+    ));
+
+    test('returns ParseError for JSONC (JSON with comments)', async () => {
+        const parser = new JsonParser();
+        const jsonc = `{
+            // This is a comment
+            "name": "test"
+        }`;
+
+        const results: any[] = [];
+        for await (const sf of parser.parse({sourcePath: 'test.json', text: jsonc})) {
+            results.push(sf);
+        }
+
+        expect(results).toHaveLength(1);
+        const result = results[0];
+
+        // Should be a ParseError, not a crash
+        expect(isParseError(result)).toBe(true);
+        expect(result.text).toBe(jsonc);
+
+        // Should have a ParseExceptionResult marker
+        const parseException = findMarker<ParseExceptionResult>(result, MarkersKind.ParseExceptionResult);
+        expect(parseException).toBeDefined();
+        expect(parseException!.parserType).toBe('JsonParser');
+        // Error message varies by Node.js version
+        expect(parseException!.message).toMatch(/JSON|token/);
+    });
 });

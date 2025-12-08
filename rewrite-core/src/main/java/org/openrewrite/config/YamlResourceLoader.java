@@ -504,11 +504,6 @@ public class YamlResourceLoader implements ResourceLoader {
 
                     @Language("markdown")
                     String packageName = (String) c.get("packageName");
-                    if (packageName.endsWith("." + CategoryTree.CORE) ||
-                        packageName.contains("." + CategoryTree.CORE + ".")) {
-                        throw new IllegalArgumentException("The package name 'core' is reserved.");
-                    }
-
                     if (name == null) {
                         name = packageName;
                     }

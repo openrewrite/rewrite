@@ -20,7 +20,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.remote.RemoteResource;
 
-public class GradleWrapperTest {
+class GradleWrapperTest {
 
     @Test
     void listGradleWrappers() {

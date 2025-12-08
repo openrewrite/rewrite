@@ -23,7 +23,7 @@ export class ReplaceId extends Recipe {
     displayName = "Replace IDs";
     description = "Replaces the ID of every `Tree` and `Marker` object in a JavaScript source.";
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
             protected async preVisit(tree: J, _p: ExecutionContext): Promise<J | undefined> {
                 let draft = createDraft(tree);

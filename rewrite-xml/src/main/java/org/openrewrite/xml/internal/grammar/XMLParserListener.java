@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.13.2
+// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -152,6 +152,46 @@ public interface XMLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitJspdirective(XMLParser.JspdirectiveContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspscriptlet}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspscriptlet(XMLParser.JspscriptletContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspscriptlet}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspscriptlet(XMLParser.JspscriptletContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspexpression}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspexpression(XMLParser.JspexpressionContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspexpression}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspexpression(XMLParser.JspexpressionContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspdeclaration}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspdeclaration(XMLParser.JspdeclarationContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspdeclaration}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspdeclaration(XMLParser.JspdeclarationContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspcomment}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspcomment(XMLParser.JspcommentContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspcomment}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspcomment(XMLParser.JspcommentContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link XMLParser#reference}.
 	 * @param ctx the parse tree

@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
-import {Trace, Tracer} from "vscode-jsonrpc/node";
 import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";
 import {Command} from 'commander';
 import {dir} from 'tmp-promise';
+import {DependencyWorkspace} from "../javascript/dependency-workspace";
 
 // Include all languages you want this server to support.
 import "../text";
@@ -28,15 +28,15 @@ import "../java";
 import "../javascript";
 
 // Not possible to set the stack size when executing from npx for security reasons
-require('v8').setFlagsFromString('--stack-size=4000');
+require('v8').setFlagsFromString('--stack-size=8000');
 
 interface ProgramOptions {
     logFile?: string;
-    verbose?: boolean;
+    metricsCsv?: string;
+    traceRpcMessages?: boolean;
     batchSize?: number;
-    traceGetObjectOutput?: boolean;
-    traceGetObjectInput?: boolean;
     recipeInstallDir?: string;
+    profile?: boolean;
 }
 
 async function main() {
@@ -44,10 +44,9 @@ async function main() {
     program
         .option('--port <number>', 'port number')
         .option('--log-file <log_path>', 'log file path')
-        .option('-v, --verbose', 'enable verbose output')
-        .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 200)
-        .option('--trace-get-object-output', 'enable `GetObject` output tracing')
-        .option('--trace-get-object-input', 'enable `GetObject` input tracing')
+        .option('--metrics-csv <metrics_csv_path>', 'metrics CSV output path')
+        .option('--trace-rpc-messages', 'trace RPC messages at the protocol level')
+        .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 1000)
         .option('--recipe-install-dir <install_dir>', 'Recipe installation directory (default is a temporary directory)')
         .parse();
 
@@ -68,6 +67,8 @@ async function main() {
             if (recipeCleanup) {
                 await recipeCleanup();
             }
+            // Clean up old dependency workspaces (older than 24 hours)
+            DependencyWorkspace.cleanupOldWorkspaces();
             process.exit(0);
         });
 
@@ -75,6 +76,8 @@ async function main() {
             if (recipeCleanup) {
                 await recipeCleanup();
             }
+            // Clean up old dependency workspaces (older than 24 hours)
+            DependencyWorkspace.cleanupOldWorkspaces();
             process.exit(0);
         });
 
@@ -85,13 +88,13 @@ async function main() {
 
     const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
     const logger: rpc.Logger = {
-        error: (msg: string) => log && log.write(`[js-rewrite-rpc] [error] ${msg}\n`),
-        warn: (msg: string) => log && log.write(`[js-rewrite-rpc] [warn] ${msg}\n`),
-        info: (msg: string) => log && options.verbose && log.write(`[js-rewrite-rpc] [info] ${msg}\n`),
-        log: (msg: string) => log && options.verbose && log.write(`[js-rewrite-rpc] [log] ${msg}\n`)
+        error: (msg: string) => log && log.write(`[js error] ${msg}\n`),
+        warn: (msg: string) => log && log.write(`[js warn] ${msg}\n`),
+        info: (msg: string) => log && log.write(`[js info] ${msg}\n`),
+        // The RPC Tracer configured below itself writes to this "log" level for every message it sends or receives,
+        // because the Tracer type has a log method on it that matches this signature.
+        log: (msg: string) => log && options.traceRpcMessages && log.write(`[js trace] ${msg}\n`)
     };
-
-    logger.log(`starting`);
 
     // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
@@ -100,13 +103,13 @@ async function main() {
         logger
     );
 
-    if (options.verbose) {
+    if (options.traceRpcMessages) {
         await connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
             // Handle any unexpected errors during trace configuration
             logger.error(`Failed to set trace: ${err}`);
         });
     } else {
-        await connection.trace(Trace.Off, {} as Tracer);
+        await connection.trace(rpc.Trace.Off, {} as rpc.Tracer);
     }
 
     connection.onError(err => {
@@ -121,18 +124,17 @@ async function main() {
         logger.info(`connection disposed`);
     });
 
-    new RewriteRpc(connection, {
-        batchSize: options.batchSize,
-        logger: logger,
-        traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
-        traceGetObjectOutput: options.traceGetObjectOutput,
-        recipeInstallDir: recipeInstallDir
-    });
-
     // log uncaught exceptions
     process.on('uncaughtException', (error) => {
         logger.error('Fatal error:' + error.message);
         process.exit(8);
+    });
+
+    new RewriteRpc(connection, {
+        batchSize: options.batchSize,
+        logger: logger,
+        metricsCsv: options.metricsCsv,
+        recipeInstallDir: recipeInstallDir
     });
 }
 

@@ -16,7 +16,6 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
@@ -24,9 +23,9 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.style.Style;
 
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Less commonly used than {@link AutoFormat}, but useful in cases when a block of code is being
@@ -39,8 +38,7 @@ public class ShiftFormat {
 
     public static <J2 extends J> J2 indent(J j, Cursor cursor, int shift) {
         JavaSourceFile cu = cursor.firstEnclosingOrThrow(JavaSourceFile.class);
-        TabsAndIndentsStyle tabsAndIndents = Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents());
+        TabsAndIndentsStyle tabsAndIndents = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
 
         //noinspection unchecked
         return (J2) Objects.requireNonNull(new JavaIsoVisitor<Integer>() {

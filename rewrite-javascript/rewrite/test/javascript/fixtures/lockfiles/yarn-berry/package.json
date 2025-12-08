@@ -1,0 +1,10 @@
+{
+  "name": "test-yarn-berry",
+  "packageManager": "yarn@4.12.0",
+  "dependencies": {
+    "is-odd": "^3.0.1"
+  },
+  "devDependencies": {
+    "is-even": "^1.0.0"
+  }
+}

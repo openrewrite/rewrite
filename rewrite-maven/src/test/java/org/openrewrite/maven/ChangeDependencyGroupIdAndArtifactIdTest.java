@@ -1736,6 +1736,74 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void changeAnnotationProcessorPathGroupIdAndArtifactId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.hibernate",
+            "hibernate-jpamodelgen",
+            "org.hibernate.orm",
+            "hibernate-processor",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.14.1</version>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.hibernate</groupId>
+                                          <artifactId>hibernate-jpamodelgen</artifactId>
+                                          <version>7.1.10.Final</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.14.1</version>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.hibernate.orm</groupId>
+                                          <artifactId>hibernate-processor</artifactId>
+                                          <version>7.1.10.Final</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void changeDependencyGroupIdAndArtifactIdWithVersionProperty() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
@@ -1856,6 +1924,108 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               </project>
               """,
             spec -> spec.path("sub-project/pom.xml")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void changeDependencyGroupIdAndArtifactIdForEjbType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.codeartisans.asadmin",
+            "ejb-example",
+            "it.vige",
+            "school-ejb",
+            "1.1.1",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.codeartisans.asadmin</groupId>
+                          <artifactId>ejb-example</artifactId>
+                          <version>0.12</version>
+                          <type>ejb</type>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>it.vige</groupId>
+                          <artifactId>school-ejb</artifactId>
+                          <version>1.1.1</version>
+                          <type>ejb</type>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void changeManagedDependencyGroupIdAndArtifactIdForEjbType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.codeartisans.asadmin",
+            "ejb-example",
+            "it.vige",
+            "school-ejb",
+            "1.1.1",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.codeartisans.asadmin</groupId>
+                              <artifactId>ejb-example</artifactId>
+                              <version>0.12</version>
+                              <type>ejb</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>it.vige</groupId>
+                              <artifactId>school-ejb</artifactId>
+                              <version>1.1.1</version>
+                              <type>ejb</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
           )
         );
     }

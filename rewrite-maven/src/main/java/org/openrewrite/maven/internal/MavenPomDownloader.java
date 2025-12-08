@@ -412,7 +412,7 @@ public class MavenPomDownloader {
                 break;
             }
             String href = responseBody.substring(start, end).trim();
-            if (href.endsWith("/")) {
+            if (!href.startsWith("../") && href.endsWith("/")) {
                 //Only look for hrefs that have directories (the directory names are the versions)
                 versions.add(hrefToVersion(href, uri));
             }

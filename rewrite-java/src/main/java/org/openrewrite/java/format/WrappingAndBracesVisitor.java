@@ -17,16 +17,22 @@ package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
@@ -38,14 +44,20 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     private final Tree stopAfter;
 
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
+    private final SpacesStyle spacesStyle;
     private final WrappingAndBracesStyle style;
 
-    public WrappingAndBracesVisitor(WrappingAndBracesStyle style) {
-        this(style, null);
+    public WrappingAndBracesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
     }
 
-    public WrappingAndBracesVisitor(WrappingAndBracesStyle style, @Nullable Tree stopAfter) {
-        this.style = style;
+    public WrappingAndBracesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
+    }
+
+    public WrappingAndBracesVisitor(SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
+        this.spacesStyle = spacesStyle;
+        this.style = wrappingAndBracesStyle;
         this.stopAfter = stopAfter;
     }
 
@@ -55,9 +67,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         Tree parentTree = getCursor().getParentTreeCursor().getValue();
         if (parentTree instanceof J.Block && !(j instanceof J.EnumValueSet)) {
             // for `J.EnumValueSet` the prefix is on the enum constants
-            if (!hasLineBreak(j.getPrefix().getWhitespace())) {
-                j = j.withPrefix(withNewline(j.getPrefix()));
-            }
+            j = j.withPrefix(withNewline(j.getPrefix()));
         }
 
         return j;
@@ -118,7 +128,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 );
             }
         }
-        return m;
+        return (J.MethodDeclaration) new WrapMethodDeclarationParameters<>(style).visit(m, p, getCursor().getParentTreeCursor());
     }
 
     @Override
@@ -134,6 +144,41 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return e;
+    }
+
+    @Override
+    public J.Case visitCase(J.Case case_, P p) {
+        case_ = super.visitCase(case_, p);
+        return case_.withStatements(ListUtils.mapFirst(case_.getStatements(), statement -> {
+            if (!(statement instanceof J.Block)) {
+                if (statement.getComments().isEmpty()) {
+                    if (!hasLineBreak(statement.getPrefix().getWhitespace())) {
+                        statement = statement.withPrefix(statement.getPrefix().withWhitespace("\n"));
+                    }
+                } else {
+                    statement = statement.withComments(ListUtils.mapLast(statement.getComments(), comment -> {
+                        if (comment != null && !hasLineBreak(comment.getSuffix())) {
+                            comment = comment.withSuffix("\n");
+                        }
+                        return comment;
+                    }));
+                }
+            }
+            return statement;
+        }));
+    }
+
+    @Override
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
+        method = (J.MethodInvocation) new WrapMethodChains<>(style).visit(method, p, getCursor().getParentTreeCursor());
+        method = super.visitMethodInvocation(method, p);
+        return (J.MethodInvocation) new WrapMethodInvocationArguments<>(style).visit(method, p, getCursor().getParentTreeCursor());
+    }
+
+    @Override
+    public J.NewClass visitNewClass(J.NewClass newClass, P p) {
+        J.NewClass n = super.visitNewClass(newClass, p);
+        return (J.NewClass) new WrapMethodInvocationArguments<>(style).visit(n, p, getCursor().getParentTreeCursor());
     }
 
     @Override
@@ -211,7 +256,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         if (prefix.getComments().isEmpty() && annotationsStyle != null) {
             if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
                 return prefix.withWhitespace(Space.SINGLE_SPACE.getWhitespace());
-            } else if (annotationsStyle.getWrap() == WrapAlways) {
+            }
+            if (annotationsStyle.getWrap() == WrapAlways) {
                 return prefix.withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace);
             }
         }
@@ -220,14 +266,25 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     private Space withNewline(Space prefix) {
         if (prefix.getComments().isEmpty()) {
-            return prefix.withWhitespace((hasLineBreak(prefix.getWhitespace()) ? "" : "\n") + prefix.getWhitespace());
-        } else if (prefix.getComments().get(prefix.getComments().size() - 1).isMultiline()) {
-            return prefix.withComments(ListUtils.mapLast(prefix.getComments(), c -> requireNonNull(c).withSuffix("\n")));
+            return prefix.withWhitespace((hasLineBreak(prefix.getWhitespace()) ? prefix.getWhitespace() : "\n"));
+        }
+        if (prefix.getComments().get(prefix.getComments().size() - 1).isMultiline()) {
+            return prefix.withComments(ListUtils.mapLast(prefix.getComments(), (Function<Comment, Comment>) c ->
+                    c.withSuffix((hasLineBreak(c.getSuffix()) ? c.getSuffix() : "\n"))));
         }
         return prefix;
     }
 
     private List<J.Modifier> withNewline(List<J.Modifier> modifiers, String whitespace, WrappingAndBracesStyle.@Nullable Annotations annotationsStyle) {
         return ListUtils.mapFirst(modifiers, mod -> requireNonNull(mod).withPrefix(wrapElement(mod.getPrefix(), whitespace, annotationsStyle)));
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
     }
 }

@@ -18,6 +18,7 @@ package org.openrewrite.hcl.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.hcl.Assertions.hcl;
 
 class HclFunctionCallTest implements RewriteTest {
@@ -29,6 +30,47 @@ class HclFunctionCallTest implements RewriteTest {
             """
               a = method (1, 2 )
               b = method ( )
+              """
+          )
+        );
+    }
+
+    @Test
+    void providerScopedFunctionCall() {
+        rewriteRun(
+          hcl(
+            """
+              terraform {
+                  required_providers {
+                      test = {
+                          source = "hashicorp/test"
+                      }
+                  }
+              }
+              locals {
+                  result = provider::test::count_e("cheese")
+              }
+              """,
+             spec -> spec.afterRecipe(configFile -> {
+                 Hcl.Block locals = (Hcl.Block) configFile.getBody().getLast();
+                 Hcl.Attribute result = (Hcl.Attribute) locals.getBody().getFirst();
+                 Hcl.FunctionCall countE = (Hcl.FunctionCall) result.getValue();
+                 assertThat(countE.getName().getName()).isEqualTo("provider::test::count_e");
+             })
+          )
+        );
+    }
+
+    @Test
+    void multipleProviderScopedFunctions() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                  a = provider::aws::ec2_instance_type_info("t2.micro")
+                  b = provider::google::compute_zone("us-central1-a")
+                  c = normalFunction("arg")
+              }
               """
           )
         );

@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Markers, SourceFile, Tree, TreeKind} from "../";
+import {Markers} from "../markers";
+import {SourceFile, Tree} from "../tree";
 
 
 export interface Json extends Tree {
@@ -22,7 +23,6 @@ export interface Json extends Tree {
 
 export namespace Json {
     export const Kind = {
-        ...TreeKind,
         Array: "org.openrewrite.json.tree.Json$Array",
         Document: "org.openrewrite.json.tree.Json$Document",
         Empty: "org.openrewrite.json.tree.Json$Empty",
@@ -32,7 +32,7 @@ export namespace Json {
         Object: "org.openrewrite.json.tree.Json$JsonObject",
         Space: "org.openrewrite.json.tree.Space",
         Comment: "org.openrewrite.json.tree.Comment",
-        RightPadded: "org.openrewrite.json.tree.RightPadded"
+        RightPadded: "org.openrewrite.json.tree.JsonRightPadded"
     } as const
 
     export type Key = Identifier | Literal

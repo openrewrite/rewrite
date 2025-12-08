@@ -1,3 +1,5 @@
+// noinspection JSUnusedLocalSymbols,TypeScriptCheckImport,ES6UnusedImports
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -13,16 +15,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for BlankLinesVisitor - handles blank lines between declarations and statements.
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    blank line scenarios into a single test with multiple variations in the source text.
+ *
+ * 2. SCOPE: This file should contain tests specific to BlankLinesVisitor behavior and
+ *    BlankLinesStyle settings. For full formatter integration tests, use format.test.ts.
+ */
+
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {BlankLinesStyle, IntelliJ, JavaScriptParser, typescript} from "../../../src/javascript";
-import {AutoformatVisitor, BlankLinesVisitor} from "../../../src/javascript/format";
+import {BlankLinesStyle, BlankLinesVisitor, IntelliJ, typescript} from "../../../src/javascript";
 import {Draft, produce} from "immer";
-import {MarkersKind, NamedStyles, randomId, Style} from "../../../src";
+import {Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
 
-function blankLines(customizer: StyleCustomizer<BlankLinesStyle>): BlankLinesStyle {
-    return produce(IntelliJ.TypeScript.blankLines(), draft => customizer(draft));
+function blankLines(customizer?: StyleCustomizer<BlankLinesStyle>): BlankLinesStyle {
+    return customizer
+        ? produce(IntelliJ.TypeScript.blankLines(), draft => customizer(draft))
+        : IntelliJ.TypeScript.blankLines();
 }
 
 describe('BlankLinesVisitor', () => {
@@ -52,10 +69,9 @@ describe('BlankLinesVisitor', () => {
                 class B {
                 }
 
-                 class C {
+                class C {
                 }
                 `),
-            // TODO the space before `class C` seems excessive, not sure if it's the BlankLinkesVisitor's responsibility though
             // @formatter:on
         )
     });
@@ -112,12 +128,12 @@ describe('BlankLinesVisitor', () => {
     });
 
     test('simple un-minify', () => {
-        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines(draft => {
-        })));
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript(`const x=["1",2,3];let y = 2;const z = 3;`,
+            typescript(
+                `const x=["1",2,3];let y = 2;const z = 3;`,
                 `
                     const x=["1",2,3];
                     let y = 2;
@@ -128,8 +144,7 @@ describe('BlankLinesVisitor', () => {
     });
 
     test('un-minify', () => {
-        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines(draft => {
-        })));
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -139,11 +154,9 @@ describe('BlankLinesVisitor', () => {
                     constructor(public title:string,public done:boolean=false){
                     }
 
-
                     toggle():void{
                     this.done=!this.done;
                     }
-
 
                     toString():string{
                     return (this.done?"[x]":"[ ]")+this.title
@@ -153,6 +166,22 @@ describe('BlankLinesVisitor', () => {
                     list[1].toggle();
                     list.forEach(item=>console.log(item.toString()));
                 `)
+            // @formatter:on
+        );
+    });
+
+    test('just a function', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                    function foo(x) {
+                        return x;
+                    }
+                    `
+                )
             // @formatter:on
         );
     });

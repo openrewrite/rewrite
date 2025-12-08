@@ -98,6 +98,14 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
+        if (method.getName().getComments().isEmpty() && method.getName().getPrefix().getWhitespace().contains("\n")) {
+            method = method.withName(method.getName().withPrefix(Space.EMPTY));
+        }
+        return super.visitMethodInvocation(method, p);
+    }
+
+    @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
@@ -149,7 +157,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
             first = false;
         }
-        if (!first) {
+        if (!first && m.getName().getPrefix().getWhitespace().isEmpty()) {
             m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace(" ")));
         }
 

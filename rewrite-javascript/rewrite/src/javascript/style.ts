@@ -234,7 +234,7 @@ export namespace IntelliJ {
                     additive: true,
                     multiplicative: true,
                     shift: true,
-                    unary: true,
+                    unary: false,
                     arrowFunction: true,
                     beforeUnaryNotAndNotNull: false,
                     afterUnaryNotAndNotNull: false
@@ -378,7 +378,7 @@ export namespace IntelliJ {
                     additive: true,
                     multiplicative: true,
                     shift: true,
-                    unary: true,
+                    unary: false,
                     arrowFunction: true,
                     beforeUnaryNotAndNotNull: false,
                     afterUnaryNotAndNotNull: false
@@ -496,5 +496,37 @@ export function styleFromSourceFile(styleKind: string, sourceFile: Tree): Style 
     if (candidate) {
         return candidate;
     }
+    return IntelliJ.TypeScript.defaults.styles.find(style => style.kind === styleKind) as Style;
+}
+
+/**
+ * Get a style by kind, with passed-in styles taking precedence over source file styles.
+ * Falls back to IntelliJ defaults if no style is found.
+ *
+ * @param styleKind The kind of style to retrieve
+ * @param sourceFile The source file to check for styles
+ * @param styles Optional array of NamedStyles that take precedence over source file styles
+ */
+export function getStyle(styleKind: string, sourceFile: Tree, styles?: NamedStyles[]): Style | undefined {
+    // First check passed-in styles (highest precedence)
+    if (styles) {
+        for (const namedStyle of styles) {
+            const found = namedStyle.styles.find(s => s.kind === styleKind);
+            if (found) {
+                return found;
+            }
+        }
+    }
+
+    // Then check source file markers
+    const namedStyles = sourceFile.markers.markers.filter(marker => marker.kind === MarkersKind.NamedStyles) as NamedStyles[];
+    for (const namedStyle of namedStyles) {
+        const found = namedStyle.styles.find(s => s.kind === styleKind);
+        if (found) {
+            return found;
+        }
+    }
+
+    // Fall back to defaults
     return IntelliJ.TypeScript.defaults.styles.find(style => style.kind === styleKind) as Style;
 }

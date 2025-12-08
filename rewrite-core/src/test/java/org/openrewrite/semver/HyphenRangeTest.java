@@ -80,4 +80,26 @@ class HyphenRangeTest {
         assertThat(hyphenRange.isValid("1.0", "2.0.1")).isFalse();
         assertThat(hyphenRange.isValid("1.0", "2.0.0.1")).isFalse();
     }
+
+    @Test
+    void compare() {
+        HyphenRange hyphenRange = HyphenRange.build("1.2 - 2", null).getValue();
+
+        assertThat(hyphenRange).isNotNull();
+        assertThat(hyphenRange.compare(null, "0.9", "1 - 2")).isNegative();
+        assertThat(hyphenRange.compare(null, "1 - 2", "0.9")).isPositive();
+        assertThat(hyphenRange.compare(null, "1.0", "1 - 2")).isZero();
+        assertThat(hyphenRange.compare(null, "1 - 2", "1.0")).isZero();
+        assertThat(hyphenRange.compare(null, "2.0", "1 - 2")).isZero();
+        assertThat(hyphenRange.compare(null, "1 - 2", "2.0")).isZero();
+        assertThat(hyphenRange.compare(null, "1.999", "1 - 2")).isZero();
+        assertThat(hyphenRange.compare(null, "1 - 2", "1.999")).isZero();
+        assertThat(hyphenRange.compare(null, "1 - 2", "1 - 2")).isZero();
+        assertThat(hyphenRange.compare(null, "1.0.1 - 2", "1 - 2")).isPositive();
+        assertThat(hyphenRange.compare(null, "0.9 - 2", "1 - 2")).isNegative();
+        assertThat(hyphenRange.compare(null, "1 - 2.0.1", "1 - 2")).isPositive();
+        assertThat(hyphenRange.compare(null, "1 - 1.9", "1 - 2")).isNegative();
+        assertThat(hyphenRange.compare(null, "2.1", "1 - 2")).isPositive();
+        assertThat(hyphenRange.compare(null, "1 - 2", "2.1")).isNegative();
+    }
 }

@@ -16,15 +16,17 @@
 package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.style.GeneralFormatStyle;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
+@SuppressWarnings("unused")
 public class NormalizeLineBreaks extends Recipe {
 
     @Override
@@ -45,14 +47,10 @@ public class NormalizeLineBreaks extends Recipe {
 
     private static class LineBreaksFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                GeneralFormatStyle generalFormatStyle = ((SourceFile) cu).getStyle(GeneralFormatStyle.class);
-                if (generalFormatStyle == null) {
-                    generalFormatStyle = autodetectGeneralFormatStyle(cu);
-                }
-                doAfterVisit(new NormalizeLineBreaksVisitor<>(generalFormatStyle));
+                doAfterVisit(new NormalizeLineBreaksVisitor<>(cu, null));
             }
             return (J) tree;
         }

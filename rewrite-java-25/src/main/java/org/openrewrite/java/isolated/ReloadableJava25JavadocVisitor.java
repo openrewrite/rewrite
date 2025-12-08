@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
@@ -981,7 +982,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
             if (i+1 <= node.length() -1 && node.charAt(i+1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
-                text.append(whitespaceBeforeAsString());
+                text.append(whitespaceBeforeAsString(Character::isSpaceChar));
             }
         }
 
@@ -1085,13 +1086,17 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     private String whitespaceBeforeAsString() {
+        return whitespaceBeforeAsString(Character::isWhitespace);
+    }
+
+    private String whitespaceBeforeAsString(Predicate<Character> whitespace) {
         if (cursor >= source.length()) {
             return "";
         }
 
         int i = cursor;
         for (; i < source.length(); i++) {
-            if (!Character.isWhitespace(source.charAt(i))) {
+            if (!whitespace.test(source.charAt(i))) {
                 break;
             }
         }
@@ -1212,17 +1217,21 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         public J visitMemberSelect(MemberSelectTree node, Space fmt) {
             JCTree.JCFieldAccess fieldAccess = (JCTree.JCFieldAccess) node;
             Expression selected = (Expression) scan(fieldAccess.selected, Space.EMPTY);
-            sourceBefore(".");
-            // Capture any whitespace (including newlines) between the dot and the name
+            // Capture whitespace before the dot - this goes in JLeftPadded.before
+            String whitespaceBeforeDot = sourceBeforeAsString(".");
+            // Capture whitespace after the dot - this goes in Identifier.prefix
             String whitespaceAfterDot = whitespaceBeforeAsString();
             cursor += fieldAccess.name.toString().length();
             return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
                     selected,
-                    JLeftPadded.build(new J.Identifier(randomId(),
-                            Space.build(whitespaceAfterDot, emptyList()),
-                            Markers.EMPTY,
-                            emptyList(),
-                            fieldAccess.name.toString(), null, null)),
+                    new JLeftPadded<>(
+                            Space.build(whitespaceBeforeDot, emptyList()),
+                            new J.Identifier(randomId(),
+                                    Space.build(whitespaceAfterDot, emptyList()),
+                                    Markers.EMPTY,
+                                    emptyList(),
+                                    fieldAccess.name.toString(), null, null),
+                            Markers.EMPTY),
                     typeMapping.type(node));
         }
 

@@ -52,7 +52,7 @@ public class PadEmptyForLoopComponents extends Recipe {
             public J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     SourceFile cu = (SourceFile) requireNonNull(tree);
-                    if (cu.getStyle(EmptyForIteratorPadStyle.class) != null || cu.getStyle(EmptyForInitializerPadStyle.class) != null) {
+                    if (Style.from(EmptyForIteratorPadStyle.class, cu) != null || Style.from(EmptyForInitializerPadStyle.class, cu) != null) {
                         return cu.withMarkers(cu.getMarkers().add(new SearchResult(randomId(), null)));
                     }
                     return (JavaSourceFile) cu;

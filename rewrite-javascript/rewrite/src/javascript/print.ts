@@ -21,7 +21,7 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
-import {Generator, DelegatedYield, FunctionDeclaration, NonNullAssertion, Optional, Spread} from "./markers";
+import {DelegatedYield, FunctionDeclaration, Generator, NonNullAssertion, Optional, Spread} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -75,16 +75,16 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     override async visitExpressionStatement(statement: JS.ExpressionStatement, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.visitSpace(statement.prefix, p);
-        await this.visitMarkers(statement.markers, p);
+        await this.beforeSyntax(statement, p);
         await this.visit(statement.expression, p);
+        await this.afterSyntax(statement, p);
         return statement;
     }
 
-    override async visitStatementExpression(statementExpression: JS.StatementExpression, p: PrintOutputCapture): Promise<J | J | undefined> {
-        await this.visitSpace(statementExpression.prefix, p);
-        await this.visitMarkers(statementExpression.markers, p);
+    override async visitStatementExpression(statementExpression: JS.StatementExpression, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(statementExpression, p);
         await this.visit(statementExpression.statement, p);
+        await this.afterSyntax(statementExpression, p);
         return statementExpression;
     }
 
@@ -97,7 +97,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitJsxTag(element: JSX.Tag, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(element, p);
-        await this.visitLeftPaddedLocal("<", element.openName, p);
+        // Print < first, then the space after < (openName.before), then the tag name
+        p.append("<");
+        await this.visitSpace(element.openName.before, p);
+        await this.visit(element.openName.element, p);
         if (element.typeArguments) {
             await this.visitContainerLocal("<", element.typeArguments, ",", ">", p);
         }
@@ -113,7 +116,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 for (let i = 0; i < element.children.length; i++) {
                     await this.visit(element.children[i], p)
                 }
-                await this.visitLeftPaddedLocal("</", element.closingName, p);
+                // Print </ first, then the space after </ (closingName.before), then the tag name
+                p.append("</");
+                await this.visitSpace(element.closingName!.before, p);
+                await this.visit(element.closingName!.element, p);
                 await this.visitSpace(element.afterClosingName, p);
                 p.append(">");
             }
@@ -457,6 +463,13 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         await this.afterSyntax(variableDeclarations, p);
         return variableDeclarations;
+    }
+
+    override async visitShebang(shebang: JS.Shebang, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(shebang, p);
+        p.append(shebang.text);
+        await this.afterSyntax(shebang, p);
+        return shebang;
     }
 
     override async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: PrintOutputCapture): Promise<J | undefined> {
@@ -1767,7 +1780,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return cursor;
     }
 
-    private async afterSyntax(j: J, p: PrintOutputCapture) {
+    protected async afterSyntax(j: J, p: PrintOutputCapture) {
         await this.afterSyntaxMarkers(j.markers, p);
     }
 
@@ -1777,7 +1790,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         }
     }
 
-    private async beforeSyntax(j: J, p: PrintOutputCapture) {
+    protected async beforeSyntax(j: J, p: PrintOutputCapture) {
         await this.beforeSyntaxExt(j.prefix, j.markers, p);
     }
 
@@ -1823,7 +1836,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         }
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: PrintOutputCapture): Promise<J.RightPadded<T>> {
+    public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: PrintOutputCapture): Promise<J.RightPadded<T>> {
         if (isTree(right.element)) {
             await this.visit(right.element, p);
         }

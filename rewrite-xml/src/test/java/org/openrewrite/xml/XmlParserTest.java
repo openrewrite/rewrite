@@ -78,6 +78,125 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Test
+    void jspScriptlet() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                <body>
+                  <%
+                    String name = request.getParameter("name");
+                    if (name == null) {
+                        name = "Guest";
+                    }
+                  %>
+                  <h1>Welcome!</h1>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("scriptlet.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspExpression() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                <body>
+                  <h1>Current time: <%= new java.util.Date() %></h1>
+                  <p>Your name: <%= request.getParameter("name") %></p>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("expression.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspDeclaration() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <%!
+                private int counter = 0;
+
+                public int incrementCounter() {
+                    return ++counter;
+                }
+              %>
+              <html>
+                <body>
+                  <h1>Page visits: <%= incrementCounter() %></h1>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("declaration.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspComment() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                <body>
+                  <%-- This is a JSP comment that won't appear in the HTML output --%>
+                  <h1>Hello World</h1>
+                  <%--
+                    Multi-line JSP comment
+                    for documenting JSP code
+                  --%>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("comment.jsp")
+          )
+        );
+    }
+
+    @Test
+    void mixedJspElements() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <%@ page language="java" contentType="text/html; charset=UTF-8" %>
+              <html>
+                <body>
+                  <%!
+                    private String greeting = "Hello";
+                  %>
+                  <%-- Display greeting --%>
+                  <h1><%= greeting %> from JSP!</h1>
+                  <%
+                    for(int i = 1; i <= 3; i++) {
+                  %>
+                    <p>Line <%= i %></p>
+                  <% } %>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("mixed.jsp")
+          )
+        );
+    }
+
+    @Test
     void lowerCaseDocType() {
         rewriteRun(
           xml(
@@ -460,6 +579,38 @@ class XmlParserTest implements RewriteTest {
         rewriteRun(
           xml(
             "<?xml version=\"1.0\"?>CR<a>CR</a>".replace("CR", "\r")
+          )
+        );
+    }
+
+    @Test
+    void utf8SurrogatePairsInComments() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                  <!-- 👇 Problem below -->
+                  <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>example</artifactId>
+                  </dependency>
+                  <!-- 👆 Problem above -->
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void utf8SurrogatePairsSimple() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!-- 👇 -->
+              <a></a>
+              """
           )
         );
     }

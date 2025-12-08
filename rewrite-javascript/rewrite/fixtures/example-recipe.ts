@@ -20,6 +20,12 @@ import {ChangeText} from "./change-text";
 import {ChangeVersion} from "./change-version";
 import {RecipeWithRecipeList} from "./recipe-with-recipe-list";
 import {ReplaceId} from "./replace-id";
+import {FindIdentifierWithRemotePathPrecondition} from "./remote-path-precondition";
+import {FindIdentifierWithPathPrecondition} from "./path-precondition";
+import {MarkTypes} from "./mark-types";
+import {MarkPrimitiveTypes} from "./mark-primitive-types";
+import {MarkClassTypes} from "./mark-class-types";
+import {ScanningEditor} from "./scanning-editor";
 
 export function activate(registry: RecipeRegistry) {
     registry.register(ChangeText);
@@ -28,4 +34,10 @@ export function activate(registry: RecipeRegistry) {
     registry.register(RecipeWithRecipeList);
     registry.register(ReplaceId);
     registry.register(FindIdentifier);
+    registry.register(FindIdentifierWithRemotePathPrecondition);
+    registry.register(FindIdentifierWithPathPrecondition);
+    registry.register(MarkTypes);
+    registry.register(MarkPrimitiveTypes);
+    registry.register(MarkClassTypes);
+    registry.register(ScanningEditor);
 }

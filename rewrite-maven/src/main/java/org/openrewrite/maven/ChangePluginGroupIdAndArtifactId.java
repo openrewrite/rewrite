@@ -57,7 +57,7 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
 
     @Option(displayName = "New version",
             description = "An exact version number.",
-            example = "29.X",
+            example = "29.0",
             required = false)
     @Nullable
     String newVersion;

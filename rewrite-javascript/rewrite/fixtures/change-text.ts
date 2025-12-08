@@ -39,11 +39,11 @@ export class ChangeText extends Recipe {
         return `Change text to '${this.text}'`;
     }
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const toText = this.text;
         const replacedText = this.replacedText;
         return new class extends PlainTextVisitor<ExecutionContext> {
-            visitText(text: PlainText, ctx: ExecutionContext): Promise<PlainText> {
+            protected override async visitText(text: PlainText, ctx: ExecutionContext): Promise<PlainText | undefined> {
                 return this.produceTree(text, ctx, draft => {
                     if (draft.text != toText) {
                         replacedText.insertRow(ctx, new ReplacedText(text.sourcePath, draft.text));

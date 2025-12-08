@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -281,6 +282,19 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5179")
+    @Test
+    void tagsInSequences() {
+        rewriteRun(
+          yaml(
+            """
+            Conditions:
+              IsPollingFrequencyInMinutesSingular: !Equals [!Ref PollingFrequencyInMinutes, 1]
+            """
+          )
+        );
+    }
+
     @Test
     void globalTags() {
         rewriteRun(
@@ -460,6 +474,87 @@ class YamlParserTest implements RewriteTest {
               - item1
               - item2
               other_anchor: *anchor
+              """
+          )
+        );
+    }
+
+    @Test
+    void parseTagsCorrectlyOnFirstLineOfMappingEntry() {
+        rewriteRun(
+          yaml(
+            """
+              - !SOMETAG
+                a: b
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Sequence sequence = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
+                Yaml.Mapping mapping = (Yaml.Mapping) sequence.getEntries().getFirst().getBlock();
+                assertThat(mapping.getTag().getName()).isEqualTo("SOMETAG");
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1471")
+    @Test
+    void yamlWithDocumentEndMarker() {
+        rewriteRun(
+          yaml(
+            """
+              ---
+              applications:
+                - name: modified-app-name
+                  memory: 1G
+              ...
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
+    void helmTemplateMatchingDocumentEndParsesCorrectly() {
+        rewriteRun(
+          yaml(
+            """
+              # ${{ looks.like.helm.before }}
+              jobs:
+                # ${{ looks.like.helm.middle }}
+                steps:
+                  # ${{ looks.like.helm.sequence }}
+                  - items1: []
+                  # ${{ looks.like.helm.in-sequence }}
+                  - items2: []
+                  # ${{ looks.like.helm.end-sequence }}
+              # ${{ looks.like.helm.end }}
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  - items1: []
+                  # ${{ looks.like.helm.sequence }}
+                  - items2: []
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  # ${{ looks.like.helm.sequence }}
+                  - items1: []
+                  - items2: []
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  - items1: []
+                  - items2: []
+              # ${{ looks.like.helm.end }}
               """
           )
         );

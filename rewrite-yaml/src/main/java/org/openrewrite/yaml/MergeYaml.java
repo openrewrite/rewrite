@@ -154,7 +154,12 @@ public class MergeYaml extends Recipe {
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
                     if (getCursor().getMessage(REMOVE_PREFIX, false)) {
-                        d = insertMode == Before ? d.withPrefix("") : d.withEnd(d.getEnd().withPrefix(""));
+                        if (insertMode == Before) {
+                            d = d.withPrefix("");
+                        } else {
+                            // Preserve newline before document separator in multi-document YAML
+                            d = d.withEnd(d.getEnd().withPrefix(preserveDocumentSeparator(d)));
+                        }
                     }
                     return d;
                 }
@@ -179,9 +184,28 @@ public class MergeYaml extends Recipe {
                                     .visitNonNull(d.getBlock(), ctx, getCursor()));
                 }
                 if (getCursor().getMessage(REMOVE_PREFIX, false)) {
-                    d = d.withEnd(d.getEnd().withPrefix(""));
+                    // Preserve newline before document separator in multi-document YAML
+                    d = d.withEnd(d.getEnd().withPrefix(preserveDocumentSeparator(d)));
                 }
                 return d;
+            }
+
+            private String preserveDocumentSeparator(Yaml.Document document) {
+                // Check if this is a multi-document YAML and if there's a following explicit document
+                Yaml.Documents documents = getCursor().firstEnclosing(Yaml.Documents.class);
+                if (documents != null) {
+                    int currentIndex = documents.getDocuments().indexOf(document);
+                    // Preserve a newline before the next document separator
+                    if (0 <= currentIndex && currentIndex < documents.getDocuments().size() - 1 &&
+                            documents.getDocuments().get(currentIndex + 1).isExplicit()) {
+                        return "\n";
+                    }
+                    // Or if this is the last document and it is explicit
+                    if (currentIndex == documents.getDocuments().size() - 1 && document.getEnd().isExplicit()) {
+                        return "\n";
+                    }
+                }
+                return "";
             }
 
             private @Nullable String maybeKeyFromJsonPath(String jsonPath) {

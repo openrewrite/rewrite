@@ -18,14 +18,8 @@ package org.openrewrite.java.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.SpacesStyle;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.style.Style;
-
-import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -50,9 +44,7 @@ public class TabsAndIndents extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
-                SpacesStyle spacesStyle = Optional.ofNullable(Style.from(SpacesStyle.class, cu)).orElse(IntelliJ.spaces());
-                return new TabsAndIndentsVisitor<>(style, spacesStyle).visit(tree, ctx);
+                return new TabsAndIndentsVisitor<>(cu, null).visit(tree, ctx);
             }
             return (J) tree;
         }
@@ -60,10 +52,7 @@ public class TabsAndIndents extends Recipe {
 
     public static <J2 extends J> J2 formatTabsAndIndents(J j, Cursor cursor) {
         SourceFile cu = cursor.firstEnclosingOrThrow(SourceFile.class);
-        TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
-        SpacesStyle spacesStyle = Optional.ofNullable(Style.from(SpacesStyle.class, cu)).orElse(IntelliJ.spaces());
         //noinspection unchecked
-        return (J2) new TabsAndIndentsVisitor<>(style, spacesStyle)
-                .visitNonNull(j, 0, cursor);
+        return (J2) new TabsAndIndentsVisitor<>(cu, null).visitNonNull(j, 0, cursor);
     }
 }

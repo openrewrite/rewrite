@@ -22,7 +22,6 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -33,7 +32,6 @@ import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project//build//plugins");
 
     @Option(
             displayName = "Release version",
