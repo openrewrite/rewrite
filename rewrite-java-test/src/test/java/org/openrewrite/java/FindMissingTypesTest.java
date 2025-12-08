@@ -284,7 +284,6 @@ class FindMissingTypesTest implements RewriteTest {
         );
     }
 
-    //This is caused by a missed case in FindMissingTypes (it checks methodType and variableType but not type)
     @Test
     void kotlinClassReference() {
         rewriteRun(
@@ -295,7 +294,6 @@ class FindMissingTypesTest implements RewriteTest {
               package com.some.other
               
               class EventPublisher {
-                  // Implementation for publishing domain events
               }
               """
           ),
@@ -304,25 +302,10 @@ class FindMissingTypesTest implements RewriteTest {
               package com.some.card
               
               import com.some.other.EventPublisher
-              import jakarta.persistence.Column
-              import jakarta.persistence.Entity
               import jakarta.persistence.EntityListeners
-              import jakarta.persistence.GeneratedValue
-              import jakarta.persistence.GenerationType
-              import jakarta.persistence.Id
-              import jakarta.persistence.Table
-              import java.time.Instant
               
-              @Entity
-              @Table(name = "card")
               @EntityListeners(EventPublisher::class)
               data class Card(
-                  @Id
-                  @GeneratedValue(strategy = GenerationType.IDENTITY)
-                  val id: Long? = null,
-              
-                  @Column(nullable = false)
-                  val createdAt: Instant = Instant.now(),
               )
               """
           )
