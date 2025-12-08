@@ -67,20 +67,31 @@ class AnnotationMatcherTest implements RewriteTest {
               class A
               """,
             spec -> spec.afterRecipe(cu -> {
-                AtomicBoolean found = new AtomicBoolean(false);
-                AnnotationMatcher matcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension::class)");
-                new KotlinIsoVisitor<AtomicBoolean>() {
-                    @Override
-                    public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean atomicBoolean) {
-                        if (matcher.matches(annotation)) {
-                            found.set(true);
-                        }
-                        return super.visitAnnotation(annotation, atomicBoolean);
-                    }
-                }.visit(cu, found);
-                assertThat(found.get()).isTrue();
+                AnnotationMatcher javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension.class)");
+                AtomicBoolean foundJavaStyle = new AtomicBoolean(false);
+
+                getMatcherVisitor(javaStyleMatcher).visit(cu, foundJavaStyle);
+                assertThat(foundJavaStyle.get()).isTrue();
+
+                AnnotationMatcher kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension::class)");
+                AtomicBoolean foundKotlinStyle = new AtomicBoolean(false);
+
+                getMatcherVisitor(kotlinStyleMatcher).visit(cu, foundKotlinStyle);
+                assertThat(foundKotlinStyle.get()).isTrue();
             })
           )
         );
+    }
+
+    private KotlinVisitor<AtomicBoolean> getMatcherVisitor(AnnotationMatcher matcher) {
+        return new KotlinIsoVisitor<>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean found) {
+                if (matcher.matches(annotation)) {
+                    found.set(true);
+                }
+                return super.visitAnnotation(annotation, found);
+            }
+        };
     }
 }
