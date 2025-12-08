@@ -159,10 +159,16 @@ public class AnnotationMatcher {
             }
             if (arg instanceof J.FieldAccess) {
                 J.FieldAccess fa = (J.FieldAccess) arg;
-                if ("class".equals(fa.getSimpleName()) && matchText.endsWith(".class")) {
+                if ("class".equals(fa.getSimpleName()) && (matchText.endsWith(".class") || matchText.endsWith("::class"))) {
                     JavaType argType = fa.getTarget().getType();
                     if (argType instanceof JavaType.FullyQualified) {
-                        String queryTypeFqn = JavaType.ShallowClass.build(matchText.substring(0, matchText.length() - 6)).getFullyQualifiedName();
+                        // Handle both Java's ".class" and Kotlin's "::class" syntax
+                        String queryTypeFqn;
+                        if (matchText.endsWith("::class")) {
+                            queryTypeFqn = JavaType.ShallowClass.build(matchText.substring(0, matchText.length() - 7)).getFullyQualifiedName();
+                        } else {
+                            queryTypeFqn = JavaType.ShallowClass.build(matchText.substring(0, matchText.length() - 6)).getFullyQualifiedName();
+                        }
                         String targetTypeFqn = ((JavaType.FullyQualified) argType).getFullyQualifiedName();
                         return TypeUtils.fullyQualifiedNamesAreEqual(queryTypeFqn, targetTypeFqn);
                     }
@@ -175,6 +181,25 @@ public class AnnotationMatcher {
                     if (owner != null && matchText.equals(owner.getFullyQualifiedName() + "." + varType.getName())) {
                         return true;
                     }
+                }
+            }
+            // Handle Kotlin's ::class syntax which is parsed as MemberReference
+            if (arg instanceof J.MemberReference) {
+                J.MemberReference mr = (J.MemberReference) arg;
+                if ("class".equals(mr.getReference().getSimpleName()) && (matchText.endsWith(".class") || matchText.endsWith("::class"))) {
+                    JavaType argType = mr.getContaining().getType();
+                    if (argType instanceof JavaType.FullyQualified) {
+                        // Handle both Java's ".class" and Kotlin's "::class" syntax
+                        String queryTypeFqn;
+                        if (matchText.endsWith("::class")) {
+                            queryTypeFqn = JavaType.ShallowClass.build(matchText.substring(0, matchText.length() - 7)).getFullyQualifiedName();
+                        } else {
+                            queryTypeFqn = JavaType.ShallowClass.build(matchText.substring(0, matchText.length() - 6)).getFullyQualifiedName();
+                        }
+                        String targetTypeFqn = ((JavaType.FullyQualified) argType).getFullyQualifiedName();
+                        return TypeUtils.fullyQualifiedNamesAreEqual(queryTypeFqn, targetTypeFqn);
+                    }
+                    return false;
                 }
             }
             if (arg instanceof J.NewArray) {

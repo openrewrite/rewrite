@@ -52,4 +52,35 @@ class AnnotationMatcherTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void matchClassArgumentWithKotlinSyntax() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().classpath("junit-jupiter-api")),
+          kotlin(
+            """
+              import org.junit.jupiter.api.extension.ExtendWith
+
+              class MyExtension : org.junit.jupiter.api.extension.Extension
+
+              @ExtendWith(MyExtension::class)
+              class A
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean found = new AtomicBoolean(false);
+                AnnotationMatcher matcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension::class)");
+                new KotlinIsoVisitor<AtomicBoolean>() {
+                    @Override
+                    public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean atomicBoolean) {
+                        if (matcher.matches(annotation)) {
+                            found.set(true);
+                        }
+                        return super.visitAnnotation(annotation, atomicBoolean);
+                    }
+                }.visit(cu, found);
+                assertThat(found.get()).isTrue();
+            })
+          )
+        );
+    }
 }
