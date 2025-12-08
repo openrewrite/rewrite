@@ -159,16 +159,10 @@ public class AnnotationMatcher {
             }
             if (arg instanceof J.FieldAccess) {
                 J.FieldAccess fa = (J.FieldAccess) arg;
-                if ("class".equals(fa.getSimpleName()) && (matchText.endsWith(".class") || matchText.endsWith("::class"))) {
+                if ("class".equals(fa.getSimpleName()) && matchText.endsWith(".class")) {
                     JavaType argType = fa.getTarget().getType();
                     if (argType instanceof JavaType.FullyQualified) {
-                        // Handle both Java's ".class" and Kotlin's "::class" syntax
-                        String queryTypeFqn;
-                        if (matchText.endsWith("::class")) {
-                            queryTypeFqn = JavaType.ShallowClass.build(matchText.substring(0, matchText.length() - 7)).getFullyQualifiedName();
-                        } else {
-                            queryTypeFqn = JavaType.ShallowClass.build(matchText.substring(0, matchText.length() - 6)).getFullyQualifiedName();
-                        }
+                        String queryTypeFqn = JavaType.ShallowClass.build(matchText.substring(0, matchText.length() - 6)).getFullyQualifiedName();
                         String targetTypeFqn = ((JavaType.FullyQualified) argType).getFullyQualifiedName();
                         return TypeUtils.fullyQualifiedNamesAreEqual(queryTypeFqn, targetTypeFqn);
                     }
