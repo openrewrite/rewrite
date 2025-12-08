@@ -108,12 +108,10 @@ describe('AutoformatVisitor', () => {
                             super();
                         }
 
-
                         m(x: number, y: number[]): number {
                             this.m(x, [1]);
                             return y[0];
                         }
-
 
                         s(s: string): number {
                             switch (s) {
@@ -155,9 +153,25 @@ describe('AutoformatVisitor', () => {
             type Values={[key:string]:string;}
             `,
             `
-            type Values = {
-                [key: string]: string;
+            type Values = { [key: string]: string; }
+            `)
+            // @formatter:on
+        )
+    });
+
+    test('inline type annotations stay single-line', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            function foo(x:{name:string}):void{}
+            const bar=(opts:{html:string})=>{};
+            `,
+            `
+            function foo(x: { name: string }): void {
             }
+            const bar = (opts: { html: string })=>{
+            };
             `)
             // @formatter:on
         )

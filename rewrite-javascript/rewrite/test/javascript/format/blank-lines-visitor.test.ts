@@ -30,8 +30,7 @@
  */
 
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {BlankLinesStyle, IntelliJ, typescript} from "../../../src/javascript";
-import {BlankLinesVisitor} from "../../../src/javascript/format";
+import {BlankLinesStyle, BlankLinesVisitor, IntelliJ, typescript} from "../../../src/javascript";
 import {Draft, produce} from "immer";
 import {Style} from "../../../src";
 
@@ -155,11 +154,9 @@ describe('BlankLinesVisitor', () => {
                     constructor(public title:string,public done:boolean=false){
                     }
 
-
                     toggle():void{
                     this.done=!this.done;
                     }
-
 
                     toString():string{
                     return (this.done?"[x]":"[ ]")+this.title

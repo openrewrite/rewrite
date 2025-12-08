@@ -148,6 +148,44 @@ describe('SpacesVisitor', () => {
             // @formatter:on
         )});
 
+    test('objectLiteralTypeBraces: true (TypeScript default)', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralTypeBraces = true;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            type Values = {[key: string]: string}
+            function foo(x:{name:string}): void {}
+            const bar: {html:string} = { html: "" };
+            `,
+                `
+            type Values = { [key: string]: string }
+            function foo(x: { name: string }): void {}
+            const bar: { html: string } = { html: "" };
+            `)
+            // @formatter:on
+        )});
+
+    test('objectLiteralTypeBraces: false (JavaScript default)', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralTypeBraces = false;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            type Values = { [key: string]: string }
+            function foo(x: { name: string }): void {}
+            `,
+                `
+            type Values = {[key: string]: string}
+            function foo(x: {name: string}): void {}
+            `)
+            // @formatter:on
+        )});
+
     test('space around assignment operator: true', () => {
         spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
             draft.aroundOperators.assignment = true;

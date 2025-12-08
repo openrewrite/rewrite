@@ -213,7 +213,19 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
         const ret = await super.visitContainer(container, p) as J.Container<T>;
         return produce(ret, draft => {
+            if (draft.elements.length > 0) {
+                // Apply beforeComma rule to all elements except the last
+                // (last element's after is before closing bracket, not a comma)
+                for (let i = 0; i < draft.elements.length - 1; i++) {
+                    const afterWs = draft.elements[i].after.whitespace;
+                    // Preserve newlines - only adjust when on same line
+                    if (!afterWs.includes("\n")) {
+                        draft.elements[i].after.whitespace = this.style.other.beforeComma ? " " : "";
+                    }
+                }
+            }
             if (draft.elements.length > 1) {
+                // Apply afterComma rule to elements after the first
                 for (let i = 1; i < draft.elements.length; i++) {
                     const currentWs = draft.elements[i].element.prefix.whitespace;
                     // Preserve original newlines - only adjust spacing when elements are on same line
@@ -235,10 +247,17 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                     if (ne.elements.elements.length > 0) {
                         // Check if this is a multi-line export (any element's prefix has a newline)
                         const isMultiLine = ne.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
-                        // Only adjust brace spacing for single-line exports
                         if (!isMultiLine) {
+                            // Single-line: adjust brace spacing
                             ne.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
                             ne.elements.elements[ne.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        } else {
+                            // Multi-line: apply beforeComma rule to last element's after (for trailing commas)
+                            // If it has only spaces (no newline), it's the space before a trailing comma
+                            const lastAfter = ne.elements.elements[ne.elements.elements.length - 1].after.whitespace;
+                            if (!lastAfter.includes("\n") && lastAfter.trim() === "") {
+                                ne.elements.elements[ne.elements.elements.length - 1].after.whitespace = this.style.other.beforeComma ? " " : "";
+                            }
                         }
                     }
                 }
@@ -302,10 +321,17 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
                         // Check if this is a multi-line import (any element's prefix has a newline)
                         const isMultiLine = ni.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
-                        // Only adjust brace spacing for single-line imports
                         if (!isMultiLine) {
+                            // Single-line: adjust brace spacing
                             ni.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
                             ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        } else {
+                            // Multi-line: apply beforeComma rule to last element's after (for trailing commas)
+                            // If it has only spaces (no newline), it's the space before a trailing comma
+                            const lastAfter = ni.elements.elements[ni.elements.elements.length - 1].after.whitespace;
+                            if (!lastAfter.includes("\n") && lastAfter.trim() === "") {
+                                ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.other.beforeComma ? " " : "";
+                            }
                         }
                     }
                 }
@@ -450,6 +476,21 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
             draft.prefix.whitespace = this.style.other.beforeTypeReferenceColon ? " " : "";
             draft.typeIdentifier = await this.spaceBefore(draft.typeIdentifier, this.style.other.afterTypeReferenceColon);
         });
+    }
+
+    protected async visitTypeLiteral(typeLiteral: JS.TypeLiteral, p: P): Promise<J | undefined> {
+        const ret = await super.visitTypeLiteral(typeLiteral, p) as JS.TypeLiteral;
+        // Apply objectLiteralTypeBraces spacing for single-line type literals
+        const isSingleLine = !ret.members.end.whitespace.includes("\n") &&
+            ret.members.statements.every(s => !s.element.prefix.whitespace.includes("\n"));
+        if (isSingleLine && ret.members.statements.length > 0) {
+            return produce(ret, draft => {
+                const space = this.style.within.objectLiteralTypeBraces ? " " : "";
+                draft.members.statements[0].element.prefix.whitespace = space;
+                draft.members.end.whitespace = space;
+            });
+        }
+        return ret;
     }
 
     protected async visitUnary(unary: J.Unary, p: P): Promise<J | undefined> {
@@ -701,9 +742,10 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
             if (!draft.end.whitespace.includes("\n") && (draft.statements.length == 0 || !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n"))) {
-                // Skip newline for object literals and empty lambda/function bodies
+                // Skip newline for object literals, type literals, and empty lambda/function bodies
                 const parentKind = this.cursor.parent?.value.kind;
                 if (parentKind !== J.Kind.NewClass &&
+                    parentKind !== JS.Kind.TypeLiteral &&
                     !(draft.statements.length === 0 && (parentKind === J.Kind.Lambda || parentKind === J.Kind.MethodDeclaration))) {
                     draft.end = this.withNewlineSpace(draft.end);
                 }
@@ -1032,14 +1074,21 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             if (statements.length > 0) {
                 this.keepMaximumBlankLines(draft.body.statements[0].element, 0);
 
+                const isInterface = draft.classKind.type === J.ClassDeclaration.Kind.Type.Interface;
                 for (let i = 1; i < statements.length; i++) {
                     const previousElement = statements[i - 1].element;
                     let currentElement = statements[i].element;
                     if (previousElement.kind == J.Kind.VariableDeclarations || currentElement.kind == J.Kind.VariableDeclarations) {
-                        this.minimumBlankLines(currentElement, 1 + this.style.minimum.aroundField) // TODO aroundFieldInInterface
+                        const fieldBlankLines = isInterface
+                            ? this.style.minimum.aroundFieldInInterface ?? 0
+                            : this.style.minimum.aroundField;
+                        this.minimumBlankLines(currentElement, fieldBlankLines);
                     }
                     if (previousElement.kind == J.Kind.MethodDeclaration || currentElement.kind == J.Kind.MethodDeclaration) {
-                        this.minimumBlankLines(currentElement, 1 + this.style.minimum.aroundMethod) // TODO aroundMethodInInterface
+                        const methodBlankLines = isInterface
+                            ? this.style.minimum.aroundMethodInInterface ?? 0
+                            : this.style.minimum.aroundMethod;
+                        this.minimumBlankLines(currentElement, methodBlankLines);
                     }
                     this.keepMaximumBlankLines(currentElement, this.style.keepMaximum.inCode);
                     draft.body.statements[i].element = currentElement;
@@ -1092,7 +1141,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
                     }
                     this.keepMaximumBlankLines(draft, this.style.keepMaximum.inCode);
                 }
-            } else if (parent?.kind === J.Kind.Block && grandparent?.kind !== J.Kind.NewClass ||
+            } else if (parent?.kind === J.Kind.Block && grandparent?.kind !== J.Kind.NewClass && grandparent?.kind !== JS.Kind.TypeLiteral ||
                       (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
                       (parent?.kind === J.Kind.Case)) {
                 if (draft.kind != J.Kind.Case) {
@@ -1106,8 +1155,8 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
             const parentKind = this.cursor.parent?.value.kind;
-            // Skip newline only for object literals (NewClass) - they should preserve single-line formatting
-            if (parentKind != J.Kind.NewClass) {
+            // Skip newline for object literals (NewClass) and type literals (TypeLiteral)
+            if (parentKind != J.Kind.NewClass && parentKind != JS.Kind.TypeLiteral) {
                 draft.end = replaceLastWhitespace(draft.end, ws =>
                     ws.includes("\n") ? ws : ws.replace(/[ \t]+$/, '') + "\n"
                 );

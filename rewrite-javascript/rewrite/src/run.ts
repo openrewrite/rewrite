@@ -78,13 +78,14 @@ export type ProgressCallback = (phase: 'parsing' | 'scanning' | 'processing', cu
  * Streaming version of scheduleRun that yields results as soon as each file is processed.
  * This allows callers to print diffs immediately and free memory earlier.
  *
- * Accepts either an array or an async iterable of source files. When the recipe is not
- * a scanning recipe, files are processed immediately as they're yielded from the iterable,
- * avoiding the need to collect all files into memory first.
+ * Accepts either an array or an async iterable of source files. Files are processed
+ * immediately as they're yielded from the iterable, avoiding the need to collect all
+ * files into memory before starting work.
  *
- * For scanning recipes, the scan phase completes on all files before yielding any results.
+ * For scanning recipes, each file is scanned immediately as it's pulled from the generator,
+ * then stored for the edit phase. The scan phase completes before any results are yielded.
  *
- * @param onProgress Optional callback for progress updates during parsing, scanning, and processing phases.
+ * @param onProgress Optional callback for progress updates during scanning and processing phases.
  */
 export async function* scheduleRunStreaming(
     recipe: Recipe,
@@ -96,29 +97,28 @@ export async function* scheduleRunStreaming(
     const isScanning = await hasScanningRecipe(recipe);
 
     if (isScanning) {
-        // For scanning recipes, we need to collect all files first for the scan phase
-        const files: SourceFile[] = Array.isArray(before) ? [...before] : [];
-        if (!Array.isArray(before)) {
-            let parseCount = 0;
-            for await (const sf of before) {
-                files.push(sf);
-                parseCount++;
-                onProgress?.('parsing', parseCount, -1, sf.sourcePath); // -1 = unknown total
-            }
-        }
+        // For scanning recipes, pull files from the generator and scan them immediately.
+        // Files are stored for the later edit phase.
+        const files: SourceFile[] = [];
+        const iterable = Array.isArray(before) ? before : before;
+        const knownTotal = Array.isArray(before) ? before.length : -1; // -1 = unknown total
 
-        const totalFiles = files.length;
+        // Phase 1: Pull files from generator and scan each immediately
+        let scanCount = 0;
+        for await (const b of iterable) {
+            files.push(b);
+            scanCount++;
+            onProgress?.('scanning', scanCount, knownTotal, b.sourcePath);
 
-        // Phase 1: Run scanners on all files
-        for (let i = 0; i < files.length; i++) {
-            const b = files[i];
-            onProgress?.('scanning', i + 1, totalFiles, b.sourcePath);
+            // Scan this file immediately
             await recurseRecipeList(recipe, b, async (recipe, b2) => {
                 if (recipe instanceof ScanningRecipe) {
                     return (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor)
                 }
             });
         }
+
+        const totalFiles = files.length;
 
         // Phase 2: Collect generated files
         const generated = (await recurseRecipeList(recipe, [] as SourceFile[], async (recipe, generated) => {
