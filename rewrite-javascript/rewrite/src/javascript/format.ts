@@ -135,8 +135,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitAssignment(assignment: J.Assignment, p: P): Promise<J | undefined> {
         const ret = await super.visitAssignment(assignment, p) as J.Assignment;
         return produce(ret, draft => {
-            draft.assignment.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
-            draft.assignment.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.assignment.before.whitespace.includes("\n")) {
+                draft.assignment.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
+            if (!draft.assignment.element.prefix.whitespace.includes("\n")) {
+                draft.assignment.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
         });
     }
 
@@ -228,8 +233,12 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 // Apply afterComma rule to elements after the first
                 for (let i = 1; i < draft.elements.length; i++) {
                     const currentWs = draft.elements[i].element.prefix.whitespace;
+                    // Also check for Spread marker with newline (for spread elements the newline is in the marker)
+                    const element = draft.elements[i].element as J;
+                    const spreadMarker = element.markers?.markers?.find(m => m.kind === JS.Markers.Spread) as { prefix: J.Space } | undefined;
+                    const hasNewlineInSpread = spreadMarker?.prefix?.whitespace?.includes("\n");
                     // Preserve original newlines - only adjust spacing when elements are on same line
-                    if (!currentWs.includes("\n")) {
+                    if (!currentWs.includes("\n") && !hasNewlineInSpread) {
                         draft.elements[i].element.prefix.whitespace = this.style.other.afterComma ? " " : "";
                     }
                 }
@@ -471,8 +480,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.name.before.whitespace = " ";
             }
             draft.name.element.prefix.whitespace = " ";
-            draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
-            draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.initializer.before.whitespace.includes("\n")) {
+                draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
+            if (!draft.initializer.element.prefix.whitespace.includes("\n")) {
+                draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
         });
     }
 

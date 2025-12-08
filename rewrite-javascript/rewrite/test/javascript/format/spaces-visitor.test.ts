@@ -209,4 +209,48 @@ describe('SpacesVisitor', () => {
                 `const x=3; class A {m() { this.x=4; }}`)
             // @formatter:on
         )});
+
+    test('assignment with newline after = should not collapse to single line', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `if (result.tailwindConfig) {
+    logInfo.firstFewLines =
+        JSON.stringify(result.tailwindConfig).slice(0, 100) + "..."
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('type declaration with newline after = should not collapse to single line', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `export type PurchaseComponentError =
+    | { type: "INSUFFICIENT_TOKENS"; message: string }
+    | { type: "COMPONENT_NOT_FOUND"; message: string }`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('spread operator should not have space after dots', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const arr = [
+    ...Object.keys(dependencies),
+    ...Object.keys(other),
+]`
+            )
+            // @formatter:on
+        )
+    });
 });

@@ -104,6 +104,18 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (tree.kind === JS.Kind.CompilationUnit) {
             return "";
         }
+        // TemplateExpressionSpan: reset indent context - template literal content determines its own indentation
+        // The expression inside ${...} should be indented based on where it appears in the template, not outer code
+        if (tree.kind === JS.Kind.TemplateExpressionSpan) {
+            // Extract base indent from the expression's prefix whitespace (after the last newline)
+            const span = tree as JS.TemplateExpression.Span;
+            const prefix = span.expression?.prefix?.whitespace ?? "";
+            const lastNewline = prefix.lastIndexOf("\n");
+            if (lastNewline >= 0) {
+                return prefix.slice(lastNewline + 1);
+            }
+            return "";
+        }
         if (tree.kind === J.Kind.IfElse || parentIndentKind === 'align') {
             return parentMyIndent;
         }
@@ -309,13 +321,57 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     private preVisitContainer<T extends J>(container: J.Container<T>): void {
-        const myIndent = this.cursor.parent?.messages.get("myIndent") as string ?? "";
+        let myIndent = this.cursor.parent?.messages.get("myIndent") as string ?? "";
+
+        // Check if we're in a method chain - use chainedIndent if available
+        // This ensures arguments inside method chains like `.select(arg)` inherit the chain's indent level
+        // BUT stop at scope boundaries:
+        // 1. Blocks - nested code inside callbacks should NOT use outer chainedIndent
+        // 2. Other Containers - nested function call arguments should NOT use outer chainedIndent
+        for (let c = this.cursor.parent; c; c = c.parent) {
+            // Stop searching if we hit a Block (function body, arrow function body, etc.)
+            // This prevents chainedIndent from leaking into nested scopes
+            if (c.value?.kind === J.Kind.Block) {
+                break;
+            }
+            // Stop searching if we hit another Container (arguments of another function call)
+            // This prevents chainedIndent from leaking into nested function calls
+            if (c.value?.kind === J.Kind.Container) {
+                break;
+            }
+            const chainedIndent = c.messages.get("chainedIndent") as string | undefined;
+            if (chainedIndent !== undefined) {
+                myIndent = chainedIndent;
+                break;
+            }
+        }
+
         this.cursor.messages.set("myIndent", myIndent);
         this.cursor.messages.set("indentKind", 'continuation');
     }
 
     private postVisitContainer<T extends J>(container: J.Container<T>): J.Container<T> {
-        const parentIndent = this.cursor.parent?.messages.get("myIndent") as string ?? "";
+        let parentIndent = this.cursor.parent?.messages.get("myIndent") as string ?? "";
+
+        // Check for chainedIndent for closing delimiter alignment in method chains
+        // BUT stop at scope boundaries:
+        // 1. Blocks - nested code inside callbacks should NOT use outer chainedIndent
+        // 2. Other Containers - nested function call arguments should NOT use outer chainedIndent
+        for (let c = this.cursor.parent; c; c = c.parent) {
+            // Stop searching if we hit a Block (function body, arrow function body, etc.)
+            if (c.value?.kind === J.Kind.Block) {
+                break;
+            }
+            // Stop searching if we hit another Container (arguments of another function call)
+            if (c.value?.kind === J.Kind.Container) {
+                break;
+            }
+            const chainedIndent = c.messages.get("chainedIndent") as string | undefined;
+            if (chainedIndent !== undefined) {
+                parentIndent = chainedIndent;
+                break;
+            }
+        }
 
         // Normalize the last element's after whitespace (closing delimiter like `)`)
         // The closing delimiter should align with the parent's indent level
@@ -446,12 +502,17 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         let myIndent = parentIndent;
         if (hasNewline && isMethodChain) {
             // Search up the cursor hierarchy for an existing chainedIndent (to avoid stacking in method chains)
-            const existingChainedIndent = this.cursor.parent?.messages.get("chainedIndent") as string | undefined;
+            let existingChainedIndent: string | undefined;
+            for (let c = this.cursor.parent; c; c = c.parent) {
+                existingChainedIndent = c.messages.get("chainedIndent") as string | undefined;
+                if (existingChainedIndent !== undefined) {
+                    break;
+                }
+            }
             if (existingChainedIndent === undefined) {
                 myIndent = parentIndent + this.singleIndent;
-                // Set myIndent on parent so Container siblings and further chain elements use it
-                this.cursor.parent?.messages.set("myIndent", myIndent);
-                this.cursor.parent?.messages.delete("chainedIndent");
+                // Set chainedIndent on parent so further chain elements don't stack
+                this.cursor.parent?.messages.set("chainedIndent", myIndent);
             } else {
                 myIndent = existingChainedIndent;
             }
@@ -472,7 +533,16 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         }
 
         this.cursor.messages.set("myIndent", myIndent);
-        this.cursor.messages.set("indentKind", "align");
+        // Set 'align' for most RightPadded elements to prevent double-continuation
+        // EXCEPT when Parentheses wraps a Binary expression - in that case, the Binary's
+        // children need continuation mode to get proper indentation for multi-line operands
+        const rightPaddedParentKind = this.cursor.parent?.value?.kind;
+        const elementKind = (right.element as any)?.kind;
+        const isParenthesesWrappingBinary = rightPaddedParentKind === J.Kind.Parentheses &&
+            elementKind === J.Kind.Binary;
+        if (!isParenthesesWrappingBinary) {
+            this.cursor.messages.set("indentKind", "align");
+        }
     }
 
     private elementPrefixContainsNewline(element: J): boolean {
