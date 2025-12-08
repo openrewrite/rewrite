@@ -3474,7 +3474,7 @@ export class JavaScriptParserVisitor {
             statements: node.clauses.map(clause =>
                 this.rightPadded(
                     this.visit(clause),
-                    this.suffix(clause)
+                    emptySpace
                 )),
             end: end
         }

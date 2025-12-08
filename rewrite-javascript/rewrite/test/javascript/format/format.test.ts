@@ -280,7 +280,7 @@ describe('AutoformatVisitor', () => {
             typescript(
                 // Should not change -1 to - 1
                 `if (obj === -1) {
-                }`,
+}`,
             )
             // @formatter:on
         )
@@ -385,8 +385,7 @@ describe('AutoformatVisitor', () => {
             typescript(
                 "abstract class L {}",
                 `abstract class L {
-                }
-                `
+}`
             )
             // @formatter:on
         )
@@ -398,8 +397,7 @@ describe('AutoformatVisitor', () => {
             //language=typescript
             typescript(
                 `const C = class extends Object {
-                }
-                `
+}`
             )
             // @formatter:on
         )

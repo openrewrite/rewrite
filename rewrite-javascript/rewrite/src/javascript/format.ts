@@ -311,11 +311,17 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitImportDeclaration(jsImport, p) as JS.Import;
         return produce(ret, draft => {
             if (draft.importClause) {
-                draft.importClause.prefix.whitespace = draft.importClause.namedBindings && !draft.importClause.typeOnly ? "" : " ";
+                // Space after 'import' keyword:
+                // - If there's a default import (name), space goes in importClause.prefix
+                // - If typeOnly (import type ...), space goes in importClause.prefix (before 'type')
+                // - If only namedBindings (no default, no type), space goes in namedBindings.prefix (importClause.prefix is empty)
+                const hasDefaultImport = !!draft.importClause.name;
+                draft.importClause.prefix.whitespace = (hasDefaultImport || draft.importClause.typeOnly) ? " " : "";
                 if (draft.importClause.name) {
                     draft.importClause.name.after.whitespace = "";
                 }
                 if (draft.importClause.namedBindings) {
+                    // Space before namedBindings - always needed
                     draft.importClause.namedBindings.prefix.whitespace = " ";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
