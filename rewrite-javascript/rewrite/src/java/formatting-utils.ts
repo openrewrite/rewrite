@@ -49,6 +49,22 @@ export function replaceLastWhitespace(space: J.Space, transform: (ws: string) =>
 }
 
 /**
+ * Strips leading spaces and tabs from a string (but not newlines).
+ */
+export function stripLeadingIndent(s: string): string {
+    return s.replace(/^[ \t]*/, '');
+}
+
+/**
+ * Replaces the indentation after the last newline in a whitespace string.
+ * If there's no newline, returns just the new indent.
+ */
+export function replaceIndentAfterLastNewline(ws: string, newIndent: string): string {
+    const lastNewline = ws.lastIndexOf("\n");
+    return ws.substring(0, lastNewline + 1) + newIndent;
+}
+
+/**
  * Handles element removal from lists while preserving LST formatting.
  * Automatically applies prefixes from removed elements to the next kept element,
  * handling whitespace and comment preservation.

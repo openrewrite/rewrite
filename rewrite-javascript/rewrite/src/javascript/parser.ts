@@ -3722,7 +3722,17 @@ export class JavaScriptParserVisitor {
     }
 
     visitJsxText(node: ts.JsxText): J.Literal {
-        return this.mapLiteral(node, node.text);
+        // For JsxText, we don't use mapLiteral because it would put whitespace into prefix.
+        // In JSX, the text content (including leading/trailing whitespace) should be in value/valueSource.
+        return {
+            kind: J.Kind.Literal,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            value: node.text,
+            valueSource: node.text,
+            type: Type.Primitive.String
+        };
     }
 
     visitJsxElement(node: ts.JsxElement): JSX.Tag {

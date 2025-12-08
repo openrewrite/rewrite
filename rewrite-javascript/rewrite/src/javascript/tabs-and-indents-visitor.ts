@@ -15,7 +15,14 @@
  */
 import {isJavaScript, JS, JSX} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {isJava, J, lastWhitespace, replaceLastWhitespace} from "../java";
+import {
+    isJava,
+    J,
+    lastWhitespace,
+    replaceIndentAfterLastNewline,
+    replaceLastWhitespace,
+    stripLeadingIndent
+} from "../java";
 import {produce} from "immer";
 import {Cursor, isScope, Tree} from "../tree";
 import {TabsAndIndentsStyle} from "./style";
@@ -85,6 +92,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         switch (tree.kind) {
             case J.Kind.Block:
             case J.Kind.Case:
+            case JS.Kind.JsxTag:
                 return 'block';
             case JS.Kind.CompilationUnit:
                 return 'align';
@@ -106,17 +114,84 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         let result = tree;
         if (result.prefix?.whitespace?.includes("\n")) {
             result = produce(result, draft => {
-                draft.prefix!.whitespace = this.combineIndent(draft.prefix!.whitespace, myIndent);
+                draft.prefix!.whitespace = replaceIndentAfterLastNewline(draft.prefix!.whitespace, myIndent);
             });
         }
 
         if (result.kind === J.Kind.Block) {
             result = this.normalizeBlockEnd(result as J.Block, myIndent);
-        } else if (result.kind === JS.Kind.JsxTag) {
-            result = this.normalizeJsxTagEnd(result as JSX.Tag, myIndent);
+        } else if (result.kind === J.Kind.Literal && this.isInsideJsxTag()) {
+            result = this.normalizeJsxTextContent(result as J.Literal, myIndent);
         }
 
         return result;
+    }
+
+    private isInsideJsxTag(): boolean {
+        return this.cursor.parentTree()!.value.kind === JS.Kind.JsxTag;
+    }
+
+    private normalizeJsxTextContent(literal: J.Literal, myIndent: string): J.Literal {
+        if (!literal.valueSource || !literal.valueSource.includes("\n")) {
+            return literal;
+        }
+
+        // Check if this literal is the last child of a JsxTag - if so, its trailing whitespace
+        // should use the parent tag's indent, not the content indent
+        const parentIndent = this.cursor.parentTree()!.messages.get("myIndent") as string | undefined;
+        const isLastChild = parentIndent !== undefined && this.isLastChildOfJsxTag(literal);
+
+        // Split by newlines and normalize each line's indentation
+        const lines = literal.valueSource.split('\n');
+        const result: string[] = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            if (i === 0) {
+                // Content before first newline stays as-is
+                result.push(lines[i]);
+                continue;
+            }
+
+            const content = stripLeadingIndent(lines[i]);
+
+            if (content === '') {
+                // Line has only whitespace (or is empty)
+                if (isLastChild && i === lines.length - 1) {
+                    // Trailing whitespace of last child - use parent indent for closing tag alignment
+                    result.push(parentIndent!);
+                } else if (i < lines.length - 1) {
+                    // Empty line in the middle (followed by more lines) - keep empty
+                    result.push('');
+                } else {
+                    // Trailing whitespace of non-last-child - add content indent
+                    result.push(myIndent);
+                }
+            } else {
+                // Line has content - add proper indent
+                result.push(myIndent + content);
+            }
+        }
+
+        const normalizedValueSource = result.join('\n');
+        if (normalizedValueSource === literal.valueSource) {
+            return literal;
+        }
+        return produce(literal, draft => {
+            draft.valueSource = normalizedValueSource;
+        });
+    }
+
+    private isLastChildOfJsxTag(literal: J.Literal): boolean {
+        const parentCursor = this.cursor.parentTree();
+        if (parentCursor && parentCursor.value.kind === JS.Kind.JsxTag) {
+            const tag = parentCursor.value as JSX.Tag;
+            if (tag.children && tag.children.length > 0) {
+                const lastChild = tag.children[tag.children.length - 1];
+                // Compare by id since object references might differ after transformations
+                return lastChild.kind === J.Kind.Literal && (lastChild as J.Literal).id === literal.id;
+            }
+        }
+        return false;
     }
 
     private normalizeBlockEnd(block: J.Block, myIndent: string): J.Block {
@@ -125,21 +200,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             return block;
         }
         return produce(block, draft => {
-            draft.end = replaceLastWhitespace(draft.end, ws => this.combineIndent(ws, myIndent));
-        });
-    }
-
-    private normalizeJsxTagEnd(tag: JSX.Tag, myIndent: string): JSX.Tag {
-        if (!tag.children || tag.children.length === 0) {
-            return tag;
-        }
-        const lastChild = tag.children[tag.children.length - 1];
-        if (lastChild.kind !== J.Kind.Literal || !lastChild.prefix.whitespace.includes("\n")) {
-            return tag;
-        }
-        return produce(tag, draft => {
-            const lastChildDraft = draft.children![draft.children!.length - 1];
-            lastChildDraft.prefix.whitespace = this.combineIndent(lastChildDraft.prefix.whitespace, myIndent);
+            draft.end = replaceLastWhitespace(draft.end, ws => replaceIndentAfterLastNewline(ws, myIndent));
         });
     }
 
@@ -158,7 +219,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
         if (ret.before.whitespace.includes("\n")) {
             ret = produce(ret, draft => {
-                draft.before.whitespace = this.combineIndent(draft.before.whitespace, elementsIndent);
+                draft.before.whitespace = replaceIndentAfterLastNewline(draft.before.whitespace, elementsIndent);
             });
         }
 
@@ -167,7 +228,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             if (effectiveLastWs.includes("\n")) {
                 ret = produce(ret, draft => {
                     const lastDraft = draft.elements[draft.elements.length - 1];
-                    lastDraft.after = replaceLastWhitespace(lastDraft.after, ws => this.combineIndent(ws, parentIndent));
+                    lastDraft.after = replaceLastWhitespace(lastDraft.after, ws => replaceIndentAfterLastNewline(ws, parentIndent));
                 });
             }
         }
@@ -203,7 +264,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             return ret;
         }
         return produce(ret, draft => {
-            draft.before.whitespace = this.combineIndent(draft.before.whitespace, parentIndent + this.singleIndent);
+            draft.before.whitespace = replaceIndentAfterLastNewline(draft.before.whitespace, parentIndent + this.singleIndent);
         });
     }
 
@@ -271,10 +332,5 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             v.kind !== J.Kind.Container &&
             v.kind !== J.Kind.LeftPadded &&
             v.kind !== J.Kind.RightPadded;
-    }
-
-    private combineIndent(oldWs: string, newIndent: string): string {
-        const lastNewline = oldWs.lastIndexOf("\n");
-        return oldWs.substring(0, lastNewline + 1) + newIndent;
     }
 }

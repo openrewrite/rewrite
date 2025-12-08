@@ -722,4 +722,43 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     })
+
+    test('JSX indentation: text content, nested tags, and closing tags', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            tsx(
+                `
+                function Page() {
+                    return (
+                        <div>
+                        <p>
+                        Text content
+
+                        Second line
+                        </p>
+                        <span>Inline</span>
+                        </div>
+                    );
+                }
+                `,
+                `
+                function Page() {
+                    return (
+                        <div>
+                            <p>
+                                Text content
+
+                                Second line
+                            </p>
+                            <span>Inline</span>
+                        </div>
+                    );
+                }
+                `
+            )
+            // @formatter:on
+        )
+    })
 });
