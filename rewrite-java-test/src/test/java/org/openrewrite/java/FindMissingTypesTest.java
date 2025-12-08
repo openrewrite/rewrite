@@ -17,13 +17,17 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings("ClassInitializerMayBeStatic")
 class FindMissingTypesTest implements RewriteTest {
@@ -236,6 +240,90 @@ class FindMissingTypesTest implements RewriteTest {
               interface Foo {
                   void bar();
               }
+              """
+          )
+        );
+    }
+
+    // Groovy Kotlin DSL seems to be missing from the classpath
+    @Test
+    void repositoryByUrlAndPurposeProjectKts() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  id("java")
+                  id("kotlin") version "1.9.22"
+                  `maven-publish`
+              }
+              
+              group = "com.some.project"
+              version = "1.0.0"
+              
+              java {
+                  withJavadocJar()
+                  withSourcesJar()
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_21.majorVersion))
+                  }
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+              
+              }
+              
+              tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+                  kotlinOptions.jvmTarget = "21"
+              }
+              """
+          )
+        );
+    }
+
+    //This is caused by a missed case in FindMissingTypes (it checks methodType and variableType but not type)
+    @Test
+    void kotlinClassReference() {
+        rewriteRun(
+          spec -> spec.parser(
+            KotlinParser.builder().classpathFromResources(new InMemoryExecutionContext(), "jakarta.persistence-api")),
+          kotlin(
+            """
+              package com.some.other
+              
+              class EventPublisher {
+                  // Implementation for publishing domain events
+              }
+              """
+          ),
+          kotlin(
+            """
+              package com.some.card
+              
+              import com.some.other.EventPublisher
+              import jakarta.persistence.Column
+              import jakarta.persistence.Entity
+              import jakarta.persistence.EntityListeners
+              import jakarta.persistence.GeneratedValue
+              import jakarta.persistence.GenerationType
+              import jakarta.persistence.Id
+              import jakarta.persistence.Table
+              import java.time.Instant
+              
+              @Entity
+              @Table(name = "card")
+              @EntityListeners(EventPublisher::class)
+              data class Card(
+                  @Id
+                  @GeneratedValue(strategy = GenerationType.IDENTITY)
+                  val id: Long? = null,
+              
+                  @Column(nullable = false)
+                  val createdAt: Instant = Instant.now(),
+              )
               """
           )
         );
