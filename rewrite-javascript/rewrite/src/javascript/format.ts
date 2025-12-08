@@ -127,8 +127,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): Promise<J | undefined> {
         const ret = await super.visitArrayAccess(arrayAccess, p) as J.ArrayAccess;
         return produce(ret, draft => {
-            draft.dimension.index.element.prefix.whitespace = this.style.within.arrayBrackets ? " " : "";
-            draft.dimension.index.after.whitespace = this.style.within.arrayBrackets ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.dimension.index.element.prefix.whitespace.includes("\n")) {
+                draft.dimension.index.element.prefix.whitespace = this.style.within.arrayBrackets ? " " : "";
+            }
+            if (!draft.dimension.index.after.whitespace.includes("\n")) {
+                draft.dimension.index.after.whitespace = this.style.within.arrayBrackets ? " " : "";
+            }
         });
     }
 

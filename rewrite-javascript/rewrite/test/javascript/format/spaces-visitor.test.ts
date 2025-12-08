@@ -253,4 +253,18 @@ describe('SpacesVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('array access with newline should not collapse to single line', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `delete flatDependencyTree[
+    (resolvedComponents as ResolvedComponent).fullSlug
+]`
+            )
+            // @formatter:on
+        )
+    });
 });
