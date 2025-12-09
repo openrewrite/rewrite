@@ -69,6 +69,10 @@ public class ExplainDependenciesInUse extends DataTable<ExplainDependenciesInUse
                               "specified in the POM.")
         String scope;
 
+        @Column(displayName = "Count",
+                description = "How many times does this dependency appear.")
+        Integer count;
+
         @Column(displayName = "Dependency graph",
                 description = "The dependency paths that requested the dependency.")
         String dependencyGraph;
