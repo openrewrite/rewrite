@@ -1579,13 +1579,13 @@ export class JavaScriptParserVisitor {
         return {
             kind: J.Kind.ParenthesizedTypeTree,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: this.prefix(node),
             markers: emptyMarkers,
             annotations: [],
             parenthesizedType: {
                 kind: J.Kind.Parentheses,
                 id: randomId(),
-                prefix: this.prefix(node),
+                prefix: emptySpace,
                 markers: emptyMarkers,
                 tree: this.rightPadded(this.convert(node.type), this.prefix(node.getLastToken()!))
             }
