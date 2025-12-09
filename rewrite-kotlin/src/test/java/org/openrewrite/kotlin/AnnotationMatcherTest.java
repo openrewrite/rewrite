@@ -83,6 +83,35 @@ class AnnotationMatcherTest implements RewriteTest {
         );
     }
 
+    @Test
+    void matchJavaClassArgumentWithKotlinSyntax() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().classpath("junit-jupiter-api")),
+          kotlin(
+            """
+              import org.junit.jupiter.api.extension.ExtendWith
+              import org.junit.jupiter.api.extension.Extension
+
+              @ExtendWith(Extension::class.java)
+              class A
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AnnotationMatcher javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension.class)");
+                AtomicBoolean foundJavaStyle = new AtomicBoolean(false);
+
+                getMatcherVisitor(javaStyleMatcher).visit(cu, foundJavaStyle);
+                assertThat(foundJavaStyle.get()).isTrue();
+
+                AnnotationMatcher kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension::class.java)");
+                AtomicBoolean foundKotlinStyle = new AtomicBoolean(false);
+
+                getMatcherVisitor(kotlinStyleMatcher).visit(cu, foundKotlinStyle);
+                assertThat(foundKotlinStyle.get()).isTrue();
+            })
+          )
+        );
+    }
+
     private KotlinVisitor<AtomicBoolean> getMatcherVisitor(AnnotationMatcher matcher) {
         return new KotlinIsoVisitor<>() {
             @Override
