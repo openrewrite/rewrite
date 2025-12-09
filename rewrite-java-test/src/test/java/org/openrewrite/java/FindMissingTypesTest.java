@@ -25,7 +25,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -245,45 +244,6 @@ class FindMissingTypesTest implements RewriteTest {
         );
     }
 
-    // Groovy Kotlin DSL seems to be missing from the classpath
-    @Test
-    void repositoryByUrlAndPurposeProjectKts() {
-        rewriteRun(
-          buildGradleKts(
-            """
-              plugins {
-                  id("java")
-                  id("kotlin") version "1.9.22"
-                  `maven-publish`
-              }
-              
-              group = "com.some.project"
-              version = "1.0.0"
-              
-              java {
-                  withJavadocJar()
-                  withSourcesJar()
-                  toolchain {
-                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_21.majorVersion))
-                  }
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-              
-              }
-              
-              tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-                  kotlinOptions.jvmTarget = "21"
-              }
-              """
-          )
-        );
-    }
-
     @Test
     void kotlinClassReference() {
         rewriteRun(
@@ -305,6 +265,34 @@ class FindMissingTypesTest implements RewriteTest {
               import jakarta.persistence.EntityListeners
               
               @EntityListeners(EventPublisher::class)
+              data class Card(
+              )
+              """
+          )
+        );
+    }
+
+    @Test
+    void invalidKotlinClassReference() {
+        rewriteRun(
+          spec -> spec.parser(
+            KotlinParser.builder().classpathFromResources(new InMemoryExecutionContext(), "jakarta.persistence-api")),
+          kotlin(
+            """
+              package com.some.card
+              
+              import jakarta.persistence.EntityListeners
+              
+              @EntityListeners(EventPublisher::class)
+              data class Card(
+              )
+              """,
+            """
+              package com.some.card
+              
+              import jakarta.persistence.EntityListeners
+              
+              @EntityListeners(/*~~(MemberReference Parameterized type is missing or malformed)~~>*//*~~(Identifier type is missing or malformed)~~>*/EventPublisher::class)
               data class Card(
               )
               """
