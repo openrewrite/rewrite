@@ -2,10 +2,6 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
-recipeDependencies {
-    parserClasspath("jakarta.persistence:jakarta.persistence-api:3.1.0")
-}
-
 dependencies {
     implementation("org.assertj:assertj-core:latest.release")
     implementation(project(":rewrite-java"))

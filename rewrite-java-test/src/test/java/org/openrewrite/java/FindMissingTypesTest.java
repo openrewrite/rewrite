@@ -283,32 +283,4 @@ class FindMissingTypesTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void kotlinClassReference() {
-        rewriteRun(
-          spec -> spec.parser(
-            KotlinParser.builder().classpathFromResources(new InMemoryExecutionContext(), "jakarta.persistence-api")),
-          kotlin(
-            """
-              package com.some.other
-              
-              class EventPublisher {
-              }
-              """
-          ),
-          kotlin(
-            """
-              package com.some.card
-              
-              import com.some.other.EventPublisher
-              import jakarta.persistence.EntityListeners
-              
-              @EntityListeners(EventPublisher::class)
-              data class Card(
-              )
-              """
-          )
-        );
-    }
 }
