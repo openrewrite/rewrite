@@ -35,7 +35,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.*;
@@ -380,7 +379,7 @@ public class ChangeParentPom extends Recipe {
         }.visitNonNull(pomXml, ctx);
         return referencedProps.stream()
                 .filter(cascadedProps::containsKey)
-                .collect(Collectors.toMap(p -> p, cascadedProps::get));
+                .collect(toMap(p -> p, cascadedProps::get));
     }
 
     private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {
