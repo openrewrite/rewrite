@@ -14,4 +14,8 @@
  * limitations under the License.
  */
 
+export * from "./async-callback-in-sync-array-method";
+export * from "./auto-format";
 export * from "./upgrade-dependency-version";
+export * from "./order-imports";
+export * from "./change-import";

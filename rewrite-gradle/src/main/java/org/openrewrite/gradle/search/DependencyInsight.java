@@ -15,9 +15,7 @@
  */
 package org.openrewrite.gradle.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -30,8 +28,10 @@ import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.graph.DependencyGraph;
 import org.openrewrite.maven.graph.DependencyTreeWalker;
 import org.openrewrite.maven.table.DependenciesInUse;
+import org.openrewrite.maven.table.ExplainDependenciesInUse;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -50,6 +50,7 @@ import static java.util.stream.Collectors.joining;
 @EqualsAndHashCode(callSuper = false)
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
+    transient ExplainDependenciesInUse explainDependenciesInUse = new ExplainDependenciesInUse(this);
 
     private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
     private static final MethodMatcher DEPENDENCY_CLOSURE_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
@@ -132,11 +133,28 @@ public class DependencyInsight extends Recipe {
                         .map(JavaSourceSet::getName)
                         .orElse("main");
 
+                Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByConfiguration = new HashMap<>();
                 DependencyTreeWalker.Matches<String> matches = new DependencyTreeWalker.Matches<>();
-                collectMatchingDependencies(projectName, sourceSetName, gp, matches, ctx);
+                collectMatchingDependencies(projectName, sourceSetName, gp, dependencyPathsByConfiguration, matches, ctx);
 
                 if (matches.isEmpty()) {
                     return sourceFile;
+                }
+
+                for (Map.Entry<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> configurationEntry : dependencyPathsByConfiguration.entrySet()) {
+                    for (Map.Entry<ResolvedGroupArtifactVersion, DependencyGraph> entry : configurationEntry.getValue().entrySet()) {
+                        ResolvedGroupArtifactVersion gav = entry.getKey();
+                        explainDependenciesInUse.insertRow(ctx, new ExplainDependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                gav.getGroupId(),
+                                gav.getArtifactId(),
+                                gav.getVersion(),
+                                gav.getDatedSnapshotVersion(),
+                                configurationEntry.getKey(),
+                                entry.getValue().print()
+                        ));
+                    }
                 }
 
                 // Non-resolvable configurations may contain the requested which has been found to transitively depend on the target
@@ -168,6 +186,7 @@ public class DependencyInsight extends Recipe {
                     String projectName,
                     String sourceSetName,
                     GradleProject gp,
+                    Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByConfiguration,
                     DependencyTreeWalker.Matches<String> matches,
                     ExecutionContext ctx
             ) {
@@ -184,8 +203,11 @@ public class DependencyInsight extends Recipe {
                             continue;
                         }
                         matches.collect(configName, resolvedDependency, dependencyMatcher,
-                                (matched, path) ->
-                                        createDataTableRow(projectName, sourceSetName, configName, matched.getGav(), path, ctx));
+                                (matched, path) -> {
+                                    dependencyPathsByConfiguration.computeIfAbsent(configName, __ -> new HashMap<>())
+                                            .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(configName, path);
+                                    createDataTableRow(projectName, sourceSetName, configName, matched.getGav(), path, ctx);
+                                });
                     }
                 }
             }
@@ -198,7 +220,6 @@ public class DependencyInsight extends Recipe {
                     Deque<ResolvedDependency> dependencyPath,
                     ExecutionContext ctx
             ) {
-                String dependencyGraph = DependencyTreeWalker.renderPath(configurationName, dependencyPath);
                 dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                         projectName,
                         sourceSetName,
@@ -207,8 +228,7 @@ public class DependencyInsight extends Recipe {
                         gav.getVersion(),
                         gav.getDatedSnapshotVersion(),
                         configurationName,
-                        dependencyPath.size() - 1,
-                        dependencyGraph
+                        dependencyPath.size() - 1
                 ));
             }
         };

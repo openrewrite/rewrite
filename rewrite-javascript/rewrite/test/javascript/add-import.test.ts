@@ -507,6 +507,31 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('should add named import to existing default-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "useState", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import React from 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `,
+                    `
+                        import React, {useState} from 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `
+                )
+            );
+        });
+
         test('should preserve formatting when merging imports (forwardRef, memo example)', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({ module: "react", member: "memo", onlyIfReferenced: false }));
@@ -734,19 +759,19 @@ describe('AddImport visitor', () => {
             await spec.rewriteRun(
                 typescript(
                     `
-                        import * as fs from 'fs';
+                    import * as fs from 'fs';
 
-                        function example() {
-                            placeholder();
-                        }
+                    function example() {
+                        placeholder();
+                    }
                     `,
                     `
-                        import * as fs from 'fs';
-                        import {promisify} from 'util';
+                    import * as fs from 'fs';
+                    import {promisify} from 'util';
 
-                        function example() {
-                            promisify(fs.readFile);
-                        }
+                    function example() {
+                        promisify(fs.readFile);
+                    }
                     `
                 )
             );

@@ -97,7 +97,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitJsxTag(element: JSX.Tag, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(element, p);
-        await this.visitLeftPaddedLocal("<", element.openName, p);
+        // Print < first, then the space after < (openName.before), then the tag name
+        p.append("<");
+        await this.visitSpace(element.openName.before, p);
+        await this.visit(element.openName.element, p);
         if (element.typeArguments) {
             await this.visitContainerLocal("<", element.typeArguments, ",", ">", p);
         }
@@ -113,7 +116,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 for (let i = 0; i < element.children.length; i++) {
                     await this.visit(element.children[i], p)
                 }
-                await this.visitLeftPaddedLocal("</", element.closingName, p);
+                // Print </ first, then the space after </ (closingName.before), then the tag name
+                p.append("</");
+                await this.visitSpace(element.closingName!.before, p);
+                await this.visit(element.closingName!.element, p);
                 await this.visitSpace(element.afterClosingName, p);
                 p.append(">");
             }

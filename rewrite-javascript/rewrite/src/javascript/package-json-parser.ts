@@ -187,12 +187,15 @@ export class PackageJsonParser extends Parser {
                 : filePath;
 
             // Try to read lock file if dependency resolution is not skipped
-            // Use relativeTo directory if available (for tests), otherwise use the directory from input path
+            // First try the directory containing the package.json, then walk up toward relativeTo
             let lockContent: PackageLockContent | undefined = undefined;
             let packageManager: PackageManager | undefined = undefined;
             if (!this.skipDependencyResolution) {
-                const lockDir = this.relativeTo || dir;
-                const lockResult = await this.tryReadLockFile(lockDir);
+                // Resolve dir relative to relativeTo if dir is relative (e.g., '.' when package.json is at root)
+                const absoluteDir = this.relativeTo && !path.isAbsolute(dir)
+                    ? path.resolve(this.relativeTo, dir)
+                    : dir;
+                const lockResult = await this.tryReadLockFileWithWalkUp(absoluteDir, this.relativeTo);
                 lockContent = lockResult?.content;
                 packageManager = lockResult?.packageManager;
             }
@@ -213,6 +216,50 @@ export class PackageJsonParser extends Parser {
             console.warn(`Failed to create NodeResolutionResult marker: ${error}`);
             return null;
         }
+    }
+
+    /**
+     * Attempts to find and read a lock file by walking up the directory tree.
+     * Starts from the directory containing the package.json and walks up toward
+     * the root directory (or relativeTo if specified).
+     *
+     * This handles both standalone projects (lock file next to package.json) and
+     * workspace scenarios (lock file at workspace root).
+     *
+     * @param startDir The directory containing the package.json being parsed
+     * @param rootDir Optional root directory to stop walking at (e.g., relativeTo/git root)
+     * @returns Object with parsed lock file content and detected package manager, or undefined if none found
+     */
+    private async tryReadLockFileWithWalkUp(
+        startDir: string,
+        rootDir?: string
+    ): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
+        // Normalize paths for comparison
+        const normalizedRoot = rootDir ? path.resolve(rootDir) : undefined;
+        let currentDir = path.resolve(startDir);
+
+        // Walk up the directory tree looking for a lock file
+        while (true) {
+            const result = await this.tryReadLockFile(currentDir);
+            if (result) {
+                return result;
+            }
+
+            // If we've reached rootDir, stop walking (don't go above it)
+            if (normalizedRoot && currentDir === normalizedRoot) {
+                break;
+            }
+
+            // Check if we've reached the filesystem root
+            const parentDir = path.dirname(currentDir);
+            if (parentDir === currentDir) {
+                break;
+            }
+
+            currentDir = parentDir;
+        }
+
+        return undefined;
     }
 
     /**
@@ -251,6 +298,14 @@ export class PackageJsonParser extends Parser {
             } catch (error) {
                 console.debug?.(`Failed to parse ${config.filename}: ${error}`);
             }
+        }
+
+        // Fallback: if node_modules exists but no lock file was found (e.g., symlinked from another workspace),
+        // walk node_modules to get resolved dependency information
+        const parsed = await this.walkNodeModules(dir);
+        if (parsed) {
+            // Assume npm as the default package manager when only node_modules exists
+            return { content: parsed, packageManager: PackageManager.Npm };
         }
 
         return undefined;

@@ -15,9 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for BlankLinesVisitor - handles blank lines between declarations and statements.
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    blank line scenarios into a single test with multiple variations in the source text.
+ *
+ * 2. SCOPE: This file should contain tests specific to BlankLinesVisitor behavior and
+ *    BlankLinesStyle settings. For full formatter integration tests, use format.test.ts.
+ */
+
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {BlankLinesStyle, IntelliJ, typescript} from "../../../src/javascript";
-import {BlankLinesVisitor} from "../../../src/javascript/format";
+import {BlankLinesStyle, BlankLinesVisitor, IntelliJ, typescript} from "../../../src/javascript";
 import {Draft, produce} from "immer";
 import {Style} from "../../../src";
 
@@ -141,11 +154,9 @@ describe('BlankLinesVisitor', () => {
                     constructor(public title:string,public done:boolean=false){
                     }
 
-
                     toggle():void{
                     this.done=!this.done;
                     }
-
 
                     toString():string{
                     return (this.done?"[x]":"[ ]")+this.title

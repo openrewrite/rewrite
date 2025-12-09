@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.marker;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -163,6 +165,7 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
      */
     @Value
     @With
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     public static class Dependency implements RpcCodec<Dependency> {
         String name;              // Package name (e.g., "react")
         String versionConstraint; // Version constraint (e.g., "^18.2.0")
@@ -195,6 +198,7 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
      */
     @Value
     @With
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     public static class ResolvedDependency implements RpcCodec<ResolvedDependency> {
         String name;    // Package name (e.g., "react")
         String version; // Actual resolved version (e.g., "18.3.1")

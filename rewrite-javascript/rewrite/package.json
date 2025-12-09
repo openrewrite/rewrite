@@ -21,7 +21,7 @@
   },
   "scripts": {
     "build": "rm -rf ./dist tsconfig.build.tsbuildinfo && tsc --build tsconfig.build.json",
-    "postbuild": "chmod +x dist/rpc/server.js && npm link",
+    "postbuild": "chmod +x dist/rpc/server.js dist/cli/rewrite.js && npm link",
     "typecheck": "tsc --noEmit",
     "dev": "tsc --watch -p tsconfig.json",
     "test": "npm run typecheck && npm run build && NODE_OPTIONS='--max-old-space-size=4096' jest",
@@ -55,6 +55,7 @@
     "ts-node": "^10.9.2"
   },
   "bin": {
+    "rewrite": "./dist/cli/rewrite.js",
     "rewrite-rpc": "./dist/rpc/server.js"
   }
 }

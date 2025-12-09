@@ -13,6 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for SpacesVisitor - handles spacing around operators, braces, parentheses, etc.
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    spacing scenarios into a single test with multiple variations in the source text.
+ *
+ * 2. SCOPE: This file should contain tests specific to SpacesVisitor behavior and
+ *    SpacesStyle settings. For full formatter integration tests, use format.test.ts.
+ */
+
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {BlankLinesStyle, IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../../src/javascript";
 import {AutoformatVisitor, SpacesVisitor} from "../../../src/javascript/format";
@@ -134,6 +148,44 @@ describe('SpacesVisitor', () => {
             // @formatter:on
         )});
 
+    test('objectLiteralTypeBraces: true (TypeScript default)', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralTypeBraces = true;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            type Values = {[key: string]: string}
+            function foo(x:{name:string}): void {}
+            const bar: {html:string} = { html: "" };
+            `,
+                `
+            type Values = { [key: string]: string }
+            function foo(x: { name: string }): void {}
+            const bar: { html: string } = { html: "" };
+            `)
+            // @formatter:on
+        )});
+
+    test('objectLiteralTypeBraces: false (JavaScript default)', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralTypeBraces = false;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            type Values = { [key: string]: string }
+            function foo(x: { name: string }): void {}
+            `,
+                `
+            type Values = {[key: string]: string}
+            function foo(x: {name: string}): void {}
+            `)
+            // @formatter:on
+        )});
+
     test('space around assignment operator: true', () => {
         spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
             draft.aroundOperators.assignment = true;
@@ -157,4 +209,62 @@ describe('SpacesVisitor', () => {
                 `const x=3; class A {m() { this.x=4; }}`)
             // @formatter:on
         )});
+
+    test('assignment with newline after = should not collapse to single line', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `if (result.tailwindConfig) {
+    logInfo.firstFewLines =
+        JSON.stringify(result.tailwindConfig).slice(0, 100) + "..."
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('type declaration with newline after = should not collapse to single line', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `export type PurchaseComponentError =
+    | { type: "INSUFFICIENT_TOKENS"; message: string }
+    | { type: "COMPONENT_NOT_FOUND"; message: string }`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('spread operator should not have space after dots', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const arr = [
+    ...Object.keys(dependencies),
+    ...Object.keys(other),
+]`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('array access with newline should not collapse to single line', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `delete flatDependencyTree[
+    (resolvedComponents as ResolvedComponent).fullSlug
+]`
+            )
+            // @formatter:on
+        )
+    });
 });

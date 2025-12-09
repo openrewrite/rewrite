@@ -367,10 +367,13 @@ export class JavaScriptParserVisitor {
         }
 
         let shebangStatement: J.RightPadded<JS.Shebang> | undefined;
+        let shebangTrailingSpace: J.Space | undefined;
         if (prefix.whitespace?.startsWith('#!')) {
             const newlineIndex = prefix.whitespace.indexOf('\n');
             const shebangText = newlineIndex === -1 ? prefix.whitespace : prefix.whitespace.slice(0, newlineIndex);
-            const afterShebang = newlineIndex === -1 ? '' : '\n';
+            // Shebang's after only contains the newline that terminates the shebang line
+            // The remaining whitespace and comments go into the first statement's prefix
+            const afterShebangNewline = newlineIndex === -1 ? '' : '\n';
             const remainingWhitespace = newlineIndex === -1 ? '' : prefix.whitespace.slice(newlineIndex + 1);
 
             shebangStatement = this.rightPadded<JS.Shebang>({
@@ -379,11 +382,36 @@ export class JavaScriptParserVisitor {
                 prefix: emptySpace,
                 markers: emptyMarkers,
                 text: shebangText
-            }, {kind: J.Kind.Space, whitespace: afterShebang, comments: []}, emptyMarkers);
+            }, {kind: J.Kind.Space, whitespace: afterShebangNewline, comments: []}, emptyMarkers);
 
+            // Store the trailing whitespace and comments to prepend to first statement
+            if (remainingWhitespace || prefix.comments.length > 0) {
+                shebangTrailingSpace = {kind: J.Kind.Space, whitespace: remainingWhitespace, comments: prefix.comments};
+            }
+
+            // CU prefix should be empty when there's a shebang
             prefix = produce(prefix, draft => {
-                draft.whitespace = remainingWhitespace;
+                draft.whitespace = '';
+                draft.comments = [];
             });
+        }
+
+        let statements = this.semicolonPaddedStatementList(node.statements);
+
+        // If there's trailing whitespace/comments after the shebang, prepend to first statement's prefix
+        if (shebangTrailingSpace && statements.length > 0) {
+            const firstStmt = statements[0];
+            statements = [
+                produce(firstStmt, draft => {
+                    const existingPrefix = draft.element.prefix;
+                    draft.element.prefix = {
+                        kind: J.Kind.Space,
+                        whitespace: shebangTrailingSpace!.whitespace + existingPrefix.whitespace,
+                        comments: [...shebangTrailingSpace!.comments, ...existingPrefix.comments]
+                    };
+                }),
+                ...statements.slice(1)
+            ];
         }
 
         return {
@@ -395,8 +423,8 @@ export class JavaScriptParserVisitor {
             charsetName: bomAndTextEncoding.encoding,
             charsetBomMarked: bomAndTextEncoding.hasBom,
             statements: shebangStatement
-                ? [shebangStatement, ...this.semicolonPaddedStatementList(node.statements)]
-                : this.semicolonPaddedStatementList(node.statements),
+                ? [shebangStatement, ...statements]
+                : statements,
             eof: this.prefix(node.endOfFileToken)
         };
     }
@@ -1764,7 +1792,9 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             head: this.visit(node.head),
-            spans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
+            // Use emptySpace for the last span's after - any trailing whitespace belongs to the outer context
+            spans: node.templateSpans.map((s, i, arr) =>
+                this.rightPadded(this.visit(s), i === arr.length - 1 ? emptySpace : this.suffix(s))),
             type: this.mapType(node)
         }
     }
@@ -2496,7 +2526,9 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             head: this.visit(node.head),
-            spans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
+            // Use emptySpace for the last span's after - any trailing whitespace belongs to the outer context
+            spans: node.templateSpans.map((s, i, arr) =>
+                this.rightPadded(this.visit(s), i === arr.length - 1 ? emptySpace : this.suffix(s))),
             type: this.mapType(node)
         }
     }
@@ -3310,7 +3342,7 @@ export class JavaScriptParserVisitor {
                     {
                         kind: J.Kind.EnumValueSet,
                         id: randomId(),
-                        prefix: node.members[0] ? this.prefix(node.members[0]) : emptySpace,
+                        prefix: emptySpace,
                         markers: emptyMarkers,
                         enums: node.members.map(em => this.rightPadded(this.visit(em), this.suffix(em))),
                         terminatedWithSemicolon: node.members.hasTrailingComma
@@ -3431,6 +3463,8 @@ export class JavaScriptParserVisitor {
     }
 
     visitCaseBlock(node: ts.CaseBlock): J.Block {
+        // consume end space so it gets assigned to the block's `end`
+        const end = this.prefix(node.getLastToken()!);
         return {
             kind: J.Kind.Block,
             id: randomId(),
@@ -3440,9 +3474,9 @@ export class JavaScriptParserVisitor {
             statements: node.clauses.map(clause =>
                 this.rightPadded(
                     this.visit(clause),
-                    this.suffix(clause)
+                    emptySpace
                 )),
-            end: this.prefix(node.getLastToken()!)
+            end: end
         }
     }
 
@@ -3688,7 +3722,17 @@ export class JavaScriptParserVisitor {
     }
 
     visitJsxText(node: ts.JsxText): J.Literal {
-        return this.mapLiteral(node, node.text);
+        // For JsxText, we don't use mapLiteral because it would put whitespace into prefix.
+        // In JSX, the text content (including leading/trailing whitespace) should be in value/valueSource.
+        return {
+            kind: J.Kind.Literal,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            value: node.text,
+            valueSource: node.text,
+            type: Type.Primitive.String
+        };
     }
 
     visitJsxElement(node: ts.JsxElement): JSX.Tag {
@@ -3698,7 +3742,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            openName: this.leftPadded(this.prefix(node.openingElement), this.visit(node.openingElement.tagName)),
+            openName: this.leftPadded(this.prefix(node.openingElement.tagName), this.visit(node.openingElement.tagName)),
             typeArguments: node.openingElement.typeArguments && this.mapTypeArguments(this.suffix(node.openingElement.tagName), node.openingElement.typeArguments),
             afterName: attrs.length === 0 ?
                 this.prefix(this.findLastChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :
@@ -3781,15 +3825,29 @@ export class JavaScriptParserVisitor {
     }
 
     visitJsxExpression(node: ts.JsxExpression): JSX.EmbeddedExpression {
+        let expr: Expression;
+        if (node.expression) {
+            if (node.dotDotDotToken) {
+                expr = produce(this.convert<Expression>(node.expression), draft => {
+                    draft.markers.markers.push({
+                        kind: JS.Markers.Spread,
+                        id: randomId(),
+                        prefix: this.prefix(node.dotDotDotToken!)
+                    } satisfies Spread as Spread);
+                });
+            } else {
+                expr = this.convert<Expression>(node.expression);
+            }
+        } else {
+            expr = this.newEmpty();
+        }
         return {
             kind: JS.Kind.JsxEmbeddedExpression,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
             expression: this.rightPadded(
-                node.expression ?
-                    this.convert<Expression>(node.expression) :
-                    this.newEmpty(),
+                expr,
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseBraceToken)!)
             )
         };
