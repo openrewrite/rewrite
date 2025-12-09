@@ -234,7 +234,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 List<ResolvedDependency> dependencies = findDependencies(groupId, artifactId);
                 return dependencies.stream()
                         .filter(ResolvedDependency::isDirect)
-                        .anyMatch(rd -> (version == null) || version.equals(rd.getVersion()));
+                        .anyMatch(rd -> (version == null) || versionComparator.compare(version, rd.getVersion()) <= 0);
             }
 
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
