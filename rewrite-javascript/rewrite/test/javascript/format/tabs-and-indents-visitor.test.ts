@@ -761,4 +761,354 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     })
+
+    test('multi-line binary expression in JSX attribute should align all operands', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=tsx
+            tsx(
+                `
+                <img
+                    src={
+                        userData.display_image_url ||
+                        userData.image_url ||
+                        "https://example.com/placeholder.svg"
+                    }
+                />
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('template literal argument should preserve continuation indent', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                const result = db
+                    .from("users")
+                    .select(
+                        \`
+                        id,
+                        name
+                        \`
+                    );
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type literal with multiple properties should all be indented', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                type ComponentFile = {
+                path: string
+                content: string
+                type: string
+                }
+                `,
+                `
+                type ComponentFile = {
+                    path: string
+                    content: string
+                    type: string
+                }
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type literal with 2-space indent normalizes to 4-space', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`type ComponentFile = {
+  path: string
+  content: string
+  type: string
+}`,
+`type ComponentFile = {
+    path: string
+    content: string
+    type: string
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type literal with inline comments only (no leading comment)', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`type ComponentFile = {
+  path: string // e.g., "magicui/marquee.tsx"
+  content: string // e.g., "import React"
+  type: string // e.g., "registry:ui"
+  target: string // e.g., ""
+}`,
+`type ComponentFile = {
+    path: string // e.g., "magicui/marquee.tsx"
+    content: string // e.g., "import React"
+    type: string // e.g., "registry:ui"
+    target: string // e.g., ""
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type literal with leading comment and inline comments', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`// Represents a file associated with the component
+type ComponentFile = {
+  path: string // e.g., "magicui/marquee.tsx"
+  content: string // e.g., "import React"
+  type: string // e.g., "registry:ui"
+  target: string // e.g., ""
+}`,
+`// Represents a file associated with the component
+type ComponentFile = {
+    path: string // e.g., "magicui/marquee.tsx"
+    content: string // e.g., "import React"
+    type: string // e.g., "registry:ui"
+    target: string // e.g., ""
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('arrow function inside chained .map() should have correct indent', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`configs
+    .map(
+        (config: string) => config
+    );`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('method chain with object literal argument should preserve inner object indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`const planResult = await supabaseWithAdminAccess
+    .from("users_to_plans")
+    .update({
+        status: "inactive",
+        updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('method chain with multiple object literal arguments should preserve inner object indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`await supabaseWithAdminAccess
+    .from("usages")
+    .upsert(
+        {
+            user_id: userId,
+            limit: usageLimit,
+            usage: 0,
+        },
+        { onConflict: "user_id" },
+    )
+    .select()`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('multi-line binary expression in if condition should preserve alignment', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`function test() {
+    if (
+        (lastBundlePurchase?.status === "paid" ||
+            lastBundlePurchase?.status === "pending") &&
+        status === "paid"
+    ) {
+        stripe.refunds.create({
+            payment_intent: paymentIntent.id,
+            reason: "duplicate",
+        })
+        return
+    }
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('arrow function inside .map() inside template literal should preserve indent', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`export async function POST() {
+    try {
+        const prompt = \`text
+\${dependencyConfigs
+    .map(
+        (config: string, index: number) => \`inner\`,
+    )
+    .join("\\n")}
+more\`
+    } catch (e) {}
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('enum members should all have same indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`function test() {
+  enum DateType {
+    RATE_TILL,
+    RATE_FROM,
+    DATE,
+  }
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('object literal in nested callback should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`function test() {
+  if (data && typeof data === "object") {
+    console.log("Details:", {
+      subscription_plan: data.subscription_plan,
+      generation_cost: data.generation_cost,
+    })
+  }
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('object literal in .then() callback should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`supabase
+  .rpc("record_usage", {
+    p_user_id: userId,
+  })
+  .then(({ data, error }) => {
+    if (error) {
+      console.error("Error:", error)
+    } else {
+      console.log("Success:", data)
+      if (data && typeof data === "object") {
+        console.log("Details:", {
+          subscription_plan: data.subscription_plan,
+          generation_cost: data.generation_cost,
+        })
+      }
+    }
+  })`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('object literal in nested function call within method chain should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`crypto
+  .createHash("md5")
+  .update(
+    JSON.stringify({
+      files,
+      dependencies,
+      customTailwindConfig,
+      customGlobalCss,
+    }),
+  )
+  .digest("hex")`
+            )
+            // @formatter:on
+        )
+    })
 });

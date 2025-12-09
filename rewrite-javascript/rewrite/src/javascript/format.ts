@@ -127,16 +127,26 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): Promise<J | undefined> {
         const ret = await super.visitArrayAccess(arrayAccess, p) as J.ArrayAccess;
         return produce(ret, draft => {
-            draft.dimension.index.element.prefix.whitespace = this.style.within.arrayBrackets ? " " : "";
-            draft.dimension.index.after.whitespace = this.style.within.arrayBrackets ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.dimension.index.element.prefix.whitespace.includes("\n")) {
+                draft.dimension.index.element.prefix.whitespace = this.style.within.arrayBrackets ? " " : "";
+            }
+            if (!draft.dimension.index.after.whitespace.includes("\n")) {
+                draft.dimension.index.after.whitespace = this.style.within.arrayBrackets ? " " : "";
+            }
         });
     }
 
     protected async visitAssignment(assignment: J.Assignment, p: P): Promise<J | undefined> {
         const ret = await super.visitAssignment(assignment, p) as J.Assignment;
         return produce(ret, draft => {
-            draft.assignment.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
-            draft.assignment.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.assignment.before.whitespace.includes("\n")) {
+                draft.assignment.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
+            if (!draft.assignment.element.prefix.whitespace.includes("\n")) {
+                draft.assignment.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
         });
     }
 
@@ -228,8 +238,12 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 // Apply afterComma rule to elements after the first
                 for (let i = 1; i < draft.elements.length; i++) {
                     const currentWs = draft.elements[i].element.prefix.whitespace;
+                    // Also check for Spread marker with newline (for spread elements the newline is in the marker)
+                    const element = draft.elements[i].element as J;
+                    const spreadMarker = element.markers?.markers?.find(m => m.kind === JS.Markers.Spread) as { prefix: J.Space } | undefined;
+                    const hasNewlineInSpread = spreadMarker?.prefix?.whitespace?.includes("\n");
                     // Preserve original newlines - only adjust spacing when elements are on same line
-                    if (!currentWs.includes("\n")) {
+                    if (!currentWs.includes("\n") && !hasNewlineInSpread) {
                         draft.elements[i].element.prefix.whitespace = this.style.other.afterComma ? " " : "";
                     }
                 }
@@ -311,11 +325,17 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitImportDeclaration(jsImport, p) as JS.Import;
         return produce(ret, draft => {
             if (draft.importClause) {
-                draft.importClause.prefix.whitespace = draft.importClause.namedBindings && !draft.importClause.typeOnly ? "" : " ";
+                // Space after 'import' keyword:
+                // - If there's a default import (name), space goes in importClause.prefix
+                // - If typeOnly (import type ...), space goes in importClause.prefix (before 'type')
+                // - If only namedBindings (no default, no type), space goes in namedBindings.prefix (importClause.prefix is empty)
+                const hasDefaultImport = !!draft.importClause.name;
+                draft.importClause.prefix.whitespace = (hasDefaultImport || draft.importClause.typeOnly) ? " " : "";
                 if (draft.importClause.name) {
                     draft.importClause.name.after.whitespace = "";
                 }
                 if (draft.importClause.namedBindings) {
+                    // Space before namedBindings - always needed
                     draft.importClause.namedBindings.prefix.whitespace = " ";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
@@ -465,8 +485,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.name.before.whitespace = " ";
             }
             draft.name.element.prefix.whitespace = " ";
-            draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
-            draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.initializer.before.whitespace.includes("\n")) {
+                draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
+            if (!draft.initializer.element.prefix.whitespace.includes("\n")) {
+                draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
         });
     }
 
