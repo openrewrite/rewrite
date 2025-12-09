@@ -195,19 +195,17 @@ public class FindMissingTypes extends Recipe {
                 } else if (!variableType.getName().equals(mr.getReference().getSimpleName())) {
                     mr = SearchResult.found(mr, "type information has a different variable name '" + variableType.getName() + "'");
                 }
-            } else {
-                if (mr.getType() != null) {
-                    JavaType type = mr.getType();
-                    if (type instanceof JavaType.Parameterized) {
-                        JavaType.Parameterized parameterizedType = (JavaType.Parameterized) type;
-                        for (JavaType t : parameterizedType.getTypeParameters()) {
-                            if (!isWellFormedType(t, seenTypes)) {
-                                mr = SearchResult.found(mr, "MemberReference Parameterized type is missing or malformed");
-                            }
+            } else if (mr.getType() != null) {
+                JavaType type = mr.getType();
+                if (type instanceof JavaType.Parameterized) {
+                    JavaType.Parameterized parameterizedType = (JavaType.Parameterized) type;
+                    for (JavaType t : parameterizedType.getTypeParameters()) {
+                        if (!isWellFormedType(t, seenTypes)) {
+                            mr = SearchResult.found(mr, "MemberReference Parameterized type is missing or malformed");
                         }
-                    } else if (type instanceof JavaType.Unknown) {
-                        mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                     }
+                } else if (type instanceof JavaType.Unknown) {
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                 }
             }
             return mr;
