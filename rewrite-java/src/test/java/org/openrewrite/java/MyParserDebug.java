@@ -15,9 +15,11 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 import java.util.List;
 import static java.util.stream.Collectors.toList;
@@ -25,12 +27,13 @@ import static java.util.stream.Collectors.toList;
 import org.openrewrite.java.TreeVisitingPrinter;
 
 
-class MyParserDebug {
+class MyParserDebug implements RewriteTest {
 
     @Test
     void debugDirectly() {
         JavaParser parser = JavaParser.fromJavaVersion().build();
 
+        @Language("java")
         String sourceCode = """
         import java.util.*;;
         import java.io.*;
