@@ -287,4 +287,16 @@ describe('SpacesVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('import type alias should preserve space around equals', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `import Space = J.Space;`
+            )
+            // @formatter:on
+        )
+    });
 });

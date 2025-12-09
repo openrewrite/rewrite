@@ -1297,4 +1297,20 @@ const { data, error } = await (
             // @formatter:on
         )
     })
+
+    test('property with decorator should not get extra indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`class ValidateParsingRecipe {
+    @Option
+    projectRoot: string;
+}`
+            )
+            // @formatter:on
+        )
+    })
 });

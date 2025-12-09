@@ -682,8 +682,12 @@ export class JavaScriptParserVisitor {
         for (let heritageClause of node.heritageClauses) {
             if ((heritageClause.token == ts.SyntaxKind.ExtendsKeyword)) {
                 const _extends: J.RightPadded<TypeTree>[] = [];
-                for (let type of heritageClause.types) {
-                    _extends.push(this.rightPadded(this.visit(type), this.suffix(type)));
+                const types = heritageClause.types;
+                for (let i = 0; i < types.length; i++) {
+                    const type = types[i];
+                    // For the last type, don't consume the suffix - it belongs to the interface body's prefix
+                    const after = i < types.length - 1 ? this.suffix(type) : emptySpace;
+                    _extends.push(this.rightPadded(this.visit(type), after));
                 }
                 return _extends.length > 0 ? {
                     kind: J.Kind.Container,
@@ -703,8 +707,12 @@ export class JavaScriptParserVisitor {
         for (let heritageClause of node.heritageClauses) {
             if (heritageClause.token == ts.SyntaxKind.ImplementsKeyword) {
                 const _implements: J.RightPadded<TypeTree>[] = [];
-                for (let type of heritageClause.types) {
-                    _implements.push(this.rightPadded(this.visit(type), this.suffix(type)));
+                const types = heritageClause.types;
+                for (let i = 0; i < types.length; i++) {
+                    const type = types[i];
+                    // For the last type, don't consume the suffix - it belongs to the class body's prefix
+                    const after = i < types.length - 1 ? this.suffix(type) : emptySpace;
+                    _implements.push(this.rightPadded(this.visit(type), after));
                 }
                 return _implements.length > 0 ? {
                     kind: J.Kind.Container,
@@ -3328,7 +3336,15 @@ export class JavaScriptParserVisitor {
                         id: randomId(),
                         prefix: emptySpace,
                         markers: emptyMarkers,
-                        enums: node.members.map(em => this.rightPadded(this.visit(em), this.suffix(em))),
+                        enums: node.members.map((em, i) => {
+                            const isLast = i === node.members.length - 1;
+                            if (isLast && !node.members.hasTrailingComma) {
+                                // No trailing comma - don't consume suffix, it belongs to block's end prefix
+                                return this.rightPadded(this.visit(em), emptySpace);
+                            }
+                            // For non-last members, or last member with trailing comma, consume the suffix
+                            return this.rightPadded(this.visit(em), this.suffix(em));
+                        }),
                         terminatedWithSemicolon: node.members.hasTrailingComma
                     },
                     emptySpace)],

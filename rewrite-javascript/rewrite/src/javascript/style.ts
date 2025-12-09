@@ -395,7 +395,7 @@ export namespace IntelliJ {
                     tryLeftBrace: true,
                     catchLeftBrace: true,
                     finallyLeftBrace: true,
-                    classInterfaceModuleLeftBrace: false
+                    classInterfaceModuleLeftBrace: true
                 },
                 beforeKeywords: {
                     kind: SpacesStyleDetailKind.SpacesStyleBeforeKeywords,
