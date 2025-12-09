@@ -1396,15 +1396,7 @@ export class JavaScriptParserVisitor {
             modifiers: [],
             constructorType: this.leftPadded(emptySpace, false),
             typeParameters: this.mapTypeParametersAsObject(node),
-            parameters: {
-                kind: J.Kind.Container,
-                before: this.prefix(node.getChildAt(node.getChildren().findIndex(n => n.pos === node.parameters.pos) - 1)),
-                elements: node.parameters.length == 0 ?
-                    [this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))]
-                    : node.parameters.map(p => this.rightPadded(this.visit(p), this.suffix(p)))
-                        .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []),
-                markers: emptyMarkers
-            },
+            parameters: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(node.typeParameters ? 3 : 0)),
             returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type))
         };
     }
@@ -1485,15 +1477,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            elements: {
-                kind: J.Kind.Container,
-                before: emptySpace,
-                elements: node.elements.length > 0 ?
-                    node.elements.map(p => this.rightPadded(this.convert(p), this.suffix(p)))
-                        .concat(node.elements.hasTrailingComma ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseBracketToken)!)) : [])
-                    : [this.rightPadded(this.newEmpty(this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseBracketToken)!)), emptySpace)],
-                markers: emptyMarkers
-            },
+            elements: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
             type: this.mapType(node)
         };
     }
