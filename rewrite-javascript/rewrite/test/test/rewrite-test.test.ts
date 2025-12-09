@@ -3,7 +3,7 @@ import {RecipeSpec} from "../../src/test";
 import {text} from "../../src/text";
 import {json} from "../../src/json";
 import {ChangeText} from "../../fixtures/change-text";
-import {Cursor, ExecutionContext, ScanningRecipe, Tree, TreeVisitor} from "../../src";
+import {ExecutionContext, ScanningRecipe} from "../../src";
 
 describe("rewrite test", () => {
     const spec = new RecipeSpec();
@@ -44,23 +44,14 @@ describe("rewrite test", () => {
         // given
         const sut = new RecipeSpec();
         let countOfAccumulators: number = 0;
-        interface Accum {}
-        sut.recipe = new class extends ScanningRecipe<Accum> {
+        sut.recipe = new class extends ScanningRecipe<{}> {
             name = "ad-hoc";
             displayName = "ad-hoc";
             description = "ad-hoc";
 
-            initialValue(ctx: ExecutionContext): Accum {
+            initialValue(ctx: ExecutionContext): {} {
                 countOfAccumulators++;
-                return {} satisfies Accum;
-            }
-
-            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                return new class extends TreeVisitor<any, ExecutionContext> {
-                    async visit<R extends any>(tree: Tree, p: ExecutionContext, parent?: Cursor): Promise<R | undefined> {
-                        return undefined;
-                    }
-                };
+                return {};
             }
         };
 
