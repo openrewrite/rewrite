@@ -3,6 +3,7 @@ import {RecipeSpec} from "../../src/test";
 import {text} from "../../src/text";
 import {json} from "../../src/json";
 import {ChangeText} from "../../fixtures/change-text";
+import {ExecutionContext, ScanningRecipe} from "../../src";
 
 describe("rewrite test", () => {
     const spec = new RecipeSpec();
@@ -38,4 +39,28 @@ describe("rewrite test", () => {
             }
         }
     ));
+
+    test("two kinds of sources and a scanning recipe", async () => {
+        // given
+        const sut = new RecipeSpec();
+        let countOfAccumulators: number = 0;
+        sut.recipe = new class extends ScanningRecipe<{}> {
+            name = "ad-hoc";
+            displayName = "ad-hoc";
+            description = "ad-hoc";
+
+            initialValue(ctx: ExecutionContext): {} {
+                countOfAccumulators++;
+                return {};
+            }
+        };
+
+        // when
+        await sut.rewriteRun(
+            json('{"A": "a"}'),
+            text("just a regular text"));
+
+        // test
+        expect(countOfAccumulators).toBe(1);
+    });
 });

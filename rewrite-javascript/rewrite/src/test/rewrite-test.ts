@@ -90,18 +90,22 @@ export class RecipeSpec {
             return groups;
         }, {} as { [kind: string]: SourceSpec<any>[] });
 
+        const allParsed: [SourceSpec<any>, SourceFile][] = [];
         for (const kind in specsByKind) {
             const specs = specsByKind[kind];
             const parsed = await this.parse(specs);
             await this.expectNoParseFailures(parsed);
             await this.expectWhitespaceNotToContainNonwhitespaceCharacters(parsed);
             this.checkParsePrintIdempotence && await this.expectParsePrintIdempotence(parsed);
-            const changeset = (await scheduleRun(this.recipe,
-                parsed.map(([_, sourceFile]) => sourceFile),
-                this.recipeExecutionContext)).changeset;
-            await this.expectResultsToMatchAfter(specs, changeset, parsed);
-            await this.expectGeneratedFiles(specs, changeset);
+            allParsed.push(...parsed);
         }
+
+        const changeset = (await scheduleRun(this.recipe,
+            allParsed.map(([_, sourceFile]) => sourceFile),
+            this.recipeExecutionContext)).changeset;
+
+        await this.expectResultsToMatchAfter(flattenedSpecs, changeset, allParsed);
+        await this.expectGeneratedFiles(flattenedSpecs, changeset);
 
         // for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
         //     assertion(getRows(name, this.recipeExecutionContext));
