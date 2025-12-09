@@ -320,13 +320,15 @@ class DependencyInsightTest implements RewriteTest {
             .dataTable(DependenciesInUse.Row.class, rows -> {
                 assertThat(rows).isNotEmpty();
                 assertThat(rows).anyMatch(row ->
-                  "com.fasterxml.jackson.datatype".equals(row.getGroupId()) &&
+                  "compileClasspath".equals(row.getScope()) &&
+                    "com.fasterxml.jackson.datatype".equals(row.getGroupId()) &&
                     "jackson-datatype-jsr310".equals(row.getArtifactId()) &&
-                    row.getDepth() == 2);
+                    row.getCount() == 1);
                 assertThat(rows).anyMatch(row ->
-                  "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
+                  "compileClasspath".equals(row.getScope()) &&
+                    "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
                     "jackson-core".equals(row.getArtifactId()) &&
-                    row.getDepth() == 3);
+                    row.getCount() == 11);
             })
             .dataTable(ExplainDependenciesInUse.Row.class, rows -> {
                 assertThat(rows).isNotEmpty();

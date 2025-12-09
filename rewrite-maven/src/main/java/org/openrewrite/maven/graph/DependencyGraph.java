@@ -31,6 +31,9 @@ import static java.util.Collections.emptySet;
 public class DependencyGraph {
     @Nullable Node root;
 
+    @Getter
+    int size = 0;
+
     /**
      * Append a leaf-to-root dependency path to this dependency graph.
      */
@@ -47,6 +50,8 @@ public class DependencyGraph {
         } else if (!root.getId().equals(id)) {
             throw new IllegalStateException("Dependency path is for a different root");
         }
+
+        size++;
 
         Node parent = root;
         while (iterator.hasNext()) {
@@ -101,6 +106,10 @@ public class DependencyGraph {
         if (prefix.length() > 0) {
             prefix.setLength(prefix.length() - 5);
         }
+    }
+
+    public boolean isEmpty() {
+        return size == 0;
     }
 
     private static String formatDependency(ResolvedGroupArtifactVersion gav) {
