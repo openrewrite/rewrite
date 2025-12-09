@@ -205,6 +205,8 @@ public class FindMissingTypes extends Recipe {
                                 mr = SearchResult.found(mr, "MemberReference Parameterized type is missing or malformed");
                             }
                         }
+                    } else if (type instanceof JavaType.Unknown) {
+                        mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                     }
                 }
             }
