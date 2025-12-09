@@ -17,17 +17,14 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.search.FindMissingTypes;
-import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings("ClassInitializerMayBeStatic")
 class FindMissingTypesTest implements RewriteTest {
