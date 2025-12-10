@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeRegistry} from "@openrewrite/rewrite";
+import {RecipeRegistry} from "../src";
 import {describe} from "@jest/globals";
 import {activate} from "../fixtures/example-recipe";
 import {ChangeText} from "../fixtures/change-text";

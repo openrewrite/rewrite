@@ -15,3 +15,5 @@
  */
 
 export {UseObjectPropertyShorthand} from "./use-object-property-shorthand";
+export {PreferOptionalChain} from "./prefer-optional-chain";
+export {AddParseIntRadix} from "./add-parse-int-radix";

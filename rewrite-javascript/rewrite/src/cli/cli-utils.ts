@@ -150,20 +150,26 @@ export async function loadLocalRecipes(
     if (stat.isDirectory()) {
         // Look for package.json to find the main entry point
         const packageJsonPath = path.join(resolvedPath, 'package.json');
+        let mainFromPkg: string | undefined;
         if (fs.existsSync(packageJsonPath)) {
             const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-            // Use the main field, or default to dist/index.js
-            const main = pkg.main || 'dist/index.js';
-            modulePath = path.join(resolvedPath, main);
+            mainFromPkg = pkg.main;
+        }
+
+        // Try the main field first, then common fallbacks
+        const candidates = [
+            mainFromPkg,
+            'dist/index.js',
+            'dist/src/index.js',
+            'index.js',
+            'src/index.ts'
+        ].filter((c): c is string => !!c);
+
+        const found = candidates.find(c => fs.existsSync(path.join(resolvedPath, c)));
+        if (found) {
+            modulePath = path.join(resolvedPath, found);
         } else {
-            // Try common entry points
-            const candidates = ['dist/index.js', 'index.js', 'src/index.ts'];
-            const found = candidates.find(c => fs.existsSync(path.join(resolvedPath, c)));
-            if (found) {
-                modulePath = path.join(resolvedPath, found);
-            } else {
-                throw new Error(`Cannot find entry point in ${resolvedPath}. Expected package.json with main field or dist/index.js`);
-            }
+            throw new Error(`Cannot find entry point in ${resolvedPath}. Tried: ${candidates.join(', ')}`);
         }
     } else {
         modulePath = resolvedPath;
@@ -176,9 +182,6 @@ export async function loadLocalRecipes(
     if (verbose) {
         console.log(`Loading recipes from ${modulePath}...`);
     }
-
-    // Set up shared dependencies
-    setupSharedDependencies(modulePath);
 
     const recipeModule = require(modulePath);
 
@@ -248,10 +251,6 @@ export async function installRecipePackage(
 
     // Load the module and activate recipes
     const resolvedPath = require.resolve(path.join(installDir, 'node_modules', packageName));
-
-    // Set up shared dependencies to avoid instanceof failures
-    setupSharedDependencies(resolvedPath);
-
     const recipeModule = require(resolvedPath);
 
     if (typeof recipeModule.activate !== 'function') {
@@ -265,76 +264,6 @@ export async function installRecipePackage(
 
     if (verbose) {
         console.log(`Loaded ${registry.all.size} recipes`);
-    }
-}
-
-/**
- * Set up shared dependencies to avoid instanceof failures when loading recipes
- * from a separate node_modules directory
- */
-export function setupSharedDependencies(targetModulePath: string): void {
-    const sharedDeps = ['@openrewrite/rewrite'];
-    const targetDir = path.dirname(targetModulePath);
-
-    for (const depName of sharedDeps) {
-        try {
-            const hostPackageEntry = require.resolve(depName);
-
-            // Find host package root
-            let hostPackageRoot = path.dirname(hostPackageEntry);
-            while (hostPackageRoot !== path.dirname(hostPackageRoot)) {
-                const pkgJsonPath = path.join(hostPackageRoot, 'package.json');
-                if (fs.existsSync(pkgJsonPath)) {
-                    try {
-                        const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
-                        if (pkg.name === depName) {
-                            break;
-                        }
-                    } catch {
-                        // Not a valid package.json
-                    }
-                }
-                hostPackageRoot = path.dirname(hostPackageRoot);
-            }
-
-            // Find target package root
-            let targetPackageRoot: string | undefined;
-            let searchDir = targetDir;
-            while (searchDir !== path.dirname(searchDir)) {
-                const nodeModulesPath = path.join(searchDir, 'node_modules', ...depName.split('/'));
-                if (fs.existsSync(nodeModulesPath)) {
-                    const pkgJsonPath = path.join(nodeModulesPath, 'package.json');
-                    if (fs.existsSync(pkgJsonPath)) {
-                        try {
-                            const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
-                            if (pkg.name === depName) {
-                                targetPackageRoot = nodeModulesPath;
-                                break;
-                            }
-                        } catch {
-                            // Not a valid package.json
-                        }
-                    }
-                }
-                searchDir = path.dirname(searchDir);
-            }
-
-            if (!targetPackageRoot || hostPackageRoot === targetPackageRoot) {
-                continue;
-            }
-
-            // Map all cached modules
-            const hostPrefix = hostPackageRoot + path.sep;
-            for (const cachedPath of Object.keys(require.cache)) {
-                if (cachedPath.startsWith(hostPrefix)) {
-                    const relativePath = cachedPath.substring(hostPrefix.length);
-                    const targetPath = path.join(targetPackageRoot, relativePath);
-                    require.cache[targetPath] = require.cache[cachedPath];
-                }
-            }
-        } catch {
-            // Failed to set up shared dependency
-        }
     }
 }
 
@@ -462,9 +391,10 @@ export async function discoverFiles(projectRoot: string, verbose: boolean = fals
         return files.filter(isAcceptedFile);
     }
 
-    // Filter to accepted file types
+    // Filter to accepted file types that exist on disk
+    // (git ls-files returns deleted files that are still tracked)
     for (const file of trackedFiles) {
-        if (!ignoredFiles.has(file) && isAcceptedFile(file)) {
+        if (!ignoredFiles.has(file) && isAcceptedFile(file) && fs.existsSync(file)) {
             files.push(file);
         }
     }
@@ -523,15 +453,25 @@ export function isAcceptedFile(filePath: string): boolean {
     return false;
 }
 
+export type ProgressCallback = (current: number, total: number, filePath: string) => void;
+
+export interface ParseFilesOptions {
+    verbose?: boolean;
+    onProgress?: ProgressCallback;
+}
+
 /**
- * Parse source files using appropriate parsers
+ * Parse source files using appropriate parsers (streaming version).
+ * Yields source files as they are parsed, allowing immediate processing.
  */
-export async function parseFiles(
+export async function* parseFilesStreaming(
     filePaths: string[],
     projectRoot: string,
-    verbose: boolean = false
-): Promise<SourceFile[]> {
-    const parsed: SourceFile[] = [];
+    options: ParseFilesOptions = {}
+): AsyncGenerator<SourceFile, void, undefined> {
+    const { verbose = false, onProgress } = options;
+    const total = filePaths.length;
+    let current = 0;
 
     // Group files by type
     const jsFiles: string[] = [];
@@ -558,7 +498,9 @@ export async function parseFiles(
         }
         const jsParser = new JavaScriptParser({relativeTo: projectRoot});
         for await (const sf of jsParser.parse(...jsFiles)) {
-            parsed.push(sf);
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
+            yield sf;
         }
     }
 
@@ -569,7 +511,9 @@ export async function parseFiles(
         }
         const pkgParser = new PackageJsonParser({relativeTo: projectRoot});
         for await (const sf of pkgParser.parse(...packageJsonFiles)) {
-            parsed.push(sf);
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
+            yield sf;
         }
     }
 
@@ -580,9 +524,25 @@ export async function parseFiles(
         }
         const jsonParser = new JsonParser({relativeTo: projectRoot});
         for await (const sf of jsonParser.parse(...jsonFiles)) {
-            parsed.push(sf);
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
+            yield sf;
         }
     }
+}
 
+/**
+ * Parse source files using appropriate parsers.
+ * Collects all parsed files into an array.
+ */
+export async function parseFiles(
+    filePaths: string[],
+    projectRoot: string,
+    options: ParseFilesOptions = {}
+): Promise<SourceFile[]> {
+    const parsed: SourceFile[] = [];
+    for await (const sf of parseFilesStreaming(filePaths, projectRoot, options)) {
+        parsed.push(sf);
+    }
     return parsed;
 }

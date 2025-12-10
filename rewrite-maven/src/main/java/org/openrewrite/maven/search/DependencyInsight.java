@@ -15,9 +15,7 @@
  */
 package org.openrewrite.maven.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -25,8 +23,10 @@ import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.graph.DependencyGraph;
 import org.openrewrite.maven.graph.DependencyTreeWalker;
 import org.openrewrite.maven.table.DependenciesInUse;
+import org.openrewrite.maven.table.ExplainDependenciesInUse;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.DependencyMatcher;
@@ -47,6 +47,7 @@ import static java.util.stream.Collectors.joining;
 @Value
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
+    transient ExplainDependenciesInUse explainDependenciesInUse = new ExplainDependenciesInUse(this);
 
     @Option(displayName = "Group pattern",
             description = "Group glob pattern used to match dependencies.",
@@ -68,8 +69,8 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Version",
             description = "Match only dependencies with the specified version. " +
-                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
-                    "All versions are searched by default.",
+                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                          "All versions are searched by default.",
             example = "1.x",
             required = false)
     @Nullable
@@ -112,7 +113,7 @@ public class DependencyInsight extends Recipe {
     @Override
     public String getDescription() {
         return "Find direct and transitive dependencies matching a group, artifact, and scope. " +
-                "Results include dependencies that either directly match or transitively include a matching dependency.";
+               "Results include dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override
@@ -131,65 +132,66 @@ public class DependencyInsight extends Recipe {
                         .map(JavaSourceSet::getName)
                         .orElse("main");
 
+                Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByScope = new HashMap<>();
                 DependencyTreeWalker.Matches<Scope> matches = new DependencyTreeWalker.Matches<>();
-                collectMatchingDependencies(projectName, sourceSetName, getResolutionResult(), requestedScope, matches, ctx);
+                collectMatchingDependencies(getResolutionResult(), dependencyPathsByScope, requestedScope, matches);
 
                 if (matches.isEmpty()) {
                     return document;
+                }
+
+                for (Map.Entry<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> scopeEntry : dependencyPathsByScope.entrySet()) {
+                    for (Map.Entry<ResolvedGroupArtifactVersion, DependencyGraph> entry : scopeEntry.getValue().entrySet()) {
+                        ResolvedGroupArtifactVersion gav = entry.getKey();
+                        dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                gav.getGroupId(),
+                                gav.getArtifactId(),
+                                gav.getVersion(),
+                                gav.getDatedSnapshotVersion(),
+                                scopeEntry.getKey(),
+                                entry.getValue().getSize()
+                        ));
+                        explainDependenciesInUse.insertRow(ctx, new ExplainDependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                gav.getGroupId(),
+                                gav.getArtifactId(),
+                                gav.getVersion(),
+                                gav.getDatedSnapshotVersion(),
+                                scopeEntry.getKey(),
+                                entry.getValue().getSize(),
+                                entry.getValue().print()
+                        ));
+                    }
                 }
 
                 return (Xml.Document) new MarkIndividualDependency(onlyDirect, matches.byScope(), matches.byDirectDependency()).visitNonNull(document, ctx);
             }
 
             private void collectMatchingDependencies(
-                    String projectName,
-                    String sourceSetName,
                     MavenResolutionResult resolutionResult,
+                    Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByConfiguration,
                     @Nullable Scope requestedScope,
-                    DependencyTreeWalker.Matches<Scope> matches,
-                    ExecutionContext ctx
+                    DependencyTreeWalker.Matches<Scope> matches
             ) {
                 VersionComparator versionComparator = version != null ? Semver.validate(version, null).getValue() : null;
                 DependencyMatcher dependencyMatcher = new DependencyMatcher(groupIdPattern, artifactIdPattern, versionComparator);
 
-                if (requestedScope != null) {
-                    for (ResolvedDependency dependency : resolutionResult.getDependencies().get(requestedScope)) {
-                        matches.collect(requestedScope, dependency, dependencyMatcher,
-                                (matched, path) ->
-                                        createDataTableRow(projectName, sourceSetName, requestedScope, matched.getGav(), path, ctx));
+                for (Map.Entry<Scope, List<ResolvedDependency>> entry : resolutionResult.getDependencies().entrySet()) {
+                    Scope scope = entry.getKey();
+                    if (requestedScope != null && requestedScope != scope) {
+                        continue;
                     }
-                } else {
-                    for (Map.Entry<Scope, List<ResolvedDependency>> entry : resolutionResult.getDependencies().entrySet()) {
-                        Scope scope = entry.getKey();
-                        for (ResolvedDependency dependency : entry.getValue()) {
-                            matches.collect(scope, dependency, dependencyMatcher,
-                                    (matched, path) ->
-                                            createDataTableRow(projectName, sourceSetName, scope, matched.getGav(), path, ctx));
-                        }
+                    for (ResolvedDependency dependency : entry.getValue()) {
+                        matches.collect(scope, dependency, dependencyMatcher,
+                                (matched, path) -> {
+                                    dependencyPathsByConfiguration.computeIfAbsent(scope.name().toLowerCase(), __ -> new HashMap<>())
+                                            .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(scope.name().toLowerCase(), path);
+                                });
                     }
                 }
-            }
-
-            private void createDataTableRow(
-                    String projectName,
-                    String sourceSetName,
-                    Scope scope,
-                    ResolvedGroupArtifactVersion gav,
-                    Deque<ResolvedDependency> dependencyPath,
-                    ExecutionContext ctx
-            ) {
-                String dependencyGraph = DependencyTreeWalker.renderPath(scope.name().toLowerCase(), dependencyPath);
-                dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
-                        projectName,
-                        sourceSetName,
-                        gav.getGroupId(),
-                        gav.getArtifactId(),
-                        gav.getVersion(),
-                        gav.getDatedSnapshotVersion(),
-                        scope.name().toLowerCase(),
-                        dependencyPath.size() - 1,
-                        dependencyGraph
-                ));
             }
         };
     }

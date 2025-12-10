@@ -331,9 +331,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // Determine the appropriate import style
         const importStyle = this.determineImportStyle(compilationUnit);
 
-        // For ES6 named imports, check if we can merge into an existing import from the same module
+        // For named imports, check if we can merge into an existing import from the same module
+        // This handles both:
+        // - Case 1: Existing import has named bindings - merge into them
+        // - Case 2: Default import without named bindings - add named bindings
         // Don't try to merge default imports (member === 'default'), side-effect imports, or namespace imports (member === '*')
-        if (!this.sideEffectOnly && importStyle === ImportStyle.ES6Named && this.member !== undefined && this.member !== 'default' && this.member !== '*') {
+        if (!this.sideEffectOnly && this.member !== undefined && this.member !== 'default' && this.member !== '*') {
             const mergedCu = await this.tryMergeIntoExistingImport(compilationUnit, p);
             if (mergedCu !== compilationUnit) {
                 return mergedCu;
@@ -436,83 +439,136 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 }
 
                 const importClause = jsImport.importClause;
-                if (!importClause || !importClause.namedBindings) {
+                if (!importClause) {
                     continue;
                 }
 
-                // Only merge into NamedImports, not namespace imports
-                if (importClause.namedBindings.kind !== JS.Kind.NamedImports) {
-                    continue;
-                }
+                // Case 1: Existing import has named bindings - merge into them
+                if (importClause.namedBindings) {
+                    // Only merge into NamedImports, not namespace imports
+                    if (importClause.namedBindings.kind !== JS.Kind.NamedImports) {
+                        continue;
+                    }
 
-                // We found a matching import with named bindings - merge into it
-                return this.produceJavaScript(compilationUnit, p, async draft => {
-                    const namedImports = importClause.namedBindings as JS.NamedImports;
-                    const existingElements = namedImports.elements.elements;
+                    // We found a matching import with named bindings - merge into it
+                    return this.produceJavaScript(compilationUnit, p, async draft => {
+                        const namedImports = importClause.namedBindings as JS.NamedImports;
+                        const existingElements = namedImports.elements.elements;
 
-                    // Find the correct insertion position (alphabetical, case-insensitive)
-                    const newName = (this.alias || this.member!).toLowerCase();
-                    let insertIndex = existingElements.findIndex(elem => {
-                        if (elem.element?.kind === JS.Kind.ImportSpecifier) {
-                            const name = this.getImportAlias(elem.element) || this.getImportName(elem.element);
-                            return newName.localeCompare(name.toLowerCase()) < 0;
-                        }
-                        return false;
-                    });
-                    if (insertIndex === -1) insertIndex = existingElements.length;
-
-                    // Build the new elements array with proper spacing
-                    const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
-                        namedImports, p, async namedDraft => {
-                            const lastIndex = existingElements.length - 1;
-                            const trailingSpace = existingElements[lastIndex].after;
-                            const newSpecifier = this.createImportSpecifier();
-
-                            const newElements = existingElements.flatMap((elem, j) => {
-                                const results: J.RightPadded<JS.ImportSpecifier>[] = [];
-                                if (j === insertIndex) {
-                                    // Insert new element here; first element gets no prefix, others get space
-                                    const prefix = j === 0 ? emptySpace : singleSpace;
-                                    results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
-                                }
-                                // Adjust existing element: first after insertion gets space prefix
-                                let adjusted = elem;
-                                if (j === 0 && insertIndex === 0 && elem.element) {
-                                    adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
-                                }
-                                // Last element before a new trailing element loses its trailing space
-                                if (j === lastIndex && insertIndex > lastIndex) {
-                                    adjusted = {...adjusted, after: emptySpace};
-                                }
-                                results.push(adjusted);
-                                return results;
-                            });
-
-                            // Append at end if inserting after all existing elements
-                            if (insertIndex > lastIndex) {
-                                newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
+                        // Find the correct insertion position (alphabetical, case-insensitive)
+                        const newName = (this.alias || this.member!).toLowerCase();
+                        let insertIndex = existingElements.findIndex(elem => {
+                            if (elem.element?.kind === JS.Kind.ImportSpecifier) {
+                                const name = this.getImportAlias(elem.element) || this.getImportName(elem.element);
+                                return newName.localeCompare(name.toLowerCase()) < 0;
                             }
+                            return false;
+                        });
+                        if (insertIndex === -1) insertIndex = existingElements.length;
 
-                            namedDraft.elements = {...namedImports.elements, elements: newElements};
-                        }
-                    );
+                        // Build the new elements array with proper spacing
+                        const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
+                            namedImports, p, async namedDraft => {
+                                const lastIndex = existingElements.length - 1;
+                                const trailingSpace = existingElements[lastIndex].after;
+                                const newSpecifier = this.createImportSpecifier();
 
-                    // Update the import with the new named imports
-                    const updatedImport: JS.Import = await this.produceJavaScript(
-                        jsImport, p, async importDraft => {
-                            importDraft.importClause = await this.produceJavaScript(
-                                importClause, p, async clauseDraft => {
-                                    clauseDraft.namedBindings = updatedNamedImports;
+                                const newElements = existingElements.flatMap((elem, j) => {
+                                    const results: J.RightPadded<JS.ImportSpecifier>[] = [];
+                                    if (j === insertIndex) {
+                                        // Insert new element here; first element gets no prefix, others get space
+                                        const prefix = j === 0 ? emptySpace : singleSpace;
+                                        results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
+                                    }
+                                    // Adjust existing element: first after insertion gets space prefix
+                                    let adjusted = elem;
+                                    if (j === 0 && insertIndex === 0 && elem.element) {
+                                        adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
+                                    }
+                                    // Last element before a new trailing element loses its trailing space
+                                    if (j === lastIndex && insertIndex > lastIndex) {
+                                        adjusted = {...adjusted, after: emptySpace};
+                                    }
+                                    results.push(adjusted);
+                                    return results;
+                                });
+
+                                // Append at end if inserting after all existing elements
+                                if (insertIndex > lastIndex) {
+                                    newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
                                 }
-                            );
-                        }
-                    );
 
-                    // Replace the statement in the compilation unit
-                    draft.statements = compilationUnit.statements.map((s, idx) =>
-                        idx === i ? {...s, element: updatedImport} : s
-                    );
-                });
+                                namedDraft.elements = {...namedImports.elements, elements: newElements};
+                            }
+                        );
+
+                        // Update the import with the new named imports
+                        const updatedImport: JS.Import = await this.produceJavaScript(
+                            jsImport, p, async importDraft => {
+                                importDraft.importClause = await this.produceJavaScript(
+                                    importClause, p, async clauseDraft => {
+                                        clauseDraft.namedBindings = updatedNamedImports;
+                                    }
+                                );
+                            }
+                        );
+
+                        // Replace the statement in the compilation unit
+                        draft.statements = compilationUnit.statements.map((s, idx) =>
+                            idx === i ? {...s, element: updatedImport} : s
+                        );
+                    });
+                }
+
+                // Case 2: Default import without named bindings - add named bindings
+                // Transform: import React from 'react' -> import React, { useState } from 'react'
+                if (importClause.name && !importClause.namedBindings) {
+                    return this.produceJavaScript(compilationUnit, p, async draft => {
+                        const newSpecifier = this.createImportSpecifier();
+
+                        // Create new NamedImports with a single element
+                        const namedImports: JS.NamedImports = {
+                            id: randomId(),
+                            kind: JS.Kind.NamedImports,
+                            prefix: singleSpace,
+                            markers: emptyMarkers,
+                            elements: {
+                                kind: J.Kind.Container,
+                                before: emptySpace,
+                                elements: [rightPadded(newSpecifier, emptySpace)],
+                                markers: emptyMarkers
+                            }
+                        };
+
+                        // Update the import clause to include named bindings
+                        // Also update name.after to emptySpace since the comma goes right after the name
+                        const updatedImport: JS.Import = await this.produceJavaScript(
+                            jsImport, p, async importDraft => {
+                                importDraft.importClause = await this.produceJavaScript(
+                                    importClause, p, async clauseDraft => {
+                                        // Remove space after default name (comma goes right after)
+                                        if (clauseDraft.name) {
+                                            clauseDraft.name = {...clauseDraft.name, after: emptySpace};
+                                        }
+                                        clauseDraft.namedBindings = namedImports;
+                                    }
+                                );
+                                // Ensure moduleSpecifier has proper space before 'from'
+                                if (importDraft.moduleSpecifier) {
+                                    importDraft.moduleSpecifier = {
+                                        ...importDraft.moduleSpecifier,
+                                        before: singleSpace
+                                    };
+                                }
+                            }
+                        );
+
+                        // Replace the statement in the compilation unit
+                        draft.statements = compilationUnit.statements.map((s, idx) =>
+                            idx === i ? {...s, element: updatedImport} : s
+                        );
+                    });
+                }
             }
         }
 

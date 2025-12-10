@@ -13,5 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@NullMarked
+@NonNullFields
+package org.openrewrite.javascript.table;
 
-export {OrderImports} from "./order-imports";
+import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;
