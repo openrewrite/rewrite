@@ -19,12 +19,19 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.java.search.FindMissingTypes.MissingTypeResult;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
+import java.util.List;
 import java.util.Optional;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -70,5 +77,20 @@ class AssertionsTest implements RewriteTest {
         assertThat(sf.isPresent()).isTrue();
         //noinspection OptionalGetWithoutIsPresent
         assertThat(sf.get()).isInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void allowNullTypeForMethodInvocation() {
+        J.MethodInvocation mi = new J.MethodInvocation(
+          Tree.randomId(),
+          Space.EMPTY,
+          Markers.EMPTY,
+          null,
+          null,
+          new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "test", null, null),
+          JContainer.empty(),
+          null); // null type
+        List<MissingTypeResult> missingTypes = Assertions.findMissingTypes(mi);
+        assertThat(missingTypes).isEmpty();
     }
 }

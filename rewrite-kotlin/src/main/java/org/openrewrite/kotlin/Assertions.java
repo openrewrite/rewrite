@@ -377,7 +377,10 @@ public final class Assertions {
             // Avoid over-reporting the same problem by checking the invocation only when its elements are well-formed
             if (mi == method) {
                 JavaType.Method type = mi.getMethodType();
-                if (!isWellFormedType(type, seenTypes)) {
+                if (type == null) {
+                  // Allow null method type for method invocations due to:
+                  // https://github.com/openrewrite/rewrite/issues/6408
+                } else if (!isWellFormedType(type, seenTypes)) {
                     mi = SearchResult.found(mi, "MethodInvocation type is missing or malformed");
                 } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor() && isValidated(mi)) {
                     mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
