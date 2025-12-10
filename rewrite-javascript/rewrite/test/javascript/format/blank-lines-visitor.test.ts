@@ -15,9 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for BlankLinesVisitor - handles blank lines between declarations and statements.
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    blank line scenarios into a single test with multiple variations in the source text.
+ *
+ * 2. SCOPE: This file should contain tests specific to BlankLinesVisitor behavior and
+ *    BlankLinesStyle settings. For full formatter integration tests, use format.test.ts.
+ */
+
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {BlankLinesStyle, IntelliJ, typescript} from "../../../src/javascript";
-import {BlankLinesVisitor} from "../../../src/javascript/format";
+import {BlankLinesStyle, BlankLinesVisitor, IntelliJ, typescript} from "../../../src/javascript";
 import {Draft, produce} from "immer";
 import {Style} from "../../../src";
 
@@ -141,11 +154,9 @@ describe('BlankLinesVisitor', () => {
                     constructor(public title:string,public done:boolean=false){
                     }
 
-
                     toggle():void{
                     this.done=!this.done;
                     }
-
 
                     toString():string{
                     return (this.done?"[x]":"[ ]")+this.title
@@ -173,5 +184,60 @@ describe('BlankLinesVisitor', () => {
                 )
             // @formatter:on
         );
+    });
+
+    test('case label with member access should not add newline', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function foo(kind: number) {
+    switch (kind) {
+        case Type.Kind.Annotation: {
+            break;
+        }
+    }
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('enum inside namespace should not add blank line before closing brace', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `export namespace Class {
+    export const enum Kind {
+        Class = "Class",
+        Enum = "Enum",
+        Interface = "Interface",
+        Annotation = "Annotation",
+        Record = "Record",
+        Value = "Value"
+    }
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('enum with trailing comma should preserve formatting', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `export const enum Kind {
+    Class = "Class",
+    Enum = "Enum",
+    Value = "Value",
+}`
+            )
+            // @formatter:on
+        )
     });
 });

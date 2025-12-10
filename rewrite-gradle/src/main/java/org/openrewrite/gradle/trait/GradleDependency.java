@@ -1351,7 +1351,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
             if (gdc != null) {
                 if (gdc.isCanBeResolved()) {
-                    for (ResolvedDependency resolvedDependency : gdc.getResolved()) {
+                    for (ResolvedDependency resolvedDependency : gdc.getDirectResolved()) {
                         if (matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
                             Dependency req = resolvedDependency.getRequested();
                             if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
@@ -1363,7 +1363,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 } else {
                     for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
                         if (transitiveConfiguration.isCanBeResolved()) {
-                            for (ResolvedDependency resolvedDependency : transitiveConfiguration.getResolved()) {
+                            for (ResolvedDependency resolvedDependency : transitiveConfiguration.getDirectResolved()) {
                                 if (matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
                                     Dependency req = resolvedDependency.getRequested();
                                     if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&

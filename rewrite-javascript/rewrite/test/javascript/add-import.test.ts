@@ -15,13 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe, test, expect} from "@jest/globals";
+import {describe, expect, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
     ImportStyle,
     javascript,
     JavaScriptVisitor,
+    JS,
     maybeAddImport,
     npm,
     packageJson,
@@ -84,10 +85,9 @@ function createForceRemoveFirstImportThenAddVisitor(
     alias?: string
 ): JavaScriptVisitor<any> {
     return new class extends JavaScriptVisitor<any> {
-        override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
-            const jsCu = cu as any;
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
             // First, manually remove the first statement (the import)
-            let result: any = await this.produceJavaScript(jsCu, p, async (draft: any) => {
+            let result: any = await this.produceJavaScript(cu, p, async draft => {
                 if (draft.statements && draft.statements.length > 0) {
                     draft.statements = draft.statements.slice(1);
                     draft.statements[0].element.prefix = emptySpace;
@@ -507,6 +507,31 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('should add named import to existing default-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "useState", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import React from 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `,
+                    `
+                        import React, {useState} from 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `
+                )
+            );
+        });
+
         test('should preserve formatting when merging imports (forwardRef, memo example)', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({ module: "react", member: "memo", onlyIfReferenced: false }));
@@ -734,19 +759,19 @@ describe('AddImport visitor', () => {
             await spec.rewriteRun(
                 typescript(
                     `
-                        import * as fs from 'fs';
+                    import * as fs from 'fs';
 
-                        function example() {
-                            placeholder();
-                        }
+                    function example() {
+                        placeholder();
+                    }
                     `,
                     `
-                        import * as fs from 'fs';
-                        import {promisify} from 'util';
+                    import * as fs from 'fs';
+                    import {promisify} from 'util';
 
-                        function example() {
-                            promisify(fs.readFile);
-                        }
+                    function example() {
+                        promisify(fs.readFile);
+                    }
                     `
                 )
             );
@@ -1350,9 +1375,9 @@ describe('AddImport visitor', () => {
     });
 
     describe('object imports (non-function references)', () => {
-        test('should add import for vitest vi object when referenced', async () => {
+        test('should add import for zod z object when referenced', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("vitest", "vi"));
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("zod", "z"));
 
             //language=typescript
             await withDir(async (repo) => {
@@ -1361,10 +1386,10 @@ describe('AddImport visitor', () => {
                         repo.path,
                         typescript(
                             `
-                                import {vi} from 'vitest';
+                                import {z} from 'zod';
 
                                 function example() {
-                                    const mock = vi.fn();
+                                    const schema = z.string();
                                 }
                             `
                         ),
@@ -1375,7 +1400,7 @@ describe('AddImport visitor', () => {
                                 "name": "test-project",
                                 "version": "1.0.0",
                                 "dependencies": {
-                                  "vitest": "^2.0.0"
+                                  "zod": "^3.0.0"
                                 }
                               }
                             `
@@ -1385,9 +1410,9 @@ describe('AddImport visitor', () => {
             }, {unsafeCleanup: true});
         });
 
-        test('should not add import for vitest vi when not referenced', async () => {
+        test('should not add import for zod z when not referenced', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({ module: "vitest", member: "vi", onlyIfReferenced: true }));
+            spec.recipe = fromVisitor(new AddImport({ module: "zod", member: "z", onlyIfReferenced: true }));
 
             //language=typescript
             await withDir(async (repo) => {
@@ -1408,7 +1433,7 @@ describe('AddImport visitor', () => {
                                 "name": "test-project",
                                 "version": "1.0.0",
                                 "dependencies": {
-                                  "vitest": "^2.0.0"
+                                  "zod": "^3.0.0"
                                 }
                               }
                             `
@@ -1418,9 +1443,9 @@ describe('AddImport visitor', () => {
             }, {unsafeCleanup: true});
         });
 
-        test('should add import for vitest vi when used as standalone identifier', async () => {
+        test('should add import for zod z when used as standalone identifier', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("vitest", "vi"));
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("zod", "z"));
 
             //language=typescript
             await withDir(async (repo) => {
@@ -1429,11 +1454,11 @@ describe('AddImport visitor', () => {
                         repo.path,
                         typescript(
                             `
-                                import {vi} from 'vitest';
+                                import {z} from 'zod';
 
                                 function example() {
-                                    const mockUtils = vi;
-                                    mockUtils.fn();
+                                    const validator = z;
+                                    validator.string();
                                 }
                             `
                         ),
@@ -1444,7 +1469,7 @@ describe('AddImport visitor', () => {
                                 "name": "test-project",
                                 "version": "1.0.0",
                                 "dependencies": {
-                                  "vitest": "^2.0.0"
+                                  "zod": "^3.0.0"
                                 }
                               }
                             `
@@ -1454,9 +1479,9 @@ describe('AddImport visitor', () => {
             }, {unsafeCleanup: true});
         });
 
-        test('should add import for vitest vi with spyOn usage', async () => {
+        test('should add import for zod z with object schema usage', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("vitest", "vi"));
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("zod", "z"));
 
             //language=typescript
             await withDir(async (repo) => {
@@ -1465,10 +1490,10 @@ describe('AddImport visitor', () => {
                         repo.path,
                         typescript(
                             `
-                                import {vi} from 'vitest';
+                                import {z} from 'zod';
 
                                 function example() {
-                                    const spy = vi.spyOn(console, 'log');
+                                    const schema = z.object({name: z.string()});
                                 }
                             `
                         ),
@@ -1479,7 +1504,7 @@ describe('AddImport visitor', () => {
                                 "name": "test-project",
                                 "version": "1.0.0",
                                 "dependencies": {
-                                  "vitest": "^2.0.0"
+                                  "zod": "^3.0.0"
                                 }
                               }
                             `
@@ -1489,12 +1514,12 @@ describe('AddImport visitor', () => {
             }, {unsafeCleanup: true});
         });
 
-        test('should add import for vitest vi when another vitest import exists (with onlyIfReferenced)', async () => {
+        test('should add import for zod z when another zod import exists (with onlyIfReferenced)', async () => {
             const spec = new RecipeSpec();
-            // This test manually removes the vi import statement, then adds it back with onlyIfReferenced: true
+            // This test manually removes the z import statement, then adds it back with onlyIfReferenced: true
             // This tests that type attribution correctly detects usage of object types (not just methods).
-            // The AddImport visitor will merge the vi import into the existing describe import from vitest.
-            spec.recipe = fromVisitor(createForceRemoveFirstImportThenAddVisitor("vitest", "vi"));
+            // The AddImport visitor will merge the z import into the existing ZodError import from zod.
+            spec.recipe = fromVisitor(createForceRemoveFirstImportThenAddVisitor("zod", "z"));
 
             //language=typescript
             await withDir(async (repo) => {
@@ -1503,18 +1528,18 @@ describe('AddImport visitor', () => {
                         repo.path,
                         typescript(
                             `
-                                import {vi} from 'vitest';
-                                import {describe} from 'vitest';
+                                import {z} from 'zod';
+                                import {ZodError} from 'zod';
 
                                 function example() {
-                                    const mock = vi.fn();
+                                    const schema = z.string();
                                 }
                             `,
                             `
-                                import {describe, vi} from 'vitest';
+                                import {z, ZodError} from 'zod';
 
                                 function example() {
-                                    const mock = vi.fn();
+                                    const schema = z.string();
                                 }
                             `
                         ),
@@ -1525,7 +1550,7 @@ describe('AddImport visitor', () => {
                                 "name": "test-project",
                                 "version": "1.0.0",
                                 "dependencies": {
-                                  "vitest": "^2.0.0"
+                                  "zod": "^3.0.0"
                                 }
                               }
                             `
@@ -1581,15 +1606,15 @@ describe('AddImport visitor', () => {
             }, {unsafeCleanup: true});
         });
 
-        test('should add import for vitest vi when code created via templating', async () => {
+        test('should add import for zod z when code created via templating', async () => {
             const spec = new RecipeSpec();
-            // This test simulates code created via templating where vi.fn() is used
+            // This test simulates code created via templating where z.string() is used
             // but the import doesn't exist. Tests that type attribution works with templated code.
 
             // Create a visitor that logs what it finds
             const addImportVisitor = new AddImport({
-                module: 'vitest',
-                member: 'vi',
+                module: 'zod',
+                member: 'z',
                 onlyIfReferenced: true
             });
 
@@ -1603,14 +1628,14 @@ describe('AddImport visitor', () => {
                         typescript(
                             `
                                 function example() {
-                                    const mockFn = vi.fn();
+                                    const schema = z.string();
                                 }
                             `,
                             `
-                                import {vi} from 'vitest';
+                                import {z} from 'zod';
 
                                 function example() {
-                                    const mockFn = vi.fn();
+                                    const schema = z.string();
                                 }
                             `
                         ),
@@ -1621,7 +1646,7 @@ describe('AddImport visitor', () => {
                                 "name": "test-project",
                                 "version": "1.0.0",
                                 "dependencies": {
-                                  "vitest": "^2.0.0"
+                                  "zod": "^3.0.0"
                                 }
                               }
                             `
@@ -1639,9 +1664,9 @@ describe('AddImport visitor', () => {
             // Visitor that adds imports in non-alphabetical order
             const addImportsVisitor = new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
-                    maybeAddImport(this, {module: 'vitest', member: 'test', onlyIfReferenced: false});
-                    maybeAddImport(this, {module: 'vitest', member: 'expect', onlyIfReferenced: false});
-                    maybeAddImport(this, {module: 'vitest', member: 'beforeEach', onlyIfReferenced: false});
+                    maybeAddImport(this, {module: 'zod', member: 'ZodType', onlyIfReferenced: false});
+                    maybeAddImport(this, {module: 'zod', member: 'ZodError', onlyIfReferenced: false});
+                    maybeAddImport(this, {module: 'zod', member: 'z', onlyIfReferenced: false});
                     return cu;
                 }
             };
@@ -1655,7 +1680,7 @@ describe('AddImport visitor', () => {
                         const x = 1;
                     `,
                     `
-                        import {beforeEach, expect, test} from 'vitest';
+                        import {z, ZodError, ZodType} from 'zod';
 
                         const x = 1;
                     `
@@ -1663,12 +1688,12 @@ describe('AddImport visitor', () => {
                 // Existing import - inserts at correct alphabetical position
                 typescript(
                     `
-                        import {afterEach, vi} from 'vitest';
+                        import {ZodString} from 'zod';
 
                         const x = 1;
                     `,
                     `
-                        import {afterEach, beforeEach, expect, test, vi} from 'vitest';
+                        import {z, ZodError, ZodString, ZodType} from 'zod';
 
                         const x = 1;
                     `

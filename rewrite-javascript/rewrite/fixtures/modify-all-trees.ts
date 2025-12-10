@@ -15,16 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {
-    ExecutionContext,
-    marker,
-    Marker,
-    randomId,
-    Recipe,
-    RecipeRegistry,
-    Tree,
-    TreeVisitor
-} from "@openrewrite/rewrite";
+import {ExecutionContext, marker, Marker, randomId, Recipe, RecipeRegistry, Tree, TreeVisitor} from "../src";
 
 export function activate(registry: RecipeRegistry) {
     registry.register(ModifyAllTrees);
@@ -41,9 +32,9 @@ class ModifyAllTrees extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends TreeVisitor<Tree, ExecutionContext> {
             protected async preVisit(tree: Tree, p: ExecutionContext): Promise<Tree> {
-                return this.produceTree(tree, p, draft => {
+                return (await this.produceTree(tree, p, draft => {
                     draft.markers.markers.push(changed);
-                });
+                }))!;
             }
         };
     }

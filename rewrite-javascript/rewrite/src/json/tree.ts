@@ -32,7 +32,7 @@ export namespace Json {
         Object: "org.openrewrite.json.tree.Json$JsonObject",
         Space: "org.openrewrite.json.tree.Space",
         Comment: "org.openrewrite.json.tree.Comment",
-        RightPadded: "org.openrewrite.json.tree.RightPadded"
+        RightPadded: "org.openrewrite.json.tree.JsonRightPadded"
     } as const
 
     export type Key = Identifier | Literal
