@@ -21,6 +21,8 @@ import {Json, JsonParser, JsonVisitor} from "../../json";
 import {
     createNodeResolutionResultMarker,
     findNodeResolutionResult,
+    Npmrc,
+    NpmrcScope,
     PackageJsonContent,
     PackageLockContent,
     PackageManager,
@@ -60,6 +62,8 @@ interface ProjectUpdateInfo {
      * already satisfies the new constraint. Only package.json needs updating.
      */
     skipInstall: boolean;
+    /** Npmrc configurations from the marker (for temp directory install) */
+    npmrcConfigs?: Npmrc[];
 }
 
 /**
@@ -114,6 +118,17 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         example: "^5.0.0"
     })
     newVersion!: string;
+
+    @Option({
+        displayName: "Npmrc scopes",
+        description: "Which .npmrc configuration scopes to include when running the package manager. " +
+            "By default, only 'Project' scope is used. Include 'User' or 'Global' to access private registries " +
+            "configured in those scopes. Pass as JSON array, e.g., '[\"Project\",\"User\"]'.",
+        required: false,
+        example: '["Project"]',
+        valid: ["Global", "User", "Project"]
+    })
+    npmrcScopes?: string[];
 
     initialValue(_ctx: ExecutionContext): Accumulator {
         return {
@@ -218,7 +233,8 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                     currentVersion,
                     newVersion: recipe.newVersion,
                     packageManager: pm,
-                    skipInstall
+                    skipInstall,
+                    npmrcConfigs: marker.npmrcConfigs
                 });
 
                 return doc;
@@ -322,6 +338,23 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     }
 
     /**
+     * Converts string scope names to NpmrcScope enum values.
+     */
+    private parseNpmrcScopes(scopes?: string[]): NpmrcScope[] | undefined {
+        if (!scopes || scopes.length === 0) {
+            return undefined; // Use default (Project only)
+        }
+        const scopeMap: Record<string, NpmrcScope> = {
+            'Global': NpmrcScope.Global,
+            'User': NpmrcScope.User,
+            'Project': NpmrcScope.Project
+        };
+        return scopes
+            .filter(s => s in scopeMap)
+            .map(s => scopeMap[s]);
+    }
+
+    /**
      * Runs the package manager in a temporary directory to update the lock file.
      * Writes a modified package.json with the new version, then runs install to update the lock file.
      */
@@ -340,7 +373,11 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         const result = await runInstallInTempDir(
             updateInfo.projectDir,
             updateInfo.packageManager,
-            modifiedPackageJson
+            modifiedPackageJson,
+            {
+                npmrcConfigs: updateInfo.npmrcConfigs,
+                npmrcScopes: this.parseNpmrcScopes(this.npmrcScopes)
+            }
         );
 
         if (result.success) {

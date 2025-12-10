@@ -598,6 +598,55 @@ function parseNpmrc(content: string): Record<string, string> {
 }
 
 /**
+ * Serializes Npmrc configurations to .npmrc file format.
+ *
+ * Merges properties from multiple scopes in priority order (Global -> User -> Project),
+ * so higher-priority scopes override lower-priority ones.
+ *
+ * @param configs Array of Npmrc configurations from the marker
+ * @param scopes Which scopes to include (default: ['Project'])
+ * @returns Serialized .npmrc content, or undefined if no matching configs
+ */
+export function serializeNpmrcConfigs(
+    configs: Npmrc[] | undefined,
+    scopes: NpmrcScope[] = [NpmrcScope.Project]
+): string | undefined {
+    if (!configs || configs.length === 0 || scopes.length === 0) {
+        return undefined;
+    }
+
+    // Define priority order (lowest to highest)
+    const scopePriority: NpmrcScope[] = [NpmrcScope.Global, NpmrcScope.User, NpmrcScope.Project];
+
+    // Filter and sort configs by priority
+    const filteredConfigs = configs
+        .filter(c => scopes.includes(c.scope))
+        .sort((a, b) => scopePriority.indexOf(a.scope) - scopePriority.indexOf(b.scope));
+
+    if (filteredConfigs.length === 0) {
+        return undefined;
+    }
+
+    // Merge properties in priority order (later entries override earlier)
+    const mergedProperties: Record<string, string> = {};
+    for (const config of filteredConfigs) {
+        Object.assign(mergedProperties, config.properties);
+    }
+
+    if (Object.keys(mergedProperties).length === 0) {
+        return undefined;
+    }
+
+    // Serialize to .npmrc format
+    const lines: string[] = [];
+    for (const [key, value] of Object.entries(mergedProperties)) {
+        lines.push(`${key}=${value}`);
+    }
+
+    return lines.join('\n') + '\n';
+}
+
+/**
  * Helper to check if a file exists asynchronously.
  */
 async function fileExists(filePath: string): Promise<boolean> {

@@ -22,6 +22,8 @@ import {
     createNodeResolutionResultMarker,
     findNodeResolutionResult,
     NodeResolutionResultQueries,
+    Npmrc,
+    NpmrcScope,
     PackageJsonContent,
     PackageLockContent,
     PackageManager,
@@ -55,6 +57,8 @@ interface ProjectUpdateInfo {
     skipInstall: boolean;
     /** Parsed dependency path for scoped overrides (if specified) */
     dependencyPathSegments?: DependencyPathSegment[];
+    /** Npmrc configurations from the marker (for temp directory install) */
+    npmrcConfigs?: Npmrc[];
 }
 
 /**
@@ -117,6 +121,17 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
         example: "express>accepts"
     })
     dependencyPath?: string;
+
+    @Option({
+        displayName: "Npmrc scopes",
+        description: "Which .npmrc configuration scopes to include when running the package manager. " +
+            "By default, only 'Project' scope is used. Include 'User' or 'Global' to access private registries " +
+            "configured in those scopes. Pass as JSON array, e.g., '[\"Project\",\"User\"]'.",
+        required: false,
+        example: '["Project"]',
+        valid: ["Global", "User", "Project"]
+    })
+    npmrcScopes?: string[];
 
     initialValue(_ctx: ExecutionContext): Accumulator {
         return {
@@ -192,7 +207,8 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                     newVersion: recipe.newVersion,
                     packageManager: pm,
                     skipInstall: false, // Always need to run install for overrides
-                    dependencyPathSegments
+                    dependencyPathSegments,
+                    npmrcConfigs: marker.npmrcConfigs
                 });
 
                 return doc;
@@ -336,6 +352,23 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
     }
 
     /**
+     * Converts string scope names to NpmrcScope enum values.
+     */
+    private parseNpmrcScopes(scopes?: string[]): NpmrcScope[] | undefined {
+        if (!scopes || scopes.length === 0) {
+            return undefined; // Use default (Project only)
+        }
+        const scopeMap: Record<string, NpmrcScope> = {
+            'Global': NpmrcScope.Global,
+            'User': NpmrcScope.User,
+            'Project': NpmrcScope.Project
+        };
+        return scopes
+            .filter(s => s in scopeMap)
+            .map(s => scopeMap[s]);
+    }
+
+    /**
      * Runs the package manager in a temporary directory to update the lock file.
      */
     private async runPackageManagerInstall(
@@ -352,7 +385,11 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
         const result = await runInstallInTempDir(
             updateInfo.projectDir,
             updateInfo.packageManager,
-            modifiedPackageJson
+            modifiedPackageJson,
+            {
+                npmrcConfigs: updateInfo.npmrcConfigs,
+                npmrcScopes: this.parseNpmrcScopes(this.npmrcScopes)
+            }
         );
 
         if (result.success) {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {PackageManager} from "./node-resolution-result";
+import {Npmrc, NpmrcScope, PackageManager, serializeNpmrcConfigs} from "./node-resolution-result";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
@@ -453,6 +453,18 @@ export interface TempInstallOptions {
      * Default: true (lock-only is faster and sufficient for most cases)
      */
     lockOnly?: boolean;
+    /**
+     * Npmrc configurations from the NodeResolutionResult marker.
+     * If provided, these will be serialized and written to .npmrc in the temp directory
+     * instead of copying from the filesystem.
+     */
+    npmrcConfigs?: Npmrc[];
+    /**
+     * Which npmrc scopes to include when writing .npmrc to the temp directory.
+     * Default: [NpmrcScope.Project] - only project-level settings.
+     * Set to [NpmrcScope.Global, NpmrcScope.User, NpmrcScope.Project] to include all scopes.
+     */
+    npmrcScopes?: NpmrcScope[];
 }
 
 /**
@@ -462,7 +474,7 @@ export interface TempInstallOptions {
  * 1. Creates a temp directory
  * 2. Writes the provided package.json content
  * 3. Copies the existing lock file (if present)
- * 4. Copies config files (.npmrc, .yarnrc, etc.)
+ * 4. Writes .npmrc from marker data (if provided) or copies config files from filesystem
  * 5. Runs the package manager install
  * 6. Returns the updated lock file content
  * 7. Cleans up the temp directory
@@ -470,7 +482,7 @@ export interface TempInstallOptions {
  * @param projectDir The original project directory (for copying lock file and configs)
  * @param pm The package manager to use
  * @param modifiedPackageJson The modified package.json content to use
- * @param options Optional settings for timeout and lock-only mode
+ * @param options Optional settings for timeout, lock-only mode, and npmrc configuration
  * @returns Result containing success status and lock file content or error
  */
 export async function runInstallInTempDir(
@@ -479,7 +491,12 @@ export async function runInstallInTempDir(
     modifiedPackageJson: string,
     options: TempInstallOptions = {}
 ): Promise<TempInstallResult> {
-    const {timeout = 120000, lockOnly = true} = options;
+    const {
+        timeout = 120000,
+        lockOnly = true,
+        npmrcConfigs,
+        npmrcScopes = [NpmrcScope.Project]
+    } = options;
     const lockFileName = getLockFileName(pm);
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
 
@@ -493,9 +510,24 @@ export async function runInstallInTempDir(
             await fsp.copyFile(originalLockPath, path.join(tempDir, lockFileName));
         }
 
-        // Copy config files if present (for registry configuration and workspace setup)
-        const configFiles = ['.npmrc', '.yarnrc', '.yarnrc.yml', '.pnpmfile.cjs', 'pnpm-workspace.yaml'];
-        for (const configFile of configFiles) {
+        // Handle .npmrc: prefer marker data, fall back to filesystem
+        if (npmrcConfigs && npmrcConfigs.length > 0) {
+            // Serialize npmrc from marker data
+            const npmrcContent = serializeNpmrcConfigs(npmrcConfigs, npmrcScopes);
+            if (npmrcContent) {
+                await fsp.writeFile(path.join(tempDir, '.npmrc'), npmrcContent);
+            }
+        } else {
+            // Fall back to copying from filesystem
+            const npmrcPath = path.join(projectDir, '.npmrc');
+            if (fs.existsSync(npmrcPath)) {
+                await fsp.copyFile(npmrcPath, path.join(tempDir, '.npmrc'));
+            }
+        }
+
+        // Copy other config files if present (for Yarn, pnpm, etc.)
+        const otherConfigFiles = ['.yarnrc', '.yarnrc.yml', '.pnpmfile.cjs', 'pnpm-workspace.yaml'];
+        for (const configFile of otherConfigFiles) {
             const configPath = path.join(projectDir, configFile);
             if (fs.existsSync(configPath)) {
                 await fsp.copyFile(configPath, path.join(tempDir, configFile));
