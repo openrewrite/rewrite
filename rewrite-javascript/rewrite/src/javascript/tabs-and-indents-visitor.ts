@@ -534,8 +534,14 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         const isParenthesesWrappingBinary = rightPaddedParentKind === J.Kind.Parentheses &&
             elementKind === J.Kind.Binary;
 
+        // Check if this is a NamedVariable inside a VariableDeclarations with decorators
+        // In this case, the newline between decorator and variable name should NOT cause continuation indent
+        const isVariableAfterDecorator = elementKind === J.Kind.NamedVariable &&
+            rightPaddedParentKind === J.Kind.VariableDeclarations &&
+            ((this.cursor.parent?.value as J.VariableDeclarations)?.leadingAnnotations?.length ?? 0) > 0;
+
         let myIndent = parentIndent;
-        if (!isParenthesesWrappingBinary && parentIndentKind !== 'align' && isJava(right.element) && this.prefixContainsNewline(right.element as J)) {
+        if (!isParenthesesWrappingBinary && !isVariableAfterDecorator && parentIndentKind !== 'align' && isJava(right.element) && this.prefixContainsNewline(right.element as J)) {
             myIndent = parentIndent + this.indentSize;
             // For spread elements with newlines, mark continuation as established
             const element = right.element as J;
