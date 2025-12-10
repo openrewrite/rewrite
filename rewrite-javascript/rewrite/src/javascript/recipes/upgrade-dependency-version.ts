@@ -45,6 +45,303 @@ import {
 type DependencyScope = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies';
 
 /**
+ * Policy for handling which dependencies to upgrade.
+ * - 'Direct': Only upgrade direct dependencies (default)
+ * - 'Transitive': Only add overrides for transitive dependencies
+ * - 'DirectAndTransitive': Upgrade direct AND add overrides for transitive
+ */
+type UpgradePolicy = 'Direct' | 'Transitive' | 'DirectAndTransitive';
+
+/**
+ * Parsed dependency path for scoped overrides.
+ * Segments represent the chain of dependencies, e.g., "express>accepts" becomes
+ * [{name: "express"}, {name: "accepts"}]
+ */
+interface DependencyPathSegment {
+    name: string;
+    version?: string;
+}
+
+/**
+ * Parses a dependency path string into segments.
+ * Accepts both '>' (pnpm style) and '/' (yarn style) as separators.
+ * Examples:
+ *   "express>accepts" -> [{name: "express"}, {name: "accepts"}]
+ *   "express@4.0.0>accepts" -> [{name: "express", version: "4.0.0"}, {name: "accepts"}]
+ *   "@scope/pkg>dep" -> [{name: "@scope/pkg"}, {name: "dep"}]
+ * @internal Exported for testing
+ */
+export function parseDependencyPath(path: string): DependencyPathSegment[] {
+    // We can't just replace all '/' with '>' because scoped packages contain '/'
+    // Strategy: Split on '>' first, then for each part that contains '/' and doesn't
+    // start with '@', treat it as a '/'-separated path (yarn style)
+    const segments: DependencyPathSegment[] = [];
+
+    // Split on '>' (pnpm style separator)
+    const gtParts = path.split('>');
+
+    for (const gtPart of gtParts) {
+        // Check if this part needs further splitting by '/'
+        // Only split if it contains '/' AND either:
+        // - doesn't start with '@' (not a scoped package), OR
+        // - contains multiple '/' (e.g., "@scope/pkg/dep" is yarn-style path)
+        if (gtPart.includes('/')) {
+            if (gtPart.startsWith('@')) {
+                // Scoped package: @scope/pkg or @scope/pkg@version or @scope/pkg/dep (yarn path)
+                // Find the first '/' which is part of the scope
+                const firstSlash = gtPart.indexOf('/');
+                const afterFirstSlash = gtPart.substring(firstSlash + 1);
+
+                // Check if there's another '/' after the scope (yarn-style nesting)
+                const secondSlash = afterFirstSlash.indexOf('/');
+                if (secondSlash !== -1) {
+                    // yarn-style: @scope/pkg/dep - split further
+                    // First get the scoped package part
+                    const scopedPart = gtPart.substring(0, firstSlash + 1 + secondSlash);
+                    segments.push(parseSegment(scopedPart));
+
+                    // Then handle the rest as separate segments
+                    const rest = afterFirstSlash.substring(secondSlash + 1);
+                    for (const subPart of rest.split('/')) {
+                        if (subPart) {
+                            segments.push(parseSegment(subPart));
+                        }
+                    }
+                } else {
+                    // Simple scoped package: @scope/pkg or @scope/pkg@version
+                    segments.push(parseSegment(gtPart));
+                }
+            } else {
+                // Non-scoped with '/': yarn-style path like "express/accepts"
+                for (const slashPart of gtPart.split('/')) {
+                    if (slashPart) {
+                        segments.push(parseSegment(slashPart));
+                    }
+                }
+            }
+        } else {
+            // No '/', just parse the segment directly
+            segments.push(parseSegment(gtPart));
+        }
+    }
+
+    return segments;
+}
+
+/**
+ * Parses a single segment (package name, possibly with version).
+ */
+function parseSegment(part: string): DependencyPathSegment {
+    // Handle scoped packages: @scope/name or @scope/name@version
+    if (part.startsWith('@')) {
+        // Find the version separator (last @ that's not the scope prefix)
+        const slashIndex = part.indexOf('/');
+        if (slashIndex === -1) {
+            return {name: part};
+        }
+        const afterSlash = part.substring(slashIndex + 1);
+        const atIndex = afterSlash.lastIndexOf('@');
+        if (atIndex > 0) {
+            return {
+                name: part.substring(0, slashIndex + 1 + atIndex),
+                version: afterSlash.substring(atIndex + 1)
+            };
+        }
+        return {name: part};
+    }
+
+    // Non-scoped package: name or name@version
+    const atIndex = part.lastIndexOf('@');
+    if (atIndex > 0) {
+        return {
+            name: part.substring(0, atIndex),
+            version: part.substring(atIndex + 1)
+        };
+    }
+    return {name: part};
+}
+
+/**
+ * Generates an npm-style override entry (nested objects).
+ * npm uses nested objects for scoped overrides:
+ *   { "express": { "accepts": "^2.0.0" } }
+ * or for global overrides:
+ *   { "lodash": "^4.17.21" }
+ *
+ * @param packageName The target package to override
+ * @param newVersion The version to set
+ * @param pathSegments Optional path segments for scoped override (excludes the target package)
+ */
+function generateNpmOverride(
+    packageName: string,
+    newVersion: string,
+    pathSegments?: DependencyPathSegment[]
+): Record<string, any> {
+    if (!pathSegments || pathSegments.length === 0) {
+        // Global override
+        return {[packageName]: newVersion};
+    }
+
+    // Build nested structure from outside in
+    let result: Record<string, any> = {[packageName]: newVersion};
+    for (let i = pathSegments.length - 1; i >= 0; i--) {
+        const segment = pathSegments[i];
+        const key = segment.version ? `${segment.name}@${segment.version}` : segment.name;
+        result = {[key]: result};
+    }
+    return result;
+}
+
+/**
+ * Generates a Yarn-style resolution entry (path with / separator).
+ * Yarn uses a flat object with path keys:
+ *   { "express/accepts": "^2.0.0" }
+ * or for global:
+ *   { "lodash": "^4.17.21" }
+ *
+ * @param packageName The target package to override
+ * @param newVersion The version to set
+ * @param pathSegments Optional path segments for scoped override (excludes the target package)
+ */
+function generateYarnResolution(
+    packageName: string,
+    newVersion: string,
+    pathSegments?: DependencyPathSegment[]
+): Record<string, string> {
+    if (!pathSegments || pathSegments.length === 0) {
+        // Global resolution
+        return {[packageName]: newVersion};
+    }
+
+    // Yarn uses / separator: "express/accepts"
+    // Note: Yarn only supports one level of nesting, so we use the last segment
+    const parentSegment = pathSegments[pathSegments.length - 1];
+    const parentKey = parentSegment.version
+        ? `${parentSegment.name}@${parentSegment.version}`
+        : parentSegment.name;
+    const key = `${parentKey}/${packageName}`;
+    return {[key]: newVersion};
+}
+
+/**
+ * Generates a pnpm-style override entry (path with > separator).
+ * pnpm uses a flat object with > path keys:
+ *   { "express>accepts": "^2.0.0" }
+ * or for global:
+ *   { "lodash": "^4.17.21" }
+ *
+ * @param packageName The target package to override
+ * @param newVersion The version to set
+ * @param pathSegments Optional path segments for scoped override (excludes the target package)
+ */
+function generatePnpmOverride(
+    packageName: string,
+    newVersion: string,
+    pathSegments?: DependencyPathSegment[]
+): Record<string, string> {
+    if (!pathSegments || pathSegments.length === 0) {
+        // Global override
+        return {[packageName]: newVersion};
+    }
+
+    // pnpm uses > separator: "express@1>accepts"
+    const pathParts = pathSegments.map(seg =>
+        seg.version ? `${seg.name}@${seg.version}` : seg.name
+    );
+    const key = `${pathParts.join('>')}>${packageName}`;
+    return {[key]: newVersion};
+}
+
+/**
+ * Merges a new override entry into an existing overrides object.
+ * Handles npm's nested structure by deep merging.
+ */
+function mergeNpmOverride(
+    existing: Record<string, any>,
+    newOverride: Record<string, any>
+): Record<string, any> {
+    const result = {...existing};
+
+    for (const [key, value] of Object.entries(newOverride)) {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            // Deep merge for nested objects
+            if (typeof result[key] === 'object' && result[key] !== null) {
+                result[key] = mergeNpmOverride(result[key], value);
+            } else {
+                result[key] = value;
+            }
+        } else {
+            // Simple value, just overwrite
+            result[key] = value;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Merges a new resolution/override entry into an existing flat object.
+ * Used for Yarn resolutions and pnpm overrides.
+ */
+function mergeFlatOverride(
+    existing: Record<string, string>,
+    newOverride: Record<string, string>
+): Record<string, string> {
+    return {...existing, ...newOverride};
+}
+
+/**
+ * Applies an override to a package.json object based on the package manager.
+ *
+ * @param packageJson The parsed package.json object
+ * @param packageManager The package manager in use
+ * @param packageName The target package to override
+ * @param newVersion The version to set
+ * @param pathSegments Optional path segments for scoped override
+ * @returns The modified package.json object
+ * @internal Exported for testing
+ */
+export function applyOverrideToPackageJson(
+    packageJson: Record<string, any>,
+    packageManager: PackageManager,
+    packageName: string,
+    newVersion: string,
+    pathSegments?: DependencyPathSegment[]
+): Record<string, any> {
+    const result = {...packageJson};
+
+    switch (packageManager) {
+        case PackageManager.Npm:
+        case PackageManager.Bun: {
+            // npm and Bun use "overrides" with nested objects
+            const newOverride = generateNpmOverride(packageName, newVersion, pathSegments);
+            result.overrides = mergeNpmOverride(result.overrides || {}, newOverride);
+            break;
+        }
+
+        case PackageManager.YarnClassic:
+        case PackageManager.YarnBerry: {
+            // Yarn uses "resolutions" with flat path keys
+            const newResolution = generateYarnResolution(packageName, newVersion, pathSegments);
+            result.resolutions = mergeFlatOverride(result.resolutions || {}, newResolution);
+            break;
+        }
+
+        case PackageManager.Pnpm: {
+            // pnpm uses "pnpm.overrides" with > path keys
+            const newOverride = generatePnpmOverride(packageName, newVersion, pathSegments);
+            if (!result.pnpm) {
+                result.pnpm = {};
+            }
+            result.pnpm.overrides = mergeFlatOverride(result.pnpm?.overrides || {}, newOverride);
+            break;
+        }
+    }
+
+    return result;
+}
+
+/**
  * Information about a project that needs updating
  */
 interface ProjectUpdateInfo {
@@ -54,10 +351,10 @@ interface ProjectUpdateInfo {
     packageJsonPath: string;
     /** Original package.json content */
     originalPackageJson: string;
-    /** The scope where the dependency was found */
-    dependencyScope: DependencyScope;
-    /** Current version constraint */
-    currentVersion: string;
+    /** The scope where the dependency was found (for direct deps) */
+    dependencyScope?: DependencyScope;
+    /** Current version constraint (for direct deps) */
+    currentVersion?: string;
     /** New version constraint to apply */
     newVersion: string;
     /** The package manager used by this project */
@@ -67,6 +364,12 @@ interface ProjectUpdateInfo {
      * already satisfies the new constraint. Only package.json needs updating.
      */
     skipInstall: boolean;
+    /** Whether to update a direct dependency */
+    updateDirect: boolean;
+    /** Whether to add/update override entries for transitive dependencies */
+    addOverride: boolean;
+    /** Parsed dependency path for scoped overrides (if specified) */
+    dependencyPathSegments?: DependencyPathSegment[];
 }
 
 /**
@@ -121,6 +424,49 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         example: "^5.0.0"
     })
     newVersion!: string;
+
+    @Option({
+        displayName: "Upgrade policy",
+        description: "Controls which dependencies are upgraded. 'Direct' (default) only upgrades direct dependencies. 'Transitive' adds override entries for transitive occurrences. 'DirectAndTransitive' does both.",
+        required: false,
+        example: "Transitive"
+    })
+    upgradePolicy?: string;
+
+    @Option({
+        displayName: "Dependency path",
+        description: "Optional path to scope the override to a specific dependency chain. Use '>' as separator (e.g., 'express>accepts'). When not specified, applies globally to all transitive occurrences. Only used when policy includes transitive handling.",
+        required: false,
+        example: "express>accepts"
+    })
+    dependencyPath?: string;
+
+    /**
+     * Returns the effective upgrade policy, defaulting to 'Direct'.
+     */
+    private getUpgradePolicy(): UpgradePolicy {
+        const policy = this.upgradePolicy as UpgradePolicy | undefined;
+        if (policy === 'Transitive' || policy === 'DirectAndTransitive') {
+            return policy;
+        }
+        return 'Direct';
+    }
+
+    /**
+     * Returns true if the policy includes upgrading direct dependencies.
+     */
+    private shouldUpgradeDirect(): boolean {
+        const policy = this.getUpgradePolicy();
+        return policy === 'Direct' || policy === 'DirectAndTransitive';
+    }
+
+    /**
+     * Returns true if the policy includes adding overrides for transitive dependencies.
+     */
+    private shouldAddOverrides(): boolean {
+        const policy = this.getUpgradePolicy();
+        return policy === 'Transitive' || policy === 'DirectAndTransitive';
+    }
 
     initialValue(_ctx: ExecutionContext): Accumulator {
         return {
@@ -180,47 +526,86 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                     return doc;
                 }
 
-                // Check each dependency scope for the target package
+                // Get the project directory and package manager
+                const projectDir = path.dirname(path.resolve(doc.sourcePath));
+                const pm = marker.packageManager ?? PackageManager.Npm;
+
+                // Check each dependency scope for the target package as a direct dependency
                 const scopes: DependencyScope[] = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+                let directDep: { scope: DependencyScope; currentVersion: string } | undefined;
 
                 for (const scope of scopes) {
                     const deps = marker[scope];
                     const dep = deps?.find(d => d.name === recipe.packageName);
 
                     if (dep) {
-                        const currentVersion = dep.versionConstraint;
-
-                        // Check if version needs updating using semver comparison
-                        // Only upgrade if the new version is strictly newer than current
-                        if (recipe.shouldUpgrade(currentVersion, recipe.newVersion)) {
-                            // Get the project directory from the marker path
-                            const projectDir = path.dirname(path.resolve(doc.sourcePath));
-
-                            // Use package manager from marker (set during parsing), default to npm
-                            const pm = marker.packageManager ?? PackageManager.Npm;
-
-                            // Check if the resolved version already satisfies the new constraint.
-                            // If so, we can skip running the package manager entirely.
-                            const resolvedDep = marker.resolvedDependencies?.find(
-                                rd => rd.name === recipe.packageName
-                            );
-                            const skipInstall = resolvedDep !== undefined &&
-                                semver.satisfies(resolvedDep.version, recipe.newVersion);
-
-                            acc.projectsToUpdate.set(doc.sourcePath, {
-                                projectDir,
-                                packageJsonPath: doc.sourcePath,
-                                originalPackageJson: await this.printDocument(doc),
-                                dependencyScope: scope,
-                                currentVersion,
-                                newVersion: recipe.newVersion,
-                                packageManager: pm,
-                                skipInstall
-                            });
-                        }
-                        break; // Found the dependency, no need to check other scopes
+                        directDep = {scope, currentVersion: dep.versionConstraint};
+                        break;
                     }
                 }
+
+                // Check if package exists as a transitive dependency (in resolvedDependencies)
+                const resolvedDep = marker.resolvedDependencies?.find(
+                    rd => rd.name === recipe.packageName
+                );
+
+                // Determine what actions to take based on upgrade policy
+                const shouldUpdateDirect = recipe.shouldUpgradeDirect() && directDep !== undefined &&
+                    recipe.shouldUpgrade(directDep.currentVersion, recipe.newVersion);
+
+                // For transitive: package must exist in resolved deps and not be a direct dep
+                // (or policy is DirectAndTransitive which handles both)
+                const isTransitiveOnly = resolvedDep !== undefined && directDep === undefined;
+                const shouldAddOverride = recipe.shouldAddOverrides() && (
+                    isTransitiveOnly ||
+                    // When DirectAndTransitive and package is both direct and transitive,
+                    // we add override to ensure all transitive instances are also updated
+                    (recipe.getUpgradePolicy() === 'DirectAndTransitive' && resolvedDep !== undefined)
+                );
+
+                // Check if the resolved version needs upgrading
+                const resolvedVersionNeedsUpgrade = resolvedDep !== undefined &&
+                    !semver.satisfies(resolvedDep.version, recipe.newVersion);
+
+                // Skip if nothing to do
+                if (!shouldUpdateDirect && !shouldAddOverride) {
+                    return doc;
+                }
+
+                // For overrides, we only need to act if the resolved version doesn't satisfy the new constraint
+                if (shouldAddOverride && !resolvedVersionNeedsUpgrade && !shouldUpdateDirect) {
+                    return doc;
+                }
+
+                // For direct deps, check if already at target version
+                if (shouldUpdateDirect && !shouldAddOverride && directDep &&
+                    !recipe.shouldUpgrade(directDep.currentVersion, recipe.newVersion)) {
+                    return doc;
+                }
+
+                // Check if we can skip running the package manager
+                // (resolved version already satisfies the new constraint)
+                const skipInstall = resolvedDep !== undefined &&
+                    semver.satisfies(resolvedDep.version, recipe.newVersion);
+
+                // Parse dependency path if specified
+                const dependencyPathSegments = recipe.dependencyPath
+                    ? parseDependencyPath(recipe.dependencyPath)
+                    : undefined;
+
+                acc.projectsToUpdate.set(doc.sourcePath, {
+                    projectDir,
+                    packageJsonPath: doc.sourcePath,
+                    originalPackageJson: await this.printDocument(doc),
+                    dependencyScope: shouldUpdateDirect ? directDep!.scope : undefined,
+                    currentVersion: shouldUpdateDirect ? directDep!.currentVersion : undefined,
+                    newVersion: recipe.newVersion,
+                    packageManager: pm,
+                    skipInstall,
+                    updateDirect: shouldUpdateDirect,
+                    addOverride: shouldAddOverride && resolvedVersionNeedsUpgrade,
+                    dependencyPathSegments
+                });
 
                 return doc;
             }
@@ -262,13 +647,22 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                         );
                     }
 
-                    // Update the dependency version in the JSON AST (preserves formatting)
-                    const visitor = new UpdateVersionVisitor(
-                        recipe.packageName,
-                        updateInfo.newVersion,
-                        updateInfo.dependencyScope
-                    );
-                    const modifiedDoc = await visitor.visit(doc, undefined) as Json.Document;
+                    let modifiedDoc = doc;
+
+                    // Update the direct dependency version in the JSON AST (preserves formatting)
+                    if (updateInfo.updateDirect && updateInfo.dependencyScope) {
+                        const visitor = new UpdateVersionVisitor(
+                            recipe.packageName,
+                            updateInfo.newVersion,
+                            updateInfo.dependencyScope
+                        );
+                        modifiedDoc = await visitor.visit(modifiedDoc, undefined) as Json.Document;
+                    }
+
+                    // Add override entries for transitive dependencies
+                    if (updateInfo.addOverride) {
+                        modifiedDoc = await this.addOverrideEntry(modifiedDoc, updateInfo);
+                    }
 
                     // Update the NodeResolutionResult marker
                     return recipe.updateMarker(modifiedDoc, updateInfo, acc);
@@ -288,6 +682,57 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                         }
                         break;
                     }
+                }
+
+                return doc;
+            }
+
+            /**
+             * Adds override entry to package.json for transitive dependency upgrade.
+             * Uses the applyOverrideToPackageJson function to generate the correct format
+             * for the package manager in use.
+             */
+            private async addOverrideEntry(
+                doc: Json.Document,
+                updateInfo: ProjectUpdateInfo
+            ): Promise<Json.Document> {
+                // Parse current package.json content
+                const currentContent = await TreePrinters.print(doc);
+                let packageJson: Record<string, any>;
+                try {
+                    packageJson = JSON.parse(currentContent);
+                } catch {
+                    return doc; // Can't parse, return unchanged
+                }
+
+                // Apply override
+                const modifiedPackageJson = applyOverrideToPackageJson(
+                    packageJson,
+                    updateInfo.packageManager,
+                    recipe.packageName,
+                    updateInfo.newVersion,
+                    updateInfo.dependencyPathSegments
+                );
+
+                // Serialize back to JSON, preserving indentation
+                // Detect indentation from original content
+                const indentMatch = currentContent.match(/^(\s+)"/m);
+                const indent = indentMatch ? indentMatch[1].length : 2;
+                const newContent = JSON.stringify(modifiedPackageJson, null, indent);
+
+                // Re-parse with JsonParser to get proper AST
+                const parser = new JsonParser({});
+                const parsed: Json.Document[] = [];
+                for await (const sf of parser.parse({text: newContent, sourcePath: doc.sourcePath})) {
+                    parsed.push(sf as Json.Document);
+                }
+
+                if (parsed.length > 0) {
+                    return {
+                        ...parsed[0],
+                        sourcePath: doc.sourcePath,
+                        markers: doc.markers
+                    };
                 }
 
                 return doc;
@@ -338,11 +783,10 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
 
         try {
-            // Create modified package.json with the new version constraint
+            // Create modified package.json with the new version constraint and/or overrides
             const modifiedPackageJson = this.createModifiedPackageJson(
                 updateInfo.originalPackageJson,
-                updateInfo.dependencyScope,
-                updateInfo.newVersion
+                updateInfo
             );
 
             // Write modified package.json to temp directory
@@ -398,18 +842,32 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     }
 
     /**
-     * Creates a modified package.json with the updated dependency version.
+     * Creates a modified package.json with the updated dependency version and/or overrides.
      * Used for the temp directory to validate the version exists.
      */
     private createModifiedPackageJson(
         originalContent: string,
-        scope: DependencyScope,
-        newVersion: string
+        updateInfo: ProjectUpdateInfo
     ): string {
-        const packageJson = JSON.parse(originalContent);
+        let packageJson = JSON.parse(originalContent);
 
-        if (packageJson[scope] && packageJson[scope][this.packageName]) {
-            packageJson[scope][this.packageName] = newVersion;
+        // Update direct dependency if applicable
+        if (updateInfo.updateDirect && updateInfo.dependencyScope) {
+            if (packageJson[updateInfo.dependencyScope] &&
+                packageJson[updateInfo.dependencyScope][this.packageName]) {
+                packageJson[updateInfo.dependencyScope][this.packageName] = updateInfo.newVersion;
+            }
+        }
+
+        // Add override if applicable
+        if (updateInfo.addOverride) {
+            packageJson = applyOverrideToPackageJson(
+                packageJson,
+                updateInfo.packageManager,
+                this.packageName,
+                updateInfo.newVersion,
+                updateInfo.dependencyPathSegments
+            );
         }
 
         return JSON.stringify(packageJson, null, 2);
@@ -487,6 +945,13 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         existingMarker: any,
         updateInfo: ProjectUpdateInfo
     ): Json.Document {
+        // If this is a transitive-only update (no direct dependency scope),
+        // we don't need to update the marker's dependency lists since overrides
+        // don't appear there. Just return the doc unchanged.
+        if (!updateInfo.dependencyScope) {
+            return doc;
+        }
+
         // Create updated dependency lists with the new versionConstraint
         const updateDeps = (deps: any[] | undefined) => {
             if (!deps) return deps;

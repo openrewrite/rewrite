@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 import {
+    applyOverrideToPackageJson,
     findNodeResolutionResult,
     npm,
     packageJson,
     packageLockJson,
+    PackageManager,
+    parseDependencyPath,
     typescript,
     UpgradeDependencyVersion
 } from "../../../src/javascript";
@@ -495,6 +498,365 @@ describe("UpgradeDependencyVersion", () => {
                 )
             );
         }, {unsafeCleanup: true});
+    });
+
+    describe("shouldUpgrade semver comparison", () => {
+
+        test("should not upgrade when versions are identical", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "^1.0.0"
+            });
+            expect(recipe.shouldUpgrade("^1.0.0", "^1.0.0")).toBe(false);
+        });
+
+        test("should upgrade when new version is higher", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "^2.0.0"
+            });
+            expect(recipe.shouldUpgrade("^1.0.0", "^2.0.0")).toBe(true);
+        });
+
+        test("should not downgrade when new version is lower", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "^1.0.0"
+            });
+            expect(recipe.shouldUpgrade("^2.0.0", "^1.0.0")).toBe(false);
+        });
+
+        test("should upgrade with tilde ranges", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "~1.1.0"
+            });
+            expect(recipe.shouldUpgrade("~1.0.0", "~1.1.0")).toBe(true);
+        });
+
+        test("should upgrade with exact versions", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "2.0.0"
+            });
+            expect(recipe.shouldUpgrade("1.0.0", "2.0.0")).toBe(true);
+        });
+
+    });
+
+    describe("override policies", () => {
+
+        test("Transitive policy adds override for transitive-only dependency (npm)", async () => {
+            const spec = new RecipeSpec();
+            // is-odd is a transitive dependency of is-even@1.0.0 (depends on is-odd@^0.1.2)
+            // Upgrading to ^3.0.0 which exists
+            spec.recipe = new UpgradeDependencyVersion({
+                packageName: "is-odd",
+                newVersion: "^3.0.0",
+                upgradePolicy: "Transitive"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(`const x = 1;`),
+                        packageJson(`
+                            {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                    "is-even": "^1.0.0"
+                                }
+                            }
+                        `, (actual: string) => {
+                            const pkg = JSON.parse(actual);
+                            // Should have added overrides section
+                            expect(pkg.overrides).toBeDefined();
+                            expect(pkg.overrides["is-odd"]).toBe("^3.0.0");
+                            // Should NOT have modified dependencies
+                            expect(pkg.dependencies["is-even"]).toBe("^1.0.0");
+                            return actual;
+                        })
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test("Transitive policy with dependencyPath adds scoped override (npm)", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new UpgradeDependencyVersion({
+                packageName: "is-odd",
+                newVersion: "^3.0.0",
+                upgradePolicy: "Transitive",
+                dependencyPath: "is-even"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(`const x = 1;`),
+                        packageJson(`
+                            {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                    "is-even": "^1.0.0"
+                                }
+                            }
+                        `, (actual: string) => {
+                            const pkg = JSON.parse(actual);
+                            // Should have nested override structure for npm
+                            expect(pkg.overrides).toBeDefined();
+                            expect(pkg.overrides["is-even"]).toBeDefined();
+                            expect(pkg.overrides["is-even"]["is-odd"]).toBe("^3.0.0");
+                            return actual;
+                        })
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test("Direct policy does not add override for transitive dependency", async () => {
+            const spec = new RecipeSpec();
+            // Default policy is Direct, which should NOT add overrides
+            spec.recipe = new UpgradeDependencyVersion({
+                packageName: "is-odd",
+                newVersion: "^3.0.0"
+                // upgradePolicy defaults to "Direct"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(`const x = 1;`),
+                        // No changes expected - is-odd is transitive only and policy is Direct
+                        packageJson(`
+                            {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                    "is-even": "^1.0.0"
+                                }
+                            }
+                        `)
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test("DirectAndTransitive policy upgrades direct dep AND adds override", async () => {
+            const spec = new RecipeSpec();
+            // is-number@7.0.0 is the latest version
+            // is-odd@3.0.0 depends on is-number@^6.0.0
+            // So if we have is-number@^6.0.0 as direct and is-odd@^3.0.0,
+            // upgrading is-number to ^7.0.0 should update direct and add override
+            spec.recipe = new UpgradeDependencyVersion({
+                packageName: "is-number",
+                newVersion: "^7.0.0",
+                upgradePolicy: "DirectAndTransitive"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(`const x = 1;`),
+                        // is-number is both direct AND transitive (via is-odd -> is-number)
+                        packageJson(`
+                            {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                    "is-number": "^6.0.0",
+                                    "is-odd": "^3.0.0"
+                                }
+                            }
+                        `, (actual: string) => {
+                            const pkg = JSON.parse(actual);
+                            // Should have upgraded direct dependency
+                            expect(pkg.dependencies["is-number"]).toBe("^7.0.0");
+                            // Should have added override for transitive usage
+                            expect(pkg.overrides).toBeDefined();
+                            expect(pkg.overrides["is-number"]).toBe("^7.0.0");
+                            return actual;
+                        })
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+    });
+
+    describe("parseDependencyPath", () => {
+
+        test("parses simple path with > separator", () => {
+            const result = parseDependencyPath("express>accepts");
+            expect(result).toEqual([
+                {name: "express"},
+                {name: "accepts"}
+            ]);
+        });
+
+        test("parses simple path with / separator", () => {
+            const result = parseDependencyPath("express/accepts");
+            expect(result).toEqual([
+                {name: "express"},
+                {name: "accepts"}
+            ]);
+        });
+
+        test("parses path with version constraint", () => {
+            const result = parseDependencyPath("express@4.0.0>accepts");
+            expect(result).toEqual([
+                {name: "express", version: "4.0.0"},
+                {name: "accepts"}
+            ]);
+        });
+
+        test("parses scoped package", () => {
+            const result = parseDependencyPath("@scope/pkg>dep");
+            expect(result).toEqual([
+                {name: "@scope/pkg"},
+                {name: "dep"}
+            ]);
+        });
+
+        test("parses scoped package with version", () => {
+            const result = parseDependencyPath("@scope/pkg@1.0.0>dep");
+            expect(result).toEqual([
+                {name: "@scope/pkg", version: "1.0.0"},
+                {name: "dep"}
+            ]);
+        });
+
+        test("parses multi-level path", () => {
+            const result = parseDependencyPath("a>b>c");
+            expect(result).toEqual([
+                {name: "a"},
+                {name: "b"},
+                {name: "c"}
+            ]);
+        });
+
+    });
+
+    describe("applyOverrideToPackageJson", () => {
+
+        test("npm: global override", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test"},
+                PackageManager.Npm,
+                "lodash",
+                "^4.17.21"
+            );
+            expect(result.overrides).toEqual({lodash: "^4.17.21"});
+        });
+
+        test("npm: scoped override", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test"},
+                PackageManager.Npm,
+                "accepts",
+                "^2.0.0",
+                [{name: "express"}]
+            );
+            expect(result.overrides).toEqual({
+                express: {accepts: "^2.0.0"}
+            });
+        });
+
+        test("npm: nested scoped override", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test"},
+                PackageManager.Npm,
+                "mime-types",
+                "^3.0.0",
+                [{name: "express"}, {name: "accepts"}]
+            );
+            expect(result.overrides).toEqual({
+                express: {accepts: {"mime-types": "^3.0.0"}}
+            });
+        });
+
+        test("npm: merges with existing overrides", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test", overrides: {lodash: "^4.17.20"}},
+                PackageManager.Npm,
+                "underscore",
+                "^1.13.0"
+            );
+            expect(result.overrides).toEqual({
+                lodash: "^4.17.20",
+                underscore: "^1.13.0"
+            });
+        });
+
+        test("yarn: global resolution", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test"},
+                PackageManager.YarnClassic,
+                "lodash",
+                "^4.17.21"
+            );
+            expect(result.resolutions).toEqual({lodash: "^4.17.21"});
+        });
+
+        test("yarn: scoped resolution", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test"},
+                PackageManager.YarnBerry,
+                "accepts",
+                "^2.0.0",
+                [{name: "express"}]
+            );
+            expect(result.resolutions).toEqual({"express/accepts": "^2.0.0"});
+        });
+
+        test("pnpm: global override", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test"},
+                PackageManager.Pnpm,
+                "lodash",
+                "^4.17.21"
+            );
+            expect(result.pnpm.overrides).toEqual({lodash: "^4.17.21"});
+        });
+
+        test("pnpm: scoped override", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test"},
+                PackageManager.Pnpm,
+                "accepts",
+                "^2.0.0",
+                [{name: "express"}]
+            );
+            expect(result.pnpm.overrides).toEqual({"express>accepts": "^2.0.0"});
+        });
+
+        test("pnpm: multi-level scoped override", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test"},
+                PackageManager.Pnpm,
+                "mime-types",
+                "^3.0.0",
+                [{name: "express"}, {name: "accepts"}]
+            );
+            expect(result.pnpm.overrides).toEqual({"express>accepts>mime-types": "^3.0.0"});
+        });
+
+        test("bun: uses npm-style overrides", () => {
+            const result = applyOverrideToPackageJson(
+                {name: "test"},
+                PackageManager.Bun,
+                "lodash",
+                "^4.17.21"
+            );
+            expect(result.overrides).toEqual({lodash: "^4.17.21"});
+        });
+
     });
 
 });
