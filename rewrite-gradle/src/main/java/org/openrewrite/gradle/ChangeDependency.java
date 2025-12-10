@@ -183,35 +183,8 @@ public class ChangeDependency extends Recipe {
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile sourceFile = (JavaSourceFile) tree;
+                    sourceFile = maybeRemoveDuplicateTargetDependency(sourceFile, ctx);
                     Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-                    if (!maybeGp.isPresent()) {
-                        return sourceFile;
-                    }
-
-                    gradleProject = maybeGp.get();
-
-                    for (GradleDependencyConfiguration c : gradleProject.getConfigurations()) {
-                        boolean oldFound = false;
-                        boolean newFound = false;
-                        for (Dependency d : c.getRequested()) {
-                            String version = d.getVersion();
-                            if (version == null) {
-                                @Nullable ResolvedDependency rd = c.findResolvedDependency(d.getGroupId(), d.getArtifactId());
-                                if (rd == null) {
-                                    continue;
-                                } else {
-                                    version = rd.getVersion();
-                                }
-                            }
-                            oldFound |= depMatcher.matches(d.getGroupId(), d.getArtifactId(), version);
-                            newFound |= existingMatcher.matches(d.getGroupId(), d.getArtifactId(), version);
-                        }
-                        if (oldFound && newFound) {
-                            sourceFile = (JavaSourceFile) new RemoveDependency(oldGroupId, oldArtifactId, c.getName()).getVisitor().visit(sourceFile, ctx);
-                        }
-                    }
-
-                    maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
                     if (!maybeGp.isPresent()) {
                         return sourceFile;
                     }
@@ -228,6 +201,39 @@ public class ChangeDependency extends Recipe {
                     return super.visit(sourceFile, ctx);
                 }
                 return super.visit(tree, ctx);
+            }
+
+            /**
+             * Avoid duplicating dependencies when the target dependency already exists in the project.
+             */
+            private JavaSourceFile maybeRemoveDuplicateTargetDependency(JavaSourceFile sourceFile, ExecutionContext ctx) {
+                Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
+                if (!maybeGp.isPresent()){
+                    return sourceFile;
+                }
+                for (GradleDependencyConfiguration c : maybeGp.get().getConfigurations()) {
+                    boolean oldFound = false;
+                    boolean newFound = false;
+                    for (Dependency d : c.getRequested()) {
+                        String version = d.getVersion();
+                        if (version == null) {
+                            ResolvedDependency rd = c.findResolvedDependency(d.getGroupId(), d.getArtifactId());
+                            if (rd == null) {
+                                continue;
+                            } else {
+                                version = rd.getVersion();
+                            }
+                        }
+                        oldFound |= depMatcher.matches(d.getGroupId(), d.getArtifactId(), version);
+                        newFound |= existingMatcher.matches(d.getGroupId(), d.getArtifactId(), version);
+                    }
+                    if (oldFound && newFound) {
+                        sourceFile = (JavaSourceFile) new RemoveDependency(oldGroupId, oldArtifactId, c.getName())
+                                .getVisitor()
+                                .visitNonNull(sourceFile, ctx);
+                    }
+                }
+                return sourceFile;
             }
 
             @Override
