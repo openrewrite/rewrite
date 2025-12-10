@@ -209,6 +209,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/6406")
     @Test
     void shouldNotAddNewIfDependencyAlreadyExists2() {
         rewriteRun(
