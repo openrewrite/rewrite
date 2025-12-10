@@ -73,7 +73,7 @@ public interface Remote extends SourceFile {
     default <P> String printAll(P p) {
         ExecutionContext ctx = p instanceof ExecutionContext ? (ExecutionContext) p :
                 new InMemoryExecutionContext();
-        return StringUtils.readFully(getInputStream(ctx), StandardCharsets.ISO_8859_1);
+        return StringUtils.readFully(getInputStream(ctx), getCharset() != null ? getCharset() : StandardCharsets.ISO_8859_1);
     }
 
     @Override
@@ -108,7 +108,7 @@ public interface Remote extends SourceFile {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 ExecutionContext ctx = p.getContext() instanceof ExecutionContext ? (ExecutionContext) p.getContext() :
                         new InMemoryExecutionContext();
-                p.append(StringUtils.readFully(getInputStream(ctx), StandardCharsets.ISO_8859_1));
+                p.append(StringUtils.readFully(getInputStream(ctx), getCharset() != null ? getCharset() : StandardCharsets.ISO_8859_1));
                 return sourceFile;
             }
         };
