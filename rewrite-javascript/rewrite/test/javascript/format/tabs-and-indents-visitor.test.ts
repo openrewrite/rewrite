@@ -1313,4 +1313,25 @@ const { data, error } = await (
             // @formatter:on
         )
     })
+
+    test('ternary with arrow function and method chain should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const filteredDependencies = dependencies
+  ? dependencies.map((dep: string) =>
+      dep
+        .split("\\n"),
+    )
+  : [];`
+            )
+            // @formatter:on
+        )
+    })
 });
