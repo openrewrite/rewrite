@@ -21,6 +21,7 @@ import {Json, JsonParser, JsonVisitor} from "../../json";
 import {
     createNodeResolutionResultMarker,
     findNodeResolutionResult,
+    NodeResolutionResultQueries,
     PackageJsonContent,
     PackageLockContent,
     PackageManager,
@@ -157,20 +158,25 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                 }
 
                 // Check if package exists as a transitive dependency (in resolvedDependencies)
-                const resolvedDep = marker.resolvedDependencies?.find(
-                    rd => rd.name === recipe.packageName
+                // Note: There may be multiple versions of the same package installed
+                const resolvedVersions = NodeResolutionResultQueries.getAllResolvedVersions(
+                    marker,
+                    recipe.packageName
                 );
 
-                if (!resolvedDep) {
+                if (resolvedVersions.length === 0) {
                     // Package not found in resolved dependencies at all
                     return doc;
                 }
 
-                // Check if the resolved version needs upgrading
-                const resolvedVersionNeedsUpgrade = !semver.satisfies(resolvedDep.version, recipe.newVersion);
+                // Check if ANY resolved version needs upgrading
+                // We need an override if at least one installed version doesn't satisfy the constraint
+                const anyVersionNeedsUpgrade = resolvedVersions.some(
+                    rd => !semver.satisfies(rd.version, recipe.newVersion)
+                );
 
-                if (!resolvedVersionNeedsUpgrade) {
-                    // Already at a satisfactory version
+                if (!anyVersionNeedsUpgrade) {
+                    // All installed versions already satisfy the constraint
                     return doc;
                 }
 
