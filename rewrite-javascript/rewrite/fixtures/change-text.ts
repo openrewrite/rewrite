@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 import {ReplacedText} from "./replaced-text";
-import {ExecutionContext, Option, Recipe, Transient, TreeVisitor} from "@openrewrite/rewrite";
-import {PlainText, PlainTextVisitor} from "@openrewrite/rewrite/text";
+import {ExecutionContext, Option, Recipe, Transient, TreeVisitor} from "../src";
+import {PlainText, PlainTextVisitor} from "../src/text";
 
 export class ChangeText extends Recipe {
     name = "org.openrewrite.example.text.change-text"

@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, ScanningRecipe, TreeVisitor} from "@openrewrite/rewrite";
-import {PlainText, PlainTextVisitor} from "@openrewrite/rewrite/text";
+import {ExecutionContext, ScanningRecipe, TreeVisitor} from "../src";
+import {PlainText, PlainTextVisitor} from "../src/text";
 
 /**
  * A test recipe that uses the accumulator in the editor phase.

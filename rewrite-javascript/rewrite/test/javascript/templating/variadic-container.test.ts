@@ -294,10 +294,12 @@ describe('variadic pattern matching in containers', () => {
         return spec.rewriteRun(
             //language=typescript
             typescript(
-                `function myFunc(props) {
+                `
+                function myFunc(props) {
                     return null;
                 }`,
-                `function myFunc(...props) {
+                `
+                function myFunc(...props) {
                     return null;
                 }`
             )
@@ -345,7 +347,7 @@ describe('variadic pattern matching in containers', () => {
             //language=typescript
             typescript(
                 `myFunc(props)`,
-                `myFunc({ ...props})`
+                `myFunc({ ...props })`
             )
         );
     });

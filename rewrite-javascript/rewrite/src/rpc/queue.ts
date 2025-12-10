@@ -180,7 +180,7 @@ export class RpcSendQueue {
                 if (!beforePos) {
                     await this.add(anAfter, onChangeRun);
                 } else {
-                    const aBefore = before ? before[beforePos] : undefined;
+                    const aBefore = before?.[beforePos];
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
                     } else if (anAfter !== undefined && this.typesAreDifferent(anAfter, aBefore)) {

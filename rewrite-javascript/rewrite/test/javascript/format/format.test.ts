@@ -13,8 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for AutoformatVisitor - the full formatting pipeline.
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    formatting scenarios into a single test with multiple variations in the source text.
+ *    For example, test type annotations, shorthand properties, and related features together.
+ *
+ * 2. VISITOR-SPECIFIC TESTS: If your test targets a specific visitor's behavior, put it in
+ *    that visitor's dedicated test file instead:
+ *    - SpacesVisitor tests → spaces-visitor.test.ts
+ *    - BlankLinesVisitor tests → blank-lines-visitor.test.ts
+ *    - TabsAndIndentsVisitor tests → tabs-and-indents-visitor.test.ts
+ *    - MinimumViableSpacingVisitor tests → minimum-viable-space-visitor.test.ts
+ *
+ *    This file (format.test.ts) should test the formatter as a whole, focusing on
+ *    integration scenarios and end-to-end formatting behavior.
+ */
+
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {autoFormat, AutoformatVisitor, JavaScriptVisitor, tsx, typescript} from "../../../src/javascript";
+import {
+    autoFormat,
+    AutoformatVisitor,
+    JavaScriptVisitor,
+    SpacesVisitor,
+    tsx,
+    typescript
+} from "../../../src/javascript";
 
 
 describe('AutoformatVisitor', () => {
@@ -79,12 +108,10 @@ describe('AutoformatVisitor', () => {
                             super();
                         }
 
-
                         m(x: number, y: number[]): number {
                             this.m(x, [1]);
                             return y[0];
                         }
-
 
                         s(s: string): number {
                             switch (s) {
@@ -126,9 +153,25 @@ describe('AutoformatVisitor', () => {
             type Values={[key:string]:string;}
             `,
             `
-            type Values = {
-                [key: string]: string;
+            type Values = { [key: string]: string; }
+            `)
+            // @formatter:on
+        )
+    });
+
+    test('inline type annotations stay single-line', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            function foo(x:{name:string}):void{}
+            const bar=(opts:{html:string})=>{};
+            `,
+            `
+            function foo(x: { name: string }): void {
             }
+            const bar = (opts: { html: string })=>{
+            };
             `)
             // @formatter:on
         )
@@ -225,6 +268,19 @@ describe('AutoformatVisitor', () => {
             typescript(
                 `const b = ! true`,
                 `const b = !true`,
+            )
+            // @formatter:on
+        )
+    });
+
+    test('unary negative should not have space', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                // Should not change -1 to - 1
+                `if (obj === -1) {
+}`,
             )
             // @formatter:on
         )
@@ -329,8 +385,7 @@ describe('AutoformatVisitor', () => {
             typescript(
                 "abstract class L {}",
                 `abstract class L {
-                }
-                `
+}`
             )
             // @formatter:on
         )
@@ -342,8 +397,7 @@ describe('AutoformatVisitor', () => {
             //language=typescript
             typescript(
                 `const C = class extends Object {
-                }
-                `
+}`
             )
             // @formatter:on
         )
@@ -614,4 +668,70 @@ buf.slice();`
             // @formatter:on
         )
     })
+
+    test('ternary with template literal should not get extra space before colon', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            // Complex template literal with expressions - should not add extra space before colon
+            typescript(
+                "const info = cond ? `value=${x}` : 'default';",
+                "const info = cond ? `value=${x}` : 'default';"
+            )
+            // @formatter:on
+        )
+    })
+
+    test('multi-line assignment with newline after = should preserve newline', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                const hasExpectedProperties =
+                    memberNames.includes('innerHTML') &&
+                    memberNames.includes('outerHTML');
+                `
+            )
+            // @formatter:on
+        )});
+
+    test('type annotation and shorthand property spacing', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            // Type annotation should have space after colon (fixed from req:Request)
+            // Shorthand properties should preserve their brace spacing
+            typescript(
+                `function test(req:Request): Response {
+    const withSpaces = { headers };
+    const noSpaces = {headers};
+    return req;
+}`,
+                `function test(req: Request): Response {
+    const withSpaces = { headers };
+    const noSpaces = {headers};
+    return req;
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('multi-line import preserves structure', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            // Multi-line imports should preserve their newlines, not collapse to single line
+            typescript(
+                `import {
+    foo,
+    bar,
+    baz,
+} from "module"
+const x = 1;`
+            )
+            // @formatter:on
+        )
+    });
 });
