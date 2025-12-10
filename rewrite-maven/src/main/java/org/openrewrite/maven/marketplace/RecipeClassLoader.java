@@ -15,13 +15,15 @@
  */
 package org.openrewrite.maven.marketplace;
 
+import org.jspecify.annotations.Nullable;
+
+import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -118,6 +120,27 @@ public class RecipeClassLoader extends URLClassLoader {
         }
     }
 
+    @Override
+    public @Nullable URL getResource(String name) {
+        Objects.requireNonNull(name);
+        URL url = findResource(name);
+        if (url == null) {
+            return parent.getResource(name);
+        }
+        return url;
+    }
+
+    @Override
+    public Enumeration<URL> getResources(String name) throws IOException {
+        Objects.requireNonNull(name);
+        @SuppressWarnings("unchecked")
+        Enumeration<URL>[] tmp = (Enumeration<URL>[]) new Enumeration<?>[2];
+        tmp[0] = findResources(name);
+        tmp[1] = parent.getResources(name);
+
+        return new CompoundEnumeration<>(tmp);
+    }
+
     private boolean shouldDelegateToParent(String className) {
         // Check additional delegations first (can be overridden)
         for (String prefix : getAdditionalParentDelegatedPackages()) {
@@ -205,5 +228,39 @@ public class RecipeClassLoader extends URLClassLoader {
                     }
                 })
                 .toArray(URL[]::new);
+    }
+}
+
+/*
+ * A utility class that will enumerate over an array of enumerations.
+ * @see java.lang.CompoundEnumeration
+ */
+final class CompoundEnumeration<E> implements Enumeration<E> {
+    private final Enumeration<E>[] enums;
+    private int index;
+
+    public CompoundEnumeration(Enumeration<E>[] enums) {
+        this.enums = enums;
+    }
+
+    private boolean next() {
+        while (index < enums.length) {
+            if (enums[index] != null && enums[index].hasMoreElements()) {
+                return true;
+            }
+            index++;
+        }
+        return false;
+    }
+
+    public boolean hasMoreElements() {
+        return next();
+    }
+
+    public E nextElement() {
+        if (!next()) {
+            throw new NoSuchElementException();
+        }
+        return enums[index].nextElement();
     }
 }
