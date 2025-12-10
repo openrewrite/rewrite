@@ -1592,6 +1592,70 @@ class WrappingAndBracesTest implements RewriteTest {
     }
 
     @Test
+    void tryWithResourcesWithBlockInside() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.util.function.Supplier;
+              
+              public class Test {
+                  void test() {
+                      try (Resource r1 = new Resource(() -> true); Resource r2 = new Resource(() -> {
+                          assert true;
+                          return true;
+                      }); Resource r3 = new Resource()) {
+                      }
+                  }
+              
+                  class Resource implements AutoCloseable {
+                      Resource() {
+                      }
+              
+                      Resource(Supplier<Boolean> supplier) {
+                      }
+              
+                      @Override
+                      public void close() {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.util.function.Supplier;
+              
+              public class Test {
+                  void test() {
+                      try (Resource r1 = new Resource(() -> true);
+                           Resource r2 = new Resource(() -> {
+                               assert true;
+                               return true;
+                           });
+                           Resource r3 = new Resource()) {
+                      }
+                  }
+              
+                  class Resource implements AutoCloseable {
+                      Resource() {
+                      }
+              
+                      Resource(Supplier<Boolean> supplier) {
+                      }
+              
+                      @Override
+                      public void close() {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void tryCatchOnNewLine() {
         rewriteRun(
           wrappingAndBraces(

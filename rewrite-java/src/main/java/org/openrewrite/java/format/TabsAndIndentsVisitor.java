@@ -158,16 +158,38 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             return space;
         }
 
-        // These are allready correctly calculated in the WrappingAndBracesVisitor
-        if (loc == Space.Location.TRY_RESOURCE || loc == Space.Location.TRY_RESOURCE_SUFFIX || loc == Space.Location.ANNOTATION_PREFIX || loc == Space.Location.IDENTIFIER_PREFIX) {
-            return space;
-        }
-
         if (loc == Space.Location.METHOD_SELECT_SUFFIX) {
             Integer chainedIndent = getCursor().getParentTreeCursor().getMessage("chainedIndent");
             if (chainedIndent != null) {
                 getCursor().getParentTreeCursor().putMessage("lastIndent", chainedIndent);
                 return indentTo(space, chainedIndent, loc);
+            }
+        }
+
+        if (loc == Space.Location.ANNOTATION_PREFIX) {
+            J annotated = getCursor().getParentTreeCursor().getValue();
+            List<J.Annotation> annotations = null;
+            if (annotated instanceof J.VariableDeclarations) {
+                annotations = ((J.VariableDeclarations) annotated).getLeadingAnnotations();
+            } else if (annotated instanceof J.MethodDeclaration) {
+                annotations = ((J.MethodDeclaration) annotated).getLeadingAnnotations();
+            } else if (annotated instanceof J.ClassDeclaration) {
+                annotations = ((J.ClassDeclaration) annotated).getLeadingAnnotations();
+            } else if (annotated instanceof J.EnumValue) {
+                annotations = ((J.EnumValue) annotated).getAnnotations();
+            }
+            if (annotations != null && !annotations.isEmpty()) {
+                J.Annotation firstAnnotation = annotations.get(0);
+                if (!firstAnnotation.getPrefix().getLastWhitespace().contains("\n") && !annotated.getPrefix().getLastWhitespace().contains("\n")) {
+                    try {
+                        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                        if (sourceFile != null) {
+                            int alignTo = getCursor().firstEnclosing(JavaSourceFile.class).service(SourcePositionService.class).positionOf(getCursor(), annotated).getStartColumn() - 1;
+                            getCursor().getParentTreeCursor().putMessage("lastIndent", alignTo);
+                            return indentTo(space, alignTo, loc);
+                        }
+                    } catch (UnsupportedOperationException ignored) {}
+                }
             }
         }
 
@@ -237,6 +259,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     elem.getPrefix().getLastWhitespace().contains("\n") ||
                     (elem.getPrefix().getWhitespace().contains("\n") && elem.getPrefix().getComments().stream().noneMatch(c -> c.getSuffix().contains("\n")))) {
                 switch (loc) {
+                    case TRY_RESOURCE:
+                        if (alignWhenMultiple(loc) && !((JContainer<J.Try.Resource>)getCursor().getParent().getValue()).getElements().get(0).getPrefix().getLastWhitespace().contains("\n")) {
+                            getCursor().putMessage("indentType", IndentType.ALIGN);
+                            getCursor().putMessage("lastIndent", indent + 5);
+                        }
+                        elem = visitAndCast(elem, p);
+                        after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
+                        break;
                     case FOR_CONDITION:
                     case FOR_UPDATE: {
                         J.ForLoop.Control control = getCursor().getParentOrThrow().getValue();
@@ -532,6 +562,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 //noinspection ConstantConditions
                 isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getChainedMethodCalls() != null && wrappingStyle.getChainedMethodCalls().getAlignWhenMultiline();
                 intelliJDefault = false;
+                break;
+            case TRY_RESOURCE:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getTryWithResources() != null && wrappingStyle.getTryWithResources().getAlignWhenMultiline();
+                intelliJDefault = true;
                 break;
             default:
                 isAlignedWhenMultipleFromStyle = () -> null;

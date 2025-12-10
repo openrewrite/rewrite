@@ -341,12 +341,14 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                         parentTreeCursor = getCursor().getParentTreeCursor();
                         parent = parentTreeCursor.getValue();
                         if (evaluate(() -> style.getIfStatement().getElseOnNewLine(), false)) {
-                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", parent.getPrefix().getIndent().length()));
+                            newLinedCursorElement = positionService.computeNewLinedCursorElement(parentTreeCursor);
+                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
                         } else if (!evaluate(() -> style.getIfStatement().getElseOnNewLine(), false) && parent instanceof J.If) {
                             if (((J.If) parent).getThenPart() instanceof J.Block) {
                                 space = withWhitespace(space, evaluate(() -> spacesStyle.getBeforeKeywords().getElseKeyword(), true) ? " " : "");
                             } else {
-                                space = withWhitespace(space, "\n" + StringUtils.repeat(" ", parent.getPrefix().getIndent().length()));
+                                newLinedCursorElement = positionService.computeNewLinedCursorElement(parentTreeCursor);
+                                space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
                             }
                         }
                     }
