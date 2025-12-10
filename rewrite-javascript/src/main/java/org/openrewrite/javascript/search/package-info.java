@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 @NullMarked
+@NonNullFields
 package org.openrewrite.javascript.search;
 
 import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;

@@ -32,6 +32,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptySet;
 
 /**
  * Find direct and transitive npm dependencies matching a package name pattern.
@@ -251,7 +252,7 @@ public class DependencyInsight extends Recipe {
             private Set<String> findTransitiveMatches(ResolvedDependency resolved, Set<String> visited) {
                 String key = resolved.getName() + "@" + resolved.getVersion();
                 if (visited.contains(key)) {
-                    return Collections.emptySet();
+                    return emptySet();
                 }
                 visited.add(key);
 
