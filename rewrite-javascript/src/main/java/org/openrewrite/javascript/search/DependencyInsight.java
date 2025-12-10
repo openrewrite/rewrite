@@ -132,6 +132,7 @@ public class DependencyInsight extends Recipe {
                             match.versionConstraint,
                             match.scope,
                             match.direct,
+                            match.count,
                             match.license
                     ));
                 }
@@ -287,6 +288,12 @@ public class DependencyInsight extends Recipe {
             }
 
             private void recordMatch(Dependency dep, String section, boolean direct) {
+                MatchInfo existing = matchedPackages.get(dep.getName());
+                if (existing != null) {
+                    existing.incrementCount();
+                    return;
+                }
+
                 ResolvedDependency resolved = dep.getResolved();
                 String resolvedVersion = resolved != null ? resolved.getVersion() : dep.getVersionConstraint();
                 String license = resolved != null ? resolved.getLicense() : null;
@@ -302,7 +309,9 @@ public class DependencyInsight extends Recipe {
             }
 
             private void recordTransitiveMatch(String packageName) {
-                if (matchedPackages.containsKey(packageName)) {
+                MatchInfo existing = matchedPackages.get(packageName);
+                if (existing != null) {
+                    existing.incrementCount();
                     return;
                 }
 
@@ -349,6 +358,7 @@ public class DependencyInsight extends Recipe {
         final @Nullable String versionConstraint;
         final String scope;
         final boolean direct;
+        int count;
         final @Nullable String license;
 
         MatchInfo(String packageName, @Nullable String version, @Nullable String versionConstraint,
@@ -358,7 +368,12 @@ public class DependencyInsight extends Recipe {
             this.versionConstraint = versionConstraint;
             this.scope = scope;
             this.direct = direct;
+            this.count = 1;
             this.license = license;
+        }
+
+        void incrementCount() {
+            count++;
         }
     }
 

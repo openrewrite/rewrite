@@ -41,6 +41,7 @@ class DependencyInsightTest implements RewriteTest {
                 assertThat(row.getPackageName()).isEqualTo("lodash");
                 assertThat(row.getScope()).isEqualTo("dependencies");
                 assertThat(row.getDirect()).isTrue();
+                assertThat(row.getCount()).isEqualTo(1);
                 assertThat(row.getLicense()).isEqualTo("MIT");
             }),
           npm(tempDir,
@@ -79,6 +80,7 @@ class DependencyInsightTest implements RewriteTest {
                 assertThat(row.getPackageName()).isEqualTo("jest");
                 assertThat(row.getScope()).isEqualTo("devDependencies");
                 assertThat(row.getDirect()).isTrue();
+                assertThat(row.getCount()).isEqualTo(1);
             }),
           npm(tempDir,
             packageJson(

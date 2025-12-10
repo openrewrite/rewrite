@@ -62,6 +62,10 @@ public class NodeDependenciesInUse extends DataTable<NodeDependenciesInUse.@NonN
                 description = "Whether this is a direct dependency (true) or transitive dependency (false).")
         Boolean direct;
 
+        @Column(displayName = "Count",
+                description = "How many times this dependency appears in the dependency tree.")
+        Integer count;
+
         @Column(displayName = "License",
                 description = "The SPDX license identifier of the package, if available.")
         @Nullable
