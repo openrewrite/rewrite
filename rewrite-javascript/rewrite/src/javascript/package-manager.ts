@@ -16,7 +16,9 @@
 
 import {PackageManager} from "./node-resolution-result";
 import * as fs from "fs";
+import * as fsp from "fs/promises";
 import * as path from "path";
+import * as os from "os";
 import {spawnSync} from "child_process";
 
 /**
@@ -424,5 +426,99 @@ export function getPackageManagerDisplayName(pm: PackageManager): string {
             return 'pnpm';
         case PackageManager.Bun:
             return 'Bun';
+    }
+}
+
+/**
+ * Result of running install in a temporary directory.
+ */
+export interface TempInstallResult {
+    /** Whether the install succeeded */
+    success: boolean;
+    /** The updated lock file content (if successful and lock file exists) */
+    lockFileContent?: string;
+    /** Error message (if failed) */
+    error?: string;
+}
+
+/**
+ * Runs package manager install in a temporary directory.
+ *
+ * This function:
+ * 1. Creates a temp directory
+ * 2. Writes the provided package.json content
+ * 3. Copies the existing lock file (if present)
+ * 4. Copies config files (.npmrc, .yarnrc, etc.)
+ * 5. Runs the package manager install (lock-only mode)
+ * 6. Returns the updated lock file content
+ * 7. Cleans up the temp directory
+ *
+ * @param projectDir The original project directory (for copying lock file and configs)
+ * @param pm The package manager to use
+ * @param modifiedPackageJson The modified package.json content to use
+ * @param timeout Timeout in milliseconds (default: 120000 = 2 minutes)
+ * @returns Result containing success status and lock file content or error
+ */
+export async function runInstallInTempDir(
+    projectDir: string,
+    pm: PackageManager,
+    modifiedPackageJson: string,
+    timeout: number = 120000
+): Promise<TempInstallResult> {
+    const lockFileName = getLockFileName(pm);
+    const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
+
+    try {
+        // Write modified package.json to temp directory
+        await fsp.writeFile(path.join(tempDir, 'package.json'), modifiedPackageJson);
+
+        // Copy existing lock file if present
+        const originalLockPath = path.join(projectDir, lockFileName);
+        if (fs.existsSync(originalLockPath)) {
+            await fsp.copyFile(originalLockPath, path.join(tempDir, lockFileName));
+        }
+
+        // Copy config files if present (for registry configuration and workspace setup)
+        const configFiles = ['.npmrc', '.yarnrc', '.yarnrc.yml', '.pnpmfile.cjs', 'pnpm-workspace.yaml'];
+        for (const configFile of configFiles) {
+            const configPath = path.join(projectDir, configFile);
+            if (fs.existsSync(configPath)) {
+                await fsp.copyFile(configPath, path.join(tempDir, configFile));
+            }
+        }
+
+        // Run package manager install
+        const result = runInstall(pm, {
+            cwd: tempDir,
+            lockOnly: true,
+            timeout
+        });
+
+        if (!result.success) {
+            return {
+                success: false,
+                error: result.error || result.stderr || 'Unknown error'
+            };
+        }
+
+        // Read back the updated lock file
+        const updatedLockPath = path.join(tempDir, lockFileName);
+        let lockFileContent: string | undefined;
+        if (fs.existsSync(updatedLockPath)) {
+            lockFileContent = await fsp.readFile(updatedLockPath, 'utf-8');
+        }
+
+        return {
+            success: true,
+            lockFileContent
+        };
+
+    } finally {
+        // Cleanup temp directory
+        try {
+            await fsp.rm(tempDir, {recursive: true, force: true});
+        } catch {
+            // Ignore cleanup errors
+        }
     }
 }

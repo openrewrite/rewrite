@@ -26,14 +26,11 @@ import {
     PackageManager,
     readNpmrcConfigs
 } from "../node-resolution-result";
-import * as fs from "fs";
-import * as fsp from "fs/promises";
 import * as path from "path";
-import * as os from "os";
 import * as semver from "semver";
 import {markupWarn, replaceMarkerByKind} from "../../markers";
 import {TreePrinters} from "../../print";
-import {getAllLockFileNames, getLockFileName, runInstall} from "../package-manager";
+import {getAllLockFileNames, getLockFileName, runInstallInTempDir} from "../package-manager";
 
 /**
  * Represents a dependency scope in package.json
@@ -333,69 +330,32 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         updateInfo: ProjectUpdateInfo,
         _ctx: ExecutionContext
     ): Promise<void> {
-        const pm = updateInfo.packageManager;
-        const lockFileName = getLockFileName(pm);
+        // Create modified package.json with the new version constraint
+        const modifiedPackageJson = this.createModifiedPackageJson(
+            updateInfo.originalPackageJson,
+            updateInfo.dependencyScope,
+            updateInfo.newVersion
+        );
 
-        // Create temp directory
-        const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
+        const result = await runInstallInTempDir(
+            updateInfo.projectDir,
+            updateInfo.packageManager,
+            modifiedPackageJson
+        );
 
-        try {
-            // Create modified package.json with the new version constraint
-            const modifiedPackageJson = this.createModifiedPackageJson(
-                updateInfo.originalPackageJson,
-                updateInfo.dependencyScope,
-                updateInfo.newVersion
-            );
+        if (result.success) {
+            // Store the modified package.json (we'll use our visitor for actual output)
+            acc.updatedPackageJsons.set(updateInfo.packageJsonPath, modifiedPackageJson);
 
-            // Write modified package.json to temp directory
-            await fsp.writeFile(path.join(tempDir, 'package.json'), modifiedPackageJson);
-
-            // Copy existing lock file if present
-            const originalLockPath = path.join(updateInfo.projectDir, lockFileName);
-            if (fs.existsSync(originalLockPath)) {
-                await fsp.copyFile(originalLockPath, path.join(tempDir, lockFileName));
+            // Store the updated lock file content
+            if (result.lockFileContent) {
+                const lockFileName = getLockFileName(updateInfo.packageManager);
+                const lockFilePath = updateInfo.packageJsonPath.replace('package.json', lockFileName);
+                acc.updatedLockFiles.set(lockFilePath, result.lockFileContent);
             }
-
-            // Copy config files if present (for registry configuration and workspace setup)
-            const configFiles = ['.npmrc', '.yarnrc', '.yarnrc.yml', '.pnpmfile.cjs', 'pnpm-workspace.yaml'];
-            for (const configFile of configFiles) {
-                const configPath = path.join(updateInfo.projectDir, configFile);
-                if (fs.existsSync(configPath)) {
-                    await fsp.copyFile(configPath, path.join(tempDir, configFile));
-                }
-            }
-
-            // Run package manager install to validate the version and update lock file
-            const result = runInstall(pm, {
-                cwd: tempDir,
-                lockOnly: true,
-                timeout: 120000 // 2 minute timeout
-            });
-
-            if (result.success) {
-                // Store the modified package.json (we'll use our visitor for actual output)
-                acc.updatedPackageJsons.set(updateInfo.packageJsonPath, modifiedPackageJson);
-
-                // Read back the updated lock file
-                const updatedLockPath = path.join(tempDir, lockFileName);
-                if (fs.existsSync(updatedLockPath)) {
-                    const updatedLockContent = await fsp.readFile(updatedLockPath, 'utf-8');
-                    const lockFilePath = updateInfo.packageJsonPath.replace('package.json', lockFileName);
-                    acc.updatedLockFiles.set(lockFilePath, updatedLockContent);
-                }
-            } else {
-                // Track the failure - don't update package.json, the version likely doesn't exist
-                const errorMessage = result.error || result.stderr || 'Unknown error';
-                acc.failedProjects.set(updateInfo.packageJsonPath, errorMessage);
-            }
-
-        } finally {
-            // Cleanup temp directory
-            try {
-                await fsp.rm(tempDir, {recursive: true, force: true});
-            } catch {
-                // Ignore cleanup errors
-            }
+        } else {
+            // Track the failure - don't update package.json, the version likely doesn't exist
+            acc.failedProjects.set(updateInfo.packageJsonPath, result.error || 'Unknown error');
         }
     }
 

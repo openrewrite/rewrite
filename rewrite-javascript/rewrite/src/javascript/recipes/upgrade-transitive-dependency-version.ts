@@ -26,14 +26,11 @@ import {
     PackageManager,
     readNpmrcConfigs
 } from "../node-resolution-result";
-import * as fs from "fs";
-import * as fsp from "fs/promises";
 import * as path from "path";
-import * as os from "os";
 import * as semver from "semver";
 import {markupWarn, replaceMarkerByKind} from "../../markers";
 import {TreePrinters} from "../../print";
-import {getAllLockFileNames, getLockFileName, runInstall} from "../package-manager";
+import {getAllLockFileNames, getLockFileName, runInstallInTempDir} from "../package-manager";
 import {applyOverrideToPackageJson, DependencyPathSegment, parseDependencyPath} from "../dependency-manager";
 
 /**
@@ -340,65 +337,29 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
         updateInfo: ProjectUpdateInfo,
         _ctx: ExecutionContext
     ): Promise<void> {
-        const pm = updateInfo.packageManager;
-        const lockFileName = getLockFileName(pm);
+        // Create modified package.json with the override
+        const modifiedPackageJson = this.createModifiedPackageJson(
+            updateInfo.originalPackageJson,
+            updateInfo
+        );
 
-        // Create temp directory
-        const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
+        const result = await runInstallInTempDir(
+            updateInfo.projectDir,
+            updateInfo.packageManager,
+            modifiedPackageJson
+        );
 
-        try {
-            // Create modified package.json with the override
-            const modifiedPackageJson = this.createModifiedPackageJson(
-                updateInfo.originalPackageJson,
-                updateInfo
-            );
+        if (result.success) {
+            acc.updatedPackageJsons.set(updateInfo.packageJsonPath, modifiedPackageJson);
 
-            // Write modified package.json to temp directory
-            await fsp.writeFile(path.join(tempDir, 'package.json'), modifiedPackageJson);
-
-            // Copy existing lock file if present
-            const originalLockPath = path.join(updateInfo.projectDir, lockFileName);
-            if (fs.existsSync(originalLockPath)) {
-                await fsp.copyFile(originalLockPath, path.join(tempDir, lockFileName));
+            // Store the updated lock file content
+            if (result.lockFileContent) {
+                const lockFileName = getLockFileName(updateInfo.packageManager);
+                const lockFilePath = updateInfo.packageJsonPath.replace('package.json', lockFileName);
+                acc.updatedLockFiles.set(lockFilePath, result.lockFileContent);
             }
-
-            // Copy config files if present
-            const configFiles = ['.npmrc', '.yarnrc', '.yarnrc.yml', '.pnpmfile.cjs', 'pnpm-workspace.yaml'];
-            for (const configFile of configFiles) {
-                const configPath = path.join(updateInfo.projectDir, configFile);
-                if (fs.existsSync(configPath)) {
-                    await fsp.copyFile(configPath, path.join(tempDir, configFile));
-                }
-            }
-
-            // Run package manager install
-            const result = runInstall(pm, {
-                cwd: tempDir,
-                lockOnly: true,
-                timeout: 120000
-            });
-
-            if (result.success) {
-                acc.updatedPackageJsons.set(updateInfo.packageJsonPath, modifiedPackageJson);
-
-                // Read back the updated lock file
-                const updatedLockPath = path.join(tempDir, lockFileName);
-                if (fs.existsSync(updatedLockPath)) {
-                    const updatedLockContent = await fsp.readFile(updatedLockPath, 'utf-8');
-                    const lockFilePath = updateInfo.packageJsonPath.replace('package.json', lockFileName);
-                    acc.updatedLockFiles.set(lockFilePath, updatedLockContent);
-                }
-            } else {
-                const errorMessage = result.error || result.stderr || 'Unknown error';
-                acc.failedProjects.set(updateInfo.packageJsonPath, errorMessage);
-            }
-
-        } finally {
-            try {
-                await fsp.rm(tempDir, {recursive: true, force: true});
-            } catch {
-                // Ignore cleanup errors
-            }
+        } else {
+            acc.failedProjects.set(updateInfo.packageJsonPath, result.error || 'Unknown error');
         }
     }
 
