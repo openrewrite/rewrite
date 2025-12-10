@@ -442,6 +442,20 @@ export interface TempInstallResult {
 }
 
 /**
+ * Options for running install in a temporary directory.
+ */
+export interface TempInstallOptions {
+    /** Timeout in milliseconds (default: 120000 = 2 minutes) */
+    timeout?: number;
+    /**
+     * If true, only update the lock file without installing node_modules.
+     * If false, perform a full install which creates node_modules in the temp dir.
+     * Default: true (lock-only is faster and sufficient for most cases)
+     */
+    lockOnly?: boolean;
+}
+
+/**
  * Runs package manager install in a temporary directory.
  *
  * This function:
@@ -449,22 +463,23 @@ export interface TempInstallResult {
  * 2. Writes the provided package.json content
  * 3. Copies the existing lock file (if present)
  * 4. Copies config files (.npmrc, .yarnrc, etc.)
- * 5. Runs the package manager install (lock-only mode)
+ * 5. Runs the package manager install
  * 6. Returns the updated lock file content
  * 7. Cleans up the temp directory
  *
  * @param projectDir The original project directory (for copying lock file and configs)
  * @param pm The package manager to use
  * @param modifiedPackageJson The modified package.json content to use
- * @param timeout Timeout in milliseconds (default: 120000 = 2 minutes)
+ * @param options Optional settings for timeout and lock-only mode
  * @returns Result containing success status and lock file content or error
  */
 export async function runInstallInTempDir(
     projectDir: string,
     pm: PackageManager,
     modifiedPackageJson: string,
-    timeout: number = 120000
+    options: TempInstallOptions = {}
 ): Promise<TempInstallResult> {
+    const {timeout = 120000, lockOnly = true} = options;
     const lockFileName = getLockFileName(pm);
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
 
@@ -490,7 +505,7 @@ export async function runInstallInTempDir(
         // Run package manager install
         const result = runInstall(pm, {
             cwd: tempDir,
-            lockOnly: true,
+            lockOnly,
             timeout
         });
 
