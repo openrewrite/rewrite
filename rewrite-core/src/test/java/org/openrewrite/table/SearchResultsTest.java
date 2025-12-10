@@ -55,11 +55,10 @@ class SearchResultsTest implements RewriteTest {
           spec -> spec.dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
               SearchResults.Row::getSourcePath,
               SearchResults.Row::getResult,
-              SearchResults.Row::getParentRecipe,
               SearchResults.Row::getRecipe)
             .containsExactlyInAnyOrder(
-              tuple("matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`"),
-              tuple("nested/matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`")
+              tuple("matched", "hi", "Find text `hi`"),
+              tuple("nested/matched", "hi", "Find text `hi`")
             )),
           text(
             "hi",
@@ -84,13 +83,12 @@ class SearchResultsTest implements RewriteTest {
           spec -> spec.dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
               SearchResults.Row::getSourcePath,
               SearchResults.Row::getResult,
-              SearchResults.Row::getParentRecipe,
               SearchResults.Row::getRecipe)
             .containsExactlyInAnyOrder(
-              tuple("match-capitalized-words", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-              tuple("match-capitalized-words", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-              tuple("match-capitalized-words", "File", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-              tuple("match-capitalized-words", "End", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`")
+              tuple("match-capitalized-words", "We", "Find text `([A-Z])\\w+`"),
+              tuple("match-capitalized-words", "SearchMarkers", "Find text `([A-Z])\\w+`"),
+              tuple("match-capitalized-words", "File", "Find text `([A-Z])\\w+`"),
+              tuple("match-capitalized-words", "End", "Find text `([A-Z])\\w+`")
             )),
           text(
             """
@@ -131,10 +129,9 @@ class SearchResultsTest implements RewriteTest {
             ).dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
                 SearchResults.Row::getSourcePath,
                 SearchResults.Row::getResult,
-                SearchResults.Row::getParentRecipe,
                 SearchResults.Row::getRecipe)
               .containsExactlyInAnyOrder(
-                tuple("matched", "hi", "Find text and add the results to the global datatable", "Find text `hi`")
+                tuple("matched", "hi", "Find text `hi`")
               )),
           text(
             doesNotExist(),
@@ -150,12 +147,11 @@ class SearchResultsTest implements RewriteTest {
           spec -> spec.dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
               SearchResults.Row::getSourcePath,
               SearchResults.Row::getResult,
-              SearchResults.Row::getParentRecipe,
               SearchResults.Row::getRecipe)
             .containsExactlyInAnyOrder(
-              tuple("different-recipes-matching", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-              tuple("different-recipes-matching", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-              tuple("different-recipes-matching", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`")
+              tuple("different-recipes-matching", "We", "Find text `([A-Z])\\w+`"),
+              tuple("different-recipes-matching", "SearchMarkers", "Find text `([A-Z])\\w+`"),
+              tuple("different-recipes-matching", "some other text", "Find text `SOME OTHER TEXT`")
             )),
           text(
             """
@@ -188,7 +184,7 @@ class SearchResultsTest implements RewriteTest {
                 ---
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.FindCapitalizedWords
-                displayName: Find text and add the results to the global datatable
+                displayName: Find capitalized text and add the results to the global datatable
                 description: Hello world.
                 recipeList:
                   - org.openrewrite.text.Find:
@@ -198,7 +194,7 @@ class SearchResultsTest implements RewriteTest {
                 ---
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.FindSomeOtherText
-                displayName: Find text and add the results to the global datatable
+                displayName: Find some other text and add the results to the global datatable
                 description: Hello world.
                 recipeList:
                   - org.openrewrite.text.Find:
@@ -208,15 +204,11 @@ class SearchResultsTest implements RewriteTest {
             ).dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
                 SearchResults.Row::getSourcePath,
                 SearchResults.Row::getResult,
-                SearchResults.Row::getParentRecipe,
                 SearchResults.Row::getRecipe)
               .containsExactlyInAnyOrder(
-                tuple("different-recipes-matching", "We", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                tuple("different-recipes-matching", "We", "", "Find text and add the results to the global datatable"),
-                tuple("different-recipes-matching", "SearchMarkers", "Find text and add the results to the global datatable", "Find text `([A-Z])\\w+`"),
-                tuple("different-recipes-matching", "SearchMarkers", "", "Find text and add the results to the global datatable"),
-                tuple("different-recipes-matching", "some other text", "Find text and add the results to the global datatable", "Find text `SOME OTHER TEXT`"),
-                tuple("different-recipes-matching", "some other text", "", "Find text and add the results to the global datatable")
+                tuple("different-recipes-matching", "We", "Find text `([A-Z])\\w+`"),
+                tuple("different-recipes-matching", "SearchMarkers", "Find text `([A-Z])\\w+`"),
+                tuple("different-recipes-matching", "some other text", "Find text `SOME OTHER TEXT`")
               )),
           text(
             """

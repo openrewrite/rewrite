@@ -44,15 +44,8 @@ public class SearchResults extends DataTable<SearchResults.Row> {
                 description = "The trimmed printed tree of the LST element that the marker is attached to.")
         String result;
 
-        @Column(displayName = "Parent of the recipe that had the search marker added",
-                description = "In a hierarchical recipe, the parent of the recipe that made a change. Empty if " +
-                        "this is the root of a hierarchy or if the recipe is not hierarchical at all.")
-        String parentRecipe;
-
         @Column(displayName = "Recipe that added the search marker",
                 description = "The specific recipe that added the Search marker.")
         String recipe;
-
     }
-    //TODO: Question for Jonathan: in `SourcesFileResults`, I see a `build` method which is not used in the OR codebase. Perhaps by our other system? Do we need to have this build method or not? `SourcesFileErrors` does not have it.
 }

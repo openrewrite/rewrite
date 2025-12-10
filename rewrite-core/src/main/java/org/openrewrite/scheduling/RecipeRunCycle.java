@@ -245,11 +245,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
 
         String parentName = "";
-        String parentInstanceName = "";
         boolean hierarchical = recipeStack.size() > 1;
         if (hierarchical) {
             parentName = recipeStack.get(recipeStack.size() - 2).getName();
-            parentInstanceName = recipeStack.get(recipeStack.size() - 2).getInstanceName();
         }
         sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
                 beforePath,
@@ -261,28 +259,25 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
         List<String> searchMarkers = collectSearchResults(before, after);
         for (String searchResult : searchMarkers) {
-            searchResults.insertRow(ctx, new SearchResults.Row(beforePath, afterPath, searchResult, parentInstanceName, recipe.getInstanceName()));
+            searchResults.insertRow(ctx, new SearchResults.Row(beforePath, afterPath, searchResult, recipe.getInstanceName()));
         }
 
         if (hierarchical) {
-            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, searchMarkers, ctx);
+            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
         }
     }
 
-    private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, Long effortSeconds, List<String> searchMarkers, ExecutionContext ctx) {
+    private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, Long effortSeconds, ExecutionContext ctx) {
         if (recipeStack.size() <= 1) {
             // No reason to record the synthetic root recipe which contains the recipe run
             return;
         }
         String parentName;
-        String parentInstanceName;
         if (recipeStack.size() == 2) {
             // Record the parent name as blank rather than CompositeRecipe when the parent is the synthetic root recipe
             parentName = "";
-            parentInstanceName = "";
         } else {
             parentName = recipeStack.get(recipeStack.size() - 2).getName();
-            parentInstanceName = recipeStack.get(recipeStack.size() - 2).getInstanceName();
         }
         Recipe recipe = recipeStack.get(recipeStack.size() - 1);
         sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
@@ -292,10 +287,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 recipe.getName(),
                 effortSeconds,
                 cycle));
-        for (String searchResult : searchMarkers) {
-            searchResults.insertRow(ctx, new SearchResults.Row(beforePath, afterPath, searchResult, parentInstanceName, recipe.getInstanceName()));
-        }
-        recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, searchMarkers, ctx);
+        recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
     }
 
     private @Nullable SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,
