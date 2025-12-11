@@ -203,4 +203,35 @@ class ExplicitDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void shouldReplaceLatestWhenVersionUsesProperty() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <guava.version>LATEST</guava.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>${guava.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("LATEST")
+                .contains("${guava.version}")
+                .containsPattern("<guava.version>\\d+\\.\\d+[^<]*</guava.version>")
+                .actual())
+          )
+        );
+    }
 }

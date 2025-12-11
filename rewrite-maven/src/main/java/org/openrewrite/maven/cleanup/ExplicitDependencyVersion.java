@@ -46,7 +46,7 @@ public class ExplicitDependencyVersion extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (isDependencyTag() || isManagedDependencyTag()) {
-                    String versionValue = t.getChildValue("version").orElse(null);
+                    String versionValue = getResolutionResult().getPom().getValue(t.getChildValue("version").orElse(null));
                     if ("LATEST".equals(versionValue) || "RELEASE".equals(versionValue)) {
                         String groupId = getResolutionResult().getPom().getValue(t.getChildValue("groupId").orElse(null));
                         String artifactId = getResolutionResult().getPom().getValue(t.getChildValue("artifactId").orElse(null));
