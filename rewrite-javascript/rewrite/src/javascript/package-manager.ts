@@ -14,7 +14,19 @@
  * limitations under the License.
  */
 
-import {Npmrc, NpmrcScope, PackageManager, serializeNpmrcConfigs} from "./node-resolution-result";
+import {
+    createNodeResolutionResultMarker,
+    findNodeResolutionResult,
+    Npmrc,
+    NpmrcScope,
+    PackageJsonContent,
+    PackageLockContent,
+    PackageManager,
+    readNpmrcConfigs,
+    serializeNpmrcConfigs
+} from "./node-resolution-result";
+import {replaceMarkerByKind} from "../markers";
+import {Json} from "../json";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
@@ -108,7 +120,7 @@ const LOCK_FILE_DETECTION: ReadonlyArray<LockFileDetectionConfig> = [
 /**
  * Result of running a package manager command.
  */
-export interface PackageManagerResult {
+interface PackageManagerResult {
     success: boolean;
     stdout?: string;
     stderr?: string;
@@ -118,7 +130,7 @@ export interface PackageManagerResult {
 /**
  * Options for running package manager install.
  */
-export interface InstallOptions {
+interface InstallOptions {
     /** Working directory */
     cwd: string;
 
@@ -165,13 +177,6 @@ export function getLockFileDetectionConfig(): ReadonlyArray<LockFileDetectionCon
 }
 
 /**
- * Gets the configuration for a package manager.
- */
-export function getPackageManagerConfig(pm: PackageManager): PackageManagerConfig {
-    return PACKAGE_MANAGER_CONFIGS[pm];
-}
-
-/**
  * Gets the lock file name for a package manager.
  */
 export function getLockFileName(pm: PackageManager): string {
@@ -186,139 +191,12 @@ export function getAllLockFileNames(): string[] {
 }
 
 /**
- * Checks if a file path is a lock file.
- */
-export function isLockFile(filePath: string): boolean {
-    const fileName = path.basename(filePath);
-    return getAllLockFileNames().includes(fileName);
-}
-
-/**
  * Runs the package manager install command.
- *
- * @param pm The package manager to use
- * @param options Install options
- * @returns Result of the install command
  */
-export function runInstall(pm: PackageManager, options: InstallOptions): PackageManagerResult {
+function runInstall(pm: PackageManager, options: InstallOptions): PackageManagerResult {
     const config = PACKAGE_MANAGER_CONFIGS[pm];
     const command = options.lockOnly ? config.installLockOnlyCommand : config.installCommand;
     const [cmd, ...args] = command;
-
-    try {
-        const result = spawnSync(cmd, args, {
-            cwd: options.cwd,
-            encoding: 'utf-8',
-            stdio: ['pipe', 'pipe', 'pipe'],
-            timeout: options.timeout ?? 120000,
-            env: options.env ? {...process.env, ...options.env} : process.env,
-        });
-
-        if (result.error) {
-            return {
-                success: false,
-                error: result.error.message,
-                stderr: result.stderr,
-            };
-        }
-
-        if (result.status !== 0) {
-            return {
-                success: false,
-                stdout: result.stdout,
-                stderr: result.stderr,
-                error: `Command exited with code ${result.status}`,
-            };
-        }
-
-        return {
-            success: true,
-            stdout: result.stdout,
-            stderr: result.stderr,
-        };
-    } catch (error: any) {
-        return {
-            success: false,
-            error: error.message,
-        };
-    }
-}
-
-/**
- * Options for adding/upgrading a package.
- */
-export interface AddPackageOptions {
-    /** Working directory */
-    cwd: string;
-
-    /** Package name to add/upgrade */
-    packageName: string;
-
-    /** Version constraint (e.g., "^5.0.0") */
-    version: string;
-
-    /** If true, only update lock file without installing to node_modules */
-    lockOnly?: boolean;
-
-    /** Timeout in milliseconds (default: 120000 = 2 minutes) */
-    timeout?: number;
-
-    /** Additional environment variables */
-    env?: Record<string, string>;
-}
-
-/**
- * Runs a package manager command to add or upgrade a package.
- * This updates both package.json and the lock file.
- *
- * @param pm The package manager to use
- * @param options Add package options
- * @returns Result of the command
- */
-export function runAddPackage(pm: PackageManager, options: AddPackageOptions): PackageManagerResult {
-    const packageSpec = `${options.packageName}@${options.version}`;
-
-    // Build command based on package manager
-    let cmd: string;
-    let args: string[];
-
-    switch (pm) {
-        case PackageManager.Npm:
-            cmd = 'npm';
-            args = ['install', packageSpec];
-            if (options.lockOnly) {
-                args.push('--package-lock-only');
-            }
-            break;
-        case PackageManager.YarnClassic:
-            cmd = 'yarn';
-            args = ['add', packageSpec];
-            if (options.lockOnly) {
-                args.push('--ignore-scripts');
-            }
-            break;
-        case PackageManager.YarnBerry:
-            cmd = 'yarn';
-            args = ['add', packageSpec];
-            if (options.lockOnly) {
-                args.push('--mode', 'skip-build');
-            }
-            break;
-        case PackageManager.Pnpm:
-            cmd = 'pnpm';
-            args = ['add', packageSpec];
-            if (options.lockOnly) {
-                args.push('--lockfile-only');
-            }
-            break;
-        case PackageManager.Bun:
-            cmd = 'bun';
-            args = ['add', packageSpec];
-            if (options.lockOnly) {
-                args.push('--ignore-scripts');
-            }
-            break;
-    }
 
     try {
         const result = spawnSync(cmd, args, {
@@ -390,46 +268,6 @@ export function runList(pm: PackageManager, cwd: string, timeout: number = 30000
 }
 
 /**
- * Checks if a package manager is available on the system.
- *
- * @param pm The package manager to check
- * @returns True if the package manager is available
- */
-export function isPackageManagerAvailable(pm: PackageManager): boolean {
-    const config = PACKAGE_MANAGER_CONFIGS[pm];
-    const cmd = config.installCommand[0];
-
-    try {
-        const result = spawnSync(cmd, ['--version'], {
-            encoding: 'utf-8',
-            stdio: ['pipe', 'pipe', 'pipe'],
-            timeout: 5000,
-        });
-        return result.status === 0;
-    } catch {
-        return false;
-    }
-}
-
-/**
- * Gets a human-readable name for a package manager.
- */
-export function getPackageManagerDisplayName(pm: PackageManager): string {
-    switch (pm) {
-        case PackageManager.Npm:
-            return 'npm';
-        case PackageManager.YarnClassic:
-            return 'Yarn Classic';
-        case PackageManager.YarnBerry:
-            return 'Yarn Berry';
-        case PackageManager.Pnpm:
-            return 'pnpm';
-        case PackageManager.Bun:
-            return 'Bun';
-    }
-}
-
-/**
  * Result of running install in a temporary directory.
  */
 export interface TempInstallResult {
@@ -439,6 +277,194 @@ export interface TempInstallResult {
     lockFileContent?: string;
     /** Error message (if failed) */
     error?: string;
+}
+
+/**
+ * Generic accumulator for dependency recipes that run package manager operations.
+ * Used by scanning recipes to track state across scanning and editing phases.
+ *
+ * @typeParam T The recipe-specific project update info type
+ */
+export interface DependencyRecipeAccumulator<T> {
+    /** Projects that need updating: packageJsonPath -> update info */
+    projectsToUpdate: Map<string, T>;
+
+    /** After running package manager, store the updated lock file content */
+    updatedLockFiles: Map<string, string>;
+
+    /** Updated package.json content (after npm install may have modified it) */
+    updatedPackageJsons: Map<string, string>;
+
+    /** Track which projects have been processed (npm install has run) */
+    processedProjects: Set<string>;
+
+    /** Track projects where npm install failed: packageJsonPath -> error message */
+    failedProjects: Map<string, string>;
+}
+
+/**
+ * Creates a new empty accumulator for dependency recipes.
+ */
+export function createDependencyRecipeAccumulator<T>(): DependencyRecipeAccumulator<T> {
+    return {
+        projectsToUpdate: new Map(),
+        updatedLockFiles: new Map(),
+        updatedPackageJsons: new Map(),
+        processedProjects: new Set(),
+        failedProjects: new Map()
+    };
+}
+
+/**
+ * Checks if a source path is a lock file and returns the updated content if available.
+ * This is a helper for dependency recipes that need to update lock files.
+ *
+ * @param sourcePath The source path to check
+ * @param acc The recipe accumulator containing updated lock file content
+ * @returns The updated lock file content if this is a lock file that was updated, undefined otherwise
+ */
+export function getUpdatedLockFileContent<T>(
+    sourcePath: string,
+    acc: DependencyRecipeAccumulator<T>
+): string | undefined {
+    for (const lockFileName of getAllLockFileNames()) {
+        if (sourcePath.endsWith(lockFileName)) {
+            // Find the corresponding package.json path
+            const packageJsonPath = sourcePath.replace(lockFileName, 'package.json');
+            const updateInfo = acc.projectsToUpdate.get(packageJsonPath);
+
+            if (updateInfo && acc.updatedLockFiles.has(sourcePath)) {
+                return acc.updatedLockFiles.get(sourcePath);
+            }
+            break;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Base interface for project update info used by dependency recipes.
+ * Recipes extend this with additional fields specific to their needs.
+ */
+export interface BaseProjectUpdateInfo {
+    /** Absolute path to the project directory */
+    projectDir: string;
+    /** Relative path to package.json (from source root) */
+    packageJsonPath: string;
+    /** The package manager used by this project */
+    packageManager: PackageManager;
+}
+
+/**
+ * Stores the result of a package manager install into the accumulator.
+ * This handles the common pattern of storing updated lock files and tracking failures.
+ *
+ * @param result The result from runInstallInTempDir
+ * @param acc The recipe accumulator
+ * @param updateInfo The project update info (must have packageJsonPath and packageManager)
+ * @param modifiedPackageJson The modified package.json content that was used for install
+ */
+export function storeInstallResult<T extends BaseProjectUpdateInfo>(
+    result: TempInstallResult,
+    acc: DependencyRecipeAccumulator<T>,
+    updateInfo: T,
+    modifiedPackageJson: string
+): void {
+    if (result.success) {
+        acc.updatedPackageJsons.set(updateInfo.packageJsonPath, modifiedPackageJson);
+
+        if (result.lockFileContent) {
+            const lockFileName = getLockFileName(updateInfo.packageManager);
+            const lockFilePath = updateInfo.packageJsonPath.replace('package.json', lockFileName);
+            acc.updatedLockFiles.set(lockFilePath, result.lockFileContent);
+        }
+    } else {
+        acc.failedProjects.set(updateInfo.packageJsonPath, result.error || 'Unknown error');
+    }
+}
+
+/**
+ * Runs the package manager install for a project if it hasn't been processed yet.
+ * Updates the accumulator's processedProjects set after running.
+ *
+ * @param sourcePath The source path (package.json path) being processed
+ * @param acc The recipe accumulator
+ * @param runInstall Function that performs the actual install (recipe-specific)
+ * @returns The failure message if install failed, undefined otherwise
+ */
+export async function runInstallIfNeeded<T>(
+    sourcePath: string,
+    acc: DependencyRecipeAccumulator<T>,
+    runInstall: () => Promise<void>
+): Promise<string | undefined> {
+    if (!acc.processedProjects.has(sourcePath)) {
+        await runInstall();
+        acc.processedProjects.add(sourcePath);
+    }
+    return acc.failedProjects.get(sourcePath);
+}
+
+/**
+ * Updates the NodeResolutionResult marker on a JSON document after a package manager operation.
+ * This recreates the marker based on the updated package.json and lock file content.
+ *
+ * @param doc The JSON document containing the marker
+ * @param updateInfo Project update info with paths and package manager
+ * @param acc The recipe accumulator containing updated content
+ * @returns The document with the updated marker, or unchanged if no existing marker
+ */
+export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo>(
+    doc: Json.Document,
+    updateInfo: T & { originalPackageJson: string },
+    acc: DependencyRecipeAccumulator<T>
+): Promise<Json.Document> {
+    const existingMarker = findNodeResolutionResult(doc);
+    if (!existingMarker) {
+        return doc;
+    }
+
+    // Parse the updated package.json and lock file to create new marker
+    const updatedPackageJson = acc.updatedPackageJsons.get(updateInfo.packageJsonPath);
+    const lockFileName = getLockFileName(updateInfo.packageManager);
+    const updatedLockFile = acc.updatedLockFiles.get(
+        updateInfo.packageJsonPath.replace('package.json', lockFileName)
+    );
+
+    let packageJsonContent: PackageJsonContent;
+    let lockContent: PackageLockContent | undefined;
+
+    try {
+        packageJsonContent = JSON.parse(updatedPackageJson || updateInfo.originalPackageJson);
+    } catch {
+        return doc; // Failed to parse, keep original marker
+    }
+
+    if (updatedLockFile) {
+        try {
+            lockContent = JSON.parse(updatedLockFile);
+        } catch {
+            // Continue without lock file content
+        }
+    }
+
+    // Read npmrc configs from the project directory
+    const npmrcConfigs = await readNpmrcConfigs(updateInfo.projectDir);
+
+    // Create new marker
+    const newMarker = createNodeResolutionResultMarker(
+        existingMarker.path,
+        packageJsonContent,
+        lockContent,
+        existingMarker.workspacePackagePaths,
+        existingMarker.packageManager,
+        npmrcConfigs.length > 0 ? npmrcConfigs : undefined
+    );
+
+    // Replace the marker in the document
+    return {
+        ...doc,
+        markers: replaceMarkerByKind(doc.markers, newMarker)
+    };
 }
 
 /**
