@@ -19,7 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenVisitor;
+import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.semver.LatestRelease;
@@ -41,10 +41,10 @@ public class ExplicitDependencyVersion extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         LatestRelease latestRelease = new LatestRelease(null);
-        return new MavenVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
                 if (isDependencyTag() || isManagedDependencyTag()) {
                     String versionValue = t.getChildValue("version").orElse(null);
                     if ("LATEST".equals(versionValue) || "RELEASE".equals(versionValue)) {
