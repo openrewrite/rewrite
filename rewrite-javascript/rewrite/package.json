@@ -19,6 +19,16 @@
     "./rpc": "./dist/rpc/index.js",
     "./test": "./dist/test/index.js"
   },
+  "typesVersions": {
+    "*": {
+      "text": ["./dist/text/index.d.ts"],
+      "json": ["./dist/json/index.d.ts"],
+      "java": ["./dist/java/index.d.ts"],
+      "javascript": ["./dist/javascript/index.d.ts"],
+      "rpc": ["./dist/rpc/index.d.ts"],
+      "test": ["./dist/test/index.d.ts"]
+    }
+  },
   "scripts": {
     "build": "rm -rf ./dist tsconfig.build.tsbuildinfo && tsc --build tsconfig.build.json",
     "postbuild": "chmod +x dist/rpc/server.js dist/cli/rewrite.js && npm link",
