@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Markers} from "../markers";
+import {emptyMarkers, Markers} from "../markers";
 import {SourceFile, Tree} from "../tree";
 
 
@@ -116,4 +116,101 @@ const jsonKindValues = new Set(Object.values(Json.Kind));
 
 export function isJson(tree: any): tree is Json {
     return jsonKindValues.has(tree["kind"]);
+}
+
+export function isLiteral(json: Json): json is Json.Literal {
+    return json.kind === Json.Kind.Literal;
+}
+
+export function isObject(json: Json): json is Json.Object {
+    return json.kind === Json.Kind.Object;
+}
+
+export function isArray(json: Json): json is Json.Array {
+    return json.kind === Json.Kind.Array;
+}
+
+export function isIdentifier(json: Json): json is Json.Identifier {
+    return json.kind === Json.Kind.Identifier;
+}
+
+export function isMember(json: Json): json is Json.Member {
+    return json.kind === Json.Kind.Member;
+}
+
+/**
+ * Gets the key name from a Json.Member.
+ * Handles both string literals (quoted keys) and identifiers (unquoted keys).
+ *
+ * @param member The JSON member to extract the key name from
+ * @returns The key name as a string, or undefined if extraction fails
+ */
+export function getMemberKeyName(member: Json.Member): string | undefined {
+    const key = member.key.element;
+    if (isLiteral(key)) {
+        const source = key.source;
+        // Remove quotes from string literal
+        if (source.startsWith('"') && source.endsWith('"')) {
+            return source.slice(1, -1);
+        }
+        return source;
+    } else if (isIdentifier(key)) {
+        return key.name;
+    }
+    return undefined;
+}
+
+/**
+ * Detects the indentation used in a JSON document by examining existing members or array elements.
+ * Returns the base indent string (e.g., "  " for 2 spaces, "    " for 4 spaces).
+ *
+ * @param doc The JSON document to analyze
+ * @returns The detected indent string, or "    " (4 spaces) as default
+ */
+export function detectIndent(doc: Json.Document): string {
+    const defaultIndent = '    '; // Default to 4 spaces
+
+    if (isObject(doc.value)) {
+        if (doc.value.members && doc.value.members.length > 0) {
+            // Look at the prefix of the first member's key to detect indentation
+            const firstMemberRightPadded = doc.value.members[0];
+            const firstMember = firstMemberRightPadded.element as Json.Member;
+            const prefix = firstMember.key.element.prefix.whitespace;
+            // Extract just the spaces/tabs after the newline
+            const match = prefix.match(/\n([ \t]+)/);
+            if (match) {
+                return match[1];
+            }
+        }
+    } else if (isArray(doc.value)) {
+        if (doc.value.values && doc.value.values.length > 0) {
+            // Look at the prefix of the first array element to detect indentation
+            const firstElement = doc.value.values[0].element;
+            const prefix = firstElement.prefix.whitespace;
+            // Extract just the spaces/tabs after the newline
+            const match = prefix.match(/\n([ \t]+)/);
+            if (match) {
+                return match[1];
+            }
+        }
+    }
+
+    return defaultIndent;
+}
+
+/**
+ * Creates a RightPadded wrapper for a JSON element.
+ *
+ * @param element The JSON element to wrap
+ * @param after The trailing space after the element
+ * @param markers Optional markers to attach
+ * @returns A RightPadded wrapper containing the element
+ */
+export function rightPadded<T extends Json>(element: T, after: Json.Space, markers?: Markers): Json.RightPadded<T> {
+    return {
+        kind: Json.Kind.RightPadded,
+        element,
+        after,
+        markers: markers ?? emptyMarkers
+    };
 }
