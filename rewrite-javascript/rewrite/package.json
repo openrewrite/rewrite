@@ -11,22 +11,33 @@
     "src/**"
   ],
   "exports": {
-    ".": "./dist/index.js",
-    "./text": "./dist/text/index.js",
-    "./json": "./dist/json/index.js",
-    "./java": "./dist/java/index.js",
-    "./javascript": "./dist/javascript/index.js",
-    "./rpc": "./dist/rpc/index.js",
-    "./test": "./dist/test/index.js"
-  },
-  "typesVersions": {
-    "*": {
-      "text": ["./dist/text/index.d.ts"],
-      "json": ["./dist/json/index.d.ts"],
-      "java": ["./dist/java/index.d.ts"],
-      "javascript": ["./dist/javascript/index.d.ts"],
-      "rpc": ["./dist/rpc/index.d.ts"],
-      "test": ["./dist/test/index.d.ts"]
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./text": {
+      "types": "./dist/text/index.d.ts",
+      "default": "./dist/text/index.js"
+    },
+    "./json": {
+      "types": "./dist/json/index.d.ts",
+      "default": "./dist/json/index.js"
+    },
+    "./java": {
+      "types": "./dist/java/index.d.ts",
+      "default": "./dist/java/index.js"
+    },
+    "./javascript": {
+      "types": "./dist/javascript/index.d.ts",
+      "default": "./dist/javascript/index.js"
+    },
+    "./rpc": {
+      "types": "./dist/rpc/index.d.ts",
+      "default": "./dist/rpc/index.js"
+    },
+    "./test": {
+      "types": "./dist/test/index.d.ts",
+      "default": "./dist/test/index.js"
     }
   },
   "scripts": {
