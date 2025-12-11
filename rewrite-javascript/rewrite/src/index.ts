@@ -38,9 +38,10 @@ export async function activate(registry: RecipeRegistry): Promise<void> {
     const {ModernizeOctalEscapeSequences, ModernizeOctalLiterals, RemoveDuplicateObjectKeys} = await import("./javascript/migrate/es6/index.js");
     const {ExportAssignmentToExportDefault} = await import("./javascript/migrate/typescript/index.js");
     const {UseObjectPropertyShorthand, PreferOptionalChain, AddParseIntRadix} = await import("./javascript/cleanup/index.js");
-    const {AsyncCallbackInSyncArrayMethod, AutoFormat, UpgradeDependencyVersion, UpgradeTransitiveDependencyVersion, OrderImports, ChangeImport} = await import("./javascript/recipes/index.js");
+    const {AddDependency, AsyncCallbackInSyncArrayMethod, AutoFormat, UpgradeDependencyVersion, UpgradeTransitiveDependencyVersion, OrderImports, ChangeImport} = await import("./javascript/recipes/index.js");
     const {FindDependency} = await import("./javascript/search/index.js");
 
+    registry.register(AddDependency);
     registry.register(ExportAssignmentToExportDefault);
     registry.register(FindDependency);
     registry.register(OrderImports);
