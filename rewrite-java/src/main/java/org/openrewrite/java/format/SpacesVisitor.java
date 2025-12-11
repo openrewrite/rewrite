@@ -250,9 +250,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     } else if (atomicIndex.get() > 0) {
                         before = evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
                     }
-                    if (atomicIndex.get() == atomicSize.get() - 1) {
-                        after = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
-                    } else if (atomicIndex.get() >= 0) {
+                    if (atomicIndex.get() != atomicSize.get() - 1 && atomicIndex.get() >= 0) {
                         after = evaluate(() -> spacesStyle.getOther().getBeforeComma(), false) ? " " : "";
                     }
                 } else {
@@ -343,16 +341,17 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        if (after != null) {
-            Space afterSpace = minimizedLastComment(right.getAfter(), after);
-            right = afterSpace == right.getAfter() ? right : new JRightPadded<>(right.getElement(), afterSpace, right.getMarkers());
-        }
-
         if (containerLocation == null) {
             setCursor(new Cursor(getCursor(), right));
         }
+
         if (before != null) {
             getCursor().putMessage("before", before);
+        }
+
+        if (after != null) {
+            Space afterSpace = minimizedLastComment(right.getAfter(), after);
+            right = afterSpace == right.getAfter() ? right : new JRightPadded<>(right.getElement(), afterSpace, right.getMarkers());
         }
 
         T t = right.getElement();
@@ -621,11 +620,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             case BLOCK_END:
                 J.Block block = getCursor().getValue();
                 if (getCursor().dropParentWhile(v -> !(v instanceof J.ClassDeclaration) && !Cursor.ROOT_VALUE.equals(v)).getMessage("singleLineEnum") == Boolean.TRUE) {
-                    if (block.getStatements().isEmpty()) {
-                        whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
-                    } else {
-                        whitespace = "";
-                    }
+                    whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
                     break;
                 } else if (block.getStatements().isEmpty() && block.getEnd().getComments().isEmpty()) {
                     parentTreeCursor = getCursor().getParentTreeCursor();
@@ -658,6 +653,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     firstAnnotation = ((J.MethodDeclaration) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
                 } else if (parentTreeCursor.getValue() instanceof J.VariableDeclarations) {
                     firstAnnotation = ((J.VariableDeclarations) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
+                } else if (parentTreeCursor.getValue() instanceof J.EnumValue) {
+                    firstAnnotation = ((J.EnumValue) parentTreeCursor.getValue()).getAnnotations().indexOf(getCursor().getValue()) <= 0;
                 }
                 if (!firstAnnotation) {
                     whitespace = " ";

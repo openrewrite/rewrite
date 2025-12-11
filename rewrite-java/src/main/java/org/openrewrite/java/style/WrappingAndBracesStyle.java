@@ -74,7 +74,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Nullable
     AssertStatement assertStatement; // Not yet implemented
     @Nullable
-    EnumConstants enumConstants; // Not yet implemented
+    EnumConstants enumConstants;
     @Nullable
     Annotations classAnnotations;
     @Nullable

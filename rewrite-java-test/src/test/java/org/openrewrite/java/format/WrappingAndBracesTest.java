@@ -36,10 +36,10 @@ import java.util.function.UnaryOperator;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.style.LineWrapSetting.WrapAlways;
-import static org.openrewrite.style.LineWrapSetting.WrapIfTooLong;
+import static org.openrewrite.style.LineWrapSetting.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
+@SuppressWarnings("all")
 class WrappingAndBracesTest implements RewriteTest {
 
     @Override
@@ -625,7 +625,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
-                  
+
                   @Foo
                   @Foo
                   void method(@Foo @Foo int param) {
@@ -1996,6 +1996,206 @@ class WrappingAndBracesTest implements RewriteTest {
                           RuntimeException {
                       FileReader fr = new FileReader("input.txt");
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsWrapAlways() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED, STARTED, COMPLETED
+              }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED,
+                  COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsWrapAlwaysAlreadyCorrect() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED,
+                  COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsChopIfTooLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withHardWrapAt(60)
+              .withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED, STARTED_BUT_NAMED_VERY_LONG_TO_MAKE_SURE_THAT_WE_WRAP, COMPLETED
+              }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED_BUT_NAMED_VERY_LONG_TO_MAKE_SURE_THAT_WE_WRAP,
+                  COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsChopIfTooLongNotLongEnough() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED, STARTED, COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsSingleLineChopIfTooLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withHardWrapAt(40)
+              .withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              enum Status { NOT_STARTED, STARTED, COMPLETED }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED,
+                  COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsSingleLineChopIfTooLongNotLongEnough() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces.withOther(spaces.getOther().withInsideOneLineEnumBraces(true)),
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              enum Status { NOT_STARTED, STARTED, COMPLETED }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsDoNotWrap() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(DoNotWrap))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED, STARTED, COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsWithArguments() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED("Not Started"), STARTED("Started"), COMPLETED("Completed");
+
+                  private final String displayName;
+
+                  Status(String displayName) {
+                      this.displayName = displayName;
+                  }
+              }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED("Not Started"),
+                  STARTED("Started"),
+                  COMPLETED("Completed");
+
+                  private final String displayName;
+
+                  Status(String displayName) {
+                      this.displayName = displayName;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsSingleLineToWrapped() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              enum Status { NOT_STARTED, STARTED, COMPLETED }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED,
+                  COMPLETED
               }
               """
           )

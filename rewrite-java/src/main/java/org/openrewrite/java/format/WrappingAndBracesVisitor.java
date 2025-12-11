@@ -41,7 +41,6 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.internal.StringUtils.hasLineBreak;
 import static org.openrewrite.style.LineWrapSetting.*;
 
 public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
@@ -169,9 +168,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                         }
                     }
 
-                    if (positionService == null) {
-                        break;
-                    }
                     boolean wrapFirstCall = evaluate(() -> style.getChainedMethodCalls().getWrapFirstCall(), false);
                     if (!((wrapFirstCall && chainStarter == m) || (!wrapFirstCall && chainStarter == m.getSelect())) && evaluate(() -> style.getChainedMethodCalls().getAlignWhenMultiline(), false)) {
                         startColumn = positionService.positionOf(getCursor(), chainStarter.getSelect()).getEndColumn() - 1; //since position is index-1-based
@@ -293,6 +289,32 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     wrappedRight = ((JRightPadded<Statement>) wrappedRight).withElement(element);
                 }
                 break;
+            case ENUM_VALUE:
+                boolean shouldWrap = false;
+                List<J.EnumValue> enums = ((J.EnumValueSet) getCursor().getValue()).getEnums();
+                if (!enums.isEmpty()) {
+                    switch (evaluate(() -> style.getEnumConstants().getWrap(), DoNotWrap)) {
+                        case WrapAlways:
+                            shouldWrap = true;
+                            break;
+                        case ChopIfTooLong:
+                            shouldWrap = sourceFile.service(SourcePositionService.class).positionOf(getCursor(), enums.get(enums.size() - 1)).getMaxColumn() >= style.getHardWrapAt();
+                            break;
+                        case WrapIfTooLong:
+                            if (enums.get(0) == right.getElement()) {
+                                shouldWrap = sourceFile.service(SourcePositionService.class).positionOf(getCursor(), enums.get(enums.size() - 1)).getMaxColumn() >= style.getHardWrapAt();
+                            } else {
+                                shouldWrap = sourceFile.service(SourcePositionService.class).positionOf(getCursor(), (J.EnumValue) right.getElement()).getMaxColumn() >= style.getHardWrapAt();
+                            }
+                            break;
+                    }
+                    if (shouldWrap) {
+                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
+                        startColumn = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length();
+                        wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n" + StringUtils.repeat(" ", startColumn + tabsAndIndentsStyle.getIndentSize()))));
+                        getCursor().pollNearestMessage("single-line-enum");
+                    }
+                }
         }
 
         return (JRightPadded<T>) super.visitRightPadded(wrappedRight, loc, p);
@@ -310,6 +332,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             boolean isLong = false;
             switch (loc) {
                 case BLOCK_END:
+                    if (Boolean.TRUE.equals(getCursor().pollMessage("single-line-enum"))) {
+                        break;
+                    }
                     newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor());
                     if (newLinedCursorElement.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) newLinedCursorElement.getValue()).getSelect() != null) {
                         column = ((J.MethodInvocation) newLinedCursorElement.getValue()).getPadding().getSelect().getAfter().getIndent().length();
@@ -490,14 +515,11 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.EnumValue visitEnumValue(J.EnumValue _enum, P p) {
-        J.EnumValue enumValue = super.visitEnumValue(_enum, p);
-        String whitespace = enumValue.getPrefix().getLastWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
-        enumValue = enumValue.withAnnotations(wrapAnnotations(enumValue.getAnnotations(), whitespace, style.getEnumFieldAnnotations()));
-        if (!enumValue.getAnnotations().isEmpty() && style.getEnumFieldAnnotations() != null) {
-            enumValue = enumValue.withName(enumValue.getName().withPrefix(wrapElement(enumValue.getName().getPrefix(), whitespace, style.getEnumFieldAnnotations())));
+    public J.Block visitBlock(J.Block block, P p) {
+        if (block.getStatements().size() == 1 && block.getStatements().get(0) instanceof J.EnumValueSet) {
+            getCursor().putMessage("single-line-enum", true);
         }
-        return enumValue;
+        return super.visitBlock(block, p);
     }
 
     @Override
@@ -516,38 +538,16 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
-    private List<J.Annotation> wrapAnnotations(List<J.Annotation> annotations, String whitespace, WrappingAndBracesStyle.@Nullable Annotations annotationsStyle) {
-        if (annotationsStyle == null) {
-            return annotations;
-        }
-        return ListUtils.map(annotations, (index, ann) -> {
-            if (annotationsStyle.getWrap() == DoNotWrap && hasLineBreak(ann.getPrefix().getLastWhitespace())) {
-                ann = ann.withPrefix(ann.getPrefix().withWhitespace(Space.SINGLE_SPACE.getLastWhitespace()));
-            } else if (annotationsStyle.getWrap() == WrapAlways && index > 0) {
-                ann = ann.withPrefix(ann.getPrefix().withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace));
-            }
-            return ann;
-        });
-    }
-
-    private Space wrapElement(Space prefix, String whitespace, WrappingAndBracesStyle.@Nullable Annotations annotationsStyle) {
-        if (prefix.getComments().isEmpty() && annotationsStyle != null) {
-            if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getLastWhitespace()) || prefix.isEmpty())) {
-                return prefix.withWhitespace(Space.SINGLE_SPACE.getLastWhitespace());
-            }
-            if (annotationsStyle.getWrap() == WrapAlways) {
-                return prefix.withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace);
-            }
-        }
-        return prefix;
-    }
-
     private Space withWhitespaceSkipComments(Space space, String whitespace) {
         if (space.getComments().isEmpty()) {
             if (!removeCustomLineBreaks && StringUtils.hasLineBreak(space.getWhitespace())) {
                 return space;
             }
             if (StringUtils.hasLineBreak(whitespace)) {
+                if (StringUtils.hasLineBreak(space.getWhitespace())) {
+                    //Keep existing amount of new lines
+                    return space.withWhitespace(space.getWhitespace().replaceAll(" ", "") + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
+                }
                 //Reduce to single new line
                 return space.withWhitespace(whitespace.substring(whitespace.lastIndexOf('\n')));
             }
@@ -569,6 +569,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                             if (!(parent instanceof J.Block || parent instanceof J.Case)) {
                                 return comment.withSuffix(whitespace);
                             }
+                        }
+                        if (StringUtils.hasLineBreak(comment.getSuffix())) {
+                            //Keep existing amount of new lines
+                            return comment.withSuffix(comment.getSuffix().replaceAll(" ", "") + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
                         }
                         //Reduce to single new line
                         return comment.withSuffix(whitespace.substring(whitespace.lastIndexOf('\n')));
