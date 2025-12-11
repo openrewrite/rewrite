@@ -70,7 +70,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Nullable
     ArrayInitializer arrayInitializer; // Not yet implemented
     @Nullable
-    ModifierList modifierList; // Not yet implemented
+    ModifierList modifierList;
     @Nullable
     AssertStatement assertStatement; // Not yet implemented
     @Nullable

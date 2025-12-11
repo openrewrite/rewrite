@@ -471,11 +471,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     }
                     break;
                 case CLASS_KIND:
-                    if (Boolean.TRUE.equals(getCursor().pollMessage("annotations-wrapped"))) {
+                    if (Boolean.TRUE.equals(getCursor().pollMessage("modifiers-wrapped")) ||  Boolean.TRUE.equals(getCursor().pollMessage("annotations-wrapped"))) {
                         space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
                     }
                     break;
                 case MODIFIER_PREFIX:
+                    getCursor().getParentTreeCursor().computeMessageIfAbsent("modifiers-wrapped", __ -> evaluate(() -> style.getModifierList().getWrapAfterModifierList(), false));
                     if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         if (space.getComments().isEmpty() || !space.getComments().get(space.getComments().size() - 1).isMultiline()) {
                             space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
@@ -484,7 +485,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     break;
                 case TYPE_PARAMETERS_PREFIX:
                 case IDENTIFIER_PREFIX:
-                    if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
+                case PRIMITIVE_PREFIX:
+                    if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("modifiers-wrapped")) || Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
                     }
                     break;

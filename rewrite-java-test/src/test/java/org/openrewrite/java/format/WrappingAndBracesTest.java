@@ -2201,4 +2201,116 @@ class WrappingAndBracesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void modifierListWrapAfterModifierListClass() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
+          ),
+          java(
+            """
+              public final class Test {
+              }
+              """,
+            """
+              public final
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierListWrapAfterModifierListMethod() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
+          ),
+          java(
+            """
+              class Test {
+                  public static void method() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  public static
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierListWrapAfterModifierListField() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
+          ),
+          java(
+            """
+              class Test {
+                  public static final int CONSTANT = 1;
+              }
+              """,
+            """
+              class Test {
+                  public static final
+                  int CONSTANT = 1;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierListWrapAfterModifierListAlreadyCorrect() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
+          ),
+          java(
+            """
+              public final
+              class Test {
+                  public static final
+                  int CONSTANT = 1;
+
+                  public static
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierListNoWrapAfterModifierList() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(false))
+          ),
+          java(
+            """
+              public final class Test {
+                  public static final int CONSTANT = 1;
+
+                  public static void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
 }

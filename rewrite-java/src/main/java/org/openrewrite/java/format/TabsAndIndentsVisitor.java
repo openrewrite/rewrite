@@ -218,6 +218,18 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             indentType = IndentType.ALIGN;
         }
 
+        switch (loc) {
+            case TYPE_PARAMETERS_PREFIX:
+            case IDENTIFIER_PREFIX:
+            case PRIMITIVE_PREFIX:
+                Object parentValue = parent.getValue();
+                if (parentValue instanceof J.VariableDeclarations || parentValue instanceof J.MethodDeclaration || parentValue instanceof J.ClassDeclaration) {
+                    // only align when it's the return type or variable type or class name.
+                    indentType = IndentType.ALIGN;
+                }
+                break;
+        }
+
         switch (indentType) {
             case ALIGN:
                 break;
