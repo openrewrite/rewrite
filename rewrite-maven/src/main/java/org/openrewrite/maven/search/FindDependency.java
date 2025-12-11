@@ -20,8 +20,14 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.trait.MavenDependency;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.semver.LatestIntegration;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
@@ -70,7 +76,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId) &&
-                        versionIsValid(version, versionPattern, () -> findDependency(tag))) {
+                        versionIsValid(version, versionPattern, this::getResolutionResult, () -> new MavenMetadataFailures(new FindDependency(groupId, artifactId, version, versionPattern)), ctx, () -> findDependency(tag))) {
                     ds.add(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -97,11 +103,12 @@ public class FindDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        Recipe outerThis = this;
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId) &&
-                        versionIsValid(version, versionPattern, () -> findDependency(tag))) {
+                        versionIsValid(version, versionPattern, this::getResolutionResult, () -> new MavenMetadataFailures(outerThis), ctx, () -> findDependency(tag))) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -109,8 +116,16 @@ public class FindDependency extends Recipe {
         };
     }
 
-    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern,
-                                          Supplier<@Nullable ResolvedDependency> resolvedDependencySupplier) {
+    //MavenResolutionResult mrr,
+    //MavenMetadataFailures metadataFailures, new MavenMetadataFailures(this)
+    private static boolean versionIsValid(
+            @Nullable String desiredVersion,
+            @Nullable String versionPattern,
+            Supplier<MavenResolutionResult> mrr,
+            Supplier<MavenMetadataFailures> mmf,
+            ExecutionContext ctx,
+            Supplier<@Nullable ResolvedDependency> resolvedDependencySupplier
+    ) {
         if (desiredVersion == null) {
             return true;
         }
@@ -124,10 +139,23 @@ public class FindDependency extends Recipe {
             return false;
         }
         assert (validate.getValue() != null);
+        String blah = "";
+        MavenMetadataFailures mmfAfter = mmf.get();
+        if (validate.getValue() instanceof LatestRelease || validate.getValue() instanceof LatestIntegration) {
+            try {
+                blah = MavenDependency.findNewerVersion(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion(), mrr.get(), mmfAfter, validate.getValue(), ctx);
+            } catch (MavenDownloadingException e) {
+                throw new RuntimeException(e);
+            }
+        }
         String requestedVersion = resolvedDependency.getRequested().getVersion();
         String actualVersion = resolvedDependency.getVersion();
-        return validate.getValue().isValid(actualVersion, actualVersion) ||
+        boolean versionsValid = validate.getValue().isValid(actualVersion, actualVersion) ||
                 // Match cases `LATEST` and `RELEASE` to version patterns `=LATEST` and `=RELEASE`
                 requestedVersion != null && validate.getValue().isValid(requestedVersion, requestedVersion);
+        if (blah != null && !blah.isEmpty()) {
+            return versionsValid && blah.equals(actualVersion);
+        }
+        return versionsValid;
     }
 }
