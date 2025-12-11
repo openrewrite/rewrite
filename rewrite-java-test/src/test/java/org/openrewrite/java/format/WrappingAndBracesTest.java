@@ -2313,4 +2313,255 @@ class WrappingAndBracesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void arrayInitializerWrapAlways() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {1,
+                          2,
+                          3,
+                          4,
+                          5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerWrapAlwaysAlreadyCorrect() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1,
+                          2,
+                          3,
+                          4,
+                          5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerWrapAlwaysAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {1,
+                                   2,
+                                   3,
+                                   4,
+                                   5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerNewLineAfterOpeningCurly() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways).withNewLineAfterOpeningCurly(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {
+                          1,
+                          2,
+                          3,
+                          4,
+                          5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerPlaceClosingCurlyOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways).withPlaceClosingCurlyOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {1,
+                          2,
+                          3,
+                          4,
+                          5
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerAllOptions() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer()
+              .withWrap(WrapAlways)
+              .withNewLineAfterOpeningCurly(true)
+              .withPlaceClosingCurlyOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {
+                          1,
+                          2,
+                          3,
+                          4,
+                          5
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerDoNotWrap() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(DoNotWrap))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerChopIfTooLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withHardWrapAt(40)
+              .withArrayInitializer(wrap.getArrayInitializer().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              class Test {
+                  Object[] numbers = {1, 2, "SOME VERY LONG VALUE CAUSING THE LINE TO BE LONG", 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  Object[] numbers = {1,
+                          2,
+                          "SOME VERY LONG VALUE CAUSING THE LINE TO BE LONG",
+                          4,
+                          5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerChopIfTooLongNotLongEnough() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerWithNewArray() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer()
+              .withWrap(WrapAlways)
+              .withNewLineAfterOpeningCurly(true)
+              .withPlaceClosingCurlyOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = new int[]{1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = new int[]{
+                          1,
+                          2,
+                          3,
+                          4,
+                          5
+                  };
+              }
+              """
+          )
+        );
+    }
 }

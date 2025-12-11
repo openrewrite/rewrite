@@ -68,7 +68,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Nullable
     TernaryOperation ternaryOperation; // Not yet implemented
     @Nullable
-    ArrayInitializer arrayInitializer; // Not yet implemented
+    ArrayInitializer arrayInitializer;
     @Nullable
     ModifierList modifierList;
     @Nullable

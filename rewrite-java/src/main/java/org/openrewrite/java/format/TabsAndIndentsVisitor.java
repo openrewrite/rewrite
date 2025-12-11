@@ -569,6 +569,23 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
                     break;
+                case NEW_ARRAY_INITIALIZER:
+                    if (alignWhenMultiple(loc.getElementLocation())) {
+                        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                        try {
+                            int alignTo = sourceFile.service(SourcePositionService.class).positionOf(getCursor()).getStartColumn() - 1; // column is index 1-based
+                            before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+                            getCursor().putMessage("indentType", IndentType.ALIGN);
+                            getCursor().putMessage("lastIndent", alignTo);
+                            js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
+                            break;
+                        } catch (UnsupportedOperationException ignored) {
+                        }
+                    }
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                    before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
+                    break;
                 default:
                     before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
@@ -605,6 +622,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             case THROWS:
                 //noinspection ConstantConditions
                 isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getThrowsList() != null && wrappingStyle.getThrowsList().getAlignWhenMultiline();
+                intelliJDefault = false;
+                break;
+            case NEW_ARRAY_INITIALIZER:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getArrayInitializer() != null && wrappingStyle.getArrayInitializer().getAlignWhenMultiline();
                 intelliJDefault = false;
                 break;
             default:

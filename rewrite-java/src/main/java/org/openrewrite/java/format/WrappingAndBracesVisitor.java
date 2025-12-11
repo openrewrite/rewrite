@@ -622,6 +622,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 }
                 wrap = evaluate(() -> style.getTryWithResources().getWrap(), DoNotWrap);
                 break;
+            case NEW_ARRAY_INITIALIZER:
+                if (index == 0) {
+                    openNewLine = evaluate(() -> style.getArrayInitializer().getNewLineAfterOpeningCurly(), false);
+                }
+                wrap = evaluate(() -> style.getArrayInitializer().getWrap(), DoNotWrap);
+                break;
             case THROWS:
                 wrap = evaluate(() -> style.getThrowsList().getWrap(), DoNotWrap);
                 openNewLine = true;
@@ -711,6 +717,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 return evaluate(() -> style.getRecordComponents().getOpenNewLine(), false);
             case TRY_RESOURCES:
                 return evaluate(() -> style.getTryWithResources().getOpenNewLine(), false);
+            case NEW_ARRAY_INITIALIZER:
+                return evaluate(() -> style.getArrayInitializer().getNewLineAfterOpeningCurly(), false);
         }
         return false;
     }
@@ -738,6 +746,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             case TRY_RESOURCES:
                 closeOnNewLine = evaluate(() -> style.getTryWithResources().getCloseNewLine(), false);
                 wrap = evaluate(() -> style.getTryWithResources().getWrap(), DoNotWrap);
+                break;
+            case NEW_ARRAY_INITIALIZER:
+                closeOnNewLine = evaluate(() -> style.getArrayInitializer().getPlaceClosingCurlyOnNewLine(), false);
+                wrap = evaluate(() -> style.getArrayInitializer().getWrap(), DoNotWrap);
                 break;
         }
 
@@ -781,6 +793,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 return evaluate(() -> style.getTryWithResources().getAlignWhenMultiline(), true);
             case THROWS:
                 return evaluate(() -> style.getThrowsList().getAlignWhenMultiline(), false);
+            case NEW_ARRAY_INITIALIZER:
+                return evaluate(() -> style.getArrayInitializer().getAlignWhenMultiline(), false);
         }
         return false;
     }
