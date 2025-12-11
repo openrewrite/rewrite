@@ -570,6 +570,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
                     break;
                 case NEW_ARRAY_INITIALIZER:
+                case ANNOTATION_ARGUMENTS:
                     if (alignWhenMultiple(loc.getElementLocation())) {
                         JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                         try {
@@ -627,6 +628,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             case NEW_ARRAY_INITIALIZER:
                 //noinspection ConstantConditions
                 isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getArrayInitializer() != null && wrappingStyle.getArrayInitializer().getAlignWhenMultiline();
+                intelliJDefault = false;
+                break;
+            case ANNOTATION_ARGUMENT:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getAnnotationParameters() != null && wrappingStyle.getAnnotationParameters().getAlignWhenMultiline();
                 intelliJDefault = false;
                 break;
             default:

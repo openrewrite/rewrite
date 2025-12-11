@@ -2564,4 +2564,265 @@ class WrappingAndBracesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotationParametersWrapAlways() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(value = "all",
+                      justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersWrapAlwaysAlreadyCorrect() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all",
+                      justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersWrapAlwaysAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(value = "all",
+                                justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersOpenNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways).withOpenNewLine(true))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(
+                      value = "all",
+                      justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersCloseNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways).withCloseNewLine(true))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(value = "all",
+                      justification = "test"
+              )
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersAllOptions() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters()
+              .withWrap(WrapAlways)
+              .withOpenNewLine(true)
+              .withCloseNewLine(true))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(
+                      value = "all",
+                      justification = "test"
+              )
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersDoNotWrap() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(DoNotWrap))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersChopIfTooLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withHardWrapAt(60)
+              .withAnnotationParameters(wrap.getAnnotationParameters().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "this is a very long justification")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(value = "all",
+                      justification = "this is a very long justification")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersChopIfTooLongNotLongEnough() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersOnMethod() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters()
+              .withWrap(WrapAlways)
+              .withOpenNewLine(true)
+              .withCloseNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  @SuppressWarnings(value = "all", justification = "test")
+                  void method() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  @SuppressWarnings(
+                          value = "all",
+                          justification = "test"
+                  )
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersOnField() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters()
+              .withWrap(WrapAlways)
+              .withOpenNewLine(true)
+              .withCloseNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  @SuppressWarnings(value = "all", justification = "test")
+                  private int field;
+              }
+              """,
+            """
+              class Test {
+                  @SuppressWarnings(
+                          value = "all",
+                          justification = "test"
+                  )
+                  private int field;
+              }
+              """
+          )
+        );
+    }
 }

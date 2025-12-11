@@ -628,6 +628,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 }
                 wrap = evaluate(() -> style.getArrayInitializer().getWrap(), DoNotWrap);
                 break;
+            case ANNOTATION_ARGUMENTS:
+                if (index == 0) {
+                    openNewLine = evaluate(() -> style.getAnnotationParameters().getOpenNewLine(), false);
+                }
+                wrap = evaluate(() -> style.getAnnotationParameters().getWrap(), DoNotWrap);
+                break;
             case THROWS:
                 wrap = evaluate(() -> style.getThrowsList().getWrap(), DoNotWrap);
                 openNewLine = true;
@@ -719,6 +725,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 return evaluate(() -> style.getTryWithResources().getOpenNewLine(), false);
             case NEW_ARRAY_INITIALIZER:
                 return evaluate(() -> style.getArrayInitializer().getNewLineAfterOpeningCurly(), false);
+            case ANNOTATION_ARGUMENTS:
+                return evaluate(() -> style.getAnnotationParameters().getOpenNewLine(), false);
         }
         return false;
     }
@@ -750,6 +758,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             case NEW_ARRAY_INITIALIZER:
                 closeOnNewLine = evaluate(() -> style.getArrayInitializer().getPlaceClosingCurlyOnNewLine(), false);
                 wrap = evaluate(() -> style.getArrayInitializer().getWrap(), DoNotWrap);
+                break;
+            case ANNOTATION_ARGUMENTS:
+                closeOnNewLine = evaluate(() -> style.getAnnotationParameters().getCloseNewLine(), false);
+                wrap = evaluate(() -> style.getAnnotationParameters().getWrap(), DoNotWrap);
                 break;
         }
 
@@ -795,6 +807,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 return evaluate(() -> style.getThrowsList().getAlignWhenMultiline(), false);
             case NEW_ARRAY_INITIALIZER:
                 return evaluate(() -> style.getArrayInitializer().getAlignWhenMultiline(), false);
+            case ANNOTATION_ARGUMENTS:
+                return evaluate(() -> style.getAnnotationParameters().getAlignWhenMultiline(), false);
         }
         return false;
     }
