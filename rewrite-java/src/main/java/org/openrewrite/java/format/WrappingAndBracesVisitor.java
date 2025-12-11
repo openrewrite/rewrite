@@ -86,16 +86,35 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 if (sourceFile != null) {
                     SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
-                    if (index != 0 && !opensOnNewLine(loc) && alignWhenMultiline(loc)) {
-                        int startColumn = positionService.positionOf(getCursor(), container.getElements().get(0)).getStartColumn();
-                        right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", startColumn - 1)))); //since position is index-1-based
-                    } else {
-                        Cursor newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        int column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                        right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column))));
+                    boolean alignWhenMultiline = alignWhenMultiline(loc);
+                    switch (loc) {
+                        case THROWS:
+                            if (alignWhenMultiline && before.getLastWhitespace().contains("\n")) {
+                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), before.getLastWhitespace())));
+                            } else if (before.getLastWhitespace().contains("\n")) {
+                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), before.getLastWhitespace() + StringUtils.repeat(" ", tabsAndIndentsStyle.getContinuationIndent()))));
+                            } else if (alignWhenMultiline) {
+                                int column = positionService.positionOf(getCursor()).getStartColumn();
+                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column - 8)))); //since position is index-1-based AND we have to align to the "throws" keyword + its suffix space = 1 + 7
+                            } else {
+                                Cursor newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
+                                int column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
+                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column))));
+                            }
+                            break;
+                        default:
+                            if (index != 0 && !opensOnNewLine(loc) && alignWhenMultiline) {
+                                int column = positionService.positionOf(getCursor(), container.getElements().get(0)).getStartColumn();
+                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column - 1)))); //since position is index-1-based
+                            } else {
+                                Cursor newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
+                                int column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
+                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column))));
+                            }
+                            break;
                     }
                 }
-            } else if (right.getElement().getPrefix().getWhitespace().contains("\n")) {
+            } else if (right.getElement().getPrefix().getLastWhitespace().contains("\n")) {
                 right = right.withElement(jElement.withPrefix(withWhitespaceSkipComments(jElement.getPrefix(), "")));
             }
             right = closeOnNewLine(index, size, right, loc);
@@ -325,12 +344,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     wrap = evaluate(() -> style.getExtendsImplementsPermitsKeyword().getWrap(), DoNotWrap);
                     if (evaluate(wrap, w -> w == WrapIfTooLong, false) || wrap == WrapAlways) {
                         newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        if (evaluate(wrap, w -> w == WrapIfTooLong, false)) {
+                        if (wrap != WrapAlways && evaluate(wrap, w -> w == WrapIfTooLong, false)) {
                             isLong = sourceFile.service(SourcePositionService.class).positionOf(newLinedCursorElement, ((J.ClassDeclaration) getCursor().getParentTreeCursor().getValue()).getBody()).getStartColumn() >= style.getHardWrapAt();
                         }
                         if (isLong || wrap == WrapAlways) {
                             column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                            space = withWhitespace(space, StringUtils.repeat(" ", column));
+                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", column));
                         }
                     }
                     break;
@@ -444,6 +463,22 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                         space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
                     }
                     break;
+                case THROWS:
+                    wrap = evaluate(() -> style.getThrowsKeyword().getWrap(), DoNotWrap);
+                    if (evaluate(wrap, w -> w == WrapIfTooLong, false) || wrap == WrapAlways) {
+                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
+                        if (wrap != WrapAlways && ((J.MethodDeclaration) getCursor().getParentTreeCursor().getValue()).getBody() != null && evaluate(wrap, w -> w == WrapIfTooLong, false)) {
+                            isLong = sourceFile.service(SourcePositionService.class).positionOf(newLinedCursorElement, ((J.MethodDeclaration) getCursor().getParentTreeCursor().getValue()).getBody()).getStartColumn() >= style.getHardWrapAt();
+                        }
+                        if (isLong || wrap == WrapAlways) {
+                            column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length();
+                            if (!evaluate(() -> style.getThrowsList().getAlignThrowsToMethodStart(), false)) {
+                                column += tabsAndIndentsStyle.getContinuationIndent();
+                            }
+                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", column));
+                        }
+                    }
+                    break;
                 default:
                     if (getCursor().getValue() instanceof TypeTree && Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.positionOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
@@ -457,7 +492,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.EnumValue visitEnumValue(J.EnumValue _enum, P p) {
         J.EnumValue enumValue = super.visitEnumValue(_enum, p);
-        String whitespace = enumValue.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
+        String whitespace = enumValue.getPrefix().getLastWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
         enumValue = enumValue.withAnnotations(wrapAnnotations(enumValue.getAnnotations(), whitespace, style.getEnumFieldAnnotations()));
         if (!enumValue.getAnnotations().isEmpty() && style.getEnumFieldAnnotations() != null) {
             enumValue = enumValue.withName(enumValue.getName().withPrefix(wrapElement(enumValue.getName().getPrefix(), whitespace, style.getEnumFieldAnnotations())));
@@ -486,8 +521,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             return annotations;
         }
         return ListUtils.map(annotations, (index, ann) -> {
-            if (annotationsStyle.getWrap() == DoNotWrap && hasLineBreak(ann.getPrefix().getWhitespace())) {
-                ann = ann.withPrefix(ann.getPrefix().withWhitespace(Space.SINGLE_SPACE.getWhitespace()));
+            if (annotationsStyle.getWrap() == DoNotWrap && hasLineBreak(ann.getPrefix().getLastWhitespace())) {
+                ann = ann.withPrefix(ann.getPrefix().withWhitespace(Space.SINGLE_SPACE.getLastWhitespace()));
             } else if (annotationsStyle.getWrap() == WrapAlways && index > 0) {
                 ann = ann.withPrefix(ann.getPrefix().withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace));
             }
@@ -497,8 +532,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     private Space wrapElement(Space prefix, String whitespace, WrappingAndBracesStyle.@Nullable Annotations annotationsStyle) {
         if (prefix.getComments().isEmpty() && annotationsStyle != null) {
-            if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
-                return prefix.withWhitespace(Space.SINGLE_SPACE.getWhitespace());
+            if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getLastWhitespace()) || prefix.isEmpty())) {
+                return prefix.withWhitespace(Space.SINGLE_SPACE.getLastWhitespace());
             }
             if (annotationsStyle.getWrap() == WrapAlways) {
                 return prefix.withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace);
@@ -550,6 +585,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
         LineWrapSetting wrap = null;
         boolean openNewLine = false;
+        int minSizeForWrap = 1;
         switch (location) {
             case METHOD_DECLARATION_PARAMETERS:
                 if (index == 0) {
@@ -580,12 +616,17 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 }
                 wrap = evaluate(() -> style.getTryWithResources().getWrap(), DoNotWrap);
                 break;
+            case THROWS:
+                wrap = evaluate(() -> style.getThrowsList().getWrap(), DoNotWrap);
+                openNewLine = true;
+                minSizeForWrap = 0;
+                break;
         }
         JavaSourceFile sourceFile;
         if (wrap != null) {
             switch (wrap) {
                 case WrapAlways:
-                    if (size <= 1) {
+                    if (size <= minSizeForWrap) {
                         return false;
                     }
                     if (index == 0) {
@@ -732,6 +773,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 return evaluate(() -> style.getExtendsImplementsPermitsList().getAlignWhenMultiline(), false);
             case TRY_RESOURCES:
                 return evaluate(() -> style.getTryWithResources().getAlignWhenMultiline(), true);
+            case THROWS:
+                return evaluate(() -> style.getThrowsList().getAlignWhenMultiline(), false);
         }
         return false;
     }

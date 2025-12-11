@@ -515,9 +515,15 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case IMPLEMENTS:
                 case THROWS:
                 case NEW_CLASS_ARGUMENTS:
-                    before = indentTo(container.getBefore(), indent + style.getContinuationIndent(), loc.getBeforeLocation());
-                    getCursor().putMessage("indentType", IndentType.ALIGN);
-                    getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    if (loc != JContainer.Location.THROWS || !evaluate(() -> wrappingStyle.getThrowsList().getAlignThrowsToMethodStart(), false)) {
+                        before = indentTo(container.getBefore(), indent + style.getContinuationIndent(), loc.getBeforeLocation());
+                        getCursor().putMessage("indentType", IndentType.ALIGN);
+                        getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    } else {
+                        before = indentTo(container.getBefore(), indent, loc.getBeforeLocation());
+                        getCursor().putMessage("indentType", IndentType.ALIGN);
+                        getCursor().putMessage("lastIndent", indent);
+                    }
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
                     break;
                 default:
@@ -530,7 +536,23 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case METHOD_INVOCATION_ARGUMENTS:
                 case NEW_CLASS_ARGUMENTS:
                 case TYPE_PARAMETERS:
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                    before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
+                    break;
                 case THROWS:
+                    if (alignWhenMultiple(loc.getElementLocation())) {
+                        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                        try {
+                            int alignTo = sourceFile.service(SourcePositionService.class).positionOf(getCursor().getParentTreeCursor(), ((J.MethodDeclaration) getCursor().getParentTreeCursor().getValue()).getPadding().getParameters()).getEndColumn() + 1; // count the closing parenthesis
+                            before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+                            getCursor().putMessage("indentType", IndentType.ALIGN);
+                            getCursor().putMessage("lastIndent", alignTo);
+                            js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
+                            break;
+                        } catch (UnsupportedOperationException ignored) {
+                        }
+                    }
                     getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
                     before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
@@ -567,6 +589,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 //noinspection ConstantConditions
                 isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getTryWithResources() != null && wrappingStyle.getTryWithResources().getAlignWhenMultiline();
                 intelliJDefault = true;
+                break;
+            case THROWS:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getThrowsList() != null && wrappingStyle.getThrowsList().getAlignWhenMultiline();
+                intelliJDefault = false;
                 break;
             default:
                 isAlignedWhenMultipleFromStyle = () -> null;
@@ -822,6 +849,15 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         ALIGN,
         INDENT,
         CONTINUATION_INDENT
+    }
+
+    private <T> T evaluate(Supplier<T> supplier, T defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError | NoSuchFieldError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
     }
 
     @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")

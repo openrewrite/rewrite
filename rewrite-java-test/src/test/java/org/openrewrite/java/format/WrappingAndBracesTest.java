@@ -37,6 +37,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.style.LineWrapSetting.WrapAlways;
+import static org.openrewrite.style.LineWrapSetting.WrapIfTooLong;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class WrappingAndBracesTest implements RewriteTest {
@@ -1748,6 +1749,252 @@ class WrappingAndBracesTest implements RewriteTest {
                       } finally {
                           System.out.println("finally");
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsKeyword() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test()
+                          throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsKeywordIfLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapIfTooLong))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void testNameWhichIsRealyTooLongForThisLimitOf120SoThatTheMethodsThrowListWillBeTooLong() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+
+                  void test() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void testNameWhichIsRealyTooLongForThisLimitOf120SoThatTheMethodsThrowListWillBeTooLong()
+                          throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+
+                  void test() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alignThrowsToMethodStart() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withThrowsList(wrap.getThrowsList().withAlignThrowsToMethodStart(true))
+              .withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test()
+                  throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsListAlways() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws FileNotFoundException, IOException, RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws
+                          FileNotFoundException,
+                          IOException,
+                          RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsListAlwaysAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws FileNotFoundException, IOException, RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws
+                              FileNotFoundException,
+                              IOException,
+                              RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsListIfLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapIfTooLong))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void testNameWhichIsReallyWayTooLongForThisLimitOf120SoWraps() throws FileNotFoundException, IOException, RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+
+                  void test() throws FileNotFoundException, IOException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void testNameWhichIsReallyWayTooLongForThisLimitOf120SoWraps() throws
+                          FileNotFoundException,
+                          IOException,
+                          RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+
+                  void test() throws FileNotFoundException, IOException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsListWithThrowsKeywordWrap() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapAlways))
+              .withThrowsList(wrap.getThrowsList().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws FileNotFoundException, IOException, RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test()
+                          throws
+                          FileNotFoundException,
+                          IOException,
+                          RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
                   }
               }
               """

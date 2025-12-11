@@ -34,9 +34,9 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Nullable
     ExtendsImplementsPermitsKeyword extendsImplementsPermitsKeyword;
     @Nullable
-    ThrowsList throwsList; // Not yet implemented
+    ThrowsList throwsList;
     @Nullable
-    ThrowsKeyword throwsKeyword; // Not yet implemented
+    ThrowsKeyword throwsKeyword;
     @Nullable
     MethodDeclarationParameters methodDeclarationParameters;
     @Nullable
@@ -149,7 +149,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
         @Nullable
         Boolean alignWhenMultiline;
         @Nullable
-        Boolean alignToMethodStart;
+        Boolean alignThrowsToMethodStart;
     }
 
     @Value
