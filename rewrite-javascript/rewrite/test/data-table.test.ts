@@ -55,7 +55,7 @@ describe("CsvDataTableStore", () => {
         fs.rmSync(tmpDir, {recursive: true, force: true});
     });
 
-    test("writes CSV file with header, description, and data rows", () => {
+    test("writes CSV file with header and data rows", () => {
         const store = new CsvDataTableStore(tmpDir);
         const ctx = new ExecutionContext();
         ctx.messages[DATA_TABLE_STORE] = store;
@@ -75,11 +75,9 @@ describe("CsvDataTableStore", () => {
 
         // Header row
         expect(lines[0]).toBe('Source Path,Text');
-        // Description row
-        expect(lines[1]).toBe('The path of the file that was changed.,The text that was replaced.');
         // Data rows
-        expect(lines[2]).toBe('src/foo.ts,old text');
-        expect(lines[3]).toBe('src/bar.ts,another');
+        expect(lines[1]).toBe('src/foo.ts,old text');
+        expect(lines[2]).toBe('src/bar.ts,another');
     });
 
     test("escapes values containing commas", () => {
@@ -95,7 +93,7 @@ describe("CsvDataTableStore", () => {
         const content = fs.readFileSync(csvPath, 'utf8');
         const lines = content.split('\n');
 
-        expect(lines[2]).toBe('src/file.ts,"hello, world"');
+        expect(lines[1]).toBe('src/file.ts,"hello, world"');
     });
 
     test("escapes values containing quotes", () => {
@@ -111,7 +109,7 @@ describe("CsvDataTableStore", () => {
         const content = fs.readFileSync(csvPath, 'utf8');
         const lines = content.split('\n');
 
-        expect(lines[2]).toBe('src/file.ts,"say ""hello"""');
+        expect(lines[1]).toBe('src/file.ts,"say ""hello"""');
     });
 
     test("escapes values containing newlines", () => {

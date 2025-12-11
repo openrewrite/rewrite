@@ -144,16 +144,15 @@ export class CsvDataTableStore implements DataTableStore {
         const tableName = descriptor.name;
         const csvPath = path.join(this.outputDir, tableName + '.csv');
 
-        // Write header rows on first insert for this table
+        // Write header row on first insert for this table
         if (!this._initializedTables.has(tableName)) {
             this._initializedTables.add(tableName);
             this._rowCounts[tableName] = 0;
 
             const columns = descriptor.columns;
             const headerRow = columns.map(col => escapeCsv(col.displayName)).join(',');
-            const descriptionRow = columns.map(col => escapeCsv(col.description)).join(',');
 
-            fs.writeFileSync(csvPath, headerRow + '\n' + descriptionRow + '\n');
+            fs.writeFileSync(csvPath, headerRow + '\n');
         }
 
         // Write the data row
