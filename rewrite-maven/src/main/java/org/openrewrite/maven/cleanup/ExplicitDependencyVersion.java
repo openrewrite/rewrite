@@ -48,8 +48,8 @@ public class ExplicitDependencyVersion extends Recipe {
                 if (isDependencyTag() || isManagedDependencyTag()) {
                     String versionValue = t.getChildValue("version").orElse(null);
                     if ("LATEST".equals(versionValue) || "RELEASE".equals(versionValue)) {
-                        String groupId = t.getChildValue("groupId").orElse(null);
-                        String artifactId = t.getChildValue("artifactId").orElse(null);
+                        String groupId = getResolutionResult().getPom().getValue(t.getChildValue("groupId").orElse(null));
+                        String artifactId = getResolutionResult().getPom().getValue(t.getChildValue("artifactId").orElse(null));
                         if (groupId != null && artifactId != null) {
                             try {
                                 String newerVersion = MavenDependency.findNewerVersion(
