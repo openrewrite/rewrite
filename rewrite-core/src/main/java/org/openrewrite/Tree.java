@@ -83,27 +83,22 @@ public interface Tree {
         this.<P>printer(cursor).visit(this, out, cursor);
 
         // Restore BOM if the source file originally had one
-        restoreBOM(out.out);
-
-        return out.getOut();
-    }
-
-    default void restoreBOM(StringBuilder out) {
         if (this instanceof SourceFile &&
             !(this instanceof Quark) &&
             !(this instanceof Binary)) {
             SourceFile sourceFile = (SourceFile) this;
             try {
-                if (sourceFile.isCharsetBomMarked()) {
-                    if (out.length() > 0 &&
-                        out.charAt(0) != '\uFEFF') {
-                        out.insert(0, '\uFEFF');
-                    }
+                if (sourceFile.isCharsetBomMarked() &&
+                        out.out.length() > 0 &&
+                        out.out.charAt(0) != '\uFEFF') {
+                    out.out.insert(0, '\uFEFF');
                 }
             } catch (UnsupportedOperationException e) {
                 // Defensive fallback for any other SourceFile implementations that don't support charset operations
             }
         }
+
+        return out.getOut();
     }
 
     default String print(TreeVisitor<?, PrintOutputCapture<Integer>> printer) {

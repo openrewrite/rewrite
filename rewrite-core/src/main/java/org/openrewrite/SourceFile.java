@@ -16,7 +16,9 @@
 package org.openrewrite;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.binary.Binary;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.style.Style;
 
 import java.nio.charset.Charset;
@@ -46,10 +48,14 @@ public interface SourceFile extends Tree {
         }
 
         // Restore BOM if the source file originally had one
-        if (isCharsetBomMarked()) {
-            StringBuilder restoredInput = new StringBuilder(readFromInput);
-            restoreBOM(restoredInput);
-            readFromInput = restoredInput.toString();
+        if (isCharsetBomMarked() && !(this instanceof Quark) && !(this instanceof Binary)) {
+            try {
+                if (!readFromInput.isEmpty() && readFromInput.charAt(0) != '\uFEFF') {
+                    readFromInput = '\uFEFF' + readFromInput;
+                }
+            } catch (UnsupportedOperationException e) {
+                // Defensive fallback for any other SourceFile implementations that don't support charset operations
+            }
         }
 
         return printed.equals(readFromInput);
