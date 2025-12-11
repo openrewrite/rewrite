@@ -336,20 +336,10 @@ export class PackageJsonParser extends Parser {
 
     /**
      * Parses JSONC (JSON with Comments and trailing commas) content.
-     *
-     * Note: This is a simple regex-based approach that works for bun.lock files but doesn't
-     * handle edge cases like comment-like sequences inside strings (e.g., "// not a comment").
-     * For lock files this is acceptable since they don't contain such patterns. If broader
-     * JSONC support is needed, consider using a proper parser like `jsonc-parser`.
      */
     private parseJsonc(content: string): Record<string, any> {
-        // Remove single-line comments (// ...)
-        let stripped = content.replace(/\/\/.*$/gm, '');
-        // Remove multi-line comments (/* ... */)
-        stripped = stripped.replace(/\/\*[\s\S]*?\*\//g, '');
-        // Remove trailing commas before ] or }
-        stripped = stripped.replace(/,(\s*[}\]])/g, '$1');
-        return JSON.parse(stripped);
+        const {parse} = require('jsonc-parser');
+        return parse(content);
     }
 
     /**
