@@ -533,9 +533,21 @@ export async function runInstallInTempDir(
         });
 
         if (!result.success) {
+            // Combine error message with stderr for more useful diagnostics
+            const errorParts: string[] = [];
+            if (result.error) {
+                errorParts.push(result.error);
+            }
+            if (result.stderr) {
+                // Trim and limit stderr to avoid excessively long error messages
+                const stderr = result.stderr.trim();
+                if (stderr) {
+                    errorParts.push(stderr.length > 2000 ? stderr.slice(0, 2000) + '...' : stderr);
+                }
+            }
             return {
                 success: false,
-                error: result.error || result.stderr || 'Unknown error'
+                error: errorParts.length > 0 ? errorParts.join('\n\n') : 'Unknown error'
             };
         }
 
