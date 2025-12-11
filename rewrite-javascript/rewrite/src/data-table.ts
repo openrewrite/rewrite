@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import * as fs from 'fs';
+import * as path from 'path';
 import {ExecutionContext} from "./execution";
 import {OptionDescriptor} from "./recipe";
 
-const DATA_TABLE_STORE = Symbol("org.openrewrite.dataTables.store");
-const COLUMNS_KEY = Symbol("org.openrewrite.dataTables.columns");
+export const DATA_TABLE_STORE = Symbol.for("org.openrewrite.dataTables.store");
+const COLUMNS_KEY = Symbol.for("org.openrewrite.dataTables.columns");
 
 export function Column(descriptor: ColumnDescriptor) {
     return function (target: any, propertyKey: string) {
@@ -102,4 +104,83 @@ export interface DataTableDescriptor {
 export interface ColumnDescriptor {
     displayName: string,
     description: string
+}
+
+/**
+ * Escape a value for CSV output following RFC 4180.
+ * Quotes the value if it contains commas, quotes, or newlines.
+ */
+function escapeCsv(value: unknown): string {
+    if (value === null || value === undefined) {
+        return '""';
+    }
+    const str = String(value);
+    // If the value contains comma, quote, or newline, wrap in quotes and escape internal quotes
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+}
+
+/**
+ * A DataTableStore that writes rows directly to CSV files as they are inserted.
+ */
+export class CsvDataTableStore implements DataTableStore {
+    private _acceptRows = false;
+    private readonly _initializedTables = new Set<string>();
+    private readonly _rowCounts: { [dataTable: string]: number } = {};
+
+    constructor(private readonly outputDir: string) {
+        // Ensure output directory exists
+        fs.mkdirSync(outputDir, {recursive: true});
+    }
+
+    insertRow<Row>(dataTable: DataTable<Row>, _ctx: ExecutionContext, row: Row): void {
+        if (!this._acceptRows) {
+            return;
+        }
+
+        const descriptor = dataTable.descriptor;
+        const tableName = descriptor.name;
+        const csvPath = path.join(this.outputDir, tableName + '.csv');
+
+        // Write header rows on first insert for this table
+        if (!this._initializedTables.has(tableName)) {
+            this._initializedTables.add(tableName);
+            this._rowCounts[tableName] = 0;
+
+            const columns = descriptor.columns;
+            const headerRow = columns.map(col => escapeCsv(col.displayName)).join(',');
+            const descriptionRow = columns.map(col => escapeCsv(col.description)).join(',');
+
+            fs.writeFileSync(csvPath, headerRow + '\n' + descriptionRow + '\n');
+        }
+
+        // Write the data row
+        const columns = descriptor.columns;
+        const rowValues = columns.map(col => {
+            const value = (row as any)[col.name];
+            return escapeCsv(value);
+        });
+        fs.appendFileSync(csvPath, rowValues.join(',') + '\n');
+        this._rowCounts[tableName]++;
+    }
+
+    acceptRows(accept: boolean): void {
+        this._acceptRows = accept;
+    }
+
+    /**
+     * Get the number of rows written for each data table.
+     */
+    get rowCounts(): { [dataTable: string]: number } {
+        return {...this._rowCounts};
+    }
+
+    /**
+     * Get the names of all data tables that have been written to.
+     */
+    get tableNames(): string[] {
+        return [...this._initializedTables];
+    }
 }

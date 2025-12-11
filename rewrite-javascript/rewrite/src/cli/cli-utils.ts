@@ -365,6 +365,12 @@ export async function discoverFiles(projectRoot: string, verbose: boolean = fals
             cwd: projectRoot,
             encoding: 'utf8'
         });
+        // Check if git command failed (not a git repository)
+        if (tracked.status !== 0 || tracked.error) {
+            // Not a git repository, fall back to recursive directory scan
+            await walkDirectory(projectRoot, files, ignoredFiles, projectRoot);
+            return files.filter(isAcceptedFile);
+        }
         if (tracked.stdout) {
             for (const line of tracked.stdout.split('\n')) {
                 if (line.trim()) {

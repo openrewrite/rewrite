@@ -21,6 +21,7 @@ import * as path from 'path';
 import {spawn} from 'child_process';
 import {Recipe, RecipeRegistry} from '../recipe';
 import {ExecutionContext} from '../execution';
+import {CsvDataTableStore, DATA_TABLE_STORE} from '../data-table';
 import {ProgressCallback, scheduleRunStreaming} from '../run';
 import {TreePrinters} from '../print';
 import {activate} from '../index';
@@ -145,6 +146,8 @@ interface CliOptions {
     option: string[];
     verbose: boolean;
     debug: boolean;
+    dataTables?: string;
+    dataTablesOnly: boolean;
 }
 
 /**
@@ -184,6 +187,8 @@ async function main() {
         .option('-o, --option <option...>', 'Recipe options in format "key=value"', [])
         .option('-v, --verbose', 'Enable verbose output', false)
         .option('--debug', 'Start with Node.js debugger (--inspect-brk)', false)
+        .option('--data-tables <dir>', 'Export data tables as CSV files to this directory')
+        .option('--data-tables-only', 'Only output data tables, skip source file diffs', false)
         .parse();
 
     const recipeArg = program.args[0];
@@ -377,8 +382,18 @@ async function main() {
     // Run the recipe with streaming output - for non-scanning recipes,
     // parsing and processing happen concurrently without collecting all files first
     const ctx = new ExecutionContext();
+
+    // Set up data table store if requested
+    let csvDataTableStore: CsvDataTableStore | undefined;
+    if (opts.dataTables) {
+        csvDataTableStore = new CsvDataTableStore(opts.dataTables);
+        csvDataTableStore.acceptRows(true);
+        ctx.messages[DATA_TABLE_STORE] = csvDataTableStore;
+    }
+
     let changeCount = 0;
     let processedCount = 0;
+    const skipSourceOutput = opts.dataTablesOnly;
 
     // Progress callback for spinner updates during all phases (disabled in verbose mode)
     const onProgress: ProgressCallback | undefined = opts.verbose ? undefined : (phase, current, total, sourcePath) => {
@@ -414,23 +429,27 @@ async function main() {
                 await fsp.writeFile(filePath, content);
 
                 changeCount++;
-                if (!opts.verbose) spinner.stop();
-                const displayPath = toCwdRelative(result.after.sourcePath, projectRoot);
-                if (result.before) {
-                    console.log(`  Modified: ${displayPath}`);
-                } else {
-                    console.log(`  Created: ${displayPath}`);
+                if (!skipSourceOutput) {
+                    if (!opts.verbose) spinner.stop();
+                    const displayPath = toCwdRelative(result.after.sourcePath, projectRoot);
+                    if (result.before) {
+                        console.log(`  Modified: ${displayPath}`);
+                    } else {
+                        console.log(`  Created: ${displayPath}`);
+                    }
+                    if (!opts.verbose) spinner.start(statusMsg);
                 }
-                if (!opts.verbose) spinner.start(statusMsg);
             } else if (result.before) {
                 const filePath = path.join(projectRoot, result.before.sourcePath);
                 await fsp.unlink(filePath);
                 changeCount++;
-                if (!opts.verbose) spinner.stop();
-                console.log(`  Deleted: ${toCwdRelative(result.before.sourcePath, projectRoot)}`);
-                if (!opts.verbose) spinner.start(statusMsg);
+                if (!skipSourceOutput) {
+                    if (!opts.verbose) spinner.stop();
+                    console.log(`  Deleted: ${toCwdRelative(result.before.sourcePath, projectRoot)}`);
+                    if (!opts.verbose) spinner.start(statusMsg);
+                }
             }
-        } else {
+        } else if (!skipSourceOutput) {
             // Dry-run mode: show diff or just list paths
             const diff = await result.diff();
             const hasChanges = diff.split('\n').some(line =>
@@ -466,12 +485,29 @@ async function main() {
         process.exit(recipe.hasErrors ? 1 : 0);
     }
 
-    if (changeCount === 0) {
-        console.log('No changes to make.');
-    } else if (opts.apply) {
-        console.log(`\n${changeCount} file(s) changed.`);
-    } else if (!opts.list) {
-        console.log(`\n${changeCount} file(s) would be changed. Run with --apply to apply changes.`);
+    // Report on data tables if any were written
+    if (csvDataTableStore) {
+        const tableNames = csvDataTableStore.tableNames;
+        const rowCounts = csvDataTableStore.rowCounts;
+        if (tableNames.length > 0) {
+            console.log(`\nData tables written to ${opts.dataTables}:`);
+            for (const name of tableNames) {
+                console.log(`  ${name}.csv (${rowCounts[name]} rows)`);
+            }
+        } else if (opts.dataTablesOnly) {
+            console.log('No data tables produced.');
+        }
+    }
+
+    // Report on source file changes (unless --data-tables-only)
+    if (!skipSourceOutput) {
+        if (changeCount === 0) {
+            console.log('No changes to make.');
+        } else if (opts.apply) {
+            console.log(`\n${changeCount} file(s) changed.`);
+        } else if (!opts.list) {
+            console.log(`\n${changeCount} file(s) would be changed. Run with --apply to apply changes.`);
+        }
     }
 }
 
