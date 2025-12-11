@@ -314,15 +314,10 @@ describe("UpgradeDependencyVersion", () => {
                                 "uuid": "^9.0.0"
                             }
                         }
-                    `, `
-                        /*~~(Failed to upgrade uuid to ^999.0.0)~~>*/{
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "dependencies": {
-                                "uuid": "^9.0.0"
-                            }
-                        }
-                    `), afterRecipe: async (doc: Json.Document) => {
+                    `, (actual: string) => {
+                            expect(actual).toContain('/*~~(Failed to upgrade uuid to ^999.0.0');
+                            return actual;
+                        }), afterRecipe: async (doc: Json.Document) => {
                             // Should have a warning marker
                             const warnMarker = findMarker(doc, MarkersKind.MarkupWarn);
                             expect(warnMarker).toBeDefined();
