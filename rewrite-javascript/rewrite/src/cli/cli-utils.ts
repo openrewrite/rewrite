@@ -21,6 +21,7 @@ import {Recipe, RecipeRegistry} from '../recipe';
 import {SourceFile} from '../tree';
 import {JavaScriptParser, PackageJsonParser} from '../javascript';
 import {JsonParser} from '../json';
+import {PlainTextParser} from '../text';
 
 // ANSI color codes
 const colors = {
@@ -441,10 +442,26 @@ export async function walkDirectory(
 }
 
 /**
+ * Lock file names that should be parsed as JSON/JSONC
+ */
+const JSON_LOCK_FILE_NAMES = ['bun.lock', 'package-lock.json'];
+
+/**
+ * Lock file names that should be parsed as plain text (YAML or custom formats)
+ */
+const TEXT_LOCK_FILE_NAMES = ['yarn.lock', 'pnpm-lock.yaml'];
+
+/**
+ * All lock file names
+ */
+const ALL_LOCK_FILE_NAMES = [...JSON_LOCK_FILE_NAMES, ...TEXT_LOCK_FILE_NAMES];
+
+/**
  * Check if a file is accepted for parsing based on its extension
  */
 export function isAcceptedFile(filePath: string): boolean {
     const ext = path.extname(filePath).toLowerCase();
+    const basename = path.basename(filePath);
 
     // JavaScript/TypeScript files
     if (['.js', '.jsx', '.ts', '.tsx', '.mjs', '.mts', '.cjs', '.cts'].includes(ext)) {
@@ -453,6 +470,11 @@ export function isAcceptedFile(filePath: string): boolean {
 
     // JSON files (including package.json which gets special parsing)
     if (ext === '.json') {
+        return true;
+    }
+
+    // Lock files
+    if (ALL_LOCK_FILE_NAMES.includes(basename)) {
         return true;
     }
 
@@ -483,6 +505,8 @@ export async function* parseFilesStreaming(
     const jsFiles: string[] = [];
     const packageJsonFiles: string[] = [];
     const jsonFiles: string[] = [];
+    const jsonLockFiles: string[] = [];
+    const textLockFiles: string[] = [];
 
     for (const filePath of filePaths) {
         const basename = path.basename(filePath);
@@ -492,6 +516,10 @@ export async function* parseFilesStreaming(
             packageJsonFiles.push(filePath);
         } else if (['.js', '.jsx', '.ts', '.tsx', '.mjs', '.mts', '.cjs', '.cts'].includes(ext)) {
             jsFiles.push(filePath);
+        } else if (JSON_LOCK_FILE_NAMES.includes(basename)) {
+            jsonLockFiles.push(filePath);
+        } else if (TEXT_LOCK_FILE_NAMES.includes(basename)) {
+            textLockFiles.push(filePath);
         } else if (ext === '.json') {
             jsonFiles.push(filePath);
         }
@@ -517,6 +545,32 @@ export async function* parseFilesStreaming(
         }
         const pkgParser = new PackageJsonParser({relativeTo: projectRoot});
         for await (const sf of pkgParser.parse(...packageJsonFiles)) {
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
+            yield sf;
+        }
+    }
+
+    // Parse JSON lock files (bun.lock, package-lock.json) - these are JSON/JSONC format
+    if (jsonLockFiles.length > 0) {
+        if (verbose) {
+            console.log(`Parsing ${jsonLockFiles.length} JSON lock files...`);
+        }
+        const jsonParser = new JsonParser({relativeTo: projectRoot});
+        for await (const sf of jsonParser.parse(...jsonLockFiles)) {
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
+            yield sf;
+        }
+    }
+
+    // Parse text lock files (yarn.lock, pnpm-lock.yaml) - these are YAML or custom formats
+    if (textLockFiles.length > 0) {
+        if (verbose) {
+            console.log(`Parsing ${textLockFiles.length} text lock files...`);
+        }
+        const textParser = new PlainTextParser({relativeTo: projectRoot});
+        for await (const sf of textParser.parse(...textLockFiles)) {
             current++;
             onProgress?.(current, total, sf.sourcePath);
             yield sf;
