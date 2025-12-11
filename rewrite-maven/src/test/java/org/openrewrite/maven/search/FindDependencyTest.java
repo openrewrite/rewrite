@@ -339,12 +339,10 @@ class FindDependencyTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "LATEST",
-      "RELEASE",
       "=LATEST",
-      "=RELEASE"
+      "=RELEASE",
     })
-    void findExactString(String version) {
+    void exactVersionString(String version) {
         rewriteRun(
           spec -> spec.recipe(new FindDependency("*", "*", version, null)),
           pomXml(
@@ -386,6 +384,59 @@ class FindDependencyTest implements RewriteTest {
                       <artifactId>javax.servlet-api</artifactId>
                       <!-- Final release not found -->
                       <version>4.0.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """.formatted(version.replace("=", ""))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "LATEST",
+      "RELEASE",
+    })
+    void resolvedVersionString(String version) {
+        rewriteRun(
+          spec -> spec.recipe(new FindDependency("*", "*", version, null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>javax.annotation</groupId>
+                      <artifactId>javax.annotation-api</artifactId>
+                      <version>%s</version>
+                  </dependency>
+                  <dependency>
+                      <groupId>javax.servlet</groupId>
+                      <artifactId>javax.servlet-api</artifactId>
+                      <version>3.1.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """.formatted(version.replace("=", "")),
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <!--~~>--><dependency>
+                      <groupId>javax.annotation</groupId>
+                      <artifactId>javax.annotation-api</artifactId>
+                      <version>%s</version>
+                  </dependency>
+                  <!--~~>--><dependency>
+                      <groupId>javax.servlet</groupId>
+                      <artifactId>javax.servlet-api</artifactId>
+                      <version>3.1.0</version>
                   </dependency>
                 </dependencies>
               </project>

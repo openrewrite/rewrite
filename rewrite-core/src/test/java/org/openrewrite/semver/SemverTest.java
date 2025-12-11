@@ -83,13 +83,22 @@ class SemverTest {
 
     @Test
     void mavenExactVersionString() {
+        // Exactly LATEST
         VersionComparator isLatest = Semver.validate("=LATEST", null).getValue();
         assertThat(isLatest).isInstanceOf(ExactVersion.class);
         assertThat(isLatest.isValid(null, "LATEST")).isTrue();
+        // Resolved LATEST
+        isLatest = Semver.validate("LATEST", null).getValue();
+        assertThat(isLatest).isInstanceOf(LatestIntegration.class);
+        assertThat(isLatest.isValid(null, "LATEST")).isFalse();
 
-        // Without '=' should also be treated as exact match
-        VersionComparator isRelease = Semver.validate("RELEASE", null).getValue();
+        // Exactly RELEASE
+        VersionComparator isRelease = Semver.validate("=RELEASE", null).getValue();
         assertThat(isRelease).isInstanceOf(ExactVersion.class);
         assertThat(isRelease.isValid(null, "RELEASE")).isTrue();
+        // Resolved RELEASE
+        isRelease = Semver.validate("RELEASE", null).getValue();
+        assertThat(isRelease).isInstanceOf(LatestRelease.class);
+        assertThat(isRelease.isValid(null, "RELEASE")).isFalse();
     }
 }
