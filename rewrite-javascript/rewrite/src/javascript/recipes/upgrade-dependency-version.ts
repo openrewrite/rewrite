@@ -23,7 +23,6 @@ import {
     DependencyScope,
     findNodeResolutionResult,
     Npmrc,
-    NpmrcScope,
     PackageManager
 } from "../node-resolution-result";
 import * as path from "path";
@@ -34,6 +33,7 @@ import {
     createDependencyRecipeAccumulator,
     DependencyRecipeAccumulator,
     getUpdatedLockFileContent,
+    parseNpmrcScopes,
     runInstallIfNeeded,
     runInstallInTempDir,
     storeInstallResult,
@@ -283,23 +283,6 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     }
 
     /**
-     * Converts string scope names to NpmrcScope enum values.
-     */
-    private parseNpmrcScopes(scopes?: string[]): NpmrcScope[] | undefined {
-        if (!scopes || scopes.length === 0) {
-            return undefined; // Use default (Project only)
-        }
-        const scopeMap: Record<string, NpmrcScope> = {
-            'Global': NpmrcScope.Global,
-            'User': NpmrcScope.User,
-            'Project': NpmrcScope.Project
-        };
-        return scopes
-            .filter(s => s in scopeMap)
-            .map(s => scopeMap[s]);
-    }
-
-    /**
      * Runs the package manager in a temporary directory to update the lock file.
      * Writes a modified package.json with the new version, then runs install to update the lock file.
      */
@@ -321,7 +304,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             modifiedPackageJson,
             {
                 npmrcConfigs: updateInfo.npmrcConfigs,
-                npmrcScopes: this.parseNpmrcScopes(this.npmrcScopes)
+                npmrcScopes: parseNpmrcScopes(this.npmrcScopes)
             }
         );
 

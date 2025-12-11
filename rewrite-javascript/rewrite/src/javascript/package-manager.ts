@@ -468,6 +468,27 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
 }
 
 /**
+ * Converts string scope names to NpmrcScope enum values.
+ * Shared helper for dependency recipes that accept npmrcScopes as string[].
+ *
+ * @param scopes Array of scope names (e.g., ["Global", "User", "Project"])
+ * @returns Array of NpmrcScope values, or undefined if input is empty/undefined
+ */
+export function parseNpmrcScopes(scopes?: string[]): NpmrcScope[] | undefined {
+    if (!scopes || scopes.length === 0) {
+        return undefined; // Use default (Project only)
+    }
+    const scopeMap: Record<string, NpmrcScope> = {
+        'Global': NpmrcScope.Global,
+        'User': NpmrcScope.User,
+        'Project': NpmrcScope.Project
+    };
+    return scopes
+        .filter(s => s in scopeMap)
+        .map(s => scopeMap[s]);
+}
+
+/**
  * Options for running install in a temporary directory.
  */
 export interface TempInstallOptions {
