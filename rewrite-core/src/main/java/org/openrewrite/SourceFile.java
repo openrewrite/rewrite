@@ -38,10 +38,21 @@ public interface SourceFile extends Tree {
     default boolean printEqualsInput(Parser.Input input, ExecutionContext ctx) {
         String printed = printAll();
         Charset charset = getCharset();
+        String readFromInput;
         if (charset != null) {
-            return printed.equals(StringUtils.readFully(input.getSource(ctx), charset));
+            readFromInput = StringUtils.readFully(input.getSource(ctx), charset);
+        } else {
+            readFromInput = StringUtils.readFully(input.getSource(ctx));
         }
-        return printed.equals(StringUtils.readFully(input.getSource(ctx)));
+
+        // Restore BOM if the source file originally had one
+        if (isCharsetBomMarked()) {
+            StringBuilder restoredInput = new StringBuilder(readFromInput);
+            restoreBOM(restoredInput);
+            readFromInput = restoredInput.toString();
+        }
+
+        return printed.equals(readFromInput);
     }
 
     /**
