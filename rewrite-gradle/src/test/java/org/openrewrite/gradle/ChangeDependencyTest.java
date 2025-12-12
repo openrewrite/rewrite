@@ -799,4 +799,59 @@ class ChangeDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void noDuplicateJacksonDatabindDependenciesInGradle() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipes(
+              new ChangeDependency(
+                "com.fasterxml.jackson.core",
+                "jackson-databind",
+                "tools.jackson.core",
+                null,
+                "3.0.x",
+                null,
+                null,
+                null
+              ),
+              new ChangeDependency(
+                "com.fasterxml.jackson.datatype",
+                "jackson-datatype-jsr310",
+                "tools.jackson.core",
+                "jackson-databind",
+                "3.0.x",
+                null,
+                null,
+                null
+              )
+            ),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("com.fasterxml.jackson.core:jackson-databind:2.19.0")
+                  implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.0")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("tools.jackson.core:jackson-databind:3.0.3")
+              }
+              """
+          )
+        );
+    }
 }
