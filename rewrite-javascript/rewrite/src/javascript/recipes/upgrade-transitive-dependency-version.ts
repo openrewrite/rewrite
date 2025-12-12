@@ -18,7 +18,6 @@ import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
 import {Json, JsonParser, JsonVisitor} from "../../json";
-import {Yaml} from "../../yaml";
 import {
     allDependencyScopes,
     findNodeResolutionResult,

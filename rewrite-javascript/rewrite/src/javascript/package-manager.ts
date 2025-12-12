@@ -121,6 +121,34 @@ const LOCK_FILE_DETECTION: ReadonlyArray<LockFileDetectionConfig> = [
 ];
 
 /**
+ * Lock file names that should be parsed as JSON/JSONC format.
+ */
+export const JSON_LOCK_FILE_NAMES = ['bun.lock', 'package-lock.json'] as const;
+
+/**
+ * Lock file names that should be parsed as YAML format.
+ */
+export const YAML_LOCK_FILE_NAMES = ['pnpm-lock.yaml'] as const;
+
+/**
+ * Lock file names that should be parsed as plain text (custom formats like yarn.lock v1).
+ * Note: yarn.lock for Yarn Berry (v2+) is actually YAML format and should be parsed as such.
+ * Use `getLockFileFormat` with content to determine the correct format for yarn.lock.
+ */
+export const TEXT_LOCK_FILE_NAMES = ['yarn.lock'] as const;
+
+/**
+ * Detects if a yarn.lock file is Yarn Berry (v2+) format based on content.
+ * Yarn Berry lock files contain a `__metadata:` key which is not present in Classic.
+ *
+ * @param content The yarn.lock file content
+ * @returns true if this is a Yarn Berry lock file (YAML format), false for Classic
+ */
+export function isYarnBerryLockFile(content: string): boolean {
+    return content.includes('__metadata:');
+}
+
+/**
  * Result of running a package manager command.
  */
 interface PackageManagerResult {
@@ -346,16 +374,31 @@ export function getUpdatedLockFileContent<T>(
 }
 
 /**
- * Determines the appropriate parser for a lock file based on its filename.
+ * Determines the appropriate parser for a lock file based on its filename and optionally content.
  *
- * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml", "package-lock.json")
+ * For yarn.lock files, the format depends on the Yarn version:
+ * - Yarn Classic (v1): Custom plain text format
+ * - Yarn Berry (v2+): YAML format
+ *
+ * If content is provided for yarn.lock, it will be used to detect the format.
+ * Otherwise, defaults to 'text' (Yarn Classic).
+ *
+ * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml", "package-lock.json", "yarn.lock")
+ * @param content Optional file content (used for yarn.lock format detection)
  * @returns 'yaml' for YAML lock files, 'json' for JSON lock files, 'text' for plain text
  */
-export function getLockFileFormat(lockFileName: string): 'yaml' | 'json' | 'text' {
-    if (lockFileName === 'pnpm-lock.yaml') {
+export function getLockFileFormat(lockFileName: string, content?: string): 'yaml' | 'json' | 'text' {
+    if ((YAML_LOCK_FILE_NAMES as readonly string[]).includes(lockFileName)) {
         return 'yaml';
     }
     if (lockFileName === 'yarn.lock') {
+        // Yarn Berry (v2+) uses YAML format, Classic uses custom text format
+        if (content && isYarnBerryLockFile(content)) {
+            return 'yaml';
+        }
+        return 'text';
+    }
+    if ((TEXT_LOCK_FILE_NAMES as readonly string[]).includes(lockFileName)) {
         return 'text';
     }
     // package-lock.json, bun.lock
@@ -366,9 +409,12 @@ export function getLockFileFormat(lockFileName: string): 'yaml' | 'json' | 'text
  * Re-parses updated lock file content using the appropriate parser.
  * This is used by dependency recipes to create the updated lock file SourceFile.
  *
+ * For yarn.lock files, the content is used to detect whether it's Yarn Berry (YAML)
+ * or Yarn Classic (plain text) format.
+ *
  * @param content The updated lock file content
  * @param sourcePath The source path of the lock file
- * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml")
+ * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml", "yarn.lock")
  * @returns The parsed SourceFile (Json.Document, Yaml.Documents, or PlainText)
  */
 export async function parseLockFileContent(
@@ -376,7 +422,8 @@ export async function parseLockFileContent(
     sourcePath: string,
     lockFileName: string
 ): Promise<SourceFile> {
-    const format = getLockFileFormat(lockFileName);
+    // Pass content to getLockFileFormat for yarn.lock detection
+    const format = getLockFileFormat(lockFileName, content);
 
     switch (format) {
         case 'yaml': {
