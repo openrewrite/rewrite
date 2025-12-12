@@ -320,6 +320,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return (JRightPadded<T>) super.visitRightPadded(wrappedRight, loc, p);
     }
 
+    @Override
     public Space visitSpace(@Nullable Space space, Space.Location loc, P p) {
         JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
         if (space != null && sourceFile != null) {
