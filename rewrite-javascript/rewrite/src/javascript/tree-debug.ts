@@ -268,9 +268,13 @@ export function findPropertyPath(cursor: Cursor | undefined, child?: any): strin
         return undefined;
     }
 
-    // If child is provided, use cursor.value as parent; otherwise use cursor.parent.value
+    // The child we're looking for
     const actualChild = child ?? cursor.value;
-    const parent = child ? cursor.value : cursor.parent?.value;
+
+    // Find the parent that should contain this child as a property.
+    // When child is explicitly provided (e.g., from visitRightPadded), cursor.value IS the parent.
+    // When child is not provided, we're looking for cursor.value in cursor.parent.value.
+    let parent = child ? cursor.value : cursor.parent?.value;
 
     if (!parent || typeof parent !== 'object') {
         return undefined;
@@ -279,16 +283,26 @@ export function findPropertyPath(cursor: Cursor | undefined, child?: any): strin
     // Properties to skip when searching
     const skipProps = new Set(['kind', 'id', 'prefix', 'markers', 'type', 'methodType', 'variableType', 'fieldType', 'constructorType']);
 
+    // Helper to compare elements - use id comparison for Tree nodes (handles immutability)
+    const sameElement = (a: any, b: any): boolean => {
+        if (a === b) return true;
+        // If both have 'id' property (Tree nodes), compare by id
+        if (a && b && typeof a === 'object' && typeof b === 'object' && 'id' in a && 'id' in b) {
+            return a.id === b.id;
+        }
+        return false;
+    };
+
     // Special case: if parent is a Container, we need to look at grandparent to find the property name
     if ((parent as any).kind === J.Kind.Container) {
         const container = parent as J.Container<any>;
-        const grandparent = child ? cursor.parent?.value : cursor.parent?.parent?.value;
+        const grandparent = cursor.parent?.parent?.value;
 
         // Find the index of actualChild in container.elements
         let childIndex = -1;
         if (container.elements) {
             for (let i = 0; i < container.elements.length; i++) {
-                if (container.elements[i] === actualChild) {
+                if (sameElement(container.elements[i], actualChild)) {
                     childIndex = i;
                     break;
                 }
@@ -299,7 +313,7 @@ export function findPropertyPath(cursor: Cursor | undefined, child?: any): strin
         if (grandparent && typeof grandparent === 'object') {
             for (const [key, value] of Object.entries(grandparent)) {
                 if (skipProps.has(key)) continue;
-                if (value === parent) {
+                if (sameElement(value, parent)) {
                     if (childIndex >= 0) {
                         return `${key}[${childIndex}]`;
                     }
@@ -318,19 +332,19 @@ export function findPropertyPath(cursor: Cursor | undefined, child?: any): strin
         if (skipProps.has(key)) continue;
 
         // Direct match
-        if (value === actualChild) {
+        if (sameElement(value, actualChild)) {
             return key;
         }
 
         // Check if child is in an array
         if (Array.isArray(value)) {
             for (let i = 0; i < value.length; i++) {
-                if (value[i] === actualChild) {
+                if (sameElement(value[i], actualChild)) {
                     return `${key}[${i}]`;
                 }
                 // Check inside RightPadded/LeftPadded wrappers
                 if (value[i] && typeof value[i] === 'object') {
-                    if (value[i].element === actualChild) {
+                    if (sameElement(value[i].element, actualChild)) {
                         return `${key}[${i}].element`;
                     }
                 }
@@ -343,10 +357,10 @@ export function findPropertyPath(cursor: Cursor | undefined, child?: any): strin
             if (container.elements) {
                 for (let i = 0; i < container.elements.length; i++) {
                     const rp = container.elements[i];
-                    if (rp === actualChild) {
+                    if (sameElement(rp, actualChild)) {
                         return `${key}[${i}]`;
                     }
-                    if (rp.element === actualChild) {
+                    if (sameElement(rp.element, actualChild)) {
                         return `${key}[${i}].element`;
                     }
                 }
@@ -356,7 +370,7 @@ export function findPropertyPath(cursor: Cursor | undefined, child?: any): strin
         // Check inside LeftPadded/RightPadded
         if (value && typeof value === 'object') {
             if ((value as any).kind === J.Kind.LeftPadded || (value as any).kind === J.Kind.RightPadded) {
-                if ((value as any).element === actualChild) {
+                if (sameElement((value as any).element, actualChild)) {
                     return `${key}.element`;
                 }
             }
@@ -414,28 +428,194 @@ function getNodeSummary(node: J): string | undefined {
 /**
  * LST Debug Printer - prints LST nodes in a readable format.
  *
- * Usage from within a visitor:
+ * This is a STATEFUL object that tracks cursor depth across calls to provide
+ * proper indentation. Create one instance as a field in your visitor and reuse it.
+ *
+ * Two main methods:
+ * - `log()`: Prints a single node WITHOUT recursing into children. Tracks cursor
+ *   hierarchy across calls to show proper indentation.
+ * - `print()`: Prints a node AND all its children recursively.
+ *
+ * Usage from within a visitor (recommended pattern):
  * ```typescript
- * class MyVisitor extends JavaScriptVisitor<P> {
- *     private debug = new LstDebugPrinter({ includeCursorMessages: true });
+ * class TabsAndIndentsVisitor extends JavaScriptVisitor<P> {
+ *     // Create as a field - it tracks state across calls
+ *     private debug = new LstDebugPrinter();
+ *
+ *     async visitBlock(block: J.Block, p: P) {
+ *         // Log this node with automatic indentation based on cursor depth
+ *         this.debug.log(block, this.cursor, "visiting block");
+ *         return super.visitBlock(block, p);
+ *     }
  *
  *     async visitMethodInvocation(mi: J.MethodInvocation, p: P) {
- *         this.debug.print(mi, this.cursor);
+ *         this.debug.log(mi, this.cursor);
  *         return super.visitMethodInvocation(mi, p);
  *     }
  * }
+ * ```
+ *
+ * Output will be properly indented based on tree depth:
+ * ```
+ * CompilationUnit{prefix=''}
+ *   statements[0]: ClassDeclaration{name='Foo' prefix=''}
+ *     body: Block{prefix='·'}
+ *       // visiting block
+ *       statements[0]: MethodDeclaration{name='bar' prefix='\n·₄'}
+ * ```
+ *
+ * To reset indentation tracking (e.g., between files):
+ * ```typescript
+ * this.debug.reset();
+ * ```
+ *
+ * To print an entire subtree with recursion:
+ * ```typescript
+ * this.debug.print(subtree, this.cursor, "dumping subtree");
  * ```
  */
 export class LstDebugPrinter {
     private readonly options: Required<LstDebugOptions>;
     private outputLines: string[] = [];
 
+    /**
+     * Cache of cursor depth to avoid recalculating.
+     * Uses WeakMap so cursors can be garbage collected.
+     */
+    private depthCache = new WeakMap<Cursor, number>();
+
     constructor(options: LstDebugOptions = {}) {
         this.options = {...DEFAULT_OPTIONS, ...options};
     }
 
     /**
-     * Print a tree node with optional cursor context.
+     * Calculate the depth of the cursor by counting parent chain length.
+     * Uses caching to avoid repeated traversals.
+     */
+    private calculateDepth(cursor: Cursor | undefined): number {
+        if (!cursor) {
+            return 0;
+        }
+
+        // Check cache first
+        const cached = this.depthCache.get(cursor);
+        if (cached !== undefined) {
+            return cached;
+        }
+
+        // Count depth by walking parent chain
+        let depth = 0;
+        for (let c: Cursor | undefined = cursor; c; c = c.parent) {
+            depth++;
+        }
+        // Subtract 2 to skip root cursor and start CompilationUnit at depth 0
+        depth = Math.max(0, depth - 2);
+
+        // Cache the result
+        this.depthCache.set(cursor, depth);
+        return depth;
+    }
+
+    /**
+     * Clear the depth cache. Call this when starting a new tree
+     * to free memory from previous traversals.
+     */
+    reset(): void {
+        this.depthCache = new WeakMap<Cursor, number>();
+    }
+
+    /**
+     * Log a single node WITHOUT recursing into children.
+     * Use this from visitor methods to log individual nodes as they are visited.
+     *
+     * When called with a cursor, tracks the cursor hierarchy across calls to
+     * provide proper indentation showing the tree structure.
+     *
+     * Output format: `// label` (if provided), then indented `TypeName{summary prefix=...}`
+     * with cursor messages on a separate line if present.
+     *
+     * @param node The node to log
+     * @param cursor Optional cursor for context, messages, and depth tracking
+     * @param label Optional label to identify this log entry
+     */
+    log(node: Tree | J.Container<any> | J.LeftPadded<any> | J.RightPadded<any>, cursor?: Cursor, label?: string): void {
+        this.outputLines = [];
+
+        // Calculate indentation based on cursor depth
+        const depth = this.calculateDepth(cursor);
+        const indent = this.options.indent.repeat(depth);
+
+        if (label) {
+            this.outputLines.push(`${indent}// ${label}`);
+        }
+
+        // Build single-line output for the node
+        let line = indent;
+
+        // Find property path from cursor
+        const propPath = findPropertyPath(cursor, node);
+        if (propPath) {
+            line += `${propPath}: `;
+        }
+
+        if (this.isContainer(node)) {
+            const container = node as J.Container<any>;
+            const before = formatSpace(container.before);
+            line += `Container<${container.elements?.length ?? 0}>{before=${before}}`;
+        } else if (this.isLeftPadded(node)) {
+            const lp = node as J.LeftPadded<any>;
+            const before = formatSpace(lp.before);
+            line += `LeftPadded{before=${before}`;
+            // Show element value if it's a primitive
+            if (lp.element !== null && lp.element !== undefined) {
+                const elemType = typeof lp.element;
+                if (elemType === 'string' || elemType === 'number' || elemType === 'boolean') {
+                    line += ` element=${JSON.stringify(lp.element)}`;
+                }
+            }
+            line += '}';
+        } else if (this.isRightPadded(node)) {
+            const rp = node as J.RightPadded<any>;
+            const after = formatSpace(rp.after);
+            line += `RightPadded{after=${after}`;
+            // Show element value if it's a primitive
+            if (rp.element !== null && rp.element !== undefined) {
+                const elemType = typeof rp.element;
+                if (elemType === 'string' || elemType === 'number' || elemType === 'boolean') {
+                    line += ` element=${JSON.stringify(rp.element)}`;
+                }
+            }
+            line += '}';
+        } else if (isJava(node)) {
+            const jNode = node as J;
+            const typeName = shortTypeName(jNode.kind);
+            line += `${typeName}{`;
+            const summary = getNodeSummary(jNode);
+            if (summary) {
+                line += `${summary} `;
+            }
+            line += `prefix=${formatSpace(jNode.prefix)}}`;
+        } else {
+            line += `<unknown: ${typeof node}>`;
+        }
+
+        this.outputLines.push(line);
+
+        // Add cursor messages on separate line if present
+        if (this.options.includeCursorMessages && cursor) {
+            const messages = formatCursorMessages(cursor);
+            if (messages !== '<no messages>') {
+                this.outputLines.push(`${indent}  ⤷ ${messages}`);
+            }
+        }
+
+        this.flush();
+    }
+
+    /**
+     * Print a tree node AND all its children recursively.
+     * Use this to dump an entire subtree structure.
+     *
      * @param tree The tree node to print
      * @param cursor Optional cursor for context
      * @param label Optional label to identify this debug output (shown as comment before output)
@@ -742,7 +922,7 @@ export class LstDebugPrinter {
         if (this.options.output === 'console') {
             console.info(output);
         } else {
-            fs.appendFileSync(this.options.output, output + '\n\n');
+            fs.appendFileSync(this.options.output, output + '\n');
         }
 
         this.outputLines = [];
@@ -750,13 +930,27 @@ export class LstDebugPrinter {
 }
 
 /**
- * A visitor that prints the LST structure as it traverses.
- * Useful for debugging the entire tree or a subtree.
+ * A visitor that prints the LST structure as it traverses, showing each node
+ * with proper indentation to visualize the tree hierarchy.
+ *
+ * Use this to print an entire tree or subtree with full traversal. Each node
+ * is printed as it's visited, with indentation showing the tree depth.
+ *
+ * For logging individual nodes from within your own visitor without recursion,
+ * use `LstDebugPrinter.log()` or `debugLog()` instead.
  *
  * Usage:
  * ```typescript
- * const debugVisitor = new LstDebugVisitor({ maxDepth: 3 });
+ * // Print entire tree structure during traversal
+ * const debugVisitor = new LstDebugVisitor();
  * await debugVisitor.visit(tree, ctx);
+ *
+ * // With options
+ * const debugVisitor = new LstDebugVisitor(
+ *     { includeCursorMessages: true },
+ *     { printPreVisit: true, printPostVisit: false }
+ * );
+ * await debugVisitor.visit(subtree, ctx);
  * ```
  */
 export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
@@ -794,12 +988,11 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             }
             line += `prefix=${prefix}}`;
 
-            console.info(line);
-
-            // Show cursor messages on a separate indented line
+            // Append cursor messages on same line to avoid empty line issues
             if (messages !== '<no messages>') {
-                console.info(`${indent}  ⤷ ${messages}`);
+                line += ` ${messages}`;
             }
+            console.info(line);
         }
         this.depth++;
         return tree;
@@ -829,11 +1022,11 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             }
             line += `Container<${container.elements.length}>{before=${before}}`;
 
-            console.info(line);
-
+            // Append cursor messages on same line to avoid empty line issues
             if (messages !== '<no messages>') {
-                console.info(`${indent}  ⤷ ${messages}`);
+                line += ` ${messages}`;
             }
+            console.info(line);
         }
         this.depth++;
         const result = await super.visitContainer(container, p);
@@ -867,11 +1060,11 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             }
             line += '}';
 
-            console.info(line);
-
+            // Append cursor messages on same line to avoid empty line issues
             if (messages !== '<no messages>') {
-                console.info(`${indent}  ⤷ ${messages}`);
+                line += ` ${messages}`;
             }
+            console.info(line);
         }
         this.depth++;
         const result = await super.visitLeftPadded(left, p);
@@ -905,11 +1098,11 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             }
             line += '}';
 
-            console.info(line);
-
+            // Append cursor messages on same line to avoid empty line issues
             if (messages !== '<no messages>') {
-                console.info(`${indent}  ⤷ ${messages}`);
+                line += ` ${messages}`;
             }
+            console.info(line);
         }
         this.depth++;
         const result = await super.visitRightPadded(right, p);
@@ -919,7 +1112,22 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
 }
 
 /**
- * Convenience function to print a tree node.
+ * Convenience function to log a single node (no recursion).
+ * Use this from visitor methods to log individual nodes as they are visited.
+ *
+ * @param node The node to log
+ * @param cursor Optional cursor for context and messages
+ * @param label Optional label to identify this log entry
+ * @param options Optional debug options
+ */
+export function debugLog(node: Tree, cursor?: Cursor, label?: string, options?: LstDebugOptions): void {
+    new LstDebugPrinter(options).log(node, cursor, label);
+}
+
+/**
+ * Convenience function to print a tree node AND all its children recursively.
+ * Use this to dump an entire subtree structure.
+ *
  * @param tree The tree node to print
  * @param cursor Optional cursor for context
  * @param label Optional label to identify this debug output

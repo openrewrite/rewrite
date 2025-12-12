@@ -280,6 +280,57 @@ describe("LST Debug Utilities", () => {
                 console.info = originalInfo;
             }
         });
+
+        test("log prints single node without recursion", async () => {
+            const source = `class Person { name: string; }`;
+            const cu = await parse(source);
+
+            const logs: string[] = [];
+            const originalInfo = console.info;
+            console.info = (msg: string) => logs.push(msg);
+
+            try {
+                const printer = new LstDebugPrinter({includeCursorMessages: false});
+                printer.log(cu, undefined, "testing log");
+
+                // Output is flushed as a single string with newlines
+                expect(logs.length).toBe(1);
+                const output = logs[0];
+                const lines = output.split('\n');
+                expect(lines[0]).toBe("// testing log");
+                expect(lines[1]).toContain("CompilationUnit{");
+                // Should NOT contain child nodes like ClassDeclaration
+                expect(output).not.toContain("ClassDeclaration");
+            } finally {
+                console.info = originalInfo;
+            }
+        });
+
+        test("log shows cursor messages on separate line", async () => {
+            const source = `const x = 1;`;
+            const cu = await parse(source);
+
+            const logs: string[] = [];
+            const originalInfo = console.info;
+            console.info = (msg: string) => logs.push(msg);
+
+            try {
+                const cursor = new Cursor(cu, undefined);
+                cursor.messages.set("indent", 4);
+                cursor.messages.set("kind", "block");
+
+                const printer = new LstDebugPrinter({includeCursorMessages: true});
+                printer.log(cu, cursor);
+
+                const output = logs.join('\n');
+                expect(output).toContain("CompilationUnit{");
+                // Cursor messages appear on separate line with arrow prefix
+                expect(output).toContain("⤷ ⟨");
+                expect(output).toContain("indent=4");
+            } finally {
+                console.info = originalInfo;
+            }
+        });
     });
 
     describe("AstDebugVisitor", () => {
