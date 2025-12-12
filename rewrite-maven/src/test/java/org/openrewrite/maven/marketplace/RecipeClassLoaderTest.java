@@ -16,15 +16,22 @@
 package org.openrewrite.maven.marketplace;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.ClasspathScanningLoader;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.StringUtils;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
 
@@ -76,5 +83,84 @@ class RecipeClassLoaderTest {
         assertThat(recipe.getClass().getClassLoader())
           .as("Recipe should be loaded through RecipeClassLoader for isolation")
           .isInstanceOf(RecipeClassLoader.class);
+    }
+
+    @Test
+    void resourcesShouldBeChildLoaded(@TempDir Path tempDir) throws IOException {
+        Path lib1 = tempDir.resolve("lib1");
+        Files.createDirectories(lib1);
+        Path file1 = lib1.resolve("rewrite.txt");
+        Files.write(file1, "file1".getBytes());
+        Path lib2 = tempDir.resolve("lib2");
+        Files.createDirectories(lib2);
+        Path file2 = lib2.resolve("rewrite.txt");
+        Files.write(file2, "file2".getBytes());
+
+        try (URLClassLoader urlClassLoader = new URLClassLoader(new URL[]{lib1.toUri().toURL()})) {
+            try (RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{lib2.toUri().toURL()}, urlClassLoader)) {
+                String text = StringUtils.readFully(classLoader.getResourceAsStream("rewrite.txt"));
+                assertThat(text).isEqualTo("file2");
+            }
+        }
+    }
+
+    @Test
+    void resourcesShouldFindFromParentLast(@TempDir Path tempDir) throws IOException {
+        Path lib1 = tempDir.resolve("lib1");
+        Files.createDirectories(lib1);
+        Path file1 = lib1.resolve("rewrite.txt");
+        Files.write(file1, "file1".getBytes());
+        Path lib2 = tempDir.resolve("lib2");
+        Files.createDirectories(lib2);
+
+        try (URLClassLoader urlClassLoader = new URLClassLoader(new URL[]{lib1.toUri().toURL()})) {
+            try (RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{lib2.toUri().toURL()}, urlClassLoader)) {
+                String text = StringUtils.readFully(classLoader.getResourceAsStream("rewrite.txt"));
+                assertThat(text).isEqualTo("file1");
+            }
+        }
+    }
+
+    @Test
+    void allResourcesShouldFindFromChildFirst(@TempDir Path tempDir) throws IOException {
+        Path lib1 = tempDir.resolve("lib1");
+        Files.createDirectories(lib1);
+        Path file1 = lib1.resolve("rewrite.txt");
+        Files.write(file1, "file1".getBytes());
+        Path lib2 = tempDir.resolve("lib2");
+        Files.createDirectories(lib2);
+        Path file2 = lib2.resolve("rewrite.txt");
+        Files.write(file2, "file2".getBytes());
+
+        try (URLClassLoader urlClassLoader = new URLClassLoader(new URL[]{lib1.toUri().toURL()})) {
+            try (RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{lib2.toUri().toURL()}, urlClassLoader)) {
+                Enumeration<URL> resources = classLoader.getResources("rewrite.txt");
+                assertThat(resources.hasMoreElements()).isTrue();
+                assertThat(resources.nextElement().toString()).contains("lib2/rewrite.txt");
+                assertThat(resources.hasMoreElements()).isTrue();
+                assertThat(resources.nextElement().toString()).contains("lib1/rewrite.txt");
+                assertThat(resources.hasMoreElements()).isFalse();
+            }
+        }
+    }
+
+    @Test
+    void allResourcesShouldFindFromParentLast(@TempDir Path tempDir) throws IOException {
+        Path lib1 = tempDir.resolve("lib1");
+        Files.createDirectories(lib1);
+        Path file1 = lib1.resolve("rewrite.txt");
+        Files.write(file1, "file1".getBytes());
+        Path lib2 = tempDir.resolve("lib2");
+        Files.createDirectories(lib2);
+
+        try (URLClassLoader urlClassLoader = new URLClassLoader(new URL[]{lib1.toUri().toURL()})) {
+            try (RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{lib2.toUri().toURL()}, urlClassLoader)) {
+                Enumeration<URL> resources = classLoader.getResources("rewrite.txt");
+                assertThat(resources.hasMoreElements()).isTrue();
+                assertThat(resources.nextElement().toString()).contains("lib1/rewrite.txt");
+                assertThat(resources.hasMoreElements()).isFalse();
+
+            }
+        }
     }
 }
