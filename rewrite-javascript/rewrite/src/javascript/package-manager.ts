@@ -23,12 +23,16 @@ import {
     readNpmrcConfigs
 } from "./node-resolution-result";
 import {replaceMarkerByKind} from "../markers";
-import {Json} from "../json";
+import {Json, JsonParser} from "../json";
+import {Yaml, YamlParser} from "../yaml";
+import {PlainTextParser} from "../text";
+import {SourceFile} from "../tree";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 import {spawnSync} from "child_process";
+import * as YAML from "yaml";
 
 /**
  * Configuration for each package manager.
@@ -340,6 +344,56 @@ export function getUpdatedLockFileContent<T>(
 }
 
 /**
+ * Determines the appropriate parser for a lock file based on its filename.
+ *
+ * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml", "package-lock.json")
+ * @returns 'yaml' for YAML lock files, 'json' for JSON lock files, 'text' for plain text
+ */
+export function getLockFileFormat(lockFileName: string): 'yaml' | 'json' | 'text' {
+    if (lockFileName === 'pnpm-lock.yaml') {
+        return 'yaml';
+    }
+    if (lockFileName === 'yarn.lock') {
+        return 'text';
+    }
+    // package-lock.json, bun.lock
+    return 'json';
+}
+
+/**
+ * Re-parses updated lock file content using the appropriate parser.
+ * This is used by dependency recipes to create the updated lock file SourceFile.
+ *
+ * @param content The updated lock file content
+ * @param sourcePath The source path of the lock file
+ * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml")
+ * @returns The parsed SourceFile (Json.Document, Yaml.Documents, or PlainText)
+ */
+export async function parseLockFileContent(
+    content: string,
+    sourcePath: string,
+    lockFileName: string
+): Promise<SourceFile> {
+    const format = getLockFileFormat(lockFileName);
+
+    switch (format) {
+        case 'yaml': {
+            const parser = new YamlParser({});
+            return await parser.parseOne({text: content, sourcePath}) as Yaml.Documents;
+        }
+        case 'text': {
+            const parser = new PlainTextParser({});
+            return await parser.parseOne({text: content, sourcePath});
+        }
+        case 'json':
+        default: {
+            const parser = new JsonParser({});
+            return await parser.parseOne({text: content, sourcePath}) as Json.Document;
+        }
+    }
+}
+
+/**
  * Base interface for project update info used by dependency recipes.
  * Recipes extend this with additional fields specific to their needs.
  */
@@ -438,7 +492,19 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
 
     if (updatedLockFile) {
         try {
-            lockContent = JSON.parse(updatedLockFile);
+            // Parse lock file based on format
+            if (updateInfo.packageManager === PackageManager.Pnpm) {
+                // pnpm-lock.yaml is YAML format
+                lockContent = YAML.parse(updatedLockFile);
+            } else if (updateInfo.packageManager === PackageManager.YarnClassic ||
+                       updateInfo.packageManager === PackageManager.YarnBerry) {
+                // yarn.lock has a custom format - skip parsing here
+                // The marker will still be updated with package.json info
+                lockContent = undefined;
+            } else {
+                // npm (package-lock.json) and bun (bun.lock) use JSON
+                lockContent = JSON.parse(updatedLockFile);
+            }
         } catch {
             // Continue without lock file content
         }

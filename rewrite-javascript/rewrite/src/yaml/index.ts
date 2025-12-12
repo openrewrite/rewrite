@@ -15,6 +15,7 @@
  */
 export * from "./tree";
 export * from "./visitor";
+export * from "./parser";
 
 import "./print";
 import "./rpc";

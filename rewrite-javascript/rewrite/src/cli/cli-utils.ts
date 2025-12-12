@@ -22,6 +22,7 @@ import {SourceFile} from '../tree';
 import {JavaScriptParser, PackageJsonParser} from '../javascript';
 import {JsonParser} from '../json';
 import {PlainTextParser} from '../text';
+import {YamlParser} from '../yaml';
 
 // ANSI color codes
 const colors = {
@@ -447,14 +448,19 @@ export async function walkDirectory(
 const JSON_LOCK_FILE_NAMES = ['bun.lock', 'package-lock.json'];
 
 /**
- * Lock file names that should be parsed as plain text (YAML or custom formats)
+ * Lock file names that should be parsed as YAML
  */
-const TEXT_LOCK_FILE_NAMES = ['yarn.lock', 'pnpm-lock.yaml'];
+const YAML_LOCK_FILE_NAMES = ['pnpm-lock.yaml'];
+
+/**
+ * Lock file names that should be parsed as plain text (custom formats like yarn.lock v1)
+ */
+const TEXT_LOCK_FILE_NAMES = ['yarn.lock'];
 
 /**
  * All lock file names
  */
-const ALL_LOCK_FILE_NAMES = [...JSON_LOCK_FILE_NAMES, ...TEXT_LOCK_FILE_NAMES];
+const ALL_LOCK_FILE_NAMES = [...JSON_LOCK_FILE_NAMES, ...YAML_LOCK_FILE_NAMES, ...TEXT_LOCK_FILE_NAMES];
 
 /**
  * Check if a file is accepted for parsing based on its extension
@@ -473,7 +479,12 @@ export function isAcceptedFile(filePath: string): boolean {
         return true;
     }
 
-    // Lock files
+    // YAML files
+    if (['.yaml', '.yml'].includes(ext)) {
+        return true;
+    }
+
+    // Lock files (some have non-standard extensions like yarn.lock)
     if (ALL_LOCK_FILE_NAMES.includes(basename)) {
         return true;
     }
@@ -506,6 +517,8 @@ export async function* parseFilesStreaming(
     const packageJsonFiles: string[] = [];
     const jsonFiles: string[] = [];
     const jsonLockFiles: string[] = [];
+    const yamlLockFiles: string[] = [];
+    const yamlFiles: string[] = [];
     const textLockFiles: string[] = [];
 
     for (const filePath of filePaths) {
@@ -518,10 +531,14 @@ export async function* parseFilesStreaming(
             jsFiles.push(filePath);
         } else if (JSON_LOCK_FILE_NAMES.includes(basename)) {
             jsonLockFiles.push(filePath);
+        } else if (YAML_LOCK_FILE_NAMES.includes(basename)) {
+            yamlLockFiles.push(filePath);
         } else if (TEXT_LOCK_FILE_NAMES.includes(basename)) {
             textLockFiles.push(filePath);
         } else if (ext === '.json') {
             jsonFiles.push(filePath);
+        } else if (['.yaml', '.yml'].includes(ext)) {
+            yamlFiles.push(filePath);
         }
     }
 
@@ -564,13 +581,39 @@ export async function* parseFilesStreaming(
         }
     }
 
-    // Parse text lock files (yarn.lock, pnpm-lock.yaml) - these are YAML or custom formats
+    // Parse YAML lock files (pnpm-lock.yaml) - these are YAML format
+    if (yamlLockFiles.length > 0) {
+        if (verbose) {
+            console.log(`Parsing ${yamlLockFiles.length} YAML lock files...`);
+        }
+        const yamlParser = new YamlParser({relativeTo: projectRoot});
+        for await (const sf of yamlParser.parse(...yamlLockFiles)) {
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
+            yield sf;
+        }
+    }
+
+    // Parse text lock files (yarn.lock) - custom format, parsed as plain text
     if (textLockFiles.length > 0) {
         if (verbose) {
             console.log(`Parsing ${textLockFiles.length} text lock files...`);
         }
         const textParser = new PlainTextParser({relativeTo: projectRoot});
         for await (const sf of textParser.parse(...textLockFiles)) {
+            current++;
+            onProgress?.(current, total, sf.sourcePath);
+            yield sf;
+        }
+    }
+
+    // Parse other YAML files
+    if (yamlFiles.length > 0) {
+        if (verbose) {
+            console.log(`Parsing ${yamlFiles.length} YAML files...`);
+        }
+        const yamlParser = new YamlParser({relativeTo: projectRoot});
+        for await (const sf of yamlParser.parse(...yamlFiles)) {
             current++;
             onProgress?.(current, total, sf.sourcePath);
             yield sf;

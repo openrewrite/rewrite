@@ -18,6 +18,7 @@ import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
 import {Json, JsonParser, JsonVisitor} from "../../json";
+import {isDocuments, Yaml, YamlVisitor} from "../../yaml";
 import {
     allDependencyScopes,
     findNodeResolutionResult,
@@ -31,7 +32,9 @@ import {TreePrinters} from "../../print";
 import {
     createDependencyRecipeAccumulator,
     DependencyRecipeAccumulator,
+    getAllLockFileNames,
     getUpdatedLockFileContent,
+    parseLockFileContent,
     runInstallIfNeeded,
     runInstallInTempDir,
     storeInstallResult,
@@ -187,7 +190,8 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
     async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
 
-        return new class extends JsonVisitor<ExecutionContext> {
+        // Create visitors for each file type
+        const jsonEditor = new class extends JsonVisitor<ExecutionContext> {
             protected async visitDocument(doc: Json.Document, ctx: ExecutionContext): Promise<Json | undefined> {
                 const sourcePath = doc.sourcePath;
 
@@ -217,13 +221,11 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                     return updateNodeResolutionMarker(modifiedDoc, updateInfo, acc);
                 }
 
-                // Handle lock files for all package managers
+                // Handle JSON lock files (package-lock.json, bun.lock)
+                const lockFileName = path.basename(sourcePath);
                 const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
-                if (updatedLockContent) {
-                    return await new JsonParser({}).parseOne({
-                        text: updatedLockContent,
-                        sourcePath: doc.sourcePath
-                    }) as Json.Document;
+                if (updatedLockContent && getAllLockFileNames().includes(lockFileName)) {
+                    return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
                 }
 
                 return doc;
@@ -269,6 +271,33 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                     ...parsed,
                     markers: doc.markers
                 };
+            }
+        };
+
+        const yamlEditor = new class extends YamlVisitor<ExecutionContext> {
+            protected async visitDocuments(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml | undefined> {
+                const sourcePath = docs.sourcePath;
+                const lockFileName = path.basename(sourcePath);
+
+                // Handle YAML lock files (pnpm-lock.yaml)
+                const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
+                if (updatedLockContent && getAllLockFileNames().includes(lockFileName)) {
+                    return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Yaml.Documents;
+                }
+
+                return docs;
+            }
+        };
+
+        // Return a composite visitor that delegates based on tree type
+        return new class extends TreeVisitor<any, ExecutionContext> {
+            async visit(tree: any, ctx: ExecutionContext): Promise<any> {
+                if (isDocuments(tree)) {
+                    return yamlEditor.visit(tree, ctx);
+                } else if (tree && tree.kind === Json.Kind.Document) {
+                    return jsonEditor.visit(tree, ctx);
+                }
+                return tree;
             }
         };
     }
