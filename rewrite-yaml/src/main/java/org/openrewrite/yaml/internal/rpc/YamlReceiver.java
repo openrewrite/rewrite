@@ -43,8 +43,7 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
         d = d.withChecksum(q.receive(d.getChecksum()));
         d = d.withFileAttributes(q.receive(d.getFileAttributes()));
         d = d.withDocuments(q.receiveList(d.getDocuments(), doc -> (Yaml.Document) visitNonNull(doc, q)));
-        d = d.withSuffix(q.receive(d.getSuffix()));
-        return d;
+        return d.withSuffix(q.receive(d.getSuffix()));
     }
 
     @Override

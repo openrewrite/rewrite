@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 @NullMarked
-@NullUnmarked
+@NonNullFields
 package org.openrewrite.yaml.internal.rpc;
 
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.NullUnmarked;
+import org.openrewrite.internal.lang.NonNullFields;
