@@ -1324,7 +1324,7 @@ public class Autodetect extends NamedStyles {
                                 .withWrap(determineWrapping(enumFieldAnnotationsWrapped, wrappingAndBracesStyle.getEnumFieldAnnotations().getWrap()))
                 );
             }
-            return wrappingAndBracesStyle.withIfStatement(wrappingAndBracesStyle.getIfStatement().withSpecialElseIfTreatment(elseOnNewLine > 0));
+            return wrappingAndBracesStyle.withIfStatement(wrappingAndBracesStyle.getIfStatement().withElseOnNewLine(elseOnNewLine > 0));
         }
 
         private LineWrapSetting determineWrapping(int wrapsFound, LineWrapSetting defaultSetting) {
