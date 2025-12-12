@@ -151,7 +151,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor) {
-        return positionOfChild(cursor, cursor.getValue(), computeNewLinedCursorElement(cursor)).asColSpan();
+        return positionOfChild(cursor, cursor.getValue(), new Cursor(null, computeNewLinedCursorElement(cursor).getValue())).asColSpan();
     }
 
     /**
@@ -160,7 +160,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor, JContainer<? extends J> container) {
-        return positionOfChild(cursor, container, new Cursor(null, computeNewLinedCursorElement(cursor))).asColSpan();
+        return positionOfChild(cursor, container, new Cursor(null, computeNewLinedCursorElement(cursor).getValue())).asColSpan();
     }
 
     /**
@@ -169,7 +169,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor, JRightPadded<J> rightPadded) {
-        return positionOfChild(cursor, rightPadded, new Cursor(null, computeNewLinedCursorElement(cursor))).asColSpan();
+        return positionOfChild(cursor, rightPadded, new Cursor(null, computeNewLinedCursorElement(cursor).getValue())).asColSpan();
     }
 
     /**
@@ -178,7 +178,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor, J child) {
-        return positionOfChild(cursor, child, new Cursor(null, computeNewLinedCursorElement(cursor))).asColSpan();
+        return positionOfChild(cursor, child, new Cursor(null, computeNewLinedCursorElement(cursor).getValue())).asColSpan();
     }
 
     /**
@@ -214,7 +214,10 @@ public class SourcePositionService {
             if (!hasNewLine && !isRootOrCompilationUnit) {
                 return computeNewLinedCursorElement(parent);
             }
+        } else if (cursor.getParent() != null && cursor.getParent().getValue() != Cursor.ROOT_VALUE) {
+            return computeNewLinedCursorElement(cursor.getParent());
         }
+
         return cursor;
     }
 
@@ -446,7 +449,7 @@ public class SourcePositionService {
         boolean hasJavaSourceFileInPath = true;
         if (!(printCursor.getValue() instanceof JavaSourceFile)) {
             try {
-                printCursor = cursor.dropParentUntil(c -> c instanceof JavaSourceFile);
+                printCursor = printCursor.dropParentUntil(c -> c instanceof JavaSourceFile);
             } catch (IllegalStateException ignored) {
                 // We might have been called with new Cursor(null, someTreeOtherThanSourceFile), so we need to create a parent for printing.
                 // we can do best effort to calculate columns even without JavaSourceFile in the path, with only the risk of the first element in the cursor path being miscalculated.
@@ -456,6 +459,7 @@ public class SourcePositionService {
                     printCursor = printCursor.getParent();
                 }
                 hasJavaSourceFileInPath = false;
+
             }
         }
         if (printCursor.getParent() == null) {
