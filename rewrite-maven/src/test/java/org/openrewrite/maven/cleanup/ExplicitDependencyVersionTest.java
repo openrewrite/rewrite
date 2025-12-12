@@ -52,7 +52,6 @@ class ExplicitDependencyVersionTest implements RewriteTest {
               assertThat(actual)
                 .doesNotContain("LATEST")
                 .containsPattern("<version>\\d+\\.\\d+[^<]*</version>")
-                .satisfies(pom -> System.out.println("Updated POM:\n" + pom))
                 .actual())
           )
         );
