@@ -43,10 +43,12 @@ public class SourcePositionService {
      * this calculates the column position of that alignment point. For elements that don't align,
      * it returns the parent's indentation plus the continuation indent.
      *
+     * @deprecated         use {@link #computeNewLinedCursorElement(Cursor)} and {@link #positionOf(Cursor)} to get the positions span of the element / parents instead
      * @param cursor       the cursor pointing to the element whose alignment position should be computed
      * @param continuation the continuation indent to add when the element doesn't align with another element
      * @return the column position (0-indexed) where the element should align to
      */
+    @Deprecated
     public int computeColumnToAlignTo(Cursor cursor, int continuation) {
         Cursor alignWith = alignsWith(cursor);
         Cursor newLinedElementCursor;
