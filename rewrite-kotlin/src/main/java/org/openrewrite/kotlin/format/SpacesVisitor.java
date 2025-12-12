@@ -20,6 +20,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
@@ -176,7 +177,8 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        boolean omitBraces = c.getBody().getMarkers().findFirst(OmitBraces.class).isPresent();
+        boolean omitBraces = c.getBody().getMarkers().findFirst(OmitBraces.class).isPresent() ||
+                             c.getBody().getMarkers().findFirst(org.openrewrite.kotlin.marker.OmitBraces.class).isPresent();
         c = c.withBody(spaceBefore(c.getBody(), beforeLeftBrace && !omitBraces));
         if (c.getBody().getStatements().isEmpty()) {
             if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
