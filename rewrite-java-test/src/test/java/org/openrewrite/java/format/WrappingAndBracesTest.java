@@ -2876,6 +2876,8 @@ class WrappingAndBracesTest implements RewriteTest {
                     ""\"
                       NO
                       ""\";
+                  private final String singleLine = ""\"
+                    noEndLine""\";
               }
               """,
             """
@@ -2886,6 +2888,8 @@ class WrappingAndBracesTest implements RewriteTest {
                   private final String bar = ""\"
                                              NO
                                              ""\";
+                  private final String singleLine = ""\"
+                                                    noEndLine""\";
               }
               """
           )

@@ -531,7 +531,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             if (literal.getValueSource().startsWith("\"\"\"") && literal.getValueSource().endsWith("\"\"\"")) {
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
-                String content = literal.getValueSource().substring(4, literal.getValueSource().lastIndexOf("\n"));
+                String content = literal.getValueSource().substring(4);
                 int currentIndent = StringUtils.minCommonIndentLevel(content);
                 content = StringUtils.trimIndent(content);
                 String[] lines = content.split("\n", -1);
@@ -542,11 +542,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     column = ((J) positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor()).getValue()).getPrefix().getIndent().length() + 2;
                 }
                 if (currentIndent != column) {
-                    StringBuilder builder = new StringBuilder().append("\"\"\"\n");
+                    StringBuilder builder = new StringBuilder().append("\"\"\"");
                     for (String line : lines) {
-                        builder.append(StringUtils.repeat(" ", column)).append(line).append("\n");
+                        builder.append("\n").append(StringUtils.repeat(" ", column)).append(line);
                     }
-                    builder.append(StringUtils.repeat(" ", column)).append("\"\"\"");
                     literal = literal.withValueSource(builder.toString()).withValue(content);
                 }
             }
