@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.*;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -115,7 +116,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor) {
-        return positionOfChild(cursor, cursor.getValue(), cursor.getParent());
+        return positionOfChild(cursor, cursor.getValue(), getSpanPrintCursor(cursor));
     }
 
     /**
@@ -124,7 +125,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor, JContainer<? extends J> container) {
-        return positionOfChild(cursor, container, cursor.getParent());
+        return positionOfChild(cursor, container, getSpanPrintCursor(cursor));
     }
 
     /**
@@ -133,7 +134,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor, JRightPadded<J> rightPadded) {
-        return positionOfChild(cursor, rightPadded, cursor.getParent());
+        return positionOfChild(cursor, rightPadded, getSpanPrintCursor(cursor));
     }
 
     /**
@@ -142,7 +143,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor, J child) {
-        return positionOfChild(cursor, child, cursor.getParent());
+        return positionOfChild(cursor, child, getSpanPrintCursor(cursor));
     }
 
     /**
@@ -151,7 +152,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor) {
-        return positionOfChild(cursor, cursor.getValue(), new Cursor(null, computeNewLinedCursorElement(cursor).getValue())).asColSpan();
+        return positionOfChild(cursor, cursor.getValue(), getColSpanPrintCursor(cursor)).asColSpan();
     }
 
     /**
@@ -160,7 +161,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor, JContainer<? extends J> container) {
-        return positionOfChild(cursor, container, new Cursor(null, computeNewLinedCursorElement(cursor).getValue())).asColSpan();
+        return positionOfChild(cursor, container, getColSpanPrintCursor(cursor)).asColSpan();
     }
 
     /**
@@ -169,7 +170,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor, JRightPadded<J> rightPadded) {
-        return positionOfChild(cursor, rightPadded, new Cursor(null, computeNewLinedCursorElement(cursor).getValue())).asColSpan();
+        return positionOfChild(cursor, rightPadded, getColSpanPrintCursor(cursor)).asColSpan();
     }
 
     /**
@@ -178,7 +179,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor, J child) {
-        return positionOfChild(cursor, child, new Cursor(null, computeNewLinedCursorElement(cursor).getValue())).asColSpan();
+        return positionOfChild(cursor, child, getColSpanPrintCursor(cursor)).asColSpan();
     }
 
     /**
@@ -300,7 +301,7 @@ public class SourcePositionService {
      * @throws IllegalArgumentException if the child is a raw {@link Collection} (use padding accessor methods instead),
      *                                  if the child type is not supported, or if the child cannot be found in the source file
      */
-    private Span positionOfChild(Cursor cursor, Object child, Cursor parent) {
+    private Span positionOfChild(Cursor cursor, Object child, Cursor printCursor) {
         J findJ;
         JContainer<J> findJContainer;
         JRightPadded<J> findJRightPadded;
@@ -445,28 +446,8 @@ public class SourcePositionService {
                 return this;
             }
         };
-        Cursor printCursor = parent;
-        boolean hasJavaSourceFileInPath = true;
-        if (!(printCursor.getValue() instanceof JavaSourceFile)) {
-            try {
-                printCursor = printCursor.dropParentUntil(c -> c instanceof JavaSourceFile);
-            } catch (IllegalStateException ignored) {
-                // We might have been called with new Cursor(null, someTreeOtherThanSourceFile), so we need to create a parent for printing.
-                // we can do best effort to calculate columns even without JavaSourceFile in the path, with only the risk of the first element in the cursor path being miscalculated.
-                // In this case, we will set line numbers to -1 to indicate unknown line numbers.
-                // This is also used for colspan calculations where line numbers are not needed and we want to avoid printing the entire source file.
-                while (printCursor.getParent() != null && printCursor.getParent().getValue() != Cursor.ROOT_VALUE) {
-                    printCursor = printCursor.getParent();
-                }
-                hasJavaSourceFileInPath = false;
-
-            }
-        }
-        if (printCursor.getParent() == null) {
-            // We might have been called with new Cursor(null, someTree), so we need to create a parent for printing.
-            printCursor = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), printCursor.getValue());
-        }
-        javaPrinter.visit(printCursor.getValue(), printLine, printCursor.getParent());
+        boolean printEntireSourceFile = printCursor.getValue() instanceof JavaSourceFile;
+        javaPrinter.visit(printCursor.getValue(), printLine, Objects.requireNonNull(printCursor.getParent()));
         String content = printLine.getOut();
         if (found.get()) {
             int indent = StringUtils.indent(content).length();
@@ -501,13 +482,26 @@ public class SourcePositionService {
             }
 
             return Span.builder()
-                    .startLine(hasJavaSourceFileInPath ? startLine.get() : -1)
+                    .startLine(printEntireSourceFile ? startLine.get() : -1)
                     .startColumn(startCol.get() + indent)
-                    .endLine(hasJavaSourceFileInPath ? startLine.get() + lines : -1)
+                    .endLine(printEntireSourceFile ? startLine.get() + lines : -1)
                     .endColumn(col)
                     .maxColumn(maxColumn)
                     .build();
         }
         throw new IllegalArgumentException("The child was not found in the sourceFile. Are you sure the passed in cursor's value contains the child and you are not searching for a mutated element in a non-mutated Cursor value?");
+    }
+
+    private Cursor getSpanPrintCursor(Cursor cursor) {
+        Cursor root = new Cursor(null, Cursor.ROOT_VALUE);
+        while (cursor.getParent() != null && cursor.getParent().getValue() != Cursor.ROOT_VALUE && !(cursor.getValue() instanceof JavaSourceFile)) {
+            cursor = cursor.getParent();
+        }
+        return new Cursor(root, cursor.getValue());
+    }
+
+    private Cursor getColSpanPrintCursor(Cursor cursor) {
+        Cursor root = new Cursor(null, Cursor.ROOT_VALUE);
+        return new Cursor(root, computeNewLinedCursorElement(cursor).getValue());
     }
 }
