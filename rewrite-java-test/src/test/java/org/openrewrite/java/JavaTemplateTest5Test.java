@@ -437,7 +437,8 @@ class JavaTemplateTest5Test implements RewriteTest {
                       @SuppressWarnings("ALL") @Deprecated /* hello */
                       Boolean z;
                       // comment n
-                      @SuppressWarnings("ALL") @Deprecated int n;
+                      @SuppressWarnings("ALL") @Deprecated
+                      int n;
                       @SuppressWarnings("ALL") @Deprecated final Boolean b;
                       @SuppressWarnings("ALL") @Deprecated
                       // comment x, y

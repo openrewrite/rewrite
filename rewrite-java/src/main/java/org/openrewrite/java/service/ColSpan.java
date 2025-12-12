@@ -13,8 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.style;
+package org.openrewrite.java.service;
 
-public enum LineWrapSetting {
-    DoNotWrap, WrapAlways, ChopIfTooLong, WrapIfTooLong;
+import lombok.Builder;
+import lombok.Value;
+
+/**
+ * Tracks the beginning and ending of a given LST element in source code
+ */
+@Value
+@Builder
+public class ColSpan {
+    int startColumn;
+    int endColumn;
+    int maxColumn;
 }

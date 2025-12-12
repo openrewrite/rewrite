@@ -29,4 +29,12 @@ public class Span {
     int endLine;
     int endColumn;
     int maxColumn;
+
+    public ColSpan asColSpan() {
+        return ColSpan.builder()
+                .startColumn(startColumn)
+                .endColumn(endColumn)
+                .maxColumn(maxColumn)
+                .build();
+    }
 }

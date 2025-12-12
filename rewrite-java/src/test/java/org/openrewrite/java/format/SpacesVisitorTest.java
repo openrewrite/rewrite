@@ -626,7 +626,6 @@ class SpacesVisitorTest implements RewriteTest {
     // ===========================
     // BeforeParentheses tests
     // ===========================
-
     @Test
     void normalizeBeforeIfParentheses() {
         rewriteRun(
@@ -837,8 +836,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation     ("test")
-                void method() {}
+                @MyAnnotation     ("test") void method() {}
             }
             """,
             """
@@ -851,8 +849,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation("test")
-                void method() {}
+                @MyAnnotation("test") void method() {}
             }
             """
           )
@@ -1617,8 +1614,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation(   "test"   )
-                void method() {}
+                @MyAnnotation(   "test"   ) void method() {}
             }
             """,
             """
@@ -1631,8 +1627,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation("test")
-                void method() {}
+                @MyAnnotation("test") void method() {}
             }
             """
           )
@@ -2063,8 +2058,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation(values =     {"a", "b"})
-                void method() {}
+                @MyAnnotation(values =     {"a", "b"}) void method() {}
             }
             """,
             """
@@ -2073,8 +2067,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation(values = {"a", "b"})
-                void method() {}
+                @MyAnnotation(values = {"a", "b"}) void method() {}
             }
             """
           )
@@ -2092,8 +2085,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation(values = {   "a", "b", "c"   }, numbers = {   1, 2, 3   })
-                void method() {}
+                @MyAnnotation(values = {   "a", "b", "c"   }, numbers = {   1, 2, 3   }) void method() {}
             }
             """,
             """
@@ -2103,8 +2095,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation(values = {"a", "b", "c"}, numbers = {1, 2, 3})
-                void method() {}
+                @MyAnnotation(values = {"a", "b", "c"}, numbers = {1, 2, 3}) void method() {}
             }
             """
           )
@@ -2122,8 +2113,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation(value   =   "test", number   =   42)
-                void method() {}
+                @MyAnnotation(value   =   "test", number   =   42) void method() {}
             }
             """,
             """
@@ -2133,8 +2123,7 @@ class SpacesVisitorTest implements RewriteTest {
             }
 
             class Test {
-                @MyAnnotation(value = "test", number = 42)
-                void method() {}
+                @MyAnnotation(value = "test", number = 42) void method() {}
             }
             """
           )

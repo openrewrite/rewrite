@@ -18,6 +18,7 @@ package org.openrewrite.java.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
@@ -37,6 +38,15 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
     @Override
     public String getLanguage() {
         return "java";
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, Object o) {
+        if (o instanceof J.Block && !(tree instanceof J.Block)) {
+            //Wrapping can introduce blocks
+            return super.visit((J.Block) o, o);
+        }
+        return super.visit(tree, o);
     }
 
     @Override
@@ -823,7 +833,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         J.Literal l = literal;
         l = l.withPrefix(visitSpace(l.getPrefix(), Space.Location.LITERAL_PREFIX, newLiteral.getPrefix()));
         l = l.withMarkers(visitMarkers(l.getMarkers(), newLiteral.getMarkers()));
-        Expression temp = (Expression) visitExpression(l, newLiteral);
+        Expression temp = (Expression) visitExpression(l.withValue(newLiteral.getValue()).withValueSource(newLiteral.getValueSource()), newLiteral); // for text blocks indentation, we use the new literal's value
         if (!(temp instanceof J.Literal)) {
             return temp;
         }

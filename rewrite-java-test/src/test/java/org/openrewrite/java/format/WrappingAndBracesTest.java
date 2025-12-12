@@ -33,31 +33,22 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
-import static org.openrewrite.style.LineWrapSetting.WrapAlways;
+import static org.openrewrite.style.LineWrapSetting.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
+@SuppressWarnings("all")
 class WrappingAndBracesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-          IntelliJ.spaces(),
-          new WrappingAndBracesStyle(
-            120,
-            new WrappingAndBracesStyle.IfStatement(false),
-            new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
-            new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-            new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-            new WrappingAndBracesStyle.Annotations(WrapAlways),
-            new WrappingAndBracesStyle.Annotations(WrapAlways),
-            new WrappingAndBracesStyle.Annotations(WrapAlways),
-            new WrappingAndBracesStyle.Annotations(DoNotWrap),
-            new WrappingAndBracesStyle.Annotations(DoNotWrap),
-            new WrappingAndBracesStyle.Annotations(DoNotWrap)),
-          null)));
+        wrappingAndBraces(
+          spaces -> spaces,
+          wrapping -> wrapping
+            .withChainedMethodCalls(wrapping.getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(Arrays.asList("builder", "newBuilder")))
+            .withMethodDeclarationParameters(wrapping.getMethodDeclarationParameters().withWrap(WrapAlways))).accept(spec);
     }
 
     @DocumentExample
@@ -76,7 +67,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   {
-              int n = 0;
+                      int n = 0;
                       n++;
                   }
               }
@@ -87,7 +78,7 @@ class WrappingAndBracesTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<SpacesStyle> spaces,
                                                           UnaryOperator<WrappingAndBracesStyle> wrapping) {
-        return spec -> spec.recipe(new AutoFormat(null, false))
+        return spec -> spec.recipe(new AutoFormat(null, true))
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
@@ -234,6 +225,34 @@ class WrappingAndBracesTest implements RewriteTest {
                   @SuppressWarnings({"ALL"})
                   <T> T method() {
                       return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void blocksShouldCloseOnNextLine() {
+        rewriteRun(
+          java(
+            """
+              public class TestClass {}
+              """,
+            """
+              public class TestClass {
+              }
+              """
+          ),
+          java(
+            """
+              public class TestMethod {
+                  void method() {}
+              }
+              """,
+            """
+              public class TestMethod {
+                  void method() {
                   }
               }
               """
@@ -416,8 +435,8 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               public class Test {
-              int m; /* comment */
-              int n;
+                  int m; /* comment */
+                  int n;
               }
               """
           )
@@ -430,7 +449,7 @@ class WrappingAndBracesTest implements RewriteTest {
         rewriteRun(
           wrappingAndBraces(
             spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
-            wrap -> wrap.withIfStatement(new WrappingAndBracesStyle.IfStatement(true))),
+            wrap -> wrap.withIfStatement(IntelliJ.wrappingAndBraces().getIfStatement().withElseOnNewLine(true))),
           java(
             """
               public class Test {
@@ -470,7 +489,7 @@ class WrappingAndBracesTest implements RewriteTest {
         rewriteRun(
           wrappingAndBraces(
             spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
-            wrap -> wrap.withIfStatement(new WrappingAndBracesStyle.IfStatement(false))),
+            wrap -> wrap),
           java(
             """
               public class Test {
@@ -494,6 +513,44 @@ class WrappingAndBracesTest implements RewriteTest {
                           System.out.println("if");
                       } else if (arg0 == 1) {
                           System.out.println("else if");
+                      } else {
+                          System.out.println("else");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ifAlwaysForceBraces() {
+        rewriteRun(
+          wrappingAndBraces(spaces -> spaces,
+            wrap -> wrap.withIfStatement(wrap.getIfStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))),
+          java(
+            """
+              public class Test {
+                  void method(int arg0) {
+                      if (arg0 == 0)
+                          System.out.println("if");
+                      else if (arg0 == 1) {
+                          System.out.println("else if 1");
+                          System.out.println("else if 2");
+                      }
+                      else
+                          System.out.println("else");
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void method(int arg0) {
+                      if (arg0 == 0) {
+                          System.out.println("if");
+                      } else if (arg0 == 1) {
+                          System.out.println("else if 1");
+                          System.out.println("else if 2");
                       } else {
                           System.out.println("else");
                       }
@@ -568,11 +625,10 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
-              
+
                   @Foo
                   @Foo
-                  void method(
-                          @Foo @Foo int param) {
+                  void method(@Foo @Foo int param) {
                       @Foo @Foo int localVar;
                   }
               }
@@ -581,8 +637,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo @Foo VALUE
               }
               
-              record someRecord(
-                      @Foo @Foo String name) {
+              record someRecord(@Foo @Foo String name) {
               }
               """
           )
@@ -612,20 +667,19 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
-              
+
                   @Foo
                   @Foo
                   void method(@Foo @Foo int param) {
                       @Foo @Foo int localVar;
                   }
               }
-              
+
               enum MyEnum {
                   @Foo @Foo VALUE
               }
-              
-              record someRecord(
-                      @Foo @Foo String name) {
+
+              record someRecord(@Foo @Foo String name) {
               }
               """
           )
@@ -669,11 +723,10 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-              
+
                   @Foo
                   @Foo
-                  public void method(
-                          @Foo @Foo final int param) {
+                  public void method(@Foo @Foo final int param) {
                       @Foo @Foo final int localVar;
                   }
               }
@@ -698,7 +751,6 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             SourceSpec::skip),
           java(
-
             """
               @Foo
               @Foo
@@ -706,11 +758,10 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-              
+                  
                   @Foo
                   @Foo
-                  public void method(
-                          @Foo @Foo final int param) {
+                  public void method(@Foo @Foo final int param) {
                       @Foo @Foo final int localVar;
                   }
               }
@@ -761,17 +812,16 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-              
+
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
-              
+
                   @Foo
                   @Foo
-                  T method(
-                          @Foo @Foo T param) {
+                  T method(@Foo @Foo T param) {
                       @Foo @Foo T localVar;
                       return param;
                   }
@@ -804,17 +854,16 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-              
+
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
-              
+
                   @Foo
                   @Foo
-                  T method(
-                          @Foo @Foo T param) {
+                  T method(@Foo @Foo T param) {
                       @Foo @Foo T localVar;
                       return param;
                   }
@@ -843,28 +892,28 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               class Test {
                   @Foo //comment
-                  String method1(){
+                  String method1() {
                       return "test";
                   }
-              
+
                   @Foo /* comment
                   on multiple
                   lines */
-                  String method2(){
+                  String method2() {
                       return "test";
                   }
-              
+
                   @Foo
                   //comment
-                  String method3(){
+                  String method3() {
                       return "test";
                   }
-              
+
                   @Foo
                   /* comment
                   on multiple
                   lines */
-                  String method4(){
+                  String method4() {
                       return "test";
                   }
               }
@@ -892,28 +941,26 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               class Test {
                   @Foo //comment
-                  final String method1(){
+                  final String method1() {
                       return "test";
                   }
-              
+
                   @Foo /* comment
                   on multiple
-                  lines */
-                  final String method2(){
+                  lines */ final String method2() {
                       return "test";
                   }
-              
+
                   @Foo
                   //comment
-                  final String method3(){
+                  final String method3() {
                       return "test";
                   }
-              
+
                   @Foo
                   /* comment
                   on multiple
-                  lines */
-                  final String method4(){
+                  lines */ final String method4() {
                       return "test";
                   }
               }
@@ -927,19 +974,11 @@ class WrappingAndBracesTest implements RewriteTest {
         rewriteRun(spec ->
             spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
               IntelliJ.spaces(),
-              new WrappingAndBracesStyle(
-                120,
-                new WrappingAndBracesStyle.IfStatement(false),
-                new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList(), false),
-                new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
-                new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null),
-              null))),
+              IntelliJ.wrappingAndBraces()
+                .withMethodDeclarationParameters(IntelliJ.wrappingAndBraces().getMethodDeclarationParameters().withWrap(WrapAlways)),
+              IntelliJ.tabsAndIndents(),
+              null,
+              true))),
           java(
             """
               import java.lang.annotation.Repeatable;
@@ -959,20 +998,17 @@ class WrappingAndBracesTest implements RewriteTest {
                   final String method1(){
                       return "test";
                   }
-              
                   @Foo /* comment
                   on multiple
                   lines */
                   final String method2(){
                       return "test";
                   }
-              
                   @Foo
                   //comment
                   final String method3(){
                       return "test";
                   }
-              
                   @Foo
                   /* comment
                   on multiple
@@ -980,6 +1016,1880 @@ class WrappingAndBracesTest implements RewriteTest {
                   final String method4(){
                       return "test";
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingRecords() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              record someRecord(
+                      @Foo
+                      @Foo
+                      String name,
+                      @Foo
+                      @Foo
+                      String place
+                      ) {
+              }
+              """,
+            """
+              record someRecord(@Foo @Foo String name, @Foo @Foo String place) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingRecordsWithOpenNewLineAndCloseNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withRecordComponents(wrap.getRecordComponents().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
+          ),
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              record someRecord(@Foo
+                                @Foo
+                                String name,
+                                @Foo
+                                @Foo
+                                String place) {
+              }
+              """,
+            """
+              record someRecord(
+                      @Foo @Foo String name,
+                      @Foo @Foo String place
+              ) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingRecordsWithNewLineAnnotations() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withRecordComponents(wrap.getRecordComponents().withWrap(WrapAlways).withNewLineForAnnotations(true))
+          ),
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              record someRecord(@Foo @Foo String name, @Foo @Foo String place) {
+              }
+              """,
+            """
+              record someRecord(@Foo
+                                @Foo
+                                String name,
+                                @Foo
+                                @Foo
+                                String place) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotWrapImplementsList() {
+        rewriteRun(
+          java("""
+            public class Interfaces {
+                public interface I1 {
+                }
+
+                public interface I2 {
+                }
+
+                public interface I3 {
+                }
+            }
+            """),
+          java(
+            """
+              public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alwaysWrapImplementsList() {
+        rewriteRun(spec ->
+            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
+              IntelliJ.spaces(),
+              IntelliJ.wrappingAndBraces()
+                .withExtendsImplementsPermitsList(IntelliJ.wrappingAndBraces().getExtendsImplementsPermitsList().withWrap(WrapAlways)),
+              IntelliJ.tabsAndIndents(),
+              null,
+              true))),
+          java("""
+            public class Interfaces {
+                public interface I1 {
+                }
+                public interface I2 {
+                }
+                public interface I3 {
+                }
+            }
+            """),
+          java(
+            """
+              public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
+              }
+              """,
+            """
+              public class Test implements Interfaces.I1,
+                      Interfaces.I2,
+                      Interfaces.I3 {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alignWrappedImplementsList() {
+        rewriteRun(spec ->
+            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
+              IntelliJ.spaces(),
+              IntelliJ.wrappingAndBraces()
+                .withExtendsImplementsPermitsList(IntelliJ.wrappingAndBraces().getExtendsImplementsPermitsList().withWrap(WrapAlways).withAlignWhenMultiline(true)),
+              IntelliJ.tabsAndIndents(),
+              null,
+              true))),
+          java("""
+            public class Interfaces {
+                public interface I1 {
+                }
+                public interface I2 {
+                }
+                public interface I3 {
+                }
+            }
+            """),
+          java(
+            """
+              public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
+              }
+              """,
+            """
+              public class Test implements Interfaces.I1,
+                                           Interfaces.I2,
+                                           Interfaces.I3 {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0;
+                           i < 10;
+                           i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forNoAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withAlignWhenMultiline(false))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0;
+                              i < 10;
+                              i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forOpenAndCloseOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
+            ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      for (
+                              int i = 0;
+                              i < 10;
+                              i++
+                      ) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forOnlyOpenAndCloseOnNewLineWhenWrapping() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withOpenNewLine(true).withCloseNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forWithForcedBlock() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withForStatement(wrap.getForStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++)
+                          System.out.println(i);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void whileWithForcedBlock() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withWhileStatement(wrap.getWhileStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      while (true)
+                          System.out.println("TESTING");
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      while (true) {
+                          System.out.println("TESTING");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doWhileWithForcedBlock() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withDoWhileStatement(wrap.getDoWhileStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      do
+                          System.out.println("TESTING");
+                      while (true);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      do {
+                          System.out.println("TESTING");
+                      } while (true);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doWhileWithWhileOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withDoWhileStatement(wrap.getDoWhileStatement().withWhileOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      do {
+                          System.out.println("TESTING");
+                      } while (true);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      do {
+                          System.out.println("TESTING");
+                      }
+                      while (true);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");
+                           BufferedReader br = new BufferedReader(fr);
+                           FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesNoAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withAlignWhenMultiline(false))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");
+                              BufferedReader br = new BufferedReader(fr);
+                              FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesOpenAndCloseOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (
+                              FileReader fr = new FileReader("input.txt");
+                              BufferedReader br = new BufferedReader(fr);
+                              FileWriter fw = new FileWriter("output.txt")
+                      ) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesOpenAndCloseOnNewLineOnlyWhenWrapping() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withOpenNewLine(true).withCloseNewLine(true))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesWithBlockInside() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.util.function.Supplier;
+              
+              public class Test {
+                  void test() {
+                      try (Resource r1 = new Resource(() -> true); Resource r2 = new Resource(() -> {
+                          assert true;
+                          return true;
+                      }); Resource r3 = new Resource()) {
+                      }
+                  }
+              
+                  class Resource implements AutoCloseable {
+                      Resource() {
+                      }
+              
+                      Resource(Supplier<Boolean> supplier) {
+                      }
+              
+                      @Override
+                      public void close() {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.util.function.Supplier;
+              
+              public class Test {
+                  void test() {
+                      try (Resource r1 = new Resource(() -> true);
+                           Resource r2 = new Resource(() -> {
+                               assert true;
+                               return true;
+                           });
+                           Resource r3 = new Resource()) {
+                      }
+                  }
+              
+                  class Resource implements AutoCloseable {
+                      Resource() {
+                      }
+              
+                      Resource(Supplier<Boolean> supplier) {
+                      }
+              
+                      @Override
+                      public void close() {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryStatement(wrap.getTryStatement().withCatchOnNewLine(true).withFinallyOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      try {
+                          System.out.println("try");
+                      } catch (RuntimeException e) {
+                          System.out.println("catch");
+                      } catch (Exception e) {
+                          System.out.println("exception");
+                      } catch (Throwable | Error e) {
+                          System.out.println("error or throwable");
+                      } finally {
+                          System.out.println("finally");
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      try {
+                          System.out.println("try");
+                      }
+                      catch (RuntimeException e) {
+                          System.out.println("catch");
+                      }
+                      catch (Exception e) {
+                          System.out.println("exception");
+                      }
+                      catch (Throwable | Error e) {
+                          System.out.println("error or throwable");
+                      }
+                      finally {
+                          System.out.println("finally");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchNotOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTryStatement(wrap.getTryStatement().withCatchOnNewLine(false).withFinallyOnNewLine(false))
+          ),
+          java(
+            """
+              class Test {
+                  void test() {
+                      try {
+                          System.out.println("try");
+                      }
+                      catch (RuntimeException e) {
+                          System.out.println("catch");
+                      }
+                      catch (Exception e) {
+                          System.out.println("exception");
+                      }
+                      catch (Throwable | Error e) {
+                          System.out.println("error or throwable");
+                      }
+                      finally {
+                          System.out.println("finally");
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      try {
+                          System.out.println("try");
+                      } catch (RuntimeException e) {
+                          System.out.println("catch");
+                      } catch (Exception e) {
+                          System.out.println("exception");
+                      } catch (Throwable | Error e) {
+                          System.out.println("error or throwable");
+                      } finally {
+                          System.out.println("finally");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsKeyword() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test()
+                          throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsKeywordIfLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapIfTooLong))
+          ),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void testNameWhichIsRealyTooLongForThisLimitOf120SoThatTheMethodsThrowListWillBeTooLong() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+
+                  void test() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void testNameWhichIsRealyTooLongForThisLimitOf120SoThatTheMethodsThrowListWillBeTooLong()
+                          throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+
+                  void test() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alignThrowsToMethodStart() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withThrowsList(wrap.getThrowsList().withAlignThrowsToMethodStart(true))
+              .withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test()
+                  throws FileNotFoundException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsListAlways() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws FileNotFoundException, IOException, RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws
+                          FileNotFoundException,
+                          IOException,
+                          RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsListAlwaysAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws FileNotFoundException, IOException, RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws
+                              FileNotFoundException,
+                              IOException,
+                              RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsListIfLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapIfTooLong))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void testNameWhichIsReallyWayTooLongForThisLimitOf120SoWraps() throws FileNotFoundException, IOException, RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+
+                  void test() throws FileNotFoundException, IOException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void testNameWhichIsReallyWayTooLongForThisLimitOf120SoWraps() throws
+                          FileNotFoundException,
+                          IOException,
+                          RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+
+                  void test() throws FileNotFoundException, IOException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapThrowsListWithThrowsKeywordWrap() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapAlways))
+              .withThrowsList(wrap.getThrowsList().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() throws FileNotFoundException, IOException, RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test()
+                          throws
+                          FileNotFoundException,
+                          IOException,
+                          RuntimeException {
+                      FileReader fr = new FileReader("input.txt");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsWrapAlways() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED, STARTED, COMPLETED
+              }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED,
+                  COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsWrapAlwaysAlreadyCorrect() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED,
+                  COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsChopIfTooLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withHardWrapAt(60)
+              .withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED, STARTED_BUT_NAMED_VERY_LONG_TO_MAKE_SURE_THAT_WE_WRAP, COMPLETED
+              }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED_BUT_NAMED_VERY_LONG_TO_MAKE_SURE_THAT_WE_WRAP,
+                  COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsChopIfTooLongNotLongEnough() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED, STARTED, COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsSingleLineChopIfTooLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withHardWrapAt(40)
+              .withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              enum Status { NOT_STARTED, STARTED, COMPLETED }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED,
+                  COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsSingleLineChopIfTooLongNotLongEnough() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces.withOther(spaces.getOther().withInsideOneLineEnumBraces(true)),
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              enum Status { NOT_STARTED, STARTED, COMPLETED }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsDoNotWrap() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(DoNotWrap))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED, STARTED, COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsWithArguments() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              enum Status {
+                  NOT_STARTED("Not Started"), STARTED("Started"), COMPLETED("Completed");
+
+                  private final String displayName;
+
+                  Status(String displayName) {
+                      this.displayName = displayName;
+                  }
+              }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED("Not Started"),
+                  STARTED("Started"),
+                  COMPLETED("Completed");
+
+                  private final String displayName;
+
+                  Status(String displayName) {
+                      this.displayName = displayName;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantsSingleLineToWrapped() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              enum Status { NOT_STARTED, STARTED, COMPLETED }
+              """,
+            """
+              enum Status {
+                  NOT_STARTED,
+                  STARTED,
+                  COMPLETED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierListWrapAfterModifierListClass() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
+          ),
+          java(
+            """
+              public final class Test {
+              }
+              """,
+            """
+              public final
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierListWrapAfterModifierListMethod() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
+          ),
+          java(
+            """
+              class Test {
+                  public static void method() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  public static
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierListWrapAfterModifierListField() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
+          ),
+          java(
+            """
+              class Test {
+                  public static final int CONSTANT = 1;
+              }
+              """,
+            """
+              class Test {
+                  public static final
+                  int CONSTANT = 1;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierListWrapAfterModifierListAlreadyCorrect() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
+          ),
+          java(
+            """
+              public final
+              class Test {
+                  public static final
+                  int CONSTANT = 1;
+
+                  public static
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierListNoWrapAfterModifierList() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(false))
+          ),
+          java(
+            """
+              public final class Test {
+                  public static final int CONSTANT = 1;
+
+                  public static void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerWrapAlways() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {1,
+                          2,
+                          3,
+                          4,
+                          5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerWrapAlwaysAlreadyCorrect() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1,
+                          2,
+                          3,
+                          4,
+                          5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerWrapAlwaysAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {1,
+                                   2,
+                                   3,
+                                   4,
+                                   5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerNewLineAfterOpeningCurly() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways).withNewLineAfterOpeningCurly(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {
+                          1,
+                          2,
+                          3,
+                          4,
+                          5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerPlaceClosingCurlyOnNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways).withPlaceClosingCurlyOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {1,
+                          2,
+                          3,
+                          4,
+                          5
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerAllOptions() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer()
+              .withWrap(WrapAlways)
+              .withNewLineAfterOpeningCurly(true)
+              .withPlaceClosingCurlyOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = {
+                          1,
+                          2,
+                          3,
+                          4,
+                          5
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerDoNotWrap() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(DoNotWrap))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerChopIfTooLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withHardWrapAt(40)
+              .withArrayInitializer(wrap.getArrayInitializer().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              class Test {
+                  Object[] numbers = {1, 2, "SOME VERY LONG VALUE CAUSING THE LINE TO BE LONG", 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  Object[] numbers = {1,
+                          2,
+                          "SOME VERY LONG VALUE CAUSING THE LINE TO BE LONG",
+                          4,
+                          5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerChopIfTooLongNotLongEnough() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = {1, 2, 3, 4, 5};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInitializerWithNewArray() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer()
+              .withWrap(WrapAlways)
+              .withNewLineAfterOpeningCurly(true)
+              .withPlaceClosingCurlyOnNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  int[] numbers = new int[]{1, 2, 3, 4, 5};
+              }
+              """,
+            """
+              class Test {
+                  int[] numbers = new int[]{
+                          1,
+                          2,
+                          3,
+                          4,
+                          5
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersWrapAlways() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(value = "all",
+                      justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersWrapAlwaysAlreadyCorrect() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all",
+                      justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersWrapAlwaysAlignWhenMultiline() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(value = "all",
+                                justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersOpenNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways).withOpenNewLine(true))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(
+                      value = "all",
+                      justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersCloseNewLine() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways).withCloseNewLine(true))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(value = "all",
+                      justification = "test"
+              )
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersAllOptions() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters()
+              .withWrap(WrapAlways)
+              .withOpenNewLine(true)
+              .withCloseNewLine(true))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(
+                      value = "all",
+                      justification = "test"
+              )
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersDoNotWrap() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(DoNotWrap))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersChopIfTooLong() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+              .withHardWrapAt(60)
+              .withAnnotationParameters(wrap.getAnnotationParameters().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "this is a very long justification")
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(value = "all",
+                      justification = "this is a very long justification")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersChopIfTooLongNotLongEnough() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(ChopIfTooLong))
+          ),
+          java(
+            """
+              @SuppressWarnings(value = "all", justification = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersOnMethod() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters()
+              .withWrap(WrapAlways)
+              .withOpenNewLine(true)
+              .withCloseNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  @SuppressWarnings(value = "all", justification = "test")
+                  void method() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  @SuppressWarnings(
+                          value = "all",
+                          justification = "test"
+                  )
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationParametersOnField() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters()
+              .withWrap(WrapAlways)
+              .withOpenNewLine(true)
+              .withCloseNewLine(true))
+          ),
+          java(
+            """
+              class Test {
+                  @SuppressWarnings(value = "all", justification = "test")
+                  private int field;
+              }
+              """,
+            """
+              class Test {
+                  @SuppressWarnings(
+                          value = "all",
+                          justification = "test"
+                  )
+                  private int field;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlocksNotAligned() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+                    ""\";
+                  private final String bar =
+                    ""\"
+                      NO
+                      ""\";
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+                    ""\";
+                  private final String bar = ""\"
+                    NO
+                    ""\";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlocksAligned() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTextBlocks(wrap.getTextBlocks().withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+                    ""\";
+                  private final String bar =
+                    ""\"
+                      NO
+                      ""\";
+                  private final String singleLine = ""\"
+                    noEndLine""\";
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                                             YES
+                                             ""\";
+                  private final String bar = ""\"
+                                             NO
+                                             ""\";
+                  private final String singleLine = ""\"
+                                                    noEndLine""\";
               }
               """
           )

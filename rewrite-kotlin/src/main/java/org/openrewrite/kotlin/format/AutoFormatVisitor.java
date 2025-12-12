@@ -53,9 +53,9 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
         // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
         J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
         t = new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p, cursor.fork());
-        t = new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter).visit(t, p, cursor.fork());
         t = new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter).visit(t, p, cursor.fork());
         t = new SpacesVisitor<>(Style.from(SpacesStyle.class, cu, IntelliJ::spaces), stopAfter).visit(t, p, cursor.fork());
+        t = new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter).visit(t, p, cursor.fork());
         t = new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter).visit(t, p, cursor.fork());
         t = new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter).visit(t, p, cursor.fork());
         t = new NormalizeLineBreaksVisitor<>(Style.from(GeneralFormatStyle.class, cu, () -> new GeneralFormatStyle(false)), stopAfter).visit(t, p, cursor.fork());

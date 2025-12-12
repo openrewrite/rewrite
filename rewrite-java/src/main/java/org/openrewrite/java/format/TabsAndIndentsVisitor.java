@@ -154,7 +154,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
         }
 
-        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null || loc == Space.Location.TRY_RESOURCE) {
+        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null) {
             return space;
         }
 
@@ -163,6 +163,33 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             if (chainedIndent != null) {
                 getCursor().getParentTreeCursor().putMessage("lastIndent", chainedIndent);
                 return indentTo(space, chainedIndent, loc);
+            }
+        }
+
+        if (loc == Space.Location.ANNOTATION_PREFIX) {
+            J annotated = getCursor().getParentTreeCursor().getValue();
+            List<J.Annotation> annotations = null;
+            if (annotated instanceof J.VariableDeclarations) {
+                annotations = ((J.VariableDeclarations) annotated).getLeadingAnnotations();
+            } else if (annotated instanceof J.MethodDeclaration) {
+                annotations = ((J.MethodDeclaration) annotated).getLeadingAnnotations();
+            } else if (annotated instanceof J.ClassDeclaration) {
+                annotations = ((J.ClassDeclaration) annotated).getLeadingAnnotations();
+            } else if (annotated instanceof J.EnumValue) {
+                annotations = ((J.EnumValue) annotated).getAnnotations();
+            }
+            if (annotations != null && !annotations.isEmpty()) {
+                J.Annotation firstAnnotation = annotations.get(0);
+                if (!firstAnnotation.getPrefix().getLastWhitespace().contains("\n") && !annotated.getPrefix().getLastWhitespace().contains("\n")) {
+                    try {
+                        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                        if (sourceFile != null) {
+                            int alignTo = getCursor().firstEnclosing(JavaSourceFile.class).service(SourcePositionService.class).positionOf(getCursor(), annotated).getStartColumn() - 1;
+                            getCursor().getParentTreeCursor().putMessage("lastIndent", alignTo);
+                            return indentTo(space, alignTo, loc);
+                        }
+                    } catch (UnsupportedOperationException ignored) {}
+                }
             }
         }
 
@@ -189,6 +216,18 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         if (alignBlockPrefixToParent || alignBlockToParent || alignToAnnotation) {
             indentType = IndentType.ALIGN;
+        }
+
+        switch (loc) {
+            case TYPE_PARAMETERS_PREFIX:
+            case IDENTIFIER_PREFIX:
+            case PRIMITIVE_PREFIX:
+                Object parentValue = parent.getValue();
+                if (parentValue instanceof J.VariableDeclarations || parentValue instanceof J.MethodDeclaration || parentValue instanceof J.ClassDeclaration) {
+                    // only align when it's the return type or variable type or class name.
+                    indentType = IndentType.ALIGN;
+                }
+                break;
         }
 
         switch (indentType) {
@@ -232,6 +271,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     elem.getPrefix().getLastWhitespace().contains("\n") ||
                     (elem.getPrefix().getWhitespace().contains("\n") && elem.getPrefix().getComments().stream().noneMatch(c -> c.getSuffix().contains("\n")))) {
                 switch (loc) {
+                    case TRY_RESOURCE:
+                        if (alignWhenMultiple(loc) && !((JContainer<J.Try.Resource>)getCursor().getParent().getValue()).getElements().get(0).getPrefix().getLastWhitespace().contains("\n")) {
+                            getCursor().putMessage("indentType", IndentType.ALIGN);
+                            getCursor().putMessage("lastIndent", indent + 5);
+                        }
+                        elem = visitAndCast(elem, p);
+                        after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
+                        break;
                     case FOR_CONDITION:
                     case FOR_UPDATE: {
                         J.ForLoop.Control control = getCursor().getParentOrThrow().getValue();
@@ -362,40 +409,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
                         break;
-                    case TRY_RESOURCE:
-                        // Align subsequent resources with the first resource in try-with-resources
-                        JContainer<J> resources = getCursor().getParentOrThrow().getValue();
-                        List<JRightPadded<J>> resourceElements = resources.getPadding().getElements();
-                        if (resourceElements.size() > 1 && resourceElements.get(0) != right && elem.getPrefix().getLastWhitespace().contains("\n")) {
-                            // For resources after the first one, align with the first resource
-                            J firstResource = resourceElements.get(0).getElement();
-                            if (!firstResource.getPrefix().getLastWhitespace().contains("\n")) {
-                                // First resource is on the same line as try(
-                                // We need to calculate the indent based on the try statement position
-                                // For now, let's use a simplified approach - align with the opening parenthesis
-                                // Count the column position by looking at the try statement prefix and "try ("
-                                J.Try tryStatement = getCursor().firstEnclosing(J.Try.class);
-                                String tryPrefix = tryStatement.getPrefix().getWhitespace();
-                                int tryIndent = getLengthOfWhitespace(tryPrefix.substring(tryPrefix.lastIndexOf('\n') + 1));
-                                // Add 3 for "try" and 1 for "(" and optionally one for space in between
-                                int firstResourceColumn = tryIndent + 4 + (spacesStyle.getBeforeParentheses().getTryParentheses() ? 1 : 0);
-                                elem = elem.withPrefix(indentTo(elem.getPrefix(), firstResourceColumn, Space.Location.TRY_RESOURCE));
-                                elem = visitAndCast(elem, p);
-                                after = right.getAfter();
-                            } else {
-                                // First resource is on a new line, align with it
-                                String firstResourcePrefix = firstResource.getPrefix().getWhitespace();
-                                int firstResourceIndent = getLengthOfWhitespace(firstResourcePrefix.substring(firstResourcePrefix.lastIndexOf('\n') + 1));
-                                elem = elem.withPrefix(indentTo(elem.getPrefix(), firstResourceIndent, Space.Location.TRY_RESOURCE));
-                                elem = visitAndCast(elem, p);
-                                after = right.getAfter();
-                            }
-                        } else {
-                            // For the first resource or single resource, use default handling
-                            elem = visitAndCast(elem, p);
-                            after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-                        }
-                        break;
                     default:
                         elem = visitAndCast(elem, p);
                         if (right.getAfter().getLastWhitespace().contains("\n") && alignWhenMultiple(loc)) {
@@ -514,9 +527,15 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case IMPLEMENTS:
                 case THROWS:
                 case NEW_CLASS_ARGUMENTS:
-                    before = indentTo(container.getBefore(), indent + style.getContinuationIndent(), loc.getBeforeLocation());
-                    getCursor().putMessage("indentType", IndentType.ALIGN);
-                    getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    if (loc != JContainer.Location.THROWS || !evaluate(() -> wrappingStyle.getThrowsList().getAlignThrowsToMethodStart(), false)) {
+                        before = indentTo(container.getBefore(), indent + style.getContinuationIndent(), loc.getBeforeLocation());
+                        getCursor().putMessage("indentType", IndentType.ALIGN);
+                        getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    } else {
+                        before = indentTo(container.getBefore(), indent, loc.getBeforeLocation());
+                        getCursor().putMessage("indentType", IndentType.ALIGN);
+                        getCursor().putMessage("lastIndent", indent);
+                    }
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
                     break;
                 default:
@@ -529,7 +548,41 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case METHOD_INVOCATION_ARGUMENTS:
                 case NEW_CLASS_ARGUMENTS:
                 case TYPE_PARAMETERS:
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                    before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
+                    break;
                 case THROWS:
+                    if (alignWhenMultiple(loc.getElementLocation())) {
+                        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                        try {
+                            int alignTo = sourceFile.service(SourcePositionService.class).positionOf(getCursor().getParentTreeCursor(), ((J.MethodDeclaration) getCursor().getParentTreeCursor().getValue()).getPadding().getParameters()).getEndColumn() + 1; // count the closing parenthesis
+                            before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+                            getCursor().putMessage("indentType", IndentType.ALIGN);
+                            getCursor().putMessage("lastIndent", alignTo);
+                            js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
+                            break;
+                        } catch (UnsupportedOperationException ignored) {
+                        }
+                    }
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                    before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
+                    break;
+                case NEW_ARRAY_INITIALIZER:
+                case ANNOTATION_ARGUMENTS:
+                    if (alignWhenMultiple(loc.getElementLocation())) {
+                        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                        try {
+                            int alignTo = sourceFile.service(SourcePositionService.class).positionOf(getCursor()).getStartColumn() - 1; // column is index 1-based
+                            before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+                            getCursor().putMessage("indentType", IndentType.ALIGN);
+                            getCursor().putMessage("lastIndent", alignTo);
+                            js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
+                            break;
+                        } catch (UnsupportedOperationException ignored) {
+                        }
+                    }
                     getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
                     before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
@@ -554,13 +607,32 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             case FOR_UPDATE:
             case METHOD_DECLARATION_PARAMETER:
             case RECORD_STATE_VECTOR:
-            case TRY_RESOURCE:
                 isAlignedWhenMultipleFromStyle = () -> null;
                 intelliJDefault = true;
                 break;
             case METHOD_SELECT:
                 //noinspection ConstantConditions
                 isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getChainedMethodCalls() != null && wrappingStyle.getChainedMethodCalls().getAlignWhenMultiline();
+                intelliJDefault = false;
+                break;
+            case TRY_RESOURCE:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getTryWithResources() != null && wrappingStyle.getTryWithResources().getAlignWhenMultiline();
+                intelliJDefault = true;
+                break;
+            case THROWS:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getThrowsList() != null && wrappingStyle.getThrowsList().getAlignWhenMultiline();
+                intelliJDefault = false;
+                break;
+            case NEW_ARRAY_INITIALIZER:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getArrayInitializer() != null && wrappingStyle.getArrayInitializer().getAlignWhenMultiline();
+                intelliJDefault = false;
+                break;
+            case ANNOTATION_ARGUMENT:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getAnnotationParameters() != null && wrappingStyle.getAnnotationParameters().getAlignWhenMultiline();
                 intelliJDefault = false;
                 break;
             default:
@@ -817,6 +889,15 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         ALIGN,
         INDENT,
         CONTINUATION_INDENT
+    }
+
+    private <T> T evaluate(Supplier<T> supplier, T defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError | NoSuchFieldError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
     }
 
     @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")

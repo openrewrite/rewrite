@@ -421,12 +421,12 @@ class AutoFormatTest implements RewriteTest {
               public class Test {
                   void test() {
                       int i;
-                      if (1 < 3) { /* multiline comment */
+                      if (1 < 1) { /* multiline comment */
                           i = 1;
                       }
-                      if (1 < 3) /* multiline comment */
-                          i = 1;
-                      if (1 < 3) /* multiline comment */ i = 1;
+                      if (1 < 2) /* multiline comment */
+                          i = 2;
+                      if (1 < 3) /* multiline comment */ i = 3;
                   }
               }
               """,
@@ -434,11 +434,11 @@ class AutoFormatTest implements RewriteTest {
               public class Test {
                   void test() {
                       int i;
-                      if (1 < 3) { /* multiline comment */
+                      if (1 < 1) { /* multiline comment */
                           i = 1;
                       }
-                      if (1 < 3) /* multiline comment */ i = 1;
-                      if (1 < 3) /* multiline comment */ i = 1;
+                      if (1 < 2) /* multiline comment */ i = 2;
+                      if (1 < 3) /* multiline comment */ i = 3;
                   }
               }
               """
@@ -462,6 +462,9 @@ class AutoFormatTest implements RewriteTest {
                               return -1;
                           case 5: /* multiline comment */
                           case 6: /* multiline comment */ return -2;
+                          case 7: {
+                              return -2;
+                          }
                           default:
                               return 0;
                       }
@@ -482,6 +485,9 @@ class AutoFormatTest implements RewriteTest {
                           case 5: /* multiline comment */
                           case 6: /* multiline comment */
                               return -2;
+                          case 7: {
+                              return -2;
+                          }
                           default:
                               return 0;
                       }
@@ -1015,9 +1021,37 @@ class AutoFormatTest implements RewriteTest {
                   @Foo
                   /* comment
                   on multiple
-                  lines */
-                  final String method4() {
+                  lines */ final String method4() {
                       return "test";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentsAreHandled() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  @Override
+                  // Note: This means any two pairs with null for both values will match each
+                  // other but what can I do?  This is due to stupid type erasure.
+                      public
+                      int hashCode() {
+                      return (0);
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  @Override
+                  // Note: This means any two pairs with null for both values will match each
+                  // other but what can I do?  This is due to stupid type erasure.
+                  public int hashCode() {
+                      return (0);
                   }
               }
               """
@@ -1625,7 +1659,7 @@ class AutoFormatTest implements RewriteTest {
                       boolean someCondition(Item item) {
                           return true;
                       }
-                      
+
                       boolean otherCondition(Item item) {
                           return false;
                       }
