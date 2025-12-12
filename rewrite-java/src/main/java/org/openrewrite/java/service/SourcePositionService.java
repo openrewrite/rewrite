@@ -112,37 +112,73 @@ public class SourcePositionService {
     /**
      * Computes the position span of the element at the given cursor.
      *
-     * @see #positionOfChild(Cursor, Object)
+     * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor) {
-        return positionOfChild(cursor, cursor.getValue());
+        return positionOfChild(cursor, cursor.getValue(), cursor.getParent());
     }
 
     /**
      * Computes the position span of a container element.
      *
-     * @see #positionOfChild(Cursor, Object)
+     * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor, JContainer<? extends J> container) {
-        return positionOfChild(cursor, container);
+        return positionOfChild(cursor, container, cursor.getParent());
     }
 
     /**
      * Computes the position span of a right-padded element.
      *
-     * @see #positionOfChild(Cursor, Object)
+     * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor, JRightPadded<J> rightPadded) {
-        return positionOfChild(cursor, rightPadded);
+        return positionOfChild(cursor, rightPadded, cursor.getParent());
     }
 
     /**
      * Computes the position span of a J element.
      *
-     * @see #positionOfChild(Cursor, Object)
+     * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor, J child) {
-        return positionOfChild(cursor, child);
+        return positionOfChild(cursor, child, cursor.getParent());
+    }
+
+    /**
+     * Computes the position span of the element at the given cursor.
+     *
+     * @see #positionOfChild(Cursor, Object, Cursor)
+     */
+    public ColSpan columnsOf(Cursor cursor) {
+        return positionOfChild(cursor, cursor.getValue(), computeNewLinedCursorElement(cursor)).asColSpan();
+    }
+
+    /**
+     * Computes the position span of a container element.
+     *
+     * @see #positionOfChild(Cursor, Object, Cursor)
+     */
+    public ColSpan columnsOf(Cursor cursor, JContainer<? extends J> container) {
+        return positionOfChild(cursor, container, new Cursor(null, computeNewLinedCursorElement(cursor))).asColSpan();
+    }
+
+    /**
+     * Computes the position span of a right-padded element.
+     *
+     * @see #positionOfChild(Cursor, Object, Cursor)
+     */
+    public ColSpan columnsOf(Cursor cursor, JRightPadded<J> rightPadded) {
+        return positionOfChild(cursor, rightPadded, new Cursor(null, computeNewLinedCursorElement(cursor))).asColSpan();
+    }
+
+    /**
+     * Computes the position span of a J element.
+     *
+     * @see #positionOfChild(Cursor, Object, Cursor)
+     */
+    public ColSpan columnsOf(Cursor cursor, J child) {
+        return positionOfChild(cursor, child, new Cursor(null, computeNewLinedCursorElement(cursor))).asColSpan();
     }
 
     /**
@@ -171,10 +207,10 @@ public class SourcePositionService {
             J j = (J) cursorValue;
             boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
             Cursor parent = cursor.dropParentUntil(it -> (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded))); // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
-            if (!(parent.getValue() instanceof Tree)) {
-                parent = parent.getParentTreeCursor();
+            while (!(parent.getValue() instanceof Tree) && parent.getParent() != null) {
+                parent = parent.getParent();
             }
-            boolean isRootOrCompilationUnit = parent.getValue() instanceof JavaSourceFile || parent.getValue() == Cursor.ROOT_VALUE;
+            boolean isRootOrCompilationUnit = parent.getValue() instanceof JavaSourceFile || parent.getValue() == Cursor.ROOT_VALUE || parent.getParent() == null;
             if (!hasNewLine && !isRootOrCompilationUnit) {
                 return computeNewLinedCursorElement(parent);
             }
@@ -261,7 +297,7 @@ public class SourcePositionService {
      * @throws IllegalArgumentException if the child is a raw {@link Collection} (use padding accessor methods instead),
      *                                  if the child type is not supported, or if the child cannot be found in the source file
      */
-    private Span positionOfChild(Cursor cursor, Object child) {
+    private Span positionOfChild(Cursor cursor, Object child, Cursor parent) {
         J findJ;
         JContainer<J> findJContainer;
         JRightPadded<J> findJRightPadded;
@@ -406,16 +442,17 @@ public class SourcePositionService {
                 return this;
             }
         };
-        Cursor printCursor = cursor;
+        Cursor printCursor = parent;
         boolean hasJavaSourceFileInPath = true;
-        if (!(cursor.getValue() instanceof JavaSourceFile)) {
+        if (!(printCursor.getValue() instanceof JavaSourceFile)) {
             try {
                 printCursor = cursor.dropParentUntil(c -> c instanceof JavaSourceFile);
             } catch (IllegalStateException ignored) {
                 // We might have been called with new Cursor(null, someTreeOtherThanSourceFile), so we need to create a parent for printing.
                 // we can do best effort to calculate columns even without JavaSourceFile in the path, with only the risk of the first element in the cursor path being miscalculated.
                 // In this case, we will set line numbers to -1 to indicate unknown line numbers.
-                while (printCursor.getParent() != null && printCursor.getParent(2) != null) {
+                // This is also used for colspan calculations where line numbers are not needed and we want to avoid printing the entire source file.
+                while (printCursor.getParent() != null && printCursor.getParent().getValue() != Cursor.ROOT_VALUE) {
                     printCursor = printCursor.getParent();
                 }
                 hasJavaSourceFileInPath = false;

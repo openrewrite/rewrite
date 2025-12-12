@@ -23,18 +23,8 @@ import lombok.Value;
  */
 @Value
 @Builder
-public class Span {
-    int startLine;
+public class ColSpan {
     int startColumn;
-    int endLine;
     int endColumn;
     int maxColumn;
-
-    public ColSpan asColSpan() {
-        return ColSpan.builder()
-                .startColumn(startColumn)
-                .endColumn(endColumn)
-                .maxColumn(maxColumn)
-                .build();
-    }
 }
