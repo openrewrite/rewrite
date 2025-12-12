@@ -370,7 +370,7 @@ class ResolvedPomTest implements RewriteTest {
     @Test
     void propertyWithNullValue() {
         rewriteRun(
-          mavenProject(
+          pomXml(
             //language=pom
             """
               <project>
