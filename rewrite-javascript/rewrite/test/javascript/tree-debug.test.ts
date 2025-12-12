@@ -464,5 +464,26 @@ describe("LST Debug Utilities", () => {
                 console.info = originalInfo;
             }
         });
+
+        test("shows markers like TrailingComma in RightPadded", async () => {
+            // Array with trailing comma
+            const source = `const arr = [1, 2,];`;
+            const cu = await parse(source);
+
+            const logs: string[] = [];
+            const originalInfo = console.info;
+            console.info = (msg: string) => logs.push(msg);
+
+            try {
+                const visitor = new LstDebugVisitor({}, {printPreVisit: true, printPostVisit: false});
+                await visitor.visit(cu, new ExecutionContext());
+
+                const output = logs.join('\n');
+                // Should show TrailingComma marker on the last element's RightPadded
+                expect(output).toContain('markers=[TrailingComma]');
+            } finally {
+                console.info = originalInfo;
+            }
+        });
     });
 });
