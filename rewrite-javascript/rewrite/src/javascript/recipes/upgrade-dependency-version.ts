@@ -18,7 +18,6 @@ import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
 import {getMemberKeyName, isLiteral, Json, JsonVisitor} from "../../json";
-import {isDocuments, Yaml, YamlVisitor} from "../../yaml";
 import {
     allDependencyScopes,
     DependencyScope,
@@ -31,9 +30,9 @@ import {markupWarn, replaceMarkerByKind} from "../../markers";
 import {TreePrinters} from "../../print";
 import {
     createDependencyRecipeAccumulator,
+    createLockFileEditor,
     DependencyRecipeAccumulator,
     getAllLockFileNames,
-    getUpdatedLockFileContent,
     parseLockFileContent,
     runInstallIfNeeded,
     runInstallInTempDir,
@@ -213,7 +212,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
 
-        // Create visitors for each file type
+        // Create JSON visitor that handles both package.json and JSON lock files
         const jsonEditor = new class extends JsonVisitor<ExecutionContext> {
             protected async visitDocument(doc: Json.Document, ctx: ExecutionContext): Promise<Json | undefined> {
                 const sourcePath = doc.sourcePath;
@@ -258,41 +257,19 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
 
                 // Handle JSON lock files (package-lock.json, bun.lock)
                 const lockFileName = path.basename(sourcePath);
-                const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
-                if (updatedLockContent && getAllLockFileNames().includes(lockFileName)) {
-                    return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
+                if (getAllLockFileNames().includes(lockFileName)) {
+                    const updatedLockContent = acc.updatedLockFiles.get(sourcePath);
+                    if (updatedLockContent) {
+                        return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
+                    }
                 }
 
                 return doc;
             }
         };
 
-        const yamlEditor = new class extends YamlVisitor<ExecutionContext> {
-            protected async visitDocuments(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml | undefined> {
-                const sourcePath = docs.sourcePath;
-                const lockFileName = path.basename(sourcePath);
-
-                // Handle YAML lock files (pnpm-lock.yaml)
-                const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
-                if (updatedLockContent && getAllLockFileNames().includes(lockFileName)) {
-                    return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Yaml.Documents;
-                }
-
-                return docs;
-            }
-        };
-
-        // Return a composite visitor that delegates based on tree type
-        return new class extends TreeVisitor<any, ExecutionContext> {
-            async visit(tree: any, ctx: ExecutionContext): Promise<any> {
-                if (isDocuments(tree)) {
-                    return yamlEditor.visit(tree, ctx);
-                } else if (tree && tree.kind === Json.Kind.Document) {
-                    return jsonEditor.visit(tree, ctx);
-                }
-                return tree;
-            }
-        };
+        // Return composite visitor that handles both JSON and YAML lock files
+        return createLockFileEditor(jsonEditor, acc);
     }
 
     /**

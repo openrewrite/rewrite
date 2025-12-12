@@ -94,6 +94,12 @@ version: 0.0.1`;
         expect(result).toBe(yaml);
     });
 
+    test('trailing comma in inline mapping', async () => {
+        const yaml = `obj: {a: 1, b: 2,}`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
     test('double quoted string', async () => {
         const yaml = `message: "hello world"`;
         const result = await parseAndPrint(yaml);

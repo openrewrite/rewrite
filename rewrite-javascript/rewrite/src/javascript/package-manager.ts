@@ -23,10 +23,12 @@ import {
     readNpmrcConfigs
 } from "./node-resolution-result";
 import {replaceMarkerByKind} from "../markers";
-import {Json, JsonParser} from "../json";
-import {Yaml, YamlParser} from "../yaml";
+import {Json, JsonParser, JsonVisitor} from "../json";
+import {isDocuments, Yaml, YamlParser, YamlVisitor} from "../yaml";
 import {PlainTextParser} from "../text";
 import {SourceFile} from "../tree";
+import {TreeVisitor} from "../visitor";
+import {ExecutionContext} from "../execution";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
@@ -637,4 +639,53 @@ export async function runInstallInTempDir(
             // Ignore cleanup errors
         }
     }
+}
+
+/**
+ * Creates a lock file visitor that handles updating YAML lock files (pnpm-lock.yaml).
+ * This is a reusable component for dependency recipes.
+ *
+ * @param acc The recipe accumulator containing updated lock file content
+ * @returns A YamlVisitor that updates YAML lock files
+ */
+export function createYamlLockFileVisitor<T>(
+    acc: DependencyRecipeAccumulator<T>
+): YamlVisitor<ExecutionContext> {
+    return new class extends YamlVisitor<ExecutionContext> {
+        protected async visitDocuments(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml | undefined> {
+            const sourcePath = docs.sourcePath;
+            const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
+            if (updatedLockContent) {
+                const lockFileName = path.basename(sourcePath);
+                return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Yaml.Documents;
+            }
+            return docs;
+        }
+    };
+}
+
+/**
+ * Creates a composite visitor that delegates to the appropriate editor based on tree type.
+ * This handles both JSON (package-lock.json, bun.lock) and YAML (pnpm-lock.yaml) lock files.
+ *
+ * @param jsonEditor The JSON visitor for handling JSON files
+ * @param acc The recipe accumulator for YAML lock file handling
+ * @returns A TreeVisitor that handles both JSON and YAML files
+ */
+export function createLockFileEditor<T>(
+    jsonEditor: JsonVisitor<ExecutionContext>,
+    acc: DependencyRecipeAccumulator<T>
+): TreeVisitor<any, ExecutionContext> {
+    const yamlEditor = createYamlLockFileVisitor(acc);
+
+    return new class extends TreeVisitor<any, ExecutionContext> {
+        async visit(tree: any, ctx: ExecutionContext): Promise<any> {
+            if (isDocuments(tree)) {
+                return yamlEditor.visit(tree, ctx);
+            } else if (tree && tree.kind === Json.Kind.Document) {
+                return jsonEditor.visit(tree, ctx);
+            }
+            return tree;
+        }
+    };
 }

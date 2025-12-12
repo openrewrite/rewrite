@@ -37,14 +37,14 @@ export class YamlParser extends Parser {
 
     async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile> {
         for (const sourcePath of sourcePaths) {
+            const text = parserInputRead(sourcePath);
             try {
                 yield {
-                    ...new YamlCstReader(parserInputRead(sourcePath)).parse(),
+                    ...new YamlCstReader(text).parse(),
                     sourcePath: this.relativePath(sourcePath)
                 };
             } catch (e: any) {
                 // Return a ParseError for files that can't be parsed
-                const text = parserInputRead(sourcePath);
                 const parseError: ParseError = {
                     kind: ParseErrorKind,
                     id: randomId(),
@@ -460,6 +460,9 @@ class YamlCstReader {
                     const result = this.convertFlowMappingEntry(item, pendingPrefix);
                     entries.push(result.entry);
                     pendingPrefix = result.trailingContent;
+                } else {
+                    // Empty item (trailing comma) - capture start tokens including the comma
+                    pendingPrefix += this.concatenateSources(item.start || []);
                 }
             }
 
