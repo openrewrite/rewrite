@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, foundSearchResult, Option, Recipe, TreeVisitor} from "../src";
-import {JavaScriptVisitor} from "../src/javascript";
-import {J} from "../src/java";
+import {ExecutionContext, foundSearchResult, Option, Recipe, TreeVisitor} from "@openrewrite/rewrite";
+import {JavaScriptVisitor} from "@openrewrite/rewrite/javascript";
+import {J} from "@openrewrite/rewrite/java";
 
 export class FindIdentifier extends Recipe {
     name = "org.openrewrite.example.javascript.find-identifier"

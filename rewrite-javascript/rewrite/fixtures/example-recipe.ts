@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeRegistry} from "../src";
+import {RecipeRegistry} from "@openrewrite/rewrite";
 import {FindIdentifier} from "./search-recipe";
 import {CreateText} from "./create-text";
 import {ChangeText} from "./change-text";

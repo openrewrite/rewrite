@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, Option, ScanningRecipe, SourceFile} from "../src";
-import {PlainTextParser} from "../src/text";
+import {ExecutionContext, Option, ScanningRecipe, SourceFile} from "@openrewrite/rewrite";
+import {PlainTextParser} from "@openrewrite/rewrite/text";
 
 export class CreateText extends ScanningRecipe<{ exists: boolean }> {
     name = "org.openrewrite.example.text.create-text";

@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, Option, Recipe} from "../src";
-import {Json, JsonVisitor} from "../src/json";
+import {ExecutionContext, Option, Recipe} from "@openrewrite/rewrite";
+import {Json, JsonVisitor} from "@openrewrite/rewrite/json";
 
 export class ChangeVersion extends Recipe {
     name = "org.openrewrite.example.npm.change-version";

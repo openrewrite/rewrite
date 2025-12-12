@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Column, DataTable} from "../src";
+import {Column, DataTable} from "@openrewrite/rewrite";
 
 export class ReplacedText {
     @Column({

@@ -13,7 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {check, ExecutionContext, foundSearchResult, isSourceFile, Option, Recipe, TreeVisitor} from "../src";
+import {
+    check,
+    ExecutionContext,
+    foundSearchResult,
+    isSourceFile,
+    Option,
+    Recipe,
+    TreeVisitor
+} from "@openrewrite/rewrite";
 import {FindIdentifier} from "./search-recipe";
 
 /**
