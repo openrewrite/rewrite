@@ -366,6 +366,33 @@ class ResolvedPomTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6391")
+    @Test
+    void propertyWithNullValue() {
+        rewriteRun(
+          mavenProject(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>artifact</artifactId>
+                  <version>${revision}${sha1}${changelist}</version>
+                  <properties>
+                      <revision>1.2.3</revision>
+                      <changelist>-SNAPSHOT</changelist>
+                      <sha1 />
+                  </properties>
+              </project>
+              """,
+              spec -> spec
+                .afterRecipe(doc -> {
+                    String version = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getVersion();
+                    assertThat(version).isEqualTo("1.2.3-SNAPSHOT");
+                }
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4687")
     @Nested
     class TolerateMissingPom {

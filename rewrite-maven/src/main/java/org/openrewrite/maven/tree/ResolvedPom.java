@@ -325,6 +325,9 @@ public class ResolvedPom {
             } else {
                 return propVal;
             }
+        } else if (properties.containsKey(property)) {
+            // An existing property key with a `null` value should be regarded as an empty string.
+            return "";
         }
         switch (property) {
             case "groupId":
