@@ -69,11 +69,9 @@ export class YamlParser extends Parser {
  * The CST preserves all whitespace, comments, and formatting.
  */
 class YamlCstReader {
-    private readonly source: string;
     private readonly cstTokens: CstToken[];
 
     constructor(source: string) {
-        this.source = source;
         const parser = new YamlCstParser();
         this.cstTokens = [...parser.parse(source)];
     }
@@ -205,10 +203,6 @@ class YamlCstReader {
         };
     }
 
-    private convertToken(token: CstToken): Yaml {
-        return this.convertTokenWithTrailing(token).node;
-    }
-
     private convertTokenWithTrailing(token: CstToken): {node: Yaml, trailing: string} {
         switch (token.type) {
             case 'block-map':
@@ -240,6 +234,10 @@ class YamlCstReader {
                 const entry = this.convertMappingEntry(item, pendingPrefix);
                 entries.push(entry.entry);
                 pendingPrefix = entry.trailingContent;
+            } else {
+                // Entry with no key or value - capture start tokens (comments, whitespace)
+                // into pending prefix for the next entry or as trailing content
+                pendingPrefix += this.concatenateSources(item.start || []);
             }
         }
 
@@ -296,8 +294,9 @@ class YamlCstReader {
                     for (let j = i + 1; j < sepTokens.length; j++) {
                         const nextToken = sepTokens[j];
                         if (nextToken.type === 'tag') {
-                            tagForValue = this.parseTagToken(nextToken.source, postfix);
+                            tagForValue = this.parseTagTokenWithSuffix(nextToken.source, postfix, sepTokens, j + 1);
                             postfix = "";
+                            break; // Tag handler consumed remaining tokens
                         } else {
                             postfix += nextToken.source;
                         }
@@ -313,8 +312,10 @@ class YamlCstReader {
                     afterColonWhitespace = "";
                     break; // We've consumed all remaining tokens
                 } else if (sepToken.type === 'tag') {
-                    tagForValue = this.parseTagToken(sepToken.source, afterColonWhitespace);
-                    afterColonWhitespace = "";
+                    // Parse tag with its suffix (whitespace after the tag)
+                    tagForValue = this.parseTagTokenWithSuffix(sepToken.source, afterColonWhitespace, sepTokens, i + 1);
+                    afterColonWhitespace = ""; // Remaining whitespace is in tag suffix, not value prefix
+                    break; // Tag handler consumed remaining tokens
                 } else {
                     // After the ':'
                     afterColonWhitespace += sepToken.source;
@@ -454,10 +455,9 @@ class YamlCstReader {
             const entries: Yaml.MappingEntry[] = [];
             let pendingPrefix = "";
 
-            for (let i = 0; i < cst.items.length; i++) {
-                const item = cst.items[i];
+            for (const item of cst.items) {
                 if (item.key !== undefined || item.value !== undefined) {
-                    const result = this.convertFlowMappingEntry(item, pendingPrefix, i === cst.items.length - 1);
+                    const result = this.convertFlowMappingEntry(item, pendingPrefix);
                     entries.push(result.entry);
                     pendingPrefix = result.trailingContent;
                 }
@@ -513,7 +513,7 @@ class YamlCstReader {
         }
     }
 
-    private convertFlowMappingEntry(item: CstCollectionItem, pendingPrefix: string, isLast: boolean): {entry: Yaml.MappingEntry, trailingContent: string} {
+    private convertFlowMappingEntry(item: CstCollectionItem, pendingPrefix: string): {entry: Yaml.MappingEntry, trailingContent: string} {
         const prefix = pendingPrefix + this.concatenateSources(item.start || []);
 
         let keyTrailing = "";
@@ -592,7 +592,7 @@ class YamlCstReader {
             trailing = valueResult.trailing;
         } else if (item.key !== undefined) {
             // Flow sequence can contain mapping entries: [a: 1, b: 2]
-            const entryResult = this.convertFlowMappingEntry(item, "", isLast);
+            const entryResult = this.convertFlowMappingEntry(item, "");
             block = {
                 kind: Yaml.Kind.Mapping,
                 id: randomId(),
@@ -666,23 +666,23 @@ class YamlCstReader {
     }
 
     private convertBlockScalarWithTrailing(cst: CstBlockScalar): {node: Yaml.Scalar, trailing: string} {
-        const resolved = CST.resolveAsScalar(cst);
-        const value = resolved?.value ?? "";
+        // Use CST.stringify to get the exact original source including header
+        const fullSource = CST.stringify(cst);
 
-        // Determine style from the header in props
-        // Block scalars have a header like | or > in the props array
-        let style = Yaml.ScalarStyle.LITERAL; // Default
+        // Determine style from the first character (| or >)
+        const headerChar = fullSource.charAt(0);
+        const style = headerChar === '|' ? Yaml.ScalarStyle.LITERAL : Yaml.ScalarStyle.FOLDED;
+
+        // The value is everything after the header indicator (| or >)
+        const value = fullSource.substring(1);
+
+        // Extract anchor and tag from props if present
         let anchor: Yaml.Anchor | undefined;
         let tag: Yaml.Tag | undefined;
-
         for (const prop of cst.props || []) {
             if ('type' in prop) {
                 const propTyped = prop as CstSourceToken;
-                if (propTyped.type === 'block-scalar-header') {
-                    // The header source starts with | or >
-                    const headerChar = propTyped.source.charAt(0);
-                    style = headerChar === '|' ? Yaml.ScalarStyle.LITERAL : Yaml.ScalarStyle.FOLDED;
-                } else if (propTyped.type === 'anchor') {
+                if (propTyped.type === 'anchor') {
                     anchor = this.parseAnchorToken(propTyped.source, "");
                 } else if (propTyped.type === 'tag') {
                     tag = this.parseTagToken(propTyped.source, "");
@@ -748,6 +748,10 @@ class YamlCstReader {
     }
 
     private parseTagToken(source: string, prefix: string): Yaml.Tag {
+        return this.parseTagTokenWithSuffix(source, prefix, [], 0);
+    }
+
+    private parseTagTokenWithSuffix(source: string, prefix: string, remainingTokens: CstSourceToken[], startIndex: number): Yaml.Tag {
         let name: string;
         let tagKind: Yaml.TagKind;
 
@@ -765,13 +769,19 @@ class YamlCstReader {
             tagKind = Yaml.TagKind.LOCAL;
         }
 
+        // Collect remaining tokens as suffix (whitespace after the tag)
+        let suffix = "";
+        for (let i = startIndex; i < remainingTokens.length; i++) {
+            suffix += remainingTokens[i].source;
+        }
+
         return {
             kind: Yaml.Kind.Tag,
             id: randomId(),
             prefix,
             markers: emptyMarkers,
             name,
-            suffix: "",
+            suffix,
             tagKind
         };
     }

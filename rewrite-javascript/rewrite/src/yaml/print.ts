@@ -53,7 +53,7 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
     }
 
     protected async visitMapping(mapping: Yaml.Mapping, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.visitMarkers(mapping.markers, p);
+        await this.beforeSyntax(mapping, p);
         if (mapping.anchor) {
             await this.visit(mapping.anchor, p);
         }
@@ -119,7 +119,7 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
     }
 
     protected async visitSequence(sequence: Yaml.Sequence, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.visitMarkers(sequence.markers, p);
+        await this.beforeSyntax(sequence, p);
         if (sequence.anchor) {
             await this.visit(sequence.anchor, p);
         }

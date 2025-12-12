@@ -66,6 +66,22 @@ version: 0.0.1`;
         expect(result).toBe(yaml);
     });
 
+    test('block mapping inside sequence entry', async () => {
+        const yaml = `items:
+  - name: first
+    value: 1`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
+    test('block sequence inside sequence entry', async () => {
+        const yaml = `matrix:
+  - - a
+    - b`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
     test('inline sequence', async () => {
         const yaml = `items: [a, b, c]`;
         const result = await parseAndPrint(yaml);
@@ -103,6 +119,17 @@ name: value`;
         expect(result).toBe(yaml);
     });
 
+    test('standalone comment in mapping', async () => {
+        const yaml = `global:
+  scrape_interval: 15s
+  # standalone comment
+
+alerting:
+  enabled: true`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
     test('explicit document start', async () => {
         const yaml = `---
 name: value`;
@@ -136,9 +163,7 @@ development:
         expect(result).toBe(yaml);
     });
 
-    // Note: Block scalars require more complex handling to preserve exact formatting
-    // These tests verify the parser correctly identifies the style
-    test.skip('literal block scalar', async () => {
+    test('literal block scalar', async () => {
         const yaml = `message: |
   This is a
   multiline string`;
@@ -146,7 +171,7 @@ development:
         expect(result).toBe(yaml);
     });
 
-    test.skip('folded block scalar', async () => {
+    test('folded block scalar', async () => {
         const yaml = `message: >
   This should be
   folded together`;
@@ -154,14 +179,13 @@ development:
         expect(result).toBe(yaml);
     });
 
-    // Note: Tags need additional whitespace tracking
-    test.skip('local tag', async () => {
+    test('local tag', async () => {
         const yaml = `tagged: !custom value`;
         const result = await parseAndPrint(yaml);
         expect(result).toBe(yaml);
     });
 
-    test.skip('global tag', async () => {
+    test('global tag', async () => {
         const yaml = `typed: !!str 123`;
         const result = await parseAndPrint(yaml);
         expect(result).toBe(yaml);
