@@ -62,9 +62,9 @@ const EXCLUDED_PROPERTIES = new Set([
 ]);
 
 /**
- * Subscript digits for counts.
+ * Subscript digits for counts (index 0-9 maps to ₀-₉).
  */
-const SUBSCRIPTS = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+const SUBSCRIPTS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
 
 /**
  * Format a count as subscript. Count of 1 is implicit (empty string).

@@ -86,6 +86,16 @@ describe("LST Debug Utilities", () => {
             const result = formatWhitespace("  \t\t");
             expect(result).toBe("'·₂-₂'");
         });
+
+        test("10 spaces shows ·₁₀", () => {
+            const result = formatWhitespace("          "); // 10 spaces
+            expect(result).toBe("'·₁₀'");
+        });
+
+        test("12 spaces shows ·₁₂", () => {
+            const result = formatWhitespace("            "); // 12 spaces
+            expect(result).toBe("'·₁₂'");
+        });
     });
 
     describe("formatSpace", () => {
