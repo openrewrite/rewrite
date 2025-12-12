@@ -111,8 +111,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             if ("java.lang".equals(packageName) && StringUtils.isBlank(member)) {
                 return cu;
             }
-            // Nor if the classes are within the same package
-            if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
+            // Nor if the classes are within the same package (unless static imports)
+            if (member == null && !"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
                 return cu;
             }
