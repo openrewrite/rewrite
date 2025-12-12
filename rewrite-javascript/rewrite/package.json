@@ -38,6 +38,10 @@
     "./test": {
       "types": "./dist/test/index.d.ts",
       "default": "./dist/test/index.js"
+    },
+    "./yaml": {
+      "types": "./dist/yaml/index.d.ts",
+      "default": "./dist/yaml/index.js"
     }
   },
   "scripts": {

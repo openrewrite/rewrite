@@ -23,12 +23,18 @@ import {
     readNpmrcConfigs
 } from "./node-resolution-result";
 import {replaceMarkerByKind} from "../markers";
-import {Json} from "../json";
+import {Json, JsonParser, JsonVisitor} from "../json";
+import {isDocuments, Yaml, YamlParser, YamlVisitor} from "../yaml";
+import {PlainTextParser} from "../text";
+import {SourceFile} from "../tree";
+import {TreeVisitor} from "../visitor";
+import {ExecutionContext} from "../execution";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 import {spawnSync} from "child_process";
+import * as YAML from "yaml";
 
 /**
  * Configuration for each package manager.
@@ -113,6 +119,34 @@ const LOCK_FILE_DETECTION: ReadonlyArray<LockFileDetectionConfig> = [
         preferNodeModules: true
     },
 ];
+
+/**
+ * Lock file names that should be parsed as JSON/JSONC format.
+ */
+export const JSON_LOCK_FILE_NAMES = ['bun.lock', 'package-lock.json'] as const;
+
+/**
+ * Lock file names that should be parsed as YAML format.
+ */
+export const YAML_LOCK_FILE_NAMES = ['pnpm-lock.yaml'] as const;
+
+/**
+ * Lock file names that should be parsed as plain text (custom formats like yarn.lock v1).
+ * Note: yarn.lock for Yarn Berry (v2+) is actually YAML format and should be parsed as such.
+ * Use `getLockFileFormat` with content to determine the correct format for yarn.lock.
+ */
+export const TEXT_LOCK_FILE_NAMES = ['yarn.lock'] as const;
+
+/**
+ * Detects if a yarn.lock file is Yarn Berry (v2+) format based on content.
+ * Yarn Berry lock files contain a `__metadata:` key which is not present in Classic.
+ *
+ * @param content The yarn.lock file content
+ * @returns true if this is a Yarn Berry lock file (YAML format), false for Classic
+ */
+export function isYarnBerryLockFile(content: string): boolean {
+    return content.includes('__metadata:');
+}
 
 /**
  * Result of running a package manager command.
@@ -340,6 +374,75 @@ export function getUpdatedLockFileContent<T>(
 }
 
 /**
+ * Determines the appropriate parser for a lock file based on its filename and optionally content.
+ *
+ * For yarn.lock files, the format depends on the Yarn version:
+ * - Yarn Classic (v1): Custom plain text format
+ * - Yarn Berry (v2+): YAML format
+ *
+ * If content is provided for yarn.lock, it will be used to detect the format.
+ * Otherwise, defaults to 'text' (Yarn Classic).
+ *
+ * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml", "package-lock.json", "yarn.lock")
+ * @param content Optional file content (used for yarn.lock format detection)
+ * @returns 'yaml' for YAML lock files, 'json' for JSON lock files, 'text' for plain text
+ */
+export function getLockFileFormat(lockFileName: string, content?: string): 'yaml' | 'json' | 'text' {
+    if ((YAML_LOCK_FILE_NAMES as readonly string[]).includes(lockFileName)) {
+        return 'yaml';
+    }
+    if (lockFileName === 'yarn.lock') {
+        // Yarn Berry (v2+) uses YAML format, Classic uses custom text format
+        if (content && isYarnBerryLockFile(content)) {
+            return 'yaml';
+        }
+        return 'text';
+    }
+    if ((TEXT_LOCK_FILE_NAMES as readonly string[]).includes(lockFileName)) {
+        return 'text';
+    }
+    // package-lock.json, bun.lock
+    return 'json';
+}
+
+/**
+ * Re-parses updated lock file content using the appropriate parser.
+ * This is used by dependency recipes to create the updated lock file SourceFile.
+ *
+ * For yarn.lock files, the content is used to detect whether it's Yarn Berry (YAML)
+ * or Yarn Classic (plain text) format.
+ *
+ * @param content The updated lock file content
+ * @param sourcePath The source path of the lock file
+ * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml", "yarn.lock")
+ * @returns The parsed SourceFile (Json.Document, Yaml.Documents, or PlainText)
+ */
+export async function parseLockFileContent(
+    content: string,
+    sourcePath: string,
+    lockFileName: string
+): Promise<SourceFile> {
+    // Pass content to getLockFileFormat for yarn.lock detection
+    const format = getLockFileFormat(lockFileName, content);
+
+    switch (format) {
+        case 'yaml': {
+            const parser = new YamlParser({});
+            return await parser.parseOne({text: content, sourcePath}) as Yaml.Documents;
+        }
+        case 'text': {
+            const parser = new PlainTextParser({});
+            return await parser.parseOne({text: content, sourcePath});
+        }
+        case 'json':
+        default: {
+            const parser = new JsonParser({});
+            return await parser.parseOne({text: content, sourcePath}) as Json.Document;
+        }
+    }
+}
+
+/**
  * Base interface for project update info used by dependency recipes.
  * Recipes extend this with additional fields specific to their needs.
  */
@@ -438,7 +541,19 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
 
     if (updatedLockFile) {
         try {
-            lockContent = JSON.parse(updatedLockFile);
+            // Parse lock file based on format
+            if (updateInfo.packageManager === PackageManager.Pnpm) {
+                // pnpm-lock.yaml is YAML format
+                lockContent = YAML.parse(updatedLockFile);
+            } else if (updateInfo.packageManager === PackageManager.YarnClassic ||
+                       updateInfo.packageManager === PackageManager.YarnBerry) {
+                // yarn.lock has a custom format - skip parsing here
+                // The marker will still be updated with package.json info
+                lockContent = undefined;
+            } else {
+                // npm (package-lock.json) and bun (bun.lock) use JSON
+                lockContent = JSON.parse(updatedLockFile);
+            }
         } catch {
             // Continue without lock file content
         }
@@ -571,4 +686,53 @@ export async function runInstallInTempDir(
             // Ignore cleanup errors
         }
     }
+}
+
+/**
+ * Creates a lock file visitor that handles updating YAML lock files (pnpm-lock.yaml).
+ * This is a reusable component for dependency recipes.
+ *
+ * @param acc The recipe accumulator containing updated lock file content
+ * @returns A YamlVisitor that updates YAML lock files
+ */
+export function createYamlLockFileVisitor<T>(
+    acc: DependencyRecipeAccumulator<T>
+): YamlVisitor<ExecutionContext> {
+    return new class extends YamlVisitor<ExecutionContext> {
+        protected async visitDocuments(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml | undefined> {
+            const sourcePath = docs.sourcePath;
+            const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
+            if (updatedLockContent) {
+                const lockFileName = path.basename(sourcePath);
+                return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Yaml.Documents;
+            }
+            return docs;
+        }
+    };
+}
+
+/**
+ * Creates a composite visitor that delegates to the appropriate editor based on tree type.
+ * This handles both JSON (package-lock.json, bun.lock) and YAML (pnpm-lock.yaml) lock files.
+ *
+ * @param jsonEditor The JSON visitor for handling JSON files
+ * @param acc The recipe accumulator for YAML lock file handling
+ * @returns A TreeVisitor that handles both JSON and YAML files
+ */
+export function createLockFileEditor<T>(
+    jsonEditor: JsonVisitor<ExecutionContext>,
+    acc: DependencyRecipeAccumulator<T>
+): TreeVisitor<any, ExecutionContext> {
+    const yamlEditor = createYamlLockFileVisitor(acc);
+
+    return new class extends TreeVisitor<any, ExecutionContext> {
+        async visit(tree: any, ctx: ExecutionContext): Promise<any> {
+            if (isDocuments(tree)) {
+                return yamlEditor.visit(tree, ctx);
+            } else if (tree && tree.kind === Json.Kind.Document) {
+                return jsonEditor.visit(tree, ctx);
+            }
+            return tree;
+        }
+    };
 }
