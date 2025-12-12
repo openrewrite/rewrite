@@ -91,8 +91,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
         if (isDependencyTag() &&
                 groupId.equals(tag.getChildValue("groupId").orElse(null)) &&
-                artifactId.equals(tag.getChildValue("artifactId").orElse(null)) &&
-                Scope.fromName(scope) == Scope.fromName(tag.getChildValue("scope").orElse(null))) {
+                artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
             getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "alreadyHasDependency", true);
             return tag;
         }
