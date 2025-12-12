@@ -53,8 +53,11 @@ public class SourcePositionService {
         Cursor alignWith = alignsWith(cursor);
         Cursor newLinedElementCursor;
         if (alignWith == null) {
-            // Do not align, just calculate parents indentation
             newLinedElementCursor = computeNewLinedCursorElement(cursor.getParentTreeCursor());
+            while (newLinedElementCursor.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) newLinedElementCursor.getValue()).getSelect() instanceof J.MethodInvocation) {
+                newLinedElementCursor = computeNewLinedCursorElement(new Cursor(newLinedElementCursor, ((J.MethodInvocation) newLinedElementCursor.getValue()).getSelect()));
+            }
+            // Do not align, just calculate parents indentation
             return ((J) newLinedElementCursor.getValue()).getPrefix().getIndent().length() + continuation;
         }
         newLinedElementCursor = computeNewLinedCursorElement(alignWith);
@@ -404,8 +407,23 @@ public class SourcePositionService {
             }
         };
         Cursor printCursor = cursor;
+        boolean hasJavaSourceFileInPath = true;
         if (!(cursor.getValue() instanceof JavaSourceFile)) {
-            printCursor = cursor.dropParentUntil(c -> c instanceof JavaSourceFile);
+            try {
+                printCursor = cursor.dropParentUntil(c -> c instanceof JavaSourceFile);
+            } catch (IllegalStateException ignored) {
+                // We might have been called with new Cursor(null, someTreeOtherThanSourceFile), so we need to create a parent for printing.
+                // we can do best effort to calculate columns even without JavaSourceFile in the path, with only the risk of the first element in the cursor path being miscalculated.
+                // In this case, we will set line numbers to -1 to indicate unknown line numbers.
+                while (printCursor.getParent() != null && printCursor.getParent(2) != null) {
+                    printCursor = printCursor.getParent();
+                }
+                hasJavaSourceFileInPath = false;
+            }
+        }
+        if (printCursor.getParent() == null) {
+            // We might have been called with new Cursor(null, someTree), so we need to create a parent for printing.
+            printCursor = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), printCursor.getValue());
         }
         javaPrinter.visit(printCursor.getValue(), printLine, printCursor.getParent());
         String content = printLine.getOut();
@@ -442,9 +460,9 @@ public class SourcePositionService {
             }
 
             return Span.builder()
-                    .startLine(startLine.get())
+                    .startLine(hasJavaSourceFileInPath ? startLine.get() : -1)
                     .startColumn(startCol.get() + indent)
-                    .endLine(startLine.get() + lines)
+                    .endLine(hasJavaSourceFileInPath ? startLine.get() + lines : -1)
                     .endColumn(col)
                     .maxColumn(maxColumn)
                     .build();
