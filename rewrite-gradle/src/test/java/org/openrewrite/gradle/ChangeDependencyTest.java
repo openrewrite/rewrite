@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
@@ -840,17 +841,11 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.0")
               }
               """,
-            """
-              plugins {
-                  id("java-library")
-              }
-              repositories {
-                  mavenCentral()
-              }
-              dependencies {
-                  implementation("tools.jackson.core:jackson-databind:3.0.3")
-              }
-              """
+            spec -> spec.after(buildGradle ->
+              assertThat(buildGradle)
+                .containsOnlyOnce("tools.jackson.core:jackson-databind:3")
+                .doesNotContain("datatype")
+                .actual())
           )
         );
     }

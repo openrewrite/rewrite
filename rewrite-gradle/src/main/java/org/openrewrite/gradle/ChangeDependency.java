@@ -643,15 +643,14 @@ public class ChangeDependency extends Recipe {
                                     gav = gav.withArtifactId(newArtifactId);
                                 }
                                 if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
-                                    String resolvedVersion = null;
                                     try {
-                                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                                 .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), gdc.getName(), newVersion, versionPattern, ctx);
+                                        if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
+                                            gav = gav.withVersion(resolvedVersion);
+                                        }
                                     } catch (MavenDownloadingException e) {
-                                        // TODO something
-                                    }
-                                    if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
-                                        gav = gav.withVersion(resolvedVersion);
+                                        // Failure already in `metadataFailures`
                                     }
                                 }
                                 if (gav != r.getGav()) {
@@ -674,15 +673,14 @@ public class ChangeDependency extends Recipe {
                                     gav = gav.withArtifactId(newArtifactId);
                                 }
                                 if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
-                                    String resolvedVersion = null;
                                     try {
-                                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                                 .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), gdc.getName(), newVersion, versionPattern, ctx);
+                                        if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
+                                            gav = gav.withVersion(resolvedVersion);
+                                        }
                                     } catch (MavenDownloadingException e) {
-                                        // TODO something
-                                    }
-                                    if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
-                                        gav = gav.withVersion(resolvedVersion);
+                                        // Failure already in `metadataFailures`
                                     }
                                 }
                                 if (gav != r.getGav()) {
