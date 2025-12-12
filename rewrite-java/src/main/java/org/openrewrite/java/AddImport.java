@@ -111,10 +111,20 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             if ("java.lang".equals(packageName) && StringUtils.isBlank(member)) {
                 return cu;
             }
-            // Nor if the classes are within the same package (unless static imports)
-            if (member == null && !"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
+            // Nor if the classes are within the same package
+            if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
-                return cu;
+                // For static imports, only skip if the target type is declared in this compilation unit
+                if (member != null) {
+                    for (J.ClassDeclaration clazz : cu.getClasses()) {
+                        JavaType.FullyQualified type = clazz.getType();
+                        if (type != null && fullyQualifiedName.equals(type.getFullyQualifiedName())) {
+                            return cu;
+                        }
+                    }
+                } else {
+                    return cu;
+                }
             }
             Optional<JavaType> typeReference = findTypeReference(cu);
             if (onlyIfReferenced && !typeReference.isPresent()) {
