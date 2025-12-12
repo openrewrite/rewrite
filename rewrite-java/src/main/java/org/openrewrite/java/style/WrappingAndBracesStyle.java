@@ -90,7 +90,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Nullable
     AnnotationParameters annotationParameters;
     @Nullable
-    TextBlocks textBlocks; // Not yet implemented
+    TextBlocks textBlocks;
     @Nullable
     RecordComponents recordComponents;
     @Nullable
