@@ -2825,4 +2825,70 @@ class WrappingAndBracesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void textBlocksNotAligned() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+                    ""\";
+                  private final String bar =
+                    ""\"
+                      NO
+                      ""\";
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+                    ""\";
+                  private final String bar = ""\"
+                    NO
+                    ""\";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlocksAligned() {
+        rewriteRun(
+          wrappingAndBraces(
+            spaces -> spaces,
+            wrap -> wrap.withTextBlocks(wrap.getTextBlocks().withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+                    ""\";
+                  private final String bar =
+                    ""\"
+                      NO
+                      ""\";
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                                             YES
+                                             ""\";
+                  private final String bar = ""\"
+                                             NO
+                                             ""\";
+              }
+              """
+          )
+        );
+    }
 }

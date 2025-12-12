@@ -833,7 +833,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         J.Literal l = literal;
         l = l.withPrefix(visitSpace(l.getPrefix(), Space.Location.LITERAL_PREFIX, newLiteral.getPrefix()));
         l = l.withMarkers(visitMarkers(l.getMarkers(), newLiteral.getMarkers()));
-        Expression temp = (Expression) visitExpression(l, newLiteral);
+        Expression temp = (Expression) visitExpression(l.withValue(newLiteral.getValue()).withValueSource(newLiteral.getValueSource()), newLiteral); // for text blocks indentation, we use the new literal's value
         if (!(temp instanceof J.Literal)) {
             return temp;
         }
