@@ -53,6 +53,8 @@ public class ExactVersion extends LatestRelease {
             versionOnly = pattern.substring(0, hyphenIndex);
         }
         if (versionOnly.startsWith("latest") ||
+            versionOnly.equals("LATEST") ||
+            versionOnly.equals("RELEASE") ||
             versionOnly.contains("x") ||
             versionOnly.contains("^") ||
             versionOnly.contains("~") ||
