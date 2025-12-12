@@ -115,15 +115,13 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
                 // For static imports, only skip if the target type is declared in this compilation unit
-                if (member != null) {
-                    for (J.ClassDeclaration clazz : cu.getClasses()) {
-                        JavaType.FullyQualified type = clazz.getType();
-                        if (type != null && fullyQualifiedName.equals(type.getFullyQualifiedName())) {
-                            return cu;
-                        }
-                    }
-                } else {
+                if (member == null) {
                     return cu;
+                }
+                for (J.ClassDeclaration clazz : cu.getClasses()) {
+                    if (TypeUtils.isOfClassType(clazz.getType(), fullyQualifiedName)) {
+                        return cu;
+                    }
                 }
             }
             Optional<JavaType> typeReference = findTypeReference(cu);
