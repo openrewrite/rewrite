@@ -16,17 +16,24 @@
  * limitations under the License.
  */
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, RecipeRegistry, rootCursor} from "@openrewrite/rewrite";
-import {RewriteRpc} from "@openrewrite/rewrite/rpc";
-import {PlainText, text} from "@openrewrite/rewrite/text";
-import {json} from "@openrewrite/rewrite/json";
-import {RecipeSpec} from "@openrewrite/rewrite/test";
+import {Cursor, RecipeRegistry, rootCursor} from "../../src";
+import {RewriteRpc} from "../../src/rpc";
+import {PlainText, text} from "../../src/text";
+import {json, Json} from "../../src/json";
+import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
-import {findNodeResolutionResult, javascript, JavaScriptVisitor, JS, npm, packageJson, typescript} from "@openrewrite/rewrite/javascript";
-import {Json} from "@openrewrite/rewrite/json";
-import {J} from "@openrewrite/rewrite/java";
+import {
+    findNodeResolutionResult,
+    javascript,
+    JavaScriptVisitor,
+    JS,
+    npm,
+    packageJson,
+    typescript
+} from "../../src/javascript";
+import {J} from "../../src/java";
 import {withDir} from "tmp-promise";
 
 describe("Rewrite RPC", () => {

@@ -3,6 +3,7 @@ import {emptySpace, J, rightPadded, singleSpace, space, Statement, Type} from ".
 import {JS} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
+import {getStyle, SpacesStyle, StyleKind} from "./style";
 
 export enum ImportStyle {
     ES6Named,      // import { x } from 'module'
@@ -1083,7 +1084,15 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             };
         } else {
             // Named import: import { member } from 'module'
+
+            // Get the spaces style for brace spacing
+            const spacesStyle = getStyle(StyleKind.SpacesStyle, compilationUnit) as SpacesStyle;
+            const braceSpace = spacesStyle.within.es6ImportExportBraces ? singleSpace : emptySpace;
+
             const importSpec = this.createImportSpecifier();
+            // Apply brace spacing: the space after { is in the specifier's prefix,
+            // and the space before } is in the rightPadded's after
+            const importSpecWithSpacing = {...importSpec, prefix: braceSpace};
 
             const namedImports: JS.NamedImports = {
                 id: randomId(),
@@ -1093,7 +1102,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 elements: {
                     kind: J.Kind.Container,
                     before: emptySpace,
-                    elements: [rightPadded(importSpec, emptySpace)],
+                    elements: [rightPadded(importSpecWithSpacing, braceSpace)],
                     markers: emptyMarkers
                 }
             };

@@ -127,16 +127,26 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): Promise<J | undefined> {
         const ret = await super.visitArrayAccess(arrayAccess, p) as J.ArrayAccess;
         return produce(ret, draft => {
-            draft.dimension.index.element.prefix.whitespace = this.style.within.arrayBrackets ? " " : "";
-            draft.dimension.index.after.whitespace = this.style.within.arrayBrackets ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.dimension.index.element.prefix.whitespace.includes("\n")) {
+                draft.dimension.index.element.prefix.whitespace = this.style.within.arrayBrackets ? " " : "";
+            }
+            if (!draft.dimension.index.after.whitespace.includes("\n")) {
+                draft.dimension.index.after.whitespace = this.style.within.arrayBrackets ? " " : "";
+            }
         });
     }
 
     protected async visitAssignment(assignment: J.Assignment, p: P): Promise<J | undefined> {
         const ret = await super.visitAssignment(assignment, p) as J.Assignment;
         return produce(ret, draft => {
-            draft.assignment.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
-            draft.assignment.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.assignment.before.whitespace.includes("\n")) {
+                draft.assignment.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
+            if (!draft.assignment.element.prefix.whitespace.includes("\n")) {
+                draft.assignment.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
         });
     }
 
@@ -195,7 +205,10 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitCase(aCase, p) as J.Case;
         return ret && produce(ret, draft => {
             if (draft.caseLabels.elements[0].element.kind != J.Kind.Identifier || (draft.caseLabels.elements[0].element as J.Identifier).simpleName != "default") {
-                draft.caseLabels.before.whitespace = " ";
+                // Preserve newlines - only set to space if no newline exists
+                if (!draft.caseLabels.before.whitespace.includes("\n")) {
+                    draft.caseLabels.before.whitespace = " ";
+                }
             }
         });
     }
@@ -206,7 +219,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         // thus we either introduce our own setting or just enforce the natural spacing with no setting
 
         return produce(ret, draft => {
-            draft.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
+            draft.body.prefix.whitespace = this.style.beforeLeftBrace.classInterfaceModuleLeftBrace ? " " : "";
         }) as J.ClassDeclaration;
     }
 
@@ -228,8 +241,12 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 // Apply afterComma rule to elements after the first
                 for (let i = 1; i < draft.elements.length; i++) {
                     const currentWs = draft.elements[i].element.prefix.whitespace;
+                    // Also check for Spread marker with newline (for spread elements the newline is in the marker)
+                    const element = draft.elements[i].element as J;
+                    const spreadMarker = element.markers?.markers?.find(m => m.kind === JS.Markers.Spread) as { prefix: J.Space } | undefined;
+                    const hasNewlineInSpread = spreadMarker?.prefix?.whitespace?.includes("\n");
                     // Preserve original newlines - only adjust spacing when elements are on same line
-                    if (!currentWs.includes("\n")) {
+                    if (!currentWs.includes("\n") && !hasNewlineInSpread) {
                         draft.elements[i].element.prefix.whitespace = this.style.other.afterComma ? " " : "";
                     }
                 }
@@ -311,11 +328,21 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitImportDeclaration(jsImport, p) as JS.Import;
         return produce(ret, draft => {
             if (draft.importClause) {
-                draft.importClause.prefix.whitespace = draft.importClause.namedBindings && !draft.importClause.typeOnly ? "" : " ";
+                // Space after 'import' keyword:
+                // - If there's a default import (name), space goes in importClause.prefix
+                // - If typeOnly (import type ...), space goes in importClause.prefix (before 'type')
+                // - If only namedBindings (no default, no type), space goes in namedBindings.prefix (importClause.prefix is empty)
+                const hasDefaultImport = !!draft.importClause.name;
+                draft.importClause.prefix.whitespace = (hasDefaultImport || draft.importClause.typeOnly) ? " " : "";
                 if (draft.importClause.name) {
-                    draft.importClause.name.after.whitespace = "";
+                    // For import equals declarations (import X = Y), use assignment spacing
+                    // For regular imports (import X from 'Y'), no space after name
+                    draft.importClause.name.after.whitespace = draft.initializer
+                        ? (this.style.aroundOperators.assignment ? " " : "")
+                        : "";
                 }
                 if (draft.importClause.namedBindings) {
+                    // Space before namedBindings - always needed
                     draft.importClause.namedBindings.prefix.whitespace = " ";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
@@ -465,8 +492,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.name.before.whitespace = " ";
             }
             draft.name.element.prefix.whitespace = " ";
-            draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
-            draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            // Preserve newlines - only modify if no newlines present
+            if (!draft.initializer.before.whitespace.includes("\n")) {
+                draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
+            if (!draft.initializer.element.prefix.whitespace.includes("\n")) {
+                draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            }
         });
     }
 
@@ -858,11 +890,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
             });
         }
 
-        if (c.typeParameters && c.typeParameters.elements.length > 0 && c.typeParameters.before.whitespace === "" && !first) {
-            c = produce(c, draft => {
-                this.ensureSpace(draft.typeParameters!.before);
-            });
-        }
+        // Note: typeParameters should NOT have space before them - they immediately follow the class name
+        // e.g., "class DataTable<Row>" not "class DataTable <Row>"
 
         if (c.extends && c.extends.before.whitespace === "") {
             c = produce(c, draft => {
@@ -1143,7 +1172,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
                 }
             } else if (parent?.kind === J.Kind.Block && grandparent?.kind !== J.Kind.NewClass && grandparent?.kind !== JS.Kind.TypeLiteral ||
                       (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
-                      (parent?.kind === J.Kind.Case)) {
+                      (parent?.kind === J.Kind.Case && this.isInsideCaseStatements(parent as J.Case, draft))) {
                 if (draft.kind != J.Kind.Case) {
                     this.ensurePrefixHasNewLine(draft);
                 }
@@ -1168,6 +1197,22 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         const e = await super.visitEnumValue(enumValue, p) as J.EnumValue;
         this.keepMaximumBlankLines(e, this.style.keepMaximum.inCode);
         return e;
+    }
+
+    /**
+     * Check if a statement is inside a Case's statements container or body,
+     * not inside the caseLabels container.
+     */
+    private isInsideCaseStatements(caseNode: J.Case, statement: J): boolean {
+        // Check if statement is in the statements container
+        if (caseNode.statements.elements.some(s => s.element.id === statement.id)) {
+            return true;
+        }
+        // Check if statement is the body
+        if (caseNode.body?.element.id === statement.id) {
+            return true;
+        }
+        return false;
     }
 
     private keepMaximumBlankLines<T extends J>(node: Draft<T>, max: number) {

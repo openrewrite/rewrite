@@ -43,7 +43,7 @@ export async function produceAsync<Base extends Objectish>(
     return finishDraft(draft) as Base;
 }
 
-const stopAfterPreVisit = Symbol("STOP_AFTER_PRE_VISIT")
+const stopAfterPreVisit = Symbol.for("STOP_AFTER_PRE_VISIT")
 
 export abstract class TreeVisitor<T extends Tree, P> {
     protected cursor: Cursor = rootCursor();
