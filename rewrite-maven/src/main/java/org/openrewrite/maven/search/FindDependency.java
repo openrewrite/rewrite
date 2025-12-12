@@ -53,7 +53,7 @@ public class FindDependency extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -70,7 +70,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, versionPattern, () -> findDependency(tag))) {
+                        versionIsValid(version, versionPattern, () -> findDependency(tag))) {
                     ds.add(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -101,7 +101,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, versionPattern, () -> findDependency(tag))) {
+                        versionIsValid(version, versionPattern, () -> findDependency(tag))) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -119,12 +119,15 @@ public class FindDependency extends Recipe {
             // shouldn't happen, but if it does, fail the condition
             return false;
         }
-        String actualVersion = resolvedDependency.getVersion();
         Validated<VersionComparator> validate = Semver.validate(desiredVersion, versionPattern);
         if (validate.isInvalid()) {
             return false;
         }
-        assert(validate.getValue() != null);
-        return validate.getValue().isValid(actualVersion, actualVersion);
+        assert (validate.getValue() != null);
+        String requestedVersion = resolvedDependency.getRequested().getVersion();
+        String actualVersion = resolvedDependency.getVersion();
+        return validate.getValue().isValid(actualVersion, actualVersion) ||
+                // Match cases `LATEST` and `RELEASE` to version patterns `=LATEST` and `=RELEASE`
+                requestedVersion != null && validate.getValue().isValid(requestedVersion, requestedVersion);
     }
 }

@@ -66,7 +66,7 @@ class SemverTest {
     void maxVersion() {
         assertThat(Semver.max(null, null)).isNull();
         assertThat(Semver.max(null, "")).isNull();
-        assertThat(Semver.max("",  null)).isNull();
+        assertThat(Semver.max("", null)).isNull();
         assertThat(Semver.max("3.3.3", null)).isEqualTo("3.3.3");
         assertThat(Semver.max("3.3.3", "")).isEqualTo("3.3.3");
         assertThat(Semver.max(null, "3.3.3")).isEqualTo("3.3.3");
@@ -79,5 +79,26 @@ class SemverTest {
         assertThat(Semver.max("INVALID-2023.1.0.3", "1.0.2")).isEqualTo("1.0.2");
         assertThat(Semver.max("1.0.2", "INVALID-2023.1.0.3")).isEqualTo("1.0.2");
         assertThat(Semver.max("123456-fix-something-SNAPSHOT", "123456-fix-something-SNAPSHOT")).isEqualTo("123456-fix-something-SNAPSHOT");
+    }
+
+    @Test
+    void mavenExactVersionString() {
+        // Exactly LATEST
+        VersionComparator isLatest = Semver.validate("=LATEST", null).getValue();
+        assertThat(isLatest).isInstanceOf(ExactVersion.class);
+        assertThat(isLatest.isValid(null, "LATEST")).isTrue();
+        // Resolved LATEST
+        isLatest = Semver.validate("LATEST", null).getValue();
+        assertThat(isLatest).isInstanceOf(LatestIntegration.class);
+        assertThat(isLatest.isValid(null, "LATEST")).isFalse();
+
+        // Exactly RELEASE
+        VersionComparator isRelease = Semver.validate("=RELEASE", null).getValue();
+        assertThat(isRelease).isInstanceOf(ExactVersion.class);
+        assertThat(isRelease.isValid(null, "RELEASE")).isTrue();
+        // Resolved RELEASE
+        isRelease = Semver.validate("RELEASE", null).getValue();
+        assertThat(isRelease).isInstanceOf(LatestRelease.class);
+        assertThat(isRelease.isValid(null, "RELEASE")).isFalse();
     }
 }
