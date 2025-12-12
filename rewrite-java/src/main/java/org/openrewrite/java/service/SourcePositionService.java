@@ -171,7 +171,7 @@ public class SourcePositionService {
             if (!(parent.getValue() instanceof Tree)) {
                 parent = parent.getParentTreeCursor();
             }
-            boolean isRootOrCompilationUnit = parent.getValue() instanceof J.CompilationUnit || parent.getValue() == Cursor.ROOT_VALUE;
+            boolean isRootOrCompilationUnit = parent.getValue() instanceof JavaSourceFile || parent.getValue() == Cursor.ROOT_VALUE;
             if (!hasNewLine && !isRootOrCompilationUnit) {
                 return computeNewLinedCursorElement(parent);
             }
