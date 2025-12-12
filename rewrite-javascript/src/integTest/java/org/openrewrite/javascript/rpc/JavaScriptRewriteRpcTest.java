@@ -45,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.javascript.Assertions.*;
 import static org.openrewrite.json.Assertions.json;
+import static org.openrewrite.yaml.Assertions.yaml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -297,6 +298,22 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         rewriteRun(
           json(packageJson, spec -> spec.beforeRecipe(json ->
             assertThat(client().print(json)).isEqualTo(packageJson.trim())))
+        );
+    }
+
+    @Test
+    void printYaml() {
+        @Language("yaml")
+        String yamlContent = """
+          name: my-project
+          version: 0.0.1
+          dependencies:
+            - lodash
+            - express
+          """;
+        rewriteRun(
+          yaml(yamlContent, spec -> spec.beforeRecipe(yaml ->
+            assertThat(client().print(yaml)).isEqualTo(yamlContent.trim())))
         );
     }
 

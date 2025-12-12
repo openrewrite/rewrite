@@ -30,8 +30,10 @@ import {markupWarn} from "../../markers";
 import {TreePrinters} from "../../print";
 import {
     createDependencyRecipeAccumulator,
+    createLockFileEditor,
     DependencyRecipeAccumulator,
-    getUpdatedLockFileContent,
+    getAllLockFileNames,
+    parseLockFileContent,
     runInstallIfNeeded,
     runInstallInTempDir,
     storeInstallResult,
@@ -187,7 +189,8 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
     async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
 
-        return new class extends JsonVisitor<ExecutionContext> {
+        // Create JSON visitor that handles both package.json and JSON lock files
+        const jsonEditor = new class extends JsonVisitor<ExecutionContext> {
             protected async visitDocument(doc: Json.Document, ctx: ExecutionContext): Promise<Json | undefined> {
                 const sourcePath = doc.sourcePath;
 
@@ -217,13 +220,13 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                     return updateNodeResolutionMarker(modifiedDoc, updateInfo, acc);
                 }
 
-                // Handle lock files for all package managers
-                const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
-                if (updatedLockContent) {
-                    return await new JsonParser({}).parseOne({
-                        text: updatedLockContent,
-                        sourcePath: doc.sourcePath
-                    }) as Json.Document;
+                // Handle JSON lock files (package-lock.json, bun.lock)
+                const lockFileName = path.basename(sourcePath);
+                if (getAllLockFileNames().includes(lockFileName)) {
+                    const updatedLockContent = acc.updatedLockFiles.get(sourcePath);
+                    if (updatedLockContent) {
+                        return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
+                    }
                 }
 
                 return doc;
@@ -271,6 +274,9 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                 };
             }
         };
+
+        // Return composite visitor that handles both JSON and YAML lock files
+        return createLockFileEditor(jsonEditor, acc);
     }
 
     /**

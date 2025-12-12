@@ -24,6 +24,7 @@ import {DependencyWorkspace} from "../javascript/dependency-workspace";
 // Include all languages you want this server to support.
 import "../text";
 import "../json";
+import "../yaml";
 import "../java";
 import "../javascript";
 
