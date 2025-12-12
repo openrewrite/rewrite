@@ -15,7 +15,6 @@
  */
 package org.openrewrite.test;
 
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.SourceFile;
 
 import java.nio.file.Paths;
@@ -24,11 +23,20 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 
-@RequiredArgsConstructor
 public class Dir implements Iterable<SourceSpec<?>>, SourceSpecs {
     private final String dir;
     private final Consumer<SourceSpec<SourceFile>> spec;
     private final SourceSpecs[] sourceSpecs;
+
+    public Dir(String dir, SourceSpecs[] sourceSpecs, Consumer<SourceSpec<SourceFile>> spec) {
+        // Prevent invalid paths such as `<project>` passed into `mavenProject(...)` where `pomXml` should be used
+        if (!dir.matches("[- \\w/\\\\]+")) {
+            throw new IllegalArgumentException("Invalid directory: " + dir);
+        }
+        this.dir = dir;
+        this.sourceSpecs = sourceSpecs;
+        this.spec = spec;
+    }
 
     @Override
     public Iterator<SourceSpec<?>> iterator() {
