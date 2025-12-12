@@ -99,7 +99,7 @@ public interface SourceFile extends Tree {
     }
 
     default <P> String printAll(PrintOutputCapture<P> out) {
-        return print(new Cursor(null, Cursor.ROOT_VALUE), out);
+        return print(new Cursor(null, "root"), out);
     }
 
     default String printAll() {
@@ -107,7 +107,7 @@ public interface SourceFile extends Tree {
     }
 
     default <P> String printAllTrimmed(P p) {
-        return printTrimmed(p, new Cursor(null, Cursor.ROOT_VALUE));
+        return printTrimmed(p, new Cursor(null, "root"));
     }
 
     default String printAllTrimmed() {
