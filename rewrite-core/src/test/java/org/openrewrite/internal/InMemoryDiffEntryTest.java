@@ -17,14 +17,23 @@ package org.openrewrite.internal;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.jgit.lib.FileMode;
+import org.openrewrite.marker.GitTreeEntry;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.quark.Quark;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class InMemoryDiffEntryTest {
@@ -241,6 +250,142 @@ class InMemoryDiffEntryTest {
                 -}
                 """
             );
+        }
+    }
+
+    @Test
+    void addBinary() {
+        PlainText after = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!").findFirst().get();
+        after = after.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(after.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+
+        try (var entry = new InMemoryDiffEntry(null, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/file.txt
+              new file mode 100644
+              index 0000000000000000000000000000000000000000..06085efc592f6851a3f54f502f1a270db233ebf0
+              GIT binary patch
+              literal 11
+              ScmeZB&B@8vQOL^AQv?7O<O8Vy
+              
+              literal 0
+              HcmV?d00001
+              
+              
+              """);
+        }
+    }
+
+    @Test
+    void deleteBinary() {
+        PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!").findFirst().get();
+        before = before.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+
+        try (var entry = new InMemoryDiffEntry(before, null, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/file.txt
+              deleted file mode 100644
+              index 0000000000000000000000000000000000000001..0000000000000000000000000000000000000000
+              GIT binary patch
+              literal 0
+              HcmV?d00001
+              
+              literal 11
+              ScmeZB&B@8vQOL^AQv?7O<O8Vy
+              
+              
+              """);
+        }
+    }
+
+    @Test
+    void renameBinary() {
+        PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!").findFirst().get();
+        before = before.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "06085efc592f6851a3f54f502f1a270db233ebf0", 0100644)));
+        PlainText after = before.withSourcePath(Paths.get("renamed.txt"));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/renamed.txt
+              similarity index 0%
+              rename from file.txt
+              rename to renamed.txt
+              """);
+        }
+    }
+
+    @Test
+    void modifyBinary() {
+        PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!\n").findFirst().get();
+        before = before.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+        PlainText after = before.withText("Hello, jon.bak!\n");
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/file.txt
+              index 0000000000000000000000000000000000000001..88292b7f3bb636b57b68867e3457ad3bcb85eb28 100644
+              GIT binary patch
+              literal 16
+              XcmeZB&B@8vQOL^A(@RRsR^$QzE_wwI
+              
+              literal 12
+              TcmeZB&B@8vQOL^AQ{(~w8kYmJ
+              
+              
+              """);
+        }
+    }
+
+    @Test
+    void breakModifyBinary() {
+        PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!\n").findFirst().get();
+        before = before.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+        PlainText after = before.withSourcePath(Paths.get("renamed.txt"))
+          .withText("Hello, jon.bak!\n");
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/renamed.txt
+              similarity index 0%
+              rename from file.txt
+              rename to renamed.txt
+              index 0000000000000000000000000000000000000001..88292b7f3bb636b57b68867e3457ad3bcb85eb28 100644
+              GIT binary patch
+              literal 16
+              XcmeZB&B@8vQOL^A(@RRsR^$QzE_wwI
+              
+              literal 12
+              TcmeZB&B@8vQOL^AQ{(~w8kYmJ
+              
+              
+              """);
+        }
+    }
+
+    @Test
+    void quarkBinary() {
+        Quark before = new Quark(randomId(), Paths.get("file.txt"), Markers.build(singletonList(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644))), null, new FileAttributes(null, null, null, true, true, false, 0));
+        PlainText after = PlainTextParser.builder().build().parse("Hello, jon!\n").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers());
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/file.txt
+              index 0000000000000000000000000000000000000001..cb9108edf7f482e8a7249097fc986c15e4fec69f 100644
+              GIT binary patch
+              literal 12
+              TcmeZB&B@8vQOL^AQ{(~w8kYmJ
+              
+              literal 0
+              HcmV?d00001
+              
+              
+              """);
         }
     }
 }

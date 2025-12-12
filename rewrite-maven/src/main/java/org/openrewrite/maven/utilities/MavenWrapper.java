@@ -35,6 +35,8 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -174,31 +176,37 @@ public class MavenWrapper {
 
     public Remote wrapperJar() {
         return Remote.builder(WRAPPER_JAR_LOCATION)
+                .charset(StandardCharsets.ISO_8859_1)
                 .build(URI.create(wrapperUri));
     }
 
     public Remote wrapperJar(SourceFile previous) {
         return Remote.builder(previous)
+                .charset(StandardCharsets.ISO_8859_1)
                 .build(URI.create(wrapperUri));
     }
 
     public Remote wrapperDownloader() {
         return Remote.builder(WRAPPER_DOWNLOADER_LOCATION)
+                .charset(StandardCharsets.UTF_8)
                 .build(URI.create(wrapperDistributionUri), ".mvn/wrapper/MavenWrapperDownloader.java");
     }
 
     public Remote wrapperDownloader(SourceFile previous) {
         return Remote.builder(previous)
+                .charset(StandardCharsets.UTF_8)
                 .build(URI.create(wrapperDistributionUri), ".mvn/wrapper/MavenWrapperDownloader.java");
     }
 
     public Remote mvnw() {
         return Remote.builder(WRAPPER_SCRIPT_LOCATION)
+                .charset(StandardCharsets.UTF_8)
                 .build(URI.create(wrapperDistributionUri), "mvnw");
     }
 
     public Remote mvnwCmd() {
         return Remote.builder(WRAPPER_BATCH_LOCATION)
+                .charset(Charset.forName("Windows-1252"))
                 .build(URI.create(wrapperDistributionUri), "mvnw.cmd");
     }
 

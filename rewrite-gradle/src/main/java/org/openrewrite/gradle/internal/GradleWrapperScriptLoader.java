@@ -25,6 +25,8 @@ import org.openrewrite.remote.RemoteResource;
 import org.openrewrite.semver.LatestRelease;
 
 import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -67,6 +69,7 @@ public class GradleWrapperScriptLoader {
             InputStream script = getClass().getResourceAsStream("/META-INF/rewrite/gradle-wrapper/unix/" + resolved.getGradlewChecksum() + ".txt");
             return maybeWarn(Remote.builder(GradleWrapper.WRAPPER_SCRIPT_LOCATION)
                     .description(String.format("Unix Gradle wrapper script template for %s", resolved.getVersion()))
+                    .charset(StandardCharsets.UTF_8)
                     .build(requireNonNull(script)));
         }
 
@@ -74,6 +77,7 @@ public class GradleWrapperScriptLoader {
             InputStream script = getClass().getResourceAsStream("/META-INF/rewrite/gradle-wrapper/windows/" + resolved.getGradlewBatChecksum() + ".txt");
             return maybeWarn(Remote.builder(GradleWrapper.WRAPPER_BATCH_LOCATION)
                     .description(String.format("Windows Gradle wrapper script template for %s", resolved.getVersion()))
+                    .charset(Charset.forName("Windows-1252"))
                     .build(requireNonNull(script)));
         }
 
