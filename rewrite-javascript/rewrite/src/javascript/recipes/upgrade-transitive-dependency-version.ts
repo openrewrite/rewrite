@@ -22,6 +22,7 @@ import {
     allDependencyScopes,
     findNodeResolutionResult,
     NodeResolutionResultQueries,
+    Npmrc,
     PackageManager
 } from "../node-resolution-result";
 import * as path from "path";
@@ -32,6 +33,7 @@ import {
     createDependencyRecipeAccumulator,
     DependencyRecipeAccumulator,
     getUpdatedLockFileContent,
+    parseNpmrcScopes,
     runInstallIfNeeded,
     runInstallInTempDir,
     storeInstallResult,
@@ -60,6 +62,8 @@ interface ProjectUpdateInfo {
     skipInstall: boolean;
     /** Parsed dependency path for scoped overrides (if specified) */
     dependencyPathSegments?: DependencyPathSegment[];
+    /** Npmrc configurations from the marker (for temp directory install) */
+    npmrcConfigs?: Npmrc[];
 }
 
 type Accumulator = DependencyRecipeAccumulator<ProjectUpdateInfo>;
@@ -104,6 +108,17 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
         example: "express>accepts"
     })
     dependencyPath?: string;
+
+    @Option({
+        displayName: "Npmrc scopes",
+        description: "Which .npmrc configuration scopes to include when running the package manager. " +
+            "By default, only 'Project' scope is used. Include 'User' or 'Global' to access private registries " +
+            "configured in those scopes. Pass as JSON array, e.g., '[\"Project\",\"User\"]'.",
+        required: false,
+        example: '["Project"]',
+        valid: ["Global", "User", "Project"]
+    })
+    npmrcScopes?: string[];
 
     initialValue(_ctx: ExecutionContext): Accumulator {
         return createDependencyRecipeAccumulator();
@@ -172,7 +187,8 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                     newVersion: recipe.newVersion,
                     packageManager: pm,
                     skipInstall: false, // Always need to run install for overrides
-                    dependencyPathSegments
+                    dependencyPathSegments,
+                    npmrcConfigs: marker.npmrcConfigs
                 });
 
                 return doc;
@@ -290,7 +306,11 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
         const result = await runInstallInTempDir(
             updateInfo.projectDir,
             updateInfo.packageManager,
-            modifiedPackageJson
+            modifiedPackageJson,
+            {
+                npmrcConfigs: updateInfo.npmrcConfigs,
+                npmrcScopes: parseNpmrcScopes(this.npmrcScopes)
+            }
         );
 
         storeInstallResult(result, acc, updateInfo, modifiedPackageJson);

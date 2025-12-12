@@ -22,6 +22,7 @@ import {
     allDependencyScopes,
     DependencyScope,
     findNodeResolutionResult,
+    Npmrc,
     PackageManager
 } from "../node-resolution-result";
 import {emptyMarkers, markupWarn} from "../../markers";
@@ -30,6 +31,7 @@ import {
     createDependencyRecipeAccumulator,
     DependencyRecipeAccumulator,
     getUpdatedLockFileContent,
+    parseNpmrcScopes,
     runInstallIfNeeded,
     runInstallInTempDir,
     storeInstallResult,
@@ -54,6 +56,8 @@ interface ProjectUpdateInfo {
     newVersion: string;
     /** The package manager used by this project */
     packageManager: PackageManager;
+    /** Npmrc configurations from the marker (for temp directory install) */
+    npmrcConfigs?: Npmrc[];
 }
 
 type Accumulator = DependencyRecipeAccumulator<ProjectUpdateInfo>;
@@ -97,6 +101,17 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
     })
     scope?: DependencyScope;
 
+    @Option({
+        displayName: "Npmrc scopes",
+        description: "Which .npmrc configuration scopes to include when running the package manager. " +
+            "By default, only 'Project' scope is used. Include 'User' or 'Global' to access private registries " +
+            "configured in those scopes. Pass as JSON array, e.g., '[\"Project\",\"User\"]'.",
+        required: false,
+        example: '["Project"]',
+        valid: ["Global", "User", "Project"]
+    })
+    npmrcScopes?: string[];
+
     initialValue(_ctx: ExecutionContext): Accumulator {
         return createDependencyRecipeAccumulator();
     }
@@ -139,7 +154,8 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
                     originalPackageJson: await this.printDocument(doc),
                     dependencyScope: recipe.getTargetScope(),
                     newVersion: recipe.version,
-                    packageManager: pm
+                    packageManager: pm,
+                    npmrcConfigs: marker.npmrcConfigs
                 });
 
                 return doc;
@@ -220,7 +236,11 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
         const result = await runInstallInTempDir(
             updateInfo.projectDir,
             updateInfo.packageManager,
-            modifiedPackageJson
+            modifiedPackageJson,
+            {
+                npmrcConfigs: updateInfo.npmrcConfigs,
+                npmrcScopes: parseNpmrcScopes(this.npmrcScopes)
+            }
         );
 
         storeInstallResult(result, acc, updateInfo, modifiedPackageJson);
