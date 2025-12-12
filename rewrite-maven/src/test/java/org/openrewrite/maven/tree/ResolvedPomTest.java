@@ -371,6 +371,7 @@ class ResolvedPomTest implements RewriteTest {
     void propertyWithNullValue() {
         rewriteRun(
           mavenProject(
+            //language=pom
             """
               <project>
                   <groupId>org.example</groupId>
@@ -383,11 +384,11 @@ class ResolvedPomTest implements RewriteTest {
                   </properties>
               </project>
               """,
-              spec -> spec
-                .afterRecipe(doc -> {
-                    String version = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getVersion();
-                    assertThat(version).isEqualTo("1.2.3-SNAPSHOT");
-                }
+            spec -> spec.afterRecipe(doc ->
+              assertThat(doc.getMarkers()
+                .findFirst(MavenResolutionResult.class).orElseThrow()
+                .getPom().getVersion())
+                .isEqualTo("1.2.3-SNAPSHOT")
             )
           )
         );
@@ -819,7 +820,7 @@ class ResolvedPomTest implements RewriteTest {
                   <artifactId>api-parent</artifactId>
                   <version>1.0.0-SNAPSHOT</version>
                   <packaging>pom</packaging>
-
+              
                   <modules>
                       <module>api-definitions</module>
                       <module>api-codegen</module>
@@ -833,7 +834,7 @@ class ResolvedPomTest implements RewriteTest {
                 <project>
                     <artifactId>api-definitions</artifactId>
                     <packaging>tgz</packaging>
-
+                
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
@@ -850,14 +851,14 @@ class ResolvedPomTest implements RewriteTest {
             pomXml("""
                 <project>
                     <artifactId>api-codegen</artifactId>
-
+                
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
                         <version>1.0.0-SNAPSHOT</version>
                         <relativePath>../pom.xml</relativePath>
                     </parent>
-
+                
                     <dependencies>
                         <dependency>
                             <groupId>org.example</groupId>
