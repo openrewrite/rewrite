@@ -17,7 +17,7 @@ package org.openrewrite.kotlin.internal;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import org.jetbrains.kotlin.KtFakeSourceElement;
+import org.jetbrains.kotlin.KtFakePsiSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
@@ -29,7 +29,6 @@ import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirProperty;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
-import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.ir.IrElement;
@@ -488,7 +487,7 @@ public class PsiTreePrinter {
 
             if (source instanceof KtRealPsiSourceElement) {
                 sb.append("Real ");
-            } else if (source instanceof KtFakeSourceElement) {
+            } else if (source instanceof KtFakePsiSourceElement) {
                 sb.append("Fake ");
             } else {
                 sb.append(source.getClass().getSimpleName());
@@ -547,7 +546,7 @@ public class PsiTreePrinter {
             return ((FirProperty) firElement).getName().toString();
         } else if (firElement instanceof FirResolvedTypeRef) {
             FirResolvedTypeRef resolvedTypeRef = (FirResolvedTypeRef) firElement;
-            ConeKotlinType coneKotlinType = resolvedTypeRef.getType();
+            ConeKotlinType coneKotlinType = resolvedTypeRef.getConeType();
             return printConeKotlinType(coneKotlinType);
         } else if (firElement instanceof FirResolvedNamedReference) {
             return ((FirResolvedNamedReference) firElement).getName().toString();
@@ -577,8 +576,8 @@ public class PsiTreePrinter {
                 }
                 return sb.toString();
             }
-        } else if (firElement instanceof FirConstExpression) {
-            Object value = ((FirConstExpression<?>) firElement).getValue();
+        } else if (firElement instanceof FirLiteralExpression) {
+            Object value = ((FirLiteralExpression) firElement).getValue();
             return value != null ? value.toString() : null;
             // return ((FirConstExpression<?>) firElement).getKind().toString();
         } else if (firElement instanceof FirWhenBranch) {
