@@ -17,47 +17,25 @@ package org.openrewrite.kotlin.internal
 
 import lombok.Getter
 import lombok.Setter
-import org.jetbrains.kotlin.com.intellij.lang.ASTNode
-import org.jetbrains.kotlin.com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.KtRealPsiSourceElement
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.ir.declarations.IrFile
-import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.openrewrite.Parser
-import java.util.*
-import kotlin.collections.ArrayDeque
+
 
 @Getter
 class KotlinSource(
     var input: Parser.Input,
-    val ktFile: KtFile,
     val cRLFLocations : List<Int>
 ) {
-    val nodes: Map<Int, ASTNode>
-
     @Setter
     var firFile: FirFile? = null
 
     @Setter
     var irFile: IrFile? = null
 
-    init {
-        nodes = map(ktFile)
-    }
-
-    private fun map(ktFile: KtFile): Map<Int, ASTNode> {
-        val result: MutableMap<Int, ASTNode> = HashMap()
-        val stack = ArrayDeque<PsiElement>()
-        stack.addFirst(ktFile)
-        while (stack.isNotEmpty()) {
-            val curr = stack.removeFirst()
-            if (curr is KtElement)
-                result[curr.textRange.startOffset] = curr.node
-            if (curr.firstChild != null)
-                stack.addFirst(curr.firstChild)
-            if (curr.nextSibling != null)
-                stack.addFirst(curr.nextSibling)
-        }
-        return result
+    fun getKtFile(): KtFile {
+        return (firFile!!.source as KtRealPsiSourceElement).psi as KtFile
     }
 }

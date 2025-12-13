@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.declarations.FirResolvedImport;
 import org.jetbrains.kotlin.fir.expressions.FirCallableReferenceAccess;
+import org.jetbrains.kotlin.fir.references.FirErrorNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol;
@@ -269,7 +270,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitCallableReferenceExpression(KtCallableReferenceExpression expression, ExecutionContext data) {
         FirElement firElement = psiElementAssociations.primary(expression.getCallableReference());
-        if (!(firElement instanceof FirResolvedCallableReference || firElement instanceof FirCallableReferenceAccess)) {
+        if (!(firElement instanceof FirResolvedCallableReference || firElement instanceof FirCallableReferenceAccess || firElement instanceof FirErrorNamedReference)) {
             throw new UnsupportedOperationException(java.lang.String.format("Unsupported callable reference: fir class: %s, fir: %s, psi class: %s.",
                     firElement == null ? "null" : firElement.getClass().getName(),
                     PsiTreePrinter.print(psiElementAssociations.primary(expression)),
@@ -1045,21 +1046,21 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             List<JRightPadded<Statement>> parameters = new ArrayList<>();
             for (KtParameter ktParameter : ktParameters) {
-                Statement stmt = convertToStatement(ktParameter.accept(this, data).withPrefix(prefix(ktParameter.getParent())));
+                Statement stmt = convertToStatement(ktParameter.accept(this, data));
                 parameters.add(padRight(stmt, prefix(accessor.getRightParenthesis())));
             }
 
-            params = JContainer.build(prefix(accessor.getLeftParenthesis()), parameters, Markers.EMPTY);
+            params = JContainer.build(suffix(accessor.getNamePlaceholder()), parameters, Markers.EMPTY);
         } else {
             params = JContainer.build(
-                    prefix(accessor.getLeftParenthesis()),
+                    suffix(accessor.getNamePlaceholder()),
                     singletonList(padRight(new J.Empty(randomId(), prefix(accessor.getRightParenthesis()), Markers.EMPTY), Space.EMPTY)),
                     Markers.EMPTY
             );
         }
 
         if (accessor.getReturnTypeReference() != null) {
-            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(accessor.getRightParenthesis())));
+            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(accessor.getParameterList())));
             returnTypeExpression = accessor.getReturnTypeReference().accept(this, data).withPrefix(prefix(accessor.getReturnTypeReference()));
         }
 
@@ -3905,6 +3906,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private static boolean isSpace(ASTNode node) {
+        if (node == null) return false;
         IElementType elementType = node.getElementType();
         return elementType == KtTokens.WHITE_SPACE ||
                elementType == KtTokens.BLOCK_COMMENT ||

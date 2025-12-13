@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fir.*
-import org.jetbrains.kotlin.fir.analysis.checkers.getContainingClassSymbol
+import org.jetbrains.kotlin.fir.analysis.checkers.getContainingSymbol
 import org.jetbrains.kotlin.fir.analysis.checkers.modality
 import org.jetbrains.kotlin.fir.analysis.checkers.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.declarations.*
@@ -40,8 +40,7 @@ import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
 import org.jetbrains.kotlin.fir.resolve.providers.firProvider
-import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
-import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
+import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
@@ -243,12 +242,13 @@ class KotlinTypeMapping(
         return jt
     }
 
+    @OptIn(DirectDeclarationsAccess::class)
     private fun fileType(file: FirFile, signature: String): JavaType {
         val functions = buildList {
             file.declarations.forEach {
                 when (it) {
                     is FirSimpleFunction -> add(it)
-                    is FirScript -> it.statements.filterIsInstance<FirSimpleFunction>().forEach(::add)
+                    is FirScript -> it.declarations.filterIsInstance<FirSimpleFunction>().forEach(::add)
                     else -> {}
                 }
             }
@@ -344,7 +344,7 @@ class KotlinTypeMapping(
             is ConeClassLikeType -> {
                 if (type.toSymbol(firSession) is FirTypeAliasSymbol) {
                     return classType(
-                        (type.toSymbol(firSession) as FirTypeAliasSymbol).resolvedExpandedTypeRef.type,
+                        (type.toSymbol(firSession) as FirTypeAliasSymbol).resolvedExpandedTypeRef,
                         parent,
                         signature
                     )
@@ -410,11 +410,12 @@ class KotlinTypeMapping(
             } else if (firClass.symbol.classId.isNestedClass) {
                 declaringType = TypeUtils.asFullyQualified(type(parent))
             }
-            val properties: MutableList<FirProperty> = ArrayList(firClass.declarations.size)
-            val javaFields: MutableList<FirJavaField> = ArrayList(firClass.declarations.size)
-            val functions: MutableList<FirFunction> = ArrayList(firClass.declarations.size)
-            val enumEntries: MutableList<FirEnumEntry> = ArrayList(firClass.declarations.size)
-            for (declaration: FirDeclaration in firClass.declarations) {
+            val properties: MutableList<FirProperty> = ArrayList()
+            val javaFields: MutableList<FirJavaField> = ArrayList()
+            val functions: MutableList<FirFunction> = ArrayList()
+            val enumEntries: MutableList<FirEnumEntry> = ArrayList()
+            firClass.processAllDeclarations(firSession) { decl ->
+                val declaration = decl.fir
                 if (declaration is FirProperty) {
                     if (declaration.source == null || declaration.source!!.kind !is KtFakeSourceElementKind) {
                         properties.add(declaration)
@@ -517,13 +518,8 @@ class KotlinTypeMapping(
 
     @OptIn(SymbolInternals::class)
     fun methodDeclarationType(enumEntry: FirEnumEntry): Method? {
-        val type = when (val fir = enumEntry.symbol.getContainingClassSymbol(firSession)?.fir) {
-            is FirClass -> {
-                when (val primary = fir.declarations.firstOrNull { it is FirPrimaryConstructor }) {
-                    is FirPrimaryConstructor -> type(primary as FirFunction)
-                    else -> null
-                }
-            }
+        val type = when (val fir = enumEntry.symbol.getContainingSymbol(firSession)?.fir) {
+            is FirClass -> fir.primaryConstructorIfAny(firSession)?.let { type(it.fir)}
             else -> null
         }
         return when (type) {
@@ -567,8 +563,8 @@ class KotlinTypeMapping(
         var parentType = when {
             function.symbol is FirConstructorSymbol -> type(function.returnTypeRef)
             function.dispatchReceiverType != null -> type(function.dispatchReceiverType!!)
-            function.symbol.getOwnerLookupTag()?.toFirRegularClass(firSession) != null -> {
-                type(function.symbol.getOwnerLookupTag()!!.toFirRegularClass(firSession)!!)
+            function.symbol.getOwnerLookupTag()?.toRegularClassSymbol(firSession) != null -> {
+                type(function.symbol.getOwnerLookupTag()!!.toRegularClassSymbol(firSession)!!.fir)
             }
 
             parent is FirRegularClass || parent != null -> type(parent)
@@ -704,7 +700,7 @@ class KotlinTypeMapping(
     @OptIn(SymbolInternals::class)
     fun methodInvocationType(function: FirFunctionCall, signature: String): Method? {
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return null
-        val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameter else null
+        val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameterSymbol else null
         val paramNames: MutableList<String>? = when {
             sym is FirFunctionSymbol<*> && (receiver != null ||
                     sym.valueParameterSymbols.isNotEmpty()) -> {
@@ -760,11 +756,11 @@ class KotlinTypeMapping(
             if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
                 declaringType = TypeUtils.asFullyQualified(type(resolvedSymbol.dispatchReceiverType))
             } else if (resolvedSymbol.containingClassLookupTag() != null &&
-                resolvedSymbol.containingClassLookupTag()!!.toFirRegularClass(firSession) != null
+                resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession) != null
             ) {
                 declaringType = TypeUtils.asFullyQualified(
                     type(
-                        resolvedSymbol.containingClassLookupTag()!!.toFirRegularClass(firSession)
+                        resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)?.fir
                     )
                 )
             } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library) {
@@ -800,8 +796,8 @@ class KotlinTypeMapping(
         }
         val returnType = type(function.typeRef)
 
-        if (function.toResolvedCallableSymbol()?.receiverParameter != null) {
-            paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
+        if (function.toResolvedCallableSymbol()?.receiverParameterSymbol != null) {
+            paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.calculateResolvedTypeRef()))
         }
         val mapNames = function.arguments.any { it is FirNamedArgumentExpression }
         var args: MutableMap<String, FirNamedArgumentExpression>? = null
@@ -816,21 +812,18 @@ class KotlinTypeMapping(
             }
         }
         val valueParams = (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters
-        for ((index, p) in valueParams.withIndex()) {
+        for (p in valueParams) {
             if (paramTypes == null) {
                 // Ideally, an ArrayList is created with the expected size based on the symbol for the function.
                 paramTypes = ArrayList()
             }
             val t = type(p.returnTypeRef)
             if (t is GenericTypeVariable) {
-                if (mapNames && args != null) {
-                    if (args.containsKey(p.name.asString())) {
-                        paramTypes.add(type(args[p.name.asString()]!!.typeRef, function)!!)
-                    } else {
-                        paramTypes.add(t)
-                    }
-                } else if (index < valueParams.size) {
-                    paramTypes.add(type(function.arguments[index].typeRef, function)!!)
+                val resolvedArgumentType = function.resolvedArgumentMapping?.entries?.find { (_, valueParam) -> valueParam == p }?.key
+                if (resolvedArgumentType != null) {
+                    paramTypes.add(type(resolvedArgumentType.typeRef))
+                } else {
+                    paramTypes.add(t)
                 }
             } else {
                 paramTypes.add(t)
@@ -916,9 +909,9 @@ class KotlinTypeMapping(
                 declaringType = type(variable.symbol.dispatchReceiverType)
             }
 
-            variable.symbol.getContainingClassSymbol(firSession) != null -> {
-                if (variable.symbol.getContainingClassSymbol(firSession) !is FirAnonymousObjectSymbol) {
-                    declaringType = type(variable.symbol.getContainingClassSymbol(firSession)!!.fir)
+            variable.symbol.getContainingSymbol(firSession) != null -> {
+                if (variable.symbol.getContainingSymbol(firSession) !is FirAnonymousObjectSymbol) {
+                    declaringType = type(variable.symbol.getContainingSymbol(firSession)!!.fir)
                 }
             }
 
@@ -1289,7 +1282,7 @@ class KotlinTypeMapping(
         for (ann in annotations) {
             if ("kotlin.annotation.Retention" == convertClassIdToFqn(ann.typeRef.coneType.classId)) {
                 for (v in ann.argumentMapping.mapping.values) {
-                    if (v.calleeReference is FirResolvedNamedReference && (v.calleeReference as FirResolvedNamedReference).name.asString() == "SOURCE") {
+                    if (v.toReference(firSession) is FirResolvedNamedReference && (v.toReference(firSession) as FirResolvedNamedReference).name.asString() == "SOURCE") {
                         return false
                     }
                 }
@@ -1365,7 +1358,7 @@ class KotlinTypeMapping(
 
     fun primitive(type: FirElement): Primitive {
         return when (type) {
-            is FirConstExpression<*> -> {
+            is FirLiteralExpression -> {
                 when (type.kind) {
                     ConstantValueKind.Boolean -> Primitive.Boolean
                     ConstantValueKind.Byte, ConstantValueKind.UnsignedByte -> Primitive.Byte
@@ -1397,3 +1390,6 @@ internal fun FirBasedSymbol<*>.getContainingFile() =
         is FirClassLikeSymbol<*> -> moduleData.session.firProvider.getFirClassifierContainerFileIfAny(this)
         else -> null
     }
+
+val FirExpression.typeRef
+    get() = resolvedType.toFirResolvedTypeRef()

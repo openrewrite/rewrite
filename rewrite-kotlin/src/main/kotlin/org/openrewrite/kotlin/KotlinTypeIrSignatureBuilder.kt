@@ -15,10 +15,10 @@
  */
 package org.openrewrite.kotlin
 
+import org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyClass
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyConstructor
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazySimpleFunction
-import org.jetbrains.kotlin.ir.backend.js.utils.valueArguments
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
@@ -63,7 +63,7 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
                 return signature(baseType.type)
             }
 
-            is IrConst<*> -> {
+            is IrConst -> {
                 return primitiveSignature(baseType)
             }
 
@@ -265,7 +265,7 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
 
     override fun primitiveSignature(type: Any): String {
         return when (type) {
-            is IrConst<*> -> type.type.classFqName!!.asString()
+            is IrConst -> type.type.classFqName!!.asString()
             else -> {
                 throw UnsupportedOperationException("Unsupported primitive type" + type.javaClass)
             }
@@ -329,6 +329,7 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
         return signature.toString()
     }
 
+    @OptIn(DeprecatedForRemovalCompilerApi::class)
     private fun methodArgumentSignature(function: IrFunction): String {
         val genericArgumentTypes = StringJoiner(",", "[", "]")
         if (function.extensionReceiverParameter != null) {
@@ -361,12 +362,13 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
         return signature.toString()
     }
 
+    @OptIn(DeprecatedForRemovalCompilerApi::class)
     private fun methodArgumentSignature(function: IrFunctionAccessExpression): String {
         val genericArgumentTypes = StringJoiner(",", "[", "]")
         if (function.extensionReceiver != null) {
             genericArgumentTypes.add(signature(function.extensionReceiver!!.type))
         }
-        for (param: IrExpression? in function.valueArguments) {
+        for (param: IrExpression? in function.getValueArguments()) {
             if (param != null) {
                 genericArgumentTypes.add(signature(param.type))
             }

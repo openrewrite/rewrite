@@ -136,7 +136,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 .computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(singleton(
                                 new Parser.Input(
                                         Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
-                                        () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8))
+                                        () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8)),
+                                        true
                                 )), null, ctx)
                         .findFirst()
                         .map(maybeCu -> {

@@ -26,8 +26,8 @@ import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
 import org.jetbrains.kotlin.fir.resolve.inference.ConeTypeParameterBasedTypeVariable
-import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
-import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
+import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
+import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
@@ -66,7 +66,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 signature(type.lowerBound)
             }
 
-            is ConeStubTypeForChainInference -> {
+            is ConeStubTypeForTypeVariableInSubtyping -> {
                 signature(type.constructor.variable)
             }
 
@@ -211,15 +211,18 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         throw UnsupportedOperationException("This should never happen.")
     }
 
+    @OptIn(SymbolInternals::class)
     override fun classSignature(type: Any): String {
         return when (type) {
             is ConeClassLikeType -> convertClassIdToFqn(type.classId)
             is ConeFlexibleType -> convertClassIdToFqn(type.lowerBound.classId)
-            is ConeTypeParameterType -> signature(type.type)
+            is ConeTypeParameterType -> signature(type)
             is FirClass -> convertClassIdToFqn(type.classId)
             is FirFile -> fileSignature(type)
-            is FirResolvedTypeRef -> classSignature(type.type)
+            is FirResolvedTypeRef -> classSignature(type.coneType)
             is FirResolvedQualifier -> convertClassIdToFqn(type.classId)
+            is FirJavaTypeRef -> signature(type)
+            is FirRegularClassSymbol -> classSignature(type.fir)
             else -> {
                 throw UnsupportedOperationException("Unsupported class type: ${type.javaClass.name}")
             }
@@ -321,9 +324,11 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         val clazz = when {
             function.symbol is FirConstructorSymbol -> classSignature(function.returnTypeRef)
             function.dispatchReceiverType != null -> classSignature(function.dispatchReceiverType!!)
+            function is FirSimpleFunction && parent is FirFile -> classSignature(parent)
+            function.symbol is FirNamedFunctionSymbol -> classSignature(function.returnTypeRef)
             function.symbol.getOwnerLookupTag() != null && function.symbol.getOwnerLookupTag()!!
-                .toFirRegularClass(firSession) != null -> {
-                classSignature(function.symbol.getOwnerLookupTag()!!.toFirRegularClass(firSession)!!)
+                .toRegularClassSymbol(firSession) != null -> {
+                classSignature(function.symbol.getOwnerLookupTag()!!.toRegularClassSymbol(firSession)!!)
             }
 
             parent is FirClass -> classSignature(parent)
@@ -361,9 +366,9 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
                 declaringSig = signature(resolvedSymbol.dispatchReceiverType)
             } else if (resolvedSymbol.containingClassLookupTag() != null &&
-                resolvedSymbol.containingClassLookupTag()!!.toFirRegularClass(firSession) != null
+                resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession) != null
             ) {
-                declaringSig = signature(resolvedSymbol.containingClassLookupTag()!!.toFirRegularClass(firSession))
+                declaringSig = signature(resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession))
             } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library) {
                 if (resolvedSymbol.fir.containerSource is JvmPackagePartSource) {
                     val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
@@ -409,8 +414,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     @OptIn(SymbolInternals::class)
     private fun methodCallArgumentSignature(function: FirFunctionCall): String {
         val genericArgumentTypes = StringJoiner(",", "[", "]")
-        if (function.toResolvedCallableSymbol()?.receiverParameter != null) {
-            genericArgumentTypes.add(signature(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
+        if (function.toResolvedCallableSymbol()?.receiverParameterSymbol != null) {
+            genericArgumentTypes.add(signature(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.resolvedType))
         }
         val mapNames = function.arguments.any { it is FirNamedArgumentExpression }
         var args: MutableMap<String, FirNamedArgumentExpression>? = null
@@ -515,8 +520,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 convertClassIdToFqn(property.dispatchReceiverType!!.toRegularClassSymbol(firSession)!!.classId)
             }
 
-            property.symbol.callableId.classId != null -> {
-                var oSig = convertClassIdToFqn(property.symbol.callableId.classId)
+            property.symbol.callableId?.classId != null -> {
+                var oSig = convertClassIdToFqn(property.symbol.callableId!!.classId)
                 if (oSig.contains("<")) {
                     oSig = oSig.substring(0, oSig.indexOf('<'))
                 }

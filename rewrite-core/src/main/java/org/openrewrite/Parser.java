@@ -148,6 +148,10 @@ public interface Parser {
             this(path, FileAttributes.fromPath(path), source, false);
         }
 
+        public Input(Path path, Supplier<InputStream> source, boolean synthetic) {
+            this(path, FileAttributes.fromPath(path), source, synthetic);
+        }
+
         public Input(Path path, @Nullable FileAttributes fileAttributes, Supplier<InputStream> source) {
             this(path, fileAttributes, source, false);
         }
