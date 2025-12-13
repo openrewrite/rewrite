@@ -15,7 +15,17 @@
  */
 package org.openrewrite.maven.tree;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.maven.Assertions.pomXml;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
@@ -27,16 +37,7 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.openrewrite.java.Assertions.mavenProject;
-import static org.openrewrite.maven.Assertions.pomXml;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 class ResolvedPomTest implements RewriteTest {
 
@@ -385,6 +386,46 @@ class ResolvedPomTest implements RewriteTest {
               </project>
               """,
             spec -> spec.afterRecipe(doc ->
+              assertThat(doc.getMarkers()
+                .findFirst(MavenResolutionResult.class).orElseThrow()
+                .getPom().getVersion())
+                .isEqualTo("1.2.3-SNAPSHOT")
+            )
+          )
+        );
+    }
+    
+    @Issue("https://github.com/openrewrite/rewrite/issues/6391")
+    @Test
+    void resolveParentWithPropertiesFromParent() {
+        rewriteRun(
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>${revision}${sha1}${changelist}</version>
+                  <properties>
+                      <revision>1.2.3</revision>
+                      <changelist>-SNAPSHOT</changelist>
+                      <sha1 />
+                  </properties>
+            </project>
+            """, spec -> spec.path("pom.xml")),
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <artifactId>child</artifactId>
+                  <parent>
+                      <groupId>org.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>${revision}${sha1}${changelist}</version>
+                  </parent>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml").afterRecipe(doc ->
               assertThat(doc.getMarkers()
                 .findFirst(MavenResolutionResult.class).orElseThrow()
                 .getPom().getVersion())
