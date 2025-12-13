@@ -212,6 +212,10 @@ public class ResolvedPom {
                 emptyList()
         ).resolver(ctx, downloader).resolve();
 
+        if (!getVersion().equals(resolved.getVersion())) {
+            return resolved;
+        }
+
         for (Map.Entry<String, String> property : resolved.getProperties().entrySet()) {
             if (properties == null || (property.getValue() != null && !property.getValue().equals(properties.get(property.getKey())))) {
                 return resolved;
@@ -325,6 +329,9 @@ public class ResolvedPom {
             } else {
                 return propVal;
             }
+        } else if (properties.containsKey(property)) {
+            // An existing property key with a `null` value should be regarded as an empty string.
+            return "";
         }
         switch (property) {
             case "groupId":
