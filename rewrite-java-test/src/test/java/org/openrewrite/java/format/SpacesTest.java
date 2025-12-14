@@ -1126,8 +1126,8 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void foo() {
                       int x = 0;
-                      x ++;
-                      x --;
+                      x++;
+                      x--;
                       -- x;
                       ++ x;
                       x = - x;
@@ -2494,7 +2494,7 @@ class SpacesTest implements RewriteTest {
     void compositeMethodDeclarationParentheses() {
         rewriteRun(
           spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))
-              .withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))
+            .withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))
           ),
           java(
             """
@@ -4575,6 +4575,26 @@ class SpacesTest implements RewriteTest {
             """
               enum Test { }
               """
+          ),
+          java(
+            """
+              enum Tester {ONE, TWO}
+              """,
+            """
+              enum Tester { ONE, TWO }
+              """
+          ),
+          java(
+            """
+              class TestEnum {
+                  enum Tester {ONE, TWO}
+              }
+              """,
+            """
+              class TestEnum {
+                  enum Tester { ONE, TWO }
+              }
+              """
           )
         );
     }
@@ -4589,6 +4609,26 @@ class SpacesTest implements RewriteTest {
               """,
             """
               enum Test {}
+              """
+          ),
+          java(
+            """
+              enum Tester { ONE, TWO }
+              """,
+            """
+              enum Tester {ONE, TWO}
+              """
+          ),
+          java(
+            """
+              class TestEnum {
+                  enum Tester { ONE, TWO }
+              }
+              """,
+            """
+              class TestEnum {
+                  enum Tester {ONE, TWO}
+              }
               """
           )
         );
@@ -4855,6 +4895,271 @@ class SpacesTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void keepMinimalViableSpaces() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withBeforeComma(true))), //This style has no impact on throws, interfaces commas
+          java(
+            """
+              class Test {
+                  void guardedCases(Object o) {
+                      switch (o) {
+                          case Integer i when i > 0 -> System.out.println("Perfect");
+                          case String s when "YES".equalsIgnoreCase(s) -> System.out.println("Great"); //The labels here should not suddenly receive no space
+                          default -> System.out.println("OK");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handleThrowsExtendsImplements() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withAfterComma(true).withBeforeComma(true))), //This style has no impact on throws, interfaces commas
+          java(
+            """
+              class Test {
+                  void guardedCases(Object o) throws IllegalStateException , IllegalArgumentException {
+                  }
+
+                  public static class ExtendedTest extends Test {
+                  }
+
+                  public static class ImplementsTestBeforeComma implements AutoCloseable
+                          , Comparable<ImplementsTestBeforeComma> {
+                  }
+
+                  public static class ImplementsTestAfterComma implements AutoCloseable,
+                          Comparable<ImplementsTestAfterComma> {
+                  }
+
+                  public static class ExtendsAndImplements extends Test implements AutoCloseable , Comparable<ExtendsAndImplements> {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void guardedCases(Object o) throws IllegalStateException, IllegalArgumentException {
+                  }
+
+                  public static class ExtendedTest extends Test {
+                  }
+
+                  public static class ImplementsTestBeforeComma implements AutoCloseable
+                          , Comparable<ImplementsTestBeforeComma> {
+                  }
+
+                  public static class ImplementsTestAfterComma implements AutoCloseable,
+                          Comparable<ImplementsTestAfterComma> {
+                  }
+
+                  public static class ExtendsAndImplements extends Test implements AutoCloseable, Comparable<ExtendsAndImplements> {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handleInstanceOf() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                void isString(Object o) {
+                    return o   instanceof   String;
+                }
+            }
+            """,
+            """
+            class Test {
+                void isString(Object o) {
+                    return o instanceof String;
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void handleIfBeforeParentheses() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if      (o instanceof String) {
+                        return true;
+                    }
+                    if(o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) {
+                        return true;
+                    }
+                    if (o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void elseIfSplitBySpace() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) {
+                        return true;
+                    } else     if (o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) {
+                        return true;
+                    } else if (o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void elseIfWithoutBraces() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String)
+                        return true;
+                    else
+                    if (o instanceof Character)
+                        return true;
+                    return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String)
+                        return true;
+                    else if (o instanceof Character)
+                        return true;
+                    return false;
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void annotationPositions() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class TestClass {
+                protected void doSomething(Object o) {
+                }
+            }
+            """
+          ),
+          java(
+            """
+            class TesterOne extends TestClass {
+                @Override
+                protected void doSomething(Object o) {
+                }
+            }
+            """
+          ),
+          java(
+            """
+            class TesterTwo extends TestClass {
+                @Override   protected void doSomething(Object o) {
+                }
+            }
+            """,
+            """
+            class TesterTwo extends TestClass {
+                @Override protected void doSomething(Object o) {
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void tooMuchSpacesInBlock() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            public class Test    {
+            
+            
+            
+            
+                    //test
+            
+            
+            
+            
+                //Testing
+            
+            
+            
+            
+            
+            }
+            """,
+            """
+            public class Test {
+            
+
+                    //test
+            
+            
+                //Testing
+
+
+            }
+            """)
         );
     }
 }

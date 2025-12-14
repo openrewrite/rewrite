@@ -2,7 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
 import {JS, JSX} from "./tree";
 import {mapAsync} from "../util";
-import {ElementRemovalFormatter} from "../java/formatting-utils";
+import {ElementRemovalFormatter} from "../java";
 
 /**
  * @param visitor The visitor to add the import removal to
@@ -113,9 +113,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         updateFn: (draft: any) => void | Promise<void>,
         p: P
     ): Promise<JS.Import> {
-        return this.produceJavaScript<JS.Import>(jsImport, p, async draft => {
+        return this.produceJavaScript(jsImport, p, async draft => {
             if (draft.importClause) {
-                draft.importClause = await this.produceJavaScript<JS.ImportClause>(
+                draft.importClause = await this.produceJavaScript(
                     importClause, p, async (clauseDraft: any) => await updateFn(clauseDraft)
                 );
             }
@@ -131,7 +131,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         await this.collectUsedIdentifiers(compilationUnit, usedIdentifiers, usedTypes);
 
         // Now process imports with knowledge of what's used
-        return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
+        return this.produceJavaScript(compilationUnit, p, async draft => {
             const formatter = new ElementRemovalFormatter<J>(true); // Preserve file headers from first import
 
             draft.statements = await mapAsync(compilationUnit.statements, async (stmt) => {
@@ -269,12 +269,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         // When removing the default import, we need to transfer its prefix to namedBindings
                         // to maintain proper spacing (the default import's prefix is typically empty)
                         if (draft.namedBindings && importClause.name?.element) {
-                            const updatedBindings = await this.produceJavaScript(
-                                importClause.namedBindings, p, async bindingsDraft => {
+                            draft.namedBindings = await this.produceJava(
+                                draft.namedBindings, p, async bindingsDraft => {
                                     bindingsDraft.prefix = importClause.name!.element!.prefix;
                                 }
                             );
-                            draft.namedBindings = updatedBindings;
                         }
                     }, p);
                 }
@@ -477,7 +476,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             },
             async (elem: J, prefix: J.Space) => {
                 if (elem.kind === JS.Kind.ImportSpecifier) {
-                    return this.produceJavaScript<JS.ImportSpecifier>(
+                    return this.produceJavaScript(
                         elem as JS.ImportSpecifier, p, async draft => {
                             draft.prefix = prefix;
                         }
@@ -497,7 +496,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Create updated named imports with filtered elements
-        return this.produceJavaScript<JS.NamedImports>(namedImports, p, async draft => {
+        return this.produceJavaScript(namedImports, p, async draft => {
             draft.elements = {
                 ...namedImports.elements,
                 elements: filtered as any
@@ -553,8 +552,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 return undefined; // Remove entire require
             } else if (updatedPattern !== objectPattern) {
                 // Update with filtered bindings
-                return this.produceJava<J.VariableDeclarations>(varDecls, p, async draft => {
-                    const updatedNamedVar = await this.produceJava<J.VariableDeclarations.NamedVariable>(
+                return this.produceJava(varDecls, p, async draft => {
+                    const updatedNamedVar = await this.produceJava(
                         namedVar, p, async namedDraft => {
                             namedDraft.name = updatedPattern;
                         }
@@ -603,13 +602,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             },
             async (elem: J, prefix: J.Space) => {
                 if (elem.kind === J.Kind.Identifier) {
-                    return this.produceJava<J.Identifier>(
+                    return this.produceJava(
                         elem as J.Identifier, p, async draft => {
                             draft.prefix = prefix;
                         }
                     );
                 } else if (elem.kind === JS.Kind.BindingElement) {
-                    return this.produceJavaScript<JS.BindingElement>(
+                    return this.produceJavaScript(
                         elem as JS.BindingElement, p, async draft => {
                             draft.prefix = prefix;
                         }
@@ -628,7 +627,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return pattern;
         }
 
-        return this.produceJavaScript<JS.ObjectBindingPattern>(pattern, p, async draft => {
+        return this.produceJavaScript(pattern, p, async draft => {
             draft.bindings = {
                 ...pattern.bindings,
                 elements: filtered as any

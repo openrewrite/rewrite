@@ -54,8 +54,6 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     .map(property -> "/project/properties/" + property)
                     .map(XPathMatcher::new).collect(toList());
 
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build//plugins");
-
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
             example = "11")

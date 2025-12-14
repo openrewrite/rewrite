@@ -69,6 +69,62 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void removeIfExists() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeDependency(
+              "javax.activation",
+              "javax.activation-api",
+              "jakarta.activation",
+              "jakarta.activation-api",
+              "1.2.X",
+              null,
+              null,
+              true
+            ),
+            new ChangeDependency(
+              "com.google.guava",
+              "guava",
+              "jakarta.activation",
+              "jakarta.activation-api",
+              "1.2.X",
+              null,
+              null,
+              true
+            )
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:23.0"
+                  implementation group: "javax.activation", name: "javax.activation-api", version: "1.2.0"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation group: "jakarta.activation", name: "jakarta.activation-api", version: "1.2.2"
+              }
+              """
+          )
+        );
+    }
+    @Test
     void changeGroupIdOnly() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", null, null, null, null, true)),

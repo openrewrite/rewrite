@@ -841,6 +841,17 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
+     * Overrides the visitShebang method to compare shebangs.
+     *
+     * @param shebang The shebang to visit
+     * @param other The other shebang to compare with
+     * @returns The visited shebang, or undefined if the visit was aborted
+     */
+    override async visitShebang(shebang: JS.Shebang, other: J): Promise<J | undefined> {
+        return this.visitElement(shebang, other as JS.Shebang);
+    }
+
+    /**
      * Overrides the visitStatementExpression method to compare statement expressions.
      * 
      * @param statementExpression The statement expression to visit

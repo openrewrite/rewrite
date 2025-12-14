@@ -13,9 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
-import {createDraft, Draft, finishDraft} from "immer";
-import {MarkersKind, ParseExceptionResult} from "./markers";
 import {JavaScript, RecipeMarketplace} from "./marketplace";
 
 export * from "./data-table";
@@ -36,8 +33,35 @@ export * from "./marketplace";
 
 // Install all recipes in this package
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
-    const {OrderImports} = await import("./recipe/index.js");
+    const {
+        AddDependency,
+        AsyncCallbackInSyncArrayMethod,
+        AutoFormat,
+        UpgradeDependencyVersion,
+        UpgradeTransitiveDependencyVersion,
+        OrderImports,
+        ChangeImport
+    } = await import("./javascript/recipes/index.js");
+    await marketplace.install(AddDependency, JavaScript);
+    await marketplace.install(AsyncCallbackInSyncArrayMethod, JavaScript);
+    await marketplace.install(AutoFormat, JavaScript);
+    await marketplace.install(UpgradeDependencyVersion, JavaScript);
+    await marketplace.install(UpgradeTransitiveDependencyVersion, JavaScript);
     await marketplace.install(OrderImports, JavaScript);
+    await marketplace.install(ChangeImport, JavaScript);
+
+    const {FindDependency, Search} = await import("./javascript/search/index.js");
+    await marketplace.install(FindDependency, Search);
+
+    const {
+        UseObjectPropertyShorthand,
+        PreferOptionalChain,
+        AddParseIntRadix,
+        Cleanup
+    } = await import("./javascript/cleanup/index.js");
+    await marketplace.install(UseObjectPropertyShorthand, Cleanup);
+    await marketplace.install(PreferOptionalChain, Cleanup);
+    await marketplace.install(AddParseIntRadix, Cleanup);
 
     const {
         ExportAssignmentToExportDefault,
@@ -55,22 +79,3 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ModernizeOctalLiterals, MigrateES6);
     await marketplace.install(RemoveDuplicateObjectKeys, MigrateES6);
 }
-
-RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
-    async rpcSend(after: ParseExceptionResult, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.parserType);
-        await q.getAndSend(after, a => a.exceptionType);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.treeType);
-    },
-    async rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): Promise<ParseExceptionResult> {
-        const draft: Draft<ParseExceptionResult> = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.parserType = await q.receive(before.parserType);
-        draft.exceptionType = await q.receive(before.exceptionType);
-        draft.message = await q.receive(before.message);
-        draft.treeType = await q.receive(before.treeType);
-        return finishDraft(draft);
-    }
-});

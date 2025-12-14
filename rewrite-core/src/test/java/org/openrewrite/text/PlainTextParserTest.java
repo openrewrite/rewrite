@@ -15,12 +15,20 @@
  */
 package org.openrewrite.text;
 
+import java.util.stream.Stream;
+import org.assertj.core.api.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 
 import java.nio.file.Path;
 import java.util.List;
+import org.openrewrite.Parser.Input;
+import org.openrewrite.SourceFile;
+import org.openrewrite.tree.ParseError;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,5 +48,34 @@ class PlainTextParserTest {
           .parseInputs(inputs, null, new InMemoryExecutionContext())
           .findFirst()
         ).containsInstanceOf(PlainText.class);
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    void testUtf8WithAndWithoutBom(String text, boolean hasBom) {
+        PlainTextParser parser = PlainTextParser.builder().build();
+        SourceFile parsed = parser.parse(text).findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(PlainText.class);
+
+        assertThat(parsed.isCharsetBomMarked()).isEqualTo(hasBom);
+
+        SourceFile checked = parser.requirePrintEqualsInput(
+          parsed, Input.fromString(text), null, new InMemoryExecutionContext()
+        );
+
+        assertThat(checked).isNotInstanceOf(ParseError.class);
+        assertThat(checked).isSameAs(parsed);
+    }
+
+    static Stream<Arguments> testUtf8WithAndWithoutBom() {
+        return Stream.of(
+          Arguments.of("""
+              <?xml version="1.0" encoding="UTF-8"?><a />
+              """, false),
+          Arguments.of("""
+              \uFEFF<?xml version="1.0" encoding="UTF-8"?><a />
+              """, true)
+        );
     }
 }

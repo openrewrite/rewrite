@@ -17,17 +17,18 @@
  */
 import {
     ExecutionContext,
+    JavaScript,
     marker,
     Marker,
     randomId,
     Recipe,
-    RecipeRegistry,
+    RecipeMarketplace,
     Tree,
     TreeVisitor
-} from "@openrewrite/rewrite";
+} from "../src";
 
-export function activate(registry: RecipeRegistry) {
-    registry.register(ModifyAllTrees);
+export async function activate(marketplace: RecipeMarketplace) {
+    await marketplace.install(ModifyAllTrees, JavaScript);
 }
 
 const changed: Marker = marker(randomId());
@@ -41,9 +42,9 @@ class ModifyAllTrees extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends TreeVisitor<Tree, ExecutionContext> {
             protected async preVisit(tree: Tree, p: ExecutionContext): Promise<Tree> {
-                return this.produceTree(tree, p, draft => {
+                return (await this.produceTree(tree, p, draft => {
                     draft.markers.markers.push(changed);
-                });
+                }))!;
             }
         };
     }

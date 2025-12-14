@@ -56,7 +56,8 @@ export {
 // Export rewrite functionality
 export {
     rewrite,
-    fromRecipe
+    fromRecipe,
+    flattenBlock
 } from './rewrite';
 
 // Export template functionality

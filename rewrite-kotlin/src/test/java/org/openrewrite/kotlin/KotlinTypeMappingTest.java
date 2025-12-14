@@ -578,6 +578,27 @@ class KotlinTypeMappingTest {
             );
         }
 
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite/issues/6140")
+        void companionObject() {
+            rewriteRun(
+              kotlin(
+                """
+                  import kotlin.random.*
+                  
+                  val foo = Random.nextLong(0, 1)
+                  """,
+                    spec -> spec.afterRecipe(cu -> {
+                        J.VariableDeclarations.NamedVariable foo = ((J.VariableDeclarations) cu.getStatements().get(0)).getVariables().get(0);
+                        J.Identifier random = (J.Identifier) ((J.MethodInvocation) foo.getInitializer()).getSelect();
+                        JavaType.Class randomType = (JavaType.Class) random.getType();
+                        assertThat(randomType.getFullyQualifiedName()).isEqualTo("kotlin.random.Random");
+                        assertThat(randomType.getSupertype().toString()).isEqualTo("kotlin.Any");
+                    })
+              )
+            );
+        }
+
         @CsvSource(value = {
           "n++~kotlin.Int",
           "--n~kotlin.Int",

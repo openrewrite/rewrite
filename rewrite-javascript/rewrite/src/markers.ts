@@ -15,12 +15,20 @@
  */
 import {randomId, UUID} from "./uuid";
 import {asRef} from "./reference";
+import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
+import {createDraft, Draft, finishDraft} from "immer";
 
 export const MarkersKind = {
     Markers: "org.openrewrite.marker.Markers",
     NamedStyles: "org.openrewrite.marker.NamedStyles",
     SearchResult: "org.openrewrite.marker.SearchResult",
     ParseExceptionResult: "org.openrewrite.ParseExceptionResult",
+
+    // Markup markers for errors, warnings, info, and debug messages
+    MarkupError: "org.openrewrite.marker.Markup$Error",
+    MarkupWarn: "org.openrewrite.marker.Markup$Warn",
+    MarkupInfo: "org.openrewrite.marker.Markup$Info",
+    MarkupDebug: "org.openrewrite.marker.Markup$Debug",
 
     /**
      * A generic marker that is sent/received as a bare map because the type hasn't been
@@ -65,6 +73,60 @@ export function findMarker<T extends Marker>(
     );
 }
 
+/**
+ * Replaces a marker in a Markers collection with a new marker.
+ * If the old marker is not found, the new marker is added.
+ *
+ * @param markers The markers collection to update
+ * @param oldMarker The marker to replace (matched by id)
+ * @param newMarker The new marker to insert
+ * @returns A new Markers object with the replacement applied
+ */
+export function replaceMarker(markers: Markers, oldMarker: Marker, newMarker: Marker): Markers {
+    const newMarkers = markers.markers.map(m =>
+        m.id === oldMarker.id ? newMarker : m
+    );
+
+    // If old marker wasn't found, add the new one
+    if (!markers.markers.some(m => m.id === oldMarker.id)) {
+        newMarkers.push(newMarker);
+    }
+
+    return {
+        ...markers,
+        markers: newMarkers
+    };
+}
+
+/**
+ * Replaces the first marker with the same kind as the new marker, or adds it if not found.
+ * This is useful when there's typically only one marker of each kind.
+ *
+ * @param markers The markers collection to update
+ * @param newMarker The new marker to insert (its kind is used to find the marker to replace)
+ * @returns A new Markers object with the replacement applied
+ */
+export function replaceMarkerByKind(markers: Markers, newMarker: Marker): Markers {
+    let found = false;
+    const newMarkers = markers.markers.map(m => {
+        if (!found && m.kind === newMarker.kind) {
+            found = true;
+            return newMarker;
+        }
+        return m;
+    });
+
+    // If marker with kind wasn't found, add the new one
+    if (!found) {
+        newMarkers.push(newMarker);
+    }
+
+    return {
+        ...markers,
+        markers: newMarkers
+    };
+}
+
 export const emptyMarkers: Markers = asRef({
     kind: MarkersKind.Markers,
     id: randomId(),
@@ -100,4 +162,110 @@ export interface ParseExceptionResult extends Marker {
     readonly exceptionType: string
     readonly message: string
     readonly treeType?: string;
+}
+
+RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
+    async rpcSend(after: ParseExceptionResult, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.parserType);
+        await q.getAndSend(after, a => a.exceptionType);
+        await q.getAndSend(after, a => a.message);
+        await q.getAndSend(after, a => a.treeType);
+    },
+    async rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): Promise<ParseExceptionResult> {
+        const draft: Draft<ParseExceptionResult> = createDraft(before);
+        draft.id = await q.receive(before.id);
+        draft.parserType = await q.receive(before.parserType);
+        draft.exceptionType = await q.receive(before.exceptionType);
+        draft.message = await q.receive(before.message);
+        draft.treeType = await q.receive(before.treeType);
+        return finishDraft(draft);
+    }
+});
+
+
+/**
+ * Base interface for Markup markers that attach messages to AST nodes.
+ * Used for errors, warnings, info, and debug messages.
+ */
+export interface Markup extends Marker {
+    readonly message: string;
+    readonly detail?: string;
+}
+
+export interface MarkupError extends Markup {
+    readonly kind: typeof MarkersKind.MarkupError;
+}
+
+export interface MarkupWarn extends Markup {
+    readonly kind: typeof MarkersKind.MarkupWarn;
+}
+
+export interface MarkupInfo extends Markup {
+    readonly kind: typeof MarkersKind.MarkupInfo;
+}
+
+export interface MarkupDebug extends Markup {
+    readonly kind: typeof MarkersKind.MarkupDebug;
+}
+
+/**
+ * Attaches an error marker to a tree node.
+ */
+export function markupError<T extends { markers: Markers }>(t: T, message: string, detail?: string): T {
+    return addMarkup(t, {
+        kind: MarkersKind.MarkupError,
+        id: randomId(),
+        message,
+        detail
+    });
+}
+
+/**
+ * Attaches a warning marker to a tree node.
+ */
+export function markupWarn<T extends { markers: Markers }>(t: T, message: string, detail?: string): T {
+    return addMarkup(t, {
+        kind: MarkersKind.MarkupWarn,
+        id: randomId(),
+        message,
+        detail
+    });
+}
+
+/**
+ * Attaches an info marker to a tree node.
+ */
+export function markupInfo<T extends { markers: Markers }>(t: T, message: string, detail?: string): T {
+    return addMarkup(t, {
+        kind: MarkersKind.MarkupInfo,
+        id: randomId(),
+        message,
+        detail
+    });
+}
+
+/**
+ * Attaches a debug marker to a tree node.
+ */
+export function markupDebug<T extends { markers: Markers }>(t: T, message: string, detail?: string): T {
+    return addMarkup(t, {
+        kind: MarkersKind.MarkupDebug,
+        id: randomId(),
+        message,
+        detail
+    });
+}
+
+/**
+ * Helper to add a markup marker to a tree node.
+ */
+function addMarkup<T extends { markers: Markers }>(t: T, markup: Markup): T {
+    return {
+        ...t,
+        markers: {
+            ...t.markers,
+            markers: [...t.markers.markers, markup]
+        }
+    } as T;
 }

@@ -35,7 +35,7 @@ type
     ;
 
 classOrInterfaceType
-    :   Identifier ((DOT | DOTDOT) Identifier)*
+    :   Identifier ((DOT | DOTDOT | COLONCOLON) Identifier)*
     ;
 
 literal

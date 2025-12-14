@@ -15,7 +15,11 @@
  */
 package org.openrewrite.groovy;
 
+import java.util.stream.Stream;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -223,6 +227,34 @@ class GroovyParserTest implements RewriteTest {
               )
               """
           )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
+        rewriteRun(groovy(groovy));
+    }
+
+    /**
+     * Produces a stream of test expressions like `def a = "\\${System.getProperty('user.name')}"`
+     */
+    static Stream<String> escapedBackslashesAndInterpolationInGStringParams() {
+        return Stream.of(
+            "1 + 1",
+            "System.getProperty('user.name')"
+        ).flatMap(exp ->
+            """
+            %s
+            "%s"
+            "${%s}"
+            "\\${%s}"
+            "\\\\${%s}"
+            "\\\\\\${%s}"
+            "${%s}\\\\"
+            "\\t${%s}"
+            "${%s}\\t"
+            """.lines().map(s -> ("def a = " + s).formatted(exp))
         );
     }
 

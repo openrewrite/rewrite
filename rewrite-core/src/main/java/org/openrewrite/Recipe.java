@@ -37,6 +37,7 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
@@ -315,6 +316,7 @@ public abstract class Recipe implements Cloneable {
 
     private static final List<DataTableDescriptor> GLOBAL_DATA_TABLES = Arrays.asList(
             dataTableDescriptorFromDataTable(new SourcesFileResults(Recipe.noop())),
+            dataTableDescriptorFromDataTable(new SearchResults(Recipe.noop())),
             dataTableDescriptorFromDataTable(new SourcesFileErrors(Recipe.noop())),
             dataTableDescriptorFromDataTable(new RecipeRunStats(Recipe.noop()))
     );
@@ -472,7 +474,7 @@ public abstract class Recipe implements Cloneable {
         List<Field> requiredFields = NullUtils.findNonNullFields(clazz);
         for (Field field : requiredFields) {
             try {
-                validated = validated.and(Validated.required(clazz.getSimpleName() + '.' + field.getName(), field.get(this)));
+                validated = validated.and(Validated.required(clazz.getName() + '.' + field.getName(), field.get(this)));
             } catch (IllegalAccessException e) {
                 validated = Validated.invalid(field.getName(), null, "Unable to access " + clazz.getName() + "." + field.getName(), e);
             }

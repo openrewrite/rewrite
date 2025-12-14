@@ -338,7 +338,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                   .filter(r -> r.getSourcePath().endsWith("maven-wrapper.jar"))
                   .findFirst();
                 assertThat(mavenWrapperJar).isPresent();
-                assertThat(mavenWrapperJar.get().getSourcePath().toString()).isEqualTo(".mvn/wrapper/maven-wrapper.jar");
+                assertThat(mavenWrapperJar.get().getSourcePath()).isEqualTo(Paths.get(".mvn/wrapper/maven-wrapper.jar"));
 
                 var mvnwCmd = run.getChangeset().getAllResults().stream()
                   .map(Result::getAfter)

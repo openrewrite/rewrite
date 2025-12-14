@@ -294,7 +294,7 @@ describe('JavaScript type mapping', () => {
                         element = div;
                     `,
                     `
-                        let element: /*~~(HTMLElement (235 members))~~>*/HTMLElement;
+                        let element: /*~~(HTMLElement (246 members))~~>*/HTMLElement;
                         const div = document.createElement('div');
                         element = div;
                     `
@@ -337,9 +337,6 @@ describe('JavaScript type mapping', () => {
                               {
                                 "name": "test-project",
                                 "version": "1.0.0",
-                                "dependencies": {
-                                  "lodash": "^4.17.21"
-                                },
                                 "devDependencies": {
                                   "@types/lodash": "^4.14.195"
                                 }
@@ -543,7 +540,6 @@ describe('JavaScript type mapping', () => {
                                 "name": "test-project",
                                 "version": "1.0.0",
                                 "dependencies": {
-                                  "react": "^16.8.0",
                                   "react-spinners": "^0.5.0"
                                 },
                                 "devDependencies": {
@@ -1631,6 +1627,163 @@ describe('JavaScript type mapping', () => {
             }, { unsafeCleanup: true });
 
             expect(true).toBe(true);
+        });
+    });
+
+    describe('variable types (fieldType)', () => {
+        test('should map imported variable reference with owner type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'vi') {
+                    // Check fieldType for variable attribution
+                    const identifier = node as J.Identifier;
+                    const fieldType = identifier.fieldType;
+                    if (fieldType?.kind === Type.Kind.Variable) {
+                        const varType = fieldType as Type.Variable;
+                        const ownerName = varType.owner ?
+                            Type.FullyQualified.getFullyQualifiedName(varType.owner) : 'no-owner';
+                        return `Variable<name=${varType.name}, owner=${ownerName}>`;
+                    }
+                    return 'NOT_VARIABLE';
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    const mock = vi.fn();
+                                }
+                            `,
+                            `
+                                import {/*~~(Variable<name=vi, owner=vitest>)~~>*/vi} from 'vitest';
+
+                                function example() {
+                                    const mock = /*~~(Variable<name=vi, owner=vitest>)~~>*/vi.fn();
+                                }
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should map function imports as Variable with owner', async () => {
+            // Functions imported from modules are also represented as Variables.
+            // The Variable's `owner` property contains the module they come from.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, _type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'describe') {
+                    const identifier = node as J.Identifier;
+                    const fieldType = identifier.fieldType;
+                    if (fieldType?.kind === Type.Kind.Variable) {
+                        const varType = fieldType as Type.Variable;
+                        const ownerName = varType.owner ?
+                            Type.FullyQualified.getFullyQualifiedName(varType.owner) : 'no-owner';
+                        return `Variable<name=${varType.name}, owner=${ownerName}>`;
+                    }
+                    return 'NOT_VARIABLE';
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {describe} from 'vitest';
+
+                                describe('test', () => {});
+                            `,
+                            // describe is a Variable with vitest as owner
+                            `
+                                import {/*~~(Variable<name=describe, owner=vitest>)~~>*/describe} from 'vitest';
+
+                                /*~~(Variable<name=describe, owner=vitest>)~~>*/describe('test', () => {});
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should map variable used as standalone assignment', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'vi') {
+                    const identifier = node as J.Identifier;
+                    const fieldType = identifier.fieldType;
+                    if (fieldType?.kind === Type.Kind.Variable) {
+                        const varType = fieldType as Type.Variable;
+                        const ownerName = varType.owner ?
+                            Type.FullyQualified.getFullyQualifiedName(varType.owner) : 'no-owner';
+                        return `Variable<owner=${ownerName}>`;
+                    }
+                    return 'NOT_VARIABLE';
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                const mockUtils = vi;
+                            `,
+                            `
+                                import {/*~~(Variable<owner=vitest>)~~>*/vi} from 'vitest';
+
+                                const mockUtils = /*~~(Variable<owner=vitest>)~~>*/vi;
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
         });
     });
 

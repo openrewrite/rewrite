@@ -1418,6 +1418,59 @@ class ChangeParentPomTest implements RewriteTest {
         }
 
         @Test
+        void doesNotBringInMavenArguments() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeParentPom(
+                "org.springframework.boot",
+                null,
+                "spring-boot-starter-parent",
+                null,
+                "3.5.x",
+                null,
+                null,
+                null,
+                false,
+                null
+              )).parser(MavenParser.builder().property("maven.repo.local", "C:/blah")),
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <properties>
+                      <maven.repo.local>${user.home}/.m2/repository</maven.repo.local>
+                      <owaspDb>${maven.repo.local}/blah</owaspDb>
+                    </properties>
+                    <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>3.5.7</version>
+                    </parent>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <properties>
+                      <maven.repo.local>${user.home}/.m2/repository</maven.repo.local>
+                      <owaspDb>${maven.repo.local}/blah</owaspDb>
+                    </properties>
+                    <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>3.5.8</version>
+                    </parent>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
         void bringsDownRemovedManagedVersion() {
             rewriteRun(
               spec -> spec.recipe(new ChangeParentPom(

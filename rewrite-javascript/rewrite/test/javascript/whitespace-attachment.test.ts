@@ -132,8 +132,11 @@ function findWhitespaceViolations(rootNodes: OutputNode[]): string[] {
 
             // Check if first child is a node (not text)
             if (firstChild instanceof OutputNode) {
-                // Check if the grandchild exists and is text with non-empty whitespace
-                if (firstChild.children.length > 0) {
+                // Skip EnumValueSet - its children intentionally have their own prefix for uniform formatting
+                if (node.element.kind === J.Kind.EnumValueSet) {
+                    // Don't check whitespace attachment for EnumValueSet children
+                } else if (firstChild.children.length > 0) {
+                    // Check if the grandchild exists and is text with non-empty whitespace
                     const grandchild = firstChild.children[0];
                     if (typeof grandchild === 'string' && grandchild.trim() === '' && grandchild.length > 0) {
                         const parentKind = prettifyKind(node.element.kind);

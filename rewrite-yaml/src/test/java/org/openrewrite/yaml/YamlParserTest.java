@@ -282,6 +282,19 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5179")
+    @Test
+    void tagsInSequences() {
+        rewriteRun(
+          yaml(
+            """
+            Conditions:
+              IsPollingFrequencyInMinutesSingular: !Equals [!Ref PollingFrequencyInMinutes, 1]
+            """
+          )
+        );
+    }
+
     @Test
     void globalTags() {
         rewriteRun(
@@ -542,6 +555,65 @@ class YamlParserTest implements RewriteTest {
                   - items1: []
                   - items2: []
               # ${{ looks.like.helm.end }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void flowStyleMappingsInSequences() {
+        rewriteRun(
+          yaml(
+            """
+              tasks:
+                - {"task_type": "Shell"}
+                - { "task_type": "Shell2"}
+              """
+          ),
+          yaml(
+            """
+              items:
+                - name: block-style
+                  type: mapping
+                - {"name": "flow-style", "type": "mapping"}
+                - key: another-block
+              """
+          ),
+          yaml(
+            """
+              items:
+                - {}
+                - {"key": "value"}
+              """
+          ),
+          yaml(
+            """
+              data:
+                - {"list": [1, 2, 3], "map": {"nested": "value"}}
+                - {"array": [{"inner": "map"}]}
+              """
+          ),
+          yaml(
+            """
+              items:
+                - {
+                    "key": "value",
+                    "another": "test"
+                  }
+              """
+          ),
+          yaml(
+            """
+              items:
+                - {"key": "value",}
+              """
+          ),
+          yaml(
+            """
+              defaults: &defaults {"type": "default", "enabled": true}
+              items:
+                - *defaults
+                - {"type": "custom"}
               """
           )
         );
