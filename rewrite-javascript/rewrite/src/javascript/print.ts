@@ -88,6 +88,14 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return statementExpression;
     }
 
+    override async visitSpread(spread: JS.Spread, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(spread, p);
+        p.append("...");
+        await this.visit(spread.expression, p);
+        await this.afterSyntax(spread, p);
+        return spread;
+    }
+
     override async visitInferType(inferType: JS.InferType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(inferType, p);
         await this.visitLeftPaddedLocal("infer", inferType.typeParameter, p);

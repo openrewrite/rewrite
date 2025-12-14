@@ -2547,14 +2547,15 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitSpreadElement(node: ts.SpreadElement): Expression {
-        return produce(this.convert<Expression>(node.expression), draft => {
-            draft.markers.markers.push({
-                kind: JS.Markers.Spread,
-                id: randomId(),
-                prefix: this.prefix(node)
-            } satisfies Spread as Spread);
-        });
+    visitSpreadElement(node: ts.SpreadElement): JS.Spread {
+        return {
+            kind: JS.Kind.Spread,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: this.convert(node.expression),
+            type: this.mapType(node)
+        };
     }
 
     visitClassExpression(node: ts.ClassExpression): JS.StatementExpression {
@@ -4011,23 +4012,14 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitSpreadAssignment(node: ts.SpreadAssignment): JS.PropertyAssignment {
+    visitSpreadAssignment(node: ts.SpreadAssignment): JS.Spread {
         return {
-            kind: JS.Kind.PropertyAssignment,
+            kind: JS.Kind.Spread,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            name: this.rightPadded(
-                produce(this.convert<Expression>(node.expression), draft => {
-                    draft.markers.markers.push({
-                        kind: JS.Markers.Spread,
-                        id: randomId(),
-                        prefix: this.prefix(node)
-                    } satisfies Spread as Spread);
-                }),
-                this.suffix(node.expression)
-            ),
-            assigmentToken: JS.PropertyAssignment.Token.Empty,
+            expression: this.convert(node.expression),
+            type: this.mapType(node)
         };
     }
 

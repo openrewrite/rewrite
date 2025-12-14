@@ -453,6 +453,26 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return s.withMarkers(visitMarkers(s.getMarkers(), p));
     }
 
+    public J visitSpread(JS.Spread spread, P p) {
+        JS.Spread sp = spread;
+        sp = sp.withPrefix(visitSpace(sp.getPrefix(), JsSpace.Location.SPREAD_PREFIX, p));
+        sp = sp.withMarkers(visitMarkers(sp.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(sp, p);
+        if (!(temp instanceof JS.Spread)) {
+            return temp;
+        } else {
+            sp = (JS.Spread) temp;
+        }
+        Statement tempStatement = (Statement) visitStatement(sp, p);
+        if (!(tempStatement instanceof JS.Spread)) {
+            return tempStatement;
+        } else {
+            sp = (JS.Spread) tempStatement;
+        }
+        sp = sp.withExpression(requireNonNull(visitAndCast(sp.getExpression(), p)));
+        return sp;
+    }
+
     public J visitStatementExpression(JS.StatementExpression expression, P p) {
         JS.StatementExpression se = expression;
         Expression temp = (Expression) visitExpression(se, p);

@@ -599,6 +599,28 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return updateIfChanged(shebang, updates);
     }
 
+    protected async visitSpread(spread: JS.Spread, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(spread, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.Spread) {
+            return expression;
+        }
+        spread = expression as JS.Spread;
+
+        const statement = await this.visitStatement(spread, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.Spread) {
+            return statement;
+        }
+        spread = statement as JS.Spread;
+
+        const updates: any = {
+            prefix: await this.visitSpace(spread.prefix, p),
+            markers: await this.visitMarkers(spread.markers, p),
+            expression: await this.visitDefined<Expression>(spread.expression, p),
+            type: await this.visitType(spread.type, p)
+        };
+        return updateIfChanged(spread, updates);
+    }
+
     protected async visitStatementExpression(statementExpression: JS.StatementExpression, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(statementExpression, p);
         if (!expression?.kind || expression.kind !== JS.Kind.StatementExpression) {
@@ -1171,6 +1193,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitScopedVariableDeclarations(tree as unknown as JS.ScopedVariableDeclarations, p);
                 case JS.Kind.Shebang:
                     return this.visitShebang(tree as unknown as JS.Shebang, p);
+                case JS.Kind.Spread:
+                    return this.visitSpread(tree as unknown as JS.Spread, p);
                 case JS.Kind.StatementExpression:
                     return this.visitStatementExpression(tree as unknown as JS.StatementExpression, p);
                 case JS.Kind.TaggedTemplateExpression:

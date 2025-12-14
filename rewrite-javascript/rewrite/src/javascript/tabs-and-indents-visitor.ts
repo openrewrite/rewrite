@@ -617,11 +617,15 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * Check if an element is a spread - either directly marked with Spread marker,
-     * or a PropertyAssignment whose name has a Spread marker (for object spreads).
+     * Check if an element is a spread - either a JS.Spread element, a marker-based spread,
+     * or a PropertyAssignment wrapping a spread.
      */
     private isSpreadElement(element: J): boolean {
-        // Direct spread marker on element
+        // JS.Spread AST element (for spread expressions like `...arr`, `...obj`)
+        if (element.kind === JS.Kind.Spread) {
+            return true;
+        }
+        // Direct spread marker on element (for rest syntax)
         if (findMarker(element, JS.Markers.Spread)) {
             return true;
         }
@@ -629,7 +633,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (element.kind === JS.Kind.PropertyAssignment) {
             const propAssign = element as JS.PropertyAssignment;
             const nameElement = propAssign.name?.element;
-            if (findMarker(nameElement, JS.Markers.Spread)) {
+            if (nameElement?.kind === JS.Kind.Spread || findMarker(nameElement, JS.Markers.Spread)) {
                 return true;
             }
         }

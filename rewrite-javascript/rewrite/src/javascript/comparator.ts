@@ -852,8 +852,19 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
+     * Overrides the visitSpread method to compare spread expressions.
+     *
+     * @param spread The spread expression to visit
+     * @param other The other spread expression to compare with
+     * @returns The visited spread expression, or undefined if the visit was aborted
+     */
+    override async visitSpread(spread: JS.Spread, other: J): Promise<J | undefined> {
+        return this.visitElement(spread, other as JS.Spread);
+    }
+
+    /**
      * Overrides the visitStatementExpression method to compare statement expressions.
-     * 
+     *
      * @param statementExpression The statement expression to visit
      * @param other The other statement expression to compare with
      * @returns The visited statement expression, or undefined if the visit was aborted
