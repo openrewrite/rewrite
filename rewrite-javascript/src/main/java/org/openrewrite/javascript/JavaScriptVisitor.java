@@ -469,8 +469,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             sp = (JS.Spread) tempStatement;
         }
-        sp = sp.withExpression(requireNonNull(visitAndCast(sp.getExpression(), p)));
-        return sp;
+        return sp.withExpression(requireNonNull(visitAndCast(sp.getExpression(), p)));
     }
 
     public J visitStatementExpression(JS.StatementExpression expression, P p) {
