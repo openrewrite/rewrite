@@ -15,6 +15,8 @@
  */
 import {Recipe, RecipeDescriptor} from "./recipe";
 
+export type RecipeConstructor = new (options?: any) => Recipe;
+
 export class RecipeMarketplace {
     readonly root: RecipeMarketplace.Category = new RecipeMarketplace.Category({
         displayName: "Root",
@@ -29,29 +31,31 @@ export class RecipeMarketplace {
      *
      * @param recipeClass The recipe class to install
      * @param categoryPath Category path from shallowest to deepest (e.g., ["Java", "Search"])
-     * @param bundle Optional bundle information (defaults to npm @openrewrite/rewrite)
      */
-    public async install<T extends Recipe>(
-        recipeClass: new (options?: any) => T,
-        categoryPath: CategoryDescriptor[],
-        bundle: RecipeBundle
+    public async install(
+        recipeClass: RecipeConstructor,
+        categoryPath: CategoryDescriptor[]
     ): Promise<void> {
-        await this.root.install(recipeClass, categoryPath, bundle);
+        await this.root.install(recipeClass, categoryPath);
     }
 
     public categories(): RecipeMarketplace.Category[] {
         return this.root.categories;
     }
 
-    public findRecipe(name: string): RecipeDescriptor | undefined {
-        return this.root.findRecipe(name);
+    public findRecipe(name: string): [ RecipeDescriptor, RecipeConstructor] | undefined {
+        return this.root.findRecipe(name)
+    }
+
+    public allRecipes(): RecipeDescriptor[] {
+        return this.root.allRecipes()
     }
 }
 
 export namespace RecipeMarketplace {
     export class Category {
         readonly categories: Category[] = [];
-        readonly recipes: RecipeDescriptor[] = [];
+        readonly recipes: Map<RecipeDescriptor, RecipeConstructor> = new Map();
 
         constructor(
             readonly descriptor: CategoryDescriptor,
@@ -64,19 +68,17 @@ export namespace RecipeMarketplace {
          * Categories are specified top-down (shallowest to deepest).
          * Intermediate categories are created as needed.
          *
-         * @param recipeClass The recipe class to install
+         * @param recipeConstructor The recipe class to install
          * @param categoryPath Category path from shallowest to deepest
-         * @param bundle Bundle information for the recipe
          */
         public async install<T extends Recipe>(
-            recipeClass: new (options?: any) => T,
-            categoryPath: CategoryDescriptor[],
-            bundle: RecipeBundle
+            recipeConstructor: new (options?: any) => T,
+            categoryPath: CategoryDescriptor[]
         ): Promise<void> {
             if (categoryPath.length === 0) {
                 try {
-                    const recipe = new recipeClass({});
-                    this.recipes.push(await recipe.descriptor());
+                    const recipe = new recipeConstructor({});
+                    this.recipes.set(await recipe.descriptor(), recipeConstructor);
                 } catch (e) {
                     throw new Error(`Failed to install recipe. Ensure the constructor can be called without any arguments.`);
                 }
@@ -88,7 +90,7 @@ export namespace RecipeMarketplace {
             const targetCategory = this.findOrCreateCategory(firstCategory);
 
             // Recursively add to the child category
-            await targetCategory.install(recipeClass, categoryPath.slice(1), bundle);
+            await targetCategory.install(recipeConstructor, categoryPath.slice(1));
         }
 
         private findOrCreateCategory(categoryDescriptor: CategoryDescriptor): Category {
@@ -102,10 +104,10 @@ export namespace RecipeMarketplace {
             return newCategory;
         }
 
-        public findRecipe(name: string): RecipeDescriptor | undefined {
-            for (const recipe of this.recipes) {
+        public findRecipe(name: string): [ RecipeDescriptor, RecipeConstructor] | undefined {
+            for (const [recipe, ctor] of this.recipes.entries()) {
                 if (recipe.name === name) {
-                    return recipe;
+                    return [recipe, ctor];
                 }
             }
             for (const category of this.categories) {
@@ -118,7 +120,7 @@ export namespace RecipeMarketplace {
         }
 
         public allRecipes(): RecipeDescriptor[] {
-            const result: RecipeDescriptor[] = [...this.recipes];
+            const result: RecipeDescriptor[] = [...this.recipes.keys()];
             for (const category of this.categories) {
                 result.push(...category.allRecipes());
             }
@@ -132,11 +134,4 @@ export const JavaScript: CategoryDescriptor[] = [{displayName: "JavaScript"}]
 export interface CategoryDescriptor {
     displayName: string,
     description?: string
-}
-
-export interface RecipeBundle {
-    readonly packageEcosystem: string
-    readonly packageName: string
-    readonly version: string
-    readonly team?: string
 }

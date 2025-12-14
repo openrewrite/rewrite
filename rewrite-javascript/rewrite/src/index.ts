@@ -37,13 +37,13 @@ export * from "./marketplace";
 // Install all recipes in this package
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     const {OrderImports} = await import("./recipe/index.js");
-    marketplace.install(OrderImports, JavaScript);
+    await marketplace.install(OrderImports, JavaScript);
 
     const {
         ExportAssignmentToExportDefault,
         MigrateTypeScript
     } = await import("./javascript/migrate/typescript/index.js");
-    marketplace.install(ExportAssignmentToExportDefault, MigrateTypeScript);
+    await marketplace.install(ExportAssignmentToExportDefault, MigrateTypeScript);
 
     const {
         ModernizeOctalEscapeSequences,
@@ -51,9 +51,9 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
         RemoveDuplicateObjectKeys,
         MigrateES6
     } = await import("./javascript/migrate/es6/index.js");
-    marketplace.install(ModernizeOctalEscapeSequences, MigrateES6);
-    marketplace.install(ModernizeOctalLiterals, MigrateES6);
-    marketplace.install(RemoveDuplicateObjectKeys, MigrateES6);
+    await marketplace.install(ModernizeOctalEscapeSequences, MigrateES6);
+    await marketplace.install(ModernizeOctalLiterals, MigrateES6);
+    await marketplace.install(RemoveDuplicateObjectKeys, MigrateES6);
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {

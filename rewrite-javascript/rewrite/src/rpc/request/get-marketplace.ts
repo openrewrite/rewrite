@@ -37,7 +37,7 @@ export class GetMarketplace {
                         const currentPath = [...categoryPath, category.descriptor];
 
                         // Add all recipes in this category
-                        for (const recipe of category.recipes) {
+                        for (const recipe of category.recipes.keys()) {
                             rows.push({
                                 descriptor: recipe,
                                 categories: currentPath

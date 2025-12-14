@@ -65,10 +65,6 @@ public class RecipeListing implements Comparable<RecipeListing> {
         return resolve().prepare(this, options);
     }
 
-    public ClassLoader classLoader() {
-        return resolve().classLoader();
-    }
-
     @Override
     public int compareTo(RecipeListing o) {
         return name.compareTo(o.name);

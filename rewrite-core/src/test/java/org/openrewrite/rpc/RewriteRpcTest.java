@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
@@ -102,7 +103,8 @@ class RewriteRpcTest implements RewriteTest {
 
     @Test
     void getMarketplace() {
-        assertThat(client.getMarketplace().getAllRecipes()).isNotEmpty();
+        assertThat(client.getMarketplace(new RecipeBundle("maven",
+          "org.openrewrite:rewrite-core", "LATEST", null)).getAllRecipes()).isNotEmpty();
     }
 
     @Test

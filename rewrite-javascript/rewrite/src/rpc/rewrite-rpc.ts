@@ -64,7 +64,7 @@ export class RewriteRpc {
                 ),
                 options: {
                     batchSize?: number,
-                    registry?: RecipeMarketplace,
+                    marketplace?: RecipeMarketplace,
                     logger?: rpc.Logger,
                     metricsCsv?: string,
                     recipeInstallDir?: string
@@ -81,18 +81,18 @@ export class RewriteRpc {
         const getCursor = (cursorIds: string[] | undefined, sourceFileType?: string) => this.getCursor(cursorIds, sourceFileType);
         const traceGetObject = () => this.traceGetObject.send;
 
-        const registry = options.registry || new RecipeMarketplace();
+        const marketplace = options.marketplace || new RecipeMarketplace();
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
-        GetMarketplace.handle(this.connection, registry, options.metricsCsv);
+        GetMarketplace.handle(this.connection, marketplace, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
-        PrepareRecipe.handle(this.connection, registry, preparedRecipes, options.metricsCsv);
+        PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
-        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger, options.metricsCsv);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, options.logger, options.metricsCsv);
 
         this.connection.onRequest(
             new rpc.RequestType<TraceGetObject, boolean, Error>("TraceGetObject"),
