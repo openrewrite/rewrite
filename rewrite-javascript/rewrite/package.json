@@ -11,13 +11,38 @@
     "src/**"
   ],
   "exports": {
-    ".": "./dist/index.js",
-    "./text": "./dist/text/index.js",
-    "./json": "./dist/json/index.js",
-    "./java": "./dist/java/index.js",
-    "./javascript": "./dist/javascript/index.js",
-    "./rpc": "./dist/rpc/index.js",
-    "./test": "./dist/test/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./text": {
+      "types": "./dist/text/index.d.ts",
+      "default": "./dist/text/index.js"
+    },
+    "./json": {
+      "types": "./dist/json/index.d.ts",
+      "default": "./dist/json/index.js"
+    },
+    "./java": {
+      "types": "./dist/java/index.d.ts",
+      "default": "./dist/java/index.js"
+    },
+    "./javascript": {
+      "types": "./dist/javascript/index.d.ts",
+      "default": "./dist/javascript/index.js"
+    },
+    "./rpc": {
+      "types": "./dist/rpc/index.d.ts",
+      "default": "./dist/rpc/index.js"
+    },
+    "./test": {
+      "types": "./dist/test/index.d.ts",
+      "default": "./dist/test/index.js"
+    },
+    "./yaml": {
+      "types": "./dist/yaml/index.d.ts",
+      "default": "./dist/yaml/index.js"
+    }
   },
   "scripts": {
     "build": "rm -rf ./dist tsconfig.build.tsbuildinfo && tsc --build tsconfig.build.json",
@@ -35,6 +60,7 @@
     "commander": "^14.0.0",
     "diff": "^7.0.0",
     "immer": "^10.1.1",
+    "jsonc-parser": "^3.3.1",
     "picomatch": "^4.0.3",
     "semver": "^7.7.3",
     "tmp-promise": "^3.0.3",

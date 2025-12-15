@@ -89,6 +89,22 @@ export const enum NpmrcScope {
     Project = 'Project',     // .npmrc in project root
 }
 
+/**
+ * Represents a dependency scope in package.json that uses object structure {name: version}.
+ * Note: `bundledDependencies` is excluded because it's a string[] of package names, not a version map.
+ */
+export type DependencyScope = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies';
+
+/**
+ * All dependency scopes in package.json that use object structure {name: version}.
+ */
+export const allDependencyScopes: readonly DependencyScope[] = [
+    'dependencies',
+    'devDependencies',
+    'peerDependencies',
+    'optionalDependencies'
+] as const;
+
 export const NpmrcKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Npmrc" as const;
 
 /**

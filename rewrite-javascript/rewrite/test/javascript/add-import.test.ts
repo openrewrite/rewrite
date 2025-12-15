@@ -20,6 +20,7 @@ import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
     ImportStyle,
+    IntelliJ,
     javascript,
     JavaScriptVisitor,
     JS,
@@ -27,11 +28,16 @@ import {
     npm,
     packageJson,
     RemoveImport,
+    SpacesStyle,
     Template,
     tsx,
     typescript
 } from "../../src/javascript";
 import {emptySpace, J} from "../../src/java";
+import {MarkersKind} from "../../src/markers";
+import {randomId} from "../../src/uuid";
+import {NamedStyles} from "../../src/style";
+import {produce} from "immer";
 import {withDir} from "tmp-promise";
 
 /**
@@ -1694,6 +1700,76 @@ describe('AddImport visitor', () => {
                     `,
                     `
                         import {z, ZodError, ZodString, ZodType} from 'zod';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+    });
+
+    describe('style options', () => {
+        /**
+         * Helper function to create a visitor that:
+         * 1. Adds a NamedStyles marker to the compilation unit with es6ImportExportBraces: true
+         * 2. Then uses AddImport to add an import statement
+         */
+        function createAddImportWithBraceSpacingVisitor(
+            module: string,
+            member?: string,
+            alias?: string
+        ): JavaScriptVisitor<any> {
+            return new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    // Create a SpacesStyle with es6ImportExportBraces: true using produce
+                    const spacesStyle: SpacesStyle = produce(IntelliJ.TypeScript.spaces(), draft => {
+                        draft.within.es6ImportExportBraces = true;
+                    });
+
+                    // Create a NamedStyles marker
+                    const namedStyles: NamedStyles = {
+                        kind: MarkersKind.NamedStyles,
+                        id: randomId(),
+                        name: "test-style",
+                        displayName: "Test Style",
+                        tags: [],
+                        styles: [spacesStyle]
+                    };
+
+                    // Add the NamedStyles marker to the compilation unit
+                    let result: JS.CompilationUnit = {
+                        ...cu,
+                        markers: {
+                            ...cu.markers,
+                            markers: [...cu.markers.markers, namedStyles]
+                        }
+                    };
+
+                    // Then add the import
+                    const addImport = new AddImport({
+                        module,
+                        member,
+                        alias,
+                        onlyIfReferenced: false
+                    });
+                    result = await addImport.visit(result, p) as JS.CompilationUnit;
+
+                    return result;
+                }
+            };
+        }
+
+        test('should add spaces inside braces when es6ImportExportBraces style is true', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createAddImportWithBraceSpacingVisitor('fs', 'readFile'));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import { readFile } from 'fs';
 
                         const x = 1;
                     `
