@@ -17,6 +17,7 @@ package org.openrewrite.marketplace;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.DataTableDescriptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,8 +76,17 @@ class RecipeMarketplaceReaderTest {
     @Test
     void readMarketplaceWithOptions() {
         @Language("csv") String csv = """
-          name,displayName,option1Name,option1DisplayName,option1Description,option2Name,option2DisplayName,option2Description,category,ecosystem,packageName
-          org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,groupId,Group ID,The group ID of the dependency,artifactId,Artifact ID,The artifact ID of the dependency,Maven,maven,org.openrewrite:rewrite-maven
+          name,displayName,options,category,ecosystem,packageName
+          org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,"[groupId]
+          displayName = ""Group ID""
+          description = ""The group ID of the dependency""
+          required = true
+          example = ""org.openrewrite""
+
+          [artifactId]
+          displayName = ""Artifact ID""
+          description = ""The artifact ID of the dependency""
+          required = false",Maven,maven,org.openrewrite:rewrite-maven
           """;
 
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
@@ -88,10 +98,71 @@ class RecipeMarketplaceReaderTest {
 
         assertThat(recipe.getOptions())
           .hasSize(2)
+          .extracting("name", "displayName", "description", "required", "example")
+          .containsExactlyInAnyOrder(
+            org.assertj.core.api.Assertions.tuple("groupId", "Group ID", "The group ID of the dependency", true, "org.openrewrite"),
+            org.assertj.core.api.Assertions.tuple("artifactId", "Artifact ID", "The artifact ID of the dependency", false, null)
+          );
+    }
+
+    @Test
+    void readMarketplaceWithDataTables() {
+        @Language("csv") String csv = """
+          name,displayName,dataTable1,dataTable2,category,ecosystem,packageName
+          org.openrewrite.java.dependencies.DependencyList,List Dependencies,"name = ""org.openrewrite.java.dependencies.DependencyListTable""
+          displayName = ""Dependencies""
+          description = ""Lists all dependencies found in the project""\","name = ""org.openrewrite.java.dependencies.RepositoryTable""
+          displayName = ""Repositories""
+          description = ""Lists all repositories""\",Java,maven,org.openrewrite:rewrite-java
+          """;
+
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
+
+        RecipeListing recipe = marketplace.getAllRecipes().iterator().next();
+        assertThat(recipe)
+          .extracting("name", "displayName")
+          .containsExactly("org.openrewrite.java.dependencies.DependencyList", "List Dependencies");
+
+        assertThat(recipe.getDataTables())
+          .hasSize(2)
           .extracting("name", "displayName", "description")
           .containsExactly(
-            org.assertj.core.api.Assertions.tuple("groupId", "Group ID", "The group ID of the dependency"),
-            org.assertj.core.api.Assertions.tuple("artifactId", "Artifact ID", "The artifact ID of the dependency")
+            org.assertj.core.api.Assertions.tuple("org.openrewrite.java.dependencies.DependencyListTable", "Dependencies", "Lists all dependencies found in the project"),
+            org.assertj.core.api.Assertions.tuple("org.openrewrite.java.dependencies.RepositoryTable", "Repositories", "Lists all repositories")
+          );
+    }
+
+    @Test
+    void readMarketplaceWithDataTableColumns() {
+        @Language("csv") String csv = """
+          name,displayName,dataTable1,category,ecosystem,packageName
+          org.openrewrite.java.dependencies.DependencyList,List Dependencies,"name = ""org.openrewrite.java.dependencies.DependencyListTable""
+          displayName = ""Dependencies""
+          description = ""Lists all dependencies""
+
+          [columns.groupId]
+          type = ""String""
+          displayName = ""Group ID""
+          description = ""The dependency group""
+
+          [columns.artifactId]
+          type = ""String""
+          displayName = ""Artifact ID""\",Java,maven,org.openrewrite:rewrite-java
+          """;
+
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
+
+        RecipeListing recipe = marketplace.getAllRecipes().iterator().next();
+        assertThat(recipe.getDataTables()).hasSize(1);
+
+        DataTableDescriptor dataTable = recipe.getDataTables().get(0);
+        assertThat(dataTable.getName()).isEqualTo("org.openrewrite.java.dependencies.DependencyListTable");
+        assertThat(dataTable.getColumns())
+          .hasSize(2)
+          .extracting("name", "type", "displayName", "description")
+          .containsExactlyInAnyOrder(
+            org.assertj.core.api.Assertions.tuple("groupId", "String", "Group ID", "The dependency group"),
+            org.assertj.core.api.Assertions.tuple("artifactId", "String", "Artifact ID", null)
           );
     }
 
@@ -185,6 +256,87 @@ class RecipeMarketplaceReaderTest {
 
         // Should not contain "Description" headers since no descriptions were provided
         assertThat(writtenCsv).doesNotContain("Description");
+    }
+
+    @Test
+    void readMarketplaceWithMetadata() {
+        @Language("csv") String csv = """
+          name,category,ecosystem,packageName,author,recipeCount
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Java,maven,org.openrewrite:rewrite-java,Jon Schneider,42
+          org.openrewrite.java.format.AutoFormat,Java,maven,org.openrewrite:rewrite-java,Jon Schneider,
+          """;
+
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
+
+        RecipeListing first = marketplace.getAllRecipes().stream()
+          .filter(r -> r.getName().equals("org.openrewrite.java.cleanup.UnnecessaryParentheses"))
+          .findFirst()
+          .orElseThrow();
+        assertThat(first.getMetadata())
+          .containsEntry("author", "Jon Schneider")
+          .containsEntry("recipeCount", "42");
+
+        RecipeListing second = marketplace.getAllRecipes().stream()
+          .filter(r -> r.getName().equals("org.openrewrite.java.format.AutoFormat"))
+          .findFirst()
+          .orElseThrow();
+        // Empty values should not be included in metadata
+        assertThat(second.getMetadata())
+          .containsEntry("author", "Jon Schneider")
+          .doesNotContainKey("recipeCount");
+    }
+
+    @Test
+    void roundTripWithMetadata() {
+        @Language("csv") String csv = """
+          name,category,ecosystem,packageName,author,recipeCount
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Java,maven,org.openrewrite:rewrite-java,Jon Schneider,42
+          """;
+
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        // Parse the written CSV again
+        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(writtenCsv);
+
+        RecipeListing listing = roundTripped.getAllRecipes().iterator().next();
+        assertThat(listing.getMetadata())
+          .containsEntry("author", "Jon Schneider")
+          .containsEntry("recipeCount", "42");
+    }
+
+    @Test
+    void writerOmitsMetadataColumnsWhenNonePresent() {
+        @Language("csv") String csv = """
+          name,category,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Java,maven,org.openrewrite:rewrite-java
+          """;
+
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        // Should only contain known headers
+        assertThat(writtenCsv.lines().findFirst().orElseThrow())
+          .contains("ecosystem", "packageName", "name", "displayName", "description", "category")
+          .doesNotContain("author", "recipeCount");
+    }
+
+    @Test
+    void metadataColumnsAreSortedAlphabetically() {
+        @Language("csv") String csv = """
+          name,category,ecosystem,packageName,recipeCount,author
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Java,maven,org.openrewrite:rewrite-java,42,Jon Schneider
+          """;
+
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        // Metadata columns should be sorted alphabetically (author before recipeCount)
+        String header = writtenCsv.lines().findFirst().orElseThrow();
+        int authorIndex = header.indexOf("author");
+        int recipeCountIndex = header.indexOf("recipeCount");
+
+        assertThat(authorIndex).isLessThan(recipeCountIndex);
     }
 
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {

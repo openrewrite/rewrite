@@ -19,13 +19,14 @@ import lombok.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.NlsRewrite;
 import org.openrewrite.Recipe;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import static java.util.stream.Collectors.toList;
 
 @Getter
 @RequiredArgsConstructor
@@ -41,7 +42,9 @@ public class RecipeListing implements Comparable<RecipeListing> {
     private final @NlsRewrite.DisplayName String displayName;
     private final @NlsRewrite.Description String description;
     private final @Nullable Duration estimatedEffortPerOccurrence;
-    private final List<? extends Option> options;
+    private final List<OptionDescriptor> options;
+    private final List<DataTableDescriptor> dataTables;
+    private final Map<String, Object> metadata = new LinkedHashMap<>();
 
     @With(AccessLevel.PACKAGE)
     private final RecipeBundle bundle;
@@ -70,29 +73,13 @@ public class RecipeListing implements Comparable<RecipeListing> {
         return name.compareTo(o.name);
     }
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Option {
-        String name;
-
-        @NlsRewrite.DisplayName
-        String displayName;
-
-        @NlsRewrite.Description
-        String description;
-    }
-
     public static RecipeListing fromDescriptor(RecipeDescriptor descriptor, RecipeBundle bundle) {
         return new RecipeListing(null, descriptor.getName(),
                 descriptor.getDisplayName(),
                 descriptor.getDescription(),
                 descriptor.getEstimatedEffortPerOccurrence(),
-                descriptor.getOptions().stream().map(opt -> new RecipeListing.Option(
-                        opt.getName(),
-                        opt.getDisplayName(),
-                        opt.getDescription()
-                )).collect(toList()),
+                descriptor.getOptions(),
+                descriptor.getDataTables(),
                 bundle
         );
     }

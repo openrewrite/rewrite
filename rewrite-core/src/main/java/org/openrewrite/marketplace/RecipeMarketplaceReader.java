@@ -15,6 +15,8 @@
  */
 package org.openrewrite.marketplace;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.dataformat.toml.TomlMapper;
 import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
 import lombok.Getter;
@@ -23,6 +25,9 @@ import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.CategoryDescriptor;
+import org.openrewrite.config.ColumnDescriptor;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.StringUtils;
 
 import java.io.*;
@@ -34,6 +39,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class RecipeMarketplaceReader {
+    private static final TomlMapper TOML_MAPPER = new TomlMapper();
+
     /**
      * Returns the recipe marketplace from CSV.
      *
@@ -132,7 +139,9 @@ public class RecipeMarketplaceReader {
         String team = null;
         Map<Integer, String> categoryDisplayNames = new TreeMap<>();
         Map<Integer, String> categoryDescriptions = new TreeMap<>();
-        Map<Integer, RecipeListing.Option> options = new TreeMap<>();
+        List<OptionDescriptor> options = new ArrayList<>();
+        Map<Integer, DataTableDescriptor> dataTables = new TreeMap<>();
+        Map<String, Object> metadata = new LinkedHashMap<>();
 
         for (int i = 0; i < row.length && i < headers.size(); i++) {
             String value = row[i];
@@ -189,26 +198,26 @@ public class RecipeMarketplaceReader {
                 case TEAM:
                     team = value;
                     break;
-                case OPTION_NAME:
+                case OPTIONS:
                     if (value != null) {
-                        int optionIndex = column.getIndex();
-                        options.computeIfAbsent(optionIndex, k -> new RecipeListing.Option()).setName(value);
+                        options.addAll(parseOptionsFromToml(value));
                     }
                     break;
-                case OPTION_DISPLAY_NAME:
+                case DATA_TABLE:
                     if (value != null) {
-                        int optionIndex = column.getIndex();
-                        options.computeIfAbsent(optionIndex, k -> new RecipeListing.Option()).setDisplayName(value);
+                        int dataTableIndex = column.getIndex();
+                        DataTableDescriptor dataTable = parseDataTableFromToml(value);
+                        if (dataTable != null) {
+                            dataTables.put(dataTableIndex, dataTable);
+                        }
                     }
                     break;
-                case OPTION_DESCRIPTION:
+                case UNKNOWN:
+                    // Unknown columns are treated as metadata
                     if (value != null) {
-                        int optionIndex = column.getIndex();
-                        options.computeIfAbsent(optionIndex, k -> new RecipeListing.Option()).setDescription(value);
+                        metadata.put(column.getHeaderName(), value);
                     }
                     break;
-                default:
-                    // Ignore unknown columns
             }
         }
 
@@ -229,9 +238,13 @@ public class RecipeMarketplaceReader {
                 displayName != null ? displayName : name,
                 description != null ? description : "",
                 estimatedEffortPerOccurrence,
-                new ArrayList<>(options.values()),
+                options,
+                new ArrayList<>(dataTables.values()),
                 bundle
         );
+
+        // Populate metadata from unknown columns
+        listing.getMetadata().putAll(metadata);
 
         // Convert category maps to CategoryDescriptor list
         // Categories are stored with index (1, 2, 3, ...) representing depth from deepest to shallowest
@@ -239,8 +252,8 @@ public class RecipeMarketplaceReader {
         List<CategoryDescriptor> categoryPath = new ArrayList<>();
         for (Map.Entry<Integer, String> entry : categoryDisplayNames.entrySet()) {
             int index = entry.getKey();
-            String catDisplayName = entry.getValue();
-            String catDescription = categoryDescriptions.getOrDefault(index, "");
+            @Language("markdown") String catDisplayName = entry.getValue();
+            @Language("markdown") String catDescription = categoryDescriptions.getOrDefault(index, "");
             categoryPath.add(new CategoryDescriptor(
                     catDisplayName,
                     "", // packageName not used for marketplace categories
@@ -253,6 +266,92 @@ public class RecipeMarketplaceReader {
         }
         Collections.reverse(categoryPath);
         marketplace.install(listing, categoryPath);
+    }
+
+    private List<OptionDescriptor> parseOptionsFromToml(String toml) {
+        try {
+            // Parse TOML with multiple tables like [groupId], [artifactId], etc.
+            Map<String, Map<String, Object>> parsed = TOML_MAPPER.readValue(toml,
+                    new TypeReference<Map<String, Map<String, Object>>>() {});
+
+            List<OptionDescriptor> options = new ArrayList<>();
+            for (Map.Entry<String, Map<String, Object>> entry : parsed.entrySet()) {
+                String optionName = entry.getKey();
+                Map<String, Object> values = entry.getValue();
+
+                options.add(new OptionDescriptor(
+                        optionName,
+                        getStringValue(values, "type", "String"),
+                        getStringValue(values, "displayName", ""),
+                        getStringValue(values, "description", ""),
+                        getStringValue(values, "example", null),
+                        null, // valid
+                        getBooleanValue(values, "required", false),
+                        null  // value
+                ));
+            }
+            return options;
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to parse options TOML: " + toml, e);
+        }
+    }
+
+    @Nullable
+    private DataTableDescriptor parseDataTableFromToml(String toml) {
+        try {
+            // Parse flat TOML format with name = "...", displayName = "...", etc.
+            Map<String, Object> values = TOML_MAPPER.readValue(toml,
+                    new TypeReference<Map<String, Object>>() {});
+            if (values.isEmpty()) {
+                return null;
+            }
+
+            // Parse columns if present - columns is a map keyed by column name
+            List<ColumnDescriptor> columns = new ArrayList<>();
+            Object columnsObj = values.get("columns");
+            if (columnsObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Map<String, Object>> columnsMap = (Map<String, Map<String, Object>>) columnsObj;
+                for (Map.Entry<String, Map<String, Object>> entry : columnsMap.entrySet()) {
+                    String columnName = entry.getKey();
+                    Map<String, Object> colMap = entry.getValue();
+                    columns.add(new ColumnDescriptor(
+                            columnName,
+                            getStringValue(colMap, "type", "String"),
+                            getStringValue(colMap, "displayName", null),
+                            getStringValue(colMap, "description", null)
+                    ));
+                }
+            }
+
+            return new DataTableDescriptor(
+                    getStringValue(values, "name", ""),
+                    getStringValue(values, "displayName", ""),
+                    getStringValue(values, "description", ""),
+                    columns
+            );
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to parse data table TOML: " + toml, e);
+        }
+    }
+
+    private String getStringValue(Map<String, Object> values, String key, @Nullable String defaultValue) {
+        Object value = values.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        return value.toString();
+    }
+
+    private boolean getBooleanValue(Map<String, Object> values, String key, boolean defaultValue) {
+        Object value = values.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        return Boolean.parseBoolean(value.toString());
     }
 
     @Getter
@@ -268,18 +367,15 @@ public class RecipeMarketplaceReader {
         PACKAGE_NAME("packageName"),
         VERSION("version"),
         TEAM("team"),
-        OPTION_NAME("optionName"),
-        OPTION_DISPLAY_NAME("optionDisplayName"),
-        OPTION_DESCRIPTION("optionDescription"),
+        OPTIONS("options"),
+        DATA_TABLE("dataTable"),
         UNKNOWN("_unknown");
 
         private final String columnName;
 
         private static final Pattern CATEGORY_PATTERN = Pattern.compile("category(\\d*)", Pattern.CASE_INSENSITIVE);
         private static final Pattern CATEGORY_DESCRIPTION_PATTERN = Pattern.compile("category(\\d*)Description", Pattern.CASE_INSENSITIVE);
-        private static final Pattern OPTION_NAME_PATTERN = Pattern.compile("option(\\d+)Name", Pattern.CASE_INSENSITIVE);
-        private static final Pattern OPTION_DISPLAY_NAME_PATTERN = Pattern.compile("option(\\d+)DisplayName", Pattern.CASE_INSENSITIVE);
-        private static final Pattern OPTION_DESCRIPTION_PATTERN = Pattern.compile("option(\\d+)Description", Pattern.CASE_INSENSITIVE);
+        private static final Pattern DATA_TABLE_PATTERN = Pattern.compile("dataTable(\\d+)", Pattern.CASE_INSENSITIVE);
 
         public static NamedColumn fromString(String key) {
             // Check for category description columns first (category1Description, category2Description, ...)
@@ -299,23 +395,11 @@ public class RecipeMarketplaceReader {
                 return new NamedColumn(CATEGORY, key, index);
             }
 
-            // Check for option columns with patterns
-            Matcher optionNameMatcher = OPTION_NAME_PATTERN.matcher(key);
-            if (optionNameMatcher.matches()) {
-                int index = Integer.parseInt(optionNameMatcher.group(1));
-                return new NamedColumn(OPTION_NAME, key, index);
-            }
-
-            Matcher optionDisplayNameMatcher = OPTION_DISPLAY_NAME_PATTERN.matcher(key);
-            if (optionDisplayNameMatcher.matches()) {
-                int index = Integer.parseInt(optionDisplayNameMatcher.group(1));
-                return new NamedColumn(OPTION_DISPLAY_NAME, key, index);
-            }
-
-            Matcher optionDescriptionMatcher = OPTION_DESCRIPTION_PATTERN.matcher(key);
-            if (optionDescriptionMatcher.matches()) {
-                int index = Integer.parseInt(optionDescriptionMatcher.group(1));
-                return new NamedColumn(OPTION_DESCRIPTION, key, index);
+            // Check for data table columns (dataTable1, dataTable2, ...)
+            Matcher dataTableMatcher = DATA_TABLE_PATTERN.matcher(key);
+            if (dataTableMatcher.matches()) {
+                int index = Integer.parseInt(dataTableMatcher.group(1));
+                return new NamedColumn(DATA_TABLE, key, index);
             }
 
             // Check for standard columns
