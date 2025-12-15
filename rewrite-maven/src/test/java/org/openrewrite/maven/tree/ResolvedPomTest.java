@@ -385,10 +385,10 @@ class ResolvedPomTest implements RewriteTest {
               </project>
               """,
             spec -> spec.afterRecipe(doc ->
-              assertThat(doc.getMarkers()
-                .findFirst(MavenResolutionResult.class).orElseThrow()
-                .getPom().getVersion())
-                .isEqualTo("1.2.3-SNAPSHOT")
+              assertThat(doc.getMarkers().findFirst(MavenResolutionResult.class))
+                .map(MavenResolutionResult::getPom)
+                .map(ResolvedPom::getVersion)
+                .contains("1.2.3-SNAPSHOT")
             )
           )
         );
@@ -425,10 +425,10 @@ class ResolvedPomTest implements RewriteTest {
               </project>
               """,
             spec -> spec.path("child/pom.xml").afterRecipe(doc ->
-              assertThat(doc.getMarkers()
-                .findFirst(MavenResolutionResult.class).orElseThrow()
-                .getPom().getVersion())
-                .isEqualTo("1.2.3-SNAPSHOT")
+              assertThat(doc.getMarkers().findFirst(MavenResolutionResult.class))
+                .map(MavenResolutionResult::getPom)
+                .map(ResolvedPom::getVersion)
+                .contains("1.2.3-SNAPSHOT")
             )
           )
         );
