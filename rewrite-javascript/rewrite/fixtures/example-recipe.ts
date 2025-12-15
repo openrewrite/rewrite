@@ -26,6 +26,7 @@ import {MarkTypes} from "./mark-types";
 import {MarkPrimitiveTypes} from "./mark-primitive-types";
 import {MarkClassTypes} from "./mark-class-types";
 import {ScanningEditor} from "./scanning-editor";
+import {ReplaceAssignment} from "./replace-assignment";
 
 export function activate(registry: RecipeRegistry) {
     registry.register(ChangeText);
@@ -40,4 +41,5 @@ export function activate(registry: RecipeRegistry) {
     registry.register(MarkPrimitiveTypes);
     registry.register(MarkClassTypes);
     registry.register(ScanningEditor);
+    registry.register(ReplaceAssignment);
 }
