@@ -44,6 +44,11 @@ public class SearchResults extends DataTable<SearchResults.Row> {
                 description = "The trimmed printed tree of the LST element that the marker is attached to.")
         String result;
 
+        @Column(displayName = "Description",
+                description = "The content of the description of the marker.")
+        @Nullable
+        String description;
+
         @Column(displayName = "Recipe that added the search marker",
                 description = "The specific recipe that added the Search marker.")
         String recipe;
