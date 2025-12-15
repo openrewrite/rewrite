@@ -411,7 +411,8 @@ class ResolvedPomTest implements RewriteTest {
                       <sha1 />
                   </properties>
             </project>
-            """, spec -> spec.path("pom.xml")),
+            """
+          ),
           pomXml(
             //language=pom
             """
