@@ -861,7 +861,6 @@ class ResolvedPomTest implements RewriteTest {
                   <artifactId>api-parent</artifactId>
                   <version>1.0.0-SNAPSHOT</version>
                   <packaging>pom</packaging>
-              
                   <modules>
                       <module>api-definitions</module>
                       <module>api-codegen</module>
@@ -875,7 +874,6 @@ class ResolvedPomTest implements RewriteTest {
                 <project>
                     <artifactId>api-definitions</artifactId>
                     <packaging>tgz</packaging>
-                
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
@@ -892,14 +890,12 @@ class ResolvedPomTest implements RewriteTest {
             pomXml("""
                 <project>
                     <artifactId>api-codegen</artifactId>
-                
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
                         <version>1.0.0-SNAPSHOT</version>
                         <relativePath>../pom.xml</relativePath>
                     </parent>
-                
                     <dependencies>
                         <dependency>
                             <groupId>org.example</groupId>
