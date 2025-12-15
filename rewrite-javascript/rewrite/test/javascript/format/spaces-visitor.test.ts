@@ -267,4 +267,36 @@ describe('SpacesVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('trailing comma in nested type array should not have trailing space', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `type X = {
+    foreignKeys: [
+        {
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+        },
+    ]
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('import type alias should preserve space around equals', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `import Space = J.Space;`
+            )
+            // @formatter:on
+        )
+    });
 });

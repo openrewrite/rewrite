@@ -18,7 +18,7 @@ import {setAutoFreeze} from "immer";
 // this is required because otherwise `asRef()` won't work for objects created using immer
 setAutoFreeze(false);
 
-const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
+const REFERENCE_KEY = Symbol.for("org.openrewrite.rpc.Reference");
 
 export interface Reference {
     [REFERENCE_KEY]: true;

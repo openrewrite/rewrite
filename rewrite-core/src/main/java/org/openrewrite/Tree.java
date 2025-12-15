@@ -89,8 +89,8 @@ public interface Tree {
             SourceFile sourceFile = (SourceFile) this;
             try {
                 if (sourceFile.isCharsetBomMarked() &&
-                    out.out.length() > 0 &&
-                    out.out.charAt(0) != '\uFEFF') {
+                        out.out.length() > 0 &&
+                        out.out.charAt(0) != '\uFEFF') {
                     out.out.insert(0, '\uFEFF');
                 }
             } catch (UnsupportedOperationException e) {

@@ -25,6 +25,7 @@ import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -63,17 +64,19 @@ public class ChangeValue extends Recipe {
         // Parse the value once here, outside the visitor
         // Try as keyword/number/array/object first, fallback to string
         Optional<JsonValue> jsonValue = parseValues(firstParserInput(), '"' + value + '"');
+        int optionsHash = Objects.hash(oldKeyPath, value);
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
                 Json.Member m = super.visitMember(member, ctx);
-                if (matcher.matches(getCursor()) && !m.getMarkers().findFirst(Changed.class).isPresent()) {
+                if (matcher.matches(getCursor()) &&
+                    !m.getMarkers().findFirst(Changed.class).map(c -> c.getRecipeOptionsHash() == optionsHash).orElse(false)) {
                     if (!jsonValue.isPresent()) {
                         return SearchResult.found(m, "Could not parse value: " + value);
                     }
                     JsonValue parsedValue = jsonValue.get();
                     return m.withValue(parsedValue.withPrefix(m.getValue().getPrefix()))
-                            .withMarkers(m.getMarkers().add(new Changed(Tree.randomId())));
+                            .withMarkers(m.getMarkers().add(new Changed(Tree.randomId(), optionsHash)));
                 }
                 return m;
             }
@@ -104,5 +107,6 @@ public class ChangeValue extends Recipe {
     @With
     static class Changed implements Marker {
         UUID id;
+        int recipeOptionsHash;
     }
 }

@@ -1111,4 +1111,227 @@ more\`
             // @formatter:on
         )
     })
+
+    test('method chain with arrow function callback should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`const uniqueLikedDemosTransformed = Array.from(
+  uniqueLikedDemosMap.values(),
+)
+  .map(transformDemoResult)
+  .sort((a, b) => {
+    // Then sort
+    // Handle potential null or undefined dates gracefully
+    const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0
+    const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0
+    return dateB - dateA // Descending order
+  })`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('method chain after bare return statement should not inherit return indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`useEffect(() => {
+  if (css) return
+  if (!shellCode) return
+  fetch(url, {
+    method: "POST",
+  })
+    .then((res) => res.json())
+    .catch((error) => {
+      console.error(error)
+    })
+})`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('continuation line after assignment should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+const [componentAccess, setComponentAccess] =
+    useState<ComponentAccessState>("UNDEFINED")
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('object literal in method chain should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+const { error } = await client
+  .from("demos")
+  .update({
+    compiled_css: url,
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", demoId)
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('nested method chain with object literal in callback should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+fetch(url)
+  .then(async (data) => {
+    const { error } = await client
+      .from("demos")
+      .update({
+        compiled_css: url,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", demoId)
+  })
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('binary expression inside parentheses in return should align', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+const generateAnonId = () => {
+    return (
+        Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15)
+    )
+}
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type cast inside parentheses should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+const { data, error } = await (
+    supabaseWithAdminAccess.rpc as any
+)("get_all_author_payouts", {
+    p_period: period,
+})
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('JSX tag inside embedded expression with parentheses should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=tsx
+            tsx(
+`
+<div>
+  {component.description && (
+    <div
+      style={{
+        display: "flex",
+      }}
+    >
+      {component.description}
+    </div>
+  )}
+</div>
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('property with decorator should not get extra indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`class ValidateParsingRecipe {
+    @Option
+    projectRoot: string;
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('ternary with arrow function and method chain should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const filteredDependencies = dependencies
+  ? dependencies.map((dep: string) =>
+      dep
+        .split("\\n"),
+    )
+  : [];`
+            )
+            // @formatter:on
+        )
+    })
 });

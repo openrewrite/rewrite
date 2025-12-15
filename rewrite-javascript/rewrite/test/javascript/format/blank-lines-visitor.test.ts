@@ -185,4 +185,59 @@ describe('BlankLinesVisitor', () => {
             // @formatter:on
         );
     });
+
+    test('case label with member access should not add newline', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function foo(kind: number) {
+    switch (kind) {
+        case Type.Kind.Annotation: {
+            break;
+        }
+    }
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('enum inside namespace should not add blank line before closing brace', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `export namespace Class {
+    export const enum Kind {
+        Class = "Class",
+        Enum = "Enum",
+        Interface = "Interface",
+        Annotation = "Annotation",
+        Record = "Record",
+        Value = "Value"
+    }
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('enum with trailing comma should preserve formatting', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `export const enum Kind {
+    Class = "Class",
+    Enum = "Enum",
+    Value = "Value",
+}`
+            )
+            // @formatter:on
+        )
+    });
 });

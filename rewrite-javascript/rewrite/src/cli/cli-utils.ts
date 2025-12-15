@@ -19,8 +19,17 @@ import * as path from 'path';
 import {spawn, spawnSync} from 'child_process';
 import {Recipe, RecipeRegistry} from '../recipe';
 import {SourceFile} from '../tree';
-import {JavaScriptParser, PackageJsonParser} from '../javascript';
+import {
+    isYarnBerryLockFile,
+    JavaScriptParser,
+    JSON_LOCK_FILE_NAMES,
+    PackageJsonParser,
+    TEXT_LOCK_FILE_NAMES,
+    YAML_LOCK_FILE_NAMES
+} from '../javascript';
 import {JsonParser} from '../json';
+import {PlainTextParser} from '../text';
+import {YamlParser} from '../yaml';
 
 // ANSI color codes
 const colors = {
@@ -365,6 +374,12 @@ export async function discoverFiles(projectRoot: string, verbose: boolean = fals
             cwd: projectRoot,
             encoding: 'utf8'
         });
+        // Check if git command failed (not a git repository)
+        if (tracked.status !== 0 || tracked.error) {
+            // Not a git repository, fall back to recursive directory scan
+            await walkDirectory(projectRoot, files, ignoredFiles, projectRoot);
+            return files.filter(isAcceptedFile);
+        }
         if (tracked.stdout) {
             for (const line of tracked.stdout.split('\n')) {
                 if (line.trim()) {
@@ -435,10 +450,16 @@ export async function walkDirectory(
 }
 
 /**
+ * All lock file names (typed as string[] for easier comparison)
+ */
+const ALL_LOCK_FILE_NAMES: readonly string[] = [...JSON_LOCK_FILE_NAMES, ...YAML_LOCK_FILE_NAMES, ...TEXT_LOCK_FILE_NAMES];
+
+/**
  * Check if a file is accepted for parsing based on its extension
  */
 export function isAcceptedFile(filePath: string): boolean {
     const ext = path.extname(filePath).toLowerCase();
+    const basename = path.basename(filePath);
 
     // JavaScript/TypeScript files
     if (['.js', '.jsx', '.ts', '.tsx', '.mjs', '.mts', '.cjs', '.cts'].includes(ext)) {
@@ -450,6 +471,16 @@ export function isAcceptedFile(filePath: string): boolean {
         return true;
     }
 
+    // YAML files
+    if (['.yaml', '.yml'].includes(ext)) {
+        return true;
+    }
+
+    // Lock files (some have non-standard extensions like yarn.lock)
+    if (ALL_LOCK_FILE_NAMES.includes(basename)) {
+        return true;
+    }
+
     return false;
 }
 
@@ -458,6 +489,56 @@ export type ProgressCallback = (current: number, total: number, filePath: string
 export interface ParseFilesOptions {
     verbose?: boolean;
     onProgress?: ProgressCallback;
+}
+
+/**
+ * Internal context for file parsing progress tracking.
+ */
+interface ParseContext {
+    current: number;
+    total: number;
+    verbose: boolean;
+    onProgress?: ProgressCallback;
+}
+
+/**
+ * Helper to parse files with a given parser, handling verbose logging and progress.
+ */
+async function* parseWithParser(
+    files: string[],
+    parser: { parse(...files: string[]): AsyncGenerator<SourceFile> },
+    fileType: string,
+    ctx: ParseContext
+): AsyncGenerator<SourceFile, ParseContext> {
+    if (files.length === 0) {
+        return ctx;
+    }
+
+    if (ctx.verbose) {
+        console.log(`Parsing ${files.length} ${fileType} files...`);
+    }
+
+    for await (const sf of parser.parse(...files)) {
+        ctx.current++;
+        ctx.onProgress?.(ctx.current, ctx.total, sf.sourcePath);
+        yield sf;
+    }
+
+    return ctx;
+}
+
+/**
+ * Classifies a yarn.lock file as YAML (Berry) or text (Classic) based on its content.
+ * Returns 'yaml' for Yarn Berry (v2+) and 'text' for Yarn Classic (v1).
+ */
+async function classifyYarnLockFile(filePath: string): Promise<'yaml' | 'text'> {
+    try {
+        const content = await fsp.readFile(filePath, 'utf-8');
+        return isYarnBerryLockFile(content) ? 'yaml' : 'text';
+    } catch {
+        // Default to text format if we can't read the file
+        return 'text';
+    }
 }
 
 /**
@@ -477,6 +558,13 @@ export async function* parseFilesStreaming(
     const jsFiles: string[] = [];
     const packageJsonFiles: string[] = [];
     const jsonFiles: string[] = [];
+    const jsonLockFiles: string[] = [];
+    const yamlLockFiles: string[] = [];
+    const yamlFiles: string[] = [];
+    const textLockFiles: string[] = [];
+
+    // Collect yarn.lock files for content-based classification
+    const yarnLockFiles: string[] = [];
 
     for (const filePath of filePaths) {
         const basename = path.basename(filePath);
@@ -486,49 +574,44 @@ export async function* parseFilesStreaming(
             packageJsonFiles.push(filePath);
         } else if (['.js', '.jsx', '.ts', '.tsx', '.mjs', '.mts', '.cjs', '.cts'].includes(ext)) {
             jsFiles.push(filePath);
+        } else if ((JSON_LOCK_FILE_NAMES as readonly string[]).includes(basename)) {
+            jsonLockFiles.push(filePath);
+        } else if ((YAML_LOCK_FILE_NAMES as readonly string[]).includes(basename)) {
+            yamlLockFiles.push(filePath);
+        } else if (basename === 'yarn.lock') {
+            // yarn.lock needs content-based classification
+            yarnLockFiles.push(filePath);
+        } else if ((TEXT_LOCK_FILE_NAMES as readonly string[]).includes(basename)) {
+            // Other text lock files (if any besides yarn.lock)
+            textLockFiles.push(filePath);
         } else if (ext === '.json') {
             jsonFiles.push(filePath);
+        } else if (['.yaml', '.yml'].includes(ext)) {
+            yamlFiles.push(filePath);
         }
     }
 
-    // Parse JavaScript/TypeScript files
-    if (jsFiles.length > 0) {
-        if (verbose) {
-            console.log(`Parsing ${jsFiles.length} JavaScript/TypeScript files...`);
-        }
-        const jsParser = new JavaScriptParser({relativeTo: projectRoot});
-        for await (const sf of jsParser.parse(...jsFiles)) {
-            current++;
-            onProgress?.(current, total, sf.sourcePath);
-            yield sf;
+    // Classify yarn.lock files by content (Yarn Berry uses YAML, Classic uses text)
+    for (const yarnLockPath of yarnLockFiles) {
+        const format = await classifyYarnLockFile(yarnLockPath);
+        if (format === 'yaml') {
+            yamlLockFiles.push(yarnLockPath);
+        } else {
+            textLockFiles.push(yarnLockPath);
         }
     }
 
-    // Parse package.json files
-    if (packageJsonFiles.length > 0) {
-        if (verbose) {
-            console.log(`Parsing ${packageJsonFiles.length} package.json files...`);
-        }
-        const pkgParser = new PackageJsonParser({relativeTo: projectRoot});
-        for await (const sf of pkgParser.parse(...packageJsonFiles)) {
-            current++;
-            onProgress?.(current, total, sf.sourcePath);
-            yield sf;
-        }
-    }
+    // Create parse context for tracking progress
+    const ctx: ParseContext = { current, total, verbose, onProgress };
 
-    // Parse other JSON files
-    if (jsonFiles.length > 0) {
-        if (verbose) {
-            console.log(`Parsing ${jsonFiles.length} JSON files...`);
-        }
-        const jsonParser = new JsonParser({relativeTo: projectRoot});
-        for await (const sf of jsonParser.parse(...jsonFiles)) {
-            current++;
-            onProgress?.(current, total, sf.sourcePath);
-            yield sf;
-        }
-    }
+    // Parse files by type using helper
+    yield* parseWithParser(jsFiles, new JavaScriptParser({relativeTo: projectRoot}), 'JavaScript/TypeScript', ctx);
+    yield* parseWithParser(packageJsonFiles, new PackageJsonParser({relativeTo: projectRoot}), 'package.json', ctx);
+    yield* parseWithParser(jsonLockFiles, new JsonParser({relativeTo: projectRoot}), 'JSON lock', ctx);
+    yield* parseWithParser(yamlLockFiles, new YamlParser({relativeTo: projectRoot}), 'YAML lock', ctx);
+    yield* parseWithParser(textLockFiles, new PlainTextParser({relativeTo: projectRoot}), 'text lock', ctx);
+    yield* parseWithParser(yamlFiles, new YamlParser({relativeTo: projectRoot}), 'YAML', ctx);
+    yield* parseWithParser(jsonFiles, new JsonParser({relativeTo: projectRoot}), 'JSON', ctx);
 }
 
 /**
