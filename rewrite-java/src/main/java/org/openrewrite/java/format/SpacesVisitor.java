@@ -50,35 +50,24 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     protected final EmptyForIteratorPadStyle emptyForIteratorPadStyle;
     @Nullable
     protected final Tree stopAfter;
-    protected final boolean removeCustomLineBreaks;
 
-    public SpacesVisitor(SourceFile sourceFile, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(sourceFile.getMarkers().findAll(NamedStyles.class), removeCustomLineBreaks, stopAfter);
+    public SpacesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
     }
 
-    public SpacesVisitor(List<NamedStyles> styles, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), stopAfter, removeCustomLineBreaks);
+    public SpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), stopAfter);
     }
 
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable Tree stopAfter) {
-        this(spacesStyle, null, null, stopAfter, false);
+        this(spacesStyle, null, null, stopAfter);
     }
 
-    public SpacesVisitor(SpacesStyle spacesStyle, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(spacesStyle, null, null, stopAfter, removeCustomLineBreaks);
-    }
-
-    @Deprecated
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter) {
-        this(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, stopAfter, false);
-    }
-
-    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
         this.spacesStyle = spacesStyle;
         this.emptyForInitializerPadStyle = emptyForInitializerPadStyle;
         this.emptyForIteratorPadStyle = emptyForIteratorPadStyle;
         this.stopAfter = stopAfter;
-        this.removeCustomLineBreaks = removeCustomLineBreaks;
     }
 
     @Override
@@ -774,9 +763,6 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     private Space minimizedSkipComments(Space space, String whitespace) {
         if (space.getComments().isEmpty()) {
-            if (!removeCustomLineBreaks && StringUtils.hasLineBreak(space.getWhitespace())) {
-                return space;
-            }
             if (StringUtils.hasLineBreak(whitespace)) {
                 //Reduce to single new line
                 return space.withWhitespace(whitespace.substring(whitespace.lastIndexOf('\n')));
@@ -807,10 +793,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                             trimCommentSuffix = cursor.getValue() instanceof J.Block || cursor.getValue() instanceof J.If || cursor.getValue() instanceof J.Case;
                         }
                     }
-                    if (Boolean.TRUE.equals(trimCommentSuffix) && !StringUtils.hasLineBreak(comment.getSuffix())) {
-                        return comment.withSuffix(whitespace);
-                    }
-                    if (removeCustomLineBreaks && Boolean.TRUE.equals(trimCommentSuffix) && comment.isMultiline()) {
+                    if (Boolean.TRUE.equals(trimCommentSuffix) && (comment.isMultiline() || !StringUtils.hasLineBreak(comment.getSuffix()))) {
                         return comment.withSuffix(whitespace);
                     }
                     return comment;

@@ -977,8 +977,7 @@ class WrappingAndBracesTest implements RewriteTest {
               IntelliJ.wrappingAndBraces()
                 .withMethodDeclarationParameters(IntelliJ.wrappingAndBraces().getMethodDeclarationParameters().withWrap(WrapAlways)),
               IntelliJ.tabsAndIndents(),
-              null,
-              true))),
+              null))),
           java(
             """
               import java.lang.annotation.Repeatable;
@@ -1166,8 +1165,7 @@ class WrappingAndBracesTest implements RewriteTest {
               IntelliJ.wrappingAndBraces()
                 .withExtendsImplementsPermitsList(IntelliJ.wrappingAndBraces().getExtendsImplementsPermitsList().withWrap(WrapAlways)),
               IntelliJ.tabsAndIndents(),
-              null,
-              true))),
+              null))),
           java("""
             public class Interfaces {
                 public interface I1 {
@@ -1201,8 +1199,7 @@ class WrappingAndBracesTest implements RewriteTest {
               IntelliJ.wrappingAndBraces()
                 .withExtendsImplementsPermitsList(IntelliJ.wrappingAndBraces().getExtendsImplementsPermitsList().withWrap(WrapAlways).withAlignWhenMultiline(true)),
               IntelliJ.tabsAndIndents(),
-              null,
-              true))),
+              null))),
           java("""
             public class Interfaces {
                 public interface I1 {

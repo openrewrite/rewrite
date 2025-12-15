@@ -46,27 +46,25 @@ import static org.openrewrite.style.LineWrapSetting.*;
 public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
-    protected final boolean removeCustomLineBreaks;
 
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final SpacesStyle spacesStyle;
     private final WrappingAndBracesStyle style;
     private final TabsAndIndentsStyle tabsAndIndentsStyle;
 
-    public WrappingAndBracesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
-        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter, removeCustomLineBreaks);
+    public WrappingAndBracesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
     }
 
-    public WrappingAndBracesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents), stopAfter, removeCustomLineBreaks);
+    public WrappingAndBracesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents), stopAfter);
     }
 
-    public WrappingAndBracesVisitor(SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingAndBracesStyle, TabsAndIndentsStyle tabsAndIndentsStyle, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
+    public WrappingAndBracesVisitor(SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingAndBracesStyle, TabsAndIndentsStyle tabsAndIndentsStyle, @Nullable Tree stopAfter) {
         this.spacesStyle = spacesStyle;
         this.style = wrappingAndBracesStyle;
         this.tabsAndIndentsStyle = tabsAndIndentsStyle;
         this.stopAfter = stopAfter;
-        this.removeCustomLineBreaks = removeCustomLineBreaks;
     }
 
     @Override
@@ -169,7 +167,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     }
 
                     boolean wrapFirstCall = evaluate(() -> style.getChainedMethodCalls().getWrapFirstCall(), false);
-                    if (!((wrapFirstCall && chainStarter == m) || (!wrapFirstCall && chainStarter == m.getSelect())) && evaluate(() -> style.getChainedMethodCalls().getAlignWhenMultiline(), false)) {
+                    if (evaluate(() -> style.getChainedMethodCalls().getAlignWhenMultiline(), false) && ((wrapFirstCall && chainStarter == m) || chainStarter != m)) {
                         startColumn = positionService.columnsOf(getCursor(), chainStarter.getSelect()).getEndColumn() - 1; //since position is index-1-based
                     } else {
                         newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor());
@@ -335,6 +333,22 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 case BLOCK_END:
                     if (Boolean.TRUE.equals(getCursor().pollMessage("single-line-enum"))) {
                         break;
+                    }
+                    if (((J.Block) getCursor().getValue()).getStatements().isEmpty()) {
+                        parent = getCursor().getParentTreeCursor().getValue();
+                        boolean keepSingleLine;
+                        if (parent instanceof J.ClassDeclaration) {
+                            keepSingleLine = evaluate(() -> style.getKeepWhenReformatting().getSimpleClassesInOneLine(), false);
+                        } else if (parent instanceof J.MethodDeclaration) {
+                            keepSingleLine = evaluate(() -> style.getKeepWhenReformatting().getSimpleMethodsInOneLine(), false);
+                        } else if (parent instanceof J.Lambda) {
+                            keepSingleLine = evaluate(() -> style.getKeepWhenReformatting().getSimpleLambdasInOneLine(), false);
+                        } else {
+                            keepSingleLine = evaluate(() -> style.getKeepWhenReformatting().getSimpleBlocksInOneLine(), false);
+                        }
+                        if (keepSingleLine) {
+                            break;
+                        }
                     }
                     newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor());
                     if (newLinedCursorElement.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) newLinedCursorElement.getValue()).getSelect() != null) {
@@ -571,9 +585,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     private Space withWhitespaceSkipComments(Space space, String whitespace) {
         if (space.getComments().isEmpty()) {
-            if (!removeCustomLineBreaks && StringUtils.hasLineBreak(space.getWhitespace())) {
-                return space;
-            }
             if (StringUtils.hasLineBreak(whitespace)) {
                 if (StringUtils.hasLineBreak(space.getWhitespace())) {
                     //Keep existing amount of new lines
@@ -594,21 +605,18 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     if (!StringUtils.hasLineBreak(comment.getSuffix())) {
                         return comment.withSuffix(whitespace);
                     }
-                    if (removeCustomLineBreaks) {
-                        if (comment.isMultiline()) {
-                            Object parent = getCursor().getParentTreeCursor().getValue();
-                            if (!(parent instanceof J.Block || parent instanceof J.Case)) {
-                                return comment.withSuffix(whitespace);
-                            }
+                    if (comment.isMultiline()) {
+                        Object parent = getCursor().getParentTreeCursor().getValue();
+                        if (!(parent instanceof J.Block || parent instanceof J.Case)) {
+                            return comment.withSuffix(whitespace);
                         }
-                        if (StringUtils.hasLineBreak(comment.getSuffix())) {
-                            //Keep existing amount of new lines
-                            return comment.withSuffix(comment.getSuffix().replaceAll(" ", "") + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
-                        }
-                        //Reduce to single new line
-                        return comment.withSuffix(whitespace.substring(whitespace.lastIndexOf('\n')));
                     }
-                    return comment;
+                    if (StringUtils.hasLineBreak(comment.getSuffix())) {
+                        //Keep existing amount of new lines
+                        return comment.withSuffix(comment.getSuffix().replaceAll(" ", "") + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
+                    }
+                    //Reduce to single new line
+                    return comment.withSuffix(whitespace.substring(whitespace.lastIndexOf('\n')));
                 })
         );
     }

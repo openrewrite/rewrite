@@ -59,7 +59,7 @@ public class WrappingAndBraces extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                return new WrappingAndBracesVisitor<>(cu, null, false).visit(cu, ctx);
+                return new WrappingAndBracesVisitor<>(cu, null).visit(cu, ctx);
             }
             return (J) tree;
         }
@@ -68,6 +68,6 @@ public class WrappingAndBraces extends Recipe {
     public static <J2 extends J> J2 formatWrappingAndBraces(J j, Cursor cursor) {
         JavaSourceFile sourceFile = cursor.firstEnclosingOrThrow(JavaSourceFile.class);
         //noinspection unchecked
-        return (J2) new WrappingAndBracesVisitor<>(sourceFile, null, false).visitNonNull(j, 0, cursor);
+        return (J2) new WrappingAndBracesVisitor<>(sourceFile, null).visitNonNull(j, 0, cursor);
     }
 }

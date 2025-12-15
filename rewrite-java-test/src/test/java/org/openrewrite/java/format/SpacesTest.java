@@ -24,12 +24,14 @@ import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -80,12 +82,26 @@ class SpacesTest implements RewriteTest {
         return spaces(style -> style);
     }
 
+    private static Consumer<RecipeSpec> spaces(boolean removeCustomLineBreaks) {
+        return spaces(style -> style, removeCustomLineBreaks);
+    }
+
     private static Consumer<RecipeSpec> spaces(UnaryOperator<SpacesStyle> with) {
-        return spec -> spec.recipe(new Spaces())
+        return spaces(with, false);
+    }
+
+    private static Consumer<RecipeSpec> spaces(UnaryOperator<SpacesStyle> with, boolean removeCustomLineBreaks) {
+        return spec -> spec.recipes(new AutoFormat(null, removeCustomLineBreaks))
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(IntelliJ.spaces()))
+              List.of(
+                with.apply(IntelliJ.spaces()),
+                IntelliJ.wrappingAndBraces()
+                  .withKeepWhenReformatting(IntelliJ.wrappingAndBraces().getKeepWhenReformatting().withSimpleMethodsInOneLine(true).withSimpleClassesInOneLine(true).withSimpleLambdasInOneLine(true))
+                  .withMethodAnnotations(IntelliJ.wrappingAndBraces().getMethodAnnotations().withWrap(LineWrapSetting.DoNotWrap)),
+                IntelliJ.blankLines().withMinimum(IntelliJ.blankLines().getMinimum().withAroundMethod(0).withAroundClass(0))
+              )
             )
           )));
     }
@@ -137,8 +153,10 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void method1 () {
                   }
+
                   void method2    () {
                   }
+
                   void method3  	() {
                   }
               }
@@ -147,8 +165,10 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void method1() {
                   }
+
                   void method2() {
                   }
+
                   void method3() {
                   }
               }
@@ -3505,6 +3525,7 @@ class SpacesTest implements RewriteTest {
                       Map<String,String> m = new HashMap<String,String>();
                       Test.<String,Integer>bar(1,2);
                   }
+
                   static <A,B> void bar(int x,int y) {
                   }
               }
@@ -3518,6 +3539,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer>bar(1, 2);
                   }
+
                   static <A, B> void bar(int x, int y) {
                   }
               }
@@ -4602,6 +4624,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.io.*;
+              
               class Test {
                   void test() {
                       try (FileReader fr = new FileReader("input.txt") ; BufferedReader br = new BufferedReader(fr) ; FileWriter fw = new FileWriter("output.txt")) {
@@ -4611,6 +4634,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.io.*;
+              
               class Test {
                   void test() {
                       try (FileReader fr = new FileReader("input.txt");BufferedReader br = new BufferedReader(fr);FileWriter fw = new FileWriter("output.txt")) {
@@ -5085,7 +5109,7 @@ class SpacesTest implements RewriteTest {
     void handleIfWithoutBlock() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new SpacesVisitor<>(IntelliJ.spaces(), true, null))),
+            new SpacesVisitor<>(IntelliJ.spaces(), null))),
           java(
             """
             class Test {
@@ -5146,16 +5170,14 @@ class SpacesTest implements RewriteTest {
     @Test
     void elseIfWithoutBraces() {
         rewriteRun(
-          spaces(),
+          spaces(true),
           java(
             """
             class Test {
                 boolean isString(Object o) {
-                    if (o instanceof String)
-                        return true;
+                    if (o instanceof String) return true;
                     else
-                    if (o instanceof Character)
-                        return true;
+                    if (o instanceof Character) return true;
                     return false;
                 }
             }
@@ -5163,10 +5185,8 @@ class SpacesTest implements RewriteTest {
             """
             class Test {
                 boolean isString(Object o) {
-                    if (o instanceof String)
-                        return true;
-                    else if (o instanceof Character)
-                        return true;
+                    if (o instanceof String) return true;
+                    else if (o instanceof Character) return true;
                     return false;
                 }
             }

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
@@ -28,7 +30,11 @@ import java.util.List;
 import java.util.Objects;
 
 @SuppressWarnings({"unused", "unchecked"})
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class MergeSpacesVisitor extends JavaVisitor<Object> {
+
+    boolean removeCustomLineBreaks; //TODO implement this here
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, @Nullable Object ctx) {
@@ -56,6 +62,13 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
             return space;
         }
         Space newSpace = (Space) ctx;
+        if (!removeCustomLineBreaks && space.getWhitespace().contains("\n")) {
+            if (newSpace.getWhitespace().contains("\n")) {
+                newSpace = newSpace.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1) + newSpace.getIndent());
+            } else {
+                newSpace = space.withComments(newSpace.getComments());
+            }
+        }
         if (space == null) {
             return newSpace;
         }
@@ -64,13 +77,14 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         if (space.getComments().isEmpty() || space.getComments().size() != newSpace.getComments().size()) {
             return space;
         }
+        Space finalNewSpace = newSpace;
         return space.withComments(ListUtils.map(space.getComments(), (index, comment) -> {
             if (comment instanceof Javadoc.DocComment) {
                 Javadoc.DocComment docComment = (Javadoc.DocComment) comment;
-                if (!(newSpace.getComments().get(index) instanceof Javadoc.DocComment)) {
+                if (!(finalNewSpace.getComments().get(index) instanceof Javadoc.DocComment)) {
                     return docComment;
                 }
-                Javadoc.DocComment replaceWith = (Javadoc.DocComment) newSpace.getComments().get(index);
+                Javadoc.DocComment replaceWith = (Javadoc.DocComment) finalNewSpace.getComments().get(index);
                 comment = docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
                     if(!(jdoc instanceof Javadoc.LineBreak && replaceWith.getBody().get(i) instanceof Javadoc.LineBreak)) {
                         return jdoc;
@@ -78,11 +92,11 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
                     return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin());
                 }));
             } else if (comment instanceof TextComment) {
-                if (newSpace.getComments().get(index) instanceof TextComment) {
-                    comment = ((TextComment) comment).withText(((TextComment) newSpace.getComments().get(index)).getText());
+                if (finalNewSpace.getComments().get(index) instanceof TextComment) {
+                    comment = ((TextComment) comment).withText(((TextComment) finalNewSpace.getComments().get(index)).getText());
                 }
             }
-            return comment.withSuffix(newSpace.getComments().get(index).getSuffix());
+            return comment.withSuffix(finalNewSpace.getComments().get(index).getSuffix());
         }));
     }
 

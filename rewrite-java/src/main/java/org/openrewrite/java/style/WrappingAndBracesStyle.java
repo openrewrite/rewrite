@@ -30,6 +30,8 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Nullable
     Integer hardWrapAt;
     @Nullable
+    KeepWhenReformatting keepWhenReformatting;
+    @Nullable
     ExtendsImplementsPermitsList extendsImplementsPermitsList;
     @Nullable
     ExtendsImplementsPermitsKeyword extendsImplementsPermitsKeyword;
@@ -100,6 +102,25 @@ public class WrappingAndBracesStyle implements JavaStyle {
         DoNotForce,
         WhenMultiline, // Not yet implemented
         Always
+    }
+
+    @Value
+    @With
+    public static class KeepWhenReformatting {
+        @Nullable
+        Boolean commentAtFirstColumn; // Not yet implemented
+        @Nullable
+        Boolean controlStatementInOneLine; // Not yet implemented
+        @Nullable
+        Boolean multipleExpressionsInOneLine; // Not yet implemented
+        @Nullable
+        Boolean simpleBlocksInOneLine;
+        @Nullable
+        Boolean simpleMethodsInOneLine;
+        @Nullable
+        Boolean simpleLambdasInOneLine;
+        @Nullable
+        Boolean simpleClassesInOneLine;
     }
 
     @Value

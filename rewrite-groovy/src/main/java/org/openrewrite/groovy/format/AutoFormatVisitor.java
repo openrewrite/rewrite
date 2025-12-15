@@ -46,8 +46,8 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
 
         // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping + indents...)
         J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
-        t = new SpacesVisitor<>(cu, false, stopAfter).visit(t, p, cursor.fork());
-        t = new WrappingAndBracesVisitor<>(cu, stopAfter, true).visit(t, p, cursor.fork());
+        t = new SpacesVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
+        t = new WrappingAndBracesVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
         t = new BlankLinesVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
         t = new NormalizeTabsOrSpacesVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
         t = new TabsAndIndentsVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
