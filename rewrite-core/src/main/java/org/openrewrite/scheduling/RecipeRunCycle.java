@@ -26,6 +26,7 @@ import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.*;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.table.RecipeRunStats;
@@ -383,7 +384,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         ctx.add(new SearchResults.Row(
                                 (before == null) ? "" : before.getSourcePath().toString(),
                                 after.getSourcePath().toString(),
-                                ((Tree) cursor.getValue()).print(getCursor(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)),
+                                StringUtils.trimIndent(((Tree) cursor.getValue()).print(getCursor(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED))),
                                 ((SearchResult) marker).getDescription(),
                                 recipeName));
                     }
