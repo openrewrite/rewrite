@@ -3662,7 +3662,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getVersion()).isEqualTo("1.0.0");
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               }
             )
@@ -3700,10 +3700,10 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getVersion()).isEqualTo("1.0.0");
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
                   assert results.getParent() != null;
-                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("1.0.0");
                   assertThat(results.getParent().getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               })
             )
