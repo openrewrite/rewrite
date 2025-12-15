@@ -189,7 +189,7 @@ public class MavenPomDownloader {
         Map<String, String> mergedProperties = new HashMap<>();
         for (Pom pom : pomAncestry) {
             for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
-                mergedProperties.putIfAbsent(property.getKey(), property.getValue());
+                mergedProperties.putIfAbsent(property.getKey(), Objects.toString(property.getValue(), ""));
             }
         }
         return mergedProperties;

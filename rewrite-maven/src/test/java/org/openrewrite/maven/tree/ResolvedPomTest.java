@@ -394,7 +394,7 @@ class ResolvedPomTest implements RewriteTest {
           )
         );
     }
-    
+
     @Issue("https://github.com/openrewrite/rewrite/issues/6391")
     @Test
     void resolveParentWithPropertiesFromParent() {
