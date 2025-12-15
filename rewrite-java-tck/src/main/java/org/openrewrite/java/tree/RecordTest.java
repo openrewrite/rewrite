@@ -123,4 +123,46 @@ class RecordTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotationsAndRecords() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.RECORD_COMPONENT})
+              public @interface Select {
+                  String value() default "";
+              }
+              
+              public record File(@Select("native") String value) {
+              }
+              """
+          ),
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.RECORD_COMPONENT})
+              public @interface Select {
+                  String value() default "";
+                  int number() default 7;
+                  float decimal();
+              }
+              
+              public record File(@Select(value = "native", decimal = 3.14f) @Deprecated String value) {
+              }
+              """
+          )
+        );
+    }
 }
