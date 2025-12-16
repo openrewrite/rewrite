@@ -150,6 +150,7 @@ describe('SpacesVisitor', () => {
 
     test('objectLiteralTypeBraces: true (TypeScript default)', () => {
         spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralBraces = true;
             draft.within.objectLiteralTypeBraces = true;
         })));
         return spec.rewriteRun(
@@ -158,7 +159,7 @@ describe('SpacesVisitor', () => {
             typescript(`
             type Values = {[key: string]: string}
             function foo(x:{name:string}): void {}
-            const bar: {html:string} = { html: "" };
+            const bar: {html:string} = {html: ""};
             `,
                 `
             type Values = { [key: string]: string }

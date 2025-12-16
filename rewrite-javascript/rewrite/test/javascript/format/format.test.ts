@@ -256,7 +256,7 @@ describe('AutoformatVisitor', () => {
             // @formatter:off
             //language=typescript
             // Single-line object literals should preserve their whitespace
-            typescript("const x = { a: 1 };")
+            typescript("const x = {a: 1};")
             // @formatter:on
         )
     });
@@ -407,30 +407,15 @@ describe('AutoformatVisitor', () => {
     test('do not wrap object literals - short', async () => {
         // TODO we might eventually implement the "Chop down if long" setting for this
         return spec.rewriteRun(typescript(
-            `const short = {name: "Ivan Almeida", age: 36};`,
-            `const short = { name: "Ivan Almeida", age: 36 };`
+            `const short = {name: "Ivan Almeida", age: 36};`
         ));
     });
 
     test('do not wrap object literals - long', async () => {
         // TODO we might eventually implement the "Chop down if long" setting for this
         return spec.rewriteRun(typescript(
-            `const long = {make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true};`,
-            `const long = { make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true };`
+            `const long = {make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true};`
         ));
-    });
-
-    test('single-line object literal should not get extra spaces before closing brace', () => {
-        return spec.rewriteRun(
-            // @formatter:off
-            //language=typescript
-            typescript(
-                `function test() {
-    const x = { a: 1 };
-}`,
-            )
-            // @formatter:on
-        )
     });
 
     test('inline comment should stay on the same line', () => {
@@ -702,28 +687,6 @@ buf.slice();`
             )
             // @formatter:on
         )});
-
-    test('type annotation and shorthand property spacing', () => {
-        return spec.rewriteRun(
-            // @formatter:off
-            //language=typescript
-            // Type annotation should have space after colon (fixed from req:Request)
-            // Object literals get spaces inside braces with objectLiteralBraces: true (TypeScript default)
-            typescript(
-                `function test(req:Request): Response {
-    const withSpaces = { headers };
-    const noSpaces = {headers};
-    return req;
-}`,
-                `function test(req: Request): Response {
-    const withSpaces = { headers };
-    const noSpaces = { headers };
-    return req;
-}`
-            )
-            // @formatter:on
-        )
-    });
 
     test('multi-line import preserves structure', () => {
         return spec.rewriteRun(
