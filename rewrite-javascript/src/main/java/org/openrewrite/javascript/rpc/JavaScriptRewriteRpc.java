@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -109,6 +110,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     @RequiredArgsConstructor
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
+        private final Map<String, String> environment = new HashMap<>();
         private Environment marketplace = Environment.builder().build();
         private Path npxPath = Paths.get("npx");
         private @Nullable Path log;
@@ -160,6 +162,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         public Builder metricsCsv(@Nullable Path metricsCsv) {
             this.metricsCsv = metricsCsv;
+            return this;
+        }
+
+        public Builder environment(Map<String, String> environment) {
+            this.environment.putAll(environment);
             return this;
         }
 
@@ -283,6 +290,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                     nodeOptions.append(" --max-old-space-size=").append(maxHeapSize);
                 }
             }
+            process.environment().putAll(environment);
             process.environment().put("NODE_OPTIONS", nodeOptions.toString());
             if (npxPath.getParent() != null) {
                 // `npx` is typically a shebang script alongside the `node` executable
