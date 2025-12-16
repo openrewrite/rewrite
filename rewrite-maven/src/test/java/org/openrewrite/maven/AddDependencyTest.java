@@ -1712,19 +1712,19 @@ class AddDependencyTest implements RewriteTest {
             //language=xml
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>28.0-jre</version>
-                                <scope>runtime</scope>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.0-jre</version>
+                            <scope>runtime</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
