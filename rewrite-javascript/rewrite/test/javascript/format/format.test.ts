@@ -403,14 +403,21 @@ describe('AutoformatVisitor', () => {
         )
     });
 
-    test.each([
-        // @formatter:off
-        `const short = {name: "Ivan Almeida", age: 36};`,
-        `const long = {make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true};`,
-        // @formatter:on
-        ])('do not wrap object literals - %s', async (code) => {
+    // With objectLiteralBraces: true (TypeScript default), spaces are added inside braces
+    test('do not wrap object literals - short', async () => {
         // TODO we might eventually implement the "Chop down if long" setting for this
-        return spec.rewriteRun(typescript(code));
+        return spec.rewriteRun(typescript(
+            `const short = {name: "Ivan Almeida", age: 36};`,
+            `const short = { name: "Ivan Almeida", age: 36 };`
+        ));
+    });
+
+    test('do not wrap object literals - long', async () => {
+        // TODO we might eventually implement the "Chop down if long" setting for this
+        return spec.rewriteRun(typescript(
+            `const long = {make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true};`,
+            `const long = { make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true };`
+        ));
     });
 
     test('single-line object literal should not get extra spaces before closing brace', () => {
@@ -701,7 +708,7 @@ buf.slice();`
             // @formatter:off
             //language=typescript
             // Type annotation should have space after colon (fixed from req:Request)
-            // Shorthand properties should preserve their brace spacing
+            // Object literals get spaces inside braces with objectLiteralBraces: true (TypeScript default)
             typescript(
                 `function test(req:Request): Response {
     const withSpaces = { headers };
@@ -710,7 +717,7 @@ buf.slice();`
 }`,
                 `function test(req: Request): Response {
     const withSpaces = { headers };
-    const noSpaces = {headers};
+    const noSpaces = { headers };
     return req;
 }`
             )

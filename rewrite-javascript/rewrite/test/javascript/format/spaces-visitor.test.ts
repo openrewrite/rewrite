@@ -299,4 +299,46 @@ describe('SpacesVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('objectLiteralBraces: true - adds spaces inside braces', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralBraces = true;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = {foo: 1};
+const b = {foo: 1, bar: 2};
+const c = {shorthand};
+const d = {x, y, z};`,
+                `const a = { foo: 1 };
+const b = { foo: 1, bar: 2 };
+const c = { shorthand };
+const d = { x, y, z };`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('objectLiteralBraces: false - removes spaces inside braces', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralBraces = false;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = { foo: 1 };
+const b = { foo: 1, bar: 2 };
+const c = { shorthand };
+const d = { x, y, z };`,
+                `const a = {foo: 1};
+const b = {foo: 1, bar: 2};
+const c = {shorthand};
+const d = {x, y, z};`
+            )
+            // @formatter:on
+        )
+    });
 });
