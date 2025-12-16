@@ -15,16 +15,22 @@
  */
 package org.openrewrite.java.tree;
 
+import org.assertj.core.api.*;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser.Input;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+import org.openrewrite.tree.ParseError;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -296,9 +302,13 @@ class VariableDeclarationsTest implements RewriteTest {
       "j",
       "(j)",
       "vari",
-      "(vari)"
+      "(vari)",
+      "var",
+      "(var)",
+      "(var var)",
+      "(Object var)"
     })
-    void lambdaParameterVariableDeclarations(@Language("java") String variableDeclaration) {
+    void lambdaParameterVariableDeclarations(String variableDeclaration) {
         @Language("java")
         String java = String.format(
           """
@@ -312,6 +322,55 @@ class VariableDeclarationsTest implements RewriteTest {
             """,
           variableDeclaration
         );
+
+        testJavaSnippet(java);
+    }
+
+    @MinimumJava11
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "i, j",
+      "i, var",
+      "var, i",
+      "var i, var j",
+      "var i, var var",
+      "var var, var i"
+    })
+    void multiLambdaParametersVariableDeclarations(String variableDeclarations) {
+        @Language("java")
+        String java = String.format(
+          """
+            import java.util.function.BiFunction;
+            
+            class Foo {
+                void main() {
+                    BiFunction<Object, Object, Object> f = (%s) -> null;
+                }
+            }
+            """,
+          variableDeclarations
+        );
+
+        testJavaSnippet(java);
+    }
+
+    private void testJavaSnippet(@Language("java") String java) {
+        JavaParser parser = JavaParser.fromJavaVersion()
+          .classpath(JavaParser.runtimeClasspath())
+          .logCompilationWarningsAndErrors(true)
+          .build();
+
+        SourceFile parsed = parser.parse(java).findFirst().orElseThrow();
+
+        AssertionsForClassTypes.assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        SourceFile checked = parser.requirePrintEqualsInput(
+          parsed, Input.fromString(java), null, new InMemoryExecutionContext()
+        );
+
+        AssertionsForClassTypes.assertThat(checked).isNotInstanceOf(ParseError.class);
+        AssertionsForClassTypes.assertThat(checked).isSameAs(parsed);
+
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
