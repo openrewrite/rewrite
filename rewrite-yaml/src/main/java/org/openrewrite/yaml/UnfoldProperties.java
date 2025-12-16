@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.yaml.search.FindIndentYamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
@@ -71,8 +72,11 @@ public class UnfoldProperties extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<JsonPathMatcher> exclusionMatchers = exclusions.stream().map(JsonPathMatcher::new).collect(toList());
         return new YamlIsoVisitor<ExecutionContext>() {
+            private final FindIndentYamlVisitor<ExecutionContext> findIndent = new FindIndentYamlVisitor<>();
+
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                findIndent.visit(document, ctx);
                 Yaml.Document doc = super.visitDocument(document, ctx);
                 doAfterVisit(new MergeDuplicateSectionsVisitor<>(doc));
                 return doc;
@@ -106,7 +110,9 @@ public class UnfoldProperties extends Recipe {
                                 if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
                                     newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
                                 } else if (identLevel == 0 && hasLineBreak(newEntry.getPrefix())) {
-                                    identLevel = 2; // autFormat indents the entire block by 2 spaces though it is a root level entry -> shift by 2 later
+                                    // Use the detected indentation from the document, defaulting to 4 if none detected
+                                    int detectedIndent = findIndent.getMostCommonIndent() > 0 ? findIndent.getMostCommonIndent() : 4;
+                                    identLevel = detectedIndent; // autFormat indents the entire block by detected spaces though it is a root level entry -> shift by detected amount later
                                 }
                                 doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
                             }
