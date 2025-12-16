@@ -124,6 +124,7 @@ class RecordTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6401")
     @Test
     void annotationsAndRecords() {
         rewriteRun(
@@ -147,6 +148,7 @@ class RecordTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6401")
     @Test
     void recordWithMultipleAnnotations() {
         rewriteRun(
