@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {J} from '../../java';
-import {Capture, Any, TemplateParam, CaptureOptions, VariadicOptions} from './types';
+import {Cursor} from '../..';
+import {J, Type} from '../../java';
+import {Any, Capture, CaptureConstraintContext, CaptureOptions, ConstraintFunction, TemplateParam, VariadicOptions} from './types';
 
 /**
  * Combines multiple constraints with AND logic.
@@ -29,8 +30,8 @@ import {Capture, Any, TemplateParam, CaptureOptions, VariadicOptions} from './ty
  *     )
  * });
  */
-export function and<T>(...constraints: ((node: T) => boolean)[]): (node: T) => boolean {
-    return (node: T) => constraints.every(c => c(node));
+export function and<T>(...constraints: ConstraintFunction<T>[]): ConstraintFunction<T> {
+    return (node: T, context: CaptureConstraintContext) => constraints.every(c => c(node, context));
 }
 
 /**
@@ -45,8 +46,8 @@ export function and<T>(...constraints: ((node: T) => boolean)[]): (node: T) => b
  *     )
  * });
  */
-export function or<T>(...constraints: ((node: T) => boolean)[]): (node: T) => boolean {
-    return (node: T) => constraints.some(c => c(node));
+export function or<T>(...constraints: ConstraintFunction<T>[]): ConstraintFunction<T> {
+    return (node: T, context: CaptureConstraintContext) => constraints.some(c => c(node, context));
 }
 
 /**
@@ -58,8 +59,8 @@ export function or<T>(...constraints: ((node: T) => boolean)[]): (node: T) => bo
  *     constraint: not((node) => typeof node.value === 'string')
  * });
  */
-export function not<T>(constraint: (node: T) => boolean): (node: T) => boolean {
-    return (node: T) => !constraint(node);
+export function not<T>(constraint: ConstraintFunction<T>): ConstraintFunction<T> {
+    return (node: T, context: CaptureConstraintContext) => !constraint(node, context);
 }
 
 // Symbol to access the internal capture name without triggering Proxy
@@ -70,13 +71,18 @@ export const CAPTURE_VARIADIC_SYMBOL = Symbol('captureVariadic');
 export const CAPTURE_CONSTRAINT_SYMBOL = Symbol('captureConstraint');
 // Symbol to access capturing flag without triggering Proxy
 export const CAPTURE_CAPTURING_SYMBOL = Symbol('captureCapturing');
+// Symbol to access type information without triggering Proxy
+export const CAPTURE_TYPE_SYMBOL = Symbol('captureType');
+// Symbol to identify RawCode instances
+export const RAW_CODE_SYMBOL = Symbol('rawCode');
 
 export class CaptureImpl<T = any> implements Capture<T> {
     public readonly name: string;
     [CAPTURE_NAME_SYMBOL]: string;
     [CAPTURE_VARIADIC_SYMBOL]: VariadicOptions | undefined;
-    [CAPTURE_CONSTRAINT_SYMBOL]: ((node: T) => boolean) | undefined;
+    [CAPTURE_CONSTRAINT_SYMBOL]: ConstraintFunction<T> | undefined;
     [CAPTURE_CAPTURING_SYMBOL]: boolean;
+    [CAPTURE_TYPE_SYMBOL]: string | Type | undefined;
 
     constructor(name: string, options?: CaptureOptions<T>, capturing: boolean = true) {
         this.name = name;
@@ -99,6 +105,11 @@ export class CaptureImpl<T = any> implements Capture<T> {
         if (options?.constraint) {
             this[CAPTURE_CONSTRAINT_SYMBOL] = options.constraint;
         }
+
+        // Store type if provided
+        if (options?.type) {
+            this[CAPTURE_TYPE_SYMBOL] = options.type;
+        }
     }
 
     getName(): string {
@@ -113,12 +124,16 @@ export class CaptureImpl<T = any> implements Capture<T> {
         return this[CAPTURE_VARIADIC_SYMBOL];
     }
 
-    getConstraint(): ((node: T) => boolean) | undefined {
+    getConstraint(): ConstraintFunction<T> | undefined {
         return this[CAPTURE_CONSTRAINT_SYMBOL];
     }
 
     isCapturing(): boolean {
         return this[CAPTURE_CAPTURING_SYMBOL];
+    }
+
+    getType(): string | Type | undefined {
+        return this[CAPTURE_TYPE_SYMBOL];
     }
 }
 
@@ -291,9 +306,17 @@ function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
             if (prop === CAPTURE_CAPTURING_SYMBOL) {
                 return target[CAPTURE_CAPTURING_SYMBOL];
             }
+            if (prop === CAPTURE_TYPE_SYMBOL) {
+                return target[CAPTURE_TYPE_SYMBOL];
+            }
+
+            // Support using Capture as object key via computed properties {[x]: value}
+            if (prop === Symbol.toPrimitive || prop === 'toString' || prop === 'valueOf') {
+                return () => target[CAPTURE_NAME_SYMBOL];
+            }
 
             // Allow methods to be called directly on the target
-            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing') {
+            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing' || prop === 'getType') {
                 return target[prop].bind(target);
             }
 
@@ -330,12 +353,12 @@ function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
 
 // Overload 1: Options object with constraint (no variadic)
 export function capture<T = any>(
-    options: { name?: string; constraint: (node: T) => boolean } & { variadic?: never }
+    options: CaptureOptions<T> & { variadic?: never }
 ): Capture<T> & T;
 
 // Overload 2: Options object with variadic
 export function capture<T = any>(
-    options: { name?: string; variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; min?: number; max?: number }
+    options: { name?: string; variadic: true | VariadicOptions; constraint?: ConstraintFunction<T[]>; min?: number; max?: number }
 ): Capture<T[]> & T[];
 
 // Overload 3: Just a string name (simple named capture)
@@ -417,12 +440,12 @@ capture.nextUnnamedId = 1;
  */
 // Overload 1: Regular any with constraint (most specific - no variadic property)
 export function any<T = any>(
-    options: { constraint: (node: T) => boolean } & { variadic?: never }
+    options: { constraint: ConstraintFunction<T> } & { variadic?: never }
 ): Any<T> & T;
 
 // Overload 2: Variadic any with constraint
 export function any<T = any>(
-    options: { variadic: true | VariadicOptions; constraint?: (nodes: T[]) => boolean; min?: number; max?: number }
+    options: { variadic: true | VariadicOptions; constraint?: ConstraintFunction<T[]>; min?: number; max?: number }
 ): Any<T[]> & T[];
 
 // Overload 3: Catch-all for simple any without special options
@@ -487,6 +510,75 @@ any.nextAnonId = 1;
 export function param<T = any>(name?: string): TemplateParam<T> {
     const paramName = name || `unnamed_${capture.nextUnnamedId++}`;
     return new TemplateParamImpl<T>(paramName);
+}
+
+/**
+ * Represents raw code that should be inserted verbatim into templates at construction time.
+ * This is useful for dynamic code generation where the code structure is determined at runtime.
+ */
+export class RawCode {
+    [RAW_CODE_SYMBOL] = true;
+
+    constructor(public readonly code: string) {}
+}
+
+/**
+ * Creates a raw code specification for inserting literal code strings into templates.
+ *
+ * Use `raw()` when you need to insert code that is generated dynamically (e.g., from recipe options,
+ * computed field names, or programmatic string manipulation) directly into a template at construction time.
+ *
+ * The string is spliced into the template before parsing, so it becomes part of the template's AST.
+ * This is different from `param()` or `capture()` which are placeholders replaced during application.
+ *
+ * @param code The code string to insert verbatim into the template
+ * @returns A RawCode object that will be spliced into the template
+ *
+ * @remarks
+ * **When to use `raw()` vs `param()` vs `capture()`:**
+ *
+ * - Use `raw()` when you have a **code string** to insert at **template construction time**
+ * - Use `param()` when you have an **AST node** to substitute at **template application time**
+ * - Use `capture()` when working with **pattern matching** and need to reference matched values
+ *
+ * **Safety Considerations:**
+ * - No validation is performed on the code string
+ * - The code must be syntactically valid at the position where it's inserted
+ * - Recipe authors are trusted to provide valid code
+ *
+ * @example
+ * // Recipe option determines the log level
+ * class MyRecipe extends Recipe {
+ *     @Option
+ *     logLevel: string = "info";
+ *
+ *     getVisitor() {
+ *         // Template constructed with dynamic method name
+ *         const replacement = template`logger.${raw(this.logLevel)}(${_('msg')})`;
+ *         // Produces: logger.info(...) or logger.warn(...) etc.
+ *     }
+ * }
+ *
+ * @example
+ * // Build object literal from collected field names
+ * const fields = ["userId", "timestamp", "status"];
+ * template`{ ${raw(fields.join(', '))} }`
+ * // Produces: { userId, timestamp, status }
+ *
+ * @example
+ * // Dynamic import path
+ * const modulePath = "./utils";
+ * template`import { helper } from ${raw(`'${modulePath}'`)}`
+ * // Produces: import { helper } from './utils'
+ *
+ * @example
+ * // Configurable operator
+ * const operator = ">=";
+ * template`${_('value')} ${raw(operator)} threshold`
+ * // Produces: value >= threshold
+ */
+export function raw(code: string): RawCode {
+    return new RawCode(code);
 }
 
 /**

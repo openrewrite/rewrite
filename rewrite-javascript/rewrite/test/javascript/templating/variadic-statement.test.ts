@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,18 +14,9 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {
-    capture,
-    JavaScriptVisitor,
-    pattern,
-    Pattern,
-    template,
-    Template,
-    typescript
-} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {produce} from "immer";
-import {maybeAutoFormat} from "../../../src/javascript/format";
 
 describe('variadic statement matching and expansion', () => {
     const spec = new RecipeSpec();
@@ -37,13 +28,13 @@ describe('variadic statement matching and expansion', () => {
         return new class extends JavaScriptVisitor<any> {
             override async visitMethodDeclaration(func: J.MethodDeclaration, p: any): Promise<J | undefined> {
                 if (func.body) {
-                    const match = await pat.match(func.body);
+                    const match = await pat.match(func.body, this.cursor);
                     if (match) {
-                        const newBody = await tmpl.apply(this.cursor, func.body, match);
+                        const newBody = await tmpl.apply(func.body, this.cursor, {values: match});
                         if (newBody && newBody !== func.body) {
-                            return maybeAutoFormat(func, produce(func, draft => {
+                            return produce(func, draft => {
                                 draft.body = newBody as J.Block;
-                            }), p, undefined, this.cursor.parent);
+                            });
                         }
                     }
                 }
@@ -72,7 +63,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function foo(x) {
                     console.log('returning');
                     return x;
@@ -102,7 +92,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function foo(x) {
                     console.log('entering');
                     console.log('returning');
@@ -134,7 +123,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function foo(x) {
                     const y = x * 2;
                     console.log(y);
@@ -166,7 +154,6 @@ describe('variadic statement matching and expansion', () => {
                     console.log('end');
                 }`,
                 `
-
                 function foo() {
                     console.log('start');
                     console.log('middle');
@@ -197,10 +184,9 @@ describe('variadic statement matching and expansion', () => {
                     const b = 2;
                 }`,
                 `
-
                 function foo() {
-                    const b = 2
-                    const a = 1
+                    const b = 2;
+                    const a = 1;
                 }`
             )
         );
@@ -234,7 +220,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function bar(x) {
                     const y = x;
                     console.log('returning');
@@ -265,7 +250,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function foo(x) {
                     console.log('returning');
                     return x;
@@ -278,7 +262,6 @@ describe('variadic statement matching and expansion', () => {
                     return x;
                 }`,
                 `
-
                 function bar(x) {
                     const y = x;
                     console.log('returning');
@@ -313,7 +296,6 @@ describe('variadic statement matching and expansion', () => {
                 `function foo() {
                 }`,
                 `
-
                 function foo() {
                     console.log('hello');
                 }`
@@ -349,7 +331,6 @@ describe('variadic statement matching and expansion', () => {
                     }
                 }`,
                 `
-
                 function foo() {
                     try {
                         doSomething();
@@ -357,6 +338,87 @@ describe('variadic statement matching and expansion', () => {
                     } catch (e) {
                         console.error(e);
                     }
+                }`
+            )
+        );
+    });
+
+    test('non-variadic capture should preserve trailing semicolons', () => {
+        // Bug report: using capture() (non-variadic) for function bodies loses trailing semicolons
+        const body = capture();
+        const pat = pattern`{${body}}`;
+        const tmpl = template`{
+            console.log('before');
+            ${body}
+        }`;
+
+        spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript(
+                `function foo() {
+                    return 42;
+                }`,
+                `
+                function foo() {
+                    console.log('before');
+                    return 42;
+                }`
+            )
+        );
+    });
+
+    test('variadic capture should preserve trailing semicolons', () => {
+        // Variadic captures should also preserve semicolons and formatting
+        const body = capture({ variadic: true });
+        const pat = pattern`{${body}}`;
+        const tmpl = template`{
+            console.log('before');
+            ${body}
+        }`;
+
+        spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript(
+                `function foo() {
+                    return 42;
+                }`,
+                `
+                function foo() {
+                    console.log('before');
+                    return 42;
+                }`
+            )
+        );
+    });
+
+    test('function body capture with wrapper pattern should preserve semicolons', () => {
+        // More complex example: extracting function body from wrapper pattern
+        const {args, body} = {args: capture(), body: capture({ variadic: true })};
+        const pat = pattern`{
+            return wrapper(function(${args}) {${body}});
+        }`;
+        const tmpl = template`{
+            function extracted(${args}) {${body}}
+            return extracted;
+        }`;
+
+        spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript(
+                `function foo() {
+                    return wrapper(function(props) {
+                        return props.value;
+                    });
+                }`,
+                `
+                function foo() {
+                    function extracted(props) {
+                        return props.value;
+                    }
+                    return extracted;
                 }`
             )
         );

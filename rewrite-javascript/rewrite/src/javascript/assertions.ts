@@ -15,36 +15,93 @@
  */
 import {AfterRecipeText, dedentAfter, SourceSpec} from "../test";
 import {JavaScriptParser} from "./parser";
+import {PackageJsonParser} from "./package-json-parser";
 import {JS} from "./tree";
 import ts from 'typescript';
 import {json, Json} from "../json";
+import {DependencyWorkspace} from "./dependency-workspace";
+import {setTemplateSourceFileCache} from "./templating/engine";
 import * as fs from "fs";
 import * as path from "path";
-import {DependencyWorkspace} from "./dependency-workspace";
 
-const sourceFileCache: Map<string, ts.SourceFile> = new Map();
+/**
+ * Shared TypeScript source file cache for test parsers.
+ * Automatically configured for template parsing in tests.
+ */
+export const sourceFileCache: Map<string, ts.SourceFile> = new Map();
+
+// Automatically enable sourceFileCache for template parsing in tests
+setTemplateSourceFileCache(sourceFileCache);
 
 export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): AsyncGenerator<SourceSpec<any>, void, unknown> {
-    for (const spec of sourceSpecs) {
-        if (spec.path === 'package.json') {
-            // Parse package.json to extract dependencies
-            const packageJsonContent = JSON.parse(spec.before!);
-            const dependencies = {
-                ...packageJsonContent.dependencies,
-                ...packageJsonContent.devDependencies
-            };
+    // Ensure the target directory exists
+    if (!fs.existsSync(relativeTo)) {
+        fs.mkdirSync(relativeTo, { recursive: true });
+    }
 
-            // Use DependencyWorkspace to create workspace in relativeTo directory
-            // This will check if it's already valid and skip npm install if so
-            if (Object.keys(dependencies).length > 0) {
-                await DependencyWorkspace.getOrCreateWorkspace(dependencies, relativeTo);
+    // Find package.json and package-lock.json specs
+    const packageJsonSpec = sourceSpecs.find(spec => spec.path === 'package.json');
+    const packageLockSpec = sourceSpecs.find(spec => spec.path === 'package-lock.json');
+
+    // Write package-lock.json first (if provided) so PackageJsonParser can read it
+    if (packageLockSpec && packageLockSpec.before) {
+        fs.writeFileSync(
+            path.join(relativeTo, 'package-lock.json'),
+            packageLockSpec.before
+        );
+    }
+
+    // Yield package.json FIRST so its PackageJsonParser is used for all JSON specs
+    // (The test framework uses the first spec's parser for all specs of the same kind)
+    if (packageJsonSpec) {
+        // Parse package.json to check if there are dependencies
+        const packageJsonContent = JSON.parse(packageJsonSpec.before!);
+        const hasDependencies = Object.keys({
+            ...packageJsonContent.dependencies,
+            ...packageJsonContent.devDependencies
+        }).length > 0;
+
+        // Get or create cached workspace with node_modules
+        // If packageLockSpec is provided, use it for deterministic installs with npm ci
+        if (hasDependencies) {
+            const cachedWorkspace = await DependencyWorkspace.getOrCreateWorkspace({
+                packageJsonContent: packageJsonSpec.before!,
+                packageLockContent: packageLockSpec?.before ?? undefined
+            });
+
+            // Symlink node_modules from cached workspace to test directory
+            const cachedNodeModules = path.join(cachedWorkspace, 'node_modules');
+            const testNodeModules = path.join(relativeTo, 'node_modules');
+
+            // Remove existing node_modules if present
+            if (fs.existsSync(testNodeModules)) {
+                fs.rmSync(testNodeModules, { recursive: true, force: true });
             }
 
-            yield spec;
+            // Create symlink
+            fs.symlinkSync(cachedNodeModules, testNodeModules, 'junction');
         }
+
+        // Write the actual package.json from the test spec
+        fs.writeFileSync(
+            path.join(relativeTo, 'package.json'),
+            packageJsonSpec.before!
+        );
+
+        // Use PackageJsonParser to parse and attach NodeResolutionResult marker
+        yield {
+            ...packageJsonSpec,
+            parser: () => new PackageJsonParser({relativeTo})
+        };
     }
+
+    // Yield package-lock.json after package.json (so PackageJsonParser is used as the group parser)
+    if (packageLockSpec) {
+        yield packageLockSpec;
+    }
+
     for (const spec of sourceSpecs) {
-        if (spec.path !== 'package.json') {
+        if (spec.path !== 'package.json' && spec.path !== 'package-lock.json') {
             if (spec.kind === JS.Kind.CompilationUnit) {
                 yield {
                     ...spec,
@@ -61,6 +118,13 @@ export function packageJson(before: string, after?: AfterRecipeText): SourceSpec
     return {
         ...json(before, after),
         path: 'package.json'
+    };
+}
+
+export function packageLockJson(before: string, after?: AfterRecipeText): SourceSpec<Json.Document> {
+    return {
+        ...json(before, after),
+        path: 'package-lock.json'
     };
 }
 

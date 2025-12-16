@@ -1569,8 +1569,19 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
-        if (typeExpr == null && node.declaredUsingVar()) {
-            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", typeMapping.type(vartype), null);
+        if (typeExpr == null) {
+            // `node.declaredUsingVar()` was only added around 11.0.15
+            int nextTokenIdx = indexOfNextNonWhitespace(cursor, source);
+            boolean nextTokenStartsWithVar = source.startsWith("var", nextTokenIdx);
+            if (nextTokenStartsWithVar && Character.isWhitespace(source.charAt(nextTokenIdx + 3))) {
+                int nextNextTokenIdx = indexOfNextNonWhitespace(cursor + 3, source);
+                boolean nextNextTokenIsArrow = source.startsWith("->", nextNextTokenIdx);
+                if (!nextNextTokenIsArrow) {
+                    typeExpr = new J.Identifier(randomId(), sourceBefore("var"),
+                        Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var",
+                        typeMapping.type(vartype), null);
+                }
+            }
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {

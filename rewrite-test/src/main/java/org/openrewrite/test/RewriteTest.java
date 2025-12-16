@@ -316,10 +316,24 @@ public interface RewriteTest extends SourceSpecs {
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
                         if (beforeValidations.parseAndPrintEquality()) {
+                            // EncodingDetectingInputStream strips BOM from expected
+                            String expected = StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx));
+                            String actual = sourceFile.printAll(out.clone());
+
+                            // Strip BOM from actual for comparison, but verify it matches charsetBomMarked flag
+                            boolean actualHasBom = actual.startsWith("\uFEFF");
+                            if (actualHasBom) {
+                                actual = actual.substring(1);
+                            }
+                            if (sourceFile.isCharsetBomMarked() && !actualHasBom) {
+                                fail("Source file was parsed with a BOM (charsetBomMarked=true) but printing did not restore it.");
+                            } else if (!sourceFile.isCharsetBomMarked() && actualHasBom) {
+                                fail("Source file was parsed without a BOM (charsetBomMarked=false) but printing added one.");
+                            }
                             assertContentEquals(
                                     sourceFile,
-                                    StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx)),
-                                    sourceFile.printAll(out.clone()),
+                                    expected,
+                                    actual,
                                     "When parsing and printing the source code back to text without modifications, " +
                                     "the printed source didn't match the original source code. This means there is a bug in the " +
                                     "parser implementation itself. Please open an issue to report this, providing a sample of the " +
@@ -649,8 +663,7 @@ public interface RewriteTest extends SourceSpecs {
             }
             fail("Failed to parse sources or run recipe", t);
         });
-        ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
-        return ctx;
+        return ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
     }
 
     @Override

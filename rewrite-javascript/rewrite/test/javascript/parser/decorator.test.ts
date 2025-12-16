@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
 
 
 describe('class decorator mapping', () => {
@@ -29,10 +30,15 @@ describe('class decorator mapping', () => {
         ));
 
     test('unqualified parens', () =>
-        spec.rewriteRun(
+        spec.rewriteRun({
             //language=typescript
-            typescript('@foo( ) class A {}')
-        ));
+            ...typescript('@foo( ) class A {}'),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const classDecl = cu.statements[0].element as J.ClassDeclaration;
+                const annotation = classDecl.leadingAnnotations[0];
+                expect(annotation.annotationType.kind).toBe(J.Kind.Identifier);
+            }
+        }));
 
     test('qualified', () =>
         spec.rewriteRun(

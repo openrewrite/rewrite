@@ -15,12 +15,15 @@
  */
 package org.openrewrite.maven.search;
 
+import org.assertj.core.api.Condition;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.maven.table.DependenciesInUse;
+import org.openrewrite.maven.table.ExplainDependenciesInUse;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,7 +57,7 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~>--><dependency>
+                  <!--~~(com.google.guava:failureaccess:1.0.1,com.google.guava:guava:29.0-jre,com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava)~~>--><dependency>
                       <groupId>com.google.guava</groupId>
                       <artifactId>guava</artifactId>
                       <version>29.0-jre</version>
@@ -116,7 +119,7 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~(io.prometheus:simpleclient_common:0.9.0)~~>--><dependency>
+                  <!--~~(io.prometheus:simpleclient:0.9.0,io.prometheus:simpleclient_common:0.9.0)~~>--><dependency>
                       <groupId>io.micrometer</groupId>
                       <artifactId>micrometer-registry-prometheus</artifactId>
                       <version>1.6.3</version>
@@ -182,7 +185,7 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~>--><dependency>
+                  <!--~~(org.openrewrite:rewrite-core:8.0.0,org.openrewrite:rewrite-java:8.0.0)~~>--><dependency>
                       <groupId>org.openrewrite</groupId>
                       <artifactId>rewrite-java</artifactId>
                       <version>8.0.0</version>
@@ -239,7 +242,7 @@ class DependencyInsightTest implements RewriteTest {
                   <version>1.0.0</version>
     
                   <dependencies>
-                    <!--~~>--><dependency>
+                    <!--~~(org.springframework:spring-core:6.1.5,org.springframework:spring-jcl:6.1.5)~~>--><dependency>
                       <groupId>org.springframework</groupId>
                       <artifactId>spring-core</artifactId>
                       <version>6.1.5</version>
@@ -292,15 +295,135 @@ class DependencyInsightTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~>--><dependency>
+                  <!--~~(com.google.guava:guava:29.0-jre)~~>--><dependency>
                       <groupId>com.google.guava</groupId>
                       <artifactId>guava</artifactId>
                       <version>29.0-jre</version>
                   </dependency>
-                  <!--~~>--><dependency>
+                  <!--~~(org.projectlombok:lombok:1.18.42)~~>--><dependency>
                       <groupId>org.projectlombok</groupId>
                       <artifactId>lombok</artifactId>
                       <version>1.18.42</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    @Disabled("Test is logically correct, but the MavenResolutionResult's dependency graph is not")
+    void jacksonIsFoundInternally() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("com.fasterxml.jackson.*", "*", null, null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                assertThat(rows).isNotEmpty();
+                assertThat(rows).anyMatch(row ->
+                  "compileClasspath".equals(row.getScope()) &&
+                    "com.fasterxml.jackson.datatype".equals(row.getGroupId()) &&
+                    "jackson-datatype-jsr310".equals(row.getArtifactId()) &&
+                    row.getCount() == 1);
+                assertThat(rows).anyMatch(row ->
+                  "compileClasspath".equals(row.getScope()) &&
+                    "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
+                    "jackson-core".equals(row.getArtifactId()) &&
+                    row.getCount() == 11);
+            })
+            .dataTable(ExplainDependenciesInUse.Row.class, rows -> {
+                assertThat(rows).isNotEmpty();
+                assertThat(rows).haveExactly(1, new Condition<>(row ->
+                  "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
+                    "jackson-core".equals(row.getArtifactId()) &&
+                    "compile".equals(row.getScope()) &&
+                    """
+                      com.fasterxml.jackson.core:jackson-core:2.13.2
+                      +--- com.fasterxml.jackson.core:jackson-databind:2.13.2.2
+                      |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2
+                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6
+                      |    |         \\--- org.springframework.boot:spring-boot-starter-web:2.6.6
+                      |    |              \\--- compile
+                      |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2
+                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                      |    +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2
+                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                      |    +--- io.pivotal.cfenv:java-cfenv:2.5.0
+                      |    |    +--- io.pivotal.cfenv:java-cfenv-boot:2.5.0
+                      |    |    |    \\--- compile
+                      |    |    \\--- io.pivotal.cfenv:java-cfenv-jdbc:2.5.0
+                      |    |         \\--- io.pivotal.cfenv:java-cfenv-boot:2.5.0 (*)
+                      |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                      +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2 (*)
+                      +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2 (*)
+                      +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2 (*)
+                      \\--- io.pivotal.cfenv:java-cfenv:2.5.0 (*)
+                      """.equals(row.getDependencyGraph()), "jackson-core dependency graph"));
+            }),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>2.6.6</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+                  <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-actuator</artifactId>
+                      <version>2.6.4</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.pivotal.cfenv</groupId>
+                    <artifactId>java-cfenv-boot</artifactId>
+                    <version>2.5.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>2.6.6</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <!--~~(com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2)~~>--><dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+                  <!--~~(com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2)~~>--><dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-actuator</artifactId>
+                      <version>2.6.4</version>
+                  </dependency>
+                  <!--~~(com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>--><dependency>
+                    <groupId>io.pivotal.cfenv</groupId>
+                    <artifactId>java-cfenv-boot</artifactId>
+                    <version>2.5.0</version>
                   </dependency>
                 </dependencies>
               </project>

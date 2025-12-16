@@ -22,12 +22,13 @@ import org.openrewrite.*;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collection;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toSet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -57,14 +58,16 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
             description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n" +
                           "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n" +
                           "- `Replace`: remove existing content from file.\n" +
-                          "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n\n" +
+                          "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n" +
+                          "- `Merge`: append only lines from new content that are not already present in the file. " +
+                          "Lines are compared line-by-line after trimming whitespace. Preserves existing line order.\n\n" +
                           "Note: this only affects the first interaction with the specified file per Rewrite execution.\n" +
                           "Subsequent instances of this recipe in the same Rewrite execution will always append.",
-            valid = {"Continue", "Replace", "Leave"},
+            valid = {"Continue", "Replace", "Leave", "Merge"},
             required = false)
     @Nullable Strategy existingFileStrategy;
 
-    public enum Strategy {Continue, Replace, Leave}
+    public enum Strategy {Continue, Replace, Leave, Merge}
 
     @Override
     public String getDisplayName() {
@@ -149,11 +152,54 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
                             return existingPlainText.withText(existingPlainText.getText() + content);
                         case Replace:
                             return existingPlainText.withText(preamble + content);
+                        case Merge:
+                            return mergeContent(existingPlainText, content, maybeNewline);
                     }
                 }
                 return sourceFile;
             }
         });
+    }
+
+    /**
+     * Merges new content with existing content by appending only lines that are not already present.
+     * Lines are compared after trimming whitespace.
+     *
+     * @param existingPlainText The existing file content
+     * @param content           The new content to merge (should already include trailing newline if appendNewline is true)
+     * @param maybeNewline      The newline character to use ("\n" or "")
+     * @return The PlainText with merged content, or unchanged if no new lines to add
+     */
+    private PlainText mergeContent(PlainText existingPlainText, String content, String maybeNewline) {
+        String existingText = existingPlainText.getText();
+
+        // Split existing content into lines and create a set of trimmed lines for comparison
+        Set<String> existingLines = Arrays.stream(existingText.split("\\R"))
+                .map(String::trim)
+                .collect(toSet());
+
+        // Filter new content to only include lines not already present
+        String[] newLines = content.split("\\R");
+        List<String> linesToAdd = new ArrayList<>();
+        for (String line : newLines) {
+            if (!existingLines.contains(line.trim())) {
+                linesToAdd.add(line);
+            }
+        }
+
+        // Only append if there are new lines to add
+        if (linesToAdd.isEmpty()) {
+            return existingPlainText;
+        }
+
+        String mergedContent = String.join(maybeNewline.isEmpty() ? "" : "\n", linesToAdd);
+        if (!maybeNewline.isEmpty() && !existingText.endsWith(maybeNewline)) {
+            mergedContent = maybeNewline + mergedContent;
+        }
+        if (!maybeNewline.isEmpty()) {
+            mergedContent = mergedContent + maybeNewline;
+        }
+        return existingPlainText.withText(existingText + mergedContent);
     }
 
 }

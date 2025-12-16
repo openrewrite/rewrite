@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, Capture, JavaScriptVisitor, pattern, Pattern, template, Template, typescript} from "../../../src/javascript";
-import {J} from "../../../src/java";
+import {capture, Capture, JavaScriptVisitor, Pattern, template, Template, typescript} from "../../../src/javascript";
+import {Expression, J} from "../../../src/java";
 
 describe('Builder API', () => {
     const spec = new RecipeSpec();
@@ -43,13 +43,13 @@ describe('Builder API', () => {
         test('creates template equivalent to template literal', async () => {
             // Using builder - just replace the literal value
             const builderTmpl = Template.builder()
-                .param(42)
+                .code(String(42))
                 .build();
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                     if (literal.valueSource === '1') {
-                        return builderTmpl.apply(this.cursor, literal);
+                        return builderTmpl.apply(literal, this.cursor);
                     }
                     return literal;
                 }
@@ -78,7 +78,7 @@ describe('Builder API', () => {
                 override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                     if (literal.valueSource === '1') {
                         const values = new Map([['value', literal]]);
-                        return tmpl.apply(this.cursor, literal, values);
+                        return tmpl.apply(literal, this.cursor, { values });
                     }
                     return literal;
                 }
@@ -86,7 +86,13 @@ describe('Builder API', () => {
 
             return spec.rewriteRun(
                 typescript('const a = 1',
-                          'const a = function validate(x) { if (typeof x !== "number") throw new Error("Invalid"); return 1; }'),
+                    `
+                      const a = function validate(x) {
+                          if (typeof x !== "number") throw new Error("Invalid");
+                          return 1;
+                      }
+                      `
+                ),
             );
         });
 
@@ -130,7 +136,7 @@ describe('Builder API', () => {
                 return Template.builder()
                     .code('function wrapper() { try { ')
                     .code(innerBody)
-                    .code(' } catch(e) { console.error(e); } }')
+                    .code(' } catch (e) { console.error(e); } }')
                     .build();
             }
 
@@ -141,7 +147,7 @@ describe('Builder API', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                     if (literal.valueSource === '1') {
-                        return tmpl.apply(this.cursor, literal);
+                        return tmpl.apply(literal, this.cursor);
                     }
                     return literal;
                 }
@@ -150,7 +156,14 @@ describe('Builder API', () => {
             return spec.rewriteRun(
                 typescript(
                     'const x = 1',
-                    'const x = function wrapper() { try { return 42; } catch(e) { console.error(e); } }'
+                    `
+                    const x = function wrapper() {
+                        try {
+                            return 42;
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }`
                 )
             );
         });
@@ -177,8 +190,8 @@ describe('Builder API', () => {
         });
 
         test('creates pattern equivalent to pattern literal', async () => {
-            const left = capture('left');
-            const right = capture('right');
+            const left = capture<Expression>('left');
+            const right = capture<Expression>('right');
 
             // Using builder
             const builderPat = Pattern.builder()
@@ -189,9 +202,11 @@ describe('Builder API', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    const match = await builderPat.match(binary);
+                    const match = await builderPat.match(binary, this.cursor);
                     if (match) {
-                        return template`${match.get(right)!} + ${match.get(left)!}`.apply(this.cursor, binary, match);
+                        const leftExpr = match.get(left)!;
+                        const rightExpr = match.get(right)!;
+                        return template`${rightExpr} + ${leftExpr}`.apply(binary, this.cursor, { values: match });
                     }
                     return binary;
                 }
@@ -220,7 +235,7 @@ describe('Builder API', () => {
             // Verify the pattern matches and captures arguments correctly
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    const match = await pat.match(methodInvocation);
+                    const match = await pat.match(methodInvocation, this.cursor);
                     if (match) {
                         // Verify all three captures were matched
                         const arg0 = match.get(captures[0]);
@@ -235,7 +250,7 @@ describe('Builder API', () => {
                         expect(arg2?.value).toBe(3);
 
                         // Swap first and last arguments
-                        return template`myFunction(${arg2!}, ${arg1!}, ${arg0!})`.apply(this.cursor, methodInvocation, match);
+                        return template`myFunction(${arg2!}, ${arg1!}, ${arg0!})`.apply(methodInvocation, this.cursor, { values: match });
                     }
                     return methodInvocation;
                 }
@@ -315,9 +330,9 @@ describe('Builder API', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    const match = await pat.match(binary);
+                    const match = await pat.match(binary, this.cursor);
                     if (match) {
-                        return tmpl.apply(this.cursor, binary, match);
+                        return tmpl.apply(binary, this.cursor, { values: match });
                     }
                     return binary;
                 }
@@ -353,9 +368,9 @@ describe('Builder API', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    const match = await pat.match(invocation);
+                    const match = await pat.match(invocation, this.cursor);
                     if (match) {
-                        return tmpl.apply(this.cursor, invocation, match);
+                        return tmpl.apply(invocation, this.cursor, { values: match });
                     }
                     return invocation;
                 }

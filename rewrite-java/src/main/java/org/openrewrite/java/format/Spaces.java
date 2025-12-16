@@ -53,7 +53,8 @@ public class Spaces extends Recipe {
                     return new SpacesVisitor<>(
                             Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
                             Style.from(EmptyForInitializerPadStyle.class, cu),
-                            Style.from(EmptyForIteratorPadStyle.class, cu))
+                            Style.from(EmptyForIteratorPadStyle.class, cu),
+                            null, false)
                             .visit(cu, ctx);
                 }
                 return super.visit(tree, ctx);
@@ -67,6 +68,8 @@ public class Spaces extends Recipe {
         //noinspection unchecked
         return (J2) new SpacesVisitor<>(style == null ? IntelliJ.spaces() : style,
                 Style.from(EmptyForInitializerPadStyle.class, cu),
-                Style.from(EmptyForIteratorPadStyle.class, cu)).visitNonNull(j, 0, cursor);
+                Style.from(EmptyForIteratorPadStyle.class, cu),
+                null,
+                false).visitNonNull(j, 0, cursor);
     }
 }

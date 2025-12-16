@@ -90,18 +90,22 @@ export class RecipeSpec {
             return groups;
         }, {} as { [kind: string]: SourceSpec<any>[] });
 
+        const allParsed: [SourceSpec<any>, SourceFile][] = [];
         for (const kind in specsByKind) {
             const specs = specsByKind[kind];
             const parsed = await this.parse(specs);
             await this.expectNoParseFailures(parsed);
             await this.expectWhitespaceNotToContainNonwhitespaceCharacters(parsed);
             this.checkParsePrintIdempotence && await this.expectParsePrintIdempotence(parsed);
-            const changeset = (await scheduleRun(this.recipe,
-                parsed.map(([_, sourceFile]) => sourceFile),
-                this.recipeExecutionContext)).changeset;
-            await this.expectResultsToMatchAfter(specs, changeset, parsed);
-            await this.expectGeneratedFiles(specs, changeset);
+            allParsed.push(...parsed);
         }
+
+        const changeset = (await scheduleRun(this.recipe,
+            allParsed.map(([_, sourceFile]) => sourceFile),
+            this.recipeExecutionContext)).changeset;
+
+        await this.expectResultsToMatchAfter(flattenedSpecs, changeset, allParsed);
+        await this.expectGeneratedFiles(flattenedSpecs, changeset);
 
         // for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
         //     assertion(getRows(name, this.recipeExecutionContext));
@@ -175,7 +179,7 @@ export class RecipeSpec {
             (spec.after as (actual: string) => string)(actualAfter) : spec.after as string;
         expect(actualAfter).toEqual(afterSource);
         if (spec.afterRecipe) {
-            await spec.afterRecipe(actualAfter);
+            await spec.afterRecipe(after);
         }
     }
 
@@ -257,7 +261,7 @@ export type AfterRecipeText = string | ((actual: string) => string | undefined) 
  * - `  code\n` → `code` (trailing newline removed)
  * - `  code\n\n` → `code\n` (first trailing newline removed, second preserved)
  */
-function dedent(s: string): string {
+export function dedent(s: string): string {
     if (!s) return s;
 
     // Remove single leading newline for ergonomics
@@ -279,9 +283,14 @@ function dedent(s: string): string {
     const str = start > 0 || end < s.length ? s.slice(start, end) : s;
     const lines = str.split('\n');
 
-    // Find minimum indentation (avoid regex for performance)
+    // Always consider all lines for minIndent calculation
+    // If first line has content at column 0, minIndent will be 0 and no dedenting happens
+    const startLine = 0;
+
+    // Find minimum indentation
     let minIndent = Infinity;
-    for (const line of lines) {
+    for (let i = startLine; i < lines.length; i++) {
+        const line = lines[i];
         let indent = 0;
         for (let j = 0; j < line.length; j++) {
             const ch = line.charCodeAt(j);
@@ -297,10 +306,10 @@ function dedent(s: string): string {
 
     // If all lines are empty or no indentation
     if (minIndent === Infinity || minIndent === 0) {
-        return lines.map(line => line.trim() || '').join('\n');
+        return lines.join('\n');
     }
 
-    // Remove common indentation from each line
+    // Remove common indentation from all lines
     return lines.map(line =>
         line.length >= minIndent ? line.slice(minIndent) : ''
     ).join('\n');
@@ -314,7 +323,7 @@ export function dedentAfter(s?: AfterRecipeText): AfterRecipeText {
         if (typeof s === "function") {
             return (actual: string): string | undefined => {
                 const raw = s(actual);
-                return raw ? dedent(raw) : undefined;
+                return raw;
             };
         }
         return () => dedent(s);

@@ -11,20 +11,45 @@
     "src/**"
   ],
   "exports": {
-    ".": "./dist/index.js",
-    "./text": "./dist/text/index.js",
-    "./json": "./dist/json/index.js",
-    "./java": "./dist/java/index.js",
-    "./javascript": "./dist/javascript/index.js",
-    "./rpc": "./dist/rpc/index.js",
-    "./test": "./dist/test/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./text": {
+      "types": "./dist/text/index.d.ts",
+      "default": "./dist/text/index.js"
+    },
+    "./json": {
+      "types": "./dist/json/index.d.ts",
+      "default": "./dist/json/index.js"
+    },
+    "./java": {
+      "types": "./dist/java/index.d.ts",
+      "default": "./dist/java/index.js"
+    },
+    "./javascript": {
+      "types": "./dist/javascript/index.d.ts",
+      "default": "./dist/javascript/index.js"
+    },
+    "./rpc": {
+      "types": "./dist/rpc/index.d.ts",
+      "default": "./dist/rpc/index.js"
+    },
+    "./test": {
+      "types": "./dist/test/index.d.ts",
+      "default": "./dist/test/index.js"
+    },
+    "./yaml": {
+      "types": "./dist/yaml/index.d.ts",
+      "default": "./dist/yaml/index.js"
+    }
   },
   "scripts": {
     "build": "rm -rf ./dist tsconfig.build.tsbuildinfo && tsc --build tsconfig.build.json",
-    "postbuild": "chmod +x dist/rpc/server.js && npm link",
+    "postbuild": "chmod +x dist/rpc/server.js dist/cli/rewrite.js && npm link",
     "typecheck": "tsc --noEmit",
     "dev": "tsc --watch -p tsconfig.json",
-    "test": "npm run build && NODE_OPTIONS='--max-old-space-size=4096' jest",
+    "test": "npm run typecheck && npm run build && NODE_OPTIONS='--max-old-space-size=4096' jest",
     "build:fixtures": "tsc --build fixtures/tsconfig.json",
     "ci:test": "NODE_OPTIONS='--max-old-space-size=4096' jest",
     "start": "npm run build && node ./dist/rpc/server.js"
@@ -35,21 +60,28 @@
     "commander": "^14.0.0",
     "diff": "^7.0.0",
     "immer": "^10.1.1",
+    "jsonc-parser": "^3.3.1",
     "picomatch": "^4.0.3",
+    "semver": "^7.7.3",
     "tmp-promise": "^3.0.3",
     "typescript": "^5.8.3",
-    "vscode-jsonrpc": "^8.2.1"
+    "vscode-jsonrpc": "^8.2.1",
+    "yaml": "^2.6.1"
   },
   "devDependencies": {
+    "@types/benchmark": "^2.1.5",
     "@types/diff": "^5.2.2",
     "@types/jest": "^29.5.13",
     "@types/picomatch": "^4.0.2",
+    "@types/semver": "^7.7.1",
+    "benchmark": "^2.1.4",
     "jest": "^29.7.0",
     "jest-junit": "^16.0.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2"
   },
   "bin": {
+    "rewrite": "./dist/cli/rewrite.js",
     "rewrite-rpc": "./dist/rpc/server.js"
   }
 }

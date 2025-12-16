@@ -13,9 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for TabsAndIndentsVisitor - handles indentation (tabs vs spaces, indent size, etc.).
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    indentation scenarios into a single test with multiple variations in the source text.
+ *
+ * 2. SCOPE: This file should contain tests specific to TabsAndIndentsVisitor behavior and
+ *    TabsAndIndentsStyle settings. For full formatter integration tests, use format.test.ts.
+ */
+
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {IntelliJ, TabsAndIndentsStyle, typescript} from "../../../src/javascript";
-import {AutoformatVisitor, TabsAndIndentsVisitor} from "../../../src/javascript/format";
+import {IntelliJ, TabsAndIndentsStyle, TabsAndIndentsVisitor, tsx, typescript} from "../../../src/javascript";
 import {Draft, produce} from "immer";
 import {Style} from "../../../src";
 
@@ -342,4 +355,983 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('nested if block inside function should get correct indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                function example() {
+                    if (true) {
+                readFile();
+                    }
+                }
+                `,
+                `
+                function example() {
+                    if (true) {
+                        readFile();
+                    }
+                }
+                `)
+            // @formatter:on
+        )
+    });
+
+    test('class inside arrow function block should get correct indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                describe('test', () => {
+                class TestClass {
+                name: string;
+                }
+                });
+                `,
+                `
+                describe('test', () => {
+                    class TestClass {
+                        name: string;
+                    }
+                });
+                `)
+            // @formatter:on
+        )
+    });
+
+    // TabsAndIndentsVisitor doesn't add newlines - it only normalizes existing indentation
+    // Single-line empty blocks should remain unchanged
+    test('empty arrow function body inside block should remain unchanged (no newlines to normalize)', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function test() {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+}`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('object spread with callback should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `await spec.rewriteRun(
+    npm(
+        repo.path,
+        {
+            ...packageJson(\`{}\`), afterRecipe: async (doc) => {
+                expect(marker).toBeDefined();
+            }
+        }
+    )
+);`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('anonymous class inside afterRecipe callback should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test("test", async () => spec.rewriteRun({
+    ...typescript(\`code\`),
+    afterRecipe: async (cu) => {
+        await new class extends Visitor {
+            protected async visitProperty(prop: Property): Promise<J | undefined> {
+                expect(prop.name).toBe('foo');
+                return prop;
+            }
+        }().visit(cu, undefined);
+    }
+}));`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('closing braces after method call should be indented correctly', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test('name', () => {
+    return spec.rewriteRun(
+        typescript(\`code\`)
+    )
+    });`,
+                `test('name', () => {
+    return spec.rewriteRun(
+        typescript(\`code\`)
+    )
+});`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('nested method calls with arrow function should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `await withDir(async (repo) => {
+    await spec.rewriteRun(
+        npm(
+            repo.path,
+            packageJson('before', 'after')
+        )
+    );
+}, {unsafeCleanup: true});`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('array literal inside method call should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const result = parseRecipeOptions([
+    'text=hello',
+    'verbose',
+    'count=5'
+]);`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('spread operator in object literal should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test("name", async () => spec.rewriteRun({
+    //language=typescript
+    ...typescript('before', 'after'),
+}))`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('spread with afterRecipe callback should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `test("name", async () => spec.rewriteRun({
+    //language=typescript
+    ...typescript('before', 'after'),
+    afterRecipe: async (cu) => {
+        console.log(cu);
+    }
+}))`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('comment before closing paren should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `fn(
+    arg1,
+    arg2
+    // trailing comment
+)`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('inline comment after last argument should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `typescriptWithSpacesRemoved(
+    'const response = await fetch("url");',
+    'const response=await fetch("url");'
+    // @formatter:on
+)`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('arrow function with object literal and spread should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+            `
+                test('plus', () =>
+                    spec.rewriteRun({
+                        //language=typescript
+                        ...typescript(
+                            '1 + 2'
+                        ),
+                        afterRecipe: (cu) => {
+                            const binary = cu.statements[0].element.expression;
+                            expect(binary.type).toBe(Type.Primitive.Double);
+                        }
+                    }));
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('describe with nested test and arrow functions should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `describe('class mapping', () => {
+    const spec = new RecipeSpec();
+
+    test('empty', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('blabla')
+        ));
+});`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('indent initializer when on new line', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                    const x =
+                    function () {
+                        return 136;
+                    };
+                    `,
+                `
+                    const x =
+                        function () {
+                            return 136;
+                        };
+                    `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('TSX', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            tsx(
+                `
+                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
+                    const handleClick = () => {
+                        console.log('clicked');
+                    };
+
+                    return (
+                    <div ref={ref} onClick={handleClick}>
+                    <h1>{props.title}</h1>
+                    <p>{props.content}</p>
+                    </div>
+                    );
+                };
+                `,
+                `
+                const ComplexComponent = function ComplexComponent({ ref, ...props }) {
+                    const handleClick = () => {
+                        console.log('clicked');
+                    };
+
+                    return (
+                        <div ref={ref} onClick={handleClick}>
+                            <h1>{props.title}</h1>
+                            <p>{props.content}</p>
+                        </div>
+                    );
+                };
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('nested ternary should preserve continuation indent', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                const mappedType = isTupleType
+                    ? elementTypes.length > 1
+                        ? 'union'  // Tuples often have union element types
+                        : 'tuple'
+                    : 'array';
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('JSX indentation: text content, nested tags, and closing tags', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            tsx(
+                `
+                function Page() {
+                    return (
+                        <div>
+                        <p>
+                        Text content
+
+                        Second line
+                        </p>
+                        <span>Inline</span>
+                        </div>
+                    );
+                }
+                `,
+                `
+                function Page() {
+                    return (
+                        <div>
+                            <p>
+                                Text content
+
+                                Second line
+                            </p>
+                            <span>Inline</span>
+                        </div>
+                    );
+                }
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('multi-line binary expression in JSX attribute should align all operands', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=tsx
+            tsx(
+                `
+                <img
+                    src={
+                        userData.display_image_url ||
+                        userData.image_url ||
+                        "https://example.com/placeholder.svg"
+                    }
+                />
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('template literal argument should preserve continuation indent', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                const result = db
+                    .from("users")
+                    .select(
+                        \`
+                        id,
+                        name
+                        \`
+                    );
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type literal with multiple properties should all be indented', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                type ComponentFile = {
+                path: string
+                content: string
+                type: string
+                }
+                `,
+                `
+                type ComponentFile = {
+                    path: string
+                    content: string
+                    type: string
+                }
+                `
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type literal with 2-space indent normalizes to 4-space', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`type ComponentFile = {
+  path: string
+  content: string
+  type: string
+}`,
+`type ComponentFile = {
+    path: string
+    content: string
+    type: string
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type literal with inline comments only (no leading comment)', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`type ComponentFile = {
+  path: string // e.g., "magicui/marquee.tsx"
+  content: string // e.g., "import React"
+  type: string // e.g., "registry:ui"
+  target: string // e.g., ""
+}`,
+`type ComponentFile = {
+    path: string // e.g., "magicui/marquee.tsx"
+    content: string // e.g., "import React"
+    type: string // e.g., "registry:ui"
+    target: string // e.g., ""
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type literal with leading comment and inline comments', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`// Represents a file associated with the component
+type ComponentFile = {
+  path: string // e.g., "magicui/marquee.tsx"
+  content: string // e.g., "import React"
+  type: string // e.g., "registry:ui"
+  target: string // e.g., ""
+}`,
+`// Represents a file associated with the component
+type ComponentFile = {
+    path: string // e.g., "magicui/marquee.tsx"
+    content: string // e.g., "import React"
+    type: string // e.g., "registry:ui"
+    target: string // e.g., ""
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('arrow function inside chained .map() should have correct indent', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`configs
+    .map(
+        (config: string) => config
+    );`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('method chain with object literal argument should preserve inner object indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`const planResult = await supabaseWithAdminAccess
+    .from("users_to_plans")
+    .update({
+        status: "inactive",
+        updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('method chain with multiple object literal arguments should preserve inner object indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`await supabaseWithAdminAccess
+    .from("usages")
+    .upsert(
+        {
+            user_id: userId,
+            limit: usageLimit,
+            usage: 0,
+        },
+        { onConflict: "user_id" },
+    )
+    .select()`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('multi-line binary expression in if condition should preserve alignment', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`function test() {
+    if (
+        (lastBundlePurchase?.status === "paid" ||
+            lastBundlePurchase?.status === "pending") &&
+        status === "paid"
+    ) {
+        stripe.refunds.create({
+            payment_intent: paymentIntent.id,
+            reason: "duplicate",
+        })
+        return
+    }
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('arrow function inside .map() inside template literal should preserve indent', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`export async function POST() {
+    try {
+        const prompt = \`text
+\${dependencyConfigs
+    .map(
+        (config: string, index: number) => \`inner\`,
+    )
+    .join("\\n")}
+more\`
+    } catch (e) {}
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('enum members should all have same indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`function test() {
+  enum DateType {
+    RATE_TILL,
+    RATE_FROM,
+    DATE,
+  }
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('object literal in nested callback should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`function test() {
+  if (data && typeof data === "object") {
+    console.log("Details:", {
+      subscription_plan: data.subscription_plan,
+      generation_cost: data.generation_cost,
+    })
+  }
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('object literal in .then() callback should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`supabase
+  .rpc("record_usage", {
+    p_user_id: userId,
+  })
+  .then(({ data, error }) => {
+    if (error) {
+      console.error("Error:", error)
+    } else {
+      console.log("Success:", data)
+      if (data && typeof data === "object") {
+        console.log("Details:", {
+          subscription_plan: data.subscription_plan,
+          generation_cost: data.generation_cost,
+        })
+      }
+    }
+  })`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('object literal in nested function call within method chain should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`crypto
+  .createHash("md5")
+  .update(
+    JSON.stringify({
+      files,
+      dependencies,
+      customTailwindConfig,
+      customGlobalCss,
+    }),
+  )
+  .digest("hex")`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('method chain with arrow function callback should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`const uniqueLikedDemosTransformed = Array.from(
+  uniqueLikedDemosMap.values(),
+)
+  .map(transformDemoResult)
+  .sort((a, b) => {
+    // Then sort
+    // Handle potential null or undefined dates gracefully
+    const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0
+    const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0
+    return dateB - dateA // Descending order
+  })`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('method chain after bare return statement should not inherit return indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`useEffect(() => {
+  if (css) return
+  if (!shellCode) return
+  fetch(url, {
+    method: "POST",
+  })
+    .then((res) => res.json())
+    .catch((error) => {
+      console.error(error)
+    })
+})`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('continuation line after assignment should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+const [componentAccess, setComponentAccess] =
+    useState<ComponentAccessState>("UNDEFINED")
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('object literal in method chain should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+const { error } = await client
+  .from("demos")
+  .update({
+    compiled_css: url,
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", demoId)
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('nested method chain with object literal in callback should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+fetch(url)
+  .then(async (data) => {
+    const { error } = await client
+      .from("demos")
+      .update({
+        compiled_css: url,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", demoId)
+  })
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('binary expression inside parentheses in return should align', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+const generateAnonId = () => {
+    return (
+        Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15)
+    )
+}
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('type cast inside parentheses should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`
+const { data, error } = await (
+    supabaseWithAdminAccess.rpc as any
+)("get_all_author_payouts", {
+    p_period: period,
+})
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('JSX tag inside embedded expression with parentheses should preserve indentation', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=tsx
+            tsx(
+`
+<div>
+  {component.description && (
+    <div
+      style={{
+        display: "flex",
+      }}
+    >
+      {component.description}
+    </div>
+  )}
+</div>
+`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('property with decorator should not get extra indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`class ValidateParsingRecipe {
+    @Option
+    projectRoot: string;
+}`
+            )
+            // @formatter:on
+        )
+    })
+
+    test('ternary with arrow function and method chain should preserve indentation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 2;
+            draft.continuationIndent = 2;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const filteredDependencies = dependencies
+  ? dependencies.map((dep: string) =>
+      dep
+        .split("\\n"),
+    )
+  : [];`
+            )
+            // @formatter:on
+        )
+    })
 });
