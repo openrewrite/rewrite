@@ -38,7 +38,7 @@ class CopyValueTest implements RewriteTest {
     void changeCurrentFileWhenNull() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.destination", null)
+            new CopyValue("$.source", null, "$.destination", null, null)
           ),
           yaml(
             """
@@ -58,7 +58,7 @@ class CopyValueTest implements RewriteTest {
     void changeOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.yml", "$.destination", null)
+            new CopyValue("$.source", "a.yml", "$.destination", null, null)
           ),
           yaml(
             """
@@ -85,7 +85,7 @@ class CopyValueTest implements RewriteTest {
     void copyComplexValue() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.destination", null)
+            new CopyValue("$.source", null, "$.destination", null, null)
           ),
           yaml(
             """
@@ -108,7 +108,7 @@ class CopyValueTest implements RewriteTest {
     void copyToOtherFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.yml", "$.destination", "b.yml")
+            new CopyValue("$.source", "a.yml", "$.destination", "b.yml", null)
           ),
           yaml(
             """
@@ -124,6 +124,31 @@ class CopyValueTest implements RewriteTest {
               destination: value
               """,
             spec -> spec.path("b.yml")
+          )
+        );
+    }
+
+    @Test
+    void createNewKeysFalse() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new CopyValue("$.source", null, "$.destination", null, false)
+          ),
+          yaml(
+            """
+              source:
+                foo: bar
+                key: value
+              destination:
+                foo: baz
+              """,
+            """
+              source:
+                foo: bar
+                key: value
+              destination:
+                foo: bar
+              """
           )
         );
     }
