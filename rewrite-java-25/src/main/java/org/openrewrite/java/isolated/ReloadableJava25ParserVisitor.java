@@ -21,6 +21,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -427,13 +428,18 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
             Map<String, List<J.Annotation>> recordParams = new HashMap<>();
             Space prefix = sourceBefore("(");
-            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
             List<JRightPadded<J.VariableDeclarations>> varDecls = new ArrayList<>();
+            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = ((JCClassDecl) node).sym.getRecordComponents().stream()
+                    .collect(toMap(
+                            Symbol::getSimpleName,
+                            rc -> mapAnnotations(extractRecordComponentAnnotations(rc), new HashMap<>())
+                    ));
+
             for (Tree member : node.getMembers()) {
                 if (member instanceof JCMethodDecl md) {
                     if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
                         for (JCVariableDecl var : md.getParameters()) {
-                            recordAnnotationPosTable.put(var.getName(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
+                            mapAnnotations(var.getModifiers().getAnnotations(), recordAnnotationPosTable.computeIfAbsent(var.getName(), k -> new HashMap<>()));
                         }
                     }
                 }
@@ -571,9 +577,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                     hasFlag(md.getModifiers(), Flags.RECORD))) {
                 continue;
             }
-            if (m instanceof JCVariableDecl vt &&
-                (hasFlag(vt.getModifiers(), Flags.ENUM) ||
-                 hasFlag(vt.getModifiers(), Flags.RECORD))) {
+            if (m instanceof JCVariableDecl vt && (
+                    hasFlag(vt.getModifiers(), Flags.ENUM) ||
+                    hasFlag(vt.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -592,6 +598,14 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
         return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
                 primaryConstructor, extendings, implementings, permitting, body, (JavaType.FullyQualified) typeMapping.type(node));
+    }
+
+    private List<JCAnnotation> extractRecordComponentAnnotations(Symbol.RecordComponent rc) {
+        List<JCAnnotation> annotations = rc.getOriginalAnnos();
+        for (int i = 0; i < rc.getAnnotationMirrors().size(); i++) {
+            annotations.get(i).getAnnotationType().setType((Type) rc.getAnnotationMirrors().get(i).getAnnotationType());
+        }
+        return annotations;
     }
 
     @Override
@@ -934,7 +948,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         if (endPos == Position.NOPOS) {
             if (typeMapping.primitive(((JCLiteral) node).typetag) == JavaType.Primitive.String) {
                 int quote = source.startsWith("\"\"\"", cursor) ? 3 : 1;
-                int elementLength = quote == 3 ? source.indexOf("\"\"\"", cursor + quote) - cursor - quote  : value.toString().length();
+                int elementLength = quote == 3 ? source.indexOf("\"\"\"", cursor + quote) - cursor - quote : value.toString().length();
                 endPos = cursor + quote + elementLength + quote;
             } else {
                 endPos = indexOf(source, cursor,
