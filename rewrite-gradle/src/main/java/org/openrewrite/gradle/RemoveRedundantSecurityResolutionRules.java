@@ -28,7 +28,6 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.marker.GradleBuildscript;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
@@ -37,25 +36,21 @@ import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.LatestIntegration;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.*;
+import static java.util.Collections.singleton;
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -112,69 +107,22 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
             GradleProject gradleProject;
             @Nullable
             UUID currentSourceFileId;
-            final Map<String, List<ResolvedPom>> buildscriptPlatforms = new HashMap<>();
-            final Map<String, List<ResolvedPom>> projectPlatforms = new HashMap<>();
             boolean insideBuildscript;
 
-            private void maybeInitialize(JavaSourceFile sourceFile, ExecutionContext ctx) {
+            private void maybeInitialize(JavaSourceFile sourceFile) {
                 // Reset state when visiting a new source file
                 if (currentSourceFileId != null && currentSourceFileId.equals(sourceFile.getId())) {
                     return;
                 }
                 currentSourceFileId = sourceFile.getId();
-                gradleProject = null;
-                buildscriptPlatforms.clear();
-                projectPlatforms.clear();
-
-                Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-                if (maybeGp.isPresent()) {
-                    gradleProject = maybeGp.get();
-
-                    // Find all platforms and download their POMs to get managed versions (fallback for constraint simulation)
-                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                    new JavaIsoVisitor<ExecutionContext>() {
-                        boolean scannerInBuildscript;
-
-                        @Override
-                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                            boolean wasInBuildscript = scannerInBuildscript;
-                            if (METHOD_BUILDSCRIPT.equals(method.getSimpleName())) {
-                                scannerInBuildscript = true;
-                            }
-
-                            J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
-
-                            // Check if this is a dependency declaration containing platforms
-                            GradleMultiDependency multiDep = GradleMultiDependency.matcher().get(getCursor()).orElse(null);
-                            if (multiDep != null) {
-                                boolean inBuildscript = scannerInBuildscript;
-                                multiDep.forEach(gradleDependency -> {
-                                    if (gradleDependency.isPlatform()) {
-                                        try {
-                                            ResolvedPom platformPom = mpd.download(
-                                                            gradleDependency.getGav(), null, null, gradleProject.getMavenRepositories())
-                                                    .resolve(emptyList(), mpd, executionContext);
-                                            Map<String, List<ResolvedPom>> targetMap = inBuildscript ? buildscriptPlatforms : projectPlatforms;
-                                            targetMap.computeIfAbsent(gradleDependency.getConfigurationName(), k -> new ArrayList<>())
-                                                    .add(platformPom);
-                                        } catch (MavenDownloadingException ignored) {
-                                        }
-                                    }
-                                });
-                            }
-
-                            scannerInBuildscript = wasInBuildscript;
-                            return m;
-                        }
-                    }.visit(sourceFile, ctx, getCursor());
-                }
+                gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class).orElse(null);
             }
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 if (sourceFile != null) {
-                    maybeInitialize(sourceFile, ctx);
+                    maybeInitialize(sourceFile);
                 }
 
                 // Track when we enter/exit buildscript block
@@ -278,10 +226,11 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 }
 
                 // Use constraint-based simulation: remove the resolution strategy constraint and check the resulting version.
-                // The constraints list only contains resolution strategy rules, not platform/BOM constraints.
-                // After removing the constraint, re-resolution will use versions from platforms, BOMs, or direct dependencies.
+                // Resolution strategy rules are modeled as constraints in the GradleProject marker. After removing the
+                // constraint, re-resolution will use versions from platforms (identified by Category attribute), BOMs,
+                // direct dependencies, or transitive dependencies - accurately reflecting what Gradle would resolve
+                // without the security rule.
                 GroupArtifactVersion gav = ruleInfo.gav;
-                Map<String, List<ResolvedPom>> platforms = inBuildscript ? buildscriptPlatforms : projectPlatforms;
 
                 String resolvedVersion;
                 if (inBuildscript && gradleProject.getBuildscript() != null) {
@@ -294,11 +243,6 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                     resolvedVersion = findResolvedVersion(simulatedProject, gav.getGroupId(), gav.getArtifactId());
                 }
 
-                // Fallback: if constraint-based simulation didn't find a version, check platform managed versions
-                if (resolvedVersion == null) {
-                    resolvedVersion = findManagedVersion(gav.getGroupId(), gav.getArtifactId(), platforms);
-                }
-
                 if (resolvedVersion == null) {
                     return false;
                 }
@@ -306,19 +250,6 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
                 // Remove if resolved version (without security constraint) >= pinned version
                 int comparison = new LatestIntegration(null).compare(null, resolvedVersion, gav.getVersion());
                 return comparison >= 0;
-            }
-
-            private @Nullable String findManagedVersion(String groupId, String artifactId, Map<String, List<ResolvedPom>> platforms) {
-                // Look through all platforms for a managed version
-                for (List<ResolvedPom> platformList : platforms.values()) {
-                    for (ResolvedPom platform : platformList) {
-                        String managedVersion = platform.getManagedVersion(groupId, artifactId, null, null);
-                        if (managedVersion != null) {
-                            return managedVersion;
-                        }
-                    }
-                }
-                return null;
             }
 
             /**
