@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 import {createDraft, finishDraft} from "immer";
-import {ExecutionContext, Option, Recipe, TreeVisitor} from "@openrewrite/rewrite";
+import {emptyMarkers, ExecutionContext, Option, randomId, Recipe, TreeVisitor} from "@openrewrite/rewrite";
 import {JavaScriptVisitor} from "@openrewrite/rewrite/javascript";
-import {J, Type} from "@openrewrite/rewrite/java";
-import {emptyMarkers, randomId} from "@openrewrite/rewrite";
-import {singleSpace} from "@openrewrite/rewrite/java";
+import {J, singleSpace, Type} from "@openrewrite/rewrite/java";
 
 export class ReplaceAssignment extends Recipe {
     name = "org.openrewrite.example.javascript.replace-assignment"
@@ -44,21 +42,19 @@ export class ReplaceAssignment extends Recipe {
                     return super.visitVariable(variable, c);
                 }
                 let draft = createDraft(variable);
-                const theLiteral: J.Literal = {
-                    kind: J.Kind.Literal,
-                    id: randomId(),
-                    prefix: singleSpace,
-                    markers: emptyMarkers,
-                    valueSource: envVarValue,
-                    type: Type.Primitive.String,
-                };
-                const leftPaddedLiteral: J.LeftPadded<J.Literal> = {
+                draft.initializer = {
                     kind: J.Kind.LeftPadded,
                     markers: emptyMarkers,
-                    element: theLiteral,
+                    element: {
+                        kind: J.Kind.Literal,
+                        id: randomId(),
+                        prefix: singleSpace,
+                        markers: emptyMarkers,
+                        valueSource: envVarValue,
+                        type: Type.Primitive.String,
+                    },
                     before: singleSpace,
-                }
-                draft.initializer = createDraft(leftPaddedLiteral);
+                };
                 return finishDraft(draft);
             }
         }
