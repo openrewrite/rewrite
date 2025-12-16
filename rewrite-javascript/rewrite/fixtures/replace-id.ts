@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 import {createDraft, finishDraft} from "immer";
-import {ExecutionContext, Markers, randomId, Recipe, TreeVisitor} from "../src";
-import {JavaScriptVisitor} from "../src/javascript";
-import {J} from "../src/java";
+import {ExecutionContext, Markers, randomId, Recipe, TreeVisitor} from "@openrewrite/rewrite";
+import {JavaScriptVisitor} from "@openrewrite/rewrite/javascript";
+import {J} from "@openrewrite/rewrite/java";
 
 export class ReplaceId extends Recipe {
     name = "org.openrewrite.example.javascript.replace-id"
