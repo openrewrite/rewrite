@@ -1911,6 +1911,8 @@ export class JavaScriptParserVisitor {
 
     private convertPropertyAssignments(nodes: ts.Node[]): J.Block {
         const prefix = this.prefix(nodes[0]);
+        // Capture end whitespace before processing statements to prevent shorthand properties from consuming it
+        const end = this.prefix(nodes[nodes.length - 1]);
         let statementList = nodes[1] as ts.SyntaxList;
 
         const statements: J.RightPadded<Statement>[] = this.rightPaddedSeparatedList(
@@ -1929,7 +1931,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             static: this.rightPadded(false, emptySpace),
             statements,
-            end: this.prefix(nodes[nodes.length - 1])
+            end
         };
     }
 
