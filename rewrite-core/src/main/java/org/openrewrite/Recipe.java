@@ -15,9 +15,16 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -30,9 +37,12 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -224,6 +234,7 @@ public abstract class Recipe implements Cloneable {
             recipeList1.add(next.getDescriptor());
         }
         recipeList1.trimToSize();
+
         URI recipeSource;
         try {
             recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
@@ -253,7 +264,6 @@ public abstract class Recipe implements Cloneable {
                 value = null;
             }
             Option option = field.getAnnotation(Option.class);
-            //noinspection ConstantValue
             if (option != null) {
                 options.add(new OptionDescriptor(field.getName(),
                         field.getType().getSimpleName(),
@@ -269,7 +279,6 @@ public abstract class Recipe implements Cloneable {
         for (Method method : recipe.getClass().getDeclaredMethods()) {
             if (method.getName().startsWith("get") && method.getParameterCount() == 0) {
                 Option option = method.getAnnotation(Option.class);
-                //noinspection ConstantValue
                 if (option != null) {
                     options.add(new OptionDescriptor(StringUtils.uncapitalize(method.getName().substring(3)),
                             method.getReturnType().getSimpleName(),
@@ -286,7 +295,6 @@ public abstract class Recipe implements Cloneable {
             Constructor<?> c = RecipeIntrospectionUtils.getPrimaryConstructor(getClass());
             for (Parameter parameter : c.getParameters()) {
                 Option option = parameter.getAnnotation(Option.class);
-                //noinspection ConstantValue
                 if (option != null) {
                     options.add(new OptionDescriptor(parameter.getName(),
                             parameter.getType().getSimpleName(),
@@ -308,6 +316,7 @@ public abstract class Recipe implements Cloneable {
 
     private static final List<DataTableDescriptor> GLOBAL_DATA_TABLES = Arrays.asList(
             dataTableDescriptorFromDataTable(new SourcesFileResults(Recipe.noop())),
+            dataTableDescriptorFromDataTable(new SearchResults(Recipe.noop())),
             dataTableDescriptorFromDataTable(new SourcesFileErrors(Recipe.noop())),
             dataTableDescriptorFromDataTable(new RecipeRunStats(Recipe.noop()))
     );
@@ -465,7 +474,7 @@ public abstract class Recipe implements Cloneable {
         List<Field> requiredFields = NullUtils.findNonNullFields(clazz);
         for (Field field : requiredFields) {
             try {
-                validated = validated.and(Validated.required(clazz.getSimpleName() + '.' + field.getName(), field.get(this)));
+                validated = validated.and(Validated.required(clazz.getName() + '.' + field.getName(), field.get(this)));
             } catch (IllegalAccessException e) {
                 validated = Validated.invalid(field.getName(), null, "Unable to access " + clazz.getName() + "." + field.getName(), e);
             }
@@ -510,9 +519,9 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Override
-    public Object clone() {
+    public Recipe clone() {
         try {
-            return super.clone();
+            return (Recipe) super.clone();
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
@@ -529,6 +538,40 @@ public abstract class Recipe implements Cloneable {
     public static Builder builder(@NlsRewrite.DisplayName @Language("markdown") String displayName,
                                   @NlsRewrite.Description @Language("markdown") String description) {
         return new Builder(displayName, description);
+    }
+
+    @Incubating(since = "8.67.0")
+    public Recipe withOptions(@Nullable Map<String, Object> options) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("@c", getName());
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
+                .configure(MapperFeature.PROPAGATE_TRANSIENT_MARKER, true)
+                .build()
+                .registerModule(new ParameterNamesModule())
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        // This is necessary to allow setting options like `FindTags#xPath`, as Jackson otherwise only sees a `xpath`
+        // property, which it derives from the `getXPath()` method generated by Lombok
+        objectMapper.setVisibility(objectMapper.getSerializationConfig().getDefaultVisibilityChecker()
+                .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
+        try {
+            Recipe clone = clone();
+            if (options != null) {
+                m.putAll(options);
+                for (OptionDescriptor optionDescriptor : clone.getDescriptor().getOptions()) {
+                    Object value = options.get(optionDescriptor.getName());
+                    if (value instanceof String) {
+                        Map<String, Object> option = new HashMap<>();
+                        option.put("value", value);
+                        objectMapper.updateValue(optionDescriptor, option);
+                    }
+                }
+            }
+            return objectMapper.updateValue(clone, m);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Incubating(since = "8.31.0")

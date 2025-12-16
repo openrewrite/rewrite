@@ -15,9 +15,7 @@
  */
 package org.openrewrite.gradle.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -29,13 +27,16 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.graph.DependencyGraph;
+import org.openrewrite.maven.graph.DependencyTreeWalker;
 import org.openrewrite.maven.table.DependenciesInUse;
+import org.openrewrite.maven.table.ExplainDependenciesInUse;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
@@ -49,6 +50,7 @@ import static java.util.stream.Collectors.joining;
 @EqualsAndHashCode(callSuper = false)
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
+    transient ExplainDependenciesInUse explainDependenciesInUse = new ExplainDependenciesInUse(this);
 
     private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
     private static final MethodMatcher DEPENDENCY_CLOSURE_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
@@ -93,7 +95,13 @@ public class DependencyInsight extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        Validated<Object> v = super.validate();
+        Validated<Object> v = super.validate()
+                .and(Validated.test(
+                        "coordinates",
+                        "groupIdPattern AND artifactIdPattern must not both be generic wildcards",
+                        this,
+                        r -> !("*".equals(r.groupIdPattern) && "*".equals(artifactIdPattern))
+                ));
         if (version != null) {
             v = v.and(Semver.validate(version, null));
         }
@@ -124,50 +132,45 @@ public class DependencyInsight extends Recipe {
                         .findFirst(JavaSourceSet.class)
                         .map(JavaSourceSet::getName)
                         .orElse("main");
-                // configuration -> dependency which is or transitively depends on search target -> search target
-                Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = new HashMap<>();
-                Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency = new HashMap<>();
-                for (GradleDependencyConfiguration c : gp.getConfigurations()) {
-                    if (!(configuration == null || configuration.isEmpty() || c.getName().equals(configuration))) {
-                        continue;
-                    }
-                    for (ResolvedDependency resolvedDependency : c.getDirectResolved()) {
-                        if (!resolvedDependency.isDirect()) { // for some reason the direct resolved ones are also containing depth ones.
-                            continue;
-                        }
-                        List<ResolvedDependency> nestedMatchingDependencies = resolvedDependency.findDependencies(groupIdPattern, artifactIdPattern);
-                        for (ResolvedDependency dep : nestedMatchingDependencies) {
-                            if (version != null) {
-                                VersionComparator versionComparator = Semver.validate(version, null).getValue();
-                                if (versionComparator == null) {
-                                    sourceFile = Markup.warn(sourceFile, new IllegalArgumentException("Could not construct a valid version comparator from " + version + "."));
-                                } else {
-                                    if (!versionComparator.isValid(null, dep.getVersion())) {
-                                        continue;
-                                    }
-                                }
-                            }
-                            GroupArtifactVersion requestedGav = new GroupArtifactVersion(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion());
-                            GroupArtifactVersion targetGav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
-                            configurationToDirectDependency.computeIfAbsent(c.getName(), EMPTY).add(requestedGav);
-                            directDependencyToTargetDependency.computeIfAbsent(requestedGav, EMPTY).add(targetGav);
-                            dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
-                                    projectName,
-                                    sourceSetName,
-                                    dep.getGroupId(),
-                                    dep.getArtifactId(),
-                                    dep.getVersion(),
-                                    dep.getDatedSnapshotVersion(),
-                                    dep.getRequested().getScope(),
-                                    dep.getDepth()
-                            ));
-                        }
-                    }
-                }
-                if (directDependencyToTargetDependency.isEmpty()) {
+
+                Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByConfiguration = new HashMap<>();
+                DependencyTreeWalker.Matches<String> matches = new DependencyTreeWalker.Matches<>();
+                collectMatchingDependencies(gp, dependencyPathsByConfiguration, matches);
+
+                if (matches.isEmpty()) {
                     return sourceFile;
                 }
+
+                for (Map.Entry<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> configurationEntry : dependencyPathsByConfiguration.entrySet()) {
+                    for (Map.Entry<ResolvedGroupArtifactVersion, DependencyGraph> entry : configurationEntry.getValue().entrySet()) {
+                        ResolvedGroupArtifactVersion gav = entry.getKey();
+                        dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                gav.getGroupId(),
+                                gav.getArtifactId(),
+                                gav.getVersion(),
+                                gav.getDatedSnapshotVersion(),
+                                configurationEntry.getKey(),
+                                entry.getValue().getSize()
+                        ));
+                        explainDependenciesInUse.insertRow(ctx, new ExplainDependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                gav.getGroupId(),
+                                gav.getArtifactId(),
+                                gav.getVersion(),
+                                gav.getDatedSnapshotVersion(),
+                                configurationEntry.getKey(),
+                                entry.getValue().getSize(),
+                                entry.getValue().print()
+                        ));
+                    }
+                }
+
                 // Non-resolvable configurations may contain the requested which has been found to transitively depend on the target
+                Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = matches.byScope();
+                Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency = matches.byDirectDependency();
                 for (GradleDependencyConfiguration c : gp.getConfigurations()) {
                     if (configurationToDirectDependency.containsKey(c.getName())) {
                         continue;
@@ -179,22 +182,51 @@ public class DependencyInsight extends Recipe {
                             matchingGroupArtifact = directDependencyToTargetDependency.keySet().stream().filter(key -> key.asGroupArtifact().equals(gav.asGroupArtifact())).findFirst();
                         }
 
-                        matchingGroupArtifact.ifPresent(version ->
-                                configurationToDirectDependency.computeIfAbsent(c.getName(), EMPTY).add(version));
+                        matchingGroupArtifact.ifPresent(v ->
+                                configurationToDirectDependency.computeIfAbsent(c.getName(), EMPTY).add(v));
                     }
                 }
                 return new MarkIndividualDependency(configurationToDirectDependency, directDependencyToTargetDependency).attachMarkers(sourceFile, ctx);
+            }
+
+            private boolean matchesConfiguration(GradleDependencyConfiguration c) {
+                return configuration == null || configuration.isEmpty() || c.getName().equals(configuration);
+            }
+
+            private void collectMatchingDependencies(
+                    GradleProject gp,
+                    Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByConfiguration,
+                    DependencyTreeWalker.Matches<String> matches
+            ) {
+                VersionComparator versionComparator = version != null ? Semver.validate(version, null).getValue() : null;
+                DependencyMatcher dependencyMatcher = new DependencyMatcher(groupIdPattern, artifactIdPattern, versionComparator);
+
+                for (GradleDependencyConfiguration c : gp.getConfigurations()) {
+                    if (!matchesConfiguration(c)) {
+                        continue;
+                    }
+                    String configName = c.getName();
+                    for (ResolvedDependency resolvedDependency : c.getDirectResolved()) {
+                        if (!resolvedDependency.isDirect()) {
+                            continue;
+                        }
+                        matches.collect(configName, resolvedDependency, dependencyMatcher,
+                                (matched, path) -> {
+                                    dependencyPathsByConfiguration.computeIfAbsent(configName, __ -> new HashMap<>())
+                                            .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(configName, path);
+                                });
+                    }
+                }
             }
         };
     }
 
     @EqualsAndHashCode(callSuper = false)
-    @RequiredArgsConstructor
-    @Data
+    @Value
     private static class MarkIndividualDependency extends JavaIsoVisitor<ExecutionContext> {
-        private final Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency;
-        private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
-        private final Set<GroupArtifactVersion> individuallyMarkedDependencies = new HashSet<>();
+        Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency;
+        Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
+        Set<GroupArtifactVersion> individuallyMarkedDependencies = new HashSet<>();
 
         public Tree attachMarkers(Tree before, ExecutionContext ctx) {
             Tree after = super.visitNonNull(before, ctx);
@@ -223,6 +255,7 @@ public class DependencyInsight extends Recipe {
                         .flatMap(Set::stream)
                         .distinct()
                         .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
+                        .sorted()
                         .collect(joining(","));
                 if (!resultText.isEmpty()) {
                     directDependencyToTargetDependency.clear();
@@ -237,7 +270,6 @@ public class DependencyInsight extends Recipe {
                             .filter(dep -> dep.asGroupArtifact().equals(gav.asGroupArtifact()))
                             .findAny();
                     if (configurationGav.isPresent()) {
-                        configurationToDirectDependency.get(m.getSimpleName());
                         Set<GroupArtifactVersion> mark = directDependencyToTargetDependency.get(configurationGav.get());
                         if (mark == null) {
                             return null;
@@ -245,6 +277,7 @@ public class DependencyInsight extends Recipe {
                         individuallyMarkedDependencies.add(configurationGav.get());
                         String resultText = mark.stream()
                                 .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
+                                .sorted()
                                 .collect(joining(","));
                         if (!resultText.isEmpty()) {
                             return SearchResult.found(m, resultText);

@@ -277,7 +277,8 @@ public class Autodetect extends NamedStyles {
                     continuationIndent,
                     false,
                     new TabsAndIndentsStyle.MethodDeclarationParameters(
-                            multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
+                            multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument),
+                    new TabsAndIndentsStyle.RecordComponents(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
             );
         }
     }
@@ -1097,7 +1098,8 @@ public class Autodetect extends NamedStyles {
                             afterForSemiColon >= 0,
                             afterTypeCast > 0,
                             beforeColonInForEach > 0,
-                            false
+                            false,
+                            true
                     ));
         }
     }
@@ -1331,7 +1333,8 @@ public class Autodetect extends NamedStyles {
         private LineWrapSetting determineWrapping(int wrapsFound, LineWrapSetting defaultSetting) {
             if (wrapsFound > 0) {
                 return WrapAlways;
-            } else if (wrapsFound < 0) {
+            }
+            if (wrapsFound < 0) {
                 return DoNotWrap;
             }
             return defaultSetting;

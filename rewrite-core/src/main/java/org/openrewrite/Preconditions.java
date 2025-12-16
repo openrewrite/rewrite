@@ -19,6 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 public class Preconditions {
@@ -38,24 +39,6 @@ public class Preconditions {
         return check ? v : TreeVisitor.noop();
     }
 
-    @Incubating(since = "8.0.0")
-    @SafeVarargs
-    public static TreeVisitor<?, ExecutionContext> firstAcceptable(TreeVisitor<?, ExecutionContext>... vs) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof SourceFile) {
-                    for (TreeVisitor<?, ExecutionContext> v : vs) {
-                        if (v.isAcceptable((SourceFile) tree, ctx)) {
-                            return v.visit(tree, ctx);
-                        }
-                    }
-                }
-                return tree;
-            }
-        };
-    }
-
     public static TreeVisitor<?, ExecutionContext> not(TreeVisitor<?, ExecutionContext> v) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
@@ -65,7 +48,7 @@ public class Preconditions {
                 if (sourceFile != null && !v.isAcceptable(sourceFile, ctx)) {
                     return SearchResult.found(tree);
                 }
-                Tree t2 = v.visit(tree, ctx);
+                Tree t2 = v.visit(tree, DataTableSuppressingExecutionContextView.view(ctx));
                 return tree == t2 && tree != null ?
                         SearchResult.found(tree) :
                         tree;
@@ -79,12 +62,13 @@ public class Preconditions {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : null;
+                DataTableSuppressingExecutionContextView suppressingCtx = DataTableSuppressingExecutionContextView.view(ctx);
                 for (TreeVisitor<?, ExecutionContext> v : vs) {
                     // calling `isAcceptable()` in case `v` overrides `visit(Tree, P)`
                     if (sourceFile != null && !v.isAcceptable(sourceFile, ctx)) {
                         continue;
                     }
-                    Tree t2 = v.visit(tree, ctx);
+                    Tree t2 = v.visit(tree, suppressingCtx);
                     if (tree != t2) {
                         return t2;
                     }
@@ -100,13 +84,14 @@ public class Preconditions {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : null;
+                DataTableSuppressingExecutionContextView suppressingCtx = DataTableSuppressingExecutionContextView.view(ctx);
                 Tree t2 = tree;
                 for (TreeVisitor<?, ExecutionContext> v : vs) {
                     // calling `isAcceptable()` in case `v` overrides `visit(Tree, P)`
                     if (sourceFile != null && !v.isAcceptable(sourceFile, ctx)) {
                         continue;
                     }
-                    t2 = v.visit(tree, ctx);
+                    t2 = v.visit(tree, suppressingCtx);
                     if (tree == t2) {
                         return tree;
                     }
@@ -160,9 +145,8 @@ public class Preconditions {
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-            // if tree isn't an instanceof of SourceFile, then a precondition visitor may
-            // not be able to do its work because it may assume we are starting from the root level
-            return !(tree instanceof SourceFile) || check.visit(tree, ctx) != tree ?
+            // Preconditions expect to begin evaluating a tree at the root
+            return !(tree instanceof SourceFile) || check.visit(tree, DataTableSuppressingExecutionContextView.view(ctx)) != tree ?
                     v.visit(tree, ctx) :
                     tree;
         }
@@ -171,9 +155,42 @@ public class Preconditions {
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
             // if tree isn't an instanceof of SourceFile, then a precondition visitor may
             // not be able to do its work because it may assume we are starting from the root level
-            return !(tree instanceof SourceFile) || check.visit(tree, ctx, parent) != tree ?
+            return !(tree instanceof SourceFile) || check.visit(tree, DataTableSuppressingExecutionContextView.view(ctx), parent) != tree ?
                     v.visit(tree, ctx, parent) :
                     tree;
+        }
+    }
+
+    /**
+     * An ExecutionContext view that suppresses writes to the DATA_TABLES key.
+     * This is used to prevent precondition visitors from emitting data table rows.
+     */
+    private static class DataTableSuppressingExecutionContextView extends DelegatingExecutionContext {
+        private DataTableSuppressingExecutionContextView(ExecutionContext delegate) {
+            super(delegate);
+        }
+
+        public static DataTableSuppressingExecutionContextView view(ExecutionContext ctx) {
+            if (ctx instanceof DataTableSuppressingExecutionContextView) {
+                return (DataTableSuppressingExecutionContextView) ctx;
+            }
+            return new DataTableSuppressingExecutionContextView(ctx);
+        }
+
+        @Override
+        public void putMessage(String key, @Nullable Object value) {
+            if (!ExecutionContext.DATA_TABLES.equals(key)) {
+                super.putMessage(key, value);
+            }
+        }
+
+        @Override
+        public <V, T> T computeMessage(String key, @Nullable V value, Supplier<T> defaultValue, BiFunction<@Nullable V, ? super T, ? extends T> remappingFunction) {
+            if (ExecutionContext.DATA_TABLES.equals(key)) {
+                // Return the default value without actually computing or storing anything
+                return defaultValue.get();
+            }
+            return super.computeMessage(key, value, defaultValue, remappingFunction);
         }
     }
 }

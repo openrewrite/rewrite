@@ -18,10 +18,18 @@ package org.openrewrite.internal;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 
+import java.util.regex.Pattern;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.internal.StringUtils.*;
 
 class StringUtilsTest {
+
+    @Test
+    void aspectJNameToPatternTest() {
+        assertThat(Pattern.compile(aspectjNameToPattern("java.io..*")).matcher("java.io.File")).matches();
+        assertThat(Pattern.compile(aspectjNameToPattern("@types/lodash..*")).matcher("@types/lodash.LoDashStatic")).matches();
+    }
 
     @Test
     void containsOnlyWhitespaceAndCommentsTest() {
@@ -81,7 +89,7 @@ class StringUtilsTest {
     @Test
     void globMatching() {
         // exact matches
-        assertThat(matchesGlob("test", null)).isFalse();
+        assertThat(matchesGlob("test", null)).isTrue();
         assertThat(matchesGlob("test", "")).isFalse();
         assertThat(matchesGlob("", "")).isTrue();
         assertThat(matchesGlob("test", "test")).isTrue();
@@ -120,17 +128,17 @@ class StringUtilsTest {
     void greatestCommonMargin() {
         assertThat(StringUtils.greatestCommonMargin(
           """
-           \s
-            \s
+             \s
               \s
-          """)).isEqualTo("  ");
+                \s
+            """)).isEqualTo("  ");
 
         assertThat(StringUtils.greatestCommonMargin(
           """
-            \s
-            s\s
-             \s
-          """)).isEqualTo("  ");
+              \s
+              s\s
+               \s
+            """)).isEqualTo("  ");
 
         assertThat(StringUtils.greatestCommonMargin("")).isEqualTo("");
         assertThat(StringUtils.greatestCommonMargin("\n\n")).isEqualTo("");

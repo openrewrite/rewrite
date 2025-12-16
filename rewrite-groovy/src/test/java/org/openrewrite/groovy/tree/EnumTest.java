@@ -199,7 +199,7 @@ class EnumTest implements RewriteTest {
           groovy(
             """
               enum A {
-                  ONE(1, "A"),
+                  ONE(1, "A", ),
                   TWO(2, "B", ")"),
                   THREE(3, $/C/$, 1);
 
@@ -296,4 +296,45 @@ class EnumTest implements RewriteTest {
         );
     }
 
+    @Test
+    void enumWithNamedArguments() {
+        rewriteRun(
+          groovy(
+            """
+              enum Mapped {
+                  SOME_ENUM_CONSTANT0(a: "0"),
+                  SOME_ENUM_CONSTANT1(a: "1"),
+                  SOME_ENUM_CONSTANT2(a: "1", b: "2"),
+                  SOME_ENUM_CONSTANT3(c: "3", d: "4")
+                  
+                  Mapped(Map args) {
+                      // Constructor that accepts a map
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void expressionsInArguments() {
+        rewriteRun(
+          groovy(
+            """
+            enum Status {
+                GOOD(PREFIX + " one. ", PREFIX + " two. ")
+
+                public static final String PREFIX = "{object}"
+                String a
+                String b
+
+                Status(String a, String b) {
+                    this.a = a
+                    this.b = b
+                }
+            }
+            """
+          )
+        );
+    }
 }

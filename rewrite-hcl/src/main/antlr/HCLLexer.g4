@@ -46,7 +46,7 @@ RBRACE                          : '}'
 ASSIGN          : '=';
 
 fragment StringLiteralChar
-    : ~[\n\r%$"]
+    : ~[\n\r%$"\\]
     | EscapeSequence
     ;
 
@@ -108,6 +108,7 @@ PLUS                            : '+';
 AND                             : '&&';
 EQ                              : '==';
 LT                              : '<';
+DOUBLE_COLON                    : '::';
 COLON                           : ':';
 LBRACK                          : '[';
 LPAREN                          : '(';
@@ -143,7 +144,7 @@ TemplateStringLiteral
     ;
 
 TemplateStringLiteralChar
-    : ~[\n\r%$"]
+    : ~[\n\r%$"\\]
     | '$' '$'
     | '$' {_input.LA(1) != '{'}?
     | '%' '%'

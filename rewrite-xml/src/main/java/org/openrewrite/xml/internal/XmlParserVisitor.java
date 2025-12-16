@@ -50,7 +50,14 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private final Charset charset;
     private final boolean charsetBomMarked;
 
+    /**
+     * Track position within the file by character
+     */
     private int cursor = 0;
+    /**
+     * Track parsing position within the file by Unicode code point
+     */
+    private int codePointCursor = 0;
 
     public XmlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
@@ -96,6 +103,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     prefix,
                     Markers.EMPTY,
                     comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length())));
+        } else if (ctx.jspdeclaration() != null) {
+            return visitJspdeclaration(ctx.jspdeclaration());
+        } else if (ctx.jspcomment() != null) {
+            return visitJspcomment(ctx.jspcomment());
         } else {
             return super.visitMisc(ctx);
         }
@@ -109,12 +120,13 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         } else if (ctx.chardata() != null) {
             Xml.CharData charData = convert(ctx.chardata(), (chardata, prefix) ->
                     charData(chardata.getText(), false, prefix));
-            cursor++; // otherwise an off-by-one on cursor positioning for close tags?
+            // Avoid off-by-one on cursor positioning error for closing tags
+            advanceCursor(codePointCursor + 1);
             return charData;
         } else if (ctx.reference() != null) {
             if (ctx.reference().EntityRef() != null) {
                 String prefix = prefix(ctx);
-                cursor = ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
+                advanceCursor(ctx.reference().EntityRef().getSymbol().getStopIndex() + 1);
                 return new Xml.CharData(randomId(),
                         prefix,
                         Markers.EMPTY,
@@ -123,7 +135,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         "");
             } else if (ctx.reference().CharRef() != null) {
                 String prefix = prefix(ctx);
-                cursor = ctx.reference().CharRef().getSymbol().getStopIndex() + 1;
+                advanceCursor(ctx.reference().CharRef().getSymbol().getStopIndex() + 1);
                 return new Xml.CharData(randomId(),
                         prefix,
                         Markers.EMPTY,
@@ -181,7 +193,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.XmlDecl visitXmldecl(XMLParser.XmldeclContext ctx) {
         return convert(ctx, (c, prefix) -> {
-                    cursor = ctx.SPECIAL_OPEN_XML().getSymbol().getStopIndex() + 1;
+                    advanceCursor(ctx.SPECIAL_OPEN_XML().getSymbol().getStopIndex() + 1);
                     String name = convert(ctx.SPECIAL_OPEN_XML(), (n, p) -> n.getText()).substring(2);
                     List<Xml.Attribute> attributes = ctx.attribute().stream()
                             .map(this::visitAttribute)
@@ -228,7 +240,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml visitJspdirective(XMLParser.JspdirectiveContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            cursor = ctx.DIRECTIVE_OPEN().getSymbol().getStopIndex() + 1;
+            advanceCursor(ctx.DIRECTIVE_OPEN().getSymbol().getStopIndex() + 1);
             String beforeType = prefix(ctx.Name());
             String type = convert(ctx.Name(), (n, p) -> n.getText());
             List<Xml.Attribute> attributes = ctx.attribute().stream().map(this::visitAttribute).collect(toList());
@@ -246,6 +258,70 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     }
 
     @Override
+    public Xml visitJspscriptlet(XMLParser.JspscriptletContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String scriptletText = ctx.JSP_SCRIPTLET().getText();
+            // Extract content between <% and %>, preserving all whitespace
+            String content = scriptletText.substring(2, scriptletText.length() - 2);
+
+            return new Xml.JspScriptlet(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspexpression(XMLParser.JspexpressionContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String expressionText = ctx.JSP_EXPRESSION().getText();
+            // Extract content between <%= and %>, preserving all whitespace
+            String content = expressionText.substring(3, expressionText.length() - 2);
+
+            return new Xml.JspExpression(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspdeclaration(XMLParser.JspdeclarationContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String declarationText = ctx.JSP_DECLARATION().getText();
+            // Extract content between <%! and %>, preserving all whitespace
+            String content = declarationText.substring(3, declarationText.length() - 2);
+
+            return new Xml.JspDeclaration(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspcomment(XMLParser.JspcommentContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String commentText = ctx.JSP_COMMENT().getText();
+            // Extract content between <%-- and --%>, preserving all whitespace
+            String content = commentText.substring(4, commentText.length() - 4);
+
+            return new Xml.JspComment(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
     public Xml.Tag visitElement(XMLParser.ElementContext ctx) {
         return convert(ctx, (c, prefix) -> {
                     String name = convert(ctx.Name(0), (n, p) -> n.getText());
@@ -258,10 +334,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
                     if (ctx.SLASH_CLOSE() != null) {
                         beforeTagDelimiterPrefix = prefix(ctx.SLASH_CLOSE());
-                        cursor = ctx.SLASH_CLOSE().getSymbol().getStopIndex() + 1;
+                        advanceCursor(ctx.SLASH_CLOSE().getSymbol().getStopIndex() + 1);
                     } else {
                         beforeTagDelimiterPrefix = prefix(ctx.CLOSE(0));
-                        cursor = ctx.CLOSE(0).getSymbol().getStopIndex() + 1;
+                        advanceCursor(ctx.CLOSE(0).getSymbol().getStopIndex() + 1);
 
                         content = ctx.content().stream()
                                 .map(this::visit)
@@ -269,7 +345,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                                 .collect(toList());
 
                         String closeTagPrefix = prefix(ctx.OPEN(1));
-                        cursor += 2;
+                        advanceCursor(codePointCursor + 2);
 
                         closeTag = new Xml.Tag.Closing(
                                 randomId(),
@@ -278,7 +354,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                                 convert(ctx.Name(1), (n, p) -> n.getText()),
                                 prefix(ctx.CLOSE(1))
                         );
-                        cursor++;
+                        advanceCursor(codePointCursor + 1);
                     }
 
                     return new Xml.Tag(randomId(), prefix, Markers.EMPTY, name, attributes,
@@ -327,7 +403,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             Xml.DocTypeDecl.ExternalSubsets externalSubsets = null;
             if (c.intsubset() != null) {
                 String subsetPrefix = prefix(c.DTD_SUBSET_OPEN());
-                cursor = c.DTD_SUBSET_OPEN().getSymbol().getStopIndex() + 1;
+                advanceCursor(c.DTD_SUBSET_OPEN().getSymbol().getStopIndex() + 1);
 
                 List<Xml.Element> elements = new ArrayList<>();
                 List<ParseTree> children = c.intsubset().children;
@@ -340,7 +416,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     String beforeElementTag = "";
                     if (i == children.size() - 1) {
                         beforeElementTag = prefix(c.DTD_SUBSET_CLOSE());
-                        cursor = c.DTD_SUBSET_CLOSE().getSymbol().getStopIndex() + 1;
+                        advanceCursor(c.DTD_SUBSET_CLOSE().getSymbol().getStopIndex() + 1);
                     }
 
                     elements.add(
@@ -377,12 +453,26 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     private String prefix(Token token) {
         int start = token.getStartIndex();
-        if (start < cursor) {
+        if (start < codePointCursor) {
             return "";
         }
-        String prefix = source.substring(cursor, start);
-        cursor = start;
-        return prefix;
+        int oldCursor = cursor;
+        advanceCursor(start);
+        return source.substring(oldCursor, cursor);
+    }
+
+
+    /**
+     *  Advance both the cursor and the code point cursor
+     */
+    @SuppressWarnings("UnusedReturnValue")
+    private int advanceCursor(int newCodePointIndex) {
+        if (newCodePointIndex <= codePointCursor) {
+            return cursor;
+        }
+        cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
+        codePointCursor = newCodePointIndex;
+        return cursor;
     }
 
     private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, String, T> conversion) {
@@ -392,7 +482,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
         T t = conversion.apply(ctx, prefix(ctx));
         if (ctx.getStop() != null) {
-            cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return t;
@@ -400,11 +490,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     private <T> T convert(TerminalNode node, BiFunction<TerminalNode, String, T> conversion) {
         T t = conversion.apply(node, prefix(node));
-        cursor = node.getSymbol().getStopIndex() + 1;
+        advanceCursor(node.getSymbol().getStopIndex() + 1);
         return t;
     }
 
     private void skip(TerminalNode node) {
-        cursor = node.getSymbol().getStopIndex() + 1;
+        advanceCursor(node.getSymbol().getStopIndex() + 1);
     }
 }

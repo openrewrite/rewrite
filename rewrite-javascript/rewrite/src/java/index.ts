@@ -17,5 +17,7 @@ export * from "./type";
 export * from "./tree";
 export * from "./markers";
 export * from "./visitor";
+export * from "./type-visitor";
+export * from "./formatting-utils";
 
 import "./print";

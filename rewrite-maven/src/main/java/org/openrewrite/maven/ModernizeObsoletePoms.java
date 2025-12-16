@@ -48,7 +48,7 @@ public class ModernizeObsoletePoms extends Recipe {
 
         return Preconditions.check(new FindSourceFiles("**/pom.xml"), new XmlIsoVisitor<ExecutionContext>() {
 
-            @SuppressWarnings({"DataFlowIssue", "ConcatenationWithEmptyString"})
+            @SuppressWarnings({"ConcatenationWithEmptyString"})
             @Override
             public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);

@@ -74,7 +74,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   var cd = classDecl;
                   if (cd.getBody().getStatements().isEmpty()) {
                       cd = JavaTemplate.builder(
-                          //language=groovy
+                          //language=java
                           """
                             /**
                              * comment

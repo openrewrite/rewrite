@@ -26,11 +26,11 @@ import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
-import org.openrewrite.marker.Generated;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.marker.*;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
@@ -41,8 +41,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.newSetFromMap;
-import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.*;
 import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.Recipe.PANIC;
 
@@ -64,6 +63,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     Cursor rootCursor;
     WatchableExecutionContext ctx;
     RecipeRunStats recipeRunStats;
+    SearchResults searchResults;
     SourcesFileResults sourcesFileResults;
     SourcesFileErrors errorsTable;
     BiFunction<LSS, UnaryOperator<@Nullable SourceFile>, LSS> sourceSetEditor;
@@ -152,7 +152,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
                         if (!generated.isEmpty()) {
                             acc.addAll(generated);
-                            generated.forEach(source -> recordSourceFileResult(null, source, recipeStack, ctx));
+                            generated.forEach(source -> recordSourceFileResultAndSearchResults(null, source, recipeStack, ctx));
                             madeChangesInThisCycle.add(recipe);
                         }
                     } catch (Throwable t) {
@@ -214,7 +214,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
                             if (after != source) {
                                 madeChangesInThisCycle.add(recipe);
-                                recordSourceFileResult(source, after, recipeStack, ctx);
+                                recordSourceFileResultAndSearchResults(source, after, recipeStack, ctx);
                                 if (source.getMarkers().findFirst(Generated.class).isPresent()) {
                                     // skip edits made to generated source files so that they don't show up in a diff
                                     // that later fails to apply on a freshly cloned repository
@@ -234,11 +234,11 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         }
                         return after;
                     }, sourceFile);
-        }
+                }
         );
     }
 
-    private void recordSourceFileResult(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
+    private void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
         Recipe recipe = recipeStack.peek();
@@ -250,14 +250,19 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         if (hierarchical) {
             parentName = recipeStack.get(recipeStack.size() - 2).getName();
         }
-        String recipeName = recipe.getName();
         sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
                 beforePath,
                 afterPath,
                 parentName,
-                recipeName,
+                recipe.getName(),
                 effortSeconds,
                 cycle));
+
+        List<SearchResults.Row> searchMarkers = collectSearchResults(before, after, recipe.getInstanceName());
+        for (SearchResults.Row searchResult : searchMarkers) {
+            searchResults.insertRow(ctx, searchResult);
+        }
+
         if (hierarchical) {
             recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
         }
@@ -346,5 +351,46 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
         }
         return false;
+    }
+
+    private List<SearchResults.Row> collectSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, String recipeName) {
+        if (after == null) {
+            return emptyList();
+        }
+        Set<SearchResult> alreadyPresentMarkers;
+        if (before != null) {
+            alreadyPresentMarkers = new TreeVisitor<Tree, Set<SearchResult>>() {
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, Set<SearchResult> ctx) {
+                    if (marker instanceof SearchResult) {
+                        ctx.add((SearchResult) marker);
+                    }
+                    return super.visitMarker(marker, ctx);
+                }
+            }.reduce(before, newSetFromMap(new IdentityHashMap<>()));
+        } else {
+            alreadyPresentMarkers = emptySet();
+        }
+
+        return new TreeVisitor<Tree, List<SearchResults.Row>>() {
+            @Override
+            public <M extends Marker> M visitMarker(Marker marker, List<SearchResults.Row> ctx) {
+                if (marker instanceof SearchResult && !alreadyPresentMarkers.contains(marker)) {
+                    Cursor cursor = getCursor();
+                    if (!(cursor.getValue() instanceof Tree)) {
+                        cursor = cursor.getParentTreeCursor();
+                    }
+                    if (cursor.getValue() instanceof Tree) {
+                        ctx.add(new SearchResults.Row(
+                                (before == null) ? "" : before.getSourcePath().toString(),
+                                after.getSourcePath().toString(),
+                                StringUtils.trimIndent(((Tree) cursor.getValue()).print(getCursor(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED))),
+                                ((SearchResult) marker).getDescription(),
+                                recipeName));
+                    }
+                }
+                return super.visitMarker(marker, ctx);
+            }
+        }.reduce(after, new ArrayList<>());
     }
 }

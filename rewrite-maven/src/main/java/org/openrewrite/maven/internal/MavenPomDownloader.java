@@ -189,7 +189,10 @@ public class MavenPomDownloader {
         Map<String, String> mergedProperties = new HashMap<>();
         for (Pom pom : pomAncestry) {
             for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
-                mergedProperties.putIfAbsent(property.getKey(), property.getValue());
+                mergedProperties.putIfAbsent(
+                        property.getKey(),
+                        // null property values like `<sha1 />` are treated as empty strings to avoid showing in URLs
+                        Objects.toString(property.getValue(), ""));
             }
         }
         return mergedProperties;
@@ -412,7 +415,7 @@ public class MavenPomDownloader {
                 break;
             }
             String href = responseBody.substring(start, end).trim();
-            if (href.endsWith("/")) {
+            if (!href.startsWith("../") && href.endsWith("/")) {
                 //Only look for hrefs that have directories (the directory names are the versions)
                 versions.add(hrefToVersion(href, uri));
             }

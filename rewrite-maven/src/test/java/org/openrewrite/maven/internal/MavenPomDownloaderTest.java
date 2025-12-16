@@ -22,7 +22,6 @@ import okhttp3.tls.HeldCertificate;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -614,6 +613,18 @@ class MavenPomDownloaderTest implements RewriteTest {
             MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
               .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
             assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(List.of("1.0.0", "1.1.0", "2.0.0"));
+        }
+
+        @Test
+        void deriveMetaDataFromHtmlBasedRepository() throws Exception {
+            MavenRepository repository = MavenRepository.builder()
+              .id("html-based")
+              .uri("https://central.sonatype.com/repository/maven-snapshots")
+              .knownToExist(true)
+              .deriveMetadataIfMissing(true)
+              .build();
+            assertThrows(MavenDownloadingException.class, () ->
+              new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
         }
 
         @SuppressWarnings("ConstantConditions")

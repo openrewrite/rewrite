@@ -15,11 +15,53 @@
  */
 package org.openrewrite.java.format;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.config.YamlResourceLoader;
+import org.openrewrite.style.NamedStyles;
 
+import java.io.ByteArrayInputStream;
+import java.net.URI;
+import java.util.Properties;
+
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class AutoFormat extends Recipe {
+
+    @Option(displayName = "Style",
+            description = "See https://docs.openrewrite.org/concepts-and-explanations/styles for a description on styles.",
+            example = "type: specs.openrewrite.org/v1beta/style\n" +
+                    "name: com.yourorg.YesTabsNoStarImports\n" +
+                    "styleConfigs:\n" +
+                    "  - org.openrewrite.java.style.TabsAndIndentsStyle:\n" +
+                    "      useTabCharacter: true",
+            required = false)
+    @Nullable
+    String style;
+
+    @Option(displayName = "Remove custom line breaks",
+            description = "Do you want to remove custom line breaks? (default false)",
+            required = false)
+    @Nullable
+    Boolean removeCustomLineBreaks;
+
+    @JsonCreator
+    public AutoFormat(@Nullable String style, @Nullable Boolean removeCustomLineBreaks) {
+        this.style = style;
+        this.removeCustomLineBreaks = removeCustomLineBreaks;
+    }
+
+    @Deprecated
+    public AutoFormat(@Nullable String style) {
+        this(style, null);
+    }
+
     @Override
     public String getDisplayName() {
         return "Format Java code";
@@ -32,6 +74,16 @@ public class AutoFormat extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AutoFormatVisitor<>(null);
+        return new AutoFormatVisitor<>(null, Boolean.TRUE.equals(removeCustomLineBreaks), computeNamedStyles());
+    }
+
+    private NamedStyles[] computeNamedStyles() {
+        if (style == null) {
+            return new NamedStyles[0];
+        }
+
+        return new YamlResourceLoader(new ByteArrayInputStream(style.getBytes()),
+                URI.create("AutoFormat$style"),
+                new Properties()).listStyles().toArray(new NamedStyles[0]);
     }
 }

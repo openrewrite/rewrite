@@ -18,7 +18,7 @@ import {setAutoFreeze} from "immer";
 // this is required because otherwise `asRef()` won't work for objects created using immer
 setAutoFreeze(false);
 
-const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
+const REFERENCE_KEY = Symbol.for("org.openrewrite.rpc.Reference");
 
 export interface Reference {
     [REFERENCE_KEY]: true;
@@ -44,7 +44,7 @@ export function asRef<T extends {} | undefined>(obj: T): T extends undefined ? u
 }
 
 export function isRef(obj: any): obj is Reference {
-    return obj !== undefined && obj[REFERENCE_KEY] === true;
+    return obj !== undefined && obj !== null && obj[REFERENCE_KEY] === true;
 }
 
 export class ReferenceMap {

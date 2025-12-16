@@ -132,8 +132,7 @@ public interface K extends J {
         @Transient
         @Override
         public long getWeight(Predicate<Object> uniqueIdentity) {
-            AtomicInteger n = new AtomicInteger();
-            new KotlinVisitor<AtomicInteger>() {
+            return new KotlinVisitor<AtomicInteger>() {
                 final JavaTypeVisitor<AtomicInteger> typeVisitor = new JavaTypeVisitor<AtomicInteger>() {
                     @Override
                     public JavaType visit(@Nullable JavaType javaType, AtomicInteger n) {
@@ -166,8 +165,7 @@ public interface K extends J {
                     }
                     return markers;
                 }
-            }.visit(this, n);
-            return n.get();
+            }.reduce(this, new AtomicInteger()).get();
         }
 
         @Override

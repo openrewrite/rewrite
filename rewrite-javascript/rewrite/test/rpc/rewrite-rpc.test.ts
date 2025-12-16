@@ -1,4 +1,4 @@
-// noinspection JSUnusedLocalSymbols
+// noinspection JSUnusedLocalSymbols,TypeScriptCheckImport,JSUnusedGlobalSymbols
 
 /*
  * Copyright 2025 the original author or authors.
@@ -16,16 +16,25 @@
  * limitations under the License.
  */
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, RecipeRegistry, rootCursor} from "@openrewrite/rewrite";
-import {RewriteRpc} from "@openrewrite/rewrite/rpc";
-import {PlainText, text} from "@openrewrite/rewrite/text";
-import {json} from "@openrewrite/rewrite/json";
-import {RecipeSpec} from "@openrewrite/rewrite/test";
+import {Cursor, RecipeRegistry, rootCursor} from "../../src";
+import {RewriteRpc} from "../../src/rpc";
+import {PlainText, text} from "../../src/text";
+import {json, Json} from "../../src/json";
+import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
-import {javascript, JS} from "@openrewrite/rewrite/javascript";
-import fs from "node:fs";
+import {
+    findNodeResolutionResult,
+    javascript,
+    JavaScriptVisitor,
+    JS,
+    npm,
+    packageJson,
+    typescript
+} from "../../src/javascript";
+import {J} from "../../src/java";
+import {withDir} from "tmp-promise";
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
@@ -43,9 +52,7 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageWriter(clientToServer)
         );
         client = new RewriteRpc(clientConnection, {
-            batchSize: 1,
-            traceGetObjectOutput: true,
-            traceGetObjectInput: fs.createWriteStream('client.txt')
+            batchSize: 1
         });
 
         const serverConnection = rpc.createMessageConnection(
@@ -53,21 +60,15 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageWriter(serverToClient)
         );
         const registry = new RecipeRegistry();
-        activate(registry);
+        activate(registry as any);
         server = new RewriteRpc(serverConnection, {
-            registry: registry,
-            traceGetObjectOutput: true,
-            traceGetObjectInput: fs.createWriteStream('server.txt')
+            registry: registry
         });
     });
 
     afterEach(() => {
         server.end();
         client.end();
-        fs.unlink('client.txt', () => {
-        });
-        fs.unlink('server.txt', () => {
-        });
     });
 
     test("print", () => spec.rewriteRun(
@@ -80,14 +81,53 @@ describe("Rewrite RPC", () => {
         }
     ));
 
+    test("print subtree", () => spec.rewriteRun(
+        {
+            //language=typescript
+            ...typescript("console.log('hello');"),
+            beforeRecipe: async (cu: JS.CompilationUnit) =>
+                await (new class extends JavaScriptVisitor<any> {
+                    protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+                        //language=typescript
+                        expect(await client.print(method, this.cursor!.parent!))
+                            .toEqual("console.log('hello')");
+                        return method;
+                    }
+                }).visit(cu, 0)
+        }
+    ));
+
     test("parse", async () => {
-        let sourceFile = (await client.parse([{
+        const sourceFile = (await client.parse([{
             text: "console.info('hello',)",
             sourcePath: "hello.js"
-        }]))[0];
+        }], JS.Kind.CompilationUnit))[0];
         expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
         expect(sourceFile.sourcePath).toEqual("hello.js");
         return sourceFile;
+    });
+
+    test("parse package.json with PackageJsonParser", async () => {
+        // Parser type is automatically detected from the file path
+        const sourceFile = (await client.parse([{
+            text: JSON.stringify({
+                name: "test-project",
+                version: "1.0.0",
+                dependencies: {
+                    "lodash": "^4.17.21"
+                }
+            }, null, 2),
+            sourcePath: "package.json"
+        }], Json.Kind.Document))[0];
+        expect(sourceFile.kind).toEqual(Json.Kind.Document);
+        expect(sourceFile.sourcePath).toEqual("package.json");
+        // Check that the NodeResolutionResult marker is attached
+        const marker = findNodeResolutionResult(sourceFile as Json.Document);
+        expect(marker).toBeDefined();
+        expect(marker!.name).toEqual("test-project");
+        expect(marker!.version).toEqual("1.0.0");
+        expect(marker!.dependencies).toHaveLength(1);
+        expect(marker!.dependencies[0].name).toEqual("lodash");
     });
 
     test("getRecipes", async () =>
@@ -175,6 +215,16 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("runScanningRecipeThatEdits", async () => {
+        // This test verifies that the accumulator from the scanning phase
+        // is correctly passed to the editor phase over RPC.
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.scanning-editor");
+        await spec.rewriteRun(
+            text("file1", "file1 (count: 2)"),
+            text("file2", "file2 (count: 2)")
+        );
+    });
+
     test("runRecipeWithPreconditions", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier-with-path", {
             identifier: "hello",
@@ -224,5 +274,45 @@ describe("Rewrite RPC", () => {
         expect(clientC2.value).toEqual({k: 1});
         expect(clientC2.parent!.value).toEqual({k: 0});
         expect(clientC2.parent!.parent!.value).toEqual("root");
+    });
+
+    test("JavaType.Class codecs across RPC boundaries", async () => {
+        await withDir(async repo => {
+            spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.mark-class-types");
+
+            //language=typescript
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(
+                        `
+                            import _ from 'lodash';
+
+                            const result = _.map([1, 2, 3], n => n * 2);
+                        `,
+                        `
+                            import /*~~(_.LoDashStatic)~~>*/_ from 'lodash';
+
+                            const result = /*~~(_.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
+                        `
+                    ),
+                    //language=json
+                    packageJson(
+                        `
+                          {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                              "lodash": "^4.17.21"
+                            },
+                            "devDependencies": {
+                              "@types/lodash": "^4.14.195"
+                            }
+                          }
+                        `
+                    )
+                )
+            );
+        }, {unsafeCleanup: true});
     });
 });

@@ -25,6 +25,8 @@ import org.openrewrite.remote.RemoteResource;
 import org.openrewrite.semver.LatestRelease;
 
 import java.io.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
@@ -32,8 +34,7 @@ import static java.util.Objects.requireNonNull;
 
 public class GradleWrapperScriptLoader {
     @Getter
-    private final NavigableMap<String, Version> allVersions = new TreeMap<>(
-            new LatestRelease(null));
+    private final Map<String, Version> allVersions = new HashMap<>();
 
     public GradleWrapperScriptLoader() {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(requireNonNull(
@@ -42,21 +43,16 @@ public class GradleWrapperScriptLoader {
             String line;
             while ((line = in.readLine()) != null) {
                 String[] row = line.split(",");
-                allVersions.put(row[0], new Version(row[0], row[1], row[2]));
+                Version version = new Version(row[0], row[1], row[2]);
+                allVersions.put(row[0], version);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    /**
-     * When the requested version is unavailable we pick the nearest available.
-     */
-    public Nearest findNearest(@Nullable String requestedVersion) {
-        if (requestedVersion == null) {
-            return new Nearest(null, allVersions.lastEntry().getValue());
-        }
-        return new Nearest(requestedVersion, allVersions.floorEntry(requestedVersion).getValue());
+    public Nearest findNearest(String requestedVersion) {
+        return new Nearest(requestedVersion, allVersions.get(requestedVersion));
     }
 
     @SuppressWarnings("resource")

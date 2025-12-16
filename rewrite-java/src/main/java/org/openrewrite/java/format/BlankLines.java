@@ -18,8 +18,6 @@ package org.openrewrite.java.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.BlankLinesStyle;
-import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
@@ -46,21 +44,14 @@ public class BlankLines extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                BlankLinesStyle style = cu.getStyle(BlankLinesStyle.class);
-                if (style == null) {
-                    style = IntelliJ.blankLines();
-                }
-                return new BlankLinesVisitor<>(style).visit(cu, ctx);
+                return new BlankLinesVisitor<>(cu, null).visit(cu, ctx);
             }
             return (J) tree;
         }
     }
 
     public static <J2 extends J> J2 formatBlankLines(J j, Cursor cursor) {
-        BlankLinesStyle style = cursor.firstEnclosingOrThrow(SourceFile.class)
-                .getStyle(BlankLinesStyle.class);
         //noinspection unchecked
-        return (J2) new BlankLinesVisitor<>(style == null ? IntelliJ.blankLines() : style)
-                .visitNonNull(j, 0, cursor);
+        return (J2) new BlankLinesVisitor<>(cursor.firstEnclosingOrThrow(SourceFile.class), null).visitNonNull(j, 0, cursor);
     }
 }

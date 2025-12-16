@@ -181,19 +181,31 @@ public class FindMissingTypes extends Recipe {
         @Override
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
-            JavaType.Method type = mr.getMethodType();
-            if (type != null) {
-                if (!isWellFormedType(type, seenTypes)) {
+            if (mr.getMethodType() != null) {
+                JavaType.Method methodType = mr.getMethodType();
+                if (!isWellFormedType(methodType, seenTypes)) {
                     mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
-                } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
-                    mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
+                } else if (!methodType.getName().equals(mr.getReference().getSimpleName()) && !methodType.isConstructor()) {
+                    mr = SearchResult.found(mr, "type information has a different method name '" + methodType.getName() + "'");
                 }
-            } else {
+            } else if (mr.getVariableType() != null) {
                 JavaType.Variable variableType = mr.getVariableType();
                 if (!isWellFormedType(variableType, seenTypes)) {
                     mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                 } else if (!variableType.getName().equals(mr.getReference().getSimpleName())) {
                     mr = SearchResult.found(mr, "type information has a different variable name '" + variableType.getName() + "'");
+                }
+            } else if (mr.getType() != null) {
+                JavaType type = mr.getType();
+                if (type instanceof JavaType.Parameterized) {
+                    JavaType.Parameterized parameterizedType = (JavaType.Parameterized) type;
+                    for (JavaType t : parameterizedType.getTypeParameters()) {
+                        if (!isWellFormedType(t, seenTypes)) {
+                            mr = SearchResult.found(mr, "MemberReference Parameterized type is missing or malformed");
+                        }
+                    }
+                } else if (type instanceof JavaType.Unknown) {
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                 }
             }
             return mr;
