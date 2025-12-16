@@ -25,6 +25,7 @@ import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -304,15 +305,17 @@ class VariableDeclarationsTest implements RewriteTest {
     void lambdaParameterVariableDeclarations(String variableDeclaration) {
         rewriteRun(
           java(
-            """
-              import java.util.function.Consumer;
-              
-              class Foo {
-                  void main() {
-                      Consumer<Object> i = %s -> {};
-                  }
-              }
-              """.formatted(variableDeclaration)
+            format(
+              """
+                import java.util.function.Consumer;
+                
+                class Foo {
+                    void main() {
+                        Consumer<Object> i = %s -> {};
+                    }
+                }
+                """,
+              variableDeclaration)
           )
         );
     }
@@ -330,17 +333,18 @@ class VariableDeclarationsTest implements RewriteTest {
     void multiLambdaParametersVariableDeclarations(String variableDeclarations) {
         rewriteRun(
           java(
-            """
-              import java.util.function.BiFunction;
-              
-              class Foo {
-                  void main() {
-                      BiFunction<Object, Object, Object> f = (%s) -> null;
-                  }
-              }
-              """.formatted(variableDeclarations)
+            format(
+              """
+                import java.util.function.BiFunction;
+                
+                class Foo {
+                    void main() {
+                        BiFunction<Object, Object, Object> f = (%s) -> null;
+                    }
+                }
+                """,
+              variableDeclarations)
           )
         );
     }
-
 }
