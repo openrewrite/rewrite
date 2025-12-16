@@ -150,6 +150,7 @@ describe('SpacesVisitor', () => {
 
     test('objectLiteralTypeBraces: true (TypeScript default)', () => {
         spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralBraces = true;
             draft.within.objectLiteralTypeBraces = true;
         })));
         return spec.rewriteRun(
@@ -158,7 +159,7 @@ describe('SpacesVisitor', () => {
             typescript(`
             type Values = {[key: string]: string}
             function foo(x:{name:string}): void {}
-            const bar: {html:string} = { html: "" };
+            const bar: {html:string} = {html: ""};
             `,
                 `
             type Values = { [key: string]: string }
@@ -295,6 +296,48 @@ describe('SpacesVisitor', () => {
             //language=typescript
             typescript(
                 `import Space = J.Space;`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('objectLiteralBraces: true - adds spaces inside braces', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralBraces = true;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = {foo: 1};
+const b = {foo: 1, bar: 2};
+const c = {shorthand};
+const d = {x, y, z};`,
+                `const a = { foo: 1 };
+const b = { foo: 1, bar: 2 };
+const c = { shorthand };
+const d = { x, y, z };`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('objectLiteralBraces: false - removes spaces inside braces', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralBraces = false;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = { foo: 1 };
+const b = { foo: 1, bar: 2 };
+const c = { shorthand };
+const d = { x, y, z };`,
+                `const a = {foo: 1};
+const b = {foo: 1, bar: 2};
+const c = {shorthand};
+const d = {x, y, z};`
             )
             // @formatter:on
         )

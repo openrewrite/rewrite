@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Autodetect, StyleKind, TabsAndIndentsStyle, SpacesStyle, JavaScriptParser} from "../../src/javascript";
+import {Autodetect, StyleKind, TabsAndIndentsStyle, SpacesStyle, WrappingAndBracesStyle, JavaScriptParser} from "../../src/javascript";
 import {dedent} from "../../src/test";
 
 describe('Autodetect', () => {
@@ -153,6 +153,85 @@ describe('Autodetect', () => {
 
             expect(spacesStyle).toBeDefined();
             expect(spacesStyle!.within.es6ImportExportBraces).toBe(false);
+        });
+    });
+
+    describe('WrappingAndBracesStyle', () => {
+        test('detects simple blocks on one line', async () => {
+            const autodetect = await parseAndDetect(`
+                if (true) {}
+                while (true) {}
+                for (let i = 0; i < 10; i++) {}
+                `);
+            const styles = autodetect.styles;
+            const wrappingStyle = styles.find(s => s.kind === StyleKind.WrappingAndBracesStyle) as WrappingAndBracesStyle | undefined;
+
+            expect(wrappingStyle).toBeDefined();
+            expect(wrappingStyle!.keepWhenReformatting.simpleBlocksInOneLine).toBe(true);
+        });
+
+        test('detects simple blocks on multiple lines', async () => {
+            const autodetect = await parseAndDetect(`
+                if (true) {
+                }
+                while (true) {
+                }
+                for (let i = 0; i < 10; i++) {
+                }
+                `);
+            const styles = autodetect.styles;
+            const wrappingStyle = styles.find(s => s.kind === StyleKind.WrappingAndBracesStyle) as WrappingAndBracesStyle | undefined;
+
+            expect(wrappingStyle).toBeDefined();
+            expect(wrappingStyle!.keepWhenReformatting.simpleBlocksInOneLine).toBe(false);
+        });
+
+        test('detects simple methods on one line', async () => {
+            const autodetect = await parseAndDetect(`
+                function foo() {}
+                const bar = () => {};
+                class A {
+                    method() {}
+                }
+                `);
+            const styles = autodetect.styles;
+            const wrappingStyle = styles.find(s => s.kind === StyleKind.WrappingAndBracesStyle) as WrappingAndBracesStyle | undefined;
+
+            expect(wrappingStyle).toBeDefined();
+            expect(wrappingStyle!.keepWhenReformatting.simpleMethodsInOneLine).toBe(true);
+        });
+
+        test('detects simple methods on multiple lines', async () => {
+            const autodetect = await parseAndDetect(`
+                function foo() {
+                }
+                const bar = () => {
+                };
+                class A {
+                    method() {
+                    }
+                }
+                `);
+            const styles = autodetect.styles;
+            const wrappingStyle = styles.find(s => s.kind === StyleKind.WrappingAndBracesStyle) as WrappingAndBracesStyle | undefined;
+
+            expect(wrappingStyle).toBeDefined();
+            expect(wrappingStyle!.keepWhenReformatting.simpleMethodsInOneLine).toBe(false);
+        });
+
+        test('majority wins for mixed simple block styles', async () => {
+            const autodetect = await parseAndDetect(`
+                if (a) {}
+                if (b) {}
+                if (c) {}
+                if (d) {
+                }
+                `);
+            const styles = autodetect.styles;
+            const wrappingStyle = styles.find(s => s.kind === StyleKind.WrappingAndBracesStyle) as WrappingAndBracesStyle | undefined;
+
+            expect(wrappingStyle).toBeDefined();
+            expect(wrappingStyle!.keepWhenReformatting.simpleBlocksInOneLine).toBe(true);
         });
     });
 

@@ -149,18 +149,26 @@ export namespace SpacesStyle {
 
 export const WrappingAndBracesStyleDetailKind = {
     WrappingAndBracesStyleIfStatement: "org.openrewrite.java.style.WrappingAndBracesStyle$IfStatement",
+    WrappingAndBracesStyleKeepWhenReformatting: "org.openrewrite.javascript.style.WrappingAndBracesStyle$KeepWhenReformatting",
 } as const;
 
 export interface WrappingAndBracesStyle extends Style {
     // TODO add more flags; this is what we have in Java, but IntelliJ has way more settings
     readonly kind: typeof StyleKind.WrappingAndBracesStyle;
     readonly ifStatement: WrappingAndBracesStyle.IfStatement;
+    readonly keepWhenReformatting: WrappingAndBracesStyle.KeepWhenReformatting;
 }
 
 export namespace WrappingAndBracesStyle {
     export interface IfStatement {
         readonly kind: typeof WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement;
         readonly elseOnNewLine: boolean;
+    }
+
+    export interface KeepWhenReformatting {
+        readonly kind: typeof WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleKeepWhenReformatting;
+        readonly simpleBlocksInOneLine: boolean;
+        readonly simpleMethodsInOneLine: boolean;
     }
 }
 
@@ -308,6 +316,11 @@ export namespace IntelliJ {
                 ifStatement: {
                     kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement,
                     elseOnNewLine: false
+                },
+                keepWhenReformatting: {
+                    kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleKeepWhenReformatting,
+                    simpleBlocksInOneLine: false,
+                    simpleMethodsInOneLine: false
                 }
             };
         }
@@ -452,6 +465,11 @@ export namespace IntelliJ {
                 ifStatement: {
                     kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement,
                     elseOnNewLine: false
+                },
+                keepWhenReformatting: {
+                    kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleKeepWhenReformatting,
+                    simpleBlocksInOneLine: false,
+                    simpleMethodsInOneLine: false
                 }
             };
         }

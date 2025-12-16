@@ -61,6 +61,7 @@ export class Autodetect implements NamedStyles {
 export class Detector {
     private readonly tabsAndIndentsStats = new TabsAndIndentsStatistics();
     private readonly spacesStats = new SpacesStatistics();
+    private readonly wrappingAndBracesStats = new WrappingAndBracesStatistics();
 
     /**
      * Sample a source file to collect formatting statistics.
@@ -77,6 +78,7 @@ export class Detector {
     async sampleJavaScript(cu: JS.CompilationUnit): Promise<void> {
         await new FindIndentVisitor(this.tabsAndIndentsStats).visit(cu, {});
         await new FindSpacesVisitor(this.spacesStats).visit(cu, {});
+        await new FindWrappingAndBracesVisitor(this.wrappingAndBracesStats).visit(cu, {});
     }
 
     /**
@@ -99,13 +101,7 @@ export class Detector {
     }
 
     getWrappingAndBracesStyle(): WrappingAndBracesStyle {
-        return {
-            kind: StyleKind.WrappingAndBracesStyle,
-            ifStatement: {
-                kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement,
-                elseOnNewLine: false
-            }
-        };
+        return this.wrappingAndBracesStats.getWrappingAndBracesStyle();
     }
 }
 
@@ -181,12 +177,20 @@ class TabsAndIndentsStatistics {
 }
 
 /**
- * Tracks spacing patterns around ES6 import/export braces.
+ * Tracks spacing patterns around braces and other constructs.
  */
 class SpacesStatistics {
     // Track spaces within ES6 import/export braces: { a } vs {a}
     es6ImportExportBracesWithSpace = 0;
     es6ImportExportBracesWithoutSpace = 0;
+
+    // Track spaces within object literal braces: { foo: 1 } vs {foo: 1}
+    objectLiteralBracesWithSpace = 0;
+    objectLiteralBracesWithoutSpace = 0;
+
+    // Track spaces within object literal type braces: { foo: string } vs {foo: string}
+    objectLiteralTypeBracesWithSpace = 0;
+    objectLiteralTypeBracesWithoutSpace = 0;
 
     getSpacesStyle(): SpacesStyle {
         // Use TypeScript defaults as base since most modern JS/TS projects use similar conventions
@@ -197,7 +201,53 @@ class SpacesStatistics {
             ...defaults,
             within: {
                 ...defaults.within,
-                es6ImportExportBraces: this.es6ImportExportBracesWithSpace > this.es6ImportExportBracesWithoutSpace
+                es6ImportExportBraces: this.es6ImportExportBracesWithSpace > this.es6ImportExportBracesWithoutSpace,
+                objectLiteralBraces: this.objectLiteralBracesWithSpace > this.objectLiteralBracesWithoutSpace,
+                objectLiteralTypeBraces: this.objectLiteralTypeBracesWithSpace > this.objectLiteralTypeBracesWithoutSpace
+            }
+        };
+    }
+}
+
+/**
+ * Tracks wrapping and braces patterns for simple (empty) blocks and methods.
+ */
+class WrappingAndBracesStatistics {
+    // Track simple blocks (not method/function bodies): {} vs {\n}
+    simpleBlocksOnOneLine = 0;
+    simpleBlocksOnMultipleLines = 0;
+
+    // Track simple method/function bodies: {} vs {\n}
+    simpleMethodsOnOneLine = 0;
+    simpleMethodsOnMultipleLines = 0;
+
+    recordSimpleBlock(isOnOneLine: boolean): void {
+        if (isOnOneLine) {
+            this.simpleBlocksOnOneLine++;
+        } else {
+            this.simpleBlocksOnMultipleLines++;
+        }
+    }
+
+    recordSimpleMethod(isOnOneLine: boolean): void {
+        if (isOnOneLine) {
+            this.simpleMethodsOnOneLine++;
+        } else {
+            this.simpleMethodsOnMultipleLines++;
+        }
+    }
+
+    getWrappingAndBracesStyle(): WrappingAndBracesStyle {
+        return {
+            kind: StyleKind.WrappingAndBracesStyle,
+            ifStatement: {
+                kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement,
+                elseOnNewLine: false
+            },
+            keepWhenReformatting: {
+                kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleKeepWhenReformatting,
+                simpleBlocksInOneLine: this.simpleBlocksOnOneLine > this.simpleBlocksOnMultipleLines,
+                simpleMethodsInOneLine: this.simpleMethodsOnOneLine > this.simpleMethodsOnMultipleLines
             }
         };
     }
@@ -298,5 +348,98 @@ class FindSpacesVisitor extends JavaScriptVisitor<any> {
             }
         }
         return super.visitExportDeclaration(export_, p);
+    }
+
+    protected async visitNewClass(newClass: J.NewClass, p: any): Promise<J | undefined> {
+        // Only handle object literals (NewClass with no class/constructor)
+        if (!newClass.class && newClass.body && newClass.body.statements.length > 0) {
+            const stmts = newClass.body.statements;
+
+            // Check if single-line (no newlines in any element prefix or in end)
+            const isMultiLine = stmts.some(s => s.element.prefix?.whitespace?.includes('\n')) ||
+                newClass.body.end?.whitespace?.includes('\n');
+
+            if (!isMultiLine) {
+                const firstElement = stmts[0];
+                const hasSpaceAfterOpenBrace = firstElement.element.prefix?.whitespace?.includes(' ') ?? false;
+
+                // For object literals, the space before } is in body.end, not in last statement's after
+                const hasSpaceBeforeCloseBrace = newClass.body.end?.whitespace?.includes(' ') ?? false;
+
+                if (hasSpaceAfterOpenBrace || hasSpaceBeforeCloseBrace) {
+                    this.stats.objectLiteralBracesWithSpace++;
+                } else {
+                    this.stats.objectLiteralBracesWithoutSpace++;
+                }
+            }
+        }
+        return super.visitNewClass(newClass, p);
+    }
+
+    protected async visitTypeLiteral(typeLiteral: JS.TypeLiteral, p: any): Promise<J | undefined> {
+        // Check type literal braces spacing: { foo: string } vs {foo: string}
+        if (typeLiteral.members && typeLiteral.members.statements.length > 0) {
+            const stmts = typeLiteral.members.statements;
+
+            // Check if single-line (no newlines in any element prefix or in end)
+            const isMultiLine = stmts.some(s => s.element.prefix?.whitespace?.includes('\n')) ||
+                typeLiteral.members.end?.whitespace?.includes('\n');
+
+            if (!isMultiLine) {
+                const firstElement = stmts[0];
+                const hasSpaceAfterOpenBrace = firstElement.element.prefix?.whitespace?.includes(' ') ?? false;
+
+                // For type literals, the space before } is in members.end, not in last statement's after
+                const hasSpaceBeforeCloseBrace = typeLiteral.members.end?.whitespace?.includes(' ') ?? false;
+
+                if (hasSpaceAfterOpenBrace || hasSpaceBeforeCloseBrace) {
+                    this.stats.objectLiteralTypeBracesWithSpace++;
+                } else {
+                    this.stats.objectLiteralTypeBracesWithoutSpace++;
+                }
+            }
+        }
+        return super.visitTypeLiteral(typeLiteral, p);
+    }
+}
+
+/**
+ * Detects wrapping and braces patterns for simple (empty) blocks.
+ */
+class FindWrappingAndBracesVisitor extends JavaScriptVisitor<any> {
+    constructor(private stats: WrappingAndBracesStatistics) {
+        super();
+    }
+
+    protected async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
+        // Check if this is a simple block (empty or contains only J.Empty)
+        const isSimple = block.statements.length === 0 ||
+            (block.statements.length === 1 && block.statements[0].element.kind === J.Kind.Empty);
+
+        if (isSimple) {
+            // Determine if block is on one line by checking for newlines
+            const hasNewlineInEnd = block.end?.whitespace?.includes('\n') ?? false;
+            const hasNewlineInStatements = block.statements.length > 0 &&
+                (block.statements[0].element.prefix?.whitespace?.includes('\n') ||
+                 block.statements[0].after?.whitespace?.includes('\n'));
+
+            const isOnOneLine = !hasNewlineInEnd && !hasNewlineInStatements;
+
+            // Determine parent kind to classify as block or method
+            const parent = this.cursor.parent?.value;
+            const isMethodOrFunctionBody = parent?.kind === J.Kind.Lambda ||
+                parent?.kind === J.Kind.MethodDeclaration;
+
+            if (isMethodOrFunctionBody) {
+                this.stats.recordSimpleMethod(isOnOneLine);
+            } else {
+                // Skip object literals and type literals
+                if (parent?.kind !== J.Kind.NewClass && parent?.kind !== JS.Kind.TypeLiteral) {
+                    this.stats.recordSimpleBlock(isOnOneLine);
+                }
+            }
+        }
+
+        return super.visitBlock(block, p);
     }
 }
