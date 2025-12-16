@@ -110,9 +110,10 @@ public class UnfoldProperties extends Recipe {
                                 if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
                                     newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
                                 } else if (identLevel == 0 && hasLineBreak(newEntry.getPrefix())) {
-                                    // Use the detected indentation from the document, defaulting to 4 if none detected
-                                    int detectedIndent = findIndent.getMostCommonIndent() > 0 ? findIndent.getMostCommonIndent() : 4;
-                                    identLevel = detectedIndent; // autFormat indents the entire block by detected spaces though it is a root level entry -> shift by detected amount later
+                                    // Use the detected indentation from the document, defaulting to 2 if none detected
+                                    int mostCommonIndent = findIndent.getMostCommonIndent();
+                                    // autoFormat indents the entire block by detected spaces though it is a root level entry -> shift by detected amount later
+                                    identLevel = 0 < mostCommonIndent ? mostCommonIndent : 2;
                                 }
                                 doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
                             }
