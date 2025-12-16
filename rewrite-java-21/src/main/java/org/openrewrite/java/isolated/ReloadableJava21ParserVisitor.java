@@ -21,6 +21,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -125,10 +126,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     public J visitAnnotation(AnnotationTree node, Space fmt) {
         skip("@");
         NameTree name = convert(node.getAnnotationType());
-
-        if (name.getType() == JavaType.Unknown.getInstance()) {
-            name = name.withType(typeMapping.type(((JCAnnotation) node).type.tsym.type));
-        }
 
         JContainer<Expression> args = null;
         if (!node.getArguments().isEmpty()) {
@@ -435,7 +432,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = ((JCClassDecl) node).sym.getRecordComponents().stream()
                     .collect(toMap(
                             Symbol::getSimpleName,
-                            rc -> mapAnnotations(rc.declarationFor().getModifiers().getAnnotations(), new HashMap<>())
+                            rc -> mapAnnotations(extractRecordComponentAnnotations(rc), new HashMap<>())
                     ));
 
             for (Tree member : node.getMembers()) {
@@ -601,6 +598,14 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
                 primaryConstructor, extendings, implementings, permitting, body, (JavaType.FullyQualified) typeMapping.type(node));
+    }
+
+    private List<JCAnnotation> extractRecordComponentAnnotations(Symbol.RecordComponent rc) {
+        List<JCAnnotation> annotations = rc.getOriginalAnnos();
+        for (int i = 0; i < rc.getAnnotationMirrors().size(); i++) {
+            annotations.get(i).getAnnotationType().setType((Type) rc.getAnnotationMirrors().get(i).getAnnotationType());
+        }
+        return annotations;
     }
 
     @Override

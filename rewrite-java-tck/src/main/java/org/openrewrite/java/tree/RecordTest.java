@@ -136,14 +136,20 @@ class RecordTest implements RewriteTest {
               
               @Retention(RetentionPolicy.RUNTIME)
               @Target({ElementType.RECORD_COMPONENT})
-              public @interface Select {
+              @interface Select {
                   String value() default "";
               }
               
               public record File(@Select("native") String value) {
               }
               """
-          ),
+          )
+        );
+    }
+
+    @Test
+    void recordWithMultipleAnnotations() {
+        rewriteRun(
           java(
             """
               import java.lang.annotation.ElementType;
@@ -153,13 +159,17 @@ class RecordTest implements RewriteTest {
               
               @Retention(RetentionPolicy.RUNTIME)
               @Target({ElementType.RECORD_COMPONENT})
-              public @interface Select {
+              @interface A {
                   String value() default "";
-                  int number() default 7;
-                  float decimal();
               }
               
-              public record File(@Select(value = "native", decimal = 3.14f) @Deprecated String value) {
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.RECORD_COMPONENT})
+              @interface B {
+                  String value() default "";
+              }
+              
+              public record File(@A("a") @B("b") String value) {
               }
               """
           )
