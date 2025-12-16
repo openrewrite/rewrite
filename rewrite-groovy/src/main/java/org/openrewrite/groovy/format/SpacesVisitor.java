@@ -34,16 +34,16 @@ import java.util.List;
 import java.util.function.Supplier;
 
 public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<P> {
-    public SpacesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
-        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
+    public SpacesVisitor(SourceFile sourceFile, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), removeCustomLineBreaks, stopAfter);
     }
 
-    private SpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), stopAfter);
+    private SpacesVisitor(List<NamedStyles> styles, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), stopAfter, removeCustomLineBreaks);
     }
 
-    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter) {
-        super(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, stopAfter);
+    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
+        super(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, stopAfter, removeCustomLineBreaks);
     }
 
     @Override

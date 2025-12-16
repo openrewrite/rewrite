@@ -5109,7 +5109,7 @@ class SpacesTest implements RewriteTest {
     void handleIfWithoutBlock() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new SpacesVisitor<>(IntelliJ.spaces(), null))),
+            new SpacesVisitor<>(IntelliJ.spaces(), true, null))),
           java(
             """
             class Test {

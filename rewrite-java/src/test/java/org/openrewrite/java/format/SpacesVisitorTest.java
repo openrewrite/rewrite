@@ -31,7 +31,7 @@ class SpacesVisitorTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .parser(JavaParser.fromJavaVersion())
-          .recipe(toRecipe(() -> new SpacesVisitor<>(emptyList(), null)));
+          .recipe(toRecipe(() -> new SpacesVisitor<>(emptyList(),  true, null)));
     }
 
     @DocumentExample

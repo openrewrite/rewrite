@@ -26,8 +26,10 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -40,7 +42,16 @@ class TabsAndIndentsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new TabsAndIndents());
+        spec.recipe(new AutoFormat(null, false))
+          .parser(JavaParser.fromJavaVersion().styles(singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(),
+              List.of(
+                IntelliJ.wrappingAndBraces().withKeepWhenReformatting(IntelliJ.wrappingAndBraces().getKeepWhenReformatting().withSimpleMethodsInOneLine(true)),
+                IntelliJ.blankLines().withMinimum(IntelliJ.blankLines().getMinimum().withAroundMethod(0).withAroundClass(0))
+              )
+            )
+          )));
     }
 
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
@@ -52,6 +63,13 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               class Test {{
+                  if (true == false)
+               doTheThing();
+                  else if (true == false)
+                doTheOtherThing();
+                  else
+                 somethingElseEntirely();
+                  
                   if (true == false)
                   doTheThing();
 
@@ -67,15 +85,23 @@ class TabsAndIndentsTest implements RewriteTest {
               }
               """,
             """
-              class Test {{
-                  if (true == false)
-                      doTheThing();
+              class Test {
+                  {
+                      if (true == false)
+                          doTheThing();
+                      else if (true == false)
+                          doTheOtherThing();
+                      else
+                          somethingElseEntirely();
 
-                  doTheOtherThing();
-                  somethingElseEntirely();
-
-                  foo();
-              }
+                      if (true == false)
+                          doTheThing();
+    
+                      doTheOtherThing();
+                      somethingElseEntirely();
+    
+                      foo();
+                  }
                   public static void doTheThing() {}
                   public static void doTheOtherThing() {}
                   public static void somethingElseEntirely() {}
@@ -1494,8 +1520,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void twoImplements() {
         rewriteRun(
-          java("interface A {}"),
-          java("interface B{}"),
+          java("interface A {}", SourceSpec::skip),
+          java("interface B{}", SourceSpec::skip),
           java(
             """
               class Test implements A,
@@ -2324,7 +2350,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void useContinuationIndentExtendsOnNewLine() {
         rewriteRun(
-          java("package org.a; public class A {}"),
+          java("package org.a; public class A {}", SourceSpec::skip),
           java(
             """
               package org.b;
@@ -2341,7 +2367,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignIdentifierOnNewLine() {
         rewriteRun(
-          java("package org.a; public class A {}"),
+          java("package org.a; public class A {}", SourceSpec::skip),
           java(
             """
               package org.b;

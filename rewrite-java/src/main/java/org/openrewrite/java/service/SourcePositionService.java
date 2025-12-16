@@ -207,7 +207,7 @@ public class SourcePositionService {
         if (cursorValue instanceof J) {
             J j = (J) cursorValue;
             boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
-            Cursor parent = cursor.dropParentUntil(it -> (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded))); // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
+            Cursor parent = cursor.dropParentUntil(it -> (!(it instanceof JRightPadded)));
             while (!(parent.getValue() instanceof Tree) && parent.getParent() != null) {
                 parent = parent.getParent();
             }

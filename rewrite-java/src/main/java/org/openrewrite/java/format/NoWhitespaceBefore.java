@@ -101,7 +101,7 @@ public class NoWhitespaceBefore extends Recipe {
                 }
             }
             if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getComma())) {
-                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null).visitNonNull(m, ctx);
+                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(m, ctx);
             }
             return m;
         }
@@ -110,7 +110,7 @@ public class NoWhitespaceBefore extends Recipe {
         public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
             J.ForLoop f = super.visitForLoop(forLoop, ctx);
             if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getSemi())) {
-                f = (J.ForLoop) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null).visitNonNull(f, ctx);
+                f = (J.ForLoop) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(f, ctx);
             }
             return f;
         }
@@ -136,7 +136,7 @@ public class NoWhitespaceBefore extends Recipe {
                 if (Boolean.FALSE.equals(noWhitespaceBeforeStyle.getAllowLineBreaks()) && u.getPadding().getOperator().getBefore().getWhitespace().contains("\n")) {
                     u = u.getPadding().withOperator(u.getPadding().getOperator().withBefore(u.getPadding().getOperator().getBefore().withWhitespace("")));
                 }
-                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null).visitNonNull(u, ctx);
+                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(u, ctx);
             }
             return u;
         }

@@ -44,7 +44,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public AutoFormatVisitor(@Nullable Tree stopAfter, NamedStyles ... style) {
-        this(stopAfter, false, style);
+        this(stopAfter, true, style);
     }
 
     public AutoFormatVisitor( @Nullable Tree stopAfter, boolean removeCustomLineBreaks, NamedStyles ... style ) {
@@ -70,16 +70,16 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
         J t = new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
         t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
-        t = new SpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new SpacesVisitor<>(activeStyles, removeCustomLineBreaks, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
-//        t = new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
 
         // With the updated tree, overwrite the original space with the newly computed space
-        tree = new MergeSpacesVisitor(removeCustomLineBreaks).visit(tree, t);
+        tree = new MergeSpacesVisitor(activeStyles, removeCustomLineBreaks).visit(tree, t);
 
         if (tree instanceof JavaSourceFile) {
             return addStyleMarker((JavaSourceFile) tree, styles);
@@ -104,7 +104,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
             JavaSourceFile t = (JavaSourceFile) new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p);
             t = (JavaSourceFile) new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p);
-            t = (JavaSourceFile) new SpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
+            t = (JavaSourceFile) new SpacesVisitor<>(activeStyles, true, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
@@ -113,7 +113,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(t, p);
 
             // With the updated tree, overwrite the original space with the newly computed space
-            tree = new MergeSpacesVisitor(removeCustomLineBreaks).visit(tree, t);
+            tree = new MergeSpacesVisitor(activeStyles, removeCustomLineBreaks).visit(tree, t);
 
             if (tree instanceof J.CompilationUnit) {
                 return addStyleMarker((JavaSourceFile) tree, styles);
@@ -122,7 +122,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         return (J) tree;
     }
 
-    @ToBeRemoved(after = "30-11-2025", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
+    @ToBeRemoved(after = "30-01-2025", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
     private static <T extends SourceFile> T addStyleMarker(T t, List<NamedStyles> styles) {
         if (!styles.isEmpty()) {
             Set<NamedStyles> newNamedStyles = new HashSet<>(styles);
