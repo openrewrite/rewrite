@@ -22,6 +22,7 @@ jobs:
   build:
     uses: openrewrite/gh-automation/.github/workflows/ci-gradle-blacksmith.yml@main
     with:
+      runs_on: blacksmith-8vcpu-ubuntu-2404
       java_version: |
         25
         21
