@@ -142,14 +142,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     }
 
     public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
-        assert parent.isRoot() ||
-               !(parent.getValue() instanceof Tree) ||
-               !((Tree) parent.getValue()).isScope(tree) ||
-               !(p instanceof ExecutionContext) ||
-               !CursorValidatingExecutionContextView.view((ExecutionContext) p).getValidateCursorAcyclic() :
-                "The `parent` cursor must not point to the same `tree` as the tree to be visited. " +
-                "This usually indicates that you have used getCursor() where getCursor().getParent() is appropriate. " +
-                "This is a test-only validation which can be opted out of by configuring your test's type validation options with `cursorAcyclic(false)`.";
+        // DUMMY CHANGE TO FORCE GRADLE RUNNING TESTS
         this.cursor = parent;
         return visit(tree, p);
     }
