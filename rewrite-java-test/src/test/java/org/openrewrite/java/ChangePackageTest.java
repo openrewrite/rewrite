@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -1828,6 +1829,53 @@ class ChangePackageTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void inheritedTypes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("com.demo", "com.newdemo", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package com.demo;
+                
+                public class A {
+                
+                }
+                """)
+            ),
+          java(
+            //language=java
+            """
+              package app;
+              
+              import com.demo.A;
+              
+              public class X extends A {
+              
+              }
+              """,
+            """
+              package app;
+              
+              import com.newdemo.A;
+              
+              public class X extends A {
+              
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                for (NameTree nt : FindTypes.find(cu, "app.X")) {
+                    if (!TypeUtils.isAssignableTo("com.newdemo.A", nt.getType())) {
+                        JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(nt.getType());
+                        assertThat(fqt).isNotNull();
+                        fail(String.format("The AST type '%s' does not inherit from 'com.newdemo.A'. Instead its superclass is '%s'", nt.getType(), fqt.getSupertype().getFullyQualifiedName()));
+                    }
+                }
+            })
+          )
+
         );
     }
 
