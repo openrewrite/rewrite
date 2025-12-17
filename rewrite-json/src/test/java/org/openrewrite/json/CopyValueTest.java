@@ -43,8 +43,7 @@ class CopyValueTest implements RewriteTest {
           json(
             """
               {
-                "source": "value",
-                "destination": "original"
+                "source": "value"
               }
               """,
             """
@@ -67,8 +66,7 @@ class CopyValueTest implements RewriteTest {
           json(
             """
               {
-                "source": "value",
-                "destination": "original"
+                "source": "value"
               }
               """,
             """
@@ -102,9 +100,6 @@ class CopyValueTest implements RewriteTest {
               {
                 "source": {
                   "foo": "bar"
-                },
-                "destination": {
-                  "foo": "baz"
                 }
               }
               """,
@@ -170,8 +165,7 @@ class CopyValueTest implements RewriteTest {
                     "name": "second",
                     "value": 2
                   }
-                ],
-                "selectedItem": "none"
+                ]
               }
               """,
             """
@@ -202,8 +196,7 @@ class CopyValueTest implements RewriteTest {
           json(
             """
               {
-                "sourceArray": [1, 2, 3],
-                "destinationArray": [4, 5, 6]
+                "sourceArray": [1, 2, 3]
               }
               """,
             """
@@ -234,11 +227,7 @@ class CopyValueTest implements RewriteTest {
                     "id": 2,
                     "name": "Bob"
                   }
-                ],
-                "activeUser": {
-                  "id": 0,
-                  "name": "Unknown"
-                }
+                ]
               }
               """,
             """
