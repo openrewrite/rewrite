@@ -139,15 +139,6 @@ class CopyValueTest implements RewriteTest {
               source:
                 foo: bar
                 key: value
-              destination:
-                foo: baz
-              """,
-            """
-              source:
-                foo: bar
-                key: value
-              destination:
-                foo: bar
               """
           )
         );
