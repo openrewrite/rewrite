@@ -38,7 +38,7 @@ class CopyValueTest implements RewriteTest {
     void changeCurrentFileWhenNull() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.destination", null)
+            new CopyValue("$.source", null, "destination", null)
           ),
           json(
             """
@@ -61,7 +61,7 @@ class CopyValueTest implements RewriteTest {
     void changeOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.json", "$.destination", null)
+            new CopyValue("$.source", "a.json", "destination", null)
           ),
           json(
             """
@@ -93,7 +93,7 @@ class CopyValueTest implements RewriteTest {
     void copyComplexValue() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.destination", null)
+            new CopyValue("$.source", null, "destination", null)
           ),
           json(
             """
@@ -121,7 +121,7 @@ class CopyValueTest implements RewriteTest {
     void copyToOtherFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.json", "$.destination", "b.json")
+            new CopyValue("$.source", "a.json", "destination", "b.json")
           ),
           json(
             """
@@ -148,50 +148,10 @@ class CopyValueTest implements RewriteTest {
     }
 
     @Test
-    void copyFromArrayElement() {
-        rewriteRun(
-          spec -> spec.recipe(
-            new CopyValue("$.items[0].name", null, "$.selectedItem", null)
-          ),
-          json(
-            """
-              {
-                "items": [
-                  {
-                    "name": "first",
-                    "value": 1
-                  },
-                  {
-                    "name": "second",
-                    "value": 2
-                  }
-                ]
-              }
-              """,
-            """
-              {
-                "items": [
-                  {
-                    "name": "first",
-                    "value": 1
-                  },
-                  {
-                    "name": "second",
-                    "value": 2
-                  }
-                ],
-                "selectedItem": "first"
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void copyEntireArray() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.sourceArray", null, "$.destinationArray", null)
+            new CopyValue("$.sourceArray", null, "destinationArray", null)
           ),
           json(
             """
@@ -203,49 +163,6 @@ class CopyValueTest implements RewriteTest {
               {
                 "sourceArray": [1, 2, 3],
                 "destinationArray": [1, 2, 3]
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void copyComplexObjectFromArray() {
-        rewriteRun(
-          spec -> spec.recipe(
-            new CopyValue("$.users[1]", null, "$.activeUser", null)
-          ),
-          json(
-            """
-              {
-                "users": [
-                  {
-                    "id": 1,
-                    "name": "Alice"
-                  },
-                  {
-                    "id": 2,
-                    "name": "Bob"
-                  }
-                ]
-              }
-              """,
-            """
-              {
-                "users": [
-                  {
-                    "id": 1,
-                    "name": "Alice"
-                  },
-                  {
-                    "id": 2,
-                    "name": "Bob"
-                  }
-                ],
-                "activeUser": {
-                  "id": 2,
-                  "name": "Bob"
-                }
               }
               """
           )

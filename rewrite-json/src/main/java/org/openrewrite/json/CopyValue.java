@@ -134,27 +134,11 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
             return TreeVisitor.noop();
         }
         return Preconditions.check(new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
-                new AddKeyValue(extractPath(oldKeyPath), extractKey(newKey), acc.snippet, false).getVisitor());
+                new AddKeyValue(extractParent(oldKeyPath), newKey, acc.snippet, false).getVisitor());
     }
 
-    // Extract the last key from the JsonPath expression
-    // For example, "$.dest.kind" should return "kind"
-    // For "$.dest" should return "dest"
-    // Regex also works for bracket notation like "$['dest']['kind']"
-    private static final Pattern lastKey = Pattern.compile("\\.(\\w+)$|\\['(\\w+)'\\]$");
-
-    private String extractKey(String keyPath) {
-        Matcher matcher = lastKey.matcher(keyPath);
-        if (matcher.find() && matcher.groupCount() == 2) {
-            return matcher.group(1);
-        }
-        return keyPath;
-    }
-
-    private static final Pattern arrayIndex = Pattern.compile("\\[\\d+\\]$");
-
-    private String extractPath(String keyPath) {
-        // Extract the path from the JsonPath expression
+    private String extractParent(String keyPath) {
+        // Extract the parent from the JsonPath expression
         // For example, "$.dest.kind" should return "$.dest"
         // For "$.destination" should return "$"
         // For bracket notation like "$['dest']['kind']" should return "$['dest']"
@@ -163,12 +147,6 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
             index = keyPath.lastIndexOf("[");
         }
         keyPath = index > 0 ? keyPath.substring(0, index) : keyPath;
-
-        // strip json array index, e.g. "$.arr[0]" should be "$.arr"
-        Matcher matcher = arrayIndex.matcher(keyPath);
-        if (matcher.find()) {
-            keyPath = keyPath.substring(0, matcher.start());
-        }
         return "$".equals(keyPath) ? "$." : keyPath;
     }
 }
