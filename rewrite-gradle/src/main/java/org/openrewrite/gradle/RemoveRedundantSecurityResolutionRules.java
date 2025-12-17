@@ -43,9 +43,7 @@ import org.openrewrite.semver.LatestIntegration;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
@@ -105,37 +103,35 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
         JavaIsoVisitor<ExecutionContext> removeRulesVisitor = new JavaIsoVisitor<ExecutionContext>() {
             @Nullable
             GradleProject gradleProject;
-            @Nullable
-            UUID currentSourceFileId;
             boolean insideBuildscript;
 
-            private void maybeInitialize(JavaSourceFile sourceFile) {
-                // Reset state when visiting a new source file
-                if (currentSourceFileId != null && currentSourceFileId.equals(sourceFile.getId())) {
-                    return;
+            private void maybeInitialize() {
+                // Initialize once per source file (getVisitor() is called once per source file)
+                if (gradleProject == null) {
+                    JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                    if (sourceFile != null) {
+                        gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    }
                 }
-                currentSourceFileId = sourceFile.getId();
-                gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class).orElse(null);
             }
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                if (sourceFile != null) {
-                    maybeInitialize(sourceFile);
-                }
+                maybeInitialize();
 
-                // Track when we enter/exit buildscript block
-                boolean wasInsideBuildscript = insideBuildscript;
-                if (METHOD_BUILDSCRIPT.equals(method.getSimpleName())) {
+                // Track when we enter buildscript block
+                boolean enteredBuildscript = METHOD_BUILDSCRIPT.equals(method.getSimpleName());
+                if (enteredBuildscript) {
                     insideBuildscript = true;
                 }
 
+                boolean currentlyInBuildscript = insideBuildscript;
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                // Restore state after visiting children
-                boolean currentlyInBuildscript = insideBuildscript;
-                insideBuildscript = wasInsideBuildscript;
+                // Reset after exiting buildscript block
+                if (enteredBuildscript) {
+                    insideBuildscript = false;
+                }
 
                 if (!isEachDependency(m, getCursor())) {
                     return m;
