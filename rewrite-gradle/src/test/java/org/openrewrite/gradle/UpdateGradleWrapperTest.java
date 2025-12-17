@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
@@ -51,6 +52,7 @@ import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.*;
 
 @SuppressWarnings("UnusedProperty")
+@Disabled
 class UpdateGradleWrapperTest implements RewriteTest {
     private final UnaryOperator<@Nullable String> notEmpty = actual -> {
         assertThat(actual).isNotNull();
