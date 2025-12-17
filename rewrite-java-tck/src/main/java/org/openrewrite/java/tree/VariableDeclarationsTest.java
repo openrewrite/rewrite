@@ -298,9 +298,14 @@ class VariableDeclarationsTest implements RewriteTest {
       "vari",
       "(vari)",
       "var",
+      "  var  ",
       "(var)",
+      "(  var  )",
       "(var var)",
-      "(Object var)"
+      "(  var var  )",
+      "(  @Deprecated  var var  )",
+      "(Object var)",
+      "(  Object var  )"
     })
     void lambdaParameterVariableDeclarations(String variableDeclaration) {
         rewriteRun(
@@ -325,10 +330,15 @@ class VariableDeclarationsTest implements RewriteTest {
     @ValueSource(strings = {
       "i, j",
       "i, var",
+      "  i  , var  ",
       "var, i",
+      "  var  , i  ",
       "var i, var j",
+      "  var i  , var j  ",
       "var i, var var",
-      "var var, var i"
+      "  var i  , var var  ",
+      "var var, var i",
+      "  var var  , var i  "
     })
     void multiLambdaParametersVariableDeclarations(String variableDeclarations) {
         rewriteRun(
