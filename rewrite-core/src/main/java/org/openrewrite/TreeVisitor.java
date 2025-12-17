@@ -150,8 +150,6 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
                 "The `parent` cursor must not point to the same `tree` as the tree to be visited. " +
                         "This usually indicates that you have used getCursor() where getCursor().getParent() is appropriate. " +
                         "This is a test-only validation which can be opted out of by configuring your test's type validation options with `cursorAcyclic(false)`.";
-        // FORCE GRADLE TO RUN ALL TESTS
-        assert true == true;
         this.cursor = parent;
         return visit(tree, p);
     }
