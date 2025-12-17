@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.search.SemanticallyEqual;
+import org.openrewrite.java.service.Span.ColSpan;
 import org.openrewrite.java.tree.*;
 
 import java.util.Collection;
@@ -44,12 +45,10 @@ public class SourcePositionService {
      * this calculates the column position of that alignment point. For elements that don't align,
      * it returns the parent's indentation plus the continuation indent.
      *
-     * @deprecated         use {@link #computeNewLinedCursorElement(Cursor)} and {@link #positionOf(Cursor)} to get the positions span of the element / parents instead
      * @param cursor       the cursor pointing to the element whose alignment position should be computed
      * @param continuation the continuation indent to add when the element doesn't align with another element
      * @return the column position (0-indexed) where the element should align to
      */
-    @Deprecated
     public int computeColumnToAlignTo(Cursor cursor, int continuation) {
         Cursor alignWith = alignsWith(cursor);
         Cursor newLinedElementCursor;
@@ -207,7 +206,7 @@ public class SourcePositionService {
         if (cursorValue instanceof J) {
             J j = (J) cursorValue;
             boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
-            Cursor parent = cursor.dropParentUntil(it -> (!(it instanceof JRightPadded)));
+            Cursor parent = cursor.dropParentUntil(it -> (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded || (it instanceof J && ((J) it).getPrefix().getWhitespace().contains("\n"))))); // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
             while (!(parent.getValue() instanceof Tree) && parent.getParent() != null) {
                 parent = parent.getParent();
             }
@@ -323,6 +322,8 @@ public class SourcePositionService {
         } else {
             throw new IllegalArgumentException("Can only find J elements or their containers. Not on " + child.getClass().getSimpleName() + ".");
         }
+        AtomicBoolean indenting = new AtomicBoolean(false);
+        AtomicInteger rowIndent = new AtomicInteger(0);
         AtomicInteger startLine = new AtomicInteger(1);
         AtomicInteger startCol = new AtomicInteger(1);
         AtomicBoolean printing = new AtomicBoolean(false);
@@ -416,14 +417,23 @@ public class SourcePositionService {
                     if (c == '\n') {
                         startLine.incrementAndGet();
                         startCol.set(1);
+                        rowIndent.set(0);
+                        indenting.set(true);;
                     } else if (c == '\r') {
                         // Skip \r in \r\n
                         if (i + 1 >= text.length() || text.charAt(i + 1) != '\n') {
                             startLine.incrementAndGet();
                             startCol.set(1);
+                            rowIndent.set(0);
+                            indenting.set(true);;
                         }
                     } else {
                         startCol.incrementAndGet();
+                        if (indenting.get() && c == ' ') {
+                            rowIndent.incrementAndGet();
+                        } else {
+                            indenting.set(false);
+                        }
                     }
                 }
                 return this;
@@ -440,8 +450,15 @@ public class SourcePositionService {
                 if (c == '\n' || c == '\r') {
                     startLine.incrementAndGet();
                     startCol.set(1);
+                    rowIndent.set(0);
+                    indenting.set(true);
                 } else {
                     startCol.incrementAndGet();
+                    if (indenting.get() && c == ' ') {
+                        rowIndent.incrementAndGet();
+                    } else {
+                        indenting.set(false);
+                    }
                 }
                 return this;
             }
@@ -487,6 +504,7 @@ public class SourcePositionService {
                     .endLine(printEntireSourceFile ? startLine.get() + lines : -1)
                     .endColumn(col)
                     .maxColumn(maxColumn)
+                    .rowIndent(rowIndent.get())
                     .build();
         }
         throw new IllegalArgumentException("The child was not found in the sourceFile. Are you sure the passed in cursor's value contains the child and you are not searching for a mutated element in a non-mutated Cursor value?");

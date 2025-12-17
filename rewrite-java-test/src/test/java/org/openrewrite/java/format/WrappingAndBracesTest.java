@@ -37,14 +37,13 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.style.LineWrapSetting.*;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("all")
 class WrappingAndBracesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        wrappingAndBraces(
+        autoFormat(
           spaces -> spaces,
           wrapping -> wrapping
             .withChainedMethodCalls(wrapping.getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(Arrays.asList("builder", "newBuilder")))
@@ -76,8 +75,8 @@ class WrappingAndBracesTest implements RewriteTest {
         );
     }
 
-    private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<SpacesStyle> spaces,
-                                                          UnaryOperator<WrappingAndBracesStyle> wrapping) {
+    private static Consumer<RecipeSpec> autoFormat(UnaryOperator<SpacesStyle> spaces,
+                                                   UnaryOperator<WrappingAndBracesStyle> wrapping) {
         return spec -> spec.recipe(new AutoFormat(null, true))
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
@@ -95,9 +94,9 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void conditionalsShouldStartOnNewLines() {
         rewriteRun(
-          spec -> spec.recipes(
-            new WrappingAndBraces(),
-            new TabsAndIndents()
+          autoFormat(
+            spaces -> spaces,
+            wrapping -> wrapping
           ),
           java(
             """
@@ -447,7 +446,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void elseOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
             wrap -> wrap.withIfStatement(IntelliJ.wrappingAndBraces().getIfStatement().withElseOnNewLine(true))),
           java(
@@ -487,7 +486,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void elseNotOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
             wrap -> wrap),
           java(
@@ -526,7 +525,8 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void ifAlwaysForceBraces() {
         rewriteRun(
-          wrappingAndBraces(spaces -> spaces,
+          autoFormat(
+            spaces -> spaces,
             wrap -> wrap.withIfStatement(wrap.getIfStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))),
           java(
             """
@@ -972,12 +972,10 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationWrappingWithNulls() {
         rewriteRun(spec ->
-            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-              IntelliJ.spaces(),
-              IntelliJ.wrappingAndBraces()
-                .withMethodDeclarationParameters(IntelliJ.wrappingAndBraces().getMethodDeclarationParameters().withWrap(WrapAlways)),
-              IntelliJ.tabsAndIndents(),
-              null))),
+          autoFormat(
+            spaces -> spaces,
+            wrapping -> wrapping.withMethodDeclarationParameters(IntelliJ.wrappingAndBraces().getMethodDeclarationParameters().withWrap(WrapAlways))
+          ),
           java(
             """
               import java.lang.annotation.Repeatable;
@@ -994,25 +992,26 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               class Test {
                   @Foo //comment
-                  final String method1(){
+                  final String method1() {
                       return "test";
                   }
+                  
                   @Foo /* comment
                   on multiple
-                  lines */
-                  final String method2(){
+                  lines */ final String method2() {
                       return "test";
                   }
+                  
                   @Foo
                   //comment
-                  final String method3(){
+                  final String method3() {
                       return "test";
                   }
+                  
                   @Foo
                   /* comment
                   on multiple
-                  lines */
-                  final String method4(){
+                  lines */ final String method4() {
                       return "test";
                   }
               }
@@ -1059,7 +1058,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationWrappingRecordsWithOpenNewLineAndCloseNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withRecordComponents(wrap.getRecordComponents().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
           ),
@@ -1099,7 +1098,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationWrappingRecordsWithNewLineAnnotations() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withRecordComponents(wrap.getRecordComponents().withWrap(WrapAlways).withNewLineForAnnotations(true))
           ),
@@ -1159,13 +1158,11 @@ class WrappingAndBracesTest implements RewriteTest {
 
     @Test
     void alwaysWrapImplementsList() {
-        rewriteRun(spec ->
-            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-              IntelliJ.spaces(),
-              IntelliJ.wrappingAndBraces()
-                .withExtendsImplementsPermitsList(IntelliJ.wrappingAndBraces().getExtendsImplementsPermitsList().withWrap(WrapAlways)),
-              IntelliJ.tabsAndIndents(),
-              null))),
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrapping -> wrapping.withExtendsImplementsPermitsList(wrapping.getExtendsImplementsPermitsList().withWrap(WrapAlways))
+          ),
           java("""
             public class Interfaces {
                 public interface I1 {
@@ -1175,7 +1172,7 @@ class WrappingAndBracesTest implements RewriteTest {
                 public interface I3 {
                 }
             }
-            """),
+            """, SourceSpec::skip),
           java(
             """
               public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
@@ -1193,13 +1190,11 @@ class WrappingAndBracesTest implements RewriteTest {
 
     @Test
     void alignWrappedImplementsList() {
-        rewriteRun(spec ->
-            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-              IntelliJ.spaces(),
-              IntelliJ.wrappingAndBraces()
-                .withExtendsImplementsPermitsList(IntelliJ.wrappingAndBraces().getExtendsImplementsPermitsList().withWrap(WrapAlways).withAlignWhenMultiline(true)),
-              IntelliJ.tabsAndIndents(),
-              null))),
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrapping -> wrapping.withExtendsImplementsPermitsList(wrapping.getExtendsImplementsPermitsList().withWrap(WrapAlways).withAlignWhenMultiline(true))
+          ),
           java("""
             public class Interfaces {
                 public interface I1 {
@@ -1209,7 +1204,7 @@ class WrappingAndBracesTest implements RewriteTest {
                 public interface I3 {
                 }
             }
-            """),
+            """, SourceSpec::skip),
           java(
             """
               public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
@@ -1228,7 +1223,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void forAlignWhenMultiline() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withAlignWhenMultiline(true))
           ),
@@ -1260,7 +1255,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void forNoAlignWhenMultiline() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withAlignWhenMultiline(false))
           ),
@@ -1292,7 +1287,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void forOpenAndCloseOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
             ),
@@ -1326,7 +1321,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void forOnlyOpenAndCloseOnNewLineWhenWrapping() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withForStatement(wrap.getForStatement().withOpenNewLine(true).withCloseNewLine(true))
           ),
@@ -1347,7 +1342,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void forWithForcedBlock() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withForStatement(wrap.getForStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))
           ),
@@ -1376,7 +1371,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void whileWithForcedBlock() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withWhileStatement(wrap.getWhileStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))
           ),
@@ -1405,7 +1400,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void doWhileWithForcedBlock() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withDoWhileStatement(wrap.getDoWhileStatement().withForceBraces(WrappingAndBracesStyle.ForceBraces.Always))
           ),
@@ -1435,7 +1430,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void doWhileWithWhileOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withDoWhileStatement(wrap.getDoWhileStatement().withWhileOnNewLine(true))
           ),
@@ -1466,7 +1461,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void tryWithResourcesAlignWhenMultiline() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withAlignWhenMultiline(true))
           ),
@@ -1500,7 +1495,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void tryWithResourcesNoAlignWhenMultiline() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withAlignWhenMultiline(false))
           ),
@@ -1534,7 +1529,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void tryWithResourcesOpenAndCloseOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
           ),
@@ -1570,7 +1565,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void tryWithResourcesOpenAndCloseOnNewLineOnlyWhenWrapping() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withOpenNewLine(true).withCloseNewLine(true))
           ),
@@ -1592,7 +1587,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void tryWithResourcesWithBlockInside() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(WrapAlways).withAlignWhenMultiline(true))
           ),
@@ -1656,7 +1651,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void tryCatchOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withTryStatement(wrap.getTryStatement().withCatchOnNewLine(true).withFinallyOnNewLine(true))
           ),
@@ -1706,7 +1701,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void tryCatchNotOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withTryStatement(wrap.getTryStatement().withCatchOnNewLine(false).withFinallyOnNewLine(false))
           ),
@@ -1756,7 +1751,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void wrapThrowsKeyword() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapAlways))
           ),
@@ -1787,7 +1782,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void wrapThrowsKeywordIfLong() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapIfTooLong))
           ),
@@ -1826,7 +1821,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void alignThrowsToMethodStart() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap
               .withThrowsList(wrap.getThrowsList().withAlignThrowsToMethodStart(true))
@@ -1859,7 +1854,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void wrapThrowsListAlways() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapAlways))
           ),
@@ -1892,7 +1887,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void wrapThrowsListAlwaysAlignWhenMultiline() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapAlways).withAlignWhenMultiline(true))
           ),
@@ -1925,7 +1920,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void wrapThrowsListIfLong() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapIfTooLong))
           ),
@@ -1966,7 +1961,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void wrapThrowsListWithThrowsKeywordWrap() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap
               .withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapAlways))
@@ -2002,7 +1997,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void enumConstantsWrapAlways() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
           ),
@@ -2026,7 +2021,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void enumConstantsWrapAlwaysAlreadyCorrect() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
           ),
@@ -2045,7 +2040,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void enumConstantsChopIfTooLong() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap
               .withHardWrapAt(60)
@@ -2071,7 +2066,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void enumConstantsChopIfTooLongNotLongEnough() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
           ),
@@ -2088,7 +2083,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void enumConstantsSingleLineChopIfTooLong() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap
               .withHardWrapAt(40)
@@ -2112,7 +2107,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void enumConstantsSingleLineChopIfTooLongNotLongEnough() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces.withOther(spaces.getOther().withInsideOneLineEnumBraces(true)),
             wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(ChopIfTooLong))
           ),
@@ -2127,7 +2122,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void enumConstantsDoNotWrap() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(DoNotWrap))
           ),
@@ -2144,7 +2139,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void enumConstantsWithArguments() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
           ),
@@ -2180,7 +2175,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void enumConstantsSingleLineToWrapped() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withEnumConstants(wrap.getEnumConstants().withWrap(WrapAlways))
           ),
@@ -2202,7 +2197,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void modifierListWrapAfterModifierListClass() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
           ),
@@ -2223,7 +2218,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void modifierListWrapAfterModifierListMethod() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
           ),
@@ -2248,7 +2243,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void modifierListWrapAfterModifierListField() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
           ),
@@ -2271,7 +2266,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void modifierListWrapAfterModifierListAlreadyCorrect() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(true))
           ),
@@ -2294,7 +2289,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void modifierListNoWrapAfterModifierList() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withModifierList(wrap.getModifierList().withWrapAfterModifierList(false))
           ),
@@ -2314,7 +2309,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerWrapAlways() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways))
           ),
@@ -2340,7 +2335,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerWrapAlwaysAlreadyCorrect() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways))
           ),
@@ -2361,7 +2356,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerWrapAlwaysAlignWhenMultiline() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways).withAlignWhenMultiline(true))
           ),
@@ -2387,7 +2382,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerNewLineAfterOpeningCurly() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways).withNewLineAfterOpeningCurly(true))
           ),
@@ -2414,7 +2409,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerPlaceClosingCurlyOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(WrapAlways).withPlaceClosingCurlyOnNewLine(true))
           ),
@@ -2441,7 +2436,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerAllOptions() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer()
               .withWrap(WrapAlways)
@@ -2472,7 +2467,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerDoNotWrap() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(DoNotWrap))
           ),
@@ -2489,7 +2484,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerChopIfTooLong() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap
               .withHardWrapAt(40)
@@ -2517,7 +2512,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerChopIfTooLongNotLongEnough() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer().withWrap(ChopIfTooLong))
           ),
@@ -2534,7 +2529,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void arrayInitializerWithNewArray() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withArrayInitializer(wrap.getArrayInitializer()
               .withWrap(WrapAlways)
@@ -2565,7 +2560,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersWrapAlways() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways))
           ),
@@ -2588,7 +2583,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersWrapAlwaysAlreadyCorrect() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways))
           ),
@@ -2606,7 +2601,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersWrapAlwaysAlignWhenMultiline() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways).withAlignWhenMultiline(true))
           ),
@@ -2629,7 +2624,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersOpenNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways).withOpenNewLine(true))
           ),
@@ -2653,7 +2648,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersCloseNewLine() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(WrapAlways).withCloseNewLine(true))
           ),
@@ -2677,7 +2672,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersAllOptions() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters()
               .withWrap(WrapAlways)
@@ -2705,7 +2700,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersDoNotWrap() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(DoNotWrap))
           ),
@@ -2722,7 +2717,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersChopIfTooLong() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap
               .withHardWrapAt(60)
@@ -2747,7 +2742,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersChopIfTooLongNotLongEnough() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(ChopIfTooLong))
           ),
@@ -2764,7 +2759,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersOnMethod() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters()
               .withWrap(WrapAlways)
@@ -2796,7 +2791,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationParametersOnField() {
         rewriteRun(
-          wrappingAndBraces(
+          autoFormat(
             spaces -> spaces,
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters()
               .withWrap(WrapAlways)
@@ -2817,76 +2812,6 @@ class WrappingAndBracesTest implements RewriteTest {
                           justification = "test"
                   )
                   private int field;
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void textBlocksNotAligned() {
-        rewriteRun(
-          wrappingAndBraces(
-            spaces -> spaces,
-            wrap -> wrap
-          ),
-          java(
-            """
-              class Test {
-                  private final String foo = ""\"
-                    YES
-                    ""\";
-                  private final String bar =
-                    ""\"
-                      NO
-                      ""\";
-              }
-              """,
-            """
-              class Test {
-                  private final String foo = ""\"
-                    YES
-                    ""\";
-                  private final String bar = ""\"
-                    NO
-                    ""\";
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void textBlocksAligned() {
-        rewriteRun(
-          wrappingAndBraces(
-            spaces -> spaces,
-            wrap -> wrap.withTextBlocks(wrap.getTextBlocks().withAlignWhenMultiline(true))
-          ),
-          java(
-            """
-              class Test {
-                  private final String foo = ""\"
-                    YES
-                    ""\";
-                  private final String bar =
-                    ""\"
-                      NO
-                      ""\";
-                  private final String singleLine = ""\"
-                    noEndLine""\";
-              }
-              """,
-            """
-              class Test {
-                  private final String foo = ""\"
-                                             YES
-                                             ""\";
-                  private final String bar = ""\"
-                                             NO
-                                             ""\";
-                  private final String singleLine = ""\"
-                                                    noEndLine""\";
               }
               """
           )

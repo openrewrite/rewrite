@@ -206,7 +206,7 @@ class SpacesTest implements RewriteTest {
             """
               class Test {
                   void method1
-                  () {
+                          () {
                   }
               }
               """
@@ -2009,6 +2009,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               package abc;
+              
               @interface MyAnno {
                   String[] names;
                   Integer[] counts;
@@ -2018,12 +2019,14 @@ class SpacesTest implements RewriteTest {
           java(
             """
               package abc;
+              
               @MyAnno(names={"a","b"},counts={1,2})
               class Test {
               }
               """,
             """
               package abc;
+              
               @MyAnno(names = {"a", "b"}, counts = {1, 2})
               class Test {
               }
@@ -2574,7 +2577,7 @@ class SpacesTest implements RewriteTest {
             """
               class Test {
                   void foo(
-                      int x
+                          int x
                   ) {
                   }
               }
@@ -4597,6 +4600,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.io.*;
+              
               class Test {
                   void test() {
                       try (FileReader fr = new FileReader("input.txt");BufferedReader br = new BufferedReader(fr);FileWriter fw = new FileWriter("output.txt")) {
@@ -4606,6 +4610,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.io.*;
+              
               class Test {
                   void test() {
                       try (FileReader fr = new FileReader("input.txt") ; BufferedReader br = new BufferedReader(fr) ; FileWriter fw = new FileWriter("output.txt")) {

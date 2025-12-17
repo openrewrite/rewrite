@@ -66,7 +66,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         J.ClassDeclaration.Padding padding = c.getPadding();
         JContainer<J.TypeParameter> typeParameters = padding.getTypeParameters();
         if (typeParameters != null && !typeParameters.getElements().isEmpty()) {
-            if (!first && !typeParameters.getBefore().getWhitespace().isEmpty()) {
+            if (!first && typeParameters.getBefore().getWhitespace().isEmpty()) {
                 c = padding.withTypeParameters(typeParameters.withBefore(typeParameters.getBefore().withWhitespace(" ")));
             }
         }
@@ -95,14 +95,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return c;
-    }
-
-    @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
-        if (method.getName().getComments().isEmpty() && method.getName().getPrefix().getWhitespace().contains("\n")) {
-            method = method.withName(method.getName().withPrefix(Space.EMPTY));
-        }
-        return super.visitMethodInvocation(method, p);
     }
 
     @Override

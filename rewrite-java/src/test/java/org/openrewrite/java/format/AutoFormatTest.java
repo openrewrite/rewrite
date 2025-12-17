@@ -3348,7 +3348,7 @@ class AutoFormatTest implements RewriteTest {
         @Test
         void formatLongLinesOnly() {
             rewriteRun(
-              spec -> withMethodInvocationArgumentChopIfTooLong(spec, 80),
+              spec -> withMethodInvocationArgumentChopIfTooLong(spec, 70),
               java(
                 """
                   package com.example;

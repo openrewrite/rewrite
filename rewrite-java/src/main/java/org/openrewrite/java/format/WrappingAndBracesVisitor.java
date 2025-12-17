@@ -36,6 +36,7 @@ import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -81,80 +82,20 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
         int size = container.getElements().stream().allMatch(it -> it instanceof J.Empty) ? 0 : container.getElements().size();
+        AtomicBoolean hasNewLinedElement = new AtomicBoolean(false);
         List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), (index, right) -> {
             J jElement = right.getElement();
             if (jElement instanceof J.Empty) {
                 return right;
             }
-            JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-            if (sourceFile != null) {
-                SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
-                boolean alignWhenMultiline = alignWhenMultiline(loc);
-                if (shouldWrap(index, size, (JContainer<J>) container, loc)) {
-                    switch (loc) {
-                        case THROWS:
-                            if (alignWhenMultiline && before.getLastWhitespace().contains("\n")) {
-                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), before.getLastWhitespace())));
-                            } else if (before.getLastWhitespace().contains("\n")) {
-                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), before.getLastWhitespace() + StringUtils.repeat(" ", tabsAndIndentsStyle.getContinuationIndent()))));
-                            } else if (alignWhenMultiline) {
-                                int column = positionService.columnsOf(getCursor()).getStartColumn();
-                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column - 8)))); //since position is index-1-based AND we have to align to the "throws" keyword + its suffix space = 1 + 7
-                            } else {
-                                Cursor newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                                int column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column))));
-                            }
-                            break;
-                        default:
-                            if (!opensOnNewLine(index, loc) && alignWhenMultiline) {
-                                int column = positionService.columnsOf(getCursor(), container.getElements().get(0)).getStartColumn();
-                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column - 1)))); //since position is index-1-based
-                            } else {
-                                Cursor newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                                int column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column))));
-                            }
-                            break;
-                    }
-                    right = closeOnNewLine(index, container, right, loc);
-                } else if (container.getElements().stream().anyMatch(elem -> elem.getPrefix().getLastWhitespace().contains("\n"))) {
-                    if (index == 0 && (right.getElement().getPrefix().getLastWhitespace().contains("\n") || opensOnNewLine(index, loc))) {
-                        Cursor newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        int column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                        if (newLinedCursorElement.getValue() instanceof J.Return) {
-                            column += tabsAndIndentsStyle.getContinuationIndent();
-                        }
-                        right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column))));
-                    } else if (index != 0 && right.getElement().getPrefix().getLastWhitespace().contains("\n") && alignWhenMultiline) {
-                        if (((JContainer<J>) getCursor().getValue()).getElements().get(0).getPrefix().getLastWhitespace().contains("\n")) {
-                            int column = ((JContainer<J>) getCursor().getValue()).getElements().get(0).getPrefix().getIndent().length();
-                            right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column))));
-                        } else {
-                            int column = positionService.columnsOf(getCursor(), container.getElements().get(0)).getStartColumn();
-                            right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column - 1)))); //since position is index-1-based
-                        }
-                    } else if (index != 0 && right.getElement().getPrefix().getLastWhitespace().contains("\n")) {
-                        Cursor newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        int column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                        if (newLinedCursorElement.getValue() instanceof J.Return) {
-                            column += tabsAndIndentsStyle.getContinuationIndent();
-                        }
-                        right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n" + StringUtils.repeat(" ", column))));
-                    }
-                    if (index == container.getElements().size() - 1 && (right.getAfter().getLastWhitespace().contains("\n") || closesOnNewLine(loc))) {
-                        Cursor newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        int column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length();
-                        if (newLinedCursorElement.getValue() instanceof J.Return) {
-                            column += tabsAndIndentsStyle.getContinuationIndent();
-                        }
-                        right = right.withAfter(withWhitespace(right.getAfter(), "\n" + StringUtils.repeat(" ", column)));
-                    }
-                }
+            if (shouldWrap(index, size, (JContainer<J>) container, loc)) {
+                hasNewLinedElement.set(true);
+                right = right.withElement(jElement.withPrefix(withWhitespace(jElement.getPrefix(), "\n")));
             }
-            JRightPadded<J2> visited = visitRightPadded(right, loc.getElementLocation(), p);
-            setCursor(new Cursor(getCursor().getParent(), container.getPadding().withElements(ListUtils.map(((JContainer<J2>) getCursor().getValue()).getPadding().getElements(), (i, rp) -> i.equals(index) ? visited : rp))));
-            return visited;
+            if (index == size - 1 && hasNewLinedElement.get() && closesOnNewLine(loc)) {
+                right = right.withAfter(withWhitespace(right.getAfter(), "\n"));
+            }
+            return visitRightPadded(right, loc.getElementLocation(), p);
         });
 
         setCursor(getCursor().getParent());
@@ -165,15 +106,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
         if (right == null) {
-            return super.visitRightPadded(right, loc, p);
+            return super.visitRightPadded(null, loc, p);
         }
         if (getCursor().getNearestMessage("stop") != null) {
             return right;
         }
         JRightPadded<?> wrappedRight = right;
-        int startColumn = -1;
-        Cursor newLinedCursorElement;
-        Cursor parentTreeCursor;
         JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
         SourcePositionService positionService = null;
         if (sourceFile != null) {
@@ -209,53 +147,20 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     }
 
                     boolean wrapFirstCall = evaluate(() -> style.getChainedMethodCalls().getWrapFirstCall(), false);
-                    if (evaluate(() -> style.getChainedMethodCalls().getAlignWhenMultiline(), false) && ((wrapFirstCall && chainStarter == m) || chainStarter != m)) {
-                        startColumn = positionService.columnsOf(getCursor(), chainStarter.getSelect()).getEndColumn() - 1; //since position is index-1-based
-                    } else {
-                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor());
-                        if (newLinedCursorElement.getValue() instanceof J.MethodInvocation && findChainStarterInChain(newLinedCursorElement.getValue()) == chainStarter) {
-                            newLinedCursorElement = newLinedCursorElement.dropParentUntil(it -> (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded)));
-                            if (!(newLinedCursorElement.getValue() instanceof Tree)) {
-                                newLinedCursorElement = newLinedCursorElement.getParentTreeCursor();
-                            }
-                            newLinedCursorElement = positionService.computeNewLinedCursorElement(newLinedCursorElement);
-                        }
-                        if (newLinedCursorElement.getValue() instanceof J.MethodInvocation) {
-                            startColumn = ((J.MethodInvocation) newLinedCursorElement.getValue()).getPadding().getSelect().getAfter().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                        }
-                        if (startColumn < 0) {
-                            startColumn = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                        }
-                    }
-                }
-                if (startColumn != -1) {
-                    wrappedRight = wrappedRight.withAfter(withWhitespace(wrappedRight.getAfter(), "\n" + StringUtils.repeat(" ", startColumn)));
-                    if (wrappedRight != right) {
-                        m = m.getPadding().withSelect((JRightPadded<Expression>) wrappedRight);
-                        setCursor(updateCursor(m));
-                        parentTreeCursor = getCursor().getParentTreeCursor();
-                        if (parentTreeCursor.getValue() instanceof J.MethodInvocation) {
-                            setCursor(new Cursor(new Cursor(parentTreeCursor, ((J.MethodInvocation) parentTreeCursor.getValue()).withSelect(m)), m));
-                        }
+                    if (wrapFirstCall || chainStarter != m) {
+                        wrappedRight = wrappedRight.withAfter(withWhitespace(wrappedRight.getAfter(), "\n"));
                     }
                 }
                 break;
             case BLOCK_STATEMENT:
-                newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor());
-                if (newLinedCursorElement.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) newLinedCursorElement.getValue()).getSelect() != null) {
-                    startColumn = ((J.MethodInvocation) newLinedCursorElement.getValue()).getPadding().getSelect().getAfter().getIndent().length() + tabsAndIndentsStyle.getIndentSize();
-                } else if (getCursor().getValue() instanceof J.Block && !(wrappedRight.getElement() instanceof J.EnumValueSet)) {
+                if (wrappedRight.getElement() instanceof J && getCursor().getValue() instanceof J.Block && !(wrappedRight.getElement() instanceof J.EnumValueSet)) {
                     // for `J.EnumValueSet` the prefix is on the enum constants
-                    startColumn = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getIndentSize();
-                }
-                if (startColumn >= 0 && wrappedRight.getElement() instanceof J) {
-                    wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n" + StringUtils.repeat(" ", startColumn))));
+                    wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n")));
                 }
                 break;
             case CASE:
                 if (!(right.getElement() instanceof J.Block)) {
-                    newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                    wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getIndentSize()))));
+                    wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n")));
                 }
                 break;
             case IF_ELSE:
@@ -265,11 +170,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 //Falling through on purpose here
             case IF_THEN:
                 if (!(wrappedRight.getElement() instanceof J.Block)) {
-                    if (evaluate(() -> style.getIfStatement().getForceBraces(), WrappingAndBracesStyle.ForceBraces.DoNotForce) == WrappingAndBracesStyle.ForceBraces.DoNotForce) {
-                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor());
-                        startColumn = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length();
-                        wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n" + StringUtils.repeat(" ", startColumn + tabsAndIndentsStyle.getIndentSize()))));
-                    } else {
+                    if (evaluate(() -> style.getIfStatement().getForceBraces(), WrappingAndBracesStyle.ForceBraces.DoNotForce) != WrappingAndBracesStyle.ForceBraces.DoNotForce) {
                         wrappedRight = ((JRightPadded<Statement>) wrappedRight).withElement(J.Block.createEmptyBlock()
                                 .withPrefix(Space.format(evaluate(() -> spacesStyle.getBeforeLeftBrace().getIfLeftBrace(), true) ? " " : ""))
                                 .withStatements(singletonList((Statement) wrappedRight.getElement())));
@@ -283,24 +184,15 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case FOR_INIT:
                 if (shouldWrap(getCursor(), loc)) {
-                    newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                    startColumn = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                    wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n" + StringUtils.repeat(" ", startColumn))));
+                    wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n")));
                 }
                 break;
             case FOR_CONDITION:
             case FOR_UPDATE:
                 if (shouldWrap(getCursor(), loc)) {
-                    newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                    if (!evaluate(() -> style.getForStatement().getOpenNewLine(), false) && evaluate(() -> style.getForStatement().getAlignWhenMultiline(), true)) {
-                        J.ForLoop.Control control = getCursor().getValue();
-                        startColumn = positionService.columnsOf(getCursor(), control.getInit().get(0)).getStartColumn() - 1;
-                    } else {
-                        startColumn = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                    }
-                    wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n" + StringUtils.repeat(" ", startColumn))));
+                    wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n")));
                     if (loc == JRightPadded.Location.FOR_UPDATE && evaluate(() -> style.getForStatement().getCloseNewLine(), false)) {
-                        wrappedRight = wrappedRight.withAfter(withWhitespace(wrappedRight.getAfter(), "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length())));
+                        wrappedRight = wrappedRight.withAfter(withWhitespace(wrappedRight.getAfter(), "\n"));
                     }
                 }
                 break;
@@ -333,28 +225,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 }
                 break;
             case ENUM_VALUE:
-                boolean shouldWrap = false;
                 List<J.EnumValue> enums = ((J.EnumValueSet) getCursor().getValue()).getEnums();
                 if (!enums.isEmpty()) {
-                    switch (evaluate(() -> style.getEnumConstants().getWrap(), DoNotWrap)) {
-                        case WrapAlways:
-                            shouldWrap = true;
-                            break;
-                        case ChopIfTooLong:
-                            shouldWrap = sourceFile.service(SourcePositionService.class).columnsOf(getCursor(), enums.get(enums.size() - 1)).getMaxColumn() >= style.getHardWrapAt();
-                            break;
-                        case WrapIfTooLong:
-                            if (enums.get(0) == right.getElement()) {
-                                shouldWrap = sourceFile.service(SourcePositionService.class).columnsOf(getCursor(), enums.get(enums.size() - 1)).getMaxColumn() >= style.getHardWrapAt();
-                            } else {
-                                shouldWrap = sourceFile.service(SourcePositionService.class).columnsOf(getCursor(), (J.EnumValue) right.getElement()).getMaxColumn() >= style.getHardWrapAt();
-                            }
-                            break;
-                    }
-                    if (shouldWrap) {
-                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        startColumn = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length();
-                        wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n" + StringUtils.repeat(" ", startColumn + tabsAndIndentsStyle.getIndentSize()))));
+                    if (shouldWrap(getCursor(), loc)) {
+                        wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n")));
                         getCursor().pollNearestMessage("single-line-enum");
                     }
                 }
@@ -375,7 +249,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             Cursor parentTreeCursor;
             J parent;
             LineWrapSetting wrap = null;
-            int column;
             boolean isLong = false;
             switch (loc) {
                 case BLOCK_END:
@@ -398,13 +271,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                             break;
                         }
                     }
-                    newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor());
-                    if (newLinedCursorElement.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) newLinedCursorElement.getValue()).getSelect() != null) {
-                        column = ((J.MethodInvocation) newLinedCursorElement.getValue()).getPadding().getSelect().getAfter().getIndent().length();
-                    } else {
-                        column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length();
-                    }
-                    space = withWhitespace(space, "\n" + StringUtils.repeat(" ", column));
+                    space = withWhitespace(space, "\n");
                     break;
                 case CASE_PREFIX:
                     if (!evaluate(() -> style.getSwitchStatement().getEachCaseOnSeparateLine(), true)) {
@@ -419,12 +286,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                             }
                         }
                     }
-                    newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                    column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length();
-                    if (evaluate(() -> style.getSwitchStatement().getIndentCaseBranches(), true)) {
-                        column += tabsAndIndentsStyle.getIndentSize();
-                    }
-                    space = withWhitespace(space, "\n" + StringUtils.repeat(" ", column));
+                    space = withWhitespace(space, "\n");
                     break;
                 case EXTENDS:
                 case IMPLEMENTS:
@@ -436,58 +298,45 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                             isLong = sourceFile.service(SourcePositionService.class).columnsOf(newLinedCursorElement, ((J.ClassDeclaration) getCursor().getParentTreeCursor().getValue()).getBody()).getStartColumn() >= style.getHardWrapAt();
                         }
                         if (isLong || wrap == WrapAlways) {
-                            column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length() + tabsAndIndentsStyle.getContinuationIndent();
-                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", column));
+                            space = withWhitespace(space, "\n");
                         }
                     }
                     break;
                 case ELSE_PREFIX:
                     J.If.Else e = getCursor().getValue();
-                    boolean hasBody = e.getBody() instanceof J.Block || e.getBody() instanceof J.If;
-                    parentTreeCursor = getCursor().getParentTreeCursor();
-                    parent = parentTreeCursor.getValue();
-                    if (hasBody) {
-                        if (evaluate(() -> style.getIfStatement().getElseOnNewLine(), false)) {
-                            newLinedCursorElement = positionService.computeNewLinedCursorElement(parentTreeCursor);
-                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
-                        } else if (!evaluate(() -> style.getIfStatement().getElseOnNewLine(), false) && parent instanceof J.If) {
-                            if (((J.If) parent).getThenPart() instanceof J.Block) {
-                                space = withWhitespace(space, evaluate(() -> spacesStyle.getBeforeKeywords().getElseKeyword(), true) ? " " : "");
-                            } else {
-                                newLinedCursorElement = positionService.computeNewLinedCursorElement(parentTreeCursor);
-                                space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
-                            }
+                    parent = getCursor().getParentTreeCursor().getValue();
+                    if (evaluate(() -> style.getIfStatement().getElseOnNewLine(), false)) {
+                        space = withWhitespace(space, "\n");
+                    } else if (!evaluate(() -> style.getIfStatement().getElseOnNewLine(), false) && parent instanceof J.If) {
+                        if (((J.If) parent).getThenPart() instanceof J.Block) {
+                            space = withWhitespace(space, evaluate(() -> spacesStyle.getBeforeKeywords().getElseKeyword(), true) ? " " : "");
+                        } else {
+                            space = withWhitespace(space, "\n");
                         }
-                    } else {
-                        newLinedCursorElement = positionService.computeNewLinedCursorElement(parentTreeCursor);
-                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
                     }
                     updateCursor(e.withPrefix(space));
 
                     break;
                 case WHILE_CONDITION:
                     if (evaluate(() -> style.getDoWhileStatement().getWhileOnNewLine(), false)) {
-                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
+                        space = withWhitespace(space, "\n");
                     }
                     break;
                 case CATCH_PREFIX:
                     if (evaluate(() -> style.getTryStatement().getCatchOnNewLine(), false)) {
-                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
+                        space = withWhitespace(space, "\n");
                     }
                     break;
                 case TRY_FINALLY:
                     if (evaluate(() -> style.getTryStatement().getFinallyOnNewLine(), false)) {
-                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
+                        space = withWhitespace(space, "\n");
                     }
                     break;
                 case CLASS_DECLARATION_PREFIX:
                 case METHOD_DECLARATION_PREFIX:
                 case VARIABLE_DECLARATIONS_PREFIX:
                     if (space.getLastWhitespace().contains("\n")) {
-                        space = withWhitespace(space, "\n" + space.getIndent());
+                        space = withWhitespace(space, "\n");
                     }
                     break;
                 case ANNOTATION_PREFIX:
@@ -530,23 +379,22 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                                 }
                             case WrapAlways:
                                 parentTreeCursor.putMessage("annotations-wrapped", true);
-                                //TODO update the cursor for length calculations of subsequent calculations
                                 if (annotations.indexOf(getCursor().getValue()) > 0) {
-                                    space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.columnsOf(getCursor().getParentTreeCursor(), annotations.get(0)).getStartColumn() - 1));
+                                    space = withWhitespace(space, "\n");
                                 }
                         }
                     }
                     break;
                 case CLASS_KIND:
                     if (Boolean.TRUE.equals(getCursor().pollMessage("modifiers-wrapped")) ||  Boolean.TRUE.equals(getCursor().pollMessage("annotations-wrapped"))) {
-                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.columnsOf(getCursor()).getStartColumn() - 1));
+                        space = withWhitespace(space, "\n");
                     }
                     break;
                 case MODIFIER_PREFIX:
                     getCursor().getParentTreeCursor().computeMessageIfAbsent("modifiers-wrapped", __ -> evaluate(() -> style.getModifierList().getWrapAfterModifierList(), false));
                     if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         if (space.getComments().isEmpty() || !space.getComments().get(space.getComments().size() - 1).isMultiline()) {
-                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.columnsOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
+                            space = withWhitespace(space, "\n");
                         }
                     }
                     break;
@@ -554,7 +402,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 case IDENTIFIER_PREFIX:
                 case PRIMITIVE_PREFIX:
                     if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("modifiers-wrapped")) || Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
-                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.columnsOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
+                        space = withWhitespace(space, "\n");
                     }
                     break;
                 case THROWS:
@@ -565,17 +413,13 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                             isLong = sourceFile.service(SourcePositionService.class).columnsOf(newLinedCursorElement, ((J.MethodDeclaration) getCursor().getParentTreeCursor().getValue()).getBody()).getStartColumn() >= style.getHardWrapAt();
                         }
                         if (isLong || wrap == WrapAlways) {
-                            column = ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length();
-                            if (!evaluate(() -> style.getThrowsList().getAlignThrowsToMethodStart(), false)) {
-                                column += tabsAndIndentsStyle.getContinuationIndent();
-                            }
-                            space = withWhitespace(space, "\n" + StringUtils.repeat(" ", column));
+                            space = withWhitespace(space, "\n");
                         }
                     }
                     break;
                 default:
                     if (getCursor().getValue() instanceof TypeTree && Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
-                        space = withWhitespace(space, "\n" + StringUtils.repeat(" ", positionService.columnsOf(getCursor().getParentTreeCursor()).getStartColumn() - 1));
+                        space = withWhitespace(space, "\n");
                     }
                     break;
             }
@@ -589,34 +433,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             getCursor().putMessage("single-line-enum", true);
         }
         return super.visitBlock(block, p);
-    }
-
-    @Override
-    public J.Literal visitLiteral(J.Literal literal, P p) {
-        if (TypeUtils.asPrimitive(literal.getType()) == JavaType.Primitive.String) {
-            if (literal.getValueSource().startsWith("\"\"\"") && literal.getValueSource().endsWith("\"\"\"")) {
-                JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
-                String content = literal.getValueSource().substring(4);
-                int currentIndent = StringUtils.minCommonIndentLevel(content);
-                content = StringUtils.trimIndent(content);
-                String[] lines = content.split("\n", -1);
-                int column;
-                if (evaluate(() -> style.getTextBlocks().getAlignWhenMultiline(), false)) {
-                    column = positionService.columnsOf(getCursor(), literal).getStartColumn() - 1; // since position is index-1-based
-                } else {
-                    column = ((J) positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor()).getValue()).getPrefix().getIndent().length() + 2;
-                }
-                if (currentIndent != column) {
-                    StringBuilder builder = new StringBuilder().append("\"\"\"");
-                    for (String line : lines) {
-                        builder.append("\n").append(StringUtils.repeat(" ", column)).append(line);
-                    }
-                    literal = literal.withValueSource(builder.toString()).withValue(content);
-                }
-            }
-        }
-        return super.visitLiteral(literal, p);
     }
 
     @Override
@@ -640,10 +456,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             if (StringUtils.hasLineBreak(whitespace)) {
                 if (StringUtils.hasLineBreak(space.getWhitespace())) {
                     //Keep existing amount of new lines
-                    return space.withWhitespace(space.getWhitespace().replaceAll(" ", "") + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
+                    return space.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1));
                 }
-                //Reduce to single new line
-                return space.withWhitespace(whitespace.substring(whitespace.lastIndexOf('\n')));
             }
             return space.withWhitespace(whitespace);
         }
@@ -663,21 +477,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                             return comment.withSuffix(whitespace);
                         }
                     }
-                    String wrappedWhitespace = whitespace;
-                    if (!StringUtils.hasLineBreak(wrappedWhitespace)) {
-                        //Calculate the continuation.
-                        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                        SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
-                        Cursor newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-
-                        wrappedWhitespace = "\n" + ((J) newLinedCursorElement.getValue()).getPrefix().getIndent(); //Align with last newlined element -> TODO should we check if we need to add indent/continuation in certain cases?
-                    }
                     if (StringUtils.hasLineBreak(comment.getSuffix())) {
                         //Keep existing amount of new lines
-                        return comment.withSuffix(comment.getSuffix().replaceAll(" ", "") + wrappedWhitespace.substring(wrappedWhitespace.lastIndexOf('\n') + 1));
+                        return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1));
                     }
                     //Reduce to single new line
-                    return comment.withSuffix(whitespace.substring(whitespace.lastIndexOf('\n')));
+                    return comment.withSuffix(whitespace);
                 })
         );
     }
@@ -744,6 +549,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 countUntil = element.getValue();
                 wrap = evaluate(() -> style.getForStatement().getWrap(), DoNotWrap);
                 break;
+            case ENUM_VALUE:
+                List<J.EnumValue> enums = ((J.EnumValueSet) getCursor().getValue()).getEnums();
+                countUntil = enums.get(enums.size() - 1);
+                wrap = evaluate(() -> style.getEnumConstants().getWrap(), DoNotWrap);
         }
         JavaSourceFile sourceFile;
         if (wrap != null) {
@@ -788,37 +597,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return false;
     }
 
-    private <T extends J> JRightPadded<T> closeOnNewLine(int index, JContainer<T> container, JRightPadded<T> right, JContainer.Location location) {
-        if (index != container.getElements().size() - 1 || (!(right.getElement() instanceof J))) {
-            return right;
-        }
-        LineWrapSetting wrap = getWrap(location);
-        boolean closeOnNewLine = closesOnNewLine(location);
-
-        Space after = right.getAfter();
-        if (closeOnNewLine) {
-            JavaSourceFile sourceFile;
-            sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-            Cursor newLinedCursorElement;
-            SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
-            switch (wrap) {
-                case WrapAlways:
-                    newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                    after = withWhitespace(right.getAfter(), "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
-                    break;
-                case ChopIfTooLong:
-                case WrapIfTooLong:
-                    boolean isLong = sourceFile.service(SourcePositionService.class).columnsOf(getCursor(), (JContainer<J>) getCursor().getValue()).getMaxColumn() >= style.getHardWrapAt();
-                    if (isLong) {
-                        newLinedCursorElement = positionService.computeNewLinedCursorElement(getCursor().getParentTreeCursor());
-                        after = withWhitespace(right.getAfter(), "\n" + StringUtils.repeat(" ", ((J) newLinedCursorElement.getValue()).getPrefix().getIndent().length()));
-                    }
-                    break;
-            }
-        }
-        return right.withAfter(after);
-    }
-
     private boolean closesOnNewLine(JContainer.Location location) {
         switch (location) {
             case METHOD_DECLARATION_PARAMETERS:
@@ -860,30 +638,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 return evaluate(() -> style.getThrowsList().getWrap(), DoNotWrap);
         }
         return null;
-    }
-
-    private boolean alignWhenMultiline(JContainer.Location location) {
-        switch (location) {
-            case METHOD_DECLARATION_PARAMETERS:
-                return evaluate(() -> style.getMethodDeclarationParameters().getAlignWhenMultiline(), true);
-            case METHOD_INVOCATION_ARGUMENTS:
-            case NEW_CLASS_ARGUMENTS:
-                return evaluate(() -> style.getMethodCallArguments().getAlignWhenMultiline(), false);
-            case RECORD_STATE_VECTOR:
-                return evaluate(() -> style.getRecordComponents().getAlignWhenMultiline(), false);
-            case IMPLEMENTS:
-            case PERMITS:
-                return evaluate(() -> style.getExtendsImplementsPermitsList().getAlignWhenMultiline(), false);
-            case TRY_RESOURCES:
-                return evaluate(() -> style.getTryWithResources().getAlignWhenMultiline(), true);
-            case THROWS:
-                return evaluate(() -> style.getThrowsList().getAlignWhenMultiline(), false);
-            case NEW_ARRAY_INITIALIZER:
-                return evaluate(() -> style.getArrayInitializer().getAlignWhenMultiline(), false);
-            case ANNOTATION_ARGUMENTS:
-                return evaluate(() -> style.getAnnotationParameters().getAlignWhenMultiline(), false);
-        }
-        return false;
     }
 
     private J.MethodInvocation findChainStarterInChain(J.MethodInvocation method) {

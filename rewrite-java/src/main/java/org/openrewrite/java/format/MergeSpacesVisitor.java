@@ -77,9 +77,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         Space newSpace = (Space) ctx;
         if (!removeCustomLineBreaks && space.getWhitespace().contains("\n")) {
             if (newSpace.getWhitespace().contains("\n")) {
-                newSpace = newSpace.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1) + newSpace.getIndent());
-            } else {
-                newSpace = space.withComments(newSpace.getComments());
+                newSpace = newSpace.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1) + newSpace.getWhitespace().substring(space.getWhitespace().lastIndexOf("\n") + 1));
             }
         }
         if (space == null) {
@@ -106,7 +104,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
                     String newMargin = ((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin();
                     if (!removeCustomLineBreaks && ((Javadoc.LineBreak) jdoc).getMargin().contains("\n")) {
                         if (newMargin.contains("\n")) {
-                            return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) jdoc).getMargin().substring(0, ((Javadoc.LineBreak) jdoc).getMargin().lastIndexOf("\n") + 1) + newMargin.substring(newMargin.lastIndexOf("\n")));
+                            return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) jdoc).getMargin().substring(0, ((Javadoc.LineBreak) jdoc).getMargin().lastIndexOf("\n") + 1) + newMargin.substring(newMargin.lastIndexOf("\n") + 1));
                         } else {
                             return jdoc;
                         }
@@ -120,7 +118,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
             }
             if (!removeCustomLineBreaks && comment.getSuffix().contains("\n")) {
                 if (newComment.getSuffix().contains("\n")) {
-                    return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1) + newComment.getSuffix().substring(newComment.getSuffix().lastIndexOf("\n")));
+                    return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1) + newComment.getSuffix().substring(newComment.getSuffix().lastIndexOf("\n") + 1));
                 } else {
                     return comment;
                 }

@@ -29,12 +29,26 @@ public class Span {
     int endLine;
     int endColumn;
     int maxColumn;
+    int rowIndent;
+
+    /**
+     * Tracks the beginning and ending of a given LST element in source code
+     */
+    @Value
+    @Builder
+    public static class ColSpan {
+        int startColumn;
+        int endColumn;
+        int maxColumn;
+        int rowIndent;
+    }
 
     public ColSpan asColSpan() {
         return ColSpan.builder()
                 .startColumn(startColumn)
                 .endColumn(endColumn)
                 .maxColumn(maxColumn)
+                .rowIndent(rowIndent)
                 .build();
     }
 }
