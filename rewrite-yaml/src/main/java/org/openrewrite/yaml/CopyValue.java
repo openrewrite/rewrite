@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -80,6 +81,20 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
                "The existing key/value pair remains unaffected by this change. " +
                "Attempts to merge the copied value into the new key if it already exists. " +
                "By default, attempts to create the new key if it does not exist.";
+    }
+
+    @JsonCreator
+    public CopyValue(String oldKeyPath, @Nullable String oldFilePath, String newKey, @Nullable String newFilePath, @Nullable Boolean createNewKeys) {
+        this.oldKeyPath = oldKeyPath;
+        this.oldFilePath = oldFilePath;
+        this.newKey = newKey;
+        this.newFilePath = newFilePath;
+        this.createNewKeys = createNewKeys;
+    }
+
+    @Deprecated
+    public CopyValue(String oldKeyPath, String oldFilePath, String newKey, String newFilePath) {
+        this(oldKeyPath, oldFilePath, newKey, newFilePath, null);
     }
 
     @Data

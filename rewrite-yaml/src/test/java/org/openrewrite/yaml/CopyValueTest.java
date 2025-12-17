@@ -38,7 +38,7 @@ class CopyValueTest implements RewriteTest {
     void changeCurrentFileWhenNull() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.destination", null, null)
+            new CopyValue("$.source", null, "$.destination", null)
           ),
           yaml(
             """
@@ -58,7 +58,7 @@ class CopyValueTest implements RewriteTest {
     void changeOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.yml", "$.destination", null, null)
+            new CopyValue("$.source", "a.yml", "$.destination", null)
           ),
           yaml(
             """
@@ -85,7 +85,7 @@ class CopyValueTest implements RewriteTest {
     void copyComplexValue() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.destination", null, null)
+            new CopyValue("$.source", null, "$.destination", null)
           ),
           yaml(
             """
@@ -108,7 +108,7 @@ class CopyValueTest implements RewriteTest {
     void copyToOtherFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.yml", "$.destination", "b.yml", null)
+            new CopyValue("$.source", "a.yml", "$.destination", "b.yml")
           ),
           yaml(
             """
