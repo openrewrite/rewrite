@@ -135,6 +135,38 @@ class CopyValueTest implements RewriteTest {
           json(
             """
               {
+                "source": "original"
+              }
+              """,
+            """
+              {
+                "source": "original",
+                "destination": "value"
+              }
+              """,
+            spec -> spec.path("b.json")
+          )
+        );
+    }
+
+    @Test
+    void copyToOtherFileWithEmptyObject() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new CopyValue("$.source", "a.json", "destination", "b.json")
+          ),
+          json(
+            """
+              {
+                "source": "value",
+                "destination": "original"
+              }
+              """,
+            spec -> spec.path("a.json")
+          ),
+          json(
+            """
+              {
               }
               """,
             """
