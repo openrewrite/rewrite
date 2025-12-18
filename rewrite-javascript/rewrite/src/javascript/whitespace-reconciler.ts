@@ -41,9 +41,10 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
     protected compatible: boolean = true;
 
     /**
-     * The ID of the subtree to reconcile. If undefined, reconcile everything.
+     * The subtree to reconcile (by reference). If undefined, reconcile everything.
+     * Can be a J node, RightPadded, LeftPadded, or Container.
      */
-    private targetSubtreeId?: string;
+    private targetSubtree?: any;
 
     /**
      * Tracks the reconciliation state:
@@ -58,15 +59,17 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
      *
      * @param original The original tree (with types, markers, etc.)
      * @param formatted The formatted tree (with desired whitespace)
-     * @param targetSubtree Optional subtree to limit reconciliation to. If provided,
-     *                      only this subtree and its descendants will have whitespace applied.
+     * @param targetSubtree Optional subtree to limit reconciliation to (by reference).
+     *                      Can be a J node, RightPadded, LeftPadded, or Container.
+     *                      If provided, only this subtree and its descendants will have
+     *                      whitespace and markers applied.
      * @returns The original tree with whitespace from the formatted tree
      */
-    async reconcile(original: J, formatted: J, targetSubtree?: J): Promise<J> {
+    async reconcile(original: J, formatted: J, targetSubtree?: any): Promise<J> {
         this.compatible = true;
         this.formattedCursor = undefined;
         this.cursor = new Cursor(undefined, undefined);
-        this.targetSubtreeId = targetSubtree?.id;
+        this.targetSubtree = targetSubtree;
         this.reconcileState = targetSubtree ? 'searching' : 'reconciling';
 
         const result = await this.visit(original, formatted);
@@ -81,39 +84,21 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
-     * Override visit to use visitElement for all nodes.
+     * Override visit for J nodes. Updates the formatted cursor.
+     * Note: Target subtree tracking is handled in visitProperty.
      */
-    override async visit<R extends J>(tree: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+    override async visit<R extends J>(tree: Tree, p: J, _parent?: Cursor): Promise<R | undefined> {
         if (!this.compatible) return tree as R;
-
-        const original = tree as J;
-        const formatted = p;
-
-        // Check kind match
-        if (original.kind !== formatted.kind) {
-            return this.structureMismatch(original) as R;
-        }
-
-        // Track entering the target subtree
-        const isTargetSubtree = this.targetSubtreeId !== undefined && original.id === this.targetSubtreeId;
-        const previousState = this.reconcileState;
-        if (isTargetSubtree && this.reconcileState === 'searching') {
-            this.reconcileState = 'reconciling';
-        }
 
         // Update formattedCursor
         const savedFormattedCursor = this.formattedCursor;
-        this.formattedCursor = new Cursor(formatted, this.formattedCursor);
+        this.formattedCursor = new Cursor(p, this.formattedCursor);
 
         try {
-            const result = await this.visitElement(original, formatted);
+            const result = await this.visitNode(tree, p);
             return result as R;
         } finally {
             this.formattedCursor = savedFormattedCursor;
-            // Track exiting the target subtree
-            if (isTargetSubtree && previousState === 'searching') {
-                this.reconcileState = 'done';
-            }
         }
     }
 
@@ -126,14 +111,8 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
-     * Copies a Space from formatted tree.
-     */
-    protected reconcileSpace(original: J.Space, formatted: J.Space): J.Space {
-        return this.shouldReconcile() ? formatted : original;
-    }
-
-    /**
      * Visit a property value, handling all the different types appropriately.
+     * This is the central entry point for visiting any node, including wrappers.
      */
     protected async visitProperty(original: any, formatted: any): Promise<any> {
         // Handle null/undefined
@@ -146,39 +125,44 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
 
         const kind = original.kind;
 
-        switch (kind) {
-            case J.Kind.Space:
-                return this.reconcileSpace(original, formatted);
+        // Type nodes - short-circuit, keep original (types don't have whitespace)
+        if (typeof kind === 'string' && kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
+            return original;
+        }
 
-            case J.Kind.RightPadded:
-                return this.visitRightPaddedReconcile(original, formatted);
+        // Primitive values or non-tree objects - return original unchanged
+        if (kind === undefined || typeof kind !== 'string') {
+            return original;
+        }
 
-            case J.Kind.LeftPadded:
-                return this.visitLeftPaddedReconcile(original, formatted);
+        // Space nodes - copy when reconciling, don't recurse
+        if (kind === J.Kind.Space) {
+            return this.shouldReconcile() ? formatted : original;
+        }
 
-            case J.Kind.Container:
-                return this.visitContainerReconcile(original, formatted);
+        // Track entering target subtree (using referential equality)
+        const isTargetSubtree = this.targetSubtree !== undefined && original === this.targetSubtree;
+        const previousState = this.reconcileState;
+        if (isTargetSubtree && this.reconcileState === 'searching') {
+            this.reconcileState = 'reconciling';
+        }
 
-            default:
-                // Type nodes - short-circuit, keep original (types don't have whitespace)
-                if (typeof kind === 'string' && kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
-                    return original;
-                }
-
-                // Tree node (has a kind property that's a string)
-                if (kind !== undefined && typeof kind === 'string') {
-                    return this.visit(original, formatted);
-                }
-
-                // Primitive values - return original unchanged
-                return original;
+        try {
+            // All tree nodes (J, RightPadded, LeftPadded, Container) go through visitNode
+            return await this.visitNode(original, formatted);
+        } finally {
+            // Track exiting the target subtree
+            if (isTargetSubtree && previousState === 'searching') {
+                this.reconcileState = 'done';
+            }
         }
     }
 
     /**
-     * Visit all properties of an element and copy prefix from formatted.
+     * Visit all properties of a tree node (J, RightPadded, LeftPadded, Container).
+     * Copies Space values and markers when reconciling, visits everything else.
      */
-    protected async visitElement<T extends J>(original: T, formatted: T): Promise<T> {
+    protected async visitNode(original: any, formatted: any): Promise<any> {
         if (!this.compatible) {
             return original;
         }
@@ -188,21 +172,12 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
             return this.structureMismatch(original);
         }
 
-        // Start with original, will copy prefix
         let result = original;
 
-        // Copy prefix from formatted when reconciling
-        if (this.shouldReconcile() && 'prefix' in original && 'prefix' in formatted) {
-            result = produce(result, (draft: any) => {
-                draft.prefix = (formatted as any).prefix;
-                draft.markers = (formatted as any).markers;
-            });
-        }
-
-        // Visit all child properties
+        // Visit all properties
         for (const key of Object.keys(original)) {
-            // Skip: kind, id, markers, prefix (already copied), type properties
-            if (key === 'kind' || key === 'id' || key === 'markers' || key === 'prefix' ||
+            // Skip: kind, id, type properties
+            if (key === 'kind' || key === 'id' ||
                 key === 'type' || key === 'fieldType' || key === 'variableType' ||
                 key === 'methodType' || key === 'constructorType') {
                 continue;
@@ -210,6 +185,16 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
 
             const originalValue = (original as any)[key];
             const formattedValue = (formatted as any)[key];
+
+            // Space values and markers: copy from formatted when reconciling
+            if (originalValue?.kind === J.Kind.Space || key === 'markers') {
+                if (this.shouldReconcile() && formattedValue !== originalValue) {
+                    result = produce(result, (draft: any) => {
+                        draft[key] = formattedValue;
+                    });
+                }
+                continue;
+            }
 
             // Handle arrays
             if (Array.isArray(originalValue)) {
@@ -247,101 +232,6 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
         }
 
         return result;
-    }
-
-    /**
-     * Reconcile RightPadded - copy 'after' whitespace and markers.
-     * Markers are copied because Prettier may add/remove semicolons or trailing commas,
-     * which are represented as markers on RightPadded elements.
-     */
-    protected async visitRightPaddedReconcile<T extends J | boolean>(
-        original: J.RightPadded<T>,
-        formatted: J.RightPadded<T>
-    ): Promise<J.RightPadded<T>> {
-        if (!this.compatible) return original;
-
-        if ((formatted as any).kind !== J.Kind.RightPadded) {
-            return this.structureMismatch(original);
-        }
-
-        // Visit the element
-        const visitedElement = await this.visitProperty(original.element, formatted.element);
-        if (!this.compatible) return original;
-
-        // Copy 'after' whitespace and markers when reconciling
-        return produce(original, draft => {
-            (draft as any).element = visitedElement;
-            if (this.shouldReconcile()) {
-                draft.after = formatted.after;
-                draft.markers = formatted.markers;
-            }
-        });
-    }
-
-    /**
-     * Reconcile LeftPadded - copy 'before' whitespace.
-     */
-    protected async visitLeftPaddedReconcile<T extends J | J.Space | number | string | boolean>(
-        original: J.LeftPadded<T>,
-        formatted: J.LeftPadded<T>
-    ): Promise<J.LeftPadded<T>> {
-        if (!this.compatible) return original;
-
-        if ((formatted as any).kind !== J.Kind.LeftPadded) {
-            return this.structureMismatch(original);
-        }
-
-        // Visit the element
-        const visitedElement = await this.visitProperty(original.element, formatted.element);
-        if (!this.compatible) return original;
-
-        // Copy 'before' whitespace when reconciling
-        return produce(original, draft => {
-            (draft as any).element = visitedElement;
-            if (this.shouldReconcile()) {
-                draft.before = formatted.before;
-                draft.markers = formatted.markers;
-            }
-        });
-    }
-
-    /**
-     * Reconcile Container - copy 'before' whitespace and visit elements.
-     */
-    protected async visitContainerReconcile<T extends J>(
-        original: J.Container<T>,
-        formatted: J.Container<T>
-    ): Promise<J.Container<T>> {
-        if (!this.compatible) return original;
-
-        if ((formatted as any).kind !== J.Kind.Container) {
-            return this.structureMismatch(original);
-        }
-
-        // Check array length
-        if (original.elements.length !== formatted.elements.length) {
-            return this.structureMismatch(original);
-        }
-
-        // Visit each element
-        const newElements: J.RightPadded<T>[] = [];
-        for (let i = 0; i < original.elements.length; i++) {
-            const visited = await this.visitRightPaddedReconcile(
-                original.elements[i],
-                formatted.elements[i]
-            );
-            if (!this.compatible) return original;
-            newElements.push(visited);
-        }
-
-        // Copy 'before' whitespace when reconciling
-        return produce(original, draft => {
-            if (this.shouldReconcile()) {
-                draft.before = formatted.before;
-                draft.markers = formatted.markers;
-            }
-            (draft as any).elements = newElements;
-        });
     }
 
     /**
