@@ -63,14 +63,31 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             const mi = tree as J.MethodInvocation;
             if (mi.select && mi.select.after.whitespace.includes("\n")) {
                 // This MethodInvocation has a chained method call after it
-                // Store the ORIGINAL parent indent context in "chainedIndentContext"
+                // Store the BASE indent context in "chainedIndentContext"
                 // This will be propagated down and used when we reach the chain's innermost element
-                const parentContext = this.getParentIndentContext(cursor);
-                cursor.messages.set("chainedIndentContext", parentContext);
-                // For children (arguments), use continuation indent
-                // But the prefix will be normalized in postVisit using chainedIndentContext
-                const [parentIndent, parentIndentKind] = parentContext;
-                cursor.messages.set("indentContext", [parentIndent + this.indentSize, parentIndentKind] as IndentContext);
+                const [parentIndent, parentIndentKind] = this.getParentIndentContext(cursor);
+
+                // If this chain-start itself is on a new line and we're in continuation context,
+                // the base indent includes continuation.
+                // BUT if parentIndentKind is 'align', we're likely in a Block child context where
+                // the parent already set the correct indent - don't add extra continuation.
+                const prefixHasNewline = this.prefixContainsNewline(tree);
+                let baseIndent = parentIndent;
+                if (prefixHasNewline && parentIndentKind !== 'align') {
+                    baseIndent += this.indentSize;
+                }
+
+                // If we're inside a Lambda expression body that's inside a Container (like method arguments),
+                // add another continuation for the Container context
+                const isLambdaBodyContainer = this.isLambdaBodyInsideContainer(cursor);
+                if (prefixHasNewline && isLambdaBodyContainer) {
+                    baseIndent += this.indentSize;
+                }
+
+                cursor.messages.set("chainedIndentContext", [baseIndent, parentIndentKind] as IndentContext);
+                // For children (arguments), use continuation indent from base
+                cursor.messages.set("indentContext", [baseIndent + this.indentSize, parentIndentKind] as IndentContext);
+
                 return;
             }
             // Check if we're at the base of a chain (no select) and parent has chainedIndentContext
@@ -122,11 +139,23 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     private getParentIndentContext(cursor: Cursor): IndentContext {
         // Walk up the cursor chain to find the nearest indent context
         // We need to walk because intermediate nodes like RightPadded may not have context set
+        let passedScopeBoundary = false;
+
         for (let c = cursor.parent; c != null; c = c.parent) {
+            // Check if we're passing a scope boundary (Lambda creates a new scope)
+            // After crossing a Lambda, we should ignore chainedIndentContext from outer scopes
+            const nodeKind = (c.value as any)?.kind;
+            if (nodeKind === J.Kind.Lambda) {
+                passedScopeBoundary = true;
+            }
+
             // chainedIndentContext stores the original context - prefer it
-            const chainedContext = c.messages.get("chainedIndentContext") as IndentContext | undefined;
-            if (chainedContext !== undefined) {
-                return chainedContext;
+            // BUT only if we haven't crossed a scope boundary (like Lambda)
+            if (!passedScopeBoundary) {
+                const chainedContext = c.messages.get("chainedIndentContext") as IndentContext | undefined;
+                if (chainedContext !== undefined) {
+                    return chainedContext;
+                }
             }
 
             const context = c.messages.get("indentContext") as IndentContext | undefined;
@@ -219,6 +248,28 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         }
     }
 
+    private isLambdaBodyInsideContainer(cursor: Cursor): boolean {
+        // Check if we're the DIRECT Lambda body (not inside a Block that's the Lambda body)
+        // AND that Lambda is inside a Container (method arguments)
+        // Walk up to find Lambda, but stop if we hit a Block (meaning we're inside a block body, not expression body)
+        let foundLambda = false;
+        for (let c = cursor.parent; c != null; c = c.parent) {
+            const kind = (c.value as any)?.kind;
+            // If we hit a Block before Lambda, we're inside the block body, not expression body
+            if (!foundLambda && kind === J.Kind.Block) {
+                return false;
+            }
+            if (kind === J.Kind.Lambda) {
+                foundLambda = true;
+            }
+            // After finding Lambda, check for Container
+            if (foundLambda && kind && kind === J.Kind.Container) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     override async postVisit(tree: J, _p: P): Promise<J | undefined> {
         if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
             this.cursor?.root.messages.set("stop", true);
@@ -241,12 +292,12 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         let [myIndent] = indentContext;
 
         // For chain-start MethodInvocations, the prefix contains whitespace before the chain BASE
-        // Use chainedIndentContext (the original indent) for the prefix, not the continuation indent
+        // Use chainedIndentContext for the prefix - it already accounts for newlines
         const chainedContext = this.cursor.messages.get("chainedIndentContext") as IndentContext | undefined;
         if (chainedContext !== undefined && tree.kind === J.Kind.MethodInvocation) {
             const mi = tree as J.MethodInvocation;
             if (mi.select && mi.select.after.whitespace.includes("\n")) {
-                // This is a chain-start - use original indent for prefix normalization
+                // This is a chain-start - use the base indent from chainedIndentContext
                 myIndent = chainedContext[0];
             }
         }
@@ -521,8 +572,12 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
         // Check if parent has chainedIndentContext - if so, this is the select of a method chain
         // Propagate chainedIndentContext but do NOT set indentContext
+        // EXCEPTION: Do NOT propagate into Lambda bodies - arrow functions create a new scope
         const parentChainedContext = this.cursor.parent?.messages.get("chainedIndentContext") as IndentContext | undefined;
-        if (parentChainedContext !== undefined) {
+        const elementKind = (right.element as any)?.kind;
+        const isLambdaBody = elementKind === J.Kind.Lambda;
+
+        if (parentChainedContext !== undefined && !isLambdaBody) {
             this.cursor.messages.set("chainedIndentContext", parentChainedContext);
             // Do NOT set indentContext - child elements will use chainedIndentContext
             return;
@@ -530,7 +585,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
         // Check if Parentheses wraps a Binary expression - if so, let Binary handle its own indent
         const rightPaddedParentKind = this.cursor.parent?.value?.kind;
-        const elementKind = (right.element as any)?.kind;
         const isParenthesesWrappingBinary = rightPaddedParentKind === J.Kind.Parentheses &&
             elementKind === J.Kind.Binary;
 

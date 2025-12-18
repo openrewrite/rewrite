@@ -47,6 +47,7 @@ import static org.openrewrite.javascript.Assertions.*;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 class JavaScriptRewriteRpcTest implements RewriteTest {
     @TempDir
@@ -55,10 +56,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @BeforeEach
     void before() {
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-          .recipeInstallDir(tempDir)
-          .metricsCsv(tempDir.resolve("rpc.csv"))
-          .log(tempDir.resolve("rpc.log"))
-          .traceRpcMessages()
+            .recipeInstallDir(tempDir)
+            .metricsCsv(tempDir.resolve("rpc.csv"))
+            .log(tempDir.resolve("rpc.log"))
+            .traceRpcMessages()
 //          .inspectBrk(Path.of("rewrite"))
 //          .timeout(Duration.ofHours(1))
         );
@@ -301,6 +302,22 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void printYaml() {
+        @Language("yaml")
+        String yamlContent = """
+          name: my-project
+          version: 0.0.1
+          dependencies:
+            - lodash
+            - express
+          """;
+        rewriteRun(
+          yaml(yamlContent, spec -> spec.beforeRecipe(yaml ->
+            assertThat(client().print(yaml)).isEqualTo(yamlContent.trim())))
+        );
+    }
+
+    @Test
     void parsePackageJsonWithNodeResolutionResultMarker(@TempDir Path projectDir) {
         rewriteRun(
           spec -> spec.relativeTo(projectDir),
@@ -426,6 +443,24 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             .expectedCyclesThatMakeChanges(1),
           text("file1", "file1 (count: 2)"),
           text("file2", "file2 (count: 2)")
+        );
+    }
+
+    @Test
+    void environmentVariableIsSetRemotely() {
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .environment(Map.of("HTTPS_PROXY", "http://unused:3128"))
+        );
+        installRecipes();
+
+        rewriteRun(spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.replace-assignment",
+              Map.of("variable", "HTTPS_PROXY"))),
+          javascript(
+            "const v = 'value'",
+            "const v = 'http://unused:3128'"
+          )
         );
     }
 

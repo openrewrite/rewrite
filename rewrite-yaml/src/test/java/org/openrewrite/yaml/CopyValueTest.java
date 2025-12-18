@@ -127,4 +127,20 @@ class CopyValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void createNewKeysFalse() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new CopyValue("$.source", null, "$.destination", null, false)
+          ),
+          yaml(
+            """
+              source:
+                foo: bar
+                key: value
+              """
+          )
+        );
+    }
 }

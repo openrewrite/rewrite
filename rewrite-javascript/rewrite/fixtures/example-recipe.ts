@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeRegistry} from "../src";
+import {RecipeRegistry} from "@openrewrite/rewrite";
 import {FindIdentifier} from "./search-recipe";
 import {CreateText} from "./create-text";
 import {ChangeText} from "./change-text";
@@ -26,6 +26,7 @@ import {MarkTypes} from "./mark-types";
 import {MarkPrimitiveTypes} from "./mark-primitive-types";
 import {MarkClassTypes} from "./mark-class-types";
 import {ScanningEditor} from "./scanning-editor";
+import {ReplaceAssignment} from "./replace-assignment";
 
 export function activate(registry: RecipeRegistry) {
     registry.register(ChangeText);
@@ -40,4 +41,5 @@ export function activate(registry: RecipeRegistry) {
     registry.register(MarkPrimitiveTypes);
     registry.register(MarkClassTypes);
     registry.register(ScanningEditor);
+    registry.register(ReplaceAssignment);
 }

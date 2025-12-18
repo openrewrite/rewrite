@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {ChangeText} from "./change-text";
-import {Recipe} from "../src";
+import {Recipe} from "@openrewrite/rewrite";
 
 export class RecipeWithRecipeList extends Recipe {
     name = "org.openrewrite.example.text.with-recipe-list"

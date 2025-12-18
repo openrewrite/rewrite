@@ -15,7 +15,10 @@
  */
 
 import {beforeEach, describe, expect, test} from '@jest/globals';
-import {findRecipe, isAcceptedFile, parseRecipeOptions, parseRecipeSpec} from '../../src/cli/cli-utils';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import {discoverFiles, findRecipe, isAcceptedFile, parseRecipeOptions, parseRecipeSpec} from '../../src/cli/cli-utils';
 import {Recipe, RecipeRegistry} from '../../src';
 
 // Test recipe classes for findRecipe tests
@@ -281,5 +284,58 @@ describe('findRecipe', () => {
         const recipe = findRecipe(registry, 'another', {});
         expect(recipe).not.toBeNull();
         expect(recipe!.name).toBe('org.openrewrite.test.another-recipe');
+    });
+});
+
+describe('discoverFiles', () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+        // Create a unique temp directory for each test
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rewrite-cli-test-'));
+    });
+
+    afterEach(() => {
+        // Clean up temp directory
+        fs.rmSync(tmpDir, {recursive: true, force: true});
+    });
+
+    test('discovers files in non-git directory', async () => {
+        // Create test files
+        fs.writeFileSync(path.join(tmpDir, 'index.js'), 'console.log("hello")');
+        fs.writeFileSync(path.join(tmpDir, 'package.json'), '{"name": "test"}');
+        fs.writeFileSync(path.join(tmpDir, 'README.md'), '# Test'); // Should be excluded
+
+        const files = await discoverFiles(tmpDir);
+
+        expect(files).toHaveLength(2);
+        expect(files.some(f => f.endsWith('index.js'))).toBe(true);
+        expect(files.some(f => f.endsWith('package.json'))).toBe(true);
+        expect(files.some(f => f.endsWith('README.md'))).toBe(false);
+    });
+
+    test('discovers files in subdirectories of non-git directory', async () => {
+        // Create nested structure
+        fs.mkdirSync(path.join(tmpDir, 'src'));
+        fs.writeFileSync(path.join(tmpDir, 'src', 'app.ts'), 'export const x = 1');
+        fs.writeFileSync(path.join(tmpDir, 'package.json'), '{}');
+
+        const files = await discoverFiles(tmpDir);
+
+        expect(files).toHaveLength(2);
+        expect(files.some(f => f.includes('src') && f.endsWith('app.ts'))).toBe(true);
+    });
+
+    test('excludes node_modules in non-git directory', async () => {
+        // Create node_modules directory with files
+        fs.mkdirSync(path.join(tmpDir, 'node_modules'));
+        fs.writeFileSync(path.join(tmpDir, 'node_modules', 'dep.js'), 'module.exports = {}');
+        fs.writeFileSync(path.join(tmpDir, 'index.js'), 'require("dep")');
+
+        const files = await discoverFiles(tmpDir);
+
+        expect(files).toHaveLength(1);
+        expect(files.some(f => f.endsWith('index.js'))).toBe(true);
+        expect(files.some(f => f.includes('node_modules'))).toBe(false);
     });
 });
