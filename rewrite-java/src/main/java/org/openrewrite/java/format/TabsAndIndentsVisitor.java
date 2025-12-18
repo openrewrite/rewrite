@@ -257,7 +257,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         int indent = getCursor().getNearestMessage("lastIndent", 0);
         JavaSourceFile sourceFile;
         SourcePositionService positionService;
-        int alignTo;
         if (right.getElement() instanceof J) {
             J elem = (J) right.getElement();
             if (right.getAfter().getLastWhitespace().contains("\n") ||
@@ -305,6 +304,21 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             }
                         }
                         break;
+                    case METHOD_SELECT:
+                        if (evaluate(() -> wrappingStyle.getChainedMethodCalls().getAlignWhenMultiline(), false)) {
+                            Integer chainedIndent = getCursor().getParent() == null ? null : getCursor().getParent().getMessage("chainedIndent");
+                            if (chainedIndent == null) {
+                                sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                                positionService = sourceFile.service(SourcePositionService.class);
+                                ColSpan colSpan = positionService.columnsOf(getCursor().getParentTreeCursor(), getChainStarterSelect((JRightPadded<Expression>) right).getElement());
+                                getCursor().getParentTreeCursor().putMessage("chainedIndent", colSpan.getEndColumn() - colSpan.getRowIndent() - 1 + indent);
+                            } else {
+                                getCursor().getParentTreeCursor().putMessage("chainedIndent", chainedIndent);
+                            }
+                        }
+                        elem = visitAndCast(elem, p);
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
                     case METHOD_DECLARATION_PARAMETER:
                     case RECORD_STATE_VECTOR:
                     case ARRAY_INDEX:
@@ -324,22 +338,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
 
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-                        break;
-                    case METHOD_SELECT:
-                        elem = visitAndCast(elem, p);
-                        alignTo = -1;
-                        if (right.getAfter().getLastWhitespace().contains("\n")) {
-                            sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                            positionService = sourceFile.service(SourcePositionService.class);
-                            if (evaluate(() -> wrappingStyle.getChainedMethodCalls().getAlignWhenMultiline(), false)) {
-                                alignTo = indent + positionService.computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
-                            }
-                        }
-                        if (alignTo != -1) {
-                            after = indentTo(right.getAfter(), alignTo, loc.getAfterLocation());
-                        } else {
-                            after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-                        }
                         break;
                     default:
                         elem = visitAndCast(elem, p);
@@ -717,29 +715,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return size;
     }
 
-    private int forInitColumn() {
-        Cursor forCursor = getCursor().dropParentUntil(J.ForLoop.class::isInstance);
-        J.ForLoop forLoop = forCursor.getValue();
-        Object parent = forCursor.getParentOrThrow().getValue();
-        @SuppressWarnings("ConstantConditions") J alignTo = parent instanceof J.Label ?
-                ((J.Label) parent).withStatement(forLoop.withBody(null)) :
-                forLoop.withBody(null);
-
-        int column = 0;
-        boolean afterInitStart = false;
-        String print = alignTo.print(getCursor());
-        for (int i = 0; i < print.length(); i++) {
-            char c = print.charAt(i);
-            if (c == '(') {
-                afterInitStart = true;
-            } else if (afterInitStart && !Character.isWhitespace(c)) {
-                return column - 1;
-            }
-            column++;
-        }
-        throw new IllegalStateException("For loops must have a control section");
-    }
-
     @Override
     public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
@@ -761,6 +736,43 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         INDENT,
         CONTINUATION_INDENT
     }
+
+    private JRightPadded<Expression> getChainStarterSelect(JRightPadded<Expression> method) {
+        if (!(method.getElement() instanceof J.MethodInvocation)) {
+            return method;
+        }
+        J.MethodInvocation methodInvocation = (J.MethodInvocation) method.getElement();
+        if (methodInvocation.getSelect() == null || (methodInvocation.getSelect() instanceof J.MethodInvocation && ((J.MethodInvocation) methodInvocation.getSelect()).getSelect() == null)) {
+            return method;
+        }
+        if (methodInvocation.getSelect() instanceof MethodCall) {
+            return getChainStarterSelect(methodInvocation.getPadding().getSelect());
+        }
+        return methodInvocation.getPadding().getSelect();
+    }
+
+    private Cursor getChainedMethodCursor(Cursor cursor) {
+        Cursor methodCursor = null;
+        if (cursor.getValue() instanceof J.MethodInvocation) {
+            methodCursor = cursor;
+        } else if (cursor.getValue() instanceof JRightPadded) {
+            if (cursor.getParent() != null && cursor.getParent().getValue() instanceof J.MethodInvocation) {
+                methodCursor = cursor.getParent();
+            }
+        }
+        if (methodCursor == null) {
+            throw new IllegalStateException("Can only calculate the chained method parent for methodInvocation cursors or their RightPadded wrappers.");
+        }
+
+        Cursor parent = methodCursor.getParent(2);
+        while (parent != null && parent.getValue() instanceof J.MethodInvocation) {
+            methodCursor = parent;
+            parent = parent.getParent(2);
+        }
+
+        return methodCursor;
+    }
+
 
     private boolean alignWhenMultiline(JContainer.Location location) {
         switch (location) {

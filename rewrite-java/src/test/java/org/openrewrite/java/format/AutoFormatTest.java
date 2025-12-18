@@ -2257,6 +2257,8 @@ class AutoFormatTest implements RewriteTest {
 
                   class Test1 {
                       private static final StringBuilder sb = new StringBuilder().append("testing long methods").append(" get wrapped").append(" and receive correct indentation");
+                      private static final StringBuilder sb1 =
+                          new StringBuilder().append("testing long methods").append(" get wrapped").append(" and receive correct indentation");
                       private final MyObject value = MyObject.builder().name("hello").age(30).build();
                   }
                   """,
@@ -2267,6 +2269,10 @@ class AutoFormatTest implements RewriteTest {
                       private static final StringBuilder sb = new StringBuilder().append("testing long methods")
                                                                                  .append(" get wrapped")
                                                                                  .append(" and receive correct indentation");
+                      private static final StringBuilder sb1 =
+                              new StringBuilder().append("testing long methods")
+                                                 .append(" get wrapped")
+                                                 .append(" and receive correct indentation");
                       private final MyObject value = MyObject.builder()
                                                              .name("hello")
                                                              .age(30)
