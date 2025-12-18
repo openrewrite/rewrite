@@ -52,7 +52,7 @@ export class ReplaceAssignment extends Recipe {
                         markers: emptyMarkers,
                         valueSource: envVarValue,
                         type: Type.Primitive.String,
-                    },
+                    } as J.Literal,
                     before: singleSpace,
                 };
                 return finishDraft(draft);

@@ -580,6 +580,30 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
+    protected async visitTypeParameter(typeParam: J.TypeParameter, p: P): Promise<J | undefined> {
+        const ret = await super.visitTypeParameter(typeParam, p) as J.TypeParameter;
+        return produce(ret, draft => {
+            if (draft.bounds && draft.bounds.elements.length >= 2) {
+                const constraintType = draft.bounds.elements[0];
+                const defaultType = draft.bounds.elements[1];
+                const hasConstraint = constraintType.element.kind !== J.Kind.Empty;
+                const hasDefault = defaultType.element.kind !== J.Kind.Empty;
+
+                if (hasConstraint) {
+                    // Space before '=' for default type (in the `after` of constraint type)
+                    if (hasDefault && !constraintType.after.whitespace.includes("\n")) {
+                        constraintType.after.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                    }
+                } else if (hasDefault) {
+                    // No constraint, just default: space before '=' is in bounds.before
+                    if (!draft.bounds.before.whitespace.includes("\n")) {
+                        draft.bounds.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                    }
+                }
+            }
+        });
+    }
+
     private async spaceAfterRightPadded<T extends J>(right: J.RightPadded<T>, spaceAfter: boolean): Promise<J.RightPadded<T>> {
         if (right.after.comments.length > 0) {
             // Perform the space rule for the suffix of the last comment only. Same as IntelliJ.

@@ -342,4 +342,24 @@ const d = {x, y, z};`
             // @formatter:on
         )
     });
+
+    test('type parameter default should have space before equals', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            typescript(
+                `type Test<TFieldValues extends FieldValues= FieldValues> = TFieldValues;`,
+                `type Test<TFieldValues extends FieldValues = FieldValues> = TFieldValues;`
+            )
+        )
+    });
+
+    test('type parameter default without extends should have space before equals', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            typescript(
+                `function createArray<T= string>(value: T): T[] { return [value]; }`,
+                `function createArray<T = string>(value: T): T[] { return [value]; }`
+            )
+        )
+    });
 });
