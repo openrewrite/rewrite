@@ -1451,13 +1451,16 @@ class ChangeParentPomTest implements RewriteTest {
                     </parent>
                   </project>
                   """,
-                spec -> spec.after(actual -> {
+                spec -> spec.after(actual ->
                     assertThat(actual)
+                      .as("Does not bring in Maven arguments.")
+                      .contains("<maven.repo.local>${user.home}/.m2/repository</maven.repo.local>")
+                      .contains("<owaspDb>${maven.repo.local}/blah</owaspDb>")
                       .as("Any version of Spring boot parent above `3.5.7`")
                       .doesNotContain("3.5.7")
-                      .containsPattern("<version>3\\.5\\.\\d+</version>");
-                    return actual;
-                })
+                      .containsPattern("<version>3\\.5\\.\\d+</version>")
+                      .actual()
+                )
               )
             );
         }
