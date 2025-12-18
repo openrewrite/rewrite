@@ -18,15 +18,18 @@ import {JavaScriptVisitor} from "./visitor";
 import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isScope, Tree} from "../tree";
-import {BlankLinesStyle, getStyle, PrettierStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "./style";
+import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "./style";
 import {NamedStyles} from "../style";
 import {produceAsync} from "../visitor";
-import {findMarker} from "../markers";
 import {Generator} from "./markers";
 import {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
-import {prettierFormat, prettierFormatSubtree, PrettierFormatOptions} from "./prettier-format";
+import {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
+import {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
+import {applyPrettierFormatting, getPrettierStyle} from "./prettier-format";
 
 export {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
+export {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
+export {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
 
 export const maybeAutoFormat = async <J2 extends J, P>(before: J2, after: J2, p: P, stopAfter?: J, parent?: Cursor): Promise<J2> => {
     if (before !== after) {
@@ -66,18 +69,18 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
         // Check for PrettierStyle in styles array or as marker on source file
         // If found, delegate entirely to Prettier (skip other formatting visitors)
-        const prettierStyle = this.getPrettierStyle(tree, cursor);
+        const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
         if (prettierStyle) {
-            return this.applyPrettierFormatting(tree as R, prettierStyle, p, cursor);
+            return applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter, this.styles);
         }
 
-        // Run all visitors except TabsAndIndentsVisitor first
         const visitors = [
             new NormalizeWhitespaceVisitor(this.stopAfter),
             new MinimumViableSpacingVisitor(this.stopAfter),
             new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, tree, this.styles) as BlankLinesStyle, this.stopAfter),
             new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, tree, this.styles) as WrappingAndBracesStyle, this.stopAfter),
             new SpacesVisitor(getStyle(StyleKind.SpacesStyle, tree, this.styles) as SpacesStyle, this.stopAfter),
+            new TabsAndIndentsVisitor(getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle, this.stopAfter),
         ]
 
         let t: R | undefined = tree as R;
@@ -88,150 +91,7 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        // Apply indentation formatting with TabsAndIndentsVisitor
-        const tabsVisitor = new TabsAndIndentsVisitor(
-            getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle,
-            this.stopAfter
-        );
-        return await tabsVisitor.visit(t, p, cursor) as R | undefined;
-    }
-
-    /**
-     * Gets the PrettierStyle from the styles array or source file markers.
-     */
-    private getPrettierStyle(tree: Tree, cursor?: Cursor): PrettierStyle | undefined {
-        // First check the styles array
-        if (this.styles) {
-            const fromStyles = this.styles.find(s => (s as any).kind === StyleKind.PrettierStyle);
-            if (fromStyles) {
-                return fromStyles as unknown as PrettierStyle;
-            }
-        }
-
-        // Then check for PrettierStyle marker on source file
-        let sourceFile: JS.CompilationUnit | undefined;
-
-        if (tree.kind === JS.Kind.CompilationUnit) {
-            sourceFile = tree as JS.CompilationUnit;
-        } else if (cursor) {
-            // Walk up the cursor to find the compilation unit
-            let current: Cursor | undefined = cursor;
-            while (current) {
-                if (current.value?.kind === JS.Kind.CompilationUnit) {
-                    sourceFile = current.value as JS.CompilationUnit;
-                    break;
-                }
-                current = current.parent;
-            }
-        }
-
-        if (!sourceFile) {
-            return undefined;
-        }
-
-        return findMarker(sourceFile, StyleKind.PrettierStyle) as PrettierStyle | undefined;
-    }
-
-    /**
-     * Applies Prettier formatting to the tree.
-     *
-     * Configuration is resolved from:
-     * 1. PrettierStyle marker on source file (if present)
-     * 2. TabsAndIndentsStyle defaults
-     *
-     * For compilation units, formats and reconciles the entire tree.
-     * For subtrees, uses prettierFormatSubtree which prunes the tree for efficiency,
-     * formats the pruned tree, and reconciles only the target subtree.
-     */
-    private async applyPrettierFormatting<R extends J>(
-        tree: R,
-        prettierStyle: PrettierStyle | undefined,
-        p: P,
-        cursor?: Cursor
-    ): Promise<R | undefined> {
-        // Run only the essential visitors first
-        const essentialVisitors = [
-            new NormalizeWhitespaceVisitor(this.stopAfter),
-            new MinimumViableSpacingVisitor(this.stopAfter),
-        ];
-
-        let t: R | undefined = tree;
-        for (const visitor of essentialVisitors) {
-            t = await visitor.visit(t, p, cursor);
-            if (t === undefined) {
-                return undefined;
-            }
-        }
-
-        // Build options from PrettierStyle or TabsAndIndentsStyle defaults
-        const tabsAndIndentsStyle = getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle;
-        let prettierOpts: PrettierFormatOptions = {
-            tabWidth: tabsAndIndentsStyle.indentSize,
-            useTabs: tabsAndIndentsStyle.useTabCharacter,
-        };
-
-        if (prettierStyle) {
-            prettierOpts = {
-                ...prettierOpts,
-                tabWidth: prettierStyle.config.tabWidth as number | undefined ?? prettierOpts.tabWidth,
-                useTabs: prettierStyle.config.useTabs as boolean | undefined ?? prettierOpts.useTabs,
-                semi: prettierStyle.config.semi as boolean | undefined,
-                singleQuote: prettierStyle.config.singleQuote as boolean | undefined,
-                trailingComma: prettierStyle.config.trailingComma as 'all' | 'es5' | 'none' | undefined,
-                printWidth: prettierStyle.config.printWidth as number | undefined,
-            };
-        }
-
-        try {
-            if (t.kind === JS.Kind.CompilationUnit) {
-                // Format and reconcile the entire compilation unit
-                const formatted = await prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts);
-                return formatted as unknown as R;
-            }
-
-            if (!cursor) {
-                // No cursor provided, fall back to TabsAndIndentsVisitor
-                const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);
-                return await tabsVisitor.visit(t, p, cursor) as R;
-            }
-
-            // Use prettierFormatSubtree for subtree formatting
-            const formatted = await prettierFormatSubtree(t, cursor, prettierOpts);
-            if (formatted) {
-                return formatted as R;
-            }
-
-            // Fall back to TabsAndIndentsVisitor if subtree formatting failed
-            const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);
-            return await tabsVisitor.visit(t, p, cursor) as R;
-        } catch (e) {
-            // If Prettier fails, return tree with essential formatting applied
-            console.warn('Prettier formatting failed, returning with essential formatting only:', e);
-            return t;
-        }
-    }
-}
-
-export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
-    // called NormalizeFormat in Java
-    // Ensures that whitespace is on the outermost AST element possible
-
-    constructor(private stopAfter?: Tree) {
-        super();
-    }
-
-    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
-        if (this.cursor?.getNearestMessage("stop") != null) {
-            return tree as R;
-        }
-        return super.visit(tree, p, parent);
-    }
-
-    override async postVisit(tree: J, p: P): Promise<J | undefined> {
-        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
-            this.cursor?.root.messages.set("stop", true);
-        }
-        return super.postVisit(tree, p);
+        return t;
     }
 }
 
@@ -1066,238 +926,6 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
     }
 }
 
-
-export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
-    constructor(private stopAfter?: Tree) {
-        super();
-    }
-
-    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
-        if (this.cursor?.getNearestMessage("stop") != null) {
-            return tree as R;
-        }
-        return super.visit(tree, p, parent);
-    }
-
-    override async postVisit(tree: J, p: P): Promise<J | undefined> {
-        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
-            this.cursor?.root.messages.set("stop", true);
-        }
-        return super.postVisit(tree, p);
-    }
-
-    protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
-        const ret = await super.visitAwait(await_, p) as JS.Await;
-        return produce(ret, draft => {
-            this.ensureSpace(draft.expression.prefix)
-        });
-    }
-
-    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
-        let c = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
-        let first = c.leadingAnnotations.length === 0;
-
-        if (c.modifiers.length > 0) {
-            if (!first && c.modifiers[0].prefix.whitespace === "") {
-                c = produce(c, draft => {
-                    this.ensureSpace(draft.modifiers[0].prefix);
-                });
-            }
-            c = produce(c, draft => {
-                for (let i = 1; i < draft.modifiers.length; i++) {
-                    this.ensureSpace(draft.modifiers[i].prefix);
-                }
-            });
-            first = false;
-        }
-
-        if (c.classKind.prefix.whitespace === "" && !first) {
-            c = produce(c, draft => {
-                this.ensureSpace(draft.classKind.prefix);
-            });
-            first = false;
-        }
-
-        // anonymous classes have an empty name
-        if (c.name.simpleName !== "") {
-            c = produce(c, draft => {
-                this.ensureSpace(draft.name.prefix);
-            });
-        }
-
-        // Note: typeParameters should NOT have space before them - they immediately follow the class name
-        // e.g., "class DataTable<Row>" not "class DataTable <Row>"
-
-        if (c.extends && c.extends.before.whitespace === "") {
-            c = produce(c, draft => {
-                this.ensureSpace(draft.extends!.before);
-            });
-        }
-
-        if (c.implements && c.implements.before.whitespace === "") {
-            c = produce(c, draft => {
-                this.ensureSpace(draft.implements!.before);
-                if (draft.implements != undefined && draft.implements.elements.length > 0) {
-                    this.ensureSpace(draft.implements.elements[0].element.prefix);
-                }
-            });
-        }
-
-        c = produce(c, draft => {
-            draft.body.prefix.whitespace = "";
-        });
-
-        return c;
-    }
-
-    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: P): Promise<J | undefined> {
-        let m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
-        let first = m.leadingAnnotations.length === 0;
-
-        if (m.modifiers.length > 0) {
-            if (!first && m.modifiers[0].prefix.whitespace === "") {
-                m = produce(m, draft => {
-                    this.ensureSpace(draft.modifiers[0].prefix);
-                });
-            }
-            m = produce(m, draft => {
-                for (let i = 1; i < draft.modifiers.length; i++) {
-                    this.ensureSpace(draft.modifiers[i].prefix);
-                }
-            });
-            first = false;
-        }
-
-        // FunctionDeclaration marker check must come AFTER modifiers processing
-        // to avoid adding unwanted space before the first modifier (e.g., 'async')
-        if (findMarker(method, JS.Markers.FunctionDeclaration)) {
-            first = false;
-        }
-
-        if (!first && m.name.prefix.whitespace === "") {
-            m = produce(m, draft => {
-                this.ensureSpace(draft.name.prefix);
-            });
-        }
-
-        if (m.throws && m.throws.before.whitespace === "") {
-            m = produce(m, draft => {
-                this.ensureSpace(draft.throws!.before);
-            });
-        }
-
-        return m;
-    }
-
-    protected async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, p: P): Promise<J | undefined> {
-        const ret = await super.visitNamespaceDeclaration(namespaceDeclaration, p) as JS.NamespaceDeclaration;
-        return produce(ret, draft => {
-            if (draft.modifiers.length > 0) {
-                draft.keywordType.before.whitespace=" ";
-            }
-            this.ensureSpace(draft.name.element.prefix);
-        });
-    }
-
-    protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
-        const ret = await super.visitNewClass(newClass, p) as J.NewClass;
-        return produce(ret, draft => {
-            if (draft.class) {
-                if (draft.class.kind == J.Kind.Identifier) {
-                    this.ensureSpace((draft.class as Draft<J.Identifier>).prefix);
-                }
-            }
-        });
-    }
-
-    protected async visitReturn(returnNode: J.Return, p: P): Promise<J | undefined> {
-        const r = await super.visitReturn(returnNode, p) as J.Return;
-        if (r.expression && r.expression.prefix.whitespace === "" &&
-            !r.markers.markers.find(m => m.id === "org.openrewrite.java.marker.ImplicitReturn")) {
-            return produce(r, draft => {
-                this.ensureSpace(draft.expression!.prefix);
-            });
-        }
-        return r;
-    }
-
-    protected async visitThrow(thrown: J.Throw, p: P): Promise<J | undefined> {
-        const ret = await super.visitThrow(thrown, p) as J.Throw;
-        return ret && produce(ret, draft => {
-           this.ensureSpace(draft.exception.prefix);
-        });
-    }
-
-    protected async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, p: P): Promise<J | undefined> {
-        const ret = await super.visitTypeDeclaration(typeDeclaration, p) as JS.TypeDeclaration;
-        return produce(ret, draft => {
-            if (draft.modifiers.length > 0) {
-                this.ensureSpace(draft.name.before);
-            }
-            this.ensureSpace(draft.name.element.prefix);
-        });
-    }
-
-    protected async visitTypeOf(typeOf: JS.TypeOf, p: P): Promise<J | undefined> {
-        const ret = await super.visitTypeOf(typeOf, p) as JS.TypeOf;
-        return produce(ret, draft => {
-            this.ensureSpace(draft.expression.prefix);
-        });
-    }
-
-    protected async visitTypeParameter(typeParam: J.TypeParameter, p: P): Promise<J | undefined> {
-        const ret = await super.visitTypeParameter(typeParam, p) as J.TypeParameter;
-        return produce(ret, draft => {
-            if (draft.bounds && draft.bounds.elements.length > 0) {
-                this.ensureSpace(draft.bounds.before);
-                this.ensureSpace(draft.bounds.elements[0].element.prefix);
-            }
-        });
-    }
-
-    protected async visitVariableDeclarations(v: J.VariableDeclarations, p: P): Promise<J | undefined> {
-        let ret = await super.visitVariableDeclarations(v, p) as J.VariableDeclarations;
-        let first = ret.leadingAnnotations.length === 0;
-
-        if (first && ret.modifiers.length > 0) {
-            ret = produce(ret, draft => {
-                for (let i = 1; i < draft.modifiers.length; i++) {
-                    this.ensureSpace(draft.modifiers[i].prefix);
-                }
-            });
-            first = false;
-        }
-
-        if (!first) {
-            ret = produce(ret, draft => {
-                this.ensureSpace(draft.variables[0].element.prefix);
-            });
-        }
-
-        return ret;
-    }
-
-
-    protected async visitCase(caseNode: J.Case, p: P): Promise<J | undefined> {
-        const c = await super.visitCase(caseNode, p) as J.Case;
-
-        if (c.guard && c.caseLabels.elements.length > 0 && c.caseLabels.elements[c.caseLabels.elements.length - 1].after.whitespace === "") {
-            return produce(c, draft => {
-                const last = draft.caseLabels.elements.length - 1;
-                draft.caseLabels.elements[last].after.whitespace = " ";
-            });
-        }
-
-        return c;
-    }
-
-    private ensureSpace(spaceDraft: Draft<J.Space>) {
-        if (spaceDraft.whitespace.length === 0 && spaceDraft.comments.length === 0) {
-            spaceDraft.whitespace = " ";
-        }
-    }
-}
-
 export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
     constructor(private readonly style: BlankLinesStyle, private stopAfter?: Tree) {
         super();
@@ -1503,4 +1131,3 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
 
 // Re-export prettier formatting utilities
 export {prettierFormat} from "./prettier-format";
-export type {PrettierFormatOptions} from "./prettier-format";

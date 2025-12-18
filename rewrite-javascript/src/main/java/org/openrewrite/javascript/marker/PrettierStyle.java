@@ -37,7 +37,7 @@ import java.util.UUID;
  */
 @Value
 @With
-public class PrettierConfig implements Marker, RpcCodec<PrettierConfig> {
+public class PrettierStyle implements Marker, RpcCodec<PrettierStyle> {
     UUID id;
 
     /**
@@ -53,15 +53,15 @@ public class PrettierConfig implements Marker, RpcCodec<PrettierConfig> {
     String prettierVersion;
 
     @Override
-    public void rpcSend(PrettierConfig after, RpcSendQueue q) {
+    public void rpcSend(PrettierStyle after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, PrettierConfig::getConfig);
-        q.getAndSend(after, PrettierConfig::getPrettierVersion);
+        q.getAndSend(after, PrettierStyle::getConfig);
+        q.getAndSend(after, PrettierStyle::getPrettierVersion);
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public PrettierConfig rpcReceive(PrettierConfig before, RpcReceiveQueue q) {
+    public PrettierStyle rpcReceive(PrettierStyle before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                 .withConfig(q.receive(before.getConfig()))

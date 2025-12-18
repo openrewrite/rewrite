@@ -15,12 +15,18 @@
  */
 import {JS} from './tree';
 import {J, Statement} from '../java';
-import {Cursor} from '../tree';
+import {Cursor, Tree} from '../tree';
 import {TreePrinters} from '../print';
 import {JavaScriptParser} from './parser';
 import {WhitespaceReconcilerVisitor} from './whitespace-reconciler';
 import {produce} from 'immer';
 import {randomId} from '../uuid';
+import {getStyle, PrettierStyle, StyleKind, TabsAndIndentsStyle} from './style';
+import {NamedStyles} from '../style';
+import {findMarker} from '../markers';
+import {NormalizeWhitespaceVisitor} from './normalize-whitespace-visitor';
+import {MinimumViableSpacingVisitor} from './minimum-viable-spacing-visitor';
+import {TabsAndIndentsVisitor} from './tabs-and-indents-visitor';
 
 /**
  * Options for Prettier formatting.
@@ -439,4 +445,138 @@ export async function prettierFormatSubtree<T extends J>(
     const reconciled = await reconciler.reconcile(target as J, formattedTarget as J);
 
     return reconciled as T;
+}
+
+/**
+ * Gets the PrettierStyle from the styles array or source file markers.
+ *
+ * @param tree The tree being formatted
+ * @param cursor Optional cursor for walking up to find source file
+ * @param styles Optional styles array to check first
+ * @returns PrettierStyle if found, undefined otherwise
+ */
+export function getPrettierStyle(
+    tree: Tree,
+    cursor?: Cursor,
+    styles?: NamedStyles<string>[]
+): PrettierStyle | undefined {
+    // First check the styles array
+    if (styles) {
+        const fromStyles = styles.find(s => (s as any).kind === StyleKind.PrettierStyle);
+        if (fromStyles) {
+            return fromStyles as unknown as PrettierStyle;
+        }
+    }
+
+    // Then check for PrettierStyle marker on source file
+    let sourceFile: JS.CompilationUnit | undefined;
+
+    if (tree.kind === JS.Kind.CompilationUnit) {
+        sourceFile = tree as JS.CompilationUnit;
+    } else if (cursor) {
+        // Walk up the cursor to find the compilation unit
+        let current: Cursor | undefined = cursor;
+        while (current) {
+            if (current.value?.kind === JS.Kind.CompilationUnit) {
+                sourceFile = current.value as JS.CompilationUnit;
+                break;
+            }
+            current = current.parent;
+        }
+    }
+
+    if (!sourceFile) {
+        return undefined;
+    }
+
+    return findMarker(sourceFile, StyleKind.PrettierStyle) as PrettierStyle | undefined;
+}
+
+/**
+ * Applies Prettier formatting to a tree.
+ *
+ * Configuration is resolved from:
+ * 1. PrettierStyle marker on source file (if present)
+ * 2. TabsAndIndentsStyle defaults
+ *
+ * For compilation units, formats and reconciles the entire tree.
+ * For subtrees, uses prettierFormatSubtree which prunes the tree for efficiency,
+ * formats the pruned tree, and reconciles only the target subtree.
+ *
+ * @param tree The tree to format
+ * @param prettierStyle The PrettierStyle containing config
+ * @param p The visitor parameter
+ * @param cursor Optional cursor for subtree formatting
+ * @param stopAfter Optional tree to stop after
+ * @param styles Optional styles array for fallback styles
+ * @returns The formatted tree
+ */
+export async function applyPrettierFormatting<R extends J, P>(
+    tree: R,
+    prettierStyle: PrettierStyle | undefined,
+    p: P,
+    cursor?: Cursor,
+    stopAfter?: Tree,
+    styles?: NamedStyles<string>[]
+): Promise<R | undefined> {
+    // Run only the essential visitors first
+    const essentialVisitors = [
+        new NormalizeWhitespaceVisitor(stopAfter),
+        new MinimumViableSpacingVisitor(stopAfter),
+    ];
+
+    let t: R | undefined = tree;
+    for (const visitor of essentialVisitors) {
+        t = await visitor.visit(t, p, cursor);
+        if (t === undefined) {
+            return undefined;
+        }
+    }
+
+    // Build options from PrettierStyle or TabsAndIndentsStyle defaults
+    const tabsAndIndentsStyle = getStyle(StyleKind.TabsAndIndentsStyle, tree, styles) as TabsAndIndentsStyle;
+    let prettierOpts: PrettierFormatOptions = {
+        tabWidth: tabsAndIndentsStyle.indentSize,
+        useTabs: tabsAndIndentsStyle.useTabCharacter,
+    };
+
+    if (prettierStyle) {
+        prettierOpts = {
+            ...prettierOpts,
+            tabWidth: prettierStyle.config.tabWidth as number | undefined ?? prettierOpts.tabWidth,
+            useTabs: prettierStyle.config.useTabs as boolean | undefined ?? prettierOpts.useTabs,
+            semi: prettierStyle.config.semi as boolean | undefined,
+            singleQuote: prettierStyle.config.singleQuote as boolean | undefined,
+            trailingComma: prettierStyle.config.trailingComma as 'all' | 'es5' | 'none' | undefined,
+            printWidth: prettierStyle.config.printWidth as number | undefined,
+        };
+    }
+
+    try {
+        if (t.kind === JS.Kind.CompilationUnit) {
+            // Format and reconcile the entire compilation unit
+            const formatted = await prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts);
+            return formatted as unknown as R;
+        }
+
+        if (!cursor) {
+            // No cursor provided, fall back to TabsAndIndentsVisitor
+            const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, stopAfter);
+            return await tabsVisitor.visit(t, p, cursor) as R;
+        }
+
+        // Use prettierFormatSubtree for subtree formatting
+        const formatted = await prettierFormatSubtree(t, cursor, prettierOpts);
+        if (formatted) {
+            return formatted as R;
+        }
+
+        // Fall back to TabsAndIndentsVisitor if subtree formatting failed
+        const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, stopAfter);
+        return await tabsVisitor.visit(t, p, cursor) as R;
+    } catch (e) {
+        // If Prettier fails, return tree with essential formatting applied
+        console.warn('Prettier formatting failed, returning with essential formatting only:', e);
+        return t;
+    }
 }
