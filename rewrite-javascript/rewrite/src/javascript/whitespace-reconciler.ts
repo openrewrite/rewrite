@@ -74,10 +74,47 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
-     * Check if we should apply whitespace changes at the current position.
+     * Returns whether the reconciliation was successful (structures were compatible).
      */
-    private shouldReconcile(): boolean {
-        return this.reconcileState === 'reconciling';
+    isCompatible(): boolean {
+        return this.compatible;
+    }
+
+    /**
+     * Override visit to use visitElement for all nodes.
+     */
+    override async visit<R extends J>(tree: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+        if (!this.compatible) return tree as R;
+
+        const original = tree as J;
+        const formatted = p;
+
+        // Check kind match
+        if (original.kind !== formatted.kind) {
+            return this.structureMismatch(original) as R;
+        }
+
+        // Track entering the target subtree
+        const isTargetSubtree = this.targetSubtreeId !== undefined && original.id === this.targetSubtreeId;
+        const previousState = this.reconcileState;
+        if (isTargetSubtree && this.reconcileState === 'searching') {
+            this.reconcileState = 'reconciling';
+        }
+
+        // Update formattedCursor
+        const savedFormattedCursor = this.formattedCursor;
+        this.formattedCursor = new Cursor(formatted, this.formattedCursor);
+
+        try {
+            const result = await this.visitElement(original, formatted);
+            return result as R;
+        } finally {
+            this.formattedCursor = savedFormattedCursor;
+            // Track exiting the target subtree
+            if (isTargetSubtree && previousState === 'searching') {
+                this.reconcileState = 'done';
+            }
+        }
     }
 
     /**
@@ -89,27 +126,10 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
-     * Copies a Space from formatted tree. This is where the actual whitespace
-     * reconciliation happens.
-     *
-     * Preserves the original whitespace if the formatted version would remove newlines,
-     * as this indicates a structural change (e.g., collapsing multi-line to single-line).
+     * Copies a Space from formatted tree.
      */
     protected reconcileSpace(original: J.Space, formatted: J.Space): J.Space {
-        // Only apply whitespace changes when inside the target subtree
-        if (!this.shouldReconcile()) {
-            return original;
-        }
-
-        // Preserve original if formatted would remove newlines (structural change)
-        const originalHasNewline = original.whitespace.includes('\n');
-        const formattedHasNewline = formatted.whitespace.includes('\n');
-        if (originalHasNewline && !formattedHasNewline) {
-            return original;
-        }
-
-        // Return the formatted space - this is the core of reconciliation
-        return formatted;
+        return this.shouldReconcile() ? formatted : original;
     }
 
     /**
@@ -124,47 +144,44 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
             return original;
         }
 
-        const kind = (original as any).kind;
+        const kind = original.kind;
 
-        // Space - copy from formatted
-        if (kind === J.Kind.Space) {
-            return this.reconcileSpace(original, formatted);
+        switch (kind) {
+            case J.Kind.Space:
+                return this.reconcileSpace(original, formatted);
+
+            case J.Kind.RightPadded:
+                return this.visitRightPaddedReconcile(original, formatted);
+
+            case J.Kind.LeftPadded:
+                return this.visitLeftPaddedReconcile(original, formatted);
+
+            case J.Kind.Container:
+                return this.visitContainerReconcile(original, formatted);
+
+            default:
+                // Type nodes - short-circuit, keep original (types don't have whitespace)
+                if (typeof kind === 'string' && kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
+                    return original;
+                }
+
+                // Tree node (has a kind property that's a string)
+                if (kind !== undefined && typeof kind === 'string') {
+                    return this.visit(original, formatted);
+                }
+
+                // Primitive values - return original unchanged
+                return original;
         }
-
-        // Type nodes - short-circuit, keep original (types don't have whitespace)
-        if (typeof kind === 'string' && kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
-            return original;
-        }
-
-        // RightPadded wrapper
-        if (kind === J.Kind.RightPadded) {
-            return this.visitRightPaddedReconcile(original, formatted);
-        }
-
-        // LeftPadded wrapper
-        if (kind === J.Kind.LeftPadded) {
-            return this.visitLeftPaddedReconcile(original, formatted);
-        }
-
-        // Container wrapper
-        if (kind === J.Kind.Container) {
-            return this.visitContainerReconcile(original, formatted);
-        }
-
-        // Tree node (has a kind property)
-        if (kind !== undefined && typeof kind === 'string') {
-            return this.visit(original, formatted);
-        }
-
-        // Primitive values - return original unchanged
-        return original;
     }
 
     /**
      * Visit all properties of an element and copy prefix from formatted.
      */
     protected async visitElement<T extends J>(original: T, formatted: T): Promise<T> {
-        if (!this.compatible) return original;
+        if (!this.compatible) {
+            return original;
+        }
 
         // Check if kinds match
         if (original.kind !== formatted.kind) {
@@ -174,17 +191,11 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
         // Start with original, will copy prefix
         let result = original;
 
-        // Copy prefix from formatted only when reconciling, and preserve original if newlines would be removed
+        // Copy prefix from formatted when reconciling
         if (this.shouldReconcile() && 'prefix' in original && 'prefix' in formatted) {
-            const originalPrefix = (original as any).prefix as J.Space;
-            const formattedPrefix = (formatted as any).prefix as J.Space;
-            const originalHasNewline = originalPrefix.whitespace.includes('\n');
-            const formattedHasNewline = formattedPrefix.whitespace.includes('\n');
-            if (!originalHasNewline || formattedHasNewline) {
-                result = produce(result, (draft: any) => {
-                    draft.prefix = formattedPrefix;
-                });
-            }
+            result = produce(result, (draft: any) => {
+                draft.prefix = (formatted as any).prefix;
+            });
         }
 
         // Visit all child properties
@@ -238,43 +249,6 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
-     * Override visit to use visitElement for all nodes.
-     */
-    override async visit<R extends J>(tree: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
-        if (!this.compatible) return tree as R;
-
-        const original = tree as J;
-        const formatted = p;
-
-        // Check kind match
-        if (original.kind !== formatted.kind) {
-            return this.structureMismatch(original) as R;
-        }
-
-        // Track entering the target subtree
-        const isTargetSubtree = this.targetSubtreeId !== undefined && original.id === this.targetSubtreeId;
-        const previousState = this.reconcileState;
-        if (isTargetSubtree && this.reconcileState === 'searching') {
-            this.reconcileState = 'reconciling';
-        }
-
-        // Update formattedCursor
-        const savedFormattedCursor = this.formattedCursor;
-        this.formattedCursor = new Cursor(formatted, this.formattedCursor);
-
-        try {
-            const result = await this.visitElement(original, formatted);
-            return result as R;
-        } finally {
-            this.formattedCursor = savedFormattedCursor;
-            // Track exiting the target subtree
-            if (isTargetSubtree && previousState === 'searching') {
-                this.reconcileState = 'done';
-            }
-        }
-    }
-
-    /**
      * Reconcile RightPadded - copy 'after' whitespace.
      */
     protected async visitRightPaddedReconcile<T extends J | boolean>(
@@ -291,15 +265,11 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
         const visitedElement = await this.visitProperty(original.element, formatted.element);
         if (!this.compatible) return original;
 
-        // Copy 'after' whitespace only when reconciling, and preserve original if newlines would be removed
+        // Copy 'after' whitespace when reconciling
         return produce(original, draft => {
             (draft as any).element = visitedElement;
             if (this.shouldReconcile()) {
-                const originalHasNewline = original.after.whitespace.includes('\n');
-                const formattedHasNewline = formatted.after.whitespace.includes('\n');
-                if (!originalHasNewline || formattedHasNewline) {
-                    draft.after = formatted.after;
-                }
+                draft.after = formatted.after;
             }
         });
     }
@@ -321,15 +291,11 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
         const visitedElement = await this.visitProperty(original.element, formatted.element);
         if (!this.compatible) return original;
 
-        // Copy 'before' whitespace only when reconciling, and preserve original if newlines would be removed
+        // Copy 'before' whitespace when reconciling
         return produce(original, draft => {
             (draft as any).element = visitedElement;
             if (this.shouldReconcile()) {
-                const originalHasNewline = original.before.whitespace.includes('\n');
-                const formattedHasNewline = formatted.before.whitespace.includes('\n');
-                if (!originalHasNewline || formattedHasNewline) {
-                    draft.before = formatted.before;
-                }
+                draft.before = formatted.before;
             }
         });
     }
@@ -363,16 +329,19 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
             newElements.push(visited);
         }
 
-        // Copy 'before' whitespace only when reconciling, and preserve original if newlines would be removed
+        // Copy 'before' whitespace when reconciling
         return produce(original, draft => {
             if (this.shouldReconcile()) {
-                const originalHasNewline = original.before.whitespace.includes('\n');
-                const formattedHasNewline = formatted.before.whitespace.includes('\n');
-                if (!originalHasNewline || formattedHasNewline) {
-                    draft.before = formatted.before;
-                }
+                draft.before = formatted.before;
             }
             (draft as any).elements = newElements;
         });
+    }
+
+    /**
+     * Check if we should apply whitespace changes at the current position.
+     */
+    private shouldReconcile(): boolean {
+        return this.reconcileState === 'reconciling';
     }
 }

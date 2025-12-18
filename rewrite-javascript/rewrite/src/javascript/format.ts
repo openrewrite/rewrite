@@ -38,27 +38,40 @@ interface PathSegment {
     property: string;
     /** For array properties, the index of the element */
     index?: number;
-    /** Whether this is a RightPadded wrapper (element is in .element) */
-    isRightPadded?: boolean;
-    /** Whether this is a LeftPadded wrapper (element is in .element) */
-    isLeftPadded?: boolean;
 }
 
 /**
  * Extracts the path from a CompilationUnit to a target node using the cursor.
  * Returns the path segments in order from root to target.
+ *
+ * @param cursor The cursor, which may not include the target (e.g., when passing cursor.parent)
+ * @param target The target node we're looking for
  */
-function extractPathFromCursor(cursor: Cursor, targetId: string): PathSegment[] {
+interface PathExtractionResult {
+    /** The compilation unit (root of the tree) */
+    compilationUnit: JS.CompilationUnit | undefined;
+    /** The path from root to target */
+    path: PathSegment[];
+}
+
+function extractPathFromCursor(cursor: Cursor, target: any): PathExtractionResult {
     const pathNodes = cursor.asArray().reverse(); // root to target
     const segments: PathSegment[] = [];
+    let compilationUnit: JS.CompilationUnit | undefined;
 
-    for (let i = 0; i < pathNodes.length - 1; i++) {
-        const parent = pathNodes[i];
-        const child = pathNodes[i + 1];
+    // Helper to check if two nodes are the same (by identity or ID)
+    const isSameNode = (a: any, b: any): boolean => {
+        if (a === b) return true;
+        if (a && b && typeof a === 'object' && typeof b === 'object' && 'id' in a && 'id' in b) {
+            return a.id === b.id;
+        }
+        return false;
+    };
 
-        if (!parent || typeof parent !== 'object') continue;
+    // Helper to find a child in a parent and return the segment
+    const findChildInParent = (parent: any, child: any): PathSegment | undefined => {
+        if (!parent || typeof parent !== 'object') return undefined;
 
-        // Find which property contains the child
         for (const key of Object.keys(parent)) {
             const value = (parent as any)[key];
             if (value == null) continue;
@@ -66,44 +79,65 @@ function extractPathFromCursor(cursor: Cursor, targetId: string): PathSegment[] 
             if (Array.isArray(value)) {
                 for (let idx = 0; idx < value.length; idx++) {
                     const item = value[idx];
-                    if (item === child) {
-                        segments.push({ property: key, index: idx });
-                        break;
-                    }
-                    // Check for RightPadded/LeftPadded wrappers
-                    if (item && typeof item === 'object' && 'element' in item) {
-                        if (item.element === child || item.element?.id === child?.id) {
-                            const isRightPadded = 'after' in item;
-                            const isLeftPadded = 'before' in item && !('after' in item);
-                            segments.push({ property: key, index: idx, isRightPadded, isLeftPadded });
-                            break;
-                        }
+                    if (isSameNode(item, child)) {
+                        return { property: key, index: idx };
                     }
                 }
-            } else if (value === child) {
-                segments.push({ property: key });
-            } else if (typeof value === 'object' && 'element' in value) {
-                if (value.element === child || value.element?.id === child?.id) {
-                    const isRightPadded = 'after' in value;
-                    const isLeftPadded = 'before' in value && !('after' in value);
-                    segments.push({ property: key, isRightPadded, isLeftPadded });
-                }
+            } else if (isSameNode(value, child)) {
+                return { property: key };
             }
+        }
+        return undefined;
+    };
+
+    for (let i = 0; i < pathNodes.length - 1; i++) {
+        const parent = pathNodes[i];
+        const child = pathNodes[i + 1];
+
+        // Check if this node is the CompilationUnit
+        if (parent?.kind === JS.Kind.CompilationUnit) {
+            compilationUnit = parent as JS.CompilationUnit;
+        }
+
+        const segment = findChildInParent(parent, child);
+        if (segment) {
+            segments.push(segment);
         }
     }
 
-    return segments;
+    // Check the last node for CompilationUnit
+    const lastNode = pathNodes[pathNodes.length - 1];
+    if (lastNode?.kind === JS.Kind.CompilationUnit) {
+        compilationUnit = lastNode as JS.CompilationUnit;
+    }
+
+    // If the cursor doesn't include the target, add the final segment
+    // This handles the case when autoFormat is called with cursor.parent
+    if (lastNode && !isSameNode(lastNode, target)) {
+        const finalSegment = findChildInParent(lastNode, target);
+        if (finalSegment) {
+            segments.push(finalSegment);
+        }
+    }
+
+    return { compilationUnit, path: segments };
 }
 
 /**
- * Creates an empty statement placeholder for use in pruned trees.
+ * Creates a "null" identifier placeholder for use in pruned trees.
+ * Using "null" instead of an empty statement ensures Prettier sees similar
+ * line lengths and doesn't collapse multi-line code to single-line.
  */
-function createEmptyStatement(): J.Empty {
+function createNullPlaceholder(prefix: J.Space): J.Identifier {
     return {
-        kind: J.Kind.Empty,
+        kind: J.Kind.Identifier,
         id: randomId(),
         markers: { kind: "org.openrewrite.marker.Markers", id: randomId(), markers: [] },
-        prefix: { kind: J.Kind.Space, whitespace: "\n", comments: [] }
+        prefix: prefix,
+        annotations: [],
+        simpleName: "null",
+        type: undefined,
+        fieldType: undefined
     };
 }
 
@@ -111,11 +145,12 @@ function createEmptyStatement(): J.Empty {
  * Prunes a compilation unit for efficient Prettier formatting of a subtree.
  *
  * For J.Block#statements along the path to the target:
- * - Prior siblings are replaced with empty statement placeholders
- * - Following siblings are removed entirely
+ * - Prior siblings are replaced with "null" identifier placeholders (to maintain line length)
+ * - Following siblings are omitted entirely
  *
  * This optimization reduces the amount of code Prettier needs to process
- * while maintaining the structural path for reconciliation.
+ * while maintaining approximate line positions so Prettier doesn't collapse
+ * multi-line code.
  *
  * @param cu The compilation unit to prune
  * @param path The path from root to the target subtree
@@ -147,15 +182,17 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
         const targetIndex = segment.index;
 
         // Create pruned statements array:
-        // - Prior siblings: replace with empty placeholders
+        // - Prior siblings: replace with "null" placeholders (to maintain line length)
         // - Target: recurse into it
-        // - Following siblings: remove entirely
+        // - Following siblings: omit entirely
         const prunedStatements: J.RightPadded<Statement>[] = [];
 
         for (let i = 0; i <= targetIndex; i++) {
             if (i < targetIndex) {
-                // Prior sibling - replace with placeholder
-                const placeholder = createEmptyStatement();
+                // Prior sibling - replace with "null" placeholder
+                // Preserve the original prefix to maintain line positions
+                const originalPrefix = statements[i].element.prefix;
+                const placeholder = createNullPlaceholder(originalPrefix);
                 prunedStatements.push({
                     kind: J.Kind.RightPadded,
                     element: placeholder,
@@ -172,7 +209,7 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
                 });
             }
         }
-        // Following siblings are not included
+        // Following siblings are omitted
 
         return produce(node, (draft: any) => {
             draft.statements = prunedStatements;
@@ -181,38 +218,20 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
 
     // For other properties, just recurse without pruning
     if (Array.isArray(value) && segment.index !== undefined) {
-        const item = value[segment.index];
-        let childNode = item;
-        if (segment.isRightPadded || segment.isLeftPadded) {
-            childNode = item.element;
-        }
-
+        const childNode = value[segment.index];
         const prunedChild = pruneNode(childNode, path, pathIndex + 1);
 
         if (prunedChild !== childNode) {
             return produce(node, (draft: any) => {
-                if (segment.isRightPadded || segment.isLeftPadded) {
-                    draft[segment.property][segment.index!].element = prunedChild;
-                } else {
-                    draft[segment.property][segment.index!] = prunedChild;
-                }
+                draft[segment.property][segment.index!] = prunedChild;
             });
         }
     } else if (!Array.isArray(value)) {
-        let childNode = value;
-        if (segment.isRightPadded || segment.isLeftPadded) {
-            childNode = value.element;
-        }
+        const prunedChild = pruneNode(value, path, pathIndex + 1);
 
-        const prunedChild = pruneNode(childNode, path, pathIndex + 1);
-
-        if (prunedChild !== childNode) {
+        if (prunedChild !== value) {
             return produce(node, (draft: any) => {
-                if (segment.isRightPadded || segment.isLeftPadded) {
-                    draft[segment.property].element = prunedChild;
-                } else {
-                    draft[segment.property] = prunedChild;
-                }
+                draft[segment.property] = prunedChild;
             });
         }
     }
@@ -223,6 +242,9 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
 /**
  * Finds a node in a tree by following a path of segments.
  * Used to locate the target node in the formatted tree.
+ *
+ * For block statements, the target is always at the last index since
+ * following siblings are omitted during pruning.
  */
 function findByPath(tree: any, path: PathSegment[]): any {
     let current = tree;
@@ -234,11 +256,15 @@ function findByPath(tree: any, path: PathSegment[]): any {
         if (value == null) return undefined;
 
         if (Array.isArray(value) && segment.index !== undefined) {
-            const item = value[segment.index];
+            // For block statements, target is always at the last index
+            // since following siblings are omitted during pruning
+            const isBlockStatements = current.kind === J.Kind.Block && segment.property === 'statements';
+            const index = isBlockStatements ? value.length - 1 : segment.index;
+            const item = value[index];
             if (item == null) return undefined;
-            current = (segment.isRightPadded || segment.isLeftPadded) ? item.element : item;
+            current = item;
         } else {
-            current = (segment.isRightPadded || segment.isLeftPadded) ? value.element : value;
+            current = value;
         }
     }
 
@@ -299,15 +325,15 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
         this.styles = styles;
         // Default to TabsAndIndentsVisitor for backwards compatibility
         // Set usePrettier: true to enable Prettier-based formatting
-        this.usePrettier = options?.usePrettier ?? true;
+        this.usePrettier = options?.usePrettier ?? false;
         this.prettierOptions = options?.prettierOptions;
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        // Check for PrettierConfig marker on the source file
-        // If present, delegate entirely to Prettier (skip other formatting visitors)
+        // Check for PrettierConfig marker on the source file OR if usePrettier was explicitly set
+        // If either is true, delegate entirely to Prettier (skip other formatting visitors)
         const prettierConfigMarker = this.getPrettierConfigMarker(tree, cursor);
-        if (prettierConfigMarker) {
+        if (prettierConfigMarker || this.usePrettier) {
             return this.applyPrettierConfigFormatting(tree as R, prettierConfigMarker, p, cursor);
         }
 
@@ -328,28 +354,12 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        // Apply indentation formatting
-        if (this.usePrettier) {
-            try {
-                t = await this.applyPrettierFormatting(t, tree, p, cursor);
-            } catch (e) {
-                // Prettier not available, fall back to TabsAndIndentsVisitor
-                const tabsVisitor = new TabsAndIndentsVisitor(
-                    getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle,
-                    this.stopAfter
-                );
-                t = await tabsVisitor.visit(t, p, cursor);
-            }
-        } else {
-            // Use TabsAndIndentsVisitor when Prettier is disabled
-            const tabsVisitor = new TabsAndIndentsVisitor(
-                getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle,
-                this.stopAfter
-            );
-            t = await tabsVisitor.visit(t, p, cursor);
-        }
-
-        return t;
+        // Apply indentation formatting with TabsAndIndentsVisitor
+        const tabsVisitor = new TabsAndIndentsVisitor(
+            getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle,
+            this.stopAfter
+        );
+        return await tabsVisitor.visit(t, p, cursor) as R | undefined;
     }
 
     /**
@@ -393,7 +403,7 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
      */
     private async applyPrettierConfigFormatting<R extends J>(
         tree: R,
-        prettierConfig: PrettierConfig,
+        prettierConfig: PrettierConfig | undefined,
         p: P,
         cursor?: Cursor
     ): Promise<R | undefined> {
@@ -411,15 +421,22 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        // Convert marker config to PrettierFormatOptions
-        const options: PrettierFormatOptions = {
-            tabWidth: prettierConfig.config.tabWidth as number | undefined,
-            useTabs: prettierConfig.config.useTabs as boolean | undefined,
-            semi: prettierConfig.config.semi as boolean | undefined,
-            singleQuote: prettierConfig.config.singleQuote as boolean | undefined,
-            trailingComma: prettierConfig.config.trailingComma as 'all' | 'es5' | 'none' | undefined,
-            printWidth: prettierConfig.config.printWidth as number | undefined,
-        };
+        // Build options from marker config (if present) and constructor options
+        let options: PrettierFormatOptions = {};
+        if (prettierConfig) {
+            options = {
+                tabWidth: prettierConfig.config.tabWidth as number | undefined,
+                useTabs: prettierConfig.config.useTabs as boolean | undefined,
+                semi: prettierConfig.config.semi as boolean | undefined,
+                singleQuote: prettierConfig.config.singleQuote as boolean | undefined,
+                trailingComma: prettierConfig.config.trailingComma as 'all' | 'es5' | 'none' | undefined,
+                printWidth: prettierConfig.config.printWidth as number | undefined,
+            };
+        }
+        // Constructor options override marker config
+        if (this.prettierOptions) {
+            options = { ...options, ...this.prettierOptions };
+        }
 
         // Apply Prettier formatting
         try {
@@ -463,19 +480,20 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
             return formatted as unknown as R;
         }
 
-        // For subtrees, get the compilation unit from the cursor
-        const cu = cursor?.firstEnclosing(
-            (node: any): node is JS.CompilationUnit => node?.kind === JS.Kind.CompilationUnit
-        );
-
-        if (!cu || !cursor) {
-            // No compilation unit in cursor, fall back to TabsAndIndentsVisitor
+        if (!cursor) {
+            // No cursor provided, fall back to TabsAndIndentsVisitor
             const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);
             return await tabsVisitor.visit(t, p, cursor) as R;
         }
 
-        // Extract the path from root to target for efficient pruning and finding
-        const path = extractPathFromCursor(cursor, t.id);
+        // Extract the path and compilation unit in a single cursor traversal
+        const { compilationUnit: cu, path } = extractPathFromCursor(cursor, t);
+
+        if (!cu) {
+            // No compilation unit in cursor, fall back to TabsAndIndentsVisitor
+            const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);
+            return await tabsVisitor.visit(t, p, cursor) as R;
+        }
 
         // Prune the tree for efficient formatting
         // This replaces prior siblings with placeholders and removes following siblings
@@ -487,7 +505,6 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
 
         // Find the target node in the formatted tree using the path
         const formattedTarget = findByPath(formattedPrunedCu, path);
-
         if (!formattedTarget) {
             // Couldn't find target in formatted tree, fall back to TabsAndIndentsVisitor
             const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);

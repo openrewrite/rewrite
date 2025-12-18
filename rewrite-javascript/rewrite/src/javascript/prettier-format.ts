@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 import {JS} from './tree';
-import {J} from '../java';
 import {TreePrinters} from '../print';
 import {JavaScriptParser} from './parser';
 import {WhitespaceReconcilerVisitor} from './whitespace-reconciler';
@@ -74,11 +73,11 @@ export async function prettierFormat(
     sourceFile: JS.CompilationUnit,
     options: PrettierFormatOptions = {}
 ): Promise<JS.CompilationUnit> {
-    // Dynamically import prettier standalone (avoids dynamic import issues with Prettier 3.x)
+    // Dynamically load prettier standalone
+    // Using require() for compatibility with Jest/CommonJS environments
     let prettier: typeof import('prettier/standalone');
     let prettierPlugins: any[];
     try {
-        // Use require for better compatibility with Jest and CommonJS environments
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         prettier = require('prettier/standalone');
         // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -89,8 +88,9 @@ export async function prettierFormat(
         const parserEstree = require('prettier/plugins/estree');
         prettierPlugins = [parserBabel, parserTypescript, parserEstree];
     } catch (e) {
+        console.error('Failed to load Prettier:', e);
         throw new Error(
-            'Prettier is not installed. Please install it with: npm install prettier'
+            `Prettier is not installed or failed to load. Please install it with: npm install prettier. Error: ${e}`
         );
     }
 
@@ -116,106 +116,22 @@ export async function prettierFormat(
 
     // Step 4: Parse the formatted string (skip types for performance)
     const formattedParser = new JavaScriptParser({skipTypes: true});
-    let formattedAst: JS.CompilationUnit | undefined;
-
-    for await (const parsed of formattedParser.parse({
+    const formattedAst = await formattedParser.parseOne({
         sourcePath: sourceFile.sourcePath,
         text: formattedSource
-    })) {
-        formattedAst = parsed as JS.CompilationUnit;
-        break;
-    }
-
-    if (!formattedAst) {
-        // If parsing fails, return original unchanged
-        console.warn('Failed to parse Prettier output, returning original');
-        return sourceFile;
-    }
+    }) as JS.CompilationUnit;
 
     // Step 5: Reconcile whitespace from formatted AST to original AST
+    // Note: For subtree formatting with pruned trees, the structure may differ
+    // (e.g., Prettier removes empty placeholder statements). In such cases,
+    // we return the formatted AST directly and let the caller handle
+    // subtree-level reconciliation.
     const reconciler = new WhitespaceReconcilerVisitor();
     const result = await reconciler.reconcile(sourceFile, formattedAst);
 
-    return result as JS.CompilationUnit;
-}
-
-/**
- * Formats a JavaScript/TypeScript expression or statement using Prettier.
- *
- * This wraps the expression in a minimal source file, formats it, and extracts
- * the result. Useful for formatting code snippets.
- *
- * @param node The node to format
- * @param options Prettier formatting options
- * @returns The formatted node with reconciled whitespace
- */
-export async function prettierFormatNode<T extends J>(
-    node: T,
-    options: PrettierFormatOptions = {}
-): Promise<T> {
-    // Dynamically import prettier standalone (avoids dynamic import issues with Prettier 3.x)
-    let prettier: typeof import('prettier/standalone');
-    let prettierPlugins: any[];
-    try {
-        // Use require for better compatibility with Jest and CommonJS environments
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        prettier = require('prettier/standalone');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const parserBabel = require('prettier/plugins/babel');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const parserEstree = require('prettier/plugins/estree');
-        prettierPlugins = [parserBabel, parserEstree];
-    } catch (e) {
-        throw new Error(
-            'Prettier is not installed. Please install it with: npm install prettier'
-        );
-    }
-
-    // Print the node to string using the JS printer
-    const originalSource = await TreePrinters.printer(JS.Kind.CompilationUnit).print(node);
-
-    // Format with Prettier using babel parser for snippets
-    const prettierOptions = {
-        parser: 'babel',
-        plugins: prettierPlugins,
-        tabWidth: options.tabWidth ?? 2,
-        useTabs: options.useTabs ?? false,
-        semi: options.semi ?? true,
-        singleQuote: options.singleQuote ?? false,
-        trailingComma: options.trailingComma ?? 'all',
-        printWidth: options.printWidth ?? 80,
-    };
-
-    const formattedSource = await prettier.format(originalSource, prettierOptions);
-
-    // Parse the formatted string
-    const formattedParser = new JavaScriptParser({skipTypes: true});
-    let formattedAst: JS.CompilationUnit | undefined;
-
-    for await (const parsed of formattedParser.parse({
-        sourcePath: 'snippet.js',
-        text: formattedSource
-    })) {
-        formattedAst = parsed as JS.CompilationUnit;
-        break;
-    }
-
-    if (!formattedAst) {
-        return node;
-    }
-
-    // Extract the first statement/expression from the formatted AST
-    // This assumes the node was a single statement/expression
-    const formattedNode = extractFirstNode(formattedAst);
-    if (!formattedNode || formattedNode.kind !== node.kind) {
-        return node;
-    }
-
-    // Reconcile whitespace
-    const reconciler = new WhitespaceReconcilerVisitor();
-    const result = await reconciler.reconcile(node, formattedNode as J);
-
-    return result as T;
+    // If reconciliation succeeded, return the reconciled original with updated whitespace
+    // If it failed (structure mismatch), return the formatted AST for subtree reconciliation
+    return reconciler.isCompatible() ? result as JS.CompilationUnit : formattedAst;
 }
 
 /**
@@ -229,12 +145,4 @@ function getParserForPath(path: string): string {
     if (lower.endsWith('.mjs')) return 'babel';
     if (lower.endsWith('.cjs')) return 'babel';
     return 'babel';
-}
-
-/**
- * Extracts the first meaningful node from a compilation unit.
- */
-function extractFirstNode(cu: JS.CompilationUnit): J | undefined {
-    if (cu.statements.length === 0) return undefined;
-    return cu.statements[0].element;
 }
