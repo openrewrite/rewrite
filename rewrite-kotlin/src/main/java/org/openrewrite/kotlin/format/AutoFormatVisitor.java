@@ -62,7 +62,7 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
         t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         // With the updated tree, overwrite the original space with the newly computed space
-        return new MergeSpacesVisitor().visit(tree, t);
+        return new MergeSpacesVisitor(false).visit(tree, t);
     }
 
     @Override
@@ -90,7 +90,7 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
             t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p);
 
             // With the updated tree, overwrite the original space with the newly computed space
-            return new MergeSpacesVisitor().visit(tree, t);
+            return new MergeSpacesVisitor(false).visit(tree, t);
         }
         return (J) tree;
     }

@@ -79,7 +79,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
 
         // With the updated tree, overwrite the original space with the newly computed space
-        tree = new MergeSpacesVisitor(activeStyles, removeCustomLineBreaks).visit(tree, t);
+        tree = new MergeSpacesVisitor(removeCustomLineBreaks).visit(tree, t);
 
         if (tree instanceof JavaSourceFile) {
             return addStyleMarker((JavaSourceFile) tree, styles);
@@ -113,7 +113,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(t, p);
 
             // With the updated tree, overwrite the original space with the newly computed space
-            tree = new MergeSpacesVisitor(activeStyles, removeCustomLineBreaks).visit(tree, t);
+            tree = new MergeSpacesVisitor(removeCustomLineBreaks).visit(tree, t);
 
             if (tree instanceof J.CompilationUnit) {
                 return addStyleMarker((JavaSourceFile) tree, styles);

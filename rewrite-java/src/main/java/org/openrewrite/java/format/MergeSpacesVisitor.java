@@ -24,8 +24,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -41,11 +39,9 @@ import java.util.function.Supplier;
 @EqualsAndHashCode(callSuper = false)
 public class MergeSpacesVisitor extends JavaVisitor<Object> {
 
-    private final boolean removeCustomLineBreaks; //TODO implement this here
-    private final TabsAndIndentsStyle tabsAndIndents;
+    private final boolean removeCustomLineBreaks;
 
-    public MergeSpacesVisitor(List<NamedStyles> styles, boolean removeCustomLineBreaks) {
-        this.tabsAndIndents = getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents);
+    public MergeSpacesVisitor(boolean removeCustomLineBreaks) {
         this.removeCustomLineBreaks = removeCustomLineBreaks;
     }
 

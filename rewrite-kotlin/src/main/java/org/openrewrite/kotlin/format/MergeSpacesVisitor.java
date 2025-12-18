@@ -19,20 +19,31 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.TypeReferencePrefix;
 import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Visit K types.
  */
 public class MergeSpacesVisitor extends KotlinVisitor<Object> {
+
+    private final boolean removeCustomLineBreaks;
+
+    public MergeSpacesVisitor(boolean removeCustomLineBreaks) {
+        this.removeCustomLineBreaks = removeCustomLineBreaks;
+    }
 
     @Override
     public J visitCompilationUnit(K.CompilationUnit cu, @Nullable Object ctx) {
@@ -652,6 +663,11 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             return space;
         }
         Space newSpace = (Space) ctx;
+        if (!removeCustomLineBreaks && space.getWhitespace().contains("\n")) {
+            if (newSpace.getWhitespace().contains("\n")) {
+                newSpace = newSpace.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1) + newSpace.getWhitespace().substring(newSpace.getWhitespace().lastIndexOf("\n") + 1));
+            }
+        }
         if (space == null) {
             return newSpace;
         }
@@ -660,25 +676,42 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         if (space.getComments().isEmpty() || space.getComments().size() != newSpace.getComments().size()) {
             return space;
         }
+        Space finalNewSpace = newSpace;
         return space.withComments(ListUtils.map(space.getComments(), (index, comment) -> {
+            Comment newComment = finalNewSpace.getComments().get(index);
             if (comment instanceof Javadoc.DocComment) {
                 Javadoc.DocComment docComment = (Javadoc.DocComment) comment;
-                if (!(newSpace.getComments().get(index) instanceof Javadoc.DocComment)) {
+                if (!(newComment instanceof Javadoc.DocComment)) {
                     return docComment;
                 }
-                Javadoc.DocComment replaceWith = (Javadoc.DocComment) newSpace.getComments().get(index);
+                Javadoc.DocComment replaceWith = (Javadoc.DocComment) newComment;
                 comment = docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
                     if(!(jdoc instanceof Javadoc.LineBreak && replaceWith.getBody().get(i) instanceof Javadoc.LineBreak)) {
                         return jdoc;
                     }
-                    return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin());
+                    String newMargin = ((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin();
+                    if (!removeCustomLineBreaks && ((Javadoc.LineBreak) jdoc).getMargin().contains("\n")) {
+                        if (newMargin.contains("\n")) {
+                            return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) jdoc).getMargin().substring(0, ((Javadoc.LineBreak) jdoc).getMargin().lastIndexOf("\n") + 1) + newMargin.substring(newMargin.lastIndexOf("\n") + 1));
+                        } else {
+                            return jdoc;
+                        }
+                    }
+                    return ((Javadoc.LineBreak) jdoc).withMargin(newMargin);
                 }));
             } else if (comment instanceof TextComment) {
-                if (newSpace.getComments().get(index) instanceof TextComment) {
-                    comment = ((TextComment) comment).withText(((TextComment) newSpace.getComments().get(index)).getText());
+                if (newComment instanceof TextComment) {
+                    comment = ((TextComment) comment).withText(((TextComment) newComment).getText());
                 }
             }
-            return comment.withSuffix(newSpace.getComments().get(index).getSuffix());
+            if (!removeCustomLineBreaks && comment.getSuffix().contains("\n")) {
+                if (newComment.getSuffix().contains("\n")) {
+                    return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1) + newComment.getSuffix().substring(newComment.getSuffix().lastIndexOf("\n") + 1));
+                } else {
+                    return comment;
+                }
+            }
+            return comment.withSuffix(newComment.getSuffix());
         }));
     }
 
@@ -2165,5 +2198,14 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         J.Erroneous u = erroneous;
         u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, newErroneous.getPrefix()));
         return u.withMarkers(visitMarkers(u.getMarkers(), newErroneous.getMarkers()));
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
     }
 }

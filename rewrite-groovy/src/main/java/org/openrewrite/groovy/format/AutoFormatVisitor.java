@@ -56,6 +56,6 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
         t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
 
         // With the updated tree, overwrite the original space with the newly computed space
-        return new MergeSpacesVisitor().visit(tree, t);
+        return new MergeSpacesVisitor(false).visit(tree, t);
     }
 }
