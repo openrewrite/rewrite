@@ -22,9 +22,13 @@ import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     autoFormat,
     AutoformatVisitor,
+    JavaScriptParser,
     JavaScriptVisitor,
+    JS,
     typescript
 } from "../../../src/javascript";
+import {J, Statement} from "../../../src/java";
+import {prettierFormat} from "../../../src/javascript/prettier-format";
 
 describe('AutoformatVisitor with Prettier', () => {
     const prettierSpec = new RecipeSpec()
@@ -35,10 +39,9 @@ describe('AutoformatVisitor with Prettier', () => {
         return prettierSpec.rewriteRun(
             // @formatter:off
             //language=typescript
-            // Note: whitespace reconciler only copies whitespace, not tokens like semicolons
-            // Prettier adds trailing newline
+            // Prettier adds semicolon and trailing newline
             typescript(`const x=1+2`,
-                `const x = 1 + 2
+                `const x = 1 + 2;
 
 `)
             // @formatter:on
@@ -183,5 +186,58 @@ describe('AutoformatVisitor with Prettier', () => {
             )
             // @formatter:on
         )
+    });
+});
+
+describe('Prettier marker reconciliation', () => {
+    test('Prettier adds Semicolon marker when adding semicolon', async () => {
+        // Parse code WITHOUT a semicolon
+        const parser = new JavaScriptParser();
+        const sourceFile = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const x = 1'  // No semicolon
+        }) as JS.CompilationUnit;
+
+        // Verify the original has no Semicolon marker on the statement
+        const originalStatements = (sourceFile as any).statements as J.RightPadded<Statement>[];
+        const originalMarkers = originalStatements[0]?.markers?.markers || [];
+        const originalHasSemicolon = originalMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
+        expect(originalHasSemicolon).toBe(false);
+
+        // Format with Prettier (semi: true by default adds semicolons)
+        const formatted = await prettierFormat(sourceFile, { semi: true });
+
+        // Check if the formatted tree has the Semicolon marker
+        const formattedStatements = (formatted as any).statements as J.RightPadded<Statement>[];
+        const formattedMarkers = formattedStatements[0]?.markers?.markers || [];
+        const formattedHasSemicolon = formattedMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
+
+        // This test currently FAILS because whitespace reconciler doesn't copy markers
+        // Once fixed, this should pass
+        expect(formattedHasSemicolon).toBe(true);
+    });
+
+    test('Prettier preserves Semicolon marker when present', async () => {
+        // Parse code WITH a semicolon
+        const parser = new JavaScriptParser();
+        const sourceFile = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const x = 1;'  // Has semicolon
+        }) as JS.CompilationUnit;
+
+        // Verify the original has Semicolon marker
+        const originalStatements = (sourceFile as any).statements as J.RightPadded<Statement>[];
+        const originalMarkers = originalStatements[0]?.markers?.markers || [];
+        const originalHasSemicolon = originalMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
+        expect(originalHasSemicolon).toBe(true);
+
+        // Format with Prettier
+        const formatted = await prettierFormat(sourceFile, { semi: true });
+
+        // Semicolon marker should still be present
+        const formattedStatements = (formatted as any).statements as J.RightPadded<Statement>[];
+        const formattedMarkers = formattedStatements[0]?.markers?.markers || [];
+        const formattedHasSemicolon = formattedMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
+        expect(formattedHasSemicolon).toBe(true);
     });
 });

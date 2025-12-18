@@ -195,6 +195,7 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
         if (this.shouldReconcile() && 'prefix' in original && 'prefix' in formatted) {
             result = produce(result, (draft: any) => {
                 draft.prefix = (formatted as any).prefix;
+                draft.markers = (formatted as any).markers;
             });
         }
 
@@ -249,7 +250,9 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
-     * Reconcile RightPadded - copy 'after' whitespace.
+     * Reconcile RightPadded - copy 'after' whitespace and markers.
+     * Markers are copied because Prettier may add/remove semicolons or trailing commas,
+     * which are represented as markers on RightPadded elements.
      */
     protected async visitRightPaddedReconcile<T extends J | boolean>(
         original: J.RightPadded<T>,
@@ -265,11 +268,12 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
         const visitedElement = await this.visitProperty(original.element, formatted.element);
         if (!this.compatible) return original;
 
-        // Copy 'after' whitespace when reconciling
+        // Copy 'after' whitespace and markers when reconciling
         return produce(original, draft => {
             (draft as any).element = visitedElement;
             if (this.shouldReconcile()) {
                 draft.after = formatted.after;
+                draft.markers = formatted.markers;
             }
         });
     }
@@ -296,6 +300,7 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
             (draft as any).element = visitedElement;
             if (this.shouldReconcile()) {
                 draft.before = formatted.before;
+                draft.markers = formatted.markers;
             }
         });
     }
@@ -333,6 +338,7 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
         return produce(original, draft => {
             if (this.shouldReconcile()) {
                 draft.before = formatted.before;
+                draft.markers = formatted.markers;
             }
             (draft as any).elements = newElements;
         });
