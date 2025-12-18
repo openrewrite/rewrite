@@ -140,6 +140,32 @@ class AutodetectTest implements RewriteTest {
         );
     }
 
+    @Test
+    void emptyObjectsAlsoCounted() {
+        rewriteRun(
+          withDetectedWrappingAndBraces( wrappingAndBraces -> {
+              assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.WrapAlways);
+              return null;
+          }),
+          json(
+            //(outer object + 3 members + 1 empty object + 1 nested + 1 nested empty value) 7 == 7 (3 members + 1 empty, 1 empty with space + 1 nested + 1 nested empty value)
+            """
+            { "non-wrapped-empty": {}, "non-wrapped-empty-space": { }, "non-wrapped": { "nested": {} },
+              "wrapped-empty": {
+              },
+              "wrapped-empty-line": {
+
+              },
+              "wrapped": {
+                "nested": {
+                }
+              }
+            }
+            """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> withDetectedIndentation(Function<TabsAndIndentsStyle, Void> fn) {
         return withDetectedStyle(TabsAndIndentsStyle.class, fn);
     }

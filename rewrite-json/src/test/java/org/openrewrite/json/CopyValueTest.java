@@ -17,21 +17,11 @@ package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
 
 class CopyValueTest implements RewriteTest {
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-        spec.executionContext(ctx);
-    }
 
     @DocumentExample
     @Test
