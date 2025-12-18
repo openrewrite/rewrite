@@ -302,7 +302,7 @@ export class JavaScriptParser extends Parser {
 
             try {
                 // Get Prettier config marker for this file (if Prettier is available)
-                const prettierConfigMarker = prettierLoader ? await prettierLoader.getConfigMarker(filePath) : undefined;
+                const prettierConfigMarker = await prettierLoader?.getConfigMarker(filePath);
 
                 yield produce(
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)

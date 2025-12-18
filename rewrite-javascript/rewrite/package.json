@@ -49,9 +49,9 @@
     "postbuild": "chmod +x dist/rpc/server.js dist/cli/rewrite.js && npm link",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "dev": "tsc --watch -p tsconfig.json",
-    "test": "npm run typecheck && npm run build && NODE_OPTIONS='--max-old-space-size=4096' jest",
+    "test": "npm run typecheck && npm run build && NODE_OPTIONS='--max-old-space-size=4096 --experimental-vm-modules' jest",
     "build:fixtures": "tsc --build fixtures/tsconfig.json",
-    "ci:test": "NODE_OPTIONS='--max-old-space-size=4096' jest",
+    "ci:test": "NODE_OPTIONS='--max-old-space-size=4096 --experimental-vm-modules' jest",
     "start": "npm run build && node ./dist/rpc/server.js"
   },
   "dependencies": {

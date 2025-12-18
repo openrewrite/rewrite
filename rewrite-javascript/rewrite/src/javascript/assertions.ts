@@ -108,6 +108,15 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
                     parser: () => new JavaScriptParser({sourceFileCache, relativeTo})
                 }
             } else {
+                // Write non-JS/TS files to disk so tools like Prettier can find config files
+                if (spec.before && spec.path) {
+                    const filePath = path.join(relativeTo, spec.path);
+                    const dir = path.dirname(filePath);
+                    if (!fs.existsSync(dir)) {
+                        fs.mkdirSync(dir, { recursive: true });
+                    }
+                    fs.writeFileSync(filePath, spec.before);
+                }
                 yield spec;
             }
         }

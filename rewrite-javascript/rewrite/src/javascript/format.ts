@@ -40,22 +40,9 @@ export const autoFormat = async <J2 extends J, P>(
     p: P,
     stopAfter?: J,
     parent?: Cursor,
-    styles?: NamedStyles[],
-    options?: AutoformatOptions
+    styles?: NamedStyles<string>[]
 ): Promise<J2> =>
-    (await new AutoformatVisitor(stopAfter, styles, options).visit(j, p, parent) as J2);
-
-/**
- * Options for the AutoformatVisitor.
- */
-export interface AutoformatOptions {
-    /**
-     * When true, uses Prettier for formatting instead of the built-in visitors.
-     * When false (default), uses built-in formatting visitors unless a PrettierStyle
-     * is present in the styles or a PrettierConfig marker is on the source file.
-     */
-    usePrettier?: boolean;
-}
+    (await new AutoformatVisitor(stopAfter, styles).visit(j, p, parent) as J2);
 
 /**
  * Formats JavaScript/TypeScript code using a comprehensive set of formatting rules.
@@ -65,26 +52,22 @@ export interface AutoformatOptions {
  * 2. Styles from source file markers (NamedStyles)
  * 3. IntelliJ defaults
  *
- * By default, uses Prettier for indentation formatting. Falls back to TabsAndIndentsVisitor
- * if Prettier is not available or if usePrettier is set to false.
+ * When a PrettierStyle is present (either in the styles array or as a marker on the source file),
+ * Prettier is used for formatting. Otherwise, built-in formatting visitors are used.
  */
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
-    private readonly styles?: NamedStyles[];
-    private readonly usePrettier: boolean;
+    private readonly styles?: NamedStyles<string>[];
 
-    constructor(private stopAfter?: Tree, styles?: NamedStyles[], options?: AutoformatOptions) {
+    constructor(private stopAfter?: Tree, styles?: NamedStyles<string>[]) {
         super();
         this.styles = styles;
-        // Default to TabsAndIndentsVisitor for backwards compatibility
-        // Set usePrettier: true to enable Prettier-based formatting
-        this.usePrettier = options?.usePrettier ?? false;
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        // Check for PrettierStyle marker on source file or usePrettier flag
-        // If either is true, delegate entirely to Prettier (skip other formatting visitors)
+        // Check for PrettierStyle in styles array or as marker on source file
+        // If found, delegate entirely to Prettier (skip other formatting visitors)
         const prettierStyle = this.getPrettierStyle(tree, cursor);
-        if (prettierStyle || this.usePrettier) {
+        if (prettierStyle) {
             return this.applyPrettierFormatting(tree as R, prettierStyle, p, cursor);
         }
 
@@ -114,10 +97,18 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * Gets the PrettierStyle from the source file markers if present.
+     * Gets the PrettierStyle from the styles array or source file markers.
      */
     private getPrettierStyle(tree: Tree, cursor?: Cursor): PrettierStyle | undefined {
-        // Get the compilation unit (source file) to check for PrettierStyle marker
+        // First check the styles array
+        if (this.styles) {
+            const fromStyles = this.styles.find(s => (s as any).kind === StyleKind.PrettierStyle);
+            if (fromStyles) {
+                return fromStyles as unknown as PrettierStyle;
+            }
+        }
+
+        // Then check for PrettierStyle marker on source file
         let sourceFile: JS.CompilationUnit | undefined;
 
         if (tree.kind === JS.Kind.CompilationUnit) {

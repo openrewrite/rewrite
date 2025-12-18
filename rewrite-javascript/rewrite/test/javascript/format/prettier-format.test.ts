@@ -25,15 +25,24 @@ import {
     JavaScriptParser,
     JavaScriptVisitor,
     JS,
+    npm,
+    packageJson,
+    prettierFormat,
+    PrettierStyle,
     typescript
 } from "../../../src/javascript";
+import {json} from "../../../src/json";
 import {J, Statement} from "../../../src/java";
-import {prettierFormat} from "../../../src/javascript/prettier-format";
+import {randomId} from "../../../src";
+import {withDir} from "tmp-promise";
+
+// A simple PrettierStyle with default configuration
+const prettierStyle = new PrettierStyle(randomId(), {});
 
 describe('AutoformatVisitor with Prettier', () => {
     const prettierSpec = new RecipeSpec()
-    // Use Prettier for these tests
-    prettierSpec.recipe = fromVisitor(new AutoformatVisitor(undefined, undefined, { usePrettier: true }));
+    // Use Prettier for these tests by passing PrettierStyle
+    prettierSpec.recipe = fromVisitor(new AutoformatVisitor(undefined, [prettierStyle]));
 
     test('formats basic code with Prettier', () => {
         return prettierSpec.rewriteRun(
@@ -55,7 +64,7 @@ describe('AutoformatVisitor with Prettier', () => {
             override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
                 // Only format the info() call to simulate template replacement
                 if (methodInvocation.name?.simpleName === 'info') {
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, undefined, { usePrettier: true });
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [prettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -90,7 +99,7 @@ describe('AutoformatVisitor with Prettier', () => {
         const visitor = new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
                 if (methodInvocation.name?.simpleName === 'slice') {
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, undefined, { usePrettier: true });
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [prettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -152,7 +161,7 @@ describe('AutoformatVisitor with Prettier', () => {
             override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
                 // Only format the console.log() call to simulate template replacement
                 if (methodInvocation.name?.simpleName === 'log') {
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, undefined, { usePrettier: true });
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [prettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -239,5 +248,54 @@ describe('Prettier marker reconciliation', () => {
         const formattedMarkers = formattedStatements[0]?.markers?.markers || [];
         const formattedHasSemicolon = formattedMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
         expect(formattedHasSemicolon).toBe(true);
+    });
+});
+
+describe('Prettier auto-detection integration', () => {
+    // These tests verify that Prettier config is automatically detected from .prettierrc
+    // when prettier is installed as a dependency.
+    //
+    // NOTE: These tests are currently skipped because:
+    // 1. Prettier v3.x is ESM-only and can't be require()'d in Jest's CommonJS context
+    // 2. Dynamic imports fail in Jest's VM context without --experimental-vm-modules
+    // TODO: Re-enable when we have proper ESM support in tests
+
+    function prettierrc(config: Record<string, unknown>) {
+        return {
+            ...json(JSON.stringify(config, null, 2)),
+            path: '.prettierrc'
+        };
+    }
+
+    test('formats using .prettierrc config when Prettier is a dependency', async () => {
+        await withDir(async (repo) => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AutoformatVisitor());
+
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "devDependencies": {
+                                "prettier": "^3.0.0"
+                            }
+                        }
+                    `),
+                    // .prettierrc with single quotes, no semicolons
+                    prettierrc({ singleQuote: true, semi: false }),
+                    // Input has double quotes and semicolon
+                    // Output should have single quotes and no semicolon per .prettierrc
+                    typescript(
+                        `const x = "hello";`,
+                        `const x = 'hello'
+
+`
+                    )
+                )
+            );
+        }, {unsafeCleanup: true});
     });
 });

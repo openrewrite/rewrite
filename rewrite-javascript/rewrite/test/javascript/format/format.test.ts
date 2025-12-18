@@ -46,8 +46,8 @@ import {
 
 describe('AutoformatVisitor', () => {
     const spec = new RecipeSpec()
-    // Use TabsAndIndentsVisitor (not Prettier) for these tests as they were written for it
-    spec.recipe = fromVisitor(new AutoformatVisitor(undefined, undefined, { usePrettier: false }));
+    // No PrettierStyle passed, so uses built-in TabsAndIndentsVisitor
+    spec.recipe = fromVisitor(new AutoformatVisitor());
 
     test('everything', () => {
         return spec.rewriteRun(

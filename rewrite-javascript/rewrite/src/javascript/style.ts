@@ -559,7 +559,7 @@ export function styleFromSourceFile(styleKind: string, sourceFile: Tree): Style 
  * @param sourceFile The source file to check for styles
  * @param styles Optional array of NamedStyles that take precedence over source file styles
  */
-export function getStyle(styleKind: string, sourceFile: Tree, styles?: NamedStyles[]): Style | undefined {
+export function getStyle(styleKind: string, sourceFile: Tree, styles?: NamedStyles<string>[]): Style | undefined {
     // First check passed-in styles (highest precedence)
     if (styles) {
         for (const namedStyle of styles) {

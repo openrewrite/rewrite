@@ -125,13 +125,17 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
 
         const kind = original.kind;
 
-        // Type nodes - short-circuit, keep original (types don't have whitespace)
+        // Type nodes - short-circuit, keep original (types are expensive to compute)
         if (typeof kind === 'string' && kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
             return original;
         }
 
-        // Primitive values or non-tree objects - return original unchanged
+        // Primitive values or non-tree objects - copy from formatted when reconciling
+        // This handles things like valueSource (quote style) which is formatting
         if (kind === undefined || typeof kind !== 'string') {
+            if (this.shouldReconcile() && formatted !== original) {
+                return formatted;
+            }
             return original;
         }
 

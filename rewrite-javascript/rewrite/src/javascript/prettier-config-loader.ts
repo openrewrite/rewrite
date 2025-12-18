@@ -85,8 +85,9 @@ export class PrettierConfigLoader {
             try {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
                 bundledPrettier = require('prettier');
-            } catch {
+            } catch (e) {
                 // Our bundled Prettier isn't available
+                console.warn('PrettierConfigLoader: Failed to load bundled Prettier:', e);
                 return this.detection;
             }
 
@@ -167,8 +168,13 @@ export class PrettierConfigLoader {
         }
 
         try {
+            // Resolve path against projectRoot if not absolute
+            const absolutePath = path.isAbsolute(filePath)
+                ? filePath
+                : path.join(this.projectRoot, filePath);
+
             // Resolve config for this specific file (applies overrides)
-            const config = await this.detection.bundledPrettier.resolveConfig(filePath);
+            const config = await this.detection.bundledPrettier.resolveConfig(absolutePath);
 
             if (!config) {
                 // No Prettier config found for this file
@@ -190,8 +196,9 @@ export class PrettierConfigLoader {
             // Cache and return
             this.configCache.set(configKey, marker);
             return marker;
-        } catch {
+        } catch (e) {
             // Config resolution failed for this file
+            console.warn(`PrettierConfigLoader: Failed to resolve config for ${filePath}:`, e);
             return undefined;
         }
     }
