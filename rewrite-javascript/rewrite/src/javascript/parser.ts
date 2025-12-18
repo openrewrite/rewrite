@@ -48,6 +48,7 @@ import {
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
 import {produce} from "immer";
+import {PrettierConfigLoader} from "./prettier-config-loader";
 import Kind = JS.Kind;
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
@@ -55,7 +56,12 @@ import SpreadAttribute = JSX.SpreadAttribute;
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
-    sourceFileCache?: Map<string, ts.SourceFile>
+    sourceFileCache?: Map<string, ts.SourceFile>,
+    /**
+     * When true, skips type attribution during parsing for faster performance.
+     * Useful for formatting-only operations where types are not needed.
+     */
+    skipTypes?: boolean
 }
 
 function getScriptKindFromFileName(fileName: string): ts.ScriptKind {
@@ -77,13 +83,15 @@ export class JavaScriptParser extends Parser {
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
     private readonly sourceFileCache?: Map<string, ts.SourceFile>;
+    private readonly skipTypes: boolean;
 
     constructor(
         {
             ctx,
             relativeTo,
             styles,
-            sourceFileCache
+            sourceFileCache,
+            skipTypes
         }: JavaScriptParserOptions = {},
     ) {
         super({ctx, relativeTo});
@@ -103,6 +111,7 @@ export class JavaScriptParser extends Parser {
         };
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
+        this.skipTypes = skipTypes ?? false;
     }
 
     // noinspection JSUnusedGlobalSymbols
@@ -255,12 +264,21 @@ export class JavaScriptParser extends Parser {
         // Update the oldProgram reference
         this.oldProgram = program;
 
-        const typeChecker = program.getTypeChecker();
+        // Detect Prettier config for the project
+        const prettierLoader = this.relativeTo ? new PrettierConfigLoader(this.relativeTo) : undefined;
+        if (prettierLoader) {
+            await prettierLoader.detectPrettier();
+        }
 
-        // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
-        // This ensures that TypeScript types with the same type.id map to the same Type instance,
-        // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
-        const typeMapping = new JavaScriptTypeMapping(typeChecker);
+        // Create type mapping only if types are needed (for performance)
+        let typeMapping: JavaScriptTypeMapping | undefined;
+        if (!this.skipTypes) {
+            const typeChecker = program.getTypeChecker();
+            // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
+            // This ensures that TypeScript types with the same type.id map to the same Type instance,
+            // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
+            typeMapping = new JavaScriptTypeMapping(typeChecker);
+        }
 
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
@@ -283,12 +301,18 @@ export class JavaScriptParser extends Parser {
             }
 
             try {
+                // Get Prettier config marker for this file (if Prettier is available)
+                const prettierConfigMarker = prettierLoader ? await prettierLoader.getConfigMarker(filePath) : undefined;
+
                 yield produce(
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
                             draft.markers.markers = draft.markers.markers.concat(this.styles);
+                        }
+                        if (prettierConfigMarker) {
+                            draft.markers.markers = draft.markers.markers.concat([prettierConfigMarker]);
                         }
                     });
             } catch (error) {
@@ -309,12 +333,12 @@ for (const [key, value] of Object.entries(ts.SyntaxKind)) {
 
 // noinspection JSUnusedGlobalSymbols
 export class JavaScriptParserVisitor {
-    private readonly typeMapping: JavaScriptTypeMapping;
+    private readonly typeMapping?: JavaScriptTypeMapping;
 
     constructor(
         private readonly sourceFile: ts.SourceFile,
         private readonly sourcePath: string,
-        typeMapping: JavaScriptTypeMapping) {
+        typeMapping?: JavaScriptTypeMapping) {
         this.typeMapping = typeMapping;
     }
 
@@ -4284,19 +4308,19 @@ export class JavaScriptParserVisitor {
     }
 
     private mapType(node: ts.Node): Type | undefined {
-        return this.typeMapping.type(node);
+        return this.typeMapping?.type(node);
     }
 
     private mapPrimitiveType(node: ts.Node): Type.Primitive {
-        return this.typeMapping.primitiveType(node);
+        return this.typeMapping?.primitiveType(node) ?? Type.Primitive.None;
     }
 
     private mapVariableType(node: ts.NamedDeclaration): Type.Variable | undefined {
-        return this.typeMapping.variableType(node);
+        return this.typeMapping?.variableType(node);
     }
 
     private mapMethodType(node: ts.Node): Type.Method | undefined {
-        return this.typeMapping.methodType(node);
+        return this.typeMapping?.methodType(node);
     }
 
     private mapCommaSeparatedList<T extends J>(nodes: readonly ts.Node[]): J.Container<T> {

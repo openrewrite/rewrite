@@ -28,6 +28,7 @@ declare module "./tree" {
             readonly Spread: "org.openrewrite.javascript.marker.Spread";
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
             readonly FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration";
+            readonly PrettierConfig: "org.openrewrite.javascript.marker.PrettierConfig";
         };
     }
 }
@@ -40,6 +41,7 @@ declare module "./tree" {
     NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion",
     Spread: "org.openrewrite.javascript.marker.Spread",
     FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration",
+    PrettierConfig: "org.openrewrite.javascript.marker.PrettierConfig",
 } as const;
 
 /**
@@ -78,6 +80,30 @@ export interface FunctionDeclaration extends Marker {
 }
 
 /**
+ * Marker containing the resolved Prettier configuration for a source file.
+ *
+ * This marker is added by the parser when a Prettier config is detected in the project.
+ * The config is resolved per-file (with overrides applied), so files with different
+ * override rules will have different marker instances.
+ *
+ * When this marker is present, AutoformatVisitor will use Prettier for formatting
+ * instead of the built-in formatting visitors.
+ */
+export interface PrettierConfig extends Marker {
+    readonly kind: typeof JS.Markers.PrettierConfig;
+    /**
+     * The resolved Prettier options for this file (with overrides applied).
+     */
+    readonly config: Record<string, unknown>;
+    /**
+     * The Prettier version from the project's package.json.
+     * At formatting time, this version of Prettier will be loaded dynamically
+     * (similar to npx) to ensure consistent formatting.
+     */
+    readonly prettierVersion: string;
+}
+
+/**
  * Registers an RPC codec for any marker that has a `prefix: J.Space` field.
  */
 function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
@@ -104,3 +130,20 @@ registerPrefixedMarkerCodec<Generator>(JS.Markers.Generator);
 registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);
 registerPrefixedMarkerCodec<Spread>(JS.Markers.Spread);
 registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration);
+
+// Register codec for PrettierConfig (different structure than prefixed markers)
+RpcCodecs.registerCodec(JS.Markers.PrettierConfig, {
+    async rpcReceive(before: PrettierConfig, q: RpcReceiveQueue): Promise<PrettierConfig> {
+        const draft = createDraft(before);
+        draft.id = await q.receive(before.id);
+        (draft as any).config = await q.receive(before.config);
+        (draft as any).prettierVersion = await q.receive(before.prettierVersion);
+        return finishDraft(draft) as PrettierConfig;
+    },
+
+    async rpcSend(after: PrettierConfig, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.config);
+        await q.getAndSend(after, a => a.prettierVersion);
+    }
+});

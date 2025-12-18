@@ -48,7 +48,8 @@ import {
 
 describe('AutoformatVisitor', () => {
     const spec = new RecipeSpec()
-    spec.recipe = fromVisitor(new AutoformatVisitor());
+    // Use TabsAndIndentsVisitor (not Prettier) for these tests as they were written for it
+    spec.recipe = fromVisitor(new AutoformatVisitor(undefined, undefined, { usePrettier: false }));
 
     test('everything', () => {
         return spec.rewriteRun(
@@ -700,6 +701,99 @@ buf.slice();`
     baz,
 } from "module"
 const x = 1;`
+            )
+            // @formatter:on
+        )
+    });
+});
+
+describe('AutoformatVisitor with Prettier', () => {
+    const prettierSpec = new RecipeSpec()
+    // Use Prettier for these tests
+    prettierSpec.recipe = fromVisitor(new AutoformatVisitor(undefined, undefined, { usePrettier: true }));
+
+    test('formats basic code with Prettier', () => {
+        return prettierSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            // Note: whitespace reconciler only copies whitespace, not tokens like semicolons
+            // Prettier adds trailing newline
+            typescript(`const x=1+2`,
+                `const x = 1 + 2
+
+`)
+            // @formatter:on
+        )
+    });
+
+    test('subtree formatting with Prettier preserves indentation', async () => {
+        // This test verifies that subtree formatting (triggered via maybeAutoFormat)
+        // works correctly with the Prettier pruning optimization
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+                // Only format the info() call to simulate template replacement
+                if (methodInvocation.name?.simpleName === 'info') {
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, undefined, { usePrettier: true });
+                }
+                return super.visitMethodInvocation(methodInvocation, p);
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+
+        // Test with multiple statements - the pruning should handle this correctly
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                function first() {
+                    console.log("first");
+                }
+                function second() {
+                    logger.info("second");
+                }
+                function third() {
+                    console.log("third");
+                }
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('subtree formatting in nested block with Prettier', async () => {
+        // This tests the pruning in nested blocks
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+                if (methodInvocation.name?.simpleName === 'slice') {
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, undefined, { usePrettier: true });
+                }
+                return super.visitMethodInvocation(methodInvocation, p);
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                class MyClass {
+                    method1() {
+                        const a = 1;
+                    }
+                    method2() {
+                        const b = arr.slice();
+                    }
+                    method3() {
+                        const c = 3;
+                    }
+                }
+                `
             )
             // @formatter:on
         )
