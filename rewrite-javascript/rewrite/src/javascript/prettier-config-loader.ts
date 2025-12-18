@@ -15,8 +15,105 @@
  */
 import * as path from 'path';
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
+import * as os from 'os';
+import {spawnSync} from 'child_process';
 import {PrettierStyle} from './style';
 import {randomId} from '../uuid';
+
+/**
+ * Cache of loaded Prettier modules by version.
+ * This ensures we don't reload the same version multiple times.
+ */
+const prettierModuleCache: Map<string, typeof import('prettier')> = new Map();
+
+/**
+ * Gets the cache directory for a specific Prettier version.
+ * Uses ~/.cache/openrewrite/prettier/<version>/
+ */
+function getPrettierCacheDir(version: string): string {
+    const cacheBase = path.join(os.homedir(), '.cache', 'openrewrite', 'prettier');
+    return path.join(cacheBase, version);
+}
+
+/**
+ * Checks if a Prettier version is installed in the cache.
+ */
+function isPrettierCached(version: string): boolean {
+    const cacheDir = getPrettierCacheDir(version);
+    const prettierPath = path.join(cacheDir, 'node_modules', 'prettier', 'package.json');
+    if (!fs.existsSync(prettierPath)) {
+        return false;
+    }
+    // Verify the installed version matches
+    try {
+        const pkg = JSON.parse(fs.readFileSync(prettierPath, 'utf8'));
+        return pkg.version === version;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Installs a specific Prettier version to the cache directory.
+ */
+async function installPrettierToCache(version: string): Promise<void> {
+    const cacheDir = getPrettierCacheDir(version);
+
+    // Create directory structure
+    await fsp.mkdir(cacheDir, {recursive: true});
+
+    // Create minimal package.json
+    const packageJson = {
+        name: `prettier-cache-${version}`,
+        version: '1.0.0',
+        private: true,
+        dependencies: {
+            prettier: version
+        }
+    };
+    await fsp.writeFile(
+        path.join(cacheDir, 'package.json'),
+        JSON.stringify(packageJson, null, 2)
+    );
+
+    // Run npm install
+    const result = spawnSync('npm', ['install', '--silent'], {
+        cwd: cacheDir,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 120000 // 2 minutes
+    });
+
+    if (result.error) {
+        throw new Error(`Failed to install Prettier ${version}: ${result.error.message}`);
+    }
+    if (result.status !== 0) {
+        const stderr = result.stderr?.trim() || '';
+        throw new Error(`Failed to install Prettier ${version}: npm exited with code ${result.status}${stderr ? '\n' + stderr : ''}`);
+    }
+
+    // Verify installation
+    if (!isPrettierCached(version)) {
+        throw new Error(`Prettier ${version} installation verification failed`);
+    }
+}
+
+/**
+ * Loads Prettier from the cache directory for a specific version.
+ */
+function loadPrettierFromCache(version: string): typeof import('prettier') {
+    const cacheDir = getPrettierCacheDir(version);
+    const prettierPath = path.join(cacheDir, 'node_modules', 'prettier');
+
+    // Clear require cache for this path to ensure fresh load
+    // (in case the version was reinstalled)
+    const resolvedPath = require.resolve(prettierPath);
+    delete require.cache[resolvedPath];
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require(prettierPath);
+}
 
 /**
  * Result of detecting Prettier in a project.
@@ -215,31 +312,43 @@ export class PrettierConfigLoader {
  * Dynamically loads a specific version of Prettier for formatting.
  *
  * This function will attempt to load Prettier in this order:
- * 1. From the current working directory's node_modules (if version matches)
- * 2. Using dynamic import with version specifier (npx-like behavior)
+ * 1. From the in-memory cache (if already loaded)
+ * 2. From the current working directory's node_modules (if version matches)
+ * 3. From the cached npm project at ~/.cache/openrewrite/prettier/<version>/
+ * 4. Install to cache and load from there
  *
  * @param version The Prettier version to load (e.g., "3.4.2")
  * @returns The loaded Prettier module
  */
 export async function loadPrettierVersion(version: string): Promise<typeof import('prettier')> {
-    // First, try to load from local node_modules if available and version matches
+    // Check in-memory cache first
+    const cached = prettierModuleCache.get(version);
+    if (cached) {
+        return cached;
+    }
+
+    // Try to load from local node_modules if version matches
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const localPrettier = require('prettier');
-        // Check if version matches
         if (localPrettier.version === version) {
+            prettierModuleCache.set(version, localPrettier);
             return localPrettier;
         }
     } catch {
         // Local prettier not available
     }
 
-    // For now, fall back to whatever prettier is available
-    // TODO: Implement npx-like dynamic version loading
-    // This would involve:
-    // 1. Check if version is available in a cache directory
-    // 2. If not, download and install to cache
-    // 3. Load from cache
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('prettier');
+    // Check if version is cached on disk
+    if (isPrettierCached(version)) {
+        const prettier = loadPrettierFromCache(version);
+        prettierModuleCache.set(version, prettier);
+        return prettier;
+    }
+
+    // Install to cache and load
+    await installPrettierToCache(version);
+    const prettier = loadPrettierFromCache(version);
+    prettierModuleCache.set(version, prettier);
+    return prettier;
 }

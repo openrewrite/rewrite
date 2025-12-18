@@ -27,6 +27,26 @@ import {findMarker} from '../markers';
 import {NormalizeWhitespaceVisitor} from './normalize-whitespace-visitor';
 import {MinimumViableSpacingVisitor} from './minimum-viable-spacing-visitor';
 import {TabsAndIndentsVisitor} from './tabs-and-indents-visitor';
+import {loadPrettierVersion} from './prettier-config-loader';
+
+/**
+ * Loads Prettier for formatting.
+ *
+ * We use the main Prettier module (not standalone) because:
+ * 1. It automatically handles parser resolution
+ * 2. Works better with CommonJS (avoids ESM issues in Jest)
+ * 3. Simpler - no need to manually load plugins
+ */
+async function loadPrettierFormatting(version?: string): Promise<typeof import('prettier')> {
+    if (version) {
+        // Ensure the version is installed and get it from cache
+        return await loadPrettierVersion(version);
+    }
+
+    // Use bundled Prettier
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('prettier');
+}
 
 /**
  * Options for Prettier formatting.
@@ -61,6 +81,13 @@ export interface PrettierFormatOptions {
      * Print width for line wrapping. Defaults to 80.
      */
     printWidth?: number;
+
+    /**
+     * The Prettier version to use (e.g., "3.4.2").
+     * If specified, loads that version from cache or installs it.
+     * If not specified, uses the bundled Prettier.
+     */
+    prettierVersion?: string;
 }
 
 /**
@@ -83,20 +110,11 @@ export async function prettierFormat(
     sourceFile: JS.CompilationUnit,
     options: PrettierFormatOptions = {}
 ): Promise<JS.CompilationUnit> {
-    // Dynamically load prettier standalone
-    // Using require() for compatibility with Jest/CommonJS environments
-    let prettier: typeof import('prettier/standalone');
-    let prettierPlugins: any[];
+    // Load Prettier - either specific version or bundled
+    let prettier: typeof import('prettier');
+
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        prettier = require('prettier/standalone');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const parserBabel = require('prettier/plugins/babel');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const parserTypescript = require('prettier/plugins/typescript');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const parserEstree = require('prettier/plugins/estree');
-        prettierPlugins = [parserBabel, parserTypescript, parserEstree];
+        prettier = await loadPrettierFormatting(options.prettierVersion);
     } catch (e) {
         console.error('Failed to load Prettier:', e);
         throw new Error(
@@ -111,9 +129,9 @@ export async function prettierFormat(
     const parser = getParserForPath(sourceFile.sourcePath);
 
     // Step 3: Format with Prettier
+    // Using the main Prettier module - parsers are resolved automatically
     const prettierOptions = {
         parser,
-        plugins: prettierPlugins,
         tabWidth: options.tabWidth ?? 2,
         useTabs: options.useTabs ?? false,
         semi: options.semi ?? true,
@@ -549,6 +567,7 @@ export async function applyPrettierFormatting<R extends J, P>(
             singleQuote: prettierStyle.config.singleQuote as boolean | undefined,
             trailingComma: prettierStyle.config.trailingComma as 'all' | 'es5' | 'none' | undefined,
             printWidth: prettierStyle.config.printWidth as number | undefined,
+            prettierVersion: prettierStyle.prettierVersion,
         };
     }
 
