@@ -26,7 +26,7 @@ class AutoFormatVisitorTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AutoFormat());
+        spec.recipe(RewriteTest.toRecipe(() -> new AutoFormatVisitor<>(null, true)));
     }
 
     @DocumentExample

@@ -33,13 +33,20 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
+    private final boolean removeCustomLineBreaks;
+
     @SuppressWarnings("unused")
     public AutoFormatVisitor() {
         this(null);
     }
 
     public AutoFormatVisitor(@Nullable Tree stopAfter) {
+        this(stopAfter, false);
+    }
+
+    public AutoFormatVisitor( @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
         this.stopAfter = stopAfter;
+        this.removeCustomLineBreaks = removeCustomLineBreaks;
     }
 
     @Override
@@ -62,7 +69,7 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
         t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         // With the updated tree, overwrite the original space with the newly computed space
-        return new MergeSpacesVisitor(false).visit(tree, t);
+        return new MergeSpacesVisitor(removeCustomLineBreaks).visit(tree, t);
     }
 
     @Override
