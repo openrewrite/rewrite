@@ -18,258 +18,15 @@ import {JavaScriptVisitor} from "./visitor";
 import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isScope, Tree} from "../tree";
-import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "./style";
+import {BlankLinesStyle, getStyle, PrettierStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "./style";
 import {NamedStyles} from "../style";
 import {produceAsync} from "../visitor";
 import {findMarker} from "../markers";
-import {Generator, PrettierConfig} from "./markers";
+import {Generator} from "./markers";
 import {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
-import {prettierFormat, PrettierFormatOptions} from "./prettier-format";
-import {WhitespaceReconcilerVisitor} from "./whitespace-reconciler";
-import {randomId} from "../uuid";
+import {prettierFormat, prettierFormatSubtree, PrettierFormatOptions} from "./prettier-format";
 
 export {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
-
-/**
- * Represents a segment of the path from root to a target node.
- */
-interface PathSegment {
-    /** The property name containing the child */
-    property: string;
-    /** For array properties, the index of the element */
-    index?: number;
-}
-
-/**
- * Extracts the path from a CompilationUnit to a target node using the cursor.
- * Returns the path segments in order from root to target.
- *
- * @param cursor The cursor, which may not include the target (e.g., when passing cursor.parent)
- * @param target The target node we're looking for
- */
-interface PathExtractionResult {
-    /** The compilation unit (root of the tree) */
-    compilationUnit: JS.CompilationUnit | undefined;
-    /** The path from root to target */
-    path: PathSegment[];
-}
-
-function extractPathFromCursor(cursor: Cursor, target: any): PathExtractionResult {
-    const pathNodes = cursor.asArray().reverse(); // root to target
-    const segments: PathSegment[] = [];
-    let compilationUnit: JS.CompilationUnit | undefined;
-
-    // Helper to check if two nodes are the same (by identity or ID)
-    const isSameNode = (a: any, b: any): boolean => {
-        if (a === b) return true;
-        if (a && b && typeof a === 'object' && typeof b === 'object' && 'id' in a && 'id' in b) {
-            return a.id === b.id;
-        }
-        return false;
-    };
-
-    // Helper to find a child in a parent and return the segment
-    const findChildInParent = (parent: any, child: any): PathSegment | undefined => {
-        if (!parent || typeof parent !== 'object') return undefined;
-
-        for (const key of Object.keys(parent)) {
-            const value = (parent as any)[key];
-            if (value == null) continue;
-
-            if (Array.isArray(value)) {
-                for (let idx = 0; idx < value.length; idx++) {
-                    const item = value[idx];
-                    if (isSameNode(item, child)) {
-                        return { property: key, index: idx };
-                    }
-                }
-            } else if (isSameNode(value, child)) {
-                return { property: key };
-            }
-        }
-        return undefined;
-    };
-
-    for (let i = 0; i < pathNodes.length - 1; i++) {
-        const parent = pathNodes[i];
-        const child = pathNodes[i + 1];
-
-        // Check if this node is the CompilationUnit
-        if (parent?.kind === JS.Kind.CompilationUnit) {
-            compilationUnit = parent as JS.CompilationUnit;
-        }
-
-        const segment = findChildInParent(parent, child);
-        if (segment) {
-            segments.push(segment);
-        }
-    }
-
-    // Check the last node for CompilationUnit
-    const lastNode = pathNodes[pathNodes.length - 1];
-    if (lastNode?.kind === JS.Kind.CompilationUnit) {
-        compilationUnit = lastNode as JS.CompilationUnit;
-    }
-
-    // If the cursor doesn't include the target, add the final segment
-    // This handles the case when autoFormat is called with cursor.parent
-    if (lastNode && !isSameNode(lastNode, target)) {
-        const finalSegment = findChildInParent(lastNode, target);
-        if (finalSegment) {
-            segments.push(finalSegment);
-        }
-    }
-
-    return { compilationUnit, path: segments };
-}
-
-/**
- * Creates a "null" identifier placeholder for use in pruned trees.
- * Using "null" instead of an empty statement ensures Prettier sees similar
- * line lengths and doesn't collapse multi-line code to single-line.
- */
-function createNullPlaceholder(prefix: J.Space): J.Identifier {
-    return {
-        kind: J.Kind.Identifier,
-        id: randomId(),
-        markers: { kind: "org.openrewrite.marker.Markers", id: randomId(), markers: [] },
-        prefix: prefix,
-        annotations: [],
-        simpleName: "null",
-        type: undefined,
-        fieldType: undefined
-    };
-}
-
-/**
- * Prunes a compilation unit for efficient Prettier formatting of a subtree.
- *
- * For J.Block#statements along the path to the target:
- * - Prior siblings are replaced with "null" identifier placeholders (to maintain line length)
- * - Following siblings are omitted entirely
- *
- * This optimization reduces the amount of code Prettier needs to process
- * while maintaining approximate line positions so Prettier doesn't collapse
- * multi-line code.
- *
- * @param cu The compilation unit to prune
- * @param path The path from root to the target subtree
- * @returns A pruned copy of the compilation unit
- */
-function pruneTreeForSubtree(cu: JS.CompilationUnit, path: PathSegment[]): JS.CompilationUnit {
-    return pruneNode(cu, path, 0) as JS.CompilationUnit;
-}
-
-/**
- * Recursively prunes a node, following the path and pruning J.Block#statements.
- */
-function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
-    if (pathIndex >= path.length) {
-        // Reached the target - return as-is
-        return node;
-    }
-
-    const segment = path[pathIndex];
-    const value = node[segment.property];
-
-    if (value == null) {
-        return node;
-    }
-
-    // Handle J.Block#statements specially
-    if (node.kind === J.Kind.Block && segment.property === 'statements' && segment.index !== undefined) {
-        const statements = value as J.RightPadded<Statement>[];
-        const targetIndex = segment.index;
-
-        // Create pruned statements array:
-        // - Prior siblings: replace with "null" placeholders (to maintain line length)
-        // - Target: recurse into it
-        // - Following siblings: omit entirely
-        const prunedStatements: J.RightPadded<Statement>[] = [];
-
-        for (let i = 0; i <= targetIndex; i++) {
-            if (i < targetIndex) {
-                // Prior sibling - replace with "null" placeholder
-                // Preserve the original prefix to maintain line positions
-                const originalPrefix = statements[i].element.prefix;
-                const placeholder = createNullPlaceholder(originalPrefix);
-                prunedStatements.push({
-                    kind: J.Kind.RightPadded,
-                    element: placeholder,
-                    after: statements[i].after,
-                    markers: statements[i].markers
-                } as J.RightPadded<Statement>);
-            } else {
-                // Target - recurse into it
-                const targetStatement = statements[i];
-                const prunedElement = pruneNode(targetStatement.element, path, pathIndex + 1);
-                prunedStatements.push({
-                    ...targetStatement,
-                    element: prunedElement
-                });
-            }
-        }
-        // Following siblings are omitted
-
-        return produce(node, (draft: any) => {
-            draft.statements = prunedStatements;
-        });
-    }
-
-    // For other properties, just recurse without pruning
-    if (Array.isArray(value) && segment.index !== undefined) {
-        const childNode = value[segment.index];
-        const prunedChild = pruneNode(childNode, path, pathIndex + 1);
-
-        if (prunedChild !== childNode) {
-            return produce(node, (draft: any) => {
-                draft[segment.property][segment.index!] = prunedChild;
-            });
-        }
-    } else if (!Array.isArray(value)) {
-        const prunedChild = pruneNode(value, path, pathIndex + 1);
-
-        if (prunedChild !== value) {
-            return produce(node, (draft: any) => {
-                draft[segment.property] = prunedChild;
-            });
-        }
-    }
-
-    return node;
-}
-
-/**
- * Finds a node in a tree by following a path of segments.
- * Used to locate the target node in the formatted tree.
- *
- * For block statements, the target is always at the last index since
- * following siblings are omitted during pruning.
- */
-function findByPath(tree: any, path: PathSegment[]): any {
-    let current = tree;
-
-    for (const segment of path) {
-        if (current == null) return undefined;
-
-        const value = current[segment.property];
-        if (value == null) return undefined;
-
-        if (Array.isArray(value) && segment.index !== undefined) {
-            // For block statements, target is always at the last index
-            // since following siblings are omitted during pruning
-            const isBlockStatements = current.kind === J.Kind.Block && segment.property === 'statements';
-            const index = isBlockStatements ? value.length - 1 : segment.index;
-            const item = value[index];
-            if (item == null) return undefined;
-            current = item;
-        } else {
-            current = value;
-        }
-    }
-
-    return current;
-}
 
 export const maybeAutoFormat = async <J2 extends J, P>(before: J2, after: J2, p: P, stopAfter?: J, parent?: Cursor): Promise<J2> => {
     if (before !== after) {
@@ -293,15 +50,11 @@ export const autoFormat = async <J2 extends J, P>(
  */
 export interface AutoformatOptions {
     /**
-     * When true, uses Prettier for indentation instead of TabsAndIndentsVisitor.
-     * Defaults to true. Falls back to TabsAndIndentsVisitor if Prettier is not available.
+     * When true, uses Prettier for formatting instead of the built-in visitors.
+     * When false (default), uses built-in formatting visitors unless a PrettierStyle
+     * is present in the styles or a PrettierConfig marker is on the source file.
      */
     usePrettier?: boolean;
-
-    /**
-     * Prettier-specific formatting options. Only used when usePrettier is true.
-     */
-    prettierOptions?: PrettierFormatOptions;
 }
 
 /**
@@ -318,7 +71,6 @@ export interface AutoformatOptions {
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     private readonly styles?: NamedStyles[];
     private readonly usePrettier: boolean;
-    private readonly prettierOptions?: PrettierFormatOptions;
 
     constructor(private stopAfter?: Tree, styles?: NamedStyles[], options?: AutoformatOptions) {
         super();
@@ -326,15 +78,14 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
         // Default to TabsAndIndentsVisitor for backwards compatibility
         // Set usePrettier: true to enable Prettier-based formatting
         this.usePrettier = options?.usePrettier ?? false;
-        this.prettierOptions = options?.prettierOptions;
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        // Check for PrettierConfig marker on the source file OR if usePrettier was explicitly set
+        // Check for PrettierStyle marker on source file or usePrettier flag
         // If either is true, delegate entirely to Prettier (skip other formatting visitors)
-        const prettierConfigMarker = this.getPrettierConfigMarker(tree, cursor);
-        if (prettierConfigMarker || this.usePrettier) {
-            return this.applyPrettierConfigFormatting(tree as R, prettierConfigMarker, p, cursor);
+        const prettierStyle = this.getPrettierStyle(tree, cursor);
+        if (prettierStyle || this.usePrettier) {
+            return this.applyPrettierFormatting(tree as R, prettierStyle, p, cursor);
         }
 
         // Run all visitors except TabsAndIndentsVisitor first
@@ -363,10 +114,10 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * Gets the PrettierConfig marker from the source file if present.
+     * Gets the PrettierStyle from the source file markers if present.
      */
-    private getPrettierConfigMarker(tree: Tree, cursor?: Cursor): PrettierConfig | undefined {
-        // Get the compilation unit (source file) to check for PrettierConfig marker
+    private getPrettierStyle(tree: Tree, cursor?: Cursor): PrettierStyle | undefined {
+        // Get the compilation unit (source file) to check for PrettierStyle marker
         let sourceFile: JS.CompilationUnit | undefined;
 
         if (tree.kind === JS.Kind.CompilationUnit) {
@@ -387,23 +138,23 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
             return undefined;
         }
 
-        return findMarker(sourceFile, JS.Markers.PrettierConfig) as PrettierConfig | undefined;
+        return findMarker(sourceFile, StyleKind.PrettierStyle) as PrettierStyle | undefined;
     }
 
     /**
-     * Applies formatting using the PrettierConfig marker from the source file.
+     * Applies Prettier formatting to the tree.
      *
-     * When a PrettierConfig marker is present (added by the parser when it detects
-     * Prettier in the project), this method delegates formatting entirely to Prettier
-     * using the resolved config from the marker.
+     * Configuration is resolved from:
+     * 1. PrettierStyle marker on source file (if present)
+     * 2. TabsAndIndentsStyle defaults
      *
-     * Only runs NormalizeWhitespaceVisitor and MinimumViableSpacingVisitor before
-     * Prettier, skipping BlankLinesVisitor, WrappingAndBracesVisitor, SpacesVisitor,
-     * and TabsAndIndentsVisitor since Prettier handles all formatting.
+     * For compilation units, formats and reconciles the entire tree.
+     * For subtrees, uses prettierFormatSubtree which prunes the tree for efficiency,
+     * formats the pruned tree, and reconciles only the target subtree.
      */
-    private async applyPrettierConfigFormatting<R extends J>(
+    private async applyPrettierFormatting<R extends J>(
         tree: R,
-        prettierConfig: PrettierConfig | undefined,
+        prettierStyle: PrettierStyle | undefined,
         p: P,
         cursor?: Cursor
     ): Promise<R | undefined> {
@@ -421,139 +172,52 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        // Build options from marker config (if present) and constructor options
-        let options: PrettierFormatOptions = {};
-        if (prettierConfig) {
-            options = {
-                tabWidth: prettierConfig.config.tabWidth as number | undefined,
-                useTabs: prettierConfig.config.useTabs as boolean | undefined,
-                semi: prettierConfig.config.semi as boolean | undefined,
-                singleQuote: prettierConfig.config.singleQuote as boolean | undefined,
-                trailingComma: prettierConfig.config.trailingComma as 'all' | 'es5' | 'none' | undefined,
-                printWidth: prettierConfig.config.printWidth as number | undefined,
-            };
-        }
-        // Constructor options override marker config
-        if (this.prettierOptions) {
-            options = { ...options, ...this.prettierOptions };
-        }
-
-        // Apply Prettier formatting
-        try {
-            return await this.applyPrettierFormatting(t, tree, p, cursor, options);
-        } catch (e) {
-            // If Prettier fails, return tree with essential formatting applied
-            console.warn('PrettierConfig formatting failed, returning with essential formatting only:', e);
-            return t;
-        }
-    }
-
-    /**
-     * Applies Prettier formatting to the tree.
-     *
-     * For compilation units, formats and reconciles the entire tree.
-     * For subtrees, gets the compilation unit from the cursor, prunes it
-     * for efficiency, formats the pruned tree, and reconciles only the target subtree.
-     *
-     * The pruning optimization replaces prior siblings in J.Block#statements
-     * with empty placeholders and removes following siblings entirely, reducing
-     * the amount of code Prettier needs to process.
-     */
-    private async applyPrettierFormatting<R extends J>(
-        t: R,
-        originalTree: Tree,
-        p: P,
-        cursor?: Cursor,
-        overrideOptions?: PrettierFormatOptions
-    ): Promise<R> {
-        const tabsAndIndentsStyle = getStyle(StyleKind.TabsAndIndentsStyle, originalTree, this.styles) as TabsAndIndentsStyle;
-        const prettierOpts: PrettierFormatOptions = {
+        // Build options from PrettierStyle or TabsAndIndentsStyle defaults
+        const tabsAndIndentsStyle = getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle;
+        let prettierOpts: PrettierFormatOptions = {
             tabWidth: tabsAndIndentsStyle.indentSize,
             useTabs: tabsAndIndentsStyle.useTabCharacter,
-            ...this.prettierOptions,
-            ...overrideOptions
         };
 
-        if (t.kind === JS.Kind.CompilationUnit) {
-            // Format and reconcile the entire compilation unit
-            const formatted = await prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts);
-            return formatted as unknown as R;
+        if (prettierStyle) {
+            prettierOpts = {
+                ...prettierOpts,
+                tabWidth: prettierStyle.config.tabWidth as number | undefined ?? prettierOpts.tabWidth,
+                useTabs: prettierStyle.config.useTabs as boolean | undefined ?? prettierOpts.useTabs,
+                semi: prettierStyle.config.semi as boolean | undefined,
+                singleQuote: prettierStyle.config.singleQuote as boolean | undefined,
+                trailingComma: prettierStyle.config.trailingComma as 'all' | 'es5' | 'none' | undefined,
+                printWidth: prettierStyle.config.printWidth as number | undefined,
+            };
         }
 
-        if (!cursor) {
-            // No cursor provided, fall back to TabsAndIndentsVisitor
-            const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);
-            return await tabsVisitor.visit(t, p, cursor) as R;
-        }
-
-        // Extract the path and compilation unit in a single cursor traversal
-        const { compilationUnit: cu, path } = extractPathFromCursor(cursor, t);
-
-        if (!cu) {
-            // No compilation unit in cursor, fall back to TabsAndIndentsVisitor
-            const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);
-            return await tabsVisitor.visit(t, p, cursor) as R;
-        }
-
-        // Prune the tree for efficient formatting
-        // This replaces prior siblings with placeholders and removes following siblings
-        // in J.Block#statements along the path
-        const prunedCu = pruneTreeForSubtree(cu, path);
-
-        // Format the pruned compilation unit with Prettier
-        const formattedPrunedCu = await prettierFormat(prunedCu, prettierOpts);
-
-        // Find the target node in the formatted tree using the path
-        const formattedTarget = findByPath(formattedPrunedCu, path);
-        if (!formattedTarget) {
-            // Couldn't find target in formatted tree, fall back to TabsAndIndentsVisitor
-            const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);
-            return await tabsVisitor.visit(t, p, cursor) as R;
-        }
-
-        // Reconcile only the target subtree
-        const reconciler = new WhitespaceReconcilerVisitor();
-        const reconciled = await reconciler.reconcile(t as J, formattedTarget as J);
-
-        return reconciled as R;
-    }
-
-    /**
-     * Finds a node by ID in the tree.
-     */
-    private findNodeById(tree: J, targetId: string): J | undefined {
-        if (tree.id === targetId) {
-            return tree;
-        }
-
-        // Search in child properties
-        for (const key of Object.keys(tree)) {
-            const value = (tree as any)[key];
-            if (value == null) continue;
-
-            if (Array.isArray(value)) {
-                for (const item of value) {
-                    if (item && typeof item === 'object') {
-                        const element = item.element ?? item;
-                        if (element && typeof element === 'object' && 'id' in element) {
-                            const found = this.findNodeById(element, targetId);
-                            if (found) return found;
-                        }
-                    }
-                }
-            } else if (typeof value === 'object' && 'kind' in value) {
-                const found = this.findNodeById(value, targetId);
-                if (found) return found;
-            } else if (typeof value === 'object' && 'element' in value) {
-                const element = value.element;
-                if (element && typeof element === 'object' && 'id' in element) {
-                    const found = this.findNodeById(element, targetId);
-                    if (found) return found;
-                }
+        try {
+            if (t.kind === JS.Kind.CompilationUnit) {
+                // Format and reconcile the entire compilation unit
+                const formatted = await prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts);
+                return formatted as unknown as R;
             }
-        }
 
-        return undefined;
+            if (!cursor) {
+                // No cursor provided, fall back to TabsAndIndentsVisitor
+                const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);
+                return await tabsVisitor.visit(t, p, cursor) as R;
+            }
+
+            // Use prettierFormatSubtree for subtree formatting
+            const formatted = await prettierFormatSubtree(t, cursor, prettierOpts);
+            if (formatted) {
+                return formatted as R;
+            }
+
+            // Fall back to TabsAndIndentsVisitor if subtree formatting failed
+            const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, this.stopAfter);
+            return await tabsVisitor.visit(t, p, cursor) as R;
+        } catch (e) {
+            // If Prettier fails, return tree with essential formatting applied
+            console.warn('Prettier formatting failed, returning with essential formatting only:', e);
+            return t;
+        }
     }
 }
 

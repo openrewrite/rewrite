@@ -27,8 +27,42 @@ export const StyleKind = {
     SpacesStyle: "org.openrewrite.javascript.style.SpacesStyle",
     WrappingAndBracesStyle: "org.openrewrite.javascript.style.WrappingAndBracesStyle",
     BlankLinesStyle: "org.openrewrite.javascript.style.BlankLinesStyle",
-    TabsAndIndentsStyle: "org.openrewrite.javascript.style.TabsAndIndentsStyle"
+    TabsAndIndentsStyle: "org.openrewrite.javascript.style.TabsAndIndentsStyle",
+    PrettierStyle: "org.openrewrite.javascript.style.PrettierStyle"
 } as const;
+
+/**
+ * Style for Prettier-based formatting.
+ *
+ * This implements NamedStyles so it can be both:
+ * - A marker attached to source files (detected from project's .prettierrc)
+ * - A style that can be passed via the styles parameter or found via getStyle
+ *
+ * When this style is present, AutoformatVisitor will use Prettier for formatting
+ * instead of the built-in formatting visitors.
+ */
+export class PrettierStyle implements NamedStyles<typeof StyleKind.PrettierStyle> {
+    readonly kind = StyleKind.PrettierStyle;
+    readonly name = "org.openrewrite.javascript.Prettier";
+    readonly displayName = "Prettier";
+    readonly description = "Prettier code formatter configuration.";
+    readonly tags: string[] = [];
+    readonly styles: Style[] = [];
+
+    constructor(
+        readonly id: string,
+        /**
+         * The resolved Prettier options for this file (with overrides applied).
+         */
+        readonly config: Record<string, unknown>,
+        /**
+         * The Prettier version from the project's package.json.
+         * At formatting time, this version of Prettier will be loaded dynamically
+         * to ensure consistent formatting.
+         */
+        readonly prettierVersion?: string
+    ) {}
+}
 
 export const SpacesStyleDetailKind = {
     SpacesStyleBeforeParentheses: "org.openrewrite.javascript.style.SpacesStyle$BeforeParentheses",

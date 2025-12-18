@@ -14,9 +14,13 @@
  * limitations under the License.
  */
 import {JS} from './tree';
+import {J, Statement} from '../java';
+import {Cursor} from '../tree';
 import {TreePrinters} from '../print';
 import {JavaScriptParser} from './parser';
 import {WhitespaceReconcilerVisitor} from './whitespace-reconciler';
+import {produce} from 'immer';
+import {randomId} from '../uuid';
 
 /**
  * Options for Prettier formatting.
@@ -145,4 +149,294 @@ function getParserForPath(path: string): string {
     if (lower.endsWith('.mjs')) return 'babel';
     if (lower.endsWith('.cjs')) return 'babel';
     return 'babel';
+}
+
+/**
+ * Represents a segment of the path from root to a target node.
+ */
+interface PathSegment {
+    /** The property name containing the child */
+    property: string;
+    /** For array properties, the index of the element */
+    index?: number;
+}
+
+/**
+ * Result of extracting a path from cursor.
+ */
+interface PathExtractionResult {
+    /** The compilation unit (root of the tree) */
+    compilationUnit: JS.CompilationUnit | undefined;
+    /** The path from root to target */
+    path: PathSegment[];
+}
+
+/**
+ * Extracts the path from a CompilationUnit to a target node using the cursor.
+ * Returns the path segments in order from root to target.
+ *
+ * @param cursor The cursor, which may not include the target (e.g., when passing cursor.parent)
+ * @param target The target node we're looking for
+ */
+function extractPathFromCursor(cursor: Cursor, target: any): PathExtractionResult {
+    const pathNodes = cursor.asArray().reverse(); // root to target
+    const segments: PathSegment[] = [];
+    let compilationUnit: JS.CompilationUnit | undefined;
+
+    // Helper to check if two nodes are the same (by identity or ID)
+    const isSameNode = (a: any, b: any): boolean => {
+        if (a === b) return true;
+        if (a && b && typeof a === 'object' && typeof b === 'object' && 'id' in a && 'id' in b) {
+            return a.id === b.id;
+        }
+        return false;
+    };
+
+    // Helper to find a child in a parent and return the segment
+    const findChildInParent = (parent: any, child: any): PathSegment | undefined => {
+        if (!parent || typeof parent !== 'object') return undefined;
+
+        for (const key of Object.keys(parent)) {
+            const value = (parent as any)[key];
+            if (value == null) continue;
+
+            if (Array.isArray(value)) {
+                for (let idx = 0; idx < value.length; idx++) {
+                    const item = value[idx];
+                    if (isSameNode(item, child)) {
+                        return { property: key, index: idx };
+                    }
+                }
+            } else if (isSameNode(value, child)) {
+                return { property: key };
+            }
+        }
+        return undefined;
+    };
+
+    for (let i = 0; i < pathNodes.length - 1; i++) {
+        const parent = pathNodes[i];
+        const child = pathNodes[i + 1];
+
+        // Check if this node is the CompilationUnit
+        if (parent?.kind === JS.Kind.CompilationUnit) {
+            compilationUnit = parent as JS.CompilationUnit;
+        }
+
+        const segment = findChildInParent(parent, child);
+        if (segment) {
+            segments.push(segment);
+        }
+    }
+
+    // Check the last node for CompilationUnit
+    const lastNode = pathNodes[pathNodes.length - 1];
+    if (lastNode?.kind === JS.Kind.CompilationUnit) {
+        compilationUnit = lastNode as JS.CompilationUnit;
+    }
+
+    // If the cursor doesn't include the target, add the final segment
+    // This handles the case when autoFormat is called with cursor.parent
+    if (lastNode && !isSameNode(lastNode, target)) {
+        const finalSegment = findChildInParent(lastNode, target);
+        if (finalSegment) {
+            segments.push(finalSegment);
+        }
+    }
+
+    return { compilationUnit, path: segments };
+}
+
+/**
+ * Creates a "null" identifier placeholder for use in pruned trees.
+ * Using "null" instead of an empty statement ensures Prettier sees similar
+ * line lengths and doesn't collapse multi-line code to single-line.
+ */
+function createNullPlaceholder(prefix: J.Space): J.Identifier {
+    return {
+        kind: J.Kind.Identifier,
+        id: randomId(),
+        markers: { kind: "org.openrewrite.marker.Markers", id: randomId(), markers: [] },
+        prefix: prefix,
+        annotations: [],
+        simpleName: "null",
+        type: undefined,
+        fieldType: undefined
+    };
+}
+
+/**
+ * Prunes a compilation unit for efficient Prettier formatting of a subtree.
+ *
+ * For J.Block#statements along the path to the target:
+ * - Prior siblings are replaced with "null" identifier placeholders (to maintain line length)
+ * - Following siblings are omitted entirely
+ *
+ * This optimization reduces the amount of code Prettier needs to process
+ * while maintaining approximate line positions so Prettier doesn't collapse
+ * multi-line code.
+ *
+ * @param cu The compilation unit to prune
+ * @param path The path from root to the target subtree
+ * @returns A pruned copy of the compilation unit
+ */
+function pruneTreeForSubtree(cu: JS.CompilationUnit, path: PathSegment[]): JS.CompilationUnit {
+    return pruneNode(cu, path, 0) as JS.CompilationUnit;
+}
+
+/**
+ * Recursively prunes a node, following the path and pruning J.Block#statements.
+ */
+function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
+    if (pathIndex >= path.length) {
+        // Reached the target - return as-is
+        return node;
+    }
+
+    const segment = path[pathIndex];
+    const value = node[segment.property];
+
+    if (value == null) {
+        return node;
+    }
+
+    // Handle J.Block#statements specially
+    if (node.kind === J.Kind.Block && segment.property === 'statements' && segment.index !== undefined) {
+        const statements = value as J.RightPadded<Statement>[];
+        const targetIndex = segment.index;
+
+        // Create pruned statements array:
+        // - Prior siblings: replace with "null" placeholders (to maintain line length)
+        // - Target: recurse into it
+        // - Following siblings: omit entirely
+        const prunedStatements: J.RightPadded<Statement>[] = [];
+
+        for (let i = 0; i <= targetIndex; i++) {
+            if (i < targetIndex) {
+                // Prior sibling - replace with "null" placeholder
+                // Preserve the original prefix to maintain line positions
+                const originalPrefix = statements[i].element.prefix;
+                const placeholder = createNullPlaceholder(originalPrefix);
+                prunedStatements.push({
+                    kind: J.Kind.RightPadded,
+                    element: placeholder,
+                    after: statements[i].after,
+                    markers: statements[i].markers
+                } as J.RightPadded<Statement>);
+            } else {
+                // Target - recurse into it
+                const targetStatement = statements[i];
+                const prunedElement = pruneNode(targetStatement.element, path, pathIndex + 1);
+                prunedStatements.push({
+                    ...targetStatement,
+                    element: prunedElement
+                });
+            }
+        }
+        // Following siblings are omitted
+
+        return produce(node, (draft: any) => {
+            draft.statements = prunedStatements;
+        });
+    }
+
+    // For other properties, just recurse without pruning
+    if (Array.isArray(value) && segment.index !== undefined) {
+        const childNode = value[segment.index];
+        const prunedChild = pruneNode(childNode, path, pathIndex + 1);
+
+        if (prunedChild !== childNode) {
+            return produce(node, (draft: any) => {
+                draft[segment.property][segment.index!] = prunedChild;
+            });
+        }
+    } else if (!Array.isArray(value)) {
+        const prunedChild = pruneNode(value, path, pathIndex + 1);
+
+        if (prunedChild !== value) {
+            return produce(node, (draft: any) => {
+                draft[segment.property] = prunedChild;
+            });
+        }
+    }
+
+    return node;
+}
+
+/**
+ * Finds a node in a tree by following a path of segments.
+ * Used to locate the target node in the formatted tree.
+ *
+ * For block statements, the target is always at the last index since
+ * following siblings are omitted during pruning.
+ */
+function findByPath(tree: any, path: PathSegment[]): any {
+    let current = tree;
+
+    for (const segment of path) {
+        if (current == null) return undefined;
+
+        const value = current[segment.property];
+        if (value == null) return undefined;
+
+        if (Array.isArray(value) && segment.index !== undefined) {
+            // For block statements, target is always at the last index
+            // since following siblings are omitted during pruning
+            const isBlockStatements = current.kind === J.Kind.Block && segment.property === 'statements';
+            const index = isBlockStatements ? value.length - 1 : segment.index;
+            const item = value[index];
+            if (item == null) return undefined;
+            current = item;
+        } else {
+            current = value;
+        }
+    }
+
+    return current;
+}
+
+/**
+ * Formats a subtree of a JavaScript/TypeScript AST using Prettier.
+ *
+ * This function is optimized for formatting a small part of a larger tree:
+ * 1. Extracts the path from compilation unit to target
+ * 2. Prunes the tree (replaces siblings with placeholders)
+ * 3. Formats the pruned tree with Prettier
+ * 4. Finds the target in the formatted tree
+ * 5. Reconciles only the target subtree's whitespace
+ *
+ * @param target The subtree to format
+ * @param cursor The cursor pointing to or near the target
+ * @param options Prettier formatting options
+ * @returns The formatted subtree, or undefined if formatting failed
+ */
+export async function prettierFormatSubtree<T extends J>(
+    target: T,
+    cursor: Cursor,
+    options: PrettierFormatOptions = {}
+): Promise<T | undefined> {
+    // Extract the path and compilation unit in a single cursor traversal
+    const { compilationUnit: cu, path } = extractPathFromCursor(cursor, target);
+
+    if (!cu) {
+        return undefined;
+    }
+
+    // Prune the tree for efficient formatting
+    const prunedCu = pruneTreeForSubtree(cu, path);
+
+    // Format the pruned compilation unit with Prettier
+    const formattedPrunedCu = await prettierFormat(prunedCu, options);
+
+    // Find the target node in the formatted tree using the path
+    const formattedTarget = findByPath(formattedPrunedCu, path);
+    if (!formattedTarget) {
+        return undefined;
+    }
+
+    // Reconcile only the target subtree
+    const reconciler = new WhitespaceReconcilerVisitor();
+    const reconciled = await reconciler.reconcile(target as J, formattedTarget as J);
+
+    return reconciled as T;
 }

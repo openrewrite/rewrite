@@ -15,9 +15,8 @@
  */
 import * as path from 'path';
 import * as fs from 'fs';
-import {PrettierConfig} from './markers';
+import {PrettierStyle} from './style';
 import {randomId} from '../uuid';
-import {JS} from './tree';
 
 /**
  * Result of detecting Prettier in a project.
@@ -46,14 +45,14 @@ export interface PrettierDetectionResult {
  * 1. Detects if Prettier is installed in the project
  * 2. Resolves Prettier config per-file (with overrides)
  * 3. Caches resolved configs for marker deduplication
- * 4. Creates PrettierConfig markers for source files
+ * 4. Creates PrettierStyle markers for source files
  *
  * The marker only stores the version and resolved config - at formatting time,
  * the correct version of Prettier will be loaded dynamically (like npx).
  */
 export class PrettierConfigLoader {
     private detection?: PrettierDetectionResult;
-    private configCache: Map<string, PrettierConfig> = new Map();
+    private configCache: Map<string, PrettierStyle> = new Map();
 
     /**
      * Creates a new PrettierConfigLoader for a project.
@@ -157,12 +156,12 @@ export class PrettierConfigLoader {
     }
 
     /**
-     * Gets or creates a PrettierConfig marker for the given source file.
+     * Gets or creates a PrettierStyle marker for the given source file.
      * Returns undefined if Prettier is not available or no config applies to this file.
      *
      * @param filePath Absolute path to the source file
      */
-    async getConfigMarker(filePath: string): Promise<PrettierConfig | undefined> {
+    async getConfigMarker(filePath: string): Promise<PrettierStyle | undefined> {
         if (!this.detection?.available || !this.detection.bundledPrettier) {
             return undefined;
         }
@@ -185,13 +184,8 @@ export class PrettierConfigLoader {
                 return marker;
             }
 
-            // Create new marker
-            marker = {
-                kind: JS.Markers.PrettierConfig,
-                id: randomId(),
-                config,
-                prettierVersion: this.detection.version!
-            };
+            // Create new PrettierStyle instance
+            marker = new PrettierStyle(randomId(), config, this.detection.version);
 
             // Cache and return
             this.configCache.set(configKey, marker);
