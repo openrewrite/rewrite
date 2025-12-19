@@ -112,11 +112,14 @@ export interface PrettierFormatOptions {
  *
  * @param sourceFile The source file to format
  * @param options Prettier formatting options
+ * @param stopAfter Optional node to stop formatting after. Once this node is exited,
+ *                  no more whitespace changes are applied to subsequent nodes.
  * @returns The formatted source file with reconciled whitespace
  */
 export async function prettierFormat(
     sourceFile: JS.CompilationUnit,
-    options: PrettierFormatOptions = {}
+    options: PrettierFormatOptions = {},
+    stopAfter?: J
 ): Promise<JS.CompilationUnit> {
     // Load Prettier - either specific version or bundled
     let prettier: typeof import('prettier');
@@ -170,7 +173,7 @@ export async function prettierFormat(
     // subtree-level reconciliation.
     const reconciler = new WhitespaceReconciler();
     const formattedCu = formattedAst as JS.CompilationUnit;
-    const result = reconciler.reconcile(sourceFile, formattedCu);
+    const result = reconciler.reconcile(sourceFile, formattedCu, undefined, stopAfter);
 
     // If reconciliation succeeded, return the reconciled original with updated whitespace
     // If it failed (structure mismatch), return the formatted AST for subtree reconciliation
@@ -458,12 +461,14 @@ function findByPath(tree: any, path: PathSegment[]): any {
  * @param target The subtree to format
  * @param cursor The cursor pointing to or near the target
  * @param options Prettier formatting options
+ * @param stopAfter Optional node to stop formatting after
  * @returns The formatted subtree, or undefined if formatting failed
  */
 export async function prettierFormatSubtree<T extends J>(
     target: T,
     cursor: Cursor,
-    options: PrettierFormatOptions = {}
+    options: PrettierFormatOptions = {},
+    stopAfter?: J
 ): Promise<T | undefined> {
     // Extract the path and compilation unit in a single cursor traversal
     const { compilationUnit: cu, path } = extractPathFromCursor(cursor, target);
@@ -486,9 +491,9 @@ export async function prettierFormatSubtree<T extends J>(
         return undefined;
     }
 
-    // Reconcile only the target subtree
+    // Reconcile only the target subtree, optionally stopping after a specific node
     const reconciler = new WhitespaceReconciler();
-    const reconciled = reconciler.reconcile(target as J, formattedTarget as J);
+    const reconciled = reconciler.reconcile(target as J, formattedTarget as J, undefined, stopAfter);
 
     return reconciled as T;
 }
@@ -590,7 +595,7 @@ export async function applyPrettierFormatting<R extends J, P>(
     try {
         if (t.kind === JS.Kind.CompilationUnit) {
             // Format and reconcile the entire compilation unit
-            const formatted = await prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts);
+            const formatted = await prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts, stopAfter as J | undefined);
             return formatted as unknown as R;
         }
 
@@ -601,7 +606,7 @@ export async function applyPrettierFormatting<R extends J, P>(
         }
 
         // Use prettierFormatSubtree for subtree formatting
-        const formatted = await prettierFormatSubtree(t, cursor, prettierOpts);
+        const formatted = await prettierFormatSubtree(t, cursor, prettierOpts, stopAfter as J | undefined);
         if (formatted) {
             return formatted as R;
         }

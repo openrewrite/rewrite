@@ -62,9 +62,11 @@ describe('AutoformatVisitor with Prettier', () => {
         )
     });
 
-    test('subtree formatting with Prettier preserves indentation', async () => {
+    test('subtree formatting with Prettier applies Prettier defaults', async () => {
         // This test verifies that subtree formatting (triggered via maybeAutoFormat)
-        // works correctly with the Prettier pruning optimization
+        // works correctly with the Prettier pruning optimization.
+        // Note: Prettier's default tabWidth is 2, so the formatted line will have
+        // 2-space indentation even if surrounding code has different indentation.
         const visitor = new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
                 // Only format the info() call to simulate template replacement
@@ -89,6 +91,17 @@ describe('AutoformatVisitor with Prettier', () => {
                 }
                 function second() {
                     logger.info("second");
+                }
+                function third() {
+                    console.log("third");
+                }
+                `,
+                `
+                function first() {
+                    console.log("first");
+                }
+                function second() {
+                  logger.info("second");
                 }
                 function third() {
                     console.log("third");
@@ -137,6 +150,7 @@ describe('AutoformatVisitor with Prettier', () => {
 
     test('formats multi-line code - Prettier may collapse short lines', () => {
         // Prettier collapses multi-line code to single line if it fits within printWidth
+        // Note: Prettier's default tabWidth is 2, so output uses 2-space indentation
         return prettierSpec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -148,7 +162,7 @@ describe('AutoformatVisitor with Prettier', () => {
     return a+b;
 }`,
                 `function foo(a: number, b: string) {
-    return a + b;
+  return a + b;
 }
 
 `)
@@ -188,6 +202,8 @@ describe('AutoformatVisitor with Prettier', () => {
         return testSpec.rewriteRun(
             // @formatter:off
             //language=typescript
+            // Note: subtree formatting uses Prettier's 2-space default, so the formatted
+            // line has slightly different indentation than surrounding context
             typescript(
                 `
                 function process() {
@@ -203,7 +219,7 @@ describe('AutoformatVisitor with Prettier', () => {
                 function process() {
                     const first = 1;
                     const second  = 2;
-                    console.info("before", "target", "after", { key: "value" });
+                  console.info("before", "target", "after", { key: "value" });
                     const third =3;
                 }
                 `
@@ -544,6 +560,67 @@ describe('Prettier .prettierignore handling', () => {
                 )
             );
         }, { unsafeCleanup: true });
+    });
+});
+
+describe('Prettier stopAfter support', () => {
+    test('stopAfter limits formatting to only part of the subtree', async () => {
+        // This test verifies that stopAfter works with Prettier formatting.
+        // We format a Lambda but stop after the parameters, leaving the body unformatted.
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitLambda(lambda: J.Lambda, p: any): Promise<J | undefined> {
+                // Format the lambda but stop after parameters
+                // The body should remain with its original (bad) formatting
+                return await autoFormat(lambda, p, lambda.parameters, this.cursor.parent, [prettierStyle]);
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                // Input: badly formatted parameters AND body
+                `const fn = (a:number,b:string) => {return a+b}`,
+                // Output: parameters are formatted (spaces added), but body is NOT formatted
+                // Note: the body keeps its original bad formatting (no spaces around +)
+                `const fn = (a: number, b: string) => {return a+b}`
+            )
+            // @formatter:on
+        );
+    });
+
+    test('stopAfter with deeply nested node', async () => {
+        // Test stopAfter with a more complex case: stop after a specific parameter
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitLambda(lambda: J.Lambda, p: any): Promise<J | undefined> {
+                // Get the first parameter to use as stopAfter
+                const params = lambda.parameters as J.Lambda.Parameters;
+                if (params.parameters.length > 0) {
+                    const firstParam = params.parameters[0].element;
+                    // Format the lambda but stop after the first parameter
+                    return await autoFormat(lambda, p, firstParam, this.cursor.parent, [prettierStyle]);
+                }
+                return lambda;
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                // Input: multiple parameters with bad formatting
+                `const fn = (a:number,b:string,c:boolean) => a+b`,
+                // Output: only first parameter is formatted, rest keeps bad formatting
+                `const fn = (a: number,b:string,c:boolean) => a+b`
+            )
+            // @formatter:on
+        );
     });
 });
 

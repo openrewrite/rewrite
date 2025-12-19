@@ -62,6 +62,9 @@ function isVisitableNode(value: { kind: string }): value is VisitableNode {
  *
  * When a target subtree is specified, the reconciler only applies whitespace changes
  * to that subtree and its descendants, leaving surrounding code unchanged.
+ *
+ * When stopAfter is specified, the reconciler stops applying changes after exiting
+ * that node, leaving all subsequent nodes with their original whitespace.
  */
 export class WhitespaceReconciler {
     /**
@@ -76,10 +79,16 @@ export class WhitespaceReconciler {
     private targetSubtree?: TreeNode;
 
     /**
+     * The node to stop after (by reference). Once we exit this node, stop reconciling.
+     * Can be a J node, RightPadded, LeftPadded, or Container.
+     */
+    private stopAfterNode?: TreeNode;
+
+    /**
      * Tracks the reconciliation state:
      * - 'searching': Walking but not yet inside target subtree
      * - 'reconciling': Inside target subtree, applying changes
-     * - 'done': Exited target subtree, no more changes
+     * - 'done': Exited target subtree or stopAfter node, no more changes
      */
     private reconcileState: 'searching' | 'reconciling' | 'done' = 'reconciling';
 
@@ -92,11 +101,14 @@ export class WhitespaceReconciler {
      *                      Can be a J node, RightPadded, LeftPadded, or Container.
      *                      If provided, only this subtree and its descendants will have
      *                      whitespace and markers applied.
+     * @param stopAfter Optional node to stop reconciliation after (by reference).
+     *                  Once we exit this node, no more changes are applied.
      * @returns The original tree with whitespace from the formatted tree
      */
-    reconcile(original: J, formatted: J, targetSubtree?: TreeNode): J {
+    reconcile(original: J, formatted: J, targetSubtree?: TreeNode, stopAfter?: TreeNode): J {
         this.compatible = true;
         this.targetSubtree = targetSubtree;
+        this.stopAfterNode = stopAfter;
         this.reconcileState = targetSubtree ? 'searching' : 'reconciling';
 
         // We know original and formatted are J nodes, so result will be J
@@ -156,6 +168,7 @@ export class WhitespaceReconciler {
 
         // Track entering target subtree (using referential equality)
         const isTargetSubtree = this.targetSubtree !== undefined && original === this.targetSubtree;
+        const isStopAfterNode = this.stopAfterNode !== undefined && original === this.stopAfterNode;
         const previousState = this.reconcileState;
         if (isTargetSubtree && this.reconcileState === 'searching') {
             this.reconcileState = 'reconciling';
@@ -171,6 +184,10 @@ export class WhitespaceReconciler {
         } finally {
             // Track exiting the target subtree
             if (isTargetSubtree && previousState === 'searching') {
+                this.reconcileState = 'done';
+            }
+            // Track exiting the stopAfter node - stop reconciling after this
+            if (isStopAfterNode && previousState === 'reconciling') {
                 this.reconcileState = 'done';
             }
         }
