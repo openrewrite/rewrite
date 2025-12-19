@@ -28,6 +28,7 @@ import {
     npm,
     packageJson,
     prettierFormat,
+    prettierStyle,
     PrettierStyle,
     typescript
 } from "../../../src/javascript";
@@ -41,12 +42,12 @@ import * as path from "path";
 import * as fsp from "fs/promises";
 
 // A simple PrettierStyle with default configuration
-const prettierStyle = new PrettierStyle(randomId(), {});
+const defaultPrettierStyle = prettierStyle(randomId(), {});
 
 describe('AutoformatVisitor with Prettier', () => {
     const prettierSpec = new RecipeSpec()
     // Use Prettier for these tests by passing PrettierStyle
-    prettierSpec.recipe = fromVisitor(new AutoformatVisitor(undefined, [prettierStyle]));
+    prettierSpec.recipe = fromVisitor(new AutoformatVisitor(undefined, [defaultPrettierStyle]));
 
     test('formats basic code with Prettier', () => {
         return prettierSpec.rewriteRun(
@@ -69,7 +70,7 @@ describe('AutoformatVisitor with Prettier', () => {
             override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
                 // Only format the info() call to simulate template replacement
                 if (methodInvocation.name?.simpleName === 'info') {
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [prettierStyle]);
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -115,7 +116,7 @@ describe('AutoformatVisitor with Prettier', () => {
         const visitor = new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
                 if (methodInvocation.name?.simpleName === 'slice') {
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [prettierStyle]);
+                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -187,7 +188,7 @@ describe('AutoformatVisitor with Prettier', () => {
                         }
                     };
                     // Format the modified node - this is the typical pattern in visitors
-                    return await autoFormat(modified, p, undefined, this.cursor.parent, [prettierStyle]);
+                    return await autoFormat(modified, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -559,7 +560,7 @@ describe('Prettier stopAfter support', () => {
             override async visitLambda(lambda: J.Lambda, p: any): Promise<J | undefined> {
                 // Format the lambda but stop after parameters
                 // The body should remain with its original (bad) formatting
-                return await autoFormat(lambda, p, lambda.parameters, this.cursor.parent, [prettierStyle]);
+                return await autoFormat(lambda, p, lambda.parameters, this.cursor.parent, [defaultPrettierStyle]);
             }
         }();
 
@@ -589,7 +590,7 @@ describe('Prettier stopAfter support', () => {
                 if (params.parameters.length > 0) {
                     const firstParam = params.parameters[0].element;
                     // Format the lambda but stop after the first parameter
-                    return await autoFormat(lambda, p, firstParam, this.cursor.parent, [prettierStyle]);
+                    return await autoFormat(lambda, p, firstParam, this.cursor.parent, [defaultPrettierStyle]);
                 }
                 return lambda;
             }
@@ -615,7 +616,7 @@ describe('Prettier stopAfter support', () => {
 describe('Prettier quoteProps option', () => {
     test('quoteProps as-needed removes unnecessary quotes', async () => {
         // quoteProps: "as-needed" removes quotes from property names that don't need them
-        const quotePropsStyle = new PrettierStyle(randomId(), { quoteProps: 'as-needed' });
+        const quotePropsStyle = prettierStyle(randomId(), { quoteProps: 'as-needed' });
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new AutoformatVisitor(undefined, [quotePropsStyle]));
 
@@ -633,7 +634,7 @@ describe('Prettier quoteProps option', () => {
 
     test('quoteProps consistent adds quotes when one property needs them', async () => {
         // quoteProps: "consistent" quotes all properties if at least one needs quoting
-        const quotePropsStyle = new PrettierStyle(randomId(), { quoteProps: 'consistent' });
+        const quotePropsStyle = prettierStyle(randomId(), { quoteProps: 'consistent' });
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new AutoformatVisitor(undefined, [quotePropsStyle]));
 
@@ -651,7 +652,7 @@ describe('Prettier quoteProps option', () => {
 
     test('quoteProps preserve keeps original quoting', async () => {
         // quoteProps: "preserve" keeps the input's use of quotes
-        const quotePropsStyle = new PrettierStyle(randomId(), { quoteProps: 'preserve' });
+        const quotePropsStyle = prettierStyle(randomId(), { quoteProps: 'preserve' });
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new AutoformatVisitor(undefined, [quotePropsStyle]));
 

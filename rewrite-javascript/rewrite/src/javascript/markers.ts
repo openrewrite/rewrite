@@ -18,7 +18,17 @@ import {J} from "../java";
 import {JS} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {createDraft, finishDraft} from "immer";
-import {PrettierStyle, StyleKind} from "./style";
+import {
+    prettierStyle,
+    PrettierStyle,
+    SpacesStyle,
+    SpacesStyleDetailKind,
+    StyleKind,
+    TabsAndIndentsStyle,
+    WrappingAndBracesStyle,
+    WrappingAndBracesStyleDetailKind
+} from "./style";
+import {Autodetect, autodetect} from "./autodetect";
 
 declare module "./tree" {
     namespace JS {
@@ -107,19 +117,159 @@ registerPrefixedMarkerCodec<Spread>(JS.Markers.Spread);
 registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration);
 
 // Register codec for PrettierStyle (a NamedStyles that contains Prettier configuration)
-// Only serialize the variable fields; constant fields are defined in the class
+// Only serialize the variable fields; constant fields are defined in the interface
 RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
     async rpcReceive(before: PrettierStyle, q: RpcReceiveQueue): Promise<PrettierStyle> {
-        const draft = createDraft(before);
-        (draft as any).id = await q.receive(before.id);
-        (draft as any).config = await q.receive(before.config);
-        (draft as any).prettierVersion = await q.receive(before.prettierVersion);
-        return finishDraft(draft) as PrettierStyle;
+        const id = await q.receive(before.id);
+        const config = await q.receive(before.config);
+        const version = await q.receive(before.prettierVersion);
+        const ignored = await q.receive(before.ignored);
+        return prettierStyle(id, config, version, ignored);
     },
 
     async rpcSend(after: PrettierStyle, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.id);
         await q.getAndSend(after, a => a.config);
         await q.getAndSend(after, a => a.prettierVersion);
+        await q.getAndSend(after, a => a.ignored);
+    }
+});
+
+// Register codec for Autodetect (auto-detected styles for JavaScript/TypeScript)
+// Only serialize the variable fields (id, styles); constant fields are defined in the interface
+RpcCodecs.registerCodec(StyleKind.Autodetect, {
+    async rpcReceive(before: Autodetect, q: RpcReceiveQueue): Promise<Autodetect> {
+        const id = await q.receive(before.id);
+        const styles = (await q.receiveList(before.styles))!;
+        return autodetect(id, styles);
+    },
+
+    async rpcSend(after: Autodetect, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSendList(after, a => a.styles, s => s.kind);
+    }
+});
+
+// ============================================================================
+// Style RPC Codecs
+// ============================================================================
+
+// Helper to create a simple codec for objects where all fields are primitives
+function registerSimpleCodec<T extends { kind: string }>(
+    kind: T["kind"],
+    fields: (keyof T)[]
+) {
+    RpcCodecs.registerCodec(kind, {
+        async rpcReceive(before: T, q: RpcReceiveQueue): Promise<T> {
+            const draft = createDraft(before);
+            for (const field of fields) {
+                (draft as any)[field] = await q.receive((before as any)[field]);
+            }
+            return finishDraft(draft) as T;
+        },
+
+        async rpcSend(after: T, q: RpcSendQueue): Promise<void> {
+            for (const field of fields) {
+                await q.getAndSend(after, a => (a as any)[field]);
+            }
+        }
+    });
+}
+
+// TabsAndIndentsStyle - simple style with primitive fields
+registerSimpleCodec<TabsAndIndentsStyle>(StyleKind.TabsAndIndentsStyle, [
+    'useTabCharacter', 'tabSize', 'indentSize', 'continuationIndent',
+    'keepIndentsOnEmptyLines', 'indentChainedMethods', 'indentAllChainedCallsInAGroup'
+]);
+
+// SpacesStyle and its nested types
+registerSimpleCodec<SpacesStyle.BeforeParentheses>(SpacesStyleDetailKind.SpacesStyleBeforeParentheses, [
+    'functionDeclarationParentheses', 'functionCallParentheses', 'ifParentheses',
+    'forParentheses', 'whileParentheses', 'switchParentheses', 'catchParentheses',
+    'inFunctionCallExpression', 'inAsyncArrowFunction'
+]);
+
+registerSimpleCodec<SpacesStyle.AroundOperators>(SpacesStyleDetailKind.SpacesStyleAroundOperators, [
+    'assignment', 'logical', 'equality', 'relational', 'bitwise', 'additive',
+    'multiplicative', 'shift', 'unary', 'arrowFunction',
+    'beforeUnaryNotAndNotNull', 'afterUnaryNotAndNotNull'
+]);
+
+registerSimpleCodec<SpacesStyle.BeforeLeftBrace>(SpacesStyleDetailKind.SpacesStyleBeforeLeftBrace, [
+    'functionLeftBrace', 'ifLeftBrace', 'elseLeftBrace', 'forLeftBrace',
+    'whileLeftBrace', 'doLeftBrace', 'switchLeftBrace', 'tryLeftBrace',
+    'catchLeftBrace', 'finallyLeftBrace', 'classInterfaceModuleLeftBrace'
+]);
+
+registerSimpleCodec<SpacesStyle.BeforeKeywords>(SpacesStyleDetailKind.SpacesStyleBeforeKeywords, [
+    'elseKeyword', 'whileKeyword', 'catchKeyword', 'finallyKeyword'
+]);
+
+registerSimpleCodec<SpacesStyle.Within>(SpacesStyleDetailKind.SpacesStyleWithin, [
+    'indexAccessBrackets', 'groupingParentheses', 'functionDeclarationParentheses',
+    'functionCallParentheses', 'ifParentheses', 'forParentheses', 'whileParentheses',
+    'switchParentheses', 'catchParentheses', 'objectLiteralBraces', 'es6ImportExportBraces',
+    'arrayBrackets', 'interpolationExpressions', 'objectLiteralTypeBraces',
+    'unionAndIntersectionTypes', 'typeAssertions'
+]);
+
+registerSimpleCodec<SpacesStyle.TernaryOperator>(SpacesStyleDetailKind.SpacesStyleTernaryOperator, [
+    'beforeQuestionMark', 'afterQuestionMark', 'beforeColon', 'afterColon'
+]);
+
+registerSimpleCodec<SpacesStyle.Other>(SpacesStyleDetailKind.SpacesStyleOther, [
+    'beforeComma', 'afterComma', 'beforeForSemicolon',
+    'beforePropertyNameValueSeparator', 'afterPropertyNameValueSeparator',
+    'afterVarArgInRestOrSpread', 'beforeAsteriskInGenerator', 'afterAsteriskInGenerator',
+    'beforeTypeReferenceColon', 'afterTypeReferenceColon'
+]);
+
+// SpacesStyle - has nested objects
+RpcCodecs.registerCodec(StyleKind.SpacesStyle, {
+    async rpcReceive(before: SpacesStyle, q: RpcReceiveQueue): Promise<SpacesStyle> {
+        const draft = createDraft(before);
+        draft.beforeParentheses = await q.receive(before.beforeParentheses);
+        draft.aroundOperators = await q.receive(before.aroundOperators);
+        draft.beforeLeftBrace = await q.receive(before.beforeLeftBrace);
+        draft.beforeKeywords = await q.receive(before.beforeKeywords);
+        draft.within = await q.receive(before.within);
+        draft.ternaryOperator = await q.receive(before.ternaryOperator);
+        draft.other = await q.receive(before.other);
+        return finishDraft(draft) as SpacesStyle;
+    },
+
+    async rpcSend(after: SpacesStyle, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.beforeParentheses);
+        await q.getAndSend(after, a => a.aroundOperators);
+        await q.getAndSend(after, a => a.beforeLeftBrace);
+        await q.getAndSend(after, a => a.beforeKeywords);
+        await q.getAndSend(after, a => a.within);
+        await q.getAndSend(after, a => a.ternaryOperator);
+        await q.getAndSend(after, a => a.other);
+    }
+});
+
+// WrappingAndBracesStyle and its nested types
+registerSimpleCodec<WrappingAndBracesStyle.IfStatement>(
+    WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement,
+    ['elseOnNewLine']
+);
+
+registerSimpleCodec<WrappingAndBracesStyle.KeepWhenReformatting>(
+    WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleKeepWhenReformatting,
+    ['simpleBlocksInOneLine', 'simpleMethodsInOneLine']
+);
+
+RpcCodecs.registerCodec(StyleKind.WrappingAndBracesStyle, {
+    async rpcReceive(before: WrappingAndBracesStyle, q: RpcReceiveQueue): Promise<WrappingAndBracesStyle> {
+        const draft = createDraft(before);
+        draft.ifStatement = await q.receive(before.ifStatement);
+        draft.keepWhenReformatting = await q.receive(before.keepWhenReformatting);
+        return finishDraft(draft) as WrappingAndBracesStyle;
+    },
+
+    async rpcSend(after: WrappingAndBracesStyle, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.ifStatement);
+        await q.getAndSend(after, a => a.keepWhenReformatting);
     }
 });

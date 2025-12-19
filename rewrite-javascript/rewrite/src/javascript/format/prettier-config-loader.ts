@@ -18,7 +18,7 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as os from 'os';
 import {spawnSync} from 'child_process';
-import {PrettierStyle} from '../style';
+import {prettierStyle, PrettierStyle} from '../style';
 import {randomId} from '../../uuid';
 
 /**
@@ -336,7 +336,7 @@ export class PrettierConfigLoader {
             }
 
             // Create new PrettierStyle instance
-            marker = new PrettierStyle(randomId(), config, this.detection.version, ignored);
+            marker = prettierStyle(randomId(), config, this.detection.version, ignored);
 
             // Cache and return
             this.configCache.set(configKey, marker);
