@@ -16,7 +16,7 @@
 import {Checksum, FileAttributes, TreeKind} from "../tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./queue";
 import {createDraft, finishDraft} from "immer";
-import {Markers, MarkersKind, SearchResult, MarkupError, MarkupWarn, MarkupInfo, MarkupDebug} from "../markers";
+import {Markers, MarkersKind, MarkupDebug, MarkupError, MarkupInfo, MarkupWarn, SearchResult} from "../markers";
 import {asRef} from "../reference";
 
 export * from "./queue";
