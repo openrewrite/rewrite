@@ -15,13 +15,16 @@
  */
 package org.openrewrite.javascript.marker;
 
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.marker.Marker;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 
@@ -35,36 +38,74 @@ import java.util.UUID;
  * When this marker is present, AutoformatVisitor will use Prettier for formatting
  * instead of the built-in formatting visitors.
  */
-@Value
-@With
-public class PrettierStyle implements Marker, RpcCodec<PrettierStyle> {
-    UUID id;
+@Getter
+@EqualsAndHashCode(callSuper = true)
+public class PrettierStyle extends NamedStyles implements RpcCodec<PrettierStyle> {
+    private static final String NAME = "org.openrewrite.javascript.Prettier";
+    private static final String DISPLAY_NAME = "Prettier";
+    private static final String DESCRIPTION = "Prettier code formatter configuration.";
 
     /**
      * The resolved Prettier options for this file (with overrides applied).
      */
-    Map<String, Object> config;
+    private final Map<String, Object> config;
 
     /**
      * The Prettier version from the project's package.json.
      * At formatting time, this version of Prettier will be loaded dynamically
      * (similar to npx) to ensure consistent formatting.
      */
-    String prettierVersion;
+    private final String prettierVersion;
+
+    /**
+     * Whether this file is ignored by .prettierignore.
+     * When true, Prettier formatting should be skipped for this file.
+     */
+    private final boolean ignored;
+
+    public PrettierStyle(UUID id, Map<String, Object> config, String prettierVersion, boolean ignored) {
+        super(id, NAME, DISPLAY_NAME, DESCRIPTION, Collections.emptySet(), Collections.emptyList());
+        this.config = config;
+        this.prettierVersion = prettierVersion;
+        this.ignored = ignored;
+    }
+
+    @Override
+    public PrettierStyle withId(UUID id) {
+        return id == getId() ? this : new PrettierStyle(id, config, prettierVersion, ignored);
+    }
+
+    public PrettierStyle withConfig(Map<String, Object> config) {
+        return config == this.config ? this : new PrettierStyle(getId(), config, prettierVersion, ignored);
+    }
+
+    public PrettierStyle withPrettierVersion(String prettierVersion) {
+        return prettierVersion.equals(this.prettierVersion) ? this : new PrettierStyle(getId(), config, prettierVersion, ignored);
+    }
+
+    public PrettierStyle withIgnored(boolean ignored) {
+        return ignored == this.ignored ? this : new PrettierStyle(getId(), config, prettierVersion, ignored);
+    }
+
+    @Override
+    public PrettierStyle withStyles(Collection<Style> styles) {
+        // PrettierStyle doesn't use the styles collection
+        return this;
+    }
 
     @Override
     public void rpcSend(PrettierStyle after, RpcSendQueue q) {
-        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, NamedStyles::getId);
         q.getAndSend(after, PrettierStyle::getConfig);
         q.getAndSend(after, PrettierStyle::getPrettierVersion);
+        q.getAndSend(after, PrettierStyle::isIgnored);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public PrettierStyle rpcReceive(PrettierStyle before, RpcReceiveQueue q) {
-        return before
-                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString))
                 .withConfig(q.receive(before.getConfig()))
-                .withPrettierVersion(q.receive(before.getPrettierVersion()));
+                .withPrettierVersion(q.receive(before.getPrettierVersion()))
+                .withIgnored(q.receive(before.isIgnored()));
     }
 }
