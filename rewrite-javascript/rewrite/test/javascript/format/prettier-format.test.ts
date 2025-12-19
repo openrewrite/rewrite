@@ -32,9 +32,14 @@ import {
     typescript
 } from "../../../src/javascript";
 import {json} from "../../../src/json";
+import {text} from "../../../src/text";
 import {J, Statement} from "../../../src/java";
 import {randomId, TreePrinters} from "../../../src";
 import {withDir} from "tmp-promise";
+import {PrettierConfigLoader} from "../../../src/javascript/prettier-config-loader";
+import * as path from "path";
+import * as fs from "fs";
+import * as fsp from "fs/promises";
 
 // A simple PrettierStyle with default configuration
 const prettierStyle = new PrettierStyle(randomId(), {});
@@ -427,5 +432,117 @@ describe('Prettier auto-detection integration', () => {
                 )
             );
         }, {unsafeCleanup: true});
+    });
+});
+
+describe('Prettier .prettierignore handling', () => {
+    test('resolveConfig returns config for ignored files (does not check ignore)', async () => {
+        // This test explores what Prettier's resolveConfig() returns for ignored files
+        // Spoiler: resolveConfig() does NOT check .prettierignore - it still returns config
+        // We need to use getFileInfo() or check() to determine if a file is ignored
+        await withDir(async (repo) => {
+            // Set up a minimal project with .prettierignore
+            await fsp.mkdir(path.join(repo.path, 'node_modules', 'prettier'), { recursive: true });
+            await fsp.writeFile(
+                path.join(repo.path, 'node_modules', 'prettier', 'package.json'),
+                JSON.stringify({ name: 'prettier', version: '3.0.0' })
+            );
+            await fsp.writeFile(
+                path.join(repo.path, 'package.json'),
+                JSON.stringify({ name: 'test', devDependencies: { prettier: '^3.0.0' } })
+            );
+            await fsp.writeFile(
+                path.join(repo.path, '.prettierrc'),
+                JSON.stringify({ singleQuote: true })
+            );
+            await fsp.writeFile(
+                path.join(repo.path, '.prettierignore'),
+                'ignored.ts\ndist/**\n'
+            );
+            await fsp.writeFile(path.join(repo.path, 'normal.ts'), 'const x = 1;');
+            await fsp.writeFile(path.join(repo.path, 'ignored.ts'), 'const x = 1;');
+
+            const loader = new PrettierConfigLoader(repo.path);
+            const detection = await loader.detectPrettier();
+
+            expect(detection.available).toBe(true);
+            expect(detection.bundledPrettier).toBeDefined();
+
+            // resolveConfig returns config for BOTH files - it doesn't check .prettierignore
+            const normalConfig = await detection.bundledPrettier!.resolveConfig(
+                path.join(repo.path, 'normal.ts')
+            );
+            const ignoredConfig = await detection.bundledPrettier!.resolveConfig(
+                path.join(repo.path, 'ignored.ts')
+            );
+
+            // Both get the same config - resolveConfig doesn't care about .prettierignore
+            expect(normalConfig).toEqual({ singleQuote: true });
+            expect(ignoredConfig).toEqual({ singleQuote: true });
+
+            // To check if a file is ignored, we need getFileInfo() WITH ignorePath option
+            // By default, getFileInfo() does NOT check .prettierignore!
+            const ignorePath = path.join(repo.path, '.prettierignore');
+
+            const normalInfo = await detection.bundledPrettier!.getFileInfo(
+                path.join(repo.path, 'normal.ts'),
+                { ignorePath }
+            );
+            const ignoredInfo = await detection.bundledPrettier!.getFileInfo(
+                path.join(repo.path, 'ignored.ts'),
+                { ignorePath }
+            );
+
+            expect(normalInfo.ignored).toBe(false);
+            expect(ignoredInfo.ignored).toBe(true);
+        }, { unsafeCleanup: true });
+    });
+
+    test('files in .prettierignore should not be formatted', async () => {
+        // This test verifies that ignored files are NOT formatted
+        await withDir(async (repo) => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AutoformatVisitor());
+
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "devDependencies": {
+                                "prettier": "^3.0.0"
+                            }
+                        }
+                    `),
+                    // .prettierrc with single quotes, no semicolons
+                    {
+                        ...json(JSON.stringify({ singleQuote: true, semi: false }, null, 2)),
+                        path: '.prettierrc'
+                    },
+                    // .prettierignore - ignore dist folder
+                    {
+                        ...text('dist/**\n'),
+                        path: '.prettierignore'
+                    },
+                    // Normal file - should be formatted
+                    {
+                        ...typescript(
+                            `const x = "hello";`,
+                            `const x = 'hello'
+
+`
+                        ),
+                        path: 'src/normal.ts'
+                    },
+                    // Ignored file - should NOT be formatted (no "after" means no change expected)
+                    {
+                        ...typescript(`const x = "hello";`),
+                        path: 'dist/ignored.ts'
+                    }
+                )
+            );
+        }, { unsafeCleanup: true });
     });
 });

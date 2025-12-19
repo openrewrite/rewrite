@@ -60,7 +60,12 @@ export class PrettierStyle implements NamedStyles<typeof StyleKind.PrettierStyle
          * At formatting time, this version of Prettier will be loaded dynamically
          * to ensure consistent formatting.
          */
-        readonly prettierVersion?: string
+        readonly prettierVersion?: string,
+        /**
+         * Whether this file is ignored by .prettierignore.
+         * When true, Prettier formatting should be skipped for this file.
+         */
+        readonly ignored: boolean = false
     ) {}
 }
 

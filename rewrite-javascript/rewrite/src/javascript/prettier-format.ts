@@ -554,8 +554,14 @@ export async function applyPrettierFormatting<R extends J, P>(
         }
     }
 
-    // Build options from PrettierStyle or TabsAndIndentsStyle defaults
+    // If file is in .prettierignore, skip Prettier and use built-in formatting
     const tabsAndIndentsStyle = getStyle(StyleKind.TabsAndIndentsStyle, tree, styles) as TabsAndIndentsStyle;
+    if (prettierStyle?.ignored) {
+        const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, stopAfter);
+        return await tabsVisitor.visit(t, p, cursor) as R;
+    }
+
+    // Build options from PrettierStyle or TabsAndIndentsStyle defaults
     let prettierOpts: PrettierFormatOptions = {
         tabWidth: tabsAndIndentsStyle.indentSize,
         useTabs: tabsAndIndentsStyle.useTabCharacter,

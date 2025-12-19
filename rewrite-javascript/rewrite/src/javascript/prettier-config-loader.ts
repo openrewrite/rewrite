@@ -255,6 +255,30 @@ export class PrettierConfigLoader {
     }
 
     /**
+     * Finds the .prettierignore file by scanning upward from projectRoot.
+     * Returns undefined if no .prettierignore file is found.
+     */
+    private findPrettierIgnore(): string | undefined {
+        let dir = this.projectRoot;
+
+        while (true) {
+            const ignorePath = path.join(dir, '.prettierignore');
+            if (fs.existsSync(ignorePath)) {
+                return ignorePath;
+            }
+
+            const parent = path.dirname(dir);
+            if (parent === dir) {
+                // Reached filesystem root
+                break;
+            }
+            dir = parent;
+        }
+
+        return undefined;
+    }
+
+    /**
      * Gets or creates a PrettierStyle marker for the given source file.
      * Returns undefined if Prettier is not available or no config applies to this file.
      *
@@ -271,12 +295,20 @@ export class PrettierConfigLoader {
                 ? filePath
                 : path.join(this.projectRoot, filePath);
 
+            // Check if file is ignored by .prettierignore
+            const ignorePath = this.findPrettierIgnore();
+            let ignored = false;
+            if (ignorePath) {
+                const fileInfo = await this.detection.bundledPrettier.getFileInfo(absolutePath, { ignorePath });
+                ignored = fileInfo.ignored;
+            }
+
             // Resolve config for this specific file (applies overrides)
             // If no config file exists, use empty config (Prettier defaults)
             const config = await this.detection.bundledPrettier.resolveConfig(absolutePath) ?? {};
 
-            // Create a cache key from the resolved config + version
-            const configKey = JSON.stringify({ config, version: this.detection.version });
+            // Create a cache key from the resolved config + version + ignored status
+            const configKey = JSON.stringify({ config, version: this.detection.version, ignored });
 
             // Check cache for existing marker with same config
             let marker = this.configCache.get(configKey);
@@ -285,7 +317,7 @@ export class PrettierConfigLoader {
             }
 
             // Create new PrettierStyle instance
-            marker = new PrettierStyle(randomId(), config, this.detection.version);
+            marker = new PrettierStyle(randomId(), config, this.detection.version, ignored);
 
             // Cache and return
             this.configCache.set(configKey, marker);
