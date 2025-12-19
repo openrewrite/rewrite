@@ -31,6 +31,7 @@ import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -464,40 +465,53 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
-    // TODO: These tests require more heap memory than the default test JVM provides.
-    // The parseProject method is implemented and tested manually.
-    // Uncomment when test heap is increased or when memory usage is optimized.
+    @Test
+    void parseProject(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+            {"name": "test-project", "version": "1.0.0"}
+            """);
+        Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
 
-    // @Test
-    // void parseProject(@TempDir Path projectDir) throws IOException {
-    //     Files.writeString(projectDir.resolve("package.json"), """
-    //         {"name": "test-project", "version": "1.0.0"}
-    //         """);
-    //     Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
-    //
-    //     List<SourceFile> sourceFiles = client()
-    //         .parseProject(projectDir, new InMemoryExecutionContext())
-    //         .toList();
-    //
-    //     assertThat(sourceFiles).isNotEmpty();
-    // }
-    //
-    // @Test
-    // void parseProjectWithExclusions(@TempDir Path projectDir) throws IOException {
-    //     Files.writeString(projectDir.resolve("package.json"), """
-    //         {"name": "test-project", "version": "1.0.0"}
-    //         """);
-    //     Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
-    //     Files.createDirectories(projectDir.resolve("vendor"));
-    //     Files.writeString(projectDir.resolve("vendor/external.js"), "const y = 2;");
-    //
-    //     List<SourceFile> sourceFiles = client()
-    //         .parseProject(projectDir, List.of("vendor/**"), new InMemoryExecutionContext())
-    //         .toList();
-    //
-    //     assertThat(sourceFiles.stream().map(sf -> sf.getSourcePath().toString()).toList())
-    //         .noneMatch(p -> p.contains("vendor"));
-    // }
+        List<SourceFile> sourceFiles = client()
+            .parseProject(projectDir, new InMemoryExecutionContext())
+            .toList();
+
+        assertThat(sourceFiles).hasSize(2);
+
+        List<String> paths = sourceFiles.stream()
+            .map(sf -> sf.getSourcePath().toString())
+            .toList();
+        assertThat(paths).containsExactlyInAnyOrder("package.json", "index.js");
+
+        // Verify content is parseable and printable
+        for (SourceFile sf : sourceFiles) {
+            assertThat(sf).isNotInstanceOf(ParseError.class);
+            assertThat(client().print(sf)).isNotEmpty();
+        }
+    }
+
+    @Test
+    void parseProjectWithExclusions(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+            {"name": "test-project", "version": "1.0.0"}
+            """);
+        Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
+        Files.createDirectories(projectDir.resolve("vendor"));
+        Files.writeString(projectDir.resolve("vendor/external.js"), "const y = 2;");
+
+        List<SourceFile> sourceFiles = client()
+            .parseProject(projectDir, List.of("**/vendor/**"), new InMemoryExecutionContext())
+            .toList();
+
+        assertThat(sourceFiles).hasSize(2);
+
+        List<String> paths = sourceFiles.stream()
+            .map(sf -> sf.getSourcePath().toString())
+            .toList();
+        assertThat(paths)
+            .containsExactlyInAnyOrder("package.json", "index.js")
+            .noneMatch(p -> p.contains("vendor"));
+    }
 
     private void installRecipes() {
         File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");

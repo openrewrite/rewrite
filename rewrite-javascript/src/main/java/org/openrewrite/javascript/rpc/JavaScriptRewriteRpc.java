@@ -183,7 +183,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
             @Override
             public int characteristics() {
-                return ORDERED | SIZED | SUBSIZED;
+                // Don't report SIZED until response is available, as estimateSize()
+                // returns Long.MAX_VALUE before the RPC call completes
+                return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
             }
         }, false);
     }
