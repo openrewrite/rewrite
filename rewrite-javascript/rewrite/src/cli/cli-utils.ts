@@ -14,22 +14,11 @@
  * limitations under the License.
  */
 import * as fs from 'fs';
-import * as fsp from 'fs/promises';
 import * as path from 'path';
-import {spawn, spawnSync} from 'child_process';
+import {spawn} from 'child_process';
 import {Recipe, RecipeRegistry} from '../recipe';
 import {SourceFile} from '../tree';
-import {
-    isYarnBerryLockFile,
-    JavaScriptParser,
-    JSON_LOCK_FILE_NAMES,
-    PackageJsonParser,
-    TEXT_LOCK_FILE_NAMES,
-    YAML_LOCK_FILE_NAMES
-} from '../javascript';
-import {JsonParser} from '../json';
-import {PlainTextParser} from '../text';
-import {YamlParser} from '../yaml';
+import {ProjectParser} from '../javascript/project-parser';
 
 // ANSI color codes
 const colors = {
@@ -339,123 +328,28 @@ export function findRecipe(
 }
 
 /**
- * Discover source files in a project directory, respecting .gitignore
+ * Discover source files in a project directory, respecting .gitignore.
+ * Delegates to ProjectParser for file discovery.
  */
 export async function discoverFiles(projectRoot: string, verbose: boolean = false): Promise<string[]> {
-    const files: string[] = [];
+    const parser = new ProjectParser(projectRoot, {verbose});
+    const discovered = await parser.discoverFiles();
 
-    if (verbose) {
-        console.log(`Discovering files in ${projectRoot}...`);
-    }
-
-    // Get list of git-ignored files
-    const ignoredFiles = new Set<string>();
-    try {
-        const result = spawnSync('git', ['ls-files', '--ignored', '--exclude-standard', '-o'], {
-            cwd: projectRoot,
-            encoding: 'utf8'
-        });
-        if (result.stdout) {
-            for (const line of result.stdout.split('\n')) {
-                if (line.trim()) {
-                    ignoredFiles.add(path.join(projectRoot, line.trim()));
-                }
-            }
-        }
-    } catch {
-        // Git not available or not a git repository
-    }
-
-    // Get tracked and untracked (but not ignored) files
-    const trackedFiles = new Set<string>();
-    try {
-        // Get tracked files
-        const tracked = spawnSync('git', ['ls-files'], {
-            cwd: projectRoot,
-            encoding: 'utf8'
-        });
-        // Check if git command failed (not a git repository)
-        if (tracked.status !== 0 || tracked.error) {
-            // Not a git repository, fall back to recursive directory scan
-            await walkDirectory(projectRoot, files, ignoredFiles, projectRoot);
-            return files.filter(isAcceptedFile);
-        }
-        if (tracked.stdout) {
-            for (const line of tracked.stdout.split('\n')) {
-                if (line.trim()) {
-                    trackedFiles.add(path.join(projectRoot, line.trim()));
-                }
-            }
-        }
-
-        // Get untracked but not ignored files
-        const untracked = spawnSync('git', ['ls-files', '--others', '--exclude-standard'], {
-            cwd: projectRoot,
-            encoding: 'utf8'
-        });
-        if (untracked.stdout) {
-            for (const line of untracked.stdout.split('\n')) {
-                if (line.trim()) {
-                    trackedFiles.add(path.join(projectRoot, line.trim()));
-                }
-            }
-        }
-    } catch {
-        // Not a git repository, fall back to recursive directory scan
-        await walkDirectory(projectRoot, files, ignoredFiles, projectRoot);
-        return files.filter(isAcceptedFile);
-    }
-
-    // Filter to accepted file types that exist on disk
-    // (git ls-files returns deleted files that are still tracked)
-    for (const file of trackedFiles) {
-        if (!ignoredFiles.has(file) && isAcceptedFile(file) && fs.existsSync(file)) {
-            files.push(file);
-        }
-    }
-
-    return files;
+    // Flatten all discovered files into a single array
+    return [
+        ...discovered.packageJsonFiles,
+        ...discovered.lockFiles.json,
+        ...discovered.lockFiles.yaml,
+        ...discovered.lockFiles.text,
+        ...discovered.jsFiles,
+        ...discovered.jsonFiles,
+        ...discovered.yamlFiles,
+        ...discovered.textFiles
+    ];
 }
 
 /**
- * Walk a directory recursively, collecting files
- */
-export async function walkDirectory(
-    dir: string,
-    files: string[],
-    ignored: Set<string>,
-    projectRoot: string
-): Promise<void> {
-    const entries = await fsp.readdir(dir, {withFileTypes: true});
-
-    for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-
-        // Skip hidden files and common ignore patterns
-        if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist' ||
-            entry.name === 'build' || entry.name === 'coverage') {
-            continue;
-        }
-
-        if (ignored.has(fullPath)) {
-            continue;
-        }
-
-        if (entry.isDirectory()) {
-            await walkDirectory(fullPath, files, ignored, projectRoot);
-        } else if (entry.isFile() && isAcceptedFile(fullPath)) {
-            files.push(fullPath);
-        }
-    }
-}
-
-/**
- * All lock file names (typed as string[] for easier comparison)
- */
-const ALL_LOCK_FILE_NAMES: readonly string[] = [...JSON_LOCK_FILE_NAMES, ...YAML_LOCK_FILE_NAMES, ...TEXT_LOCK_FILE_NAMES];
-
-/**
- * Check if a file is accepted for parsing based on its extension
+ * Check if a file is accepted for parsing based on its extension.
  */
 export function isAcceptedFile(filePath: string): boolean {
     const ext = path.extname(filePath).toLowerCase();
@@ -466,7 +360,7 @@ export function isAcceptedFile(filePath: string): boolean {
         return true;
     }
 
-    // JSON files (including package.json which gets special parsing)
+    // JSON files
     if (ext === '.json') {
         return true;
     }
@@ -476,8 +370,13 @@ export function isAcceptedFile(filePath: string): boolean {
         return true;
     }
 
-    // Lock files (some have non-standard extensions like yarn.lock)
-    if (ALL_LOCK_FILE_NAMES.includes(basename)) {
+    // Lock files (yarn.lock has no extension)
+    if (['yarn.lock', 'pnpm-lock.yaml', 'package-lock.json', 'bun.lock'].includes(basename)) {
+        return true;
+    }
+
+    // Text config files
+    if (['.prettierignore', '.gitignore', '.npmignore', '.eslintignore'].includes(basename)) {
         return true;
     }
 
@@ -492,126 +391,36 @@ export interface ParseFilesOptions {
 }
 
 /**
- * Internal context for file parsing progress tracking.
- */
-interface ParseContext {
-    current: number;
-    total: number;
-    verbose: boolean;
-    onProgress?: ProgressCallback;
-}
-
-/**
- * Helper to parse files with a given parser, handling verbose logging and progress.
- */
-async function* parseWithParser(
-    files: string[],
-    parser: { parse(...files: string[]): AsyncGenerator<SourceFile> },
-    fileType: string,
-    ctx: ParseContext
-): AsyncGenerator<SourceFile, ParseContext> {
-    if (files.length === 0) {
-        return ctx;
-    }
-
-    if (ctx.verbose) {
-        console.log(`Parsing ${files.length} ${fileType} files...`);
-    }
-
-    for await (const sf of parser.parse(...files)) {
-        ctx.current++;
-        ctx.onProgress?.(ctx.current, ctx.total, sf.sourcePath);
-        yield sf;
-    }
-
-    return ctx;
-}
-
-/**
- * Classifies a yarn.lock file as YAML (Berry) or text (Classic) based on its content.
- * Returns 'yaml' for Yarn Berry (v2+) and 'text' for Yarn Classic (v1).
- */
-async function classifyYarnLockFile(filePath: string): Promise<'yaml' | 'text'> {
-    try {
-        const content = await fsp.readFile(filePath, 'utf-8');
-        return isYarnBerryLockFile(content) ? 'yaml' : 'text';
-    } catch {
-        // Default to text format if we can't read the file
-        return 'text';
-    }
-}
-
-/**
  * Parse source files using appropriate parsers (streaming version).
  * Yields source files as they are parsed, allowing immediate processing.
+ *
+ * Uses ProjectParser with a file filter to parse only the specified files.
+ * This handles Prettier detection, file classification, and appropriate parser selection.
  */
 export async function* parseFilesStreaming(
     filePaths: string[],
     projectRoot: string,
     options: ParseFilesOptions = {}
 ): AsyncGenerator<SourceFile, void, undefined> {
-    const { verbose = false, onProgress } = options;
-    const total = filePaths.length;
+    const {verbose = false, onProgress} = options;
+
+    // Create a set for fast lookup
+    const fileSet = new Set(filePaths.map(f => path.resolve(f)));
     let current = 0;
+    const total = filePaths.length;
 
-    // Group files by type
-    const jsFiles: string[] = [];
-    const packageJsonFiles: string[] = [];
-    const jsonFiles: string[] = [];
-    const jsonLockFiles: string[] = [];
-    const yamlLockFiles: string[] = [];
-    const yamlFiles: string[] = [];
-    const textLockFiles: string[] = [];
+    const parser = new ProjectParser(projectRoot, {
+        verbose,
+        fileFilter: (absolutePath) => fileSet.has(absolutePath),
+        onProgress: onProgress ? (phase, cur, tot, filePath) => {
+            if (phase === "parsing" && filePath) {
+                current++;
+                onProgress(current, total, filePath);
+            }
+        } : undefined
+    });
 
-    // Collect yarn.lock files for content-based classification
-    const yarnLockFiles: string[] = [];
-
-    for (const filePath of filePaths) {
-        const basename = path.basename(filePath);
-        const ext = path.extname(filePath).toLowerCase();
-
-        if (basename === 'package.json') {
-            packageJsonFiles.push(filePath);
-        } else if (['.js', '.jsx', '.ts', '.tsx', '.mjs', '.mts', '.cjs', '.cts'].includes(ext)) {
-            jsFiles.push(filePath);
-        } else if ((JSON_LOCK_FILE_NAMES as readonly string[]).includes(basename)) {
-            jsonLockFiles.push(filePath);
-        } else if ((YAML_LOCK_FILE_NAMES as readonly string[]).includes(basename)) {
-            yamlLockFiles.push(filePath);
-        } else if (basename === 'yarn.lock') {
-            // yarn.lock needs content-based classification
-            yarnLockFiles.push(filePath);
-        } else if ((TEXT_LOCK_FILE_NAMES as readonly string[]).includes(basename)) {
-            // Other text lock files (if any besides yarn.lock)
-            textLockFiles.push(filePath);
-        } else if (ext === '.json') {
-            jsonFiles.push(filePath);
-        } else if (['.yaml', '.yml'].includes(ext)) {
-            yamlFiles.push(filePath);
-        }
-    }
-
-    // Classify yarn.lock files by content (Yarn Berry uses YAML, Classic uses text)
-    for (const yarnLockPath of yarnLockFiles) {
-        const format = await classifyYarnLockFile(yarnLockPath);
-        if (format === 'yaml') {
-            yamlLockFiles.push(yarnLockPath);
-        } else {
-            textLockFiles.push(yarnLockPath);
-        }
-    }
-
-    // Create parse context for tracking progress
-    const ctx: ParseContext = { current, total, verbose, onProgress };
-
-    // Parse files by type using helper
-    yield* parseWithParser(jsFiles, new JavaScriptParser({relativeTo: projectRoot}), 'JavaScript/TypeScript', ctx);
-    yield* parseWithParser(packageJsonFiles, new PackageJsonParser({relativeTo: projectRoot}), 'package.json', ctx);
-    yield* parseWithParser(jsonLockFiles, new JsonParser({relativeTo: projectRoot}), 'JSON lock', ctx);
-    yield* parseWithParser(yamlLockFiles, new YamlParser({relativeTo: projectRoot}), 'YAML lock', ctx);
-    yield* parseWithParser(textLockFiles, new PlainTextParser({relativeTo: projectRoot}), 'text lock', ctx);
-    yield* parseWithParser(yamlFiles, new YamlParser({relativeTo: projectRoot}), 'YAML', ctx);
-    yield* parseWithParser(jsonFiles, new JsonParser({relativeTo: projectRoot}), 'JSON', ctx);
+    yield* parser.parse();
 }
 
 /**

@@ -28,7 +28,8 @@ export const StyleKind = {
     WrappingAndBracesStyle: "org.openrewrite.javascript.style.WrappingAndBracesStyle",
     BlankLinesStyle: "org.openrewrite.javascript.style.BlankLinesStyle",
     TabsAndIndentsStyle: "org.openrewrite.javascript.style.TabsAndIndentsStyle",
-    PrettierStyle: "org.openrewrite.javascript.style.PrettierStyle"
+    PrettierStyle: "org.openrewrite.javascript.style.PrettierStyle",
+    Autodetect: "org.openrewrite.javascript.style.Autodetect"
 } as const;
 
 /**
@@ -41,32 +42,46 @@ export const StyleKind = {
  * When this style is present, AutoformatVisitor will use Prettier for formatting
  * instead of the built-in formatting visitors.
  */
-export class PrettierStyle implements NamedStyles<typeof StyleKind.PrettierStyle> {
-    readonly kind = StyleKind.PrettierStyle;
-    readonly name = "org.openrewrite.javascript.Prettier";
-    readonly displayName = "Prettier";
-    readonly description = "Prettier code formatter configuration.";
-    readonly tags: string[] = [];
-    readonly styles: Style[] = [];
+export interface PrettierStyle extends NamedStyles<typeof StyleKind.PrettierStyle> {
+    readonly kind: typeof StyleKind.PrettierStyle;
+    readonly name: "org.openrewrite.javascript.Prettier";
+    readonly displayName: "Prettier";
+    readonly description: "Prettier code formatter configuration.";
+    /**
+     * The resolved Prettier options for this file (with overrides applied).
+     */
+    readonly config: Record<string, unknown>;
+    /**
+     * The Prettier version from the project's package.json.
+     * At formatting time, this version of Prettier will be loaded dynamically
+     * to ensure consistent formatting.
+     */
+    readonly prettierVersion?: string;
+    /**
+     * Whether this file is ignored by .prettierignore.
+     * When true, Prettier formatting should be skipped for this file.
+     */
+    readonly ignored: boolean;
+}
 
-    constructor(
-        readonly id: string,
-        /**
-         * The resolved Prettier options for this file (with overrides applied).
-         */
-        readonly config: Record<string, unknown>,
-        /**
-         * The Prettier version from the project's package.json.
-         * At formatting time, this version of Prettier will be loaded dynamically
-         * to ensure consistent formatting.
-         */
-        readonly prettierVersion?: string,
-        /**
-         * Whether this file is ignored by .prettierignore.
-         * When true, Prettier formatting should be skipped for this file.
-         */
-        readonly ignored: boolean = false
-    ) {}
+export function prettierStyle(
+    id: string,
+    config: Record<string, unknown>,
+    prettierVersion?: string,
+    ignored: boolean = false
+): PrettierStyle {
+    return {
+        kind: StyleKind.PrettierStyle,
+        id,
+        name: "org.openrewrite.javascript.Prettier",
+        displayName: "Prettier",
+        description: "Prettier code formatter configuration.",
+        tags: [],
+        styles: [],
+        config,
+        prettierVersion,
+        ignored
+    };
 }
 
 export const SpacesStyleDetailKind = {
@@ -187,7 +202,7 @@ export namespace SpacesStyle {
 }
 
 export const WrappingAndBracesStyleDetailKind = {
-    WrappingAndBracesStyleIfStatement: "org.openrewrite.java.style.WrappingAndBracesStyle$IfStatement",
+    WrappingAndBracesStyleIfStatement: "org.openrewrite.javascript.style.WrappingAndBracesStyle$IfStatement",
     WrappingAndBracesStyleKeepWhenReformatting: "org.openrewrite.javascript.style.WrappingAndBracesStyle$KeepWhenReformatting",
 } as const;
 

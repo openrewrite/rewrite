@@ -28,6 +28,7 @@ import {
     WrappingAndBracesStyle,
     WrappingAndBracesStyleDetailKind
 } from "./style";
+import {UUID} from "../uuid";
 
 /**
  * Auto-detected styles for JavaScript/TypeScript code.
@@ -36,21 +37,27 @@ import {
  * - Indent size (2, 4, etc.)
  * - Spaces within ES6 import/export braces
  */
-export class Autodetect implements NamedStyles {
-    readonly kind = "org.openrewrite.marker.NamedStyles" as const;
-    readonly id: string;
-    readonly name = "org.openrewrite.javascript.Autodetect";
-    readonly displayName = "Auto-detected";
-    readonly description = "Automatically detect styles from a repository's existing code.";
-    readonly tags: string[] = [];
-    readonly styles: Style[];
+export interface Autodetect extends NamedStyles<typeof StyleKind.Autodetect> {
+    readonly kind: typeof StyleKind.Autodetect;
+    readonly name: "org.openrewrite.javascript.Autodetect";
+    readonly displayName: "Auto-detected";
+    readonly description: "Automatically detect styles from a repository's existing code.";
+}
 
-    constructor(id: string, styles: Style[]) {
-        this.id = id;
-        this.styles = styles;
-    }
+export function autodetect(id: UUID, styles: Style[]): Autodetect {
+    return {
+        kind: StyleKind.Autodetect,
+        id,
+        name: "org.openrewrite.javascript.Autodetect",
+        displayName: "Auto-detected",
+        description: "Automatically detect styles from a repository's existing code.",
+        tags: [],
+        styles
+    };
+}
 
-    static detector(): Detector {
+export namespace Autodetect {
+    export function detector(): Detector {
         return new Detector();
     }
 }
@@ -85,7 +92,7 @@ export class Detector {
      * Build the auto-detected styles from collected statistics.
      */
     build(): Autodetect {
-        return new Autodetect(randomId(), [
+        return autodetect(randomId(), [
             this.tabsAndIndentsStats.getTabsAndIndentsStyle(),
             this.spacesStats.getSpacesStyle(),
             this.getWrappingAndBracesStyle(),

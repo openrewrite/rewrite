@@ -17,7 +17,7 @@
  */
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
 import {Cursor, RecipeRegistry, rootCursor} from "../../src";
-import {RewriteRpc} from "../../src/rpc";
+import {RewriteRpc} from "../../src/rpc/rewrite-rpc";
 import {PlainText, text} from "../../src/text";
 import {json, Json} from "../../src/json";
 import {RecipeSpec} from "../../src/test";

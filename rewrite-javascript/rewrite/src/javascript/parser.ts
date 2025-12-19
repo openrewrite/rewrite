@@ -48,12 +48,9 @@ import {
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
 import {produce} from "immer";
-import {PrettierConfigLoader} from "./format/prettier-config-loader";
-import Kind = JS.Kind;
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
-
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
     sourceFileCache?: Map<string, ts.SourceFile>,
@@ -330,12 +327,6 @@ export class JavaScriptParser extends Parser {
         // Update the oldProgram reference
         this.oldProgram = program;
 
-        // Detect Prettier config for the project
-        const prettierLoader = this.relativeTo ? new PrettierConfigLoader(this.relativeTo) : undefined;
-        if (prettierLoader) {
-            await prettierLoader.detectPrettier();
-        }
-
         // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
         // This ensures that TypeScript types with the same type.id map to the same Type instance,
         // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
@@ -363,18 +354,12 @@ export class JavaScriptParser extends Parser {
             }
 
             try {
-                // Get Prettier config marker for this file (if Prettier is available)
-                const prettierConfigMarker = await prettierLoader?.getConfigMarker(filePath);
-
                 yield produce(
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
                             draft.markers.markers = draft.markers.markers.concat(this.styles);
-                        }
-                        if (prettierConfigMarker) {
-                            draft.markers.markers = draft.markers.markers.concat([prettierConfigMarker]);
                         }
                     });
             } catch (error) {
@@ -1766,7 +1751,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 typeParameter: this.rightPadded(
                     {
-                        kind: Kind.MappedTypeParameter,
+                        kind: JS.Kind.MappedTypeParameter,
                         id: randomId(),
                         prefix: this.prefix(node.typeParameter),
                         markers: emptyMarkers,
