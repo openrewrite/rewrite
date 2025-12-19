@@ -27,7 +27,6 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.LineWrapSetting;
@@ -52,20 +51,18 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final SpacesStyle spacesStyle;
     private final WrappingAndBracesStyle style;
-    private final TabsAndIndentsStyle tabsAndIndentsStyle;
 
     public WrappingAndBracesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
         this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
     }
 
     public WrappingAndBracesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents), stopAfter);
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
     }
 
-    public WrappingAndBracesVisitor(SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingAndBracesStyle, TabsAndIndentsStyle tabsAndIndentsStyle, @Nullable Tree stopAfter) {
+    public WrappingAndBracesVisitor(SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
         this.spacesStyle = spacesStyle;
         this.style = wrappingAndBracesStyle;
-        this.tabsAndIndentsStyle = tabsAndIndentsStyle;
         this.stopAfter = stopAfter;
     }
 
@@ -259,13 +256,13 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                         parent = getCursor().getParentTreeCursor().getValue();
                         boolean keepSingleLine;
                         if (parent instanceof J.ClassDeclaration) {
-                            keepSingleLine = evaluate(() -> style.getKeepWhenReformatting().getSimpleClassesInOneLine(), false);
+                            keepSingleLine = evaluate(() -> style.getKeepWhenFormatting().getSimpleClassesInOneLine(), false);
                         } else if (parent instanceof J.MethodDeclaration) {
-                            keepSingleLine = evaluate(() -> style.getKeepWhenReformatting().getSimpleMethodsInOneLine(), false);
+                            keepSingleLine = evaluate(() -> style.getKeepWhenFormatting().getSimpleMethodsInOneLine(), false);
                         } else if (parent instanceof J.Lambda) {
-                            keepSingleLine = evaluate(() -> style.getKeepWhenReformatting().getSimpleLambdasInOneLine(), false);
+                            keepSingleLine = evaluate(() -> style.getKeepWhenFormatting().getSimpleLambdasInOneLine(), false);
                         } else {
-                            keepSingleLine = evaluate(() -> style.getKeepWhenReformatting().getSimpleBlocksInOneLine(), false);
+                            keepSingleLine = evaluate(() -> style.getKeepWhenFormatting().getSimpleBlocksInOneLine(), false);
                         }
                         if (keepSingleLine) {
                             break;

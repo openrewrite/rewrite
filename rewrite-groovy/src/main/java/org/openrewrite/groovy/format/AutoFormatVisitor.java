@@ -22,6 +22,9 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.java.format.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.style.NamedStyles;
+
+import java.util.List;
 
 public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
     @Nullable
@@ -49,20 +52,26 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
                 (JavaSourceFile) tree :
                 cursor.firstEnclosingOrThrow(JavaSourceFile.class);
 
+        List<NamedStyles> activeStyles = cu.getMarkers().findAll(NamedStyles.class);
+
         tree = new OmitParenthesesForLastArgumentLambdaVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
 
-        // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping + indents...)
-        J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
-        t = new SpacesVisitor<>(cu, removeCustomLineBreaks, stopAfter).visit(t, p, cursor.fork());
-        t = new WrappingAndBracesVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
-        t = new BlankLinesVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
-        t = new NormalizeTabsOrSpacesVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
-        t = new TabsAndIndentsVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
-        t = new NormalizeLineBreaksVisitor<>(cu, stopAfter).visit(t, p, cursor.fork());
-        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
+        // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
+        J t = new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
         t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new SpacesVisitor<>(activeStyles, stopAfter).visit(t, p, cursor.fork());
+        t = new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
 
         // With the updated tree, overwrite the original space with the newly computed space
-        return new MergeSpacesVisitor(removeCustomLineBreaks).visit(tree, t);
+        tree = new MergeSpacesVisitor(activeStyles).visit(tree, t, cursor.fork());
+
+        // Then apply formatting that applies on line-endings / #lines / ...
+        tree = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(tree, p, cursor.fork());
+        tree = new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(tree, p, cursor.fork());
+        tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
+
+        return (J) tree;
     }
 }

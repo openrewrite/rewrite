@@ -45,13 +45,13 @@ class TabsAndIndentsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AutoFormat(null, false))
+        spec.recipe(new AutoFormat(null))
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
               List.of(
                 IntelliJ.wrappingAndBraces()
-                  .withKeepWhenReformatting(IntelliJ.wrappingAndBraces().getKeepWhenReformatting().withSimpleMethodsInOneLine(true))
+                  .withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withSimpleMethodsInOneLine(true))
                   .withMethodAnnotations(IntelliJ.wrappingAndBraces().getMethodAnnotations().withWrap(LineWrapSetting.DoNotWrap)),
                 IntelliJ.blankLines().withMinimum(IntelliJ.blankLines().getMinimum().withAroundMethod(0).withAroundClass(0))
               )
@@ -2161,7 +2161,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignBlockPrefixes() {
         rewriteRun(
-          spec -> spec.recipe(new AutoFormat(null, false)),
+          spec -> spec.recipe(new AutoFormat(null)),
           java(
             """
               public class Test {

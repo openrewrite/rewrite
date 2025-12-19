@@ -15,11 +15,13 @@
  */
 package org.openrewrite.java.style;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
+import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.LineWrapSetting;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
 
@@ -30,7 +32,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Nullable
     Integer hardWrapAt;
     @Nullable
-    KeepWhenReformatting keepWhenReformatting;
+    KeepWhenFormatting keepWhenFormatting;
     @Nullable
     ExtendsImplementsPermitsList extendsImplementsPermitsList;
     @Nullable
@@ -106,7 +108,9 @@ public class WrappingAndBracesStyle implements JavaStyle {
 
     @Value
     @With
-    public static class KeepWhenReformatting {
+    public static class KeepWhenFormatting {
+        @Nullable
+        Boolean lineBreaks;
         @Nullable
         Boolean commentAtFirstColumn; // Not yet implemented
         @Nullable
@@ -134,11 +138,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
         Boolean specialElseIfTreatment;
     }
 
-    @Getter
-    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
-    @AllArgsConstructor
-    @ToString
-    @EqualsAndHashCode
+    @Value
     @With
     public static class Annotations {
         @Nullable
@@ -390,48 +390,24 @@ public class WrappingAndBracesStyle implements JavaStyle {
         LineWrapSetting wrap;
     }
 
-    @Getter
-    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
-    @ToString
-    @EqualsAndHashCode(callSuper = true)
-    public static class FieldAnnotations extends Annotations {
+    @Value
+    @With
+    public static class FieldAnnotations {
+        @Nullable
+        LineWrapSetting wrap;
+
         @Nullable
         Boolean doNotWrapAfterSingleAnnotation;
-
-        public FieldAnnotations(@Nullable LineWrapSetting wrap, @Nullable Boolean doNotWrapAfterSingleAnnotation) {
-            super(wrap);
-            this.doNotWrapAfterSingleAnnotation = doNotWrapAfterSingleAnnotation;
-        }
-
-        public FieldAnnotations withDoNotWrapAfterSingleAnnotation(Boolean doNotWrapAfterSingleAnnotation) {
-            return new FieldAnnotations(this.getWrap(), doNotWrapAfterSingleAnnotation);
-        }
-
-        public FieldAnnotations withWrap(LineWrapSetting wrap) {
-            return new FieldAnnotations(wrap, this.doNotWrapAfterSingleAnnotation);
-        }
     }
 
-    @Getter
-    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
-    @ToString
-    @EqualsAndHashCode(callSuper = true)
-    public static class ParameterAnnotations extends Annotations {
+    @Value
+    @With
+    public static class ParameterAnnotations {
+        @Nullable
+        LineWrapSetting wrap;
+
         @Nullable
         Boolean doNotWrapAfterSingleAnnotation;
-
-        public ParameterAnnotations(@Nullable LineWrapSetting wrap, @Nullable Boolean doNotWrapAfterSingleAnnotation) {
-            super(wrap);
-            this.doNotWrapAfterSingleAnnotation = doNotWrapAfterSingleAnnotation;
-        }
-
-        public ParameterAnnotations withDoNotWrapAfterSingleAnnotation(Boolean doNotWrapAfterSingleAnnotation) {
-            return new ParameterAnnotations(this.getWrap(), doNotWrapAfterSingleAnnotation);
-        }
-
-        public ParameterAnnotations withWrap(LineWrapSetting wrap) {
-            return new ParameterAnnotations(wrap, this.doNotWrapAfterSingleAnnotation);
-        }
     }
 
     @Value
@@ -480,5 +456,10 @@ public class WrappingAndBracesStyle implements JavaStyle {
         Boolean openNewLine;
         @Nullable
         Boolean closeNewLine;
+    }
+
+    @Override
+    public Style applyDefaults() {
+        return StyleHelper.merge(IntelliJ.wrappingAndBraces(), this);
     }
 }

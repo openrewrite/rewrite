@@ -59,7 +59,6 @@ class AutoFormatTest implements RewriteTest {
             description: Formats the code with some IntelliJ settings overwritten.
             recipeList:
               - org.openrewrite.java.format.AutoFormat:
-                  removeCustomLineBreaks: true
                   style: |
                     type: specs.openrewrite.org/v1beta/style
                     name: junit
@@ -67,6 +66,8 @@ class AutoFormatTest implements RewriteTest {
                     description: Only used in unit tests
                     styleConfigs:
                       - org.openrewrite.java.style.WrappingAndBracesStyle:
+                          keepWhenFormatting:
+                            lineBreaks: false
                           chainedMethodCalls:
                             wrap: WrapAlways
                             builderMethods:
@@ -3729,7 +3730,6 @@ class AutoFormatTest implements RewriteTest {
               description: Formats the code with method invocation argument wrapping enabled.
               recipeList:
                 - org.openrewrite.java.format.AutoFormat:
-                    removeCustomLineBreaks: true
                     style: |
                       type: specs.openrewrite.org/v1beta/style
                       name: junit
@@ -3737,6 +3737,8 @@ class AutoFormatTest implements RewriteTest {
                       description: Only used in unit tests
                       styleConfigs:
                         - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            keepWhenFormatting:
+                              lineBreaks: false
                             methodCallArguments:
                               wrap: WrapAlways
               """,
@@ -3753,7 +3755,6 @@ class AutoFormatTest implements RewriteTest {
               description: Formats the code with method invocation argument wrapping only for long lines.
               recipeList:
                 - org.openrewrite.java.format.AutoFormat:
-                    removeCustomLineBreaks: true
                     style: |
                       type: specs.openrewrite.org/v1beta/style
                       name: junit
@@ -3761,6 +3762,8 @@ class AutoFormatTest implements RewriteTest {
                       description: Only used in unit tests
                       styleConfigs:
                         - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            keepWhenFormatting:
+                              lineBreaks: false
                             hardWrapAt: %d
                             methodCallArguments:
                               wrap: ChopIfTooLong
@@ -3778,7 +3781,6 @@ class AutoFormatTest implements RewriteTest {
               description: Formats the code with method invocation argument wrapping and open new line.
               recipeList:
                 - org.openrewrite.java.format.AutoFormat:
-                    removeCustomLineBreaks: true
                     style: |
                       type: specs.openrewrite.org/v1beta/style
                       name: junit
@@ -3786,6 +3788,8 @@ class AutoFormatTest implements RewriteTest {
                       description: Only used in unit tests
                       styleConfigs:
                         - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            keepWhenFormatting:
+                              lineBreaks: false
                             methodCallArguments:
                               wrap: WrapAlways
                               openNewLine: true
@@ -3803,7 +3807,6 @@ class AutoFormatTest implements RewriteTest {
               description: Formats the code with method invocation argument wrapping and close new line.
               recipeList:
                 - org.openrewrite.java.format.AutoFormat:
-                    removeCustomLineBreaks: true
                     style: |
                       type: specs.openrewrite.org/v1beta/style
                       name: junit
@@ -3811,6 +3814,8 @@ class AutoFormatTest implements RewriteTest {
                       description: Only used in unit tests
                       styleConfigs:
                         - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            keepWhenFormatting:
+                              lineBreaks: false
                             methodCallArguments:
                               wrap: WrapAlways
                               closeNewLine: true
@@ -3828,7 +3833,6 @@ class AutoFormatTest implements RewriteTest {
               description: Formats the code with method invocation argument wrapping and both open and close new lines.
               recipeList:
                 - org.openrewrite.java.format.AutoFormat:
-                    removeCustomLineBreaks: true
                     style: |
                       type: specs.openrewrite.org/v1beta/style
                       name: junit
@@ -3836,6 +3840,8 @@ class AutoFormatTest implements RewriteTest {
                       description: Only used in unit tests
                       styleConfigs:
                         - org.openrewrite.java.style.WrappingAndBracesStyle:
+                            keepWhenFormatting:
+                              lineBreaks: false
                             methodCallArguments:
                               wrap: WrapAlways
                               openNewLine: true

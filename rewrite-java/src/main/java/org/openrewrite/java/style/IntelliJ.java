@@ -98,7 +98,7 @@ public class IntelliJ extends NamedStyles {
     public static WrappingAndBracesStyle wrappingAndBraces() {
         return new WrappingAndBracesStyle(
                 120,
-                new WrappingAndBracesStyle.KeepWhenReformatting(true, true, true, false, false, false, false),
+                new WrappingAndBracesStyle.KeepWhenFormatting(true, true, true, true, false, false, false, false),
                 new WrappingAndBracesStyle.ExtendsImplementsPermitsList(LineWrapSetting.DoNotWrap, false),
                 new WrappingAndBracesStyle.ExtendsImplementsPermitsKeyword(LineWrapSetting.DoNotWrap),
                 new WrappingAndBracesStyle.ThrowsList(LineWrapSetting.DoNotWrap, false, false),

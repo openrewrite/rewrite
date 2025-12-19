@@ -23,12 +23,12 @@ import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.TypeReferencePrefix;
+import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
-import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
 import java.util.Objects;
@@ -39,10 +39,10 @@ import java.util.function.Supplier;
  */
 public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
-    private final boolean removeCustomLineBreaks;
+    private final WrappingAndBracesStyle wrappingAndBracesStyle;
 
-    public MergeSpacesVisitor(boolean removeCustomLineBreaks) {
-        this.removeCustomLineBreaks = removeCustomLineBreaks;
+    public MergeSpacesVisitor(WrappingAndBracesStyle wrappingAndBracesStyle) {
+        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
     }
 
     @Override
@@ -663,7 +663,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             return space;
         }
         Space newSpace = (Space) ctx;
-        if (!removeCustomLineBreaks && space.getWhitespace().contains("\n")) {
+        if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && space.getWhitespace().contains("\n")) {
             if (newSpace.getWhitespace().contains("\n")) {
                 newSpace = newSpace.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1) + newSpace.getWhitespace().substring(newSpace.getWhitespace().lastIndexOf("\n") + 1));
             }
@@ -690,7 +690,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
                         return jdoc;
                     }
                     String newMargin = ((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin();
-                    if (!removeCustomLineBreaks && ((Javadoc.LineBreak) jdoc).getMargin().contains("\n")) {
+                    if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && ((Javadoc.LineBreak) jdoc).getMargin().contains("\n")) {
                         if (newMargin.contains("\n")) {
                             return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) jdoc).getMargin().substring(0, ((Javadoc.LineBreak) jdoc).getMargin().lastIndexOf("\n") + 1) + newMargin.substring(newMargin.lastIndexOf("\n") + 1));
                         } else {
@@ -704,7 +704,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
                     comment = ((TextComment) comment).withText(((TextComment) newComment).getText());
                 }
             }
-            if (!removeCustomLineBreaks && comment.getSuffix().contains("\n")) {
+            if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && comment.getSuffix().contains("\n")) {
                 if (newComment.getSuffix().contains("\n")) {
                     return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1) + newComment.getSuffix().substring(newComment.getSuffix().lastIndexOf("\n") + 1));
                 } else {
@@ -2201,11 +2201,20 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+    private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {
-            return StyleHelper.merge(defaultStyle.get(), style);
+            return (S) style.applyDefaults();
         }
-        return defaultStyle.get();
+        return null;
+    }
+
+    private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
     }
 }

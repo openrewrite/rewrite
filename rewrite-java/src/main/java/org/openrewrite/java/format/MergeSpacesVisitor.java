@@ -24,6 +24,8 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -39,10 +41,10 @@ import java.util.function.Supplier;
 @EqualsAndHashCode(callSuper = false)
 public class MergeSpacesVisitor extends JavaVisitor<Object> {
 
-    private final boolean removeCustomLineBreaks;
+    private final WrappingAndBracesStyle wrappingAndBracesStyle;
 
-    public MergeSpacesVisitor(boolean removeCustomLineBreaks) {
-        this.removeCustomLineBreaks = removeCustomLineBreaks;
+    public MergeSpacesVisitor(List<NamedStyles> styles) {
+        this.wrappingAndBracesStyle = getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces);
     }
 
     @Override
@@ -71,7 +73,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
             return space;
         }
         Space newSpace = (Space) ctx;
-        if (!removeCustomLineBreaks && space.getWhitespace().contains("\n")) {
+        if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && space.getWhitespace().contains("\n")) {
             if (newSpace.getWhitespace().contains("\n")) {
                 newSpace = newSpace.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1) + newSpace.getWhitespace().substring(newSpace.getWhitespace().lastIndexOf("\n") + 1));
             }
@@ -94,11 +96,11 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
                 }
                 Javadoc.DocComment replaceWith = (Javadoc.DocComment) newComment;
                 comment = docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
-                    if(!(jdoc instanceof Javadoc.LineBreak && replaceWith.getBody().get(i) instanceof Javadoc.LineBreak)) {
+                    if (!(jdoc instanceof Javadoc.LineBreak && replaceWith.getBody().get(i) instanceof Javadoc.LineBreak)) {
                         return jdoc;
                     }
                     String newMargin = ((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin();
-                    if (!removeCustomLineBreaks && ((Javadoc.LineBreak) jdoc).getMargin().contains("\n")) {
+                    if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && ((Javadoc.LineBreak) jdoc).getMargin().contains("\n")) {
                         if (newMargin.contains("\n")) {
                             return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) jdoc).getMargin().substring(0, ((Javadoc.LineBreak) jdoc).getMargin().lastIndexOf("\n") + 1) + newMargin.substring(newMargin.lastIndexOf("\n") + 1));
                         } else {
@@ -112,7 +114,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
                     comment = ((TextComment) comment).withText(((TextComment) newComment).getText());
                 }
             }
-            if (!removeCustomLineBreaks && comment.getSuffix().contains("\n")) {
+            if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && comment.getSuffix().contains("\n")) {
                 if (newComment.getSuffix().contains("\n")) {
                     return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1) + newComment.getSuffix().substring(newComment.getSuffix().lastIndexOf("\n") + 1));
                 } else {
@@ -1615,5 +1617,14 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
             return StyleHelper.merge(defaultStyle.get(), style);
         }
         return defaultStyle.get();
+    }
+
+    private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
     }
 }

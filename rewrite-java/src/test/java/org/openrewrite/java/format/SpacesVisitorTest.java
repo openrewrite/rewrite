@@ -18,10 +18,10 @@ package org.openrewrite.java.format;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -31,7 +31,7 @@ class SpacesVisitorTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .parser(JavaParser.fromJavaVersion())
-          .recipe(toRecipe(() -> new SpacesVisitor<>(emptyList(),  true, null)));
+          .recipe(toRecipe(() -> new SpacesVisitor<>(IntelliJ.spaces(), null, null, IntelliJ.wrappingAndBraces().withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withLineBreaks(false)), null)));
     }
 
     @DocumentExample

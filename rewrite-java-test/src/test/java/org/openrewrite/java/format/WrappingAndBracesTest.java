@@ -77,13 +77,13 @@ class WrappingAndBracesTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> autoFormat(UnaryOperator<SpacesStyle> spaces,
                                                    UnaryOperator<WrappingAndBracesStyle> wrapping) {
-        return spec -> spec.recipe(new AutoFormat(null, true))
+        return spec -> spec.recipe(new AutoFormat(null))
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
               List.of(
                 spaces.apply(IntelliJ.spaces()),
-                wrapping.apply(IntelliJ.wrappingAndBraces())
+                wrapping.apply(IntelliJ.wrappingAndBraces().withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withLineBreaks(false)))
               )
             )
           )));

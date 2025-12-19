@@ -23,10 +23,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.EmptyForInitializerPadStyle;
-import org.openrewrite.java.style.EmptyForIteratorPadStyle;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.SpacesStyle;
+import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -50,35 +47,33 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     protected final EmptyForIteratorPadStyle emptyForIteratorPadStyle;
     @Nullable
     protected final Tree stopAfter;
-    protected final boolean removeCustomLineBreaks;
+    protected final WrappingAndBracesStyle wrappingAndBracesStyle;
 
-    public SpacesVisitor(SourceFile sourceFile, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(sourceFile.getMarkers().findAll(NamedStyles.class), removeCustomLineBreaks, stopAfter);
+    public SpacesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
     }
 
-    public SpacesVisitor(List<NamedStyles> styles, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), stopAfter, removeCustomLineBreaks);
+    public SpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
     }
 
+    @Deprecated
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable Tree stopAfter) {
-        this(spacesStyle, null, null, stopAfter, false);
-    }
-
-    public SpacesVisitor(SpacesStyle spacesStyle, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(spacesStyle, null, null, stopAfter, removeCustomLineBreaks);
+        this(spacesStyle, null, null, stopAfter);
     }
 
     @Deprecated
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter) {
-        this(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, stopAfter, false);
+        this(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, IntelliJ.wrappingAndBraces(), stopAfter);
     }
 
-    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
+    @Deprecated
+    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
         this.spacesStyle = spacesStyle;
         this.emptyForInitializerPadStyle = emptyForInitializerPadStyle;
         this.emptyForIteratorPadStyle = emptyForIteratorPadStyle;
         this.stopAfter = stopAfter;
-        this.removeCustomLineBreaks = removeCustomLineBreaks;
+        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
     }
 
     @Override
@@ -786,7 +781,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     private Space minimizedSkipComments(Space space, String whitespace) {
         if (space.getComments().isEmpty()) {
-            if (!removeCustomLineBreaks && StringUtils.hasLineBreak(space.getWhitespace())) {
+            if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && StringUtils.hasLineBreak(space.getWhitespace())) {
                 return space;
             }
             if (StringUtils.hasLineBreak(whitespace)) {
@@ -822,7 +817,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     if (Boolean.TRUE.equals(trimCommentSuffix) && !StringUtils.hasLineBreak(comment.getSuffix())) {
                         return comment.withSuffix(whitespace);
                     }
-                    if (removeCustomLineBreaks && Boolean.TRUE.equals(trimCommentSuffix) && comment.isMultiline()) {
+                    if (!evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && Boolean.TRUE.equals(trimCommentSuffix) && comment.isMultiline()) {
                         return comment.withSuffix(whitespace);
                     }
                     return comment;

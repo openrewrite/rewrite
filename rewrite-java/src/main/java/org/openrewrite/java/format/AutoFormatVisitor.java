@@ -37,20 +37,13 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     private final List<NamedStyles> styles;
 
-    private final boolean removeCustomLineBreaks;
-
     public AutoFormatVisitor() {
         this(null);
     }
 
     public AutoFormatVisitor(@Nullable Tree stopAfter, NamedStyles ... style) {
-        this(stopAfter, true, style);
-    }
-
-    public AutoFormatVisitor( @Nullable Tree stopAfter, boolean removeCustomLineBreaks, NamedStyles ... style ) {
         this.stopAfter = stopAfter;
         this.styles = Arrays.stream(style).collect(toList());
-        this.removeCustomLineBreaks = removeCustomLineBreaks;
     }
 
     @Override
@@ -70,16 +63,18 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
         J t = new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
         t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
-        t = new SpacesVisitor<>(activeStyles, removeCustomLineBreaks, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new SpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
-        t = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
-        t = new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(t, p, cursor.fork());
-        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
 
         // With the updated tree, overwrite the original space with the newly computed space
-        tree = new MergeSpacesVisitor(removeCustomLineBreaks).visit(tree, t);
+        tree = new MergeSpacesVisitor(activeStyles).visit(tree, t, cursor.fork());
+
+        // Then apply formatting that applies on line-endings / #lines / ...
+        tree = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(tree, p, cursor.fork());
+        tree = new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(tree, p, cursor.fork());
+        tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
 
         if (tree instanceof JavaSourceFile) {
             return addStyleMarker((JavaSourceFile) tree, styles);
@@ -104,16 +99,18 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
             JavaSourceFile t = (JavaSourceFile) new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p);
             t = (JavaSourceFile) new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p);
-            t = (JavaSourceFile) new SpacesVisitor<>(activeStyles, true, stopAfter).visitNonNull(t, p);
+            t = (JavaSourceFile) new SpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
-            t = (JavaSourceFile) new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
             t = (JavaSourceFile) new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
-            t = (JavaSourceFile) new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(t, p);
-            t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(t, p);
 
             // With the updated tree, overwrite the original space with the newly computed space
-            tree = new MergeSpacesVisitor(removeCustomLineBreaks).visit(tree, t);
+            tree = new MergeSpacesVisitor(activeStyles).visit(tree, t);
+
+            // Then apply formatting that applies on line-endings / #lines / ...
+            tree = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(tree, p);
+            tree = new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(tree, p);
+            tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p);
 
             if (tree instanceof J.CompilationUnit) {
                 return addStyleMarker((JavaSourceFile) tree, styles);

@@ -91,14 +91,14 @@ class SpacesTest implements RewriteTest {
     }
 
     private static Consumer<RecipeSpec> spaces(UnaryOperator<SpacesStyle> with, boolean removeCustomLineBreaks) {
-        return spec -> spec.recipes(new AutoFormat(null, removeCustomLineBreaks))
+        return spec -> spec.recipes(new AutoFormat(null))
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
               List.of(
                 with.apply(IntelliJ.spaces()),
                 IntelliJ.wrappingAndBraces()
-                  .withKeepWhenReformatting(IntelliJ.wrappingAndBraces().getKeepWhenReformatting().withSimpleMethodsInOneLine(true).withSimpleClassesInOneLine(true).withSimpleLambdasInOneLine(true))
+                  .withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withLineBreaks(!removeCustomLineBreaks).withSimpleMethodsInOneLine(true).withSimpleClassesInOneLine(true).withSimpleLambdasInOneLine(true))
                   .withMethodAnnotations(IntelliJ.wrappingAndBraces().getMethodAnnotations().withWrap(LineWrapSetting.DoNotWrap)),
                 IntelliJ.blankLines().withMinimum(IntelliJ.blankLines().getMinimum().withAroundMethod(0).withAroundClass(0))
               )
@@ -5114,7 +5114,7 @@ class SpacesTest implements RewriteTest {
     void handleIfWithoutBlock() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new SpacesVisitor<>(IntelliJ.spaces(), true, null))),
+            new SpacesVisitor<>(IntelliJ.spaces(), null, null, IntelliJ.wrappingAndBraces().withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withLineBreaks(false)), null))),
           java(
             """
             class Test {
