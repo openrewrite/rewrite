@@ -50,7 +50,7 @@ export interface PackageLockEntry {
     readonly version?: string;
     readonly resolved?: string;
     readonly integrity?: string;
-    readonly license?: string;
+    readonly license?: string | string[] | { type?: string; url?: string };  // Can be legacy formats
     readonly dependencies?: Record<string, string>;
     readonly devDependencies?: Record<string, string>;
     readonly peerDependencies?: Record<string, string>;
@@ -265,6 +265,27 @@ export function createNodeResolutionResultMarker(
     }
 
     /**
+     * Normalizes the license field from package-lock.json.
+     * Older packages may have license in legacy formats:
+     * - Array: ["MIT", "Apache2"] -> "(MIT OR Apache2)"
+     * - Object: { type: "MIT", url: "..." } -> "MIT"
+     */
+    function normalizeLicense(license?: string | string[] | { type?: string; url?: string }): string | undefined {
+        if (!license) return undefined;
+        if (Array.isArray(license)) {
+            // Convert array format to SPDX OR expression
+            // e.g., ["MIT", "Apache2"] -> "(MIT OR Apache2)"
+            return license.length > 0 ? `(${license.join(' OR ')})` : undefined;
+        }
+        if (typeof license === 'object') {
+            // Extract type from object format
+            // e.g., { type: "MIT", url: "..." } -> "MIT"
+            return license.type || undefined;
+        }
+        return license;
+    }
+
+    /**
      * Extracts package name and optionally version from a package-lock.json path.
      * e.g., "node_modules/@babel/core" -> { name: "@babel/core" }
      * e.g., "node_modules/foo/node_modules/bar" -> { name: "bar" }
@@ -324,7 +345,7 @@ export function createNodeResolutionResultMarker(
                 peerDependencies: undefined,
                 optionalDependencies: undefined,
                 engines: normalizeEngines(pkgEntry?.engines),
-                license: pkgEntry?.license,
+                license: normalizeLicense(pkgEntry?.license),
             });
             resolvedDependencyCache.set(key, resolved);
 
