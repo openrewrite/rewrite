@@ -18,8 +18,8 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as os from 'os';
 import {spawnSync} from 'child_process';
-import {PrettierStyle} from './style';
-import {randomId} from '../uuid';
+import {PrettierStyle} from '../style';
+import {randomId} from '../../uuid';
 
 /**
  * Cache of loaded Prettier modules by version.

@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JavaScriptVisitor} from "./visitor";
-import {J} from "../java";
-import {Cursor, isScope, Tree} from "../tree";
-import {JS} from "./tree";
+import {JavaScriptVisitor} from "../visitor";
+import {J} from "../../java";
+import {Cursor, isScope, Tree} from "../../tree";
+import {JS} from "../tree";
 import {Draft, produce} from "immer";
-import {findMarker} from "../markers";
+import {findMarker} from "../../markers";
 
 /**
  * Ensures minimum viable spacing between AST elements.

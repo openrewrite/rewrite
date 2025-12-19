@@ -48,7 +48,7 @@ import {
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
 import {produce} from "immer";
-import {PrettierConfigLoader} from "./prettier-config-loader";
+import {PrettierConfigLoader} from "./format/prettier-config-loader";
 import Kind = JS.Kind;
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;

@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JS} from "./tree";
-import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../java";
+import {JS} from "../tree";
+import {JavaScriptVisitor} from "../visitor";
+import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../../java";
 import {Draft, produce} from "immer";
-import {Cursor, isScope, Tree} from "../tree";
-import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "./style";
-import {NamedStyles} from "../style";
-import {produceAsync} from "../visitor";
-import {Generator} from "./markers";
+import {Cursor, isScope, Tree} from "../../tree";
+import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
+import {NamedStyles} from "../../style";
+import {produceAsync} from "../../visitor";
+import {Generator} from "../markers";
 import {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
 import {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
 import {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";

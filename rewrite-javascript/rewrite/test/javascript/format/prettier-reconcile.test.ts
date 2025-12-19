@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaScriptParser, JS, prettierFormat} from "../../../src/javascript";
-import {WhitespaceReconcilerVisitor} from "../../../src/javascript/whitespace-reconciler";
+import {WhitespaceReconcilerVisitor} from "../../../src/javascript/format/whitespace-reconciler";
 import {TreePrinters} from "../../../src";
 
 describe('WhitespaceReconcilerVisitor', () => {

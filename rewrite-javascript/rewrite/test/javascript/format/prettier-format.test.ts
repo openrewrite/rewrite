@@ -36,7 +36,7 @@ import {text} from "../../../src/text";
 import {J, Statement} from "../../../src/java";
 import {randomId, TreePrinters} from "../../../src";
 import {withDir} from "tmp-promise";
-import {PrettierConfigLoader} from "../../../src/javascript/prettier-config-loader";
+import {PrettierConfigLoader} from "../../../src/javascript/format/prettier-config-loader";
 import * as path from "path";
 import * as fs from "fs";
 import * as fsp from "fs/promises";

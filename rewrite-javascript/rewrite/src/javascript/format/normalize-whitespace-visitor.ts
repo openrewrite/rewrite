@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JavaScriptVisitor} from "./visitor";
-import {J} from "../java";
-import {Cursor, isScope, Tree} from "../tree";
+import {JavaScriptVisitor} from "../visitor";
+import {J} from "../../java";
+import {Cursor, isScope, Tree} from "../../tree";
 
 /**
  * Ensures that whitespace is on the outermost AST element possible.

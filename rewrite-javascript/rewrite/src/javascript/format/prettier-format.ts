@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JS} from './tree';
-import {J, Statement} from '../java';
-import {Cursor, Tree} from '../tree';
-import {TreePrinters} from '../print';
-import {JavaScriptParser} from './parser';
+import {JS} from '../tree';
+import {J, Statement} from '../../java';
+import {Cursor, Tree} from '../../tree';
+import {TreePrinters} from '../../print';
+import {JavaScriptParser} from '../parser';
 import {WhitespaceReconcilerVisitor} from './whitespace-reconciler';
 import {produce} from 'immer';
-import {randomId} from '../uuid';
-import {getStyle, PrettierStyle, StyleKind, TabsAndIndentsStyle} from './style';
-import {NamedStyles} from '../style';
-import {findMarker} from '../markers';
+import {randomId} from '../../uuid';
+import {getStyle, PrettierStyle, StyleKind, TabsAndIndentsStyle} from '../style';
+import {NamedStyles} from '../../style';
+import {findMarker} from '../../markers';
 import {NormalizeWhitespaceVisitor} from './normalize-whitespace-visitor';
 import {MinimumViableSpacingVisitor} from './minimum-viable-spacing-visitor';
 import {TabsAndIndentsVisitor} from './tabs-and-indents-visitor';
