@@ -13,10 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-export * from "./assertions";
-export * from "./parser";
-export * from "./tree";
-export * from "./visitor";
+import {AfterRecipeText, dedentAfter, SourceSpec} from "../test";
+import {YamlParser} from "./parser";
+import {Yaml} from "./tree";
 
-import "./print";
-import "./rpc";
+export function yaml(before: string | null, after?: AfterRecipeText): SourceSpec<Yaml.Documents> {
+    return {
+        kind: Yaml.Kind.Documents,
+        before: before,
+        after: dedentAfter(after),
+        ext: 'yaml',
+        parser: () => new YamlParser()
+    };
+}
