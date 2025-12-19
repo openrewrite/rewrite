@@ -99,6 +99,8 @@ export class JavaScriptParser extends Parser {
             target: ts.ScriptTarget.Latest,
             module: ts.ModuleKind.CommonJS,
             moduleResolution: ts.ModuleResolutionKind.Node10,
+            noEmit: true,
+            declarations: false,
             allowJs: true,
             checkJs: true,
             esModuleInterop: true,
@@ -112,6 +114,75 @@ export class JavaScriptParser extends Parser {
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
         this.skipTypes = skipTypes ?? false;
+    }
+
+    /**
+     * Parses a single source file using only ts.createSourceFile(), bypassing
+     * the TypeScript type checker entirely. This is significantly faster than
+     * the full parse() method when type information is not needed.
+     *
+     * Use this method for formatting-only operations where AST structure is
+     * needed but type attribution is not required.
+     *
+     * @param input The parser input containing the source code
+     * @returns The parsed SourceFile, or a ParseExceptionResult if parsing failed
+     */
+    async parseOnly(input: ParserInput): Promise<SourceFile> {
+        const filePath = parserInputFile(input);
+        const sourcePath = this.relativeTo && !path.isAbsolute(filePath)
+            ? path.join(this.relativeTo, filePath)
+            : filePath;
+
+        const sourceText = parserInputRead(input);
+        const scriptKind = getScriptKindFromFileName(sourcePath);
+
+        // Create source file directly without a Program
+        const sourceFileOptions: ts.CreateSourceFileOptions = {
+            languageVersion: ts.ScriptTarget.Latest,
+            jsDocParsingMode: ts.JSDocParsingMode.ParseNone
+        };
+
+        const tsSourceFile = ts.createSourceFile(
+            sourcePath,
+            sourceText,
+            sourceFileOptions,
+            true, // setParentNodes
+            scriptKind
+        );
+
+        // Check for parse-time syntax errors (accessible via internal parseDiagnostics)
+        // TypeScript stores parse errors directly on the source file
+        const parseDiagnostics = (tsSourceFile as any).parseDiagnostics as ts.Diagnostic[] | undefined;
+        if (parseDiagnostics && parseDiagnostics.length > 0) {
+            const errors = parseDiagnostics.filter(d => d.category === ts.DiagnosticCategory.Error);
+            if (errors.length > 0) {
+                const errorMessages = errors.map(e => {
+                    if (e.file && e.start !== undefined) {
+                        const { line, character } = ts.getLineAndCharacterOfPosition(e.file, e.start);
+                        const message = ts.flattenDiagnosticMessageText(e.messageText, "\n");
+                        return `(${line + 1},${character + 1}): ${message} [${e.code}]`;
+                    }
+                    return `${ts.flattenDiagnosticMessageText(e.messageText, "\n")} [${e.code}]`;
+                }).join('; ');
+                return this.error(input, new SyntaxError(`Compiler error(s): ${errorMessages}`));
+            }
+        }
+
+        try {
+            // Parse without type mapping (no type checker available)
+            const result = new JavaScriptParserVisitor(tsSourceFile, this.relativePath(input), undefined)
+                .visit(tsSourceFile) as SourceFile;
+
+            if (this.styles) {
+                const styles = this.styles;
+                return produce(result, draft => {
+                    draft.markers.markers = draft.markers.markers.concat(styles);
+                });
+            }
+            return result;
+        } catch (error) {
+            return this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
+        }
     }
 
     // noinspection JSUnusedGlobalSymbols
@@ -420,6 +491,7 @@ export class JavaScriptParserVisitor {
             });
         }
 
+        const eof = this.prefix(node.endOfFileToken);
         let statements = this.semicolonPaddedStatementList(node.statements);
 
         // If there's trailing whitespace/comments after the shebang, prepend to first statement's prefix
@@ -449,7 +521,7 @@ export class JavaScriptParserVisitor {
             statements: shebangStatement
                 ? [shebangStatement, ...statements]
                 : statements,
-            eof: this.prefix(node.endOfFileToken)
+            eof
         };
     }
 

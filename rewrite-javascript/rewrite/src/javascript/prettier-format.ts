@@ -142,9 +142,10 @@ export async function prettierFormat(
 
     const formattedSource = await prettier.format(originalSource, prettierOptions);
 
-    // Step 4: Parse the formatted string (skip types for performance)
-    const formattedParser = new JavaScriptParser({skipTypes: true});
-    const formattedAst = await formattedParser.parseOne({
+    // Step 4: Parse the formatted string using parseOnly() for maximum performance
+    // (bypasses TypeScript's type checker entirely)
+    const formattedParser = new JavaScriptParser();
+    const formattedAst = await formattedParser.parseOnly({
         sourcePath: sourceFile.sourcePath,
         text: formattedSource
     }) as JS.CompilationUnit;
@@ -290,7 +291,8 @@ function createNullPlaceholder(prefix: J.Space): J.Identifier {
 }
 
 /**
- * Prunes a compilation unit for efficient Prettier formatting of a subtree.
+ * Prunes a compilation unit for efficient Prettier formatting of a subtree,
+ * and substitutes the (potentially modified) target at the path location.
  *
  * For J.Block#statements along the path to the target:
  * - Prior siblings are replaced with "null" identifier placeholders (to maintain line length)
@@ -302,19 +304,21 @@ function createNullPlaceholder(prefix: J.Space): J.Identifier {
  *
  * @param cu The compilation unit to prune
  * @param path The path from root to the target subtree
- * @returns A pruned copy of the compilation unit
+ * @param target The (potentially modified) target to substitute at the path location
+ * @returns A pruned copy of the compilation unit with the target substituted
  */
-function pruneTreeForSubtree(cu: JS.CompilationUnit, path: PathSegment[]): JS.CompilationUnit {
-    return pruneNode(cu, path, 0) as JS.CompilationUnit;
+function pruneTreeForSubtree(cu: JS.CompilationUnit, path: PathSegment[], target: any): JS.CompilationUnit {
+    return pruneNode(cu, path, 0, target) as JS.CompilationUnit;
 }
 
 /**
- * Recursively prunes a node, following the path and pruning J.Block#statements.
+ * Recursively prunes a node, following the path, pruning J.Block#statements,
+ * and substituting the target at the final location.
  */
-function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
+function pruneNode(node: any, path: PathSegment[], pathIndex: number, target: any): any {
     if (pathIndex >= path.length) {
-        // Reached the target - return as-is
-        return node;
+        // Reached the target location - substitute with the (potentially modified) target
+        return target;
     }
 
     const segment = path[pathIndex];
@@ -324,14 +328,14 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
         return node;
     }
 
-    // Handle J.Block#statements specially
+    // Handle J.Block#statements specially - prune siblings
     if (node.kind === J.Kind.Block && segment.property === 'statements' && segment.index !== undefined) {
         const statements = value as J.RightPadded<Statement>[];
         const targetIndex = segment.index;
 
         // Create pruned statements array:
         // - Prior siblings: replace with "null" placeholders (to maintain line length)
-        // - Target: recurse into it
+        // - Target: recurse into it (following the path through RightPadded.element)
         // - Following siblings: omit entirely
         const prunedStatements: J.RightPadded<Statement>[] = [];
 
@@ -348,13 +352,9 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
                     markers: statements[i].markers
                 } as J.RightPadded<Statement>);
             } else {
-                // Target - recurse into it
-                const targetStatement = statements[i];
-                const prunedElement = pruneNode(targetStatement.element, path, pathIndex + 1);
-                prunedStatements.push({
-                    ...targetStatement,
-                    element: prunedElement
-                });
+                // Target - recurse into the RightPadded (path will handle .element)
+                const prunedRightPadded = pruneNode(statements[i], path, pathIndex + 1, target);
+                prunedStatements.push(prunedRightPadded);
             }
         }
         // Following siblings are omitted
@@ -367,7 +367,7 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
     // For other properties, just recurse without pruning
     if (Array.isArray(value) && segment.index !== undefined) {
         const childNode = value[segment.index];
-        const prunedChild = pruneNode(childNode, path, pathIndex + 1);
+        const prunedChild = pruneNode(childNode, path, pathIndex + 1, target);
 
         if (prunedChild !== childNode) {
             return produce(node, (draft: any) => {
@@ -375,7 +375,7 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number): any {
             });
         }
     } else if (!Array.isArray(value)) {
-        const prunedChild = pruneNode(value, path, pathIndex + 1);
+        const prunedChild = pruneNode(value, path, pathIndex + 1, target);
 
         if (prunedChild !== value) {
             return produce(node, (draft: any) => {
@@ -446,8 +446,10 @@ export async function prettierFormatSubtree<T extends J>(
         return undefined;
     }
 
-    // Prune the tree for efficient formatting
-    const prunedCu = pruneTreeForSubtree(cu, path);
+    // Prune the tree for efficient formatting and substitute the (potentially modified) target.
+    // This ensures that if the visitor modified the target before calling autoFormat,
+    // we format the modified content, not the original from the cursor.
+    const prunedCu = pruneTreeForSubtree(cu, path, target);
 
     // Format the pruned compilation unit with Prettier
     const formattedPrunedCu = await prettierFormat(prunedCu, options);

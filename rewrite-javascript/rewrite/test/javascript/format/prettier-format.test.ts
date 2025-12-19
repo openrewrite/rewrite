@@ -155,13 +155,23 @@ describe('AutoformatVisitor with Prettier', () => {
         // Test scenario:
         // - Function with multiple statements
         // - Function call that isn't the first statement (console.log is 3rd statement)
-        // - Format the method invocation to simulate template replacement
+        // - Visitor modifies the method name (log -> info) then calls autoFormat
         // - Prettier fixes the spacing in just the formatted call, not surrounding statements
+        // This simulates what visitors often do: modify an AST node and then format it
         const visitor = new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
-                // Only format the console.log() call to simulate template replacement
+            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+                // Change console.log() to console.info() and format
                 if (methodInvocation.name?.simpleName === 'log') {
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [prettierStyle]);
+                    // Modify the method name from 'log' to 'info'
+                    const modified: J.MethodInvocation = {
+                        ...methodInvocation,
+                        name: {
+                            ...methodInvocation.name,
+                            simpleName: 'info'
+                        }
+                    };
+                    // Format the modified node - this is the typical pattern in visitors
+                    return await autoFormat(modified, p, undefined, this.cursor.parent, [prettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -188,13 +198,29 @@ describe('AutoformatVisitor with Prettier', () => {
                 function process() {
                     const first = 1;
                     const second  = 2;
-                    console.log("before", "target", "after", { key: "value" });
+                    console.info("before", "target", "after", { key: "value" });
                     const third =3;
                 }
                 `
             )
             // @formatter:on
         )
+    });
+
+    test('Prettier adds parentheses to single-parameter arrow function', () => {
+        // Prettier's default arrowParens: 'always' adds parentheses around single parameters
+        // This tests that the Lambda.Parameters.parenthesized boolean gets updated
+        return prettierSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const fn = x => x + 1`,
+                `const fn = (x) => x + 1;
+
+`
+            )
+            // @formatter:on
+        );
     });
 });
 
