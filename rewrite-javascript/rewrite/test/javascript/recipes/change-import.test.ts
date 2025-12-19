@@ -15,8 +15,7 @@
  */
 import {describe} from "@jest/globals";
 import {RecipeSpec} from "../../../src/test";
-import {ChangeImport} from "../../../src/javascript/recipes/change-import";
-import {npm, packageJson, tsx, typescript} from "../../../src/javascript";
+import {ChangeImport, npm, packageJson, tsx, typescript} from "../../../src/javascript";
 import {withDir} from "tmp-promise";
 
 describe("change-import", () => {
@@ -114,7 +113,7 @@ describe("change-import", () => {
                             `,
                             `
                             import { renderIntoDocument } from 'react-dom/test-utils';
-                            import {act} from 'react';
+                            import { act } from 'react';
 
                             act(() => {});
                             renderIntoDocument(<div />);

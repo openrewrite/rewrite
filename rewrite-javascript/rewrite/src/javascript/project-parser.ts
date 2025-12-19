@@ -23,6 +23,7 @@ import {SourceFile} from "../tree";
 import {Parsers} from "../parser";
 import {PrettierConfigLoader} from "./format/prettier-config-loader";
 import {ExecutionContext} from "../execution";
+import {Marker} from "../markers";
 
 // Lock file names defined here to avoid circular dependency with package-manager.ts
 // These must be kept in sync with the definitions in package-manager.ts
@@ -170,6 +171,38 @@ export class ProjectParser {
     }
 
     /**
+     * Creates and initializes a PrettierConfigLoader for this project.
+     * Use this when you need to handle Prettier detection separately from parsing.
+     */
+    async createPrettierLoader(): Promise<PrettierConfigLoader> {
+        this.log("Detecting Prettier configuration...");
+        const prettierLoader = new PrettierConfigLoader(this.projectPath);
+        await prettierLoader.detectPrettier();
+        return prettierLoader;
+    }
+
+    /**
+     * Builds an Autodetect marker from the given source files.
+     * Samples all files to detect common formatting styles.
+     * Uses dynamic import to avoid circular dependencies.
+     */
+    async buildAutodetectMarker(sourceFiles: SourceFile[]): Promise<Marker> {
+        // Dynamic import to break circular dependency at module load time:
+        // parse-project.ts → project-parser.ts → autodetect.ts → visitor.ts → java → rpc → parse-project.ts
+        // By deferring the import until runtime, all modules are already loaded when this executes.
+        const {Autodetect} = await import("./autodetect.js");
+        const {JS} = await import("./tree.js");
+
+        const detector = Autodetect.detector();
+        for (const sf of sourceFiles) {
+            if (sf.kind === JS.Kind.CompilationUnit) {
+                await detector.sample(sf);
+            }
+        }
+        return detector.build();
+    }
+
+    /**
      * Parses all source files in the project.
      * Yields source files as they are parsed.
      */
@@ -188,9 +221,7 @@ export class ProjectParser {
         this.log(`Found ${totalFiles} files to parse`);
 
         // Detect Prettier configuration once for the project
-        this.log("Detecting Prettier configuration...");
-        const prettierLoader = new PrettierConfigLoader(this.projectPath);
-        await prettierLoader.detectPrettier();
+        const prettierLoader = await this.createPrettierLoader();
 
         let current = 0;
 
@@ -257,20 +288,61 @@ export class ProjectParser {
                 ctx: this.ctx,
                 relativeTo: this.projectPath
             });
-            for await (const sf of parser.parse(...discovered.jsFiles)) {
-                current++;
-                this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
 
-                // Add PrettierStyle marker if Prettier is available
-                const prettierMarker = await prettierLoader.getConfigMarker(
-                    path.join(this.projectPath, sf.sourcePath)
-                );
-                if (prettierMarker) {
+            // Check if Prettier is available
+            const detection = await prettierLoader.detectPrettier();
+
+            if (detection.available) {
+                // Prettier is available: add per-file PrettierStyle markers
+                for await (const sf of parser.parse(...discovered.jsFiles)) {
+                    current++;
+                    this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
+
+                    const prettierMarker = await prettierLoader.getConfigMarker(
+                        path.join(this.projectPath, sf.sourcePath)
+                    );
+                    if (prettierMarker) {
+                        yield produce(sf, draft => {
+                            draft.markers.markers = draft.markers.markers.concat([prettierMarker]);
+                        });
+                    } else {
+                        yield sf;
+                    }
+                }
+            } else {
+                // Prettier is NOT available: auto-detect styles from parsed files
+                this.log("Prettier not found, auto-detecting styles...");
+
+                // Dynamic import to break circular dependency at module load time
+                // (see buildAutodetectMarker for explanation)
+                const {Autodetect} = await import("./autodetect.js");
+                const {JS} = await import("./tree.js");
+
+                const parsedFiles: SourceFile[] = [];
+
+                // Parse all JS files and collect them for sampling
+                for await (const sf of parser.parse(...discovered.jsFiles)) {
+                    current++;
+                    this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
+                    if (sf.kind === JS.Kind.CompilationUnit) {
+                        parsedFiles.push(sf);
+                    }
+                }
+
+                // Sample all parsed files and build Autodetect marker
+                const detector = Autodetect.detector();
+                for (const sf of parsedFiles) {
+                    await detector.sample(sf);
+                }
+                const autodetectMarker = detector.build();
+                this.log(`Auto-detected styles: indent=${detector.getTabsAndIndentsStyle().indentSize}, ` +
+                    `useTabs=${detector.getTabsAndIndentsStyle().useTabCharacter}`);
+
+                // Yield all files with the Autodetect marker
+                for (const sf of parsedFiles) {
                     yield produce(sf, draft => {
-                        draft.markers.markers = draft.markers.markers.concat([prettierMarker]);
+                        draft.markers.markers = draft.markers.markers.concat([autodetectMarker]);
                     });
-                } else {
-                    yield sf;
                 }
             }
         }
@@ -405,7 +477,11 @@ export class ProjectParser {
             for (const line of tracked.stdout.split("\n")) {
                 const trimmed = line.trim();
                 if (trimmed) {
-                    files.push(path.join(this.projectPath, trimmed));
+                    const fullPath = path.join(this.projectPath, trimmed);
+                    // git ls-files can return deleted files that are still tracked
+                    if (fs.existsSync(fullPath)) {
+                        files.push(fullPath);
+                    }
                 }
             }
         }
@@ -420,7 +496,11 @@ export class ProjectParser {
             for (const line of untracked.stdout.split("\n")) {
                 const trimmed = line.trim();
                 if (trimmed) {
-                    files.push(path.join(this.projectPath, trimmed));
+                    // Untracked files should exist, but check anyway for robustness
+                    const fullPath = path.join(this.projectPath, trimmed);
+                    if (fs.existsSync(fullPath)) {
+                        files.push(fullPath);
+                    }
                 }
             }
         }

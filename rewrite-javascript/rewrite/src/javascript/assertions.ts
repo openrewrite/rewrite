@@ -25,6 +25,8 @@ import {PrettierConfigLoader} from "./format/prettier-config-loader";
 import {produce} from "immer";
 import * as fs from "fs";
 import * as path from "path";
+import {Autodetect} from "./autodetect";
+import {Marker} from "../markers";
 
 /**
  * Shared TypeScript source file cache for test parsers.
@@ -118,25 +120,63 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
 
     // Detect Prettier configuration for the project
     const prettierLoader = new PrettierConfigLoader(relativeTo);
-    await prettierLoader.detectPrettier();
+    const detection = await prettierLoader.detectPrettier();
+
+    // Collect JS/TS specs for potential auto-detection
+    const jsSpecs = sourceSpecs.filter(
+        spec => spec.path !== 'package.json' && spec.path !== 'package-lock.json' && spec.kind === JS.Kind.CompilationUnit
+    );
+
+    // Build style marker: either PrettierStyle per-file or Autodetect for all
+    let autodetectMarker: Marker | null = null;
+    if (!detection.available && jsSpecs.length > 0) {
+        // Prettier is NOT available: auto-detect styles from the source files
+        // Pre-parse all JS specs to sample them
+        const detector = Autodetect.detector();
+        const tempParser = new JavaScriptParser({sourceFileCache, relativeTo});
+
+        for (const spec of jsSpecs) {
+            if (spec.before) {
+                const fileName = spec.path ?? `file.${spec.ext}`;
+                const filePath = path.join(relativeTo, fileName);
+                for await (const sf of tempParser.parse({text: spec.before, sourcePath: filePath})) {
+                    if (sf.kind === JS.Kind.CompilationUnit) {
+                        await detector.sample(sf as JS.CompilationUnit);
+                    }
+                }
+            }
+        }
+        autodetectMarker = detector.build();
+    }
 
     for (const spec of sourceSpecs) {
         if (spec.path !== 'package.json' && spec.path !== 'package-lock.json') {
             if (spec.kind === JS.Kind.CompilationUnit) {
-                // For JS/TS files, use a parser that adds PrettierStyle marker if available
+                // For JS/TS files, use a parser that adds style marker if available
                 // spec.path may be undefined, so generate a reasonable path from the extension
                 const fileName = spec.path ?? `file.${spec.ext}`;
                 const filePath = path.join(relativeTo, fileName);
-                const prettierMarker = await prettierLoader.getConfigMarker(filePath);
+
+                // Get the appropriate style marker
+                let styleMarker: Marker | undefined;
+                if (detection.available) {
+                    // Use per-file PrettierStyle marker
+                    styleMarker = await prettierLoader.getConfigMarker(filePath);
+                } else {
+                    // Use shared Autodetect marker
+                    styleMarker = autodetectMarker ?? undefined;
+                }
 
                 yield {
                     ...spec,
                     parser: () => new JavaScriptParser({sourceFileCache, relativeTo}),
-                    // Add PrettierStyle marker before recipe runs if Prettier is configured
-                    beforeRecipe: prettierMarker ? (sf: JS.CompilationUnit) => {
-                        return produce(sf, draft => {
-                            draft.markers.markers = draft.markers.markers.concat([prettierMarker]);
+                    // Add style marker before recipe runs if available
+                    // Compose with existing beforeRecipe if present
+                    beforeRecipe: styleMarker ? (sf: JS.CompilationUnit) => {
+                        const withMarker = produce(sf, draft => {
+                            draft.markers.markers = draft.markers.markers.concat([styleMarker]);
                         });
+                        return spec.beforeRecipe ? spec.beforeRecipe(withMarker) : withMarker;
                     } : spec.beforeRecipe
                 }
             } else {

@@ -21,8 +21,7 @@ import {produce} from "immer";
 import {SourceFile} from "../../tree";
 import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
-import {DEFAULT_EXCLUSIONS, ProjectParser} from "../../javascript/project-parser";
-import {PrettierConfigLoader} from "../../javascript/format/prettier-config-loader";
+import {DEFAULT_EXCLUSIONS, ProjectParser} from "../../javascript";
 
 /**
  * Response item with object ID and source file type for proper deserialization.
@@ -63,16 +62,13 @@ export class ParseProject {
                     const projectPath = path.resolve(request.projectPath);
                     const exclusions = request.exclusions ?? DEFAULT_EXCLUSIONS;
 
-                    // Use ProjectParser for file discovery
+                    // Use ProjectParser for file discovery and Prettier detection
                     const projectParser = new ProjectParser(projectPath, {exclusions});
                     const discovered = await projectParser.discoverFiles();
+                    const prettierLoader = await projectParser.createPrettierLoader();
 
                     const resultItems: ParseProjectResponseItem[] = [];
                     const ctx = new ExecutionContext();
-
-                    // Detect Prettier configuration once for the project
-                    const prettierLoader = new PrettierConfigLoader(projectPath);
-                    await prettierLoader.detectPrettier();
 
                     // Parse package.json files (these get NodeResolutionResult markers)
                     if (discovered.packageJsonFiles.length > 0) {
@@ -163,25 +159,59 @@ export class ParseProject {
                             ctx,
                             relativeTo: projectPath
                         });
-                        const generator = parser.parse(...discovered.jsFiles);
 
-                        for (const filePath of discovered.jsFiles) {
-                            const id = randomId();
-                            localObjects.set(id, async (id: string) => {
-                                const sourceFile: SourceFile = (await generator.next()).value;
-                                // Add PrettierStyle marker if Prettier is available
-                                const prettierMarker = await prettierLoader.getConfigMarker(filePath);
-                                return produce(sourceFile, (draft) => {
-                                    draft.id = id;
-                                    if (prettierMarker) {
-                                        draft.markers.markers = draft.markers.markers.concat([prettierMarker]);
-                                    }
+                        // Check if Prettier is available
+                        const detection = await prettierLoader.detectPrettier();
+
+                        if (detection.available) {
+                            // Prettier is available: add per-file PrettierStyle markers
+                            const generator = parser.parse(...discovered.jsFiles);
+
+                            for (const filePath of discovered.jsFiles) {
+                                const id = randomId();
+                                localObjects.set(id, async (id: string) => {
+                                    const sourceFile: SourceFile = (await generator.next()).value;
+                                    // Add PrettierStyle marker if Prettier is available
+                                    const prettierMarker = await prettierLoader.getConfigMarker(filePath);
+                                    return produce(sourceFile, (draft) => {
+                                        draft.id = id;
+                                        if (prettierMarker) {
+                                            draft.markers.markers = draft.markers.markers.concat([prettierMarker]);
+                                        }
+                                    });
                                 });
-                            });
-                            resultItems.push({
-                                id,
-                                sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit" // break cycle
-                            });
+                                resultItems.push({
+                                    id,
+                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit" // break cycle
+                                });
+                            }
+                        } else {
+                            // Prettier is NOT available: auto-detect styles from parsed files
+                            // Parse all files first to sample them
+                            const parsedFiles: {id: string, sourceFile: SourceFile}[] = [];
+                            for await (const sourceFile of parser.parse(...discovered.jsFiles)) {
+                                const id = randomId();
+                                parsedFiles.push({id, sourceFile});
+                            }
+
+                            // Sample all parsed files and build Autodetect marker using ProjectParser helper
+                            const autodetectMarker = await projectParser.buildAutodetectMarker(
+                                parsedFiles.map(p => p.sourceFile)
+                            );
+
+                            // Store thunks that add the Autodetect marker
+                            for (const {id, sourceFile} of parsedFiles) {
+                                localObjects.set(id, async (newId: string) => {
+                                    return produce(sourceFile, (draft) => {
+                                        draft.id = newId;
+                                        draft.markers.markers = draft.markers.markers.concat([autodetectMarker]);
+                                    });
+                                });
+                                resultItems.push({
+                                    id,
+                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit" // break cycle
+                                });
+                            }
                         }
                     }
 
