@@ -107,6 +107,7 @@ class TabsAndIndentsTest implements RewriteTest {
     
                       foo();
                   }
+                  
                   public static void doTheThing() {}
                   public static void doTheOtherThing() {}
                   public static void somethingElseEntirely() {}
@@ -1462,6 +1463,7 @@ class TabsAndIndentsTest implements RewriteTest {
               """,
             """
               import java.util.function.Supplier;
+              
               public class Test {
                   public void method(int n) {
                       Supplier<Integer> ns = () ->
@@ -1642,6 +1644,7 @@ class TabsAndIndentsTest implements RewriteTest {
               import java.io.InputStream;
               import java.io.Serializable;
               import java.lang.annotation.Retention;
+              
               @Retention
                       (value = "1.0")
               public
@@ -2550,6 +2553,7 @@ class TabsAndIndentsTest implements RewriteTest {
               """,
             """
               import java.io.*;
+              
               class Test {
                   void method(String file1, String file2) {
                       try (FileInputStream fis1 = new FileInputStream(file1);
@@ -2587,6 +2591,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """,
             """
             import java.io.*;
+            
             class Test {
                 void method(String file1, String file2) {
                     try (
