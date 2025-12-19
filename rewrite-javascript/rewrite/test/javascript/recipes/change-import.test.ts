@@ -113,7 +113,7 @@ describe("change-import", () => {
                             `,
                             `
                             import { renderIntoDocument } from 'react-dom/test-utils';
-                            import { act } from 'react';
+                            import {act} from 'react';
 
                             act(() => {});
                             renderIntoDocument(<div />);
