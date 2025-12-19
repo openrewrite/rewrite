@@ -19,64 +19,36 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.style.LineWrapSetting;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
+
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class AutoFormatTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec
-          .parser(JavaParser.fromJavaVersion().dependsOn("""
-            package com.example;
-
-            public class MyObject {
-                public MyObject(String... x) {}
-                public static Builder builder() { return new Builder(); }
-                public static Builder newBuilder() { return new Builder(); }
-                public static class Builder {
-                    Builder name(String n) { return this; }
-                    Builder age(int a) { return this; }
-                    Builder items(java.util.List<String> items) { return this; }
-                    Builder nested(MyObject nested) { return this; }
-                    MyObject build() { return new MyObject(); }
-                }
-
-                public static void outerMethod(String... x) {}
-                public static String innerMethod(String... x) { return ""; }
-                public static String veryLongMethodNameThatExceedsTheMaxLimit(String... x) { return ""; }
-            }
-            """))
-          .recipeFromYaml(
-            """
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.openrewrite.java.AutoFormatWithCustomStyle
-            displayName: Autoformat java code with custom style
-            description: Formats the code with some IntelliJ settings overwritten.
-            recipeList:
-              - org.openrewrite.java.format.AutoFormat:
-                  style: |
-                    type: specs.openrewrite.org/v1beta/style
-                    name: junit
-                    displayName: Unit Test style
-                    description: Only used in unit tests
-                    styleConfigs:
-                      - org.openrewrite.java.style.WrappingAndBracesStyle:
-                          keepWhenFormatting:
-                            lineBreaks: false
-                          chainedMethodCalls:
-                            wrap: WrapAlways
-                            builderMethods:
-                              - builder
-                              - newBuilder
-                              - stream
-            """,
-            "org.openrewrite.java.AutoFormatWithCustomStyle"
-          );
+        autoFormat(
+          wrap -> wrap
+            .withKeepWhenFormatting(wrap.getKeepWhenFormatting().withLineBreaks(false))
+            .withChainedMethodCalls(wrap.getChainedMethodCalls()
+              .withWrap(LineWrapSetting.WrapAlways)
+              .withBuilderMethods(List.of("builder", "newBuilder", "stream")))
+        ).accept(spec);
     }
 
     @DocumentExample
@@ -102,6 +74,37 @@ class AutoFormatTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static Consumer<RecipeSpec> autoFormat(UnaryOperator<WrappingAndBracesStyle> wrapping) {
+        return spec -> spec.recipe(new AutoFormat(null))
+          .parser(JavaParser.fromJavaVersion()
+            .styles(singletonList(
+              new NamedStyles(
+                Tree.randomId(), "test", "test", "test", emptySet(),
+                List.of(wrapping.apply(IntelliJ.wrappingAndBraces()))
+              )))
+            .dependsOn("""
+              package com.example;
+
+              public class MyObject {
+                  public MyObject(String... x) {}
+                  public static Builder builder() { return new Builder(); }
+                  public static Builder newBuilder() { return new Builder(); }
+                  public static class Builder {
+                      Builder name(String n) { return this; }
+                      Builder age(int a) { return this; }
+                      Builder items(java.util.List<String> items) { return this; }
+                      Builder nested(MyObject nested) { return this; }
+                      MyObject build() { return new MyObject(); }
+                  }
+
+                  public static void outerMethod(String... x) {}
+                  public static String innerMethod(String... x) { return ""; }
+                  public static String veryLongMethodNameThatExceedsTheMaxLimit(String... x) { return ""; }
+              }
+              """)
+            );
     }
 
     @Test
@@ -284,11 +287,6 @@ class AutoFormatTest implements RewriteTest {
               @SuppressWarnings({"ALL"})
               class Test {
               }
-              """,
-            """
-              @SuppressWarnings({"ALL"})
-              class Test {
-              }
               """
           )
         );
@@ -344,13 +342,6 @@ class AutoFormatTest implements RewriteTest {
                       @SuppressWarnings("ALL") int foo;
                   }
               }
-              """,
-            """
-              public class Test {
-                  public void doSomething() {
-                      @SuppressWarnings("ALL") int foo;
-                  }
-              }
               """
           )
         );
@@ -379,12 +370,6 @@ class AutoFormatTest implements RewriteTest {
     void annotatedVariableDeclInMethodDeclaration() {
         rewriteRun(
           java(
-            """
-              public class Test {
-                  public void doSomething(@SuppressWarnings("ALL") int foo) {
-                  }
-              }
-              """,
             """
               public class Test {
                   public void doSomething(@SuppressWarnings("ALL") int foo) {
@@ -504,12 +489,6 @@ class AutoFormatTest implements RewriteTest {
     void emptyLineBeforeEnumConstants() {
         rewriteRun(
           java(
-            """
-              public enum Status {
-                  NOT_STARTED,
-                  STARTED
-              }
-              """,
             """
               public enum Status {
                   NOT_STARTED,
@@ -732,21 +711,6 @@ class AutoFormatTest implements RewriteTest {
                       @Foo @Foo final int localVar;
                   }
               }
-              """,
-            """
-              @Foo
-              @Foo
-              final class Test {
-                  @Foo
-                  @Foo
-                  private int field;
-              
-                  @Foo
-                  @Foo
-                  public void method(@Foo @Foo final int param) {
-                      @Foo @Foo final int localVar;
-                  }
-              }
               """
           )
         );
@@ -850,28 +814,6 @@ class AutoFormatTest implements RewriteTest {
                       return param;
                   }
               }
-              """,
-            """
-              @Foo
-              @Foo
-              class Test<T> {
-                  @Foo
-                  @Foo
-                  private int field;
-              
-                  @Foo
-                  @Foo
-                  Test(int field) {
-                      this.field = field;
-                  }
-              
-                  @Foo
-                  @Foo
-                  T method(@Foo @Foo T param) {
-                      @Foo @Foo T localVar;
-                      return param;
-                  }
-              }
               """
           )
         );
@@ -893,35 +835,6 @@ class AutoFormatTest implements RewriteTest {
               """,
             SourceSpec::skip),
           java(
-            """
-              class Test {
-                  @Foo //comment
-                  String method1() {
-                      return "test";
-                  }
-              
-                  @Foo /* comment
-                  on multiple
-                  lines */
-                  String method2() {
-                      return "test";
-                  }
-              
-                  @Foo
-                  //comment
-                  String method3() {
-                      return "test";
-                  }
-              
-                  @Foo
-                  /* comment
-                  on multiple
-                  lines */
-                  String method4() {
-                      return "test";
-                  }
-              }
-              """,
             """
               class Test {
                   @Foo //comment
@@ -1125,18 +1038,6 @@ class AutoFormatTest implements RewriteTest {
         void preserveAlreadyFormattedBuilder() {
             rewriteRun(
               java(
-                """
-                  package com.example;
-                  
-                  class Test {
-                      void test() {
-                          MyObject obj = MyObject.builder()
-                                  .name("test")
-                                  .age(25)
-                                  .build();
-                      }
-                  }
-                  """,
                 """
                   package com.example;
                   
@@ -1987,38 +1888,6 @@ class AutoFormatTest implements RewriteTest {
                       static class Item {
                       }
                   }
-                  """,
-                """
-                  package com.example;
-                  
-                  import java.util.Collection;
-                  import java.util.Optional;
-                  
-                  class Test {
-                      Optional<Item> findItem(Collection<Item> collection) {
-                          return collection.stream()
-                                  .filter(item -> {
-                                      if (someCondition(item)) {
-                                          return true;
-                                      } else if (otherCondition(item)) {
-                                          return true;
-                                      }
-                                      return false;
-                                  })
-                                  .findFirst();
-                      }
-                  
-                      boolean someCondition(Item item) {
-                          return true;
-                      }
-    
-                      boolean otherCondition(Item item) {
-                          return false;
-                      }
-                  
-                      static class Item {
-                      }
-                  }
                   """
               )
             );
@@ -2156,15 +2025,6 @@ class AutoFormatTest implements RewriteTest {
                   """
               ),
               java(
-                """
-                  package com.example;
-    
-                  class Test3 {
-                      void test() {
-                          MyObject.outerMethod("arg1", MyObject.innerMethod("nested1", "nested2", "nested3"), "arg3");
-                      }
-                  }
-                  """,
                 """
                   package com.example;
     
@@ -3134,15 +2994,6 @@ class AutoFormatTest implements RewriteTest {
                           MyObject.outerMethod("arg1");
                       }
                   }
-                  """,
-                """
-                  package com.example;
-
-                  class Test {
-                      void test() {
-                          MyObject.outerMethod("arg1");
-                      }
-                  }
                   """
               )
             );
@@ -3182,17 +3033,6 @@ class AutoFormatTest implements RewriteTest {
             rewriteRun(
               this::withMethodInvocationArgumentWrapping,
               java(
-                """
-                  package com.example;
-
-                  class Test {
-                      void test() {
-                          MyObject.outerMethod("arg1",
-                                  "arg2",
-                                  "arg3");
-                      }
-                  }
-                  """,
                 """
                   package com.example;
 
@@ -3355,7 +3195,13 @@ class AutoFormatTest implements RewriteTest {
         @Test
         void formatLongLinesOnly() {
             rewriteRun(
-              spec -> withMethodInvocationArgumentChopIfTooLong(spec, 70),
+              autoFormat(
+                wrap -> wrap
+                  .withHardWrapAt(70)
+                  .withKeepWhenFormatting(wrap.getKeepWhenFormatting().withLineBreaks(false))
+                  .withMethodCallArguments(wrap.getMethodCallArguments()
+                    .withWrap(LineWrapSetting.ChopIfTooLong))
+              ),
               java(
                 """
                   package com.example;
@@ -3392,17 +3238,14 @@ class AutoFormatTest implements RewriteTest {
         @Test
         void preserveMethodInvocationBelowThreshold() {
             rewriteRun(
-              spec -> withMethodInvocationArgumentChopIfTooLong(spec, 120),
+              autoFormat(
+                wrap -> wrap
+                  .withHardWrapAt(120)
+                  .withKeepWhenFormatting(wrap.getKeepWhenFormatting().withLineBreaks(false))
+                  .withMethodCallArguments(wrap.getMethodCallArguments()
+                    .withWrap(LineWrapSetting.ChopIfTooLong))
+              ),
               java(
-                """
-                  package com.example;
-
-                  class Test {
-                      void test() {
-                          MyObject.outerMethod("arg1", "arg2");
-                      }
-                  }
-                  """,
                 """
                   package com.example;
 
@@ -3419,7 +3262,13 @@ class AutoFormatTest implements RewriteTest {
         @Test
         void formatWithOpenNewLine() {
             rewriteRun(
-              this::withMethodInvocationArgumentOpenNewLine,
+              autoFormat(
+                wrap -> wrap
+                  .withKeepWhenFormatting(wrap.getKeepWhenFormatting().withLineBreaks(false))
+                  .withMethodCallArguments(wrap.getMethodCallArguments()
+                    .withWrap(LineWrapSetting.WrapAlways)
+                    .withOpenNewLine(true))
+              ),
               java(
                 """
                   package com.example;
@@ -3449,7 +3298,13 @@ class AutoFormatTest implements RewriteTest {
         @Test
         void formatWithCloseNewLine() {
             rewriteRun(
-              this::withMethodInvocationArgumentCloseNewLine,
+              autoFormat(
+                wrap -> wrap
+                  .withKeepWhenFormatting(wrap.getKeepWhenFormatting().withLineBreaks(false))
+                  .withMethodCallArguments(wrap.getMethodCallArguments()
+                    .withWrap(LineWrapSetting.WrapAlways)
+                    .withCloseNewLine(true))
+              ),
               java(
                 """
                   package com.example;
@@ -3479,7 +3334,14 @@ class AutoFormatTest implements RewriteTest {
         @Test
         void formatWithOpenAndCloseNewLine() {
             rewriteRun(
-              this::withMethodInvocationArgumentOpenAndCloseNewLine,
+              autoFormat(
+                wrap -> wrap
+                  .withKeepWhenFormatting(wrap.getKeepWhenFormatting().withLineBreaks(false))
+                  .withMethodCallArguments(wrap.getMethodCallArguments()
+                    .withWrap(LineWrapSetting.WrapAlways)
+                    .withOpenNewLine(true)
+                    .withCloseNewLine(true))
+              ),
               java(
                 """
                   package com.example;
@@ -3722,133 +3584,59 @@ class AutoFormatTest implements RewriteTest {
         }
 
         private void withMethodInvocationArgumentWrapping(RecipeSpec spec) {
-            spec.recipeFromYaml(
-              """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentWrapping
-              displayName: Autoformat java code with method invocation argument wrapping
-              description: Formats the code with method invocation argument wrapping enabled.
-              recipeList:
-                - org.openrewrite.java.format.AutoFormat:
-                    style: |
-                      type: specs.openrewrite.org/v1beta/style
-                      name: junit
-                      displayName: Unit Test style
-                      description: Only used in unit tests
-                      styleConfigs:
-                        - org.openrewrite.java.style.WrappingAndBracesStyle:
-                            keepWhenFormatting:
-                              lineBreaks: false
-                            methodCallArguments:
-                              wrap: WrapAlways
-              """,
-              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentWrapping"
-            );
+            autoFormat(
+              wrap -> wrap
+                .withKeepWhenFormatting(wrap.getKeepWhenFormatting().withLineBreaks(false))
+                .withMethodCallArguments(wrap.getMethodCallArguments()
+                  .withWrap(LineWrapSetting.WrapAlways))
+            ).accept(spec);
         }
+    }
 
-        private void withMethodInvocationArgumentChopIfTooLong(RecipeSpec spec, int hardWrapAt) {
-            spec.recipeFromYaml(
-              """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentChopIfTooLong
-              displayName: Autoformat java code with method invocation argument chop if too long
-              description: Formats the code with method invocation argument wrapping only for long lines.
-              recipeList:
-                - org.openrewrite.java.format.AutoFormat:
-                    style: |
-                      type: specs.openrewrite.org/v1beta/style
-                      name: junit
-                      displayName: Unit Test style
-                      description: Only used in unit tests
-                      styleConfigs:
-                        - org.openrewrite.java.style.WrappingAndBracesStyle:
-                            keepWhenFormatting:
-                              lineBreaks: false
-                            hardWrapAt: %d
-                            methodCallArguments:
-                              wrap: ChopIfTooLong
-              """.formatted(hardWrapAt),
-              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentChopIfTooLong"
-            );
-        }
-
-        private void withMethodInvocationArgumentOpenNewLine(RecipeSpec spec) {
-            spec.recipeFromYaml(
-              """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenNewLine
-              displayName: Autoformat java code with method invocation argument open new line
-              description: Formats the code with method invocation argument wrapping and open new line.
-              recipeList:
-                - org.openrewrite.java.format.AutoFormat:
-                    style: |
-                      type: specs.openrewrite.org/v1beta/style
-                      name: junit
-                      displayName: Unit Test style
-                      description: Only used in unit tests
-                      styleConfigs:
-                        - org.openrewrite.java.style.WrappingAndBracesStyle:
-                            keepWhenFormatting:
-                              lineBreaks: false
-                            methodCallArguments:
-                              wrap: WrapAlways
-                              openNewLine: true
+    @Test
+    void providedStyleMarkerGetsAddedToCuForFutureFormats() {
+        rewriteRun(
+          spec ->
+            spec
+              .parser(JavaParser.fromJavaVersion())
+              .recipeFromYaml(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.java.AutoFormatWithCustomStyle
+                  displayName: Autoformat java code with custom style
+                  description: Formats the code with some IntelliJ settings overwritten.
+                  recipeList:
+                    - org.openrewrite.java.format.AutoFormat:
+                        style: |
+                          type: specs.openrewrite.org/v1beta/style
+                          name: junit
+                          displayName: Unit Test style
+                          description: Only used in unit tests
+                          styleConfigs:
+                            - org.openrewrite.java.style.WrappingAndBracesStyle:
+                                keepWhenFormatting:
+                                  lineBreaks: false
+                                chainedMethodCalls:
+                                  wrap: WrapAlways
+                                  builderMethods:
+                                    - builder
+                                    - newBuilder
+                                    - stream
+                  """,
+                "org.openrewrite.java.AutoFormatWithCustomStyle"
+              ),
+          java(
+            """
+              public enum Status {
+                  NOT_STARTED,
+                  STARTED
+              }
               """,
-              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenNewLine"
-            );
-        }
-
-        private void withMethodInvocationArgumentCloseNewLine(RecipeSpec spec) {
-            spec.recipeFromYaml(
-              """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentCloseNewLine
-              displayName: Autoformat java code with method invocation argument close new line
-              description: Formats the code with method invocation argument wrapping and close new line.
-              recipeList:
-                - org.openrewrite.java.format.AutoFormat:
-                    style: |
-                      type: specs.openrewrite.org/v1beta/style
-                      name: junit
-                      displayName: Unit Test style
-                      description: Only used in unit tests
-                      styleConfigs:
-                        - org.openrewrite.java.style.WrappingAndBracesStyle:
-                            keepWhenFormatting:
-                              lineBreaks: false
-                            methodCallArguments:
-                              wrap: WrapAlways
-                              closeNewLine: true
-              """,
-              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentCloseNewLine"
-            );
-        }
-
-        private void withMethodInvocationArgumentOpenAndCloseNewLine(RecipeSpec spec) {
-            spec.recipeFromYaml(
-              """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenAndCloseNewLine
-              displayName: Autoformat java code with method invocation argument open and close new line
-              description: Formats the code with method invocation argument wrapping and both open and close new lines.
-              recipeList:
-                - org.openrewrite.java.format.AutoFormat:
-                    style: |
-                      type: specs.openrewrite.org/v1beta/style
-                      name: junit
-                      displayName: Unit Test style
-                      description: Only used in unit tests
-                      styleConfigs:
-                        - org.openrewrite.java.style.WrappingAndBracesStyle:
-                            keepWhenFormatting:
-                              lineBreaks: false
-                            methodCallArguments:
-                              wrap: WrapAlways
-                              openNewLine: true
-                              closeNewLine: true
-              """,
-              "org.openrewrite.java.AutoFormatWithMethodInvocationArgumentOpenAndCloseNewLine"
-            );
-        }
+            sourceSpecs -> sourceSpecs
+              .beforeRecipe(cu -> assertThat(cu.getMarkers().findAll(NamedStyles.class)).isEmpty())
+              .after(after -> after)
+              .afterRecipe(cu -> assertThat(cu.getMarkers().findAll(NamedStyles.class)).hasSize(1))
+          )
+        );
     }
 }
