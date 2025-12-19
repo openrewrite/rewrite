@@ -14,16 +14,8 @@
  * limitations under the License.
  */
 
-// Main formatting entry point
+// Main formatting entry point (includes AutoformatVisitor, autoFormat, maybeAutoFormat, and individual visitors)
 export * from "./format";
 
-// Individual formatting visitors
-export {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
-export {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
-export {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
-
-// Prettier integration
-export {prettierFormat, applyPrettierFormatting, getPrettierStyle} from "./prettier-format";
-export {PrettierConfigLoader, loadPrettierVersion, clearPrettierModuleCache} from "./prettier-config-loader";
-export type {PrettierDetectionResult} from "./prettier-config-loader";
-
+// Prettier formatting (public API)
+export {prettierFormat} from "./prettier-format";

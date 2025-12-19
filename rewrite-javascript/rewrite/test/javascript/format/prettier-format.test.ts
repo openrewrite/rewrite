@@ -27,11 +27,11 @@ import {
     JS,
     npm,
     packageJson,
-    PrettierConfigLoader,
     prettierFormat,
     PrettierStyle,
     typescript
 } from "../../../src/javascript";
+import {PrettierConfigLoader} from "../../../src/javascript/format/prettier-config-loader";
 import {json} from "../../../src/json";
 import {text} from "../../../src/text";
 import {J, Statement} from "../../../src/java";
