@@ -21,6 +21,8 @@ import ts from 'typescript';
 import {json, Json} from "../json";
 import {DependencyWorkspace} from "./dependency-workspace";
 import {setTemplateSourceFileCache} from "./templating/engine";
+import {PrettierConfigLoader} from "./format/prettier-config-loader";
+import {produce} from "immer";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -49,6 +51,20 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
             path.join(relativeTo, 'package-lock.json'),
             packageLockSpec.before
         );
+    }
+
+    // Write non-JS/TS files to disk FIRST so Prettier config detection can find them
+    for (const spec of sourceSpecs) {
+        if (spec.path !== 'package.json' && spec.path !== 'package-lock.json' && spec.kind !== JS.Kind.CompilationUnit) {
+            if (spec.before && spec.path) {
+                const filePath = path.join(relativeTo, spec.path);
+                const dir = path.dirname(filePath);
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true });
+                }
+                fs.writeFileSync(filePath, spec.before);
+            }
+        }
     }
 
     // Yield package.json FIRST so its PackageJsonParser is used for all JSON specs
@@ -100,23 +116,31 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
         yield packageLockSpec;
     }
 
+    // Detect Prettier configuration for the project
+    const prettierLoader = new PrettierConfigLoader(relativeTo);
+    await prettierLoader.detectPrettier();
+
     for (const spec of sourceSpecs) {
         if (spec.path !== 'package.json' && spec.path !== 'package-lock.json') {
             if (spec.kind === JS.Kind.CompilationUnit) {
+                // For JS/TS files, use a parser that adds PrettierStyle marker if available
+                // spec.path may be undefined, so generate a reasonable path from the extension
+                const fileName = spec.path ?? `file.${spec.ext}`;
+                const filePath = path.join(relativeTo, fileName);
+                const prettierMarker = await prettierLoader.getConfigMarker(filePath);
+
                 yield {
                     ...spec,
-                    parser: () => new JavaScriptParser({sourceFileCache, relativeTo})
+                    parser: () => new JavaScriptParser({sourceFileCache, relativeTo}),
+                    // Add PrettierStyle marker before recipe runs if Prettier is configured
+                    beforeRecipe: prettierMarker ? (sf: JS.CompilationUnit) => {
+                        return produce(sf, draft => {
+                            draft.markers.markers = draft.markers.markers.concat([prettierMarker]);
+                        });
+                    } : spec.beforeRecipe
                 }
             } else {
-                // Write non-JS/TS files to disk so tools like Prettier can find config files
-                if (spec.before && spec.path) {
-                    const filePath = path.join(relativeTo, spec.path);
-                    const dir = path.dirname(filePath);
-                    if (!fs.existsSync(dir)) {
-                        fs.mkdirSync(dir, { recursive: true });
-                    }
-                    fs.writeFileSync(filePath, spec.before);
-                }
+                // Non-JS/TS files were already written to disk above
                 yield spec;
             }
         }

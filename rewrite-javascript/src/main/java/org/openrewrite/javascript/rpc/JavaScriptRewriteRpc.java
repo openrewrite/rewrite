@@ -25,6 +25,12 @@ import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.rpc.request.PrepareRecipe;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -34,11 +40,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.util.Objects.requireNonNull;
 
@@ -103,6 +109,84 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         ).getRecipesInstalled();
     }
 
+    /**
+     * Parses an entire JavaScript/TypeScript project directory.
+     * Discovers and parses all relevant source files, package.json files, and lock files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, ExecutionContext ctx) {
+        return parseProject(projectPath, null, ctx);
+    }
+
+    /**
+     * Parses an entire JavaScript/TypeScript project directory.
+     * Discovers and parses all relevant source files, package.json files, and lock files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param exclusions  Optional glob patterns to exclude from parsing
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
+            private int index = 0;
+            private @Nullable ParseProjectResponse response;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                if (response == null) {
+                    parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions), ParseProjectResponse.class);
+                    parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
+                }
+
+                if (index >= response.size()) {
+                    return false;
+                }
+
+                ParseProjectResponse.Item item = response.get(index);
+                index++;
+
+                SourceFile sourceFile = null;
+                try {
+                    sourceFile = getObject(item.getId(), item.getSourceFileType());
+                } catch (Exception e) {
+                    sourceFile = ParseError.build(
+                            null,
+                            null,
+                            projectPath,
+                            ctx,
+                            e
+                    );
+                } finally {
+                    if (sourceFile != null) {
+                        action.accept(sourceFile);
+                    }
+                }
+                return true;
+            }
+
+            @Override
+            public @Nullable Spliterator<SourceFile> trySplit() {
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                return response == null ? Long.MAX_VALUE : response.size() - index;
+            }
+
+            @Override
+            public int characteristics() {
+                return ORDERED | SIZED | SUBSIZED;
+            }
+        }, false);
+    }
 
     public static Builder builder() {
         return new Builder();

@@ -16,7 +16,7 @@
 import {Cursor, SourceFile, Tree} from "./tree";
 import {TreeVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "./print";
-import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
+import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc/queue";
 import {createDraft, Draft, finishDraft} from "immer";
 
 export const ParseErrorKind = "org.openrewrite.tree.ParseError";

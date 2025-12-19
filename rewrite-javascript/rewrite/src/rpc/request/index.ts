@@ -17,6 +17,8 @@ export * from "./generate";
 export * from "./get-object";
 export * from "./get-recipes";
 export * from "./parse";
+// Note: parse-project is not exported here to avoid circular dependencies.
+// Import directly from "./parse-project" if needed.
 export * from "./prepare-recipe";
 export * from "./print";
 export * from "./visit";

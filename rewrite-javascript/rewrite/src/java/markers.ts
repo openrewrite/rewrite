@@ -15,7 +15,7 @@
  */
 import {Marker} from "../markers";
 import {J} from "./tree";
-import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc/queue";
 import {createDraft, finishDraft} from "immer";
 // The `RpcCodec` for `J.Space` is registered in the `rpc` module.
 import "./rpc";

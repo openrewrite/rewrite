@@ -16,7 +16,7 @@
 import {findMarker, Marker, Markers} from "../markers";
 import {randomId, UUID} from "../uuid";
 import {asRef} from "../reference";
-import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc/queue";
 import {castDraft, createDraft, finishDraft} from "immer";
 import * as semver from "semver";
 import * as fsp from "fs/promises";

@@ -346,11 +346,6 @@ describe('Prettier marker reconciliation', () => {
 describe('Prettier auto-detection integration', () => {
     // These tests verify that Prettier config is automatically detected from .prettierrc
     // when prettier is installed as a dependency.
-    //
-    // NOTE: These tests are currently skipped because:
-    // 1. Prettier v3.x is ESM-only and can't be require()'d in Jest's CommonJS context
-    // 2. Dynamic imports fail in Jest's VM context without --experimental-vm-modules
-    // TODO: Re-enable when we have proper ESM support in tests
 
     function prettierrc(config: Record<string, unknown>) {
         return {

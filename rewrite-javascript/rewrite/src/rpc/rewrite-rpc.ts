@@ -31,6 +31,7 @@ import {
     Visit,
     VisitResponse
 } from "./request";
+import {ParseProject} from "./request/parse-project";
 import {initializeMetricsCsv} from "./request/metrics";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
@@ -90,6 +91,7 @@ export class RewriteRpc {
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
+        ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger, options.metricsCsv);
 
