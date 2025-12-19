@@ -23,9 +23,13 @@ import {
     readNpmrcConfigs
 } from "./node-resolution-result";
 import {replaceMarkerByKind} from "../markers";
-import {Json, JsonParser, JsonVisitor} from "../json";
-import {isDocuments, Yaml, YamlParser, YamlVisitor} from "../yaml";
-import {PlainTextParser} from "../text";
+import {Json} from "../json/tree";
+import {JsonParser} from "../json/parser";
+import {JsonVisitor} from "../json/visitor";
+import {isDocuments, Yaml} from "../yaml/tree";
+import {YamlParser} from "../yaml/parser";
+import {YamlVisitor} from "../yaml/visitor";
+import {PlainTextParser} from "../text/parser";
 import {SourceFile} from "../tree";
 import {TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";

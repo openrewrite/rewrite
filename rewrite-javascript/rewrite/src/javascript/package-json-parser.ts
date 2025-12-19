@@ -15,7 +15,8 @@
  */
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers} from "../parser";
 import {SourceFile} from "../tree";
-import {Json, JsonParser} from "../json";
+import {Json} from "../json/tree";
+import {JsonParser} from "../json/parser";
 import {
     createNodeResolutionResultMarker,
     NodeResolutionResult,

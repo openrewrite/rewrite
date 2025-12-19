@@ -48,11 +48,9 @@ import {
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
 import {produce} from "immer";
-import Kind = JS.Kind;
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
-
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
     sourceFileCache?: Map<string, ts.SourceFile>,
@@ -1753,7 +1751,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 typeParameter: this.rightPadded(
                     {
-                        kind: Kind.MappedTypeParameter,
+                        kind: JS.Kind.MappedTypeParameter,
                         id: randomId(),
                         prefix: this.prefix(node.typeParameter),
                         markers: emptyMarkers,

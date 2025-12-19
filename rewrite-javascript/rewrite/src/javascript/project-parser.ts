@@ -20,11 +20,7 @@ import {spawnSync} from "child_process";
 import picomatch from "picomatch";
 import {produce} from "immer";
 import {SourceFile} from "../tree";
-import {JavaScriptParser} from "./parser";
-import {PackageJsonParser} from "./package-json-parser";
-import {JsonParser} from "../json";
-import {YamlParser} from "../yaml";
-import {PlainTextParser} from "../text";
+import {Parsers} from "../parser";
 import {PrettierConfigLoader} from "./format/prettier-config-loader";
 import {ExecutionContext} from "../execution";
 
@@ -201,7 +197,7 @@ export class ProjectParser {
         // Parse package.json files first (they get NodeResolutionResult markers)
         if (discovered.packageJsonFiles.length > 0) {
             this.log(`Parsing ${discovered.packageJsonFiles.length} package.json files...`);
-            const parser = new PackageJsonParser({
+            const parser = Parsers.createParser("packageJson", {
                 ctx: this.ctx,
                 relativeTo: this.projectPath
             });
@@ -215,7 +211,7 @@ export class ProjectParser {
         // Parse JSON lock files
         if (discovered.lockFiles.json.length > 0) {
             this.log(`Parsing ${discovered.lockFiles.json.length} JSON lock files...`);
-            const parser = new JsonParser({
+            const parser = Parsers.createParser("json", {
                 ctx: this.ctx,
                 relativeTo: this.projectPath
             });
@@ -229,7 +225,7 @@ export class ProjectParser {
         // Parse YAML lock files
         if (discovered.lockFiles.yaml.length > 0) {
             this.log(`Parsing ${discovered.lockFiles.yaml.length} YAML lock files...`);
-            const parser = new YamlParser({
+            const parser = Parsers.createParser("yaml", {
                 ctx: this.ctx,
                 relativeTo: this.projectPath
             });
@@ -243,7 +239,7 @@ export class ProjectParser {
         // Parse text lock files (yarn.lock Classic)
         if (discovered.lockFiles.text.length > 0) {
             this.log(`Parsing ${discovered.lockFiles.text.length} text lock files...`);
-            const parser = new PlainTextParser({
+            const parser = Parsers.createParser("plainText", {
                 ctx: this.ctx,
                 relativeTo: this.projectPath
             });
@@ -257,7 +253,7 @@ export class ProjectParser {
         // Parse JavaScript/TypeScript source files
         if (discovered.jsFiles.length > 0) {
             this.log(`Parsing ${discovered.jsFiles.length} JavaScript/TypeScript files...`);
-            const parser = new JavaScriptParser({
+            const parser = Parsers.createParser("javascript", {
                 ctx: this.ctx,
                 relativeTo: this.projectPath
             });
@@ -282,7 +278,7 @@ export class ProjectParser {
         // Parse other YAML files
         if (discovered.yamlFiles.length > 0) {
             this.log(`Parsing ${discovered.yamlFiles.length} YAML files...`);
-            const parser = new YamlParser({
+            const parser = Parsers.createParser("yaml", {
                 ctx: this.ctx,
                 relativeTo: this.projectPath
             });
@@ -296,7 +292,7 @@ export class ProjectParser {
         // Parse other JSON files
         if (discovered.jsonFiles.length > 0) {
             this.log(`Parsing ${discovered.jsonFiles.length} JSON files...`);
-            const parser = new JsonParser({
+            const parser = Parsers.createParser("json", {
                 ctx: this.ctx,
                 relativeTo: this.projectPath
             });
@@ -310,7 +306,7 @@ export class ProjectParser {
         // Parse text config files (.prettierignore, .gitignore, etc.)
         if (discovered.textFiles.length > 0) {
             this.log(`Parsing ${discovered.textFiles.length} text config files...`);
-            const parser = new PlainTextParser({
+            const parser = Parsers.createParser("plainText", {
                 ctx: this.ctx,
                 relativeTo: this.projectPath
             });

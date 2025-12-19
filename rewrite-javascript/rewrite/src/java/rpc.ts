@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 import {JavaVisitor} from "./visitor";
-import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc/queue";
-import {asRef} from "../reference";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {Expression, isSpace, J, TextComment} from "./tree";
 import {isTree} from "../tree";
 import {Type} from "./type";

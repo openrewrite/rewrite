@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {emptyMarkers, markers, MarkersKind, ParseExceptionResult} from "../markers";
-import {Parser, ParserInput, parserInputRead} from "../parser";
+import {Parser, ParserInput, parserInputRead, Parsers} from "../parser";
 import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
 import {Yaml} from "./tree";
@@ -848,3 +848,5 @@ class YamlCstReader {
         return tokens.map(t => t.source).join('');
     }
 }
+
+Parsers.registerParser("yaml", YamlParser);

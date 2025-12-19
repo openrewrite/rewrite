@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {asRef} from "../reference";
+import {asRef} from "../rpc";
 
 export interface Type {
     readonly kind: string;

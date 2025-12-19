@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc/queue";
+import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
 
 export class ExecutionContext {
     readonly kind: string = "org.openrewrite.ExecutionContext"

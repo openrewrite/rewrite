@@ -19,16 +19,9 @@ import {ExecutionContext} from "../../execution";
 import {randomId, UUID} from "../../uuid";
 import {produce} from "immer";
 import {SourceFile} from "../../tree";
+import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
-import {
-    JS,
-    JavaScriptParser,
-    PackageJsonParser
-} from "../../javascript";
-import {ProjectParser, DEFAULT_EXCLUSIONS} from "../../javascript/project-parser";
-import {Json, JsonParser} from "../../json";
-import {Yaml, YamlParser} from "../../yaml";
-import {PlainTextParser, PlainText} from "../../text";
+import {DEFAULT_EXCLUSIONS, ProjectParser} from "../../javascript/project-parser";
 import {PrettierConfigLoader} from "../../javascript/format/prettier-config-loader";
 
 /**
@@ -83,11 +76,11 @@ export class ParseProject {
 
                     // Parse package.json files (these get NodeResolutionResult markers)
                     if (discovered.packageJsonFiles.length > 0) {
-                        const packageJsonParser = new PackageJsonParser({
+                        const parser = Parsers.createParser("packageJson", {
                             ctx,
                             relativeTo: projectPath
                         });
-                        const generator = packageJsonParser.parse(...discovered.packageJsonFiles);
+                        const generator = parser.parse(...discovered.packageJsonFiles);
 
                         for (const _ of discovered.packageJsonFiles) {
                             const id = randomId();
@@ -99,15 +92,15 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: Json.Kind.Document
+                                sourceFileType: "org.openrewrite.json.tree.Json$Document" // break cycle
                             });
                         }
                     }
 
                     // Parse JSON lock files
                     if (discovered.lockFiles.json.length > 0) {
-                        const jsonParser = new JsonParser({ctx, relativeTo: projectPath});
-                        const generator = jsonParser.parse(...discovered.lockFiles.json);
+                        const parser = Parsers.createParser("json", {ctx, relativeTo: projectPath});
+                        const generator = parser.parse(...discovered.lockFiles.json);
 
                         for (const _ of discovered.lockFiles.json) {
                             const id = randomId();
@@ -119,15 +112,15 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: Json.Kind.Document
+                                sourceFileType: "org.openrewrite.json.tree.Json$Document" // break cycle
                             });
                         }
                     }
 
                     // Parse YAML lock files
                     if (discovered.lockFiles.yaml.length > 0) {
-                        const yamlParser = new YamlParser({ctx, relativeTo: projectPath});
-                        const generator = yamlParser.parse(...discovered.lockFiles.yaml);
+                        const parser = Parsers.createParser("yaml", {ctx, relativeTo: projectPath});
+                        const generator = parser.parse(...discovered.lockFiles.yaml);
 
                         for (const _ of discovered.lockFiles.yaml) {
                             const id = randomId();
@@ -139,15 +132,15 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: Yaml.Kind.Documents
+                                sourceFileType: "org.openrewrite.yaml.tree.Yaml$Documents" // break cycle
                             });
                         }
                     }
 
                     // Parse text lock files (yarn.lock Classic)
                     if (discovered.lockFiles.text.length > 0) {
-                        const textParser = new PlainTextParser({ctx, relativeTo: projectPath});
-                        const generator = textParser.parse(...discovered.lockFiles.text);
+                        const parser = Parsers.createParser("plainText", {ctx, relativeTo: projectPath});
+                        const generator = parser.parse(...discovered.lockFiles.text);
 
                         for (const _ of discovered.lockFiles.text) {
                             const id = randomId();
@@ -159,18 +152,18 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: PlainText.Kind.PlainText
+                                sourceFileType: "org.openrewrite.text.PlainText" // break cycle
                             });
                         }
                     }
 
                     // Parse JavaScript/TypeScript source files
                     if (discovered.jsFiles.length > 0) {
-                        const jsParser = new JavaScriptParser({
+                        const parser = Parsers.createParser("javascript", {
                             ctx,
                             relativeTo: projectPath
                         });
-                        const generator = jsParser.parse(...discovered.jsFiles);
+                        const generator = parser.parse(...discovered.jsFiles);
 
                         for (const filePath of discovered.jsFiles) {
                             const id = randomId();
@@ -187,15 +180,15 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: JS.Kind.CompilationUnit
+                                sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit" // break cycle
                             });
                         }
                     }
 
                     // Parse other YAML files
                     if (discovered.yamlFiles.length > 0) {
-                        const yamlParser = new YamlParser({ctx, relativeTo: projectPath});
-                        const generator = yamlParser.parse(...discovered.yamlFiles);
+                        const parser = Parsers.createParser("yaml", {ctx, relativeTo: projectPath});
+                        const generator = parser.parse(...discovered.yamlFiles);
 
                         for (const _ of discovered.yamlFiles) {
                             const id = randomId();
@@ -207,15 +200,15 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: Yaml.Kind.Documents
+                                sourceFileType: "org.openrewrite.yaml.tree.Yaml$Documents" // break cycle
                             });
                         }
                     }
 
                     // Parse other JSON files
                     if (discovered.jsonFiles.length > 0) {
-                        const jsonParser = new JsonParser({ctx, relativeTo: projectPath});
-                        const generator = jsonParser.parse(...discovered.jsonFiles);
+                        const parser = Parsers.createParser("json", {ctx, relativeTo: projectPath});
+                        const generator = parser.parse(...discovered.jsonFiles);
 
                         for (const _ of discovered.jsonFiles) {
                             const id = randomId();
@@ -227,15 +220,15 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: Json.Kind.Document
+                                sourceFileType: "org.openrewrite.json.tree.Json$Document" // break cycle
                             });
                         }
                     }
 
                     // Parse text config files (.prettierignore, .gitignore, etc.)
                     if (discovered.textFiles.length > 0) {
-                        const textParser = new PlainTextParser({ctx, relativeTo: projectPath});
-                        const generator = textParser.parse(...discovered.textFiles);
+                        const parser = Parsers.createParser("plainText", {ctx, relativeTo: projectPath});
+                        const generator = parser.parse(...discovered.textFiles);
 
                         for (const _ of discovered.textFiles) {
                             const id = randomId();
@@ -247,7 +240,7 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: PlainText.Kind.PlainText
+                                sourceFileType: "org.openrewrite.text.PlainText" // break cycle
                             });
                         }
                     }
