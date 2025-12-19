@@ -57,24 +57,23 @@ import SpreadAttribute = JSX.SpreadAttribute;
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
     sourceFileCache?: Map<string, ts.SourceFile>,
-    /**
-     * When true, skips type attribution during parsing for faster performance.
-     * Useful for formatting-only operations where types are not needed.
-     */
-    skipTypes?: boolean
 }
 
 function getScriptKindFromFileName(fileName: string): ts.ScriptKind {
-    const ext = fileName.toLowerCase();
-    if (ext.endsWith('.tsx')) return ts.ScriptKind.TSX;
-    if (ext.endsWith('.jsx')) return ts.ScriptKind.JSX;
-    if (ext.endsWith('.ts')) return ts.ScriptKind.TS;
-    if (ext.endsWith('.js')) return ts.ScriptKind.JS;
-    if (ext.endsWith('.mjs')) return ts.ScriptKind.JS;
-    if (ext.endsWith('.cjs')) return ts.ScriptKind.JS;
-    if (ext.endsWith('.mts')) return ts.ScriptKind.TS;
-    if (ext.endsWith('.cts')) return ts.ScriptKind.TS;
-    return ts.ScriptKind.TS;
+    const dotIndex = fileName.lastIndexOf('.');
+    if (dotIndex === -1) return ts.ScriptKind.TS;
+    const ext = fileName.slice(dotIndex);
+    switch (ext) {
+        case '.tsx': return ts.ScriptKind.TSX;
+        case '.jsx': return ts.ScriptKind.JSX;
+        case '.ts':
+        case '.mts':
+        case '.cts': return ts.ScriptKind.TS;
+        case '.js':
+        case '.mjs':
+        case '.cjs': return ts.ScriptKind.JS;
+        default: return ts.ScriptKind.TS;
+    }
 }
 
 export class JavaScriptParser extends Parser {
@@ -83,7 +82,6 @@ export class JavaScriptParser extends Parser {
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
     private readonly sourceFileCache?: Map<string, ts.SourceFile>;
-    private readonly skipTypes: boolean;
 
     constructor(
         {
@@ -91,7 +89,6 @@ export class JavaScriptParser extends Parser {
             relativeTo,
             styles,
             sourceFileCache,
-            skipTypes
         }: JavaScriptParserOptions = {},
     ) {
         super({ctx, relativeTo});
@@ -100,7 +97,6 @@ export class JavaScriptParser extends Parser {
             module: ts.ModuleKind.CommonJS,
             moduleResolution: ts.ModuleResolutionKind.Node10,
             noEmit: true,
-            declarations: false,
             allowJs: true,
             checkJs: true,
             esModuleInterop: true,
@@ -113,7 +109,6 @@ export class JavaScriptParser extends Parser {
         };
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
-        this.skipTypes = skipTypes ?? false;
     }
 
     /**
@@ -341,15 +336,11 @@ export class JavaScriptParser extends Parser {
             await prettierLoader.detectPrettier();
         }
 
-        // Create type mapping only if types are needed (for performance)
-        let typeMapping: JavaScriptTypeMapping | undefined;
-        if (!this.skipTypes) {
-            const typeChecker = program.getTypeChecker();
-            // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
-            // This ensures that TypeScript types with the same type.id map to the same Type instance,
-            // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
-            typeMapping = new JavaScriptTypeMapping(typeChecker);
-        }
+        // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
+        // This ensures that TypeScript types with the same type.id map to the same Type instance,
+        // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
+        const typeChecker = program.getTypeChecker();
+        const typeMapping = new JavaScriptTypeMapping(typeChecker);
 
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
