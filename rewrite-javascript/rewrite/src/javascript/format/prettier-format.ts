@@ -18,7 +18,7 @@ import {J, Statement} from '../../java';
 import {Cursor, Tree} from '../../tree';
 import {TreePrinters} from '../../print';
 import {JavaScriptParser} from '../parser';
-import {WhitespaceReconcilerVisitor} from './whitespace-reconciler';
+import {WhitespaceReconciler} from './whitespace-reconciler';
 import {produce} from 'immer';
 import {randomId} from '../../uuid';
 import {getStyle, PrettierStyle, StyleKind, TabsAndIndentsStyle} from '../style';
@@ -169,8 +169,8 @@ export async function prettierFormat(
     // (e.g., Prettier removes empty placeholder statements). In such cases,
     // we return the formatted AST directly and let the caller handle
     // subtree-level reconciliation.
-    const reconciler = new WhitespaceReconcilerVisitor();
-    const result = await reconciler.reconcile(sourceFile, formattedAst);
+    const reconciler = new WhitespaceReconciler();
+    const result = reconciler.reconcile(sourceFile, formattedAst);
 
     // If reconciliation succeeded, return the reconciled original with updated whitespace
     // If it failed (structure mismatch), return the formatted AST for subtree reconciliation
@@ -475,8 +475,8 @@ export async function prettierFormatSubtree<T extends J>(
     }
 
     // Reconcile only the target subtree
-    const reconciler = new WhitespaceReconcilerVisitor();
-    const reconciled = await reconciler.reconcile(target as J, formattedTarget as J);
+    const reconciler = new WhitespaceReconciler();
+    const reconciled = reconciler.reconcile(target as J, formattedTarget as J);
 
     return reconciled as T;
 }

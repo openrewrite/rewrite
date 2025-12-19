@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 import {JavaScriptParser, JS, prettierFormat} from "../../../src/javascript";
-import {WhitespaceReconcilerVisitor} from "../../../src/javascript/format/whitespace-reconciler";
+import {WhitespaceReconciler} from "../../../src/javascript/format/whitespace-reconciler";
 import {TreePrinters} from "../../../src";
 
-describe('WhitespaceReconcilerVisitor', () => {
+describe('WhitespaceReconciler', () => {
     const parser = new JavaScriptParser();
     const parserNoTypes = new JavaScriptParser({skipTypes: true});
 
@@ -37,8 +37,8 @@ describe('WhitespaceReconcilerVisitor', () => {
         const formatted = await parseNoTypes('const x = 1');
 
         // Reconcile
-        const reconciler = new WhitespaceReconcilerVisitor();
-        const result = await reconciler.reconcile(original, formatted);
+        const reconciler = new WhitespaceReconciler();
+        const result = reconciler.reconcile(original, formatted);
 
         // Print and verify
         const printed = await print(result as JS.CompilationUnit);
@@ -57,8 +57,8 @@ describe('WhitespaceReconcilerVisitor', () => {
         const formatted = await parseNoTypes('foo()');
 
         // Reconcile - should return original unchanged
-        const reconciler = new WhitespaceReconcilerVisitor();
-        const result = await reconciler.reconcile(original, formatted);
+        const reconciler = new WhitespaceReconciler();
+        const result = reconciler.reconcile(original, formatted);
 
         // Should return original unchanged
         const printed = await print(result as JS.CompilationUnit);
@@ -70,8 +70,8 @@ describe('WhitespaceReconcilerVisitor', () => {
         const original = await parse('const x = 1; const y = 2');
         const formatted = await parseNoTypes('const x = 1;\nconst y = 2');
 
-        const reconciler = new WhitespaceReconcilerVisitor();
-        const result = await reconciler.reconcile(original, formatted);
+        const reconciler = new WhitespaceReconciler();
+        const result = reconciler.reconcile(original, formatted);
 
         const resultCu = result as JS.CompilationUnit;
         expect(resultCu.statements.length).toBe(2);
@@ -94,8 +94,8 @@ describe('WhitespaceReconcilerVisitor', () => {
 };
 `);
 
-        const reconciler = new WhitespaceReconcilerVisitor();
-        const result = await reconciler.reconcile(original, formatted);
+        const reconciler = new WhitespaceReconciler();
+        const result = reconciler.reconcile(original, formatted);
 
         const printed = await print(result as JS.CompilationUnit);
         expect(printed).toContain('\n');
@@ -106,8 +106,8 @@ describe('WhitespaceReconcilerVisitor', () => {
         const original = await parse('const x=1+2');
         const formatted = await parseNoTypes('const x = 1 + 2');
 
-        const reconciler = new WhitespaceReconcilerVisitor();
-        const result = await reconciler.reconcile(original, formatted);
+        const reconciler = new WhitespaceReconciler();
+        const result = reconciler.reconcile(original, formatted);
 
         const printed = await print(result as JS.CompilationUnit);
         expect(printed).toBe('const x = 1 + 2');
