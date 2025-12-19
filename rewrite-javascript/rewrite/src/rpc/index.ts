@@ -17,6 +17,7 @@ import {Checksum, FileAttributes, TreeKind} from "../tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./queue";
 import {createDraft, finishDraft} from "immer";
 import {Markers, MarkersKind, SearchResult, MarkupError, MarkupWarn, MarkupInfo, MarkupDebug} from "../markers";
+import {asRef} from "../reference";
 
 export * from "./queue";
 export * from "../reference";
@@ -71,7 +72,7 @@ RpcCodecs.registerCodec(MarkersKind.Markers, {
 
     async rpcSend(after: Markers, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, m => m.id);
-        await q.getAndSendList(after, m => m.markers, m => m.id);
+        await q.getAndSendList(after, m => m.markers.map(marker => asRef(marker)), m => m.id);
     }
 });
 
