@@ -325,8 +325,7 @@ describe('AutoformatVisitor', () => {
                 `
                 const x = function () {
                     return 136;
-                };
-                `
+                };`
             )
             // @formatter:on
         )
@@ -343,8 +342,7 @@ describe('AutoformatVisitor', () => {
                 const x =
                     function () {
                         return 136;
-                    };
-                `
+                    };`
             )
             // @formatter:on
         )

@@ -27,6 +27,7 @@ import {
     JS,
     npm,
     packageJson,
+    PrettierConfigLoader,
     prettierFormat,
     PrettierStyle,
     typescript
@@ -36,9 +37,7 @@ import {text} from "../../../src/text";
 import {J, Statement} from "../../../src/java";
 import {randomId, TreePrinters} from "../../../src";
 import {withDir} from "tmp-promise";
-import {PrettierConfigLoader} from "../../../src/javascript/format/prettier-config-loader";
 import * as path from "path";
-import * as fs from "fs";
 import * as fsp from "fs/promises";
 
 // A simple PrettierStyle with default configuration
@@ -56,7 +55,6 @@ describe('AutoformatVisitor with Prettier', () => {
             // Prettier adds semicolon and trailing newline
             typescript(`const x=1+2`,
                 `const x = 1 + 2;
-
 `)
             // @formatter:on
         )
@@ -164,7 +162,6 @@ describe('AutoformatVisitor with Prettier', () => {
                 `function foo(a: number, b: string) {
   return a + b;
 }
-
 `)
             // @formatter:on
         )
@@ -237,7 +234,6 @@ describe('AutoformatVisitor with Prettier', () => {
             typescript(
                 `const fn = x => x + 1`,
                 `const fn = (x) => x + 1;
-
 `
             )
             // @formatter:on
@@ -387,7 +383,6 @@ describe('Prettier auto-detection integration', () => {
                     typescript(
                         `const x = "hello";`,
                         `const x = 'hello'
-
 `
                     )
                 )
@@ -440,7 +435,6 @@ describe('Prettier auto-detection integration', () => {
                         ...typescript(
                             `const x = "hello";`,
                             `const x = 'hello'
-
 `
                         ),
                         path: 'apps/web/src/test.ts'
@@ -547,7 +541,6 @@ describe('Prettier .prettierignore handling', () => {
                         ...typescript(
                             `const x = "hello";`,
                             `const x = 'hello'
-
 `
                         ),
                         path: 'src/normal.ts'
@@ -637,7 +630,6 @@ describe('Prettier quoteProps option', () => {
             typescript(
                 `const obj = { "foo": 1, "bar": 2 }`,
                 `const obj = { foo: 1, bar: 2 };
-
 `
             )
             // @formatter:on
@@ -656,7 +648,6 @@ describe('Prettier quoteProps option', () => {
             typescript(
                 `const obj = { foo: 1, "bar-baz": 2 }`,
                 `const obj = { "foo": 1, "bar-baz": 2 };
-
 `
             )
             // @formatter:on
@@ -675,7 +666,6 @@ describe('Prettier quoteProps option', () => {
             typescript(
                 `const obj = { "foo": 1, bar: 2 }`,
                 `const obj = { "foo": 1, bar: 2 };
-
 `
             )
             // @formatter:on
