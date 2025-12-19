@@ -22,6 +22,9 @@ import {Autodetect, Detector} from "../autodetect";
 import {JavaScriptVisitor} from "../visitor";
 import {JS} from "../tree";
 import {J} from "../../java";
+import {findMarker, MarkersKind} from "../../markers";
+import {StyleKind} from "../style";
+import {NamedStyles} from "../../style";
 
 /**
  * Accumulator for the AutoFormat scanning recipe.
@@ -30,6 +33,24 @@ import {J} from "../../java";
 interface AutoFormatAccumulator {
     detector: Detector;
     detectedStyles?: Autodetect;
+}
+
+/**
+ * Checks if a compilation unit already has formatting styles attached.
+ * Returns true if either PrettierStyle or Autodetect markers are present.
+ */
+function hasFormattingStyles(cu: JS.CompilationUnit): boolean {
+    // Check for PrettierStyle marker
+    if (findMarker(cu, StyleKind.PrettierStyle)) {
+        return true;
+    }
+
+    // Check for Autodetect marker (NamedStyles with specific name)
+    const namedStyles = cu.markers.markers.filter(
+        m => m.kind === MarkersKind.NamedStyles
+    ) as NamedStyles[];
+
+    return namedStyles.some(s => s.name === "org.openrewrite.javascript.Autodetect");
 }
 
 /**
@@ -45,6 +66,9 @@ interface AutoFormatAccumulator {
  * - ES6 import/export brace spacing
  *
  * If no clear style is detected, defaults to IntelliJ IDEA style.
+ *
+ * Files with existing formatting styles (PrettierStyle or Autodetect markers)
+ * are skipped during style detection since they already have their formatting configured.
  */
 export class AutoFormat extends ScanningRecipe<AutoFormatAccumulator> {
     readonly name = "org.openrewrite.javascript.format.auto-format";
@@ -60,7 +84,10 @@ export class AutoFormat extends ScanningRecipe<AutoFormatAccumulator> {
     async scanner(acc: AutoFormatAccumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
-                await acc.detector.sample(cu);
+                // Skip sampling files that already have formatting styles attached
+                if (!hasFormattingStyles(cu)) {
+                    await acc.detector.sample(cu);
+                }
                 return cu;
             }
         };

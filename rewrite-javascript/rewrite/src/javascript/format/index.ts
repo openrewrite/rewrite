@@ -24,6 +24,6 @@ export {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
 
 // Prettier integration
 export {prettierFormat, applyPrettierFormatting, getPrettierStyle} from "./prettier-format";
-export {PrettierConfigLoader, loadPrettierVersion} from "./prettier-config-loader";
+export {PrettierConfigLoader, loadPrettierVersion, clearPrettierModuleCache} from "./prettier-config-loader";
 export type {PrettierDetectionResult} from "./prettier-config-loader";
 

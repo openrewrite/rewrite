@@ -21,12 +21,11 @@ import {JavaScriptParser} from '../parser';
 import {WhitespaceReconciler} from './whitespace-reconciler';
 import {produce} from 'immer';
 import {randomId} from '../../uuid';
-import {getStyle, PrettierStyle, StyleKind, TabsAndIndentsStyle} from '../style';
+import {PrettierStyle, StyleKind} from '../style';
 import {NamedStyles} from '../../style';
 import {findMarker} from '../../markers';
 import {NormalizeWhitespaceVisitor} from './normalize-whitespace-visitor';
 import {MinimumViableSpacingVisitor} from './minimum-viable-spacing-visitor';
-import {TabsAndIndentsVisitor} from './tabs-and-indents-visitor';
 import {loadPrettierVersion} from './prettier-config-loader';
 
 /**
@@ -139,20 +138,15 @@ export async function prettierFormat(
 
     // Step 3: Format with Prettier
     // Using the main Prettier module - parsers are resolved automatically
+    // Only set parser and filepath - pass through all other options without defaults
+    // This lets Prettier use its own defaults for any unspecified options
     const prettierOptions: Record<string, unknown> = {
         parser,
         filepath: sourceFile.sourcePath,  // Important: tells Prettier the file type for proper formatting
-        tabWidth: options.tabWidth ?? 2,
-        useTabs: options.useTabs ?? false,
-        semi: options.semi ?? true,
-        singleQuote: options.singleQuote ?? false,
-        trailingComma: options.trailingComma ?? 'all',
-        printWidth: options.printWidth ?? 80,
+        ...options,
     };
-    // Only add quoteProps if explicitly set (let Prettier use its default otherwise)
-    if (options.quoteProps !== undefined) {
-        prettierOptions.quoteProps = options.quoteProps;
-    }
+    // Remove our internal option that Prettier doesn't understand
+    delete prettierOptions.prettierVersion;
 
     const formattedSource = await prettier.format(originalSource, prettierOptions);
 
@@ -162,7 +156,12 @@ export async function prettierFormat(
     const formattedAst = await formattedParser.parseOnly({
         sourcePath: sourceFile.sourcePath,
         text: formattedSource
-    }) as JS.CompilationUnit;
+    });
+
+    if (!formattedAst) {
+        console.warn('Prettier formatting: Failed to parse formatted output, returning original');
+        return sourceFile;
+    }
 
     // Step 5: Reconcile whitespace from formatted AST to original AST
     // Note: For subtree formatting with pruned trees, the structure may differ
@@ -170,24 +169,37 @@ export async function prettierFormat(
     // we return the formatted AST directly and let the caller handle
     // subtree-level reconciliation.
     const reconciler = new WhitespaceReconciler();
-    const result = reconciler.reconcile(sourceFile, formattedAst);
+    const formattedCu = formattedAst as JS.CompilationUnit;
+    const result = reconciler.reconcile(sourceFile, formattedCu);
 
     // If reconciliation succeeded, return the reconciled original with updated whitespace
     // If it failed (structure mismatch), return the formatted AST for subtree reconciliation
-    return reconciler.isCompatible() ? result as JS.CompilationUnit : formattedAst;
+    return reconciler.isCompatible() ? result as JS.CompilationUnit : formattedCu;
 }
+
+/**
+ * Maps file extensions to Prettier parser names.
+ */
+const PRETTIER_PARSER_BY_EXTENSION: Record<string, string> = {
+    '.ts': 'typescript',
+    '.tsx': 'typescript',
+    '.js': 'babel',
+    '.jsx': 'babel',
+    '.mjs': 'babel',
+    '.cjs': 'babel',
+};
 
 /**
  * Determines the Prettier parser to use based on file extension.
  */
-function getParserForPath(path: string): string {
-    const lower = path.toLowerCase();
-    if (lower.endsWith('.tsx')) return 'typescript';
-    if (lower.endsWith('.ts')) return 'typescript';
-    if (lower.endsWith('.jsx')) return 'babel';
-    if (lower.endsWith('.mjs')) return 'babel';
-    if (lower.endsWith('.cjs')) return 'babel';
-    return 'babel';
+function getParserForPath(filePath: string): string {
+    const lower = filePath.toLowerCase();
+    for (const [ext, parser] of Object.entries(PRETTIER_PARSER_BY_EXTENSION)) {
+        if (lower.endsWith(ext)) {
+            return parser;
+        }
+    }
+    return 'babel'; // Default parser
 }
 
 /**
@@ -529,9 +541,7 @@ export function getPrettierStyle(
 /**
  * Applies Prettier formatting to a tree.
  *
- * Configuration is resolved from:
- * 1. PrettierStyle marker on source file (if present)
- * 2. TabsAndIndentsStyle defaults
+ * Configuration is resolved from the PrettierStyle marker on the source file.
  *
  * For compilation units, formats and reconciles the entire tree.
  * For subtrees, uses prettierFormatSubtree which prunes the tree for efficiency,
@@ -542,16 +552,14 @@ export function getPrettierStyle(
  * @param p The visitor parameter
  * @param cursor Optional cursor for subtree formatting
  * @param stopAfter Optional tree to stop after
- * @param styles Optional styles array for fallback styles
  * @returns The formatted tree
  */
 export async function applyPrettierFormatting<R extends J, P>(
     tree: R,
-    prettierStyle: PrettierStyle | undefined,
+    prettierStyle: PrettierStyle,
     p: P,
     cursor?: Cursor,
-    stopAfter?: Tree,
-    styles?: NamedStyles<string>[]
+    stopAfter?: Tree
 ): Promise<R | undefined> {
     // Run only the essential visitors first
     const essentialVisitors = [
@@ -567,32 +575,17 @@ export async function applyPrettierFormatting<R extends J, P>(
         }
     }
 
-    // If file is in .prettierignore, skip Prettier and use built-in formatting
-    const tabsAndIndentsStyle = getStyle(StyleKind.TabsAndIndentsStyle, tree, styles) as TabsAndIndentsStyle;
-    if (prettierStyle?.ignored) {
-        const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, stopAfter);
-        return await tabsVisitor.visit(t, p, cursor) as R;
+    // If file is in .prettierignore, skip formatting entirely
+    if (prettierStyle.ignored) {
+        return t;
     }
 
-    // Build options from PrettierStyle or TabsAndIndentsStyle defaults
-    let prettierOpts: PrettierFormatOptions = {
-        tabWidth: tabsAndIndentsStyle.indentSize,
-        useTabs: tabsAndIndentsStyle.useTabCharacter,
+    // Build options for Prettier
+    // Pass through the entire resolved config - let Prettier use its own defaults for unspecified options
+    const prettierOpts: PrettierFormatOptions = {
+        ...prettierStyle.config as PrettierFormatOptions,
+        prettierVersion: prettierStyle.prettierVersion,
     };
-
-    if (prettierStyle) {
-        prettierOpts = {
-            ...prettierOpts,
-            tabWidth: prettierStyle.config.tabWidth as number | undefined ?? prettierOpts.tabWidth,
-            useTabs: prettierStyle.config.useTabs as boolean | undefined ?? prettierOpts.useTabs,
-            semi: prettierStyle.config.semi as boolean | undefined,
-            singleQuote: prettierStyle.config.singleQuote as boolean | undefined,
-            trailingComma: prettierStyle.config.trailingComma as 'all' | 'es5' | 'none' | undefined,
-            printWidth: prettierStyle.config.printWidth as number | undefined,
-            quoteProps: prettierStyle.config.quoteProps as 'as-needed' | 'consistent' | 'preserve' | undefined,
-            prettierVersion: prettierStyle.prettierVersion,
-        };
-    }
 
     try {
         if (t.kind === JS.Kind.CompilationUnit) {
@@ -602,9 +595,9 @@ export async function applyPrettierFormatting<R extends J, P>(
         }
 
         if (!cursor) {
-            // No cursor provided, fall back to TabsAndIndentsVisitor
-            const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, stopAfter);
-            return await tabsVisitor.visit(t, p, cursor) as R;
+            // No cursor provided - can't use subtree formatting, return with essential formatting
+            console.warn('Prettier formatting: No cursor provided for subtree, returning with essential formatting only');
+            return t;
         }
 
         // Use prettierFormatSubtree for subtree formatting
@@ -613,9 +606,9 @@ export async function applyPrettierFormatting<R extends J, P>(
             return formatted as R;
         }
 
-        // Fall back to TabsAndIndentsVisitor if subtree formatting failed
-        const tabsVisitor = new TabsAndIndentsVisitor(tabsAndIndentsStyle, stopAfter);
-        return await tabsVisitor.visit(t, p, cursor) as R;
+        // Subtree formatting failed, return with essential formatting applied
+        console.warn('Prettier formatting: Subtree formatting failed, returning with essential formatting only');
+        return t;
     } catch (e) {
         // If Prettier fails, return tree with essential formatting applied
         console.warn('Prettier formatting failed, returning with essential formatting only:', e);

@@ -71,7 +71,7 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
         // If found, delegate entirely to Prettier (skip other formatting visitors)
         const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
         if (prettierStyle) {
-            return applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter, this.styles);
+            return applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
         }
 
         const visitors = [

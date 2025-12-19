@@ -24,8 +24,27 @@ import {randomId} from '../../uuid';
 /**
  * Cache of loaded Prettier modules by version.
  * This ensures we don't reload the same version multiple times.
+ *
+ * Use `clearPrettierModuleCache()` to clear this cache if needed
+ * (e.g., in long-running processes to free memory).
  */
 const prettierModuleCache: Map<string, typeof import('prettier')> = new Map();
+
+/**
+ * Cache of pending Prettier load operations.
+ * Prevents concurrent requests for the same version from duplicating work.
+ */
+const pendingLoads: Map<string, Promise<typeof import('prettier')>> = new Map();
+
+/**
+ * Clears the in-memory Prettier module cache.
+ * Call this in long-running processes to free memory when Prettier
+ * versions are no longer needed.
+ */
+export function clearPrettierModuleCache(): void {
+    prettierModuleCache.clear();
+    pendingLoads.clear();
+}
 
 /**
  * Gets the cache directory for a specific Prettier version.
@@ -346,6 +365,8 @@ export class PrettierConfigLoader {
  * 3. From the cached npm project at ~/.cache/openrewrite/prettier/<version>/
  * 4. Install to cache and load from there
  *
+ * Concurrent requests for the same version are deduplicated.
+ *
  * @param version The Prettier version to load (e.g., "3.4.2")
  * @returns The loaded Prettier module
  */
@@ -356,12 +377,34 @@ export async function loadPrettierVersion(version: string): Promise<typeof impor
         return cached;
     }
 
+    // Check if there's already a pending load for this version
+    const pending = pendingLoads.get(version);
+    if (pending) {
+        return pending;
+    }
+
+    // Create and cache the load promise to prevent concurrent duplicate loads
+    const loadPromise = loadPrettierVersionInternal(version);
+    pendingLoads.set(version, loadPromise);
+
+    try {
+        const prettier = await loadPromise;
+        prettierModuleCache.set(version, prettier);
+        return prettier;
+    } finally {
+        pendingLoads.delete(version);
+    }
+}
+
+/**
+ * Internal implementation of Prettier version loading.
+ */
+async function loadPrettierVersionInternal(version: string): Promise<typeof import('prettier')> {
     // Try to load from local node_modules if version matches
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const localPrettier = require('prettier');
         if (localPrettier.version === version) {
-            prettierModuleCache.set(version, localPrettier);
             return localPrettier;
         }
     } catch {
@@ -370,14 +413,10 @@ export async function loadPrettierVersion(version: string): Promise<typeof impor
 
     // Check if version is cached on disk
     if (isPrettierCached(version)) {
-        const prettier = loadPrettierFromCache(version);
-        prettierModuleCache.set(version, prettier);
-        return prettier;
+        return loadPrettierFromCache(version);
     }
 
     // Install to cache and load
     await installPrettierToCache(version);
-    const prettier = loadPrettierFromCache(version);
-    prettierModuleCache.set(version, prettier);
-    return prettier;
+    return loadPrettierFromCache(version);
 }
