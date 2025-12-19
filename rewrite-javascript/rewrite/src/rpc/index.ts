@@ -18,9 +18,10 @@ import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./queue";
 import {createDraft, finishDraft} from "immer";
 import {Markers, MarkersKind, SearchResult, MarkupError, MarkupWarn, MarkupInfo, MarkupDebug} from "../markers";
 
-export * from "./queue"
-export * from "../reference"
-export * from "./rewrite-rpc"
+export * from "./queue";
+export * from "../reference";
+// rewrite-rpc is not exported here to avoid circular dependency
+// Import directly from "./rewrite-rpc" if needed
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
     async rpcReceive(before: Checksum, q: RpcReceiveQueue): Promise<Checksum> {
