@@ -37,7 +37,7 @@ import {
  * - Spaces within ES6 import/export braces
  */
 export class Autodetect implements NamedStyles {
-    readonly kind = "org.openrewrite.marker.NamedStyles" as const;
+    readonly kind = "org.openrewrite.style.NamedStyles" as const;
     readonly id: string;
     readonly name = "org.openrewrite.javascript.Autodetect";
     readonly displayName = "Auto-detected";

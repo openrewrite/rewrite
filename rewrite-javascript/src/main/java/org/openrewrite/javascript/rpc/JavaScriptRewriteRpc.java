@@ -27,7 +27,6 @@ import org.openrewrite.rpc.request.PrepareRecipe;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -152,22 +151,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
 
-                SourceFile sourceFile = null;
-                try {
-                    sourceFile = getObject(item.getId(), item.getSourceFileType());
-                } catch (Exception e) {
-                    sourceFile = ParseError.build(
-                            null,
-                            null,
-                            projectPath,
-                            ctx,
-                            e
-                    );
-                } finally {
-                    if (sourceFile != null) {
-                        action.accept(sourceFile);
-                    }
-                }
+                SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
+                action.accept(sourceFile);
                 return true;
             }
 
