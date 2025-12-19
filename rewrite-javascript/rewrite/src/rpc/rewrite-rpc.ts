@@ -24,6 +24,7 @@ import {
     GetObject,
     GetRecipes,
     Parse,
+    ParseProject,
     PrepareRecipe,
     PrepareRecipeResponse,
     Print,
@@ -31,7 +32,6 @@ import {
     Visit,
     VisitResponse
 } from "./request";
-import {ParseProject} from "./request/parse-project";
 import {initializeMetricsCsv} from "./request/metrics";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
