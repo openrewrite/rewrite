@@ -18,6 +18,7 @@ import {J} from "../java";
 import {JS} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {createDraft, finishDraft} from "immer";
+import {PrettierStyle, StyleKind} from "./style";
 
 declare module "./tree" {
     namespace JS {
@@ -104,3 +105,21 @@ registerPrefixedMarkerCodec<Generator>(JS.Markers.Generator);
 registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);
 registerPrefixedMarkerCodec<Spread>(JS.Markers.Spread);
 registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration);
+
+// Register codec for PrettierStyle (a NamedStyles that contains Prettier configuration)
+// Only serialize the variable fields; constant fields are defined in the class
+RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
+    async rpcReceive(before: PrettierStyle, q: RpcReceiveQueue): Promise<PrettierStyle> {
+        const draft = createDraft(before);
+        (draft as any).id = await q.receive(before.id);
+        (draft as any).config = await q.receive(before.config);
+        (draft as any).prettierVersion = await q.receive(before.prettierVersion);
+        return finishDraft(draft) as PrettierStyle;
+    },
+
+    async rpcSend(after: PrettierStyle, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.config);
+        await q.getAndSend(after, a => a.prettierVersion);
+    }
+});

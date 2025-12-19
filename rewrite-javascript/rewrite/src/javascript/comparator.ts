@@ -249,12 +249,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             return j;
         }
 
+        // Check if it's a Type node
+        if (Type.isType(j)) {
+            return await this.visitType(j, other);
+        }
+
         // Check if it's a Tree node (has a kind property with a string value)
         if (kind !== undefined && typeof kind === 'string') {
-            // Check if it's a Type node (starts with "org.openrewrite.java.tree.JavaType$")
-            if (kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
-                return await this.visitType(j, other);
-            }
             return await this.visit(j, other);
         }
 
@@ -2244,13 +2245,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         if (this.lenientTypeMatching && (j == null || other == null)) {
             if (j !== other) {
                 // Don't abort if one is null and the other is a Type
-                const jKind = (j as any)?.kind;
-                const otherKind = (other as any)?.kind;
-                const isTypeComparison =
-                    (jKind && typeof jKind === 'string' && jKind.startsWith('org.openrewrite.java.tree.JavaType$')) ||
-                    (otherKind && typeof otherKind === 'string' && otherKind.startsWith('org.openrewrite.java.tree.JavaType$'));
-
-                if (!isTypeComparison) {
+                if (!Type.isType(j) && !Type.isType(other)) {
                     this.structuralMismatch(propertyName!);
                 }
             }

@@ -250,37 +250,25 @@ export type AfterRecipeText = string | ((actual: string) => string | undefined) 
  *
  * Behavior:
  * - Removes ONE leading newline if present (for template string ergonomics)
- * - Removes trailing newline + whitespace (for template string ergonomics)
- * - Preserves additional leading/trailing empty lines beyond the first
+ * - Preserves trailing newlines (important for testing formatters like Prettier)
  * - For lines with content: removes common indentation
  * - For lines with only whitespace: removes common indentation, preserving remaining spaces
  *
  * Examples:
  * - `\n  code` → `code` (single leading newline removed)
  * - `\n\n  code` → `\ncode` (first newline removed, second preserved)
- * - `  code\n` → `code` (trailing newline removed)
- * - `  code\n\n` → `code\n` (first trailing newline removed, second preserved)
+ * - `  code\n` → `code\n` (trailing newline preserved)
+ * - `  code\n\n` → `code\n\n` (trailing newlines preserved)
  */
 export function dedent(s: string): string {
     if (!s) return s;
 
     // Remove single leading newline for ergonomics
-    let start = s.charCodeAt(0) === 10 ? 1 : 0;  // 10 = '\n'
+    const start = s.charCodeAt(0) === 10 ? 1 : 0;  // 10 = '\n'
 
-    // Remove trailing newline + any trailing whitespace
-    let end = s.length;
-    for (let i = s.length - 1; i >= start; i--) {
-        const ch = s.charCodeAt(i);
-        if (ch === 10) {  // '\n'
-            end = i;
-            break;
-        }
-        if (ch !== 32 && ch !== 9) break;  // not ' ' or '\t'
-    }
+    if (start >= s.length) return '';
 
-    if (start >= end) return '';
-
-    const str = start > 0 || end < s.length ? s.slice(start, end) : s;
+    const str = start > 0 ? s.slice(start) : s;
     const lines = str.split('\n');
 
     // Always consider all lines for minIndent calculation
