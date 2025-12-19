@@ -19,6 +19,22 @@ import {Cursor, Tree} from "../../tree";
 import {produce} from "immer";
 
 /**
+ * Union type for all tree node types that the reconciler handles.
+ * This includes J nodes and their wrapper types.
+ */
+type TreeNode = J | J.RightPadded<J> | J.LeftPadded<J> | J.Container<J> | J.Space;
+
+/**
+ * Type guard to check if a value has a kind property (is a tree node or wrapper).
+ */
+function hasKind(value: unknown): value is { kind: string } {
+    return value !== null &&
+        typeof value === 'object' &&
+        'kind' in value &&
+        typeof (value as { kind: unknown }).kind === 'string';
+}
+
+/**
  * A visitor that reconciles whitespace from a formatted tree into the original tree.
  * Walks both trees in parallel and copies whitespace (prefix, before, after) from
  * the formatted tree to the original.
@@ -44,7 +60,7 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
      * The subtree to reconcile (by reference). If undefined, reconcile everything.
      * Can be a J node, RightPadded, LeftPadded, or Container.
      */
-    private targetSubtree?: any;
+    private targetSubtree?: TreeNode;
 
     /**
      * Tracks the reconciliation state:
@@ -65,7 +81,7 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
      *                      whitespace and markers applied.
      * @returns The original tree with whitespace from the formatted tree
      */
-    async reconcile(original: J, formatted: J, targetSubtree?: any): Promise<J> {
+    async reconcile(original: J, formatted: J, targetSubtree?: TreeNode): Promise<J> {
         this.compatible = true;
         this.formattedCursor = undefined;
         this.cursor = new Cursor(undefined, undefined);
@@ -113,8 +129,10 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
     /**
      * Visit a property value, handling all the different types appropriately.
      * This is the central entry point for visiting any node, including wrappers.
+     *
+     * @returns The reconciled value (original structure with formatted whitespace)
      */
-    protected async visitProperty(original: any, formatted: any): Promise<any> {
+    protected async visitProperty(original: unknown, formatted: unknown): Promise<unknown> {
         // Handle null/undefined
         if (original == null || formatted == null) {
             if (original !== formatted) {
@@ -123,24 +141,23 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
             return original;
         }
 
-        const kind = original.kind;
-
-        // Type nodes - short-circuit, keep original (types are expensive to compute)
-        if (typeof kind === 'string' && kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
-            return original;
-        }
-
-        // Primitive values or non-tree objects - copy from formatted when reconciling
-        // This handles things like valueSource (quote style) which is formatting
-        if (kind === undefined || typeof kind !== 'string') {
+        // Check if this is a tree node (has a kind property)
+        if (!hasKind(original)) {
+            // Primitive values or non-tree objects - copy from formatted when reconciling
+            // This handles things like valueSource (quote style) which is formatting
             if (this.shouldReconcile() && formatted !== original) {
                 return formatted;
             }
             return original;
         }
 
+        // Type nodes - short-circuit, keep original (types are expensive to compute)
+        if (original.kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
+            return original;
+        }
+
         // Space nodes - copy when reconciling, don't recurse
-        if (kind === J.Kind.Space) {
+        if (original.kind === J.Kind.Space) {
             return this.shouldReconcile() ? formatted : original;
         }
 
@@ -153,7 +170,8 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
 
         try {
             // All tree nodes (J, RightPadded, LeftPadded, Container) go through visitNode
-            return await this.visitNode(original, formatted);
+            // formatted must also have a kind since we check hasKind(original) and they should match
+            return await this.visitNode(original, formatted as { kind: string });
         } finally {
             // Track exiting the target subtree
             if (isTargetSubtree && previousState === 'searching') {
@@ -165,18 +183,34 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
     /**
      * Visit all properties of a tree node (J, RightPadded, LeftPadded, Container).
      * Copies Space values and markers when reconciling, visits everything else.
+     *
+     * @param original Tree node with kind property
+     * @param formatted Corresponding formatted tree node
+     * @returns The original with whitespace from formatted applied
      */
-    protected async visitNode(original: any, formatted: any): Promise<any> {
+    protected async visitNode(
+        original: { kind: string },
+        formatted: { kind: string }
+    ): Promise<{ kind: string }> {
         if (!this.compatible) {
             return original;
         }
 
         // Check if kinds match
         if (original.kind !== formatted.kind) {
+            // Check if this is a valid semantic equivalence (e.g., quoteProps changing Identifier↔Literal)
+            if (this.shouldReconcile() && this.isSemanticEquivalent(original, formatted)) {
+                // Use the formatted node but preserve type information from original
+                // Safe cast: isSemanticEquivalent only returns true for Identifier/Literal pairs
+                return this.copyWithPreservedTypes(
+                    original as J.Identifier | J.Literal,
+                    formatted
+                );
+            }
             return this.structureMismatch(original);
         }
 
-        let result = original;
+        let result: { kind: string } = original;
 
         // Visit all properties
         for (const key of Object.keys(original)) {
@@ -187,14 +221,14 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
                 continue;
             }
 
-            const originalValue = (original as any)[key];
-            const formattedValue = (formatted as any)[key];
+            const originalValue = (original as Record<string, unknown>)[key];
+            const formattedValue = (formatted as Record<string, unknown>)[key];
 
             // Space values and markers: copy from formatted when reconciling
-            if (originalValue?.kind === J.Kind.Space || key === 'markers') {
+            if ((hasKind(originalValue) && originalValue.kind === J.Kind.Space) || key === 'markers') {
                 if (this.shouldReconcile() && formattedValue !== originalValue) {
-                    result = produce(result, (draft: any) => {
-                        draft[key] = formattedValue;
+                    result = produce(result, (draft) => {
+                        (draft as Record<string, unknown>)[key] = formattedValue;
                     });
                 }
                 continue;
@@ -206,7 +240,7 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
                     return this.structureMismatch(original);
                 }
 
-                const newArray: any[] = [];
+                const newArray: unknown[] = [];
                 let changed = false;
                 for (let i = 0; i < originalValue.length; i++) {
                     const visited = await this.visitProperty(originalValue[i], formattedValue[i]);
@@ -218,8 +252,8 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
                 }
 
                 if (changed) {
-                    result = produce(result, (draft: any) => {
-                        draft[key] = newArray;
+                    result = produce(result, (draft) => {
+                        (draft as Record<string, unknown>)[key] = newArray;
                     });
                 }
             } else {
@@ -228,8 +262,8 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
                 if (!this.compatible) return original;
 
                 if (visited !== originalValue) {
-                    result = produce(result, (draft: any) => {
-                        draft[key] = visited;
+                    result = produce(result, (draft) => {
+                        (draft as Record<string, unknown>)[key] = visited;
                     });
                 }
             }
@@ -243,5 +277,58 @@ export class WhitespaceReconcilerVisitor extends JavaScriptVisitor<J> {
      */
     private shouldReconcile(): boolean {
         return this.reconcileState === 'reconciling';
+    }
+
+    /**
+     * Checks if two nodes with different kinds are semantically equivalent.
+     * This handles cases like Prettier's quoteProps option which can change
+     * property names between Identifier and Literal forms.
+     */
+    private isSemanticEquivalent(original: { kind: string }, formatted: { kind: string }): boolean {
+        const origKind = original.kind;
+        const fmtKind = formatted.kind;
+
+        // Identifier ↔ Literal equivalence (for property names with quoteProps)
+        if ((origKind === J.Kind.Identifier && fmtKind === J.Kind.Literal) ||
+            (origKind === J.Kind.Literal && fmtKind === J.Kind.Identifier)) {
+            // Extract the string value from each
+            const origValue = origKind === J.Kind.Identifier
+                ? (original as J.Identifier).simpleName
+                : (original as J.Literal).value;
+            const fmtValue = fmtKind === J.Kind.Identifier
+                ? (formatted as J.Identifier).simpleName
+                : (formatted as J.Literal).value;
+            // They're equivalent if they represent the same string value
+            return origValue === fmtValue;
+        }
+
+        return false;
+    }
+
+    /**
+     * Creates a copy of the formatted node with type information preserved from the original.
+     * Used when we accept a structural change from Prettier (Identifier ↔ Literal)
+     * but need to keep type attribution from the original.
+     *
+     * Only preserves `type` and `fieldType` since those are the only type-related
+     * fields on J.Identifier and J.Literal.
+     */
+    private copyWithPreservedTypes(
+        original: J.Identifier | J.Literal,
+        formatted: { kind: string }
+    ): { kind: string } {
+        const result: Record<string, unknown> = { ...formatted };
+
+        // Preserve type attribution - both Identifier and Literal have `type`
+        if (original.type !== undefined) {
+            result.type = original.type;
+        }
+
+        // Preserve fieldType - only Identifier has this, but safe to check
+        if ('fieldType' in original && original.fieldType !== undefined) {
+            result.fieldType = original.fieldType;
+        }
+
+        return result as { kind: string };
     }
 }

@@ -83,6 +83,15 @@ export interface PrettierFormatOptions {
     printWidth?: number;
 
     /**
+     * Change when properties in objects are quoted.
+     * - "as-needed" - Only add quotes around object properties where required.
+     * - "consistent" - If at least one property in an object requires quotes, quote all properties.
+     * - "preserve" - Respect the input use of quotes in object properties.
+     * Defaults to "as-needed".
+     */
+    quoteProps?: 'as-needed' | 'consistent' | 'preserve';
+
+    /**
      * The Prettier version to use (e.g., "3.4.2").
      * If specified, loads that version from cache or installs it.
      * If not specified, uses the bundled Prettier.
@@ -130,7 +139,7 @@ export async function prettierFormat(
 
     // Step 3: Format with Prettier
     // Using the main Prettier module - parsers are resolved automatically
-    const prettierOptions = {
+    const prettierOptions: Record<string, unknown> = {
         parser,
         filepath: sourceFile.sourcePath,  // Important: tells Prettier the file type for proper formatting
         tabWidth: options.tabWidth ?? 2,
@@ -140,6 +149,10 @@ export async function prettierFormat(
         trailingComma: options.trailingComma ?? 'all',
         printWidth: options.printWidth ?? 80,
     };
+    // Only add quoteProps if explicitly set (let Prettier use its default otherwise)
+    if (options.quoteProps !== undefined) {
+        prettierOptions.quoteProps = options.quoteProps;
+    }
 
     const formattedSource = await prettier.format(originalSource, prettierOptions);
 
@@ -576,6 +589,7 @@ export async function applyPrettierFormatting<R extends J, P>(
             singleQuote: prettierStyle.config.singleQuote as boolean | undefined,
             trailingComma: prettierStyle.config.trailingComma as 'all' | 'es5' | 'none' | undefined,
             printWidth: prettierStyle.config.printWidth as number | undefined,
+            quoteProps: prettierStyle.config.quoteProps as 'as-needed' | 'consistent' | 'preserve' | undefined,
             prettierVersion: prettierStyle.prettierVersion,
         };
     }

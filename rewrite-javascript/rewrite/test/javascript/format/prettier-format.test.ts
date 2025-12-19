@@ -546,3 +546,62 @@ describe('Prettier .prettierignore handling', () => {
         }, { unsafeCleanup: true });
     });
 });
+
+describe('Prettier quoteProps option', () => {
+    test('quoteProps as-needed removes unnecessary quotes', async () => {
+        // quoteProps: "as-needed" removes quotes from property names that don't need them
+        const quotePropsStyle = new PrettierStyle(randomId(), { quoteProps: 'as-needed' });
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new AutoformatVisitor(undefined, [quotePropsStyle]));
+
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const obj = { "foo": 1, "bar": 2 }`,
+                `const obj = { foo: 1, bar: 2 };
+
+`
+            )
+            // @formatter:on
+        );
+    });
+
+    test('quoteProps consistent adds quotes when one property needs them', async () => {
+        // quoteProps: "consistent" quotes all properties if at least one needs quoting
+        const quotePropsStyle = new PrettierStyle(randomId(), { quoteProps: 'consistent' });
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new AutoformatVisitor(undefined, [quotePropsStyle]));
+
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const obj = { foo: 1, "bar-baz": 2 }`,
+                `const obj = { "foo": 1, "bar-baz": 2 };
+
+`
+            )
+            // @formatter:on
+        );
+    });
+
+    test('quoteProps preserve keeps original quoting', async () => {
+        // quoteProps: "preserve" keeps the input's use of quotes
+        const quotePropsStyle = new PrettierStyle(randomId(), { quoteProps: 'preserve' });
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new AutoformatVisitor(undefined, [quotePropsStyle]));
+
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const obj = { "foo": 1, bar: 2 }`,
+                `const obj = { "foo": 1, bar: 2 };
+
+`
+            )
+            // @formatter:on
+        );
+    });
+});
