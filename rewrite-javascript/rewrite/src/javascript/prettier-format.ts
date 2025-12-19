@@ -132,6 +132,7 @@ export async function prettierFormat(
     // Using the main Prettier module - parsers are resolved automatically
     const prettierOptions = {
         parser,
+        filepath: sourceFile.sourcePath,  // Important: tells Prettier the file type for proper formatting
         tabWidth: options.tabWidth ?? 2,
         useTabs: options.useTabs ?? false,
         semi: options.semi ?? true,

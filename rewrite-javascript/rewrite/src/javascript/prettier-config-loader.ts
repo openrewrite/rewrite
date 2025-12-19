@@ -203,53 +203,54 @@ export class PrettierConfigLoader {
 
     /**
      * Gets the Prettier version from the project's package.json or node_modules.
+     * Scans upward from projectRoot to support monorepo structures where Prettier
+     * is installed at the repository root.
      */
     private getPrettierVersionFromProject(): string | undefined {
-        // First, check project's package.json for prettier dependency
-        const packageJsonPath = path.join(this.projectRoot, 'package.json');
-        if (fs.existsSync(packageJsonPath)) {
-            try {
-                const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-                const deps = {
-                    ...packageJson.dependencies,
-                    ...packageJson.devDependencies
-                };
-                if (deps.prettier) {
-                    // Try to get exact version from node_modules
-                    const installedVersion = this.getInstalledPrettierVersion();
-                    if (installedVersion) {
-                        return installedVersion;
-                    }
-                    // Fall back to declared version (might be a range)
-                    return deps.prettier;
-                }
-            } catch {
-                // package.json parse error
-            }
-        }
+        // Scan upward from projectRoot to find Prettier
+        // This handles monorepos where Prettier is at the root but files are in subdirectories
+        let dir = this.projectRoot;
 
-        // Check if prettier is installed in node_modules even without being in package.json
-        return this.getInstalledPrettierVersion();
-    }
-
-    /**
-     * Gets the exact Prettier version from node_modules.
-     */
-    private getInstalledPrettierVersion(): string | undefined {
-        try {
-            const prettierPackageJson = path.join(
-                this.projectRoot,
-                'node_modules',
-                'prettier',
-                'package.json'
-            );
+        while (true) {
+            // First, check for prettier in node_modules (actual installation)
+            const prettierPackageJson = path.join(dir, 'node_modules', 'prettier', 'package.json');
             if (fs.existsSync(prettierPackageJson)) {
-                const pkg = JSON.parse(fs.readFileSync(prettierPackageJson, 'utf8'));
-                return pkg.version;
+                try {
+                    const pkg = JSON.parse(fs.readFileSync(prettierPackageJson, 'utf8'));
+                    return pkg.version;
+                } catch {
+                    // Corrupted package.json, continue scanning
+                }
             }
-        } catch {
-            // Not installed or can't read
+
+            // Check package.json for prettier dependency (might be a range like ^3.0.0)
+            const packageJsonPath = path.join(dir, 'package.json');
+            if (fs.existsSync(packageJsonPath)) {
+                try {
+                    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+                    const deps = {
+                        ...packageJson.dependencies,
+                        ...packageJson.devDependencies
+                    };
+                    if (deps.prettier) {
+                        // Found prettier as a dependency, but node_modules wasn't found
+                        // This might mean dependencies aren't installed yet
+                        // Continue scanning upward in case there's a parent with node_modules
+                    }
+                } catch {
+                    // package.json parse error, continue
+                }
+            }
+
+            // Move up to parent directory
+            const parent = path.dirname(dir);
+            if (parent === dir) {
+                // Reached filesystem root
+                break;
+            }
+            dir = parent;
         }
+
         return undefined;
     }
 
@@ -271,12 +272,8 @@ export class PrettierConfigLoader {
                 : path.join(this.projectRoot, filePath);
 
             // Resolve config for this specific file (applies overrides)
-            const config = await this.detection.bundledPrettier.resolveConfig(absolutePath);
-
-            if (!config) {
-                // No Prettier config found for this file
-                return undefined;
-            }
+            // If no config file exists, use empty config (Prettier defaults)
+            const config = await this.detection.bundledPrettier.resolveConfig(absolutePath) ?? {};
 
             // Create a cache key from the resolved config + version
             const configKey = JSON.stringify({ config, version: this.detection.version });

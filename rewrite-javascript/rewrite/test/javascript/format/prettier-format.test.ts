@@ -33,7 +33,7 @@ import {
 } from "../../../src/javascript";
 import {json} from "../../../src/json";
 import {J, Statement} from "../../../src/java";
-import {randomId} from "../../../src";
+import {randomId, TreePrinters} from "../../../src";
 import {withDir} from "tmp-promise";
 
 // A simple PrettierStyle with default configuration
@@ -224,6 +224,55 @@ describe('AutoformatVisitor with Prettier', () => {
     });
 });
 
+describe('Prettier eof handling', () => {
+    test('Prettier adds trailing newline via eof', async () => {
+        const parser = new JavaScriptParser();
+
+        // Parse code without trailing newline
+        const sourceFile = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const x = 1;'  // No trailing newline
+        }) as JS.CompilationUnit;
+
+        // Original has no trailing whitespace in eof
+        expect(sourceFile.eof.whitespace).toBe('');
+
+        // Format with Prettier
+        const formatted = await prettierFormat(sourceFile, { semi: true });
+
+        // Prettier adds trailing newline - this is stored in eof
+        expect(formatted.eof.whitespace).toBe('\n');
+
+        // Verify the printed output reflects this
+        const formattedPrinted = await TreePrinters.print(formatted);
+        expect(formattedPrinted).toBe('const x = 1;\n');
+    });
+
+    test('no double newline when original already has trailing newline', async () => {
+        const parser = new JavaScriptParser();
+
+        // Parse code WITH trailing newline
+        const sourceFile = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const x = 1;\n'  // Has trailing newline
+        }) as JS.CompilationUnit;
+
+        // Original eof already has the newline
+        expect(sourceFile.eof.whitespace).toBe('\n');
+
+        // Format with Prettier
+        const formatted = await prettierFormat(sourceFile, { semi: true });
+
+        // Formatted eof still has just one newline
+        expect(formatted.eof.whitespace).toBe('\n');
+
+        // Verify we don't get double newline in output
+        const formattedPrinted = await TreePrinters.print(formatted);
+        expect(formattedPrinted).toBe('const x = 1;\n');
+        expect(formattedPrinted.endsWith('\n\n')).toBe(false);
+    });
+});
+
 describe('Prettier marker reconciliation', () => {
     test('Prettier adds Semicolon marker when adding semicolon', async () => {
         // Parse code WITHOUT a semicolon
@@ -320,6 +369,61 @@ describe('Prettier auto-detection integration', () => {
 
 `
                     )
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
+    test('detects Prettier in monorepo parent directory', async () => {
+        // This test verifies that PrettierConfigLoader scans upward from projectRoot
+        // to find Prettier installed in a monorepo root
+        await withDir(async (repo) => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AutoformatVisitor());
+
+            // Monorepo structure:
+            // /
+            //   package.json (with prettier)
+            //   .prettierrc (config at root)
+            //   apps/
+            //     web/
+            //       package.json (no prettier dependency)
+            //       src/
+            //         test.ts
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    packageJson(`
+                        {
+                            "name": "monorepo",
+                            "private": true,
+                            "devDependencies": {
+                                "prettier": "^3.0.0"
+                            }
+                        }
+                    `),
+                    // .prettierrc at monorepo root
+                    prettierrc({ singleQuote: true, semi: false }),
+                    // Nested package without prettier
+                    {
+                        ...packageJson(`
+                            {
+                                "name": "@apps/web",
+                                "version": "1.0.0"
+                            }
+                        `),
+                        path: 'apps/web/package.json'
+                    },
+                    // Source file in nested package
+                    {
+                        ...typescript(
+                            `const x = "hello";`,
+                            `const x = 'hello'
+
+`
+                        ),
+                        path: 'apps/web/src/test.ts'
+                    }
                 )
             );
         }, {unsafeCleanup: true});
