@@ -17,7 +17,8 @@ import {findMarker, Marker, Markers} from "../markers";
 import {randomId, UUID} from "../uuid";
 import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {castDraft, createDraft, finishDraft} from "immer";
+import {castDraft} from "immer";
+import {updateIfChanged} from "../util";
 import * as semver from "semver";
 import * as fsp from "fs/promises";
 import * as path from "path";
@@ -815,12 +816,11 @@ export namespace NodeResolutionResultQueries {
  */
 RpcCodecs.registerCodec(NpmrcKind, {
     async rpcReceive(before: Npmrc, q: RpcReceiveQueue): Promise<Npmrc> {
-        const draft = createDraft(before);
-        draft.kind = NpmrcKind;
-        draft.scope = await q.receive(before.scope);
-        draft.properties = await q.receive(before.properties);
-
-        return finishDraft(draft) as Npmrc;
+        return updateIfChanged(before, {
+            kind: NpmrcKind,
+            scope: await q.receive(before.scope),
+            properties: await q.receive(before.properties),
+        });
     },
 
     async rpcSend(after: Npmrc, q: RpcSendQueue): Promise<void> {
@@ -834,13 +834,12 @@ RpcCodecs.registerCodec(NpmrcKind, {
  */
 RpcCodecs.registerCodec(DependencyKind, {
     async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
-        const draft = createDraft(before);
-        draft.kind = DependencyKind;
-        draft.name = await q.receive(before.name);
-        draft.versionConstraint = await q.receive(before.versionConstraint);
-        draft.resolved = await q.receive(before.resolved);
-
-        return finishDraft(draft) as Dependency;
+        return updateIfChanged(before, {
+            kind: DependencyKind,
+            name: await q.receive(before.name),
+            versionConstraint: await q.receive(before.versionConstraint),
+            resolved: await q.receive(before.resolved),
+        });
     },
 
     async rpcSend(after: Dependency, q: RpcSendQueue): Promise<void> {
@@ -855,18 +854,17 @@ RpcCodecs.registerCodec(DependencyKind, {
  */
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
     async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
-        const draft = createDraft(before);
-        draft.kind = ResolvedDependencyKind;
-        draft.name = await q.receive(before.name);
-        draft.version = await q.receive(before.version);
-        draft.dependencies = (await q.receiveList(before.dependencies)) || undefined;
-        draft.devDependencies = (await q.receiveList(before.devDependencies)) || undefined;
-        draft.peerDependencies = (await q.receiveList(before.peerDependencies)) || undefined;
-        draft.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || undefined;
-        draft.engines = await q.receive(before.engines);
-        draft.license = await q.receive(before.license);
-
-        return finishDraft(draft) as ResolvedDependency;
+        return updateIfChanged(before, {
+            kind: ResolvedDependencyKind,
+            name: await q.receive(before.name),
+            version: await q.receive(before.version),
+            dependencies: (await q.receiveList(before.dependencies)) || undefined,
+            devDependencies: (await q.receiveList(before.devDependencies)) || undefined,
+            peerDependencies: (await q.receiveList(before.peerDependencies)) || undefined,
+            optionalDependencies: (await q.receiveList(before.optionalDependencies)) || undefined,
+            engines: await q.receive(before.engines),
+            license: await q.receive(before.license),
+        });
     },
 
     async rpcSend(after: ResolvedDependency, q: RpcSendQueue): Promise<void> {
@@ -888,29 +886,29 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
 /**
  * Register RPC codec for NodeResolutionResult marker.
  * This handles serialization/deserialization for communication between JS and Java.
+ * Note: We avoid Immer here because the dependency graph can contain cycles
+ * (e.g., Dependency -> ResolvedDependency -> Dependency[]), and Immer's proxies
+ * don't handle cyclic structures correctly.
  */
 RpcCodecs.registerCodec(NodeResolutionResultKind, {
     async rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): Promise<NodeResolutionResult> {
-        const draft = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.name = await q.receive(before.name);
-        draft.version = await q.receive(before.version);
-        draft.description = await q.receive(before.description);
-        draft.path = await q.receive(before.path);
-        draft.workspacePackagePaths = await q.receive(before.workspacePackagePaths);
-
-        draft.dependencies = (await q.receiveList(before.dependencies)) || [];
-        draft.devDependencies = (await q.receiveList(before.devDependencies)) || [];
-        draft.peerDependencies = (await q.receiveList(before.peerDependencies)) || [];
-        draft.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || [];
-        draft.bundledDependencies = (await q.receiveList(before.bundledDependencies)) || [];
-        draft.resolvedDependencies = (await q.receiveList(before.resolvedDependencies)) || [];
-
-        draft.packageManager = await q.receive(before.packageManager);
-        draft.engines = await q.receive(before.engines);
-        draft.npmrcConfigs = (await q.receiveList(before.npmrcConfigs)) || undefined;
-
-        return finishDraft(draft) as NodeResolutionResult;
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            name: await q.receive(before.name),
+            version: await q.receive(before.version),
+            description: await q.receive(before.description),
+            path: await q.receive(before.path),
+            workspacePackagePaths: await q.receive(before.workspacePackagePaths),
+            dependencies: (await q.receiveList(before.dependencies)) || [],
+            devDependencies: (await q.receiveList(before.devDependencies)) || [],
+            peerDependencies: (await q.receiveList(before.peerDependencies)) || [],
+            optionalDependencies: (await q.receiveList(before.optionalDependencies)) || [],
+            bundledDependencies: (await q.receiveList(before.bundledDependencies)) || [],
+            resolvedDependencies: (await q.receiveList(before.resolvedDependencies)) || [],
+            packageManager: await q.receive(before.packageManager),
+            engines: await q.receive(before.engines),
+            npmrcConfigs: (await q.receiveList(before.npmrcConfigs)) || undefined,
+        });
     },
 
     async rpcSend(after: NodeResolutionResult, q: RpcSendQueue): Promise<void> {

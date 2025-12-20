@@ -17,7 +17,6 @@ import {Marker} from "../markers";
 import {J} from "../java";
 import {JS} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {createDraft, finishDraft} from "immer";
 import {
     prettierStyle,
     PrettierStyle,
@@ -28,7 +27,8 @@ import {
     WrappingAndBracesStyle,
     WrappingAndBracesStyleDetailKind
 } from "./style";
-import {Autodetect, autodetect} from "./autodetect";
+import {Autodetect} from "./autodetect";
+import {updateIfChanged} from "../util";
 
 declare module "./tree" {
     namespace JS {
@@ -96,10 +96,10 @@ function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
 ) {
     RpcCodecs.registerCodec(kind, {
         async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
-            const draft = createDraft(before);
-            draft.id = await q.receive(before.id);
-            draft.prefix = await q.receive(before.prefix);
-            return finishDraft(draft) as M;
+            return updateIfChanged(before, {
+                id: await q.receive(before.id),
+                prefix: await q.receive(before.prefix)
+            } as Partial<M>);
         },
 
         async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
@@ -139,9 +139,10 @@ RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
 // Only serialize the variable fields (id, styles); constant fields are defined in the interface
 RpcCodecs.registerCodec(StyleKind.Autodetect, {
     async rpcReceive(before: Autodetect, q: RpcReceiveQueue): Promise<Autodetect> {
-        const id = await q.receive(before.id);
-        const styles = (await q.receiveList(before.styles))!;
-        return autodetect(id, styles);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            styles: (await q.receiveList(before.styles))!,
+        });
     },
 
     async rpcSend(after: Autodetect, q: RpcSendQueue): Promise<void> {
@@ -161,11 +162,11 @@ function registerSimpleCodec<T extends { kind: string }>(
 ) {
     RpcCodecs.registerCodec(kind, {
         async rpcReceive(before: T, q: RpcReceiveQueue): Promise<T> {
-            const draft = createDraft(before);
+            const updates: Partial<T> = {};
             for (const field of fields) {
-                (draft as any)[field] = await q.receive((before as any)[field]);
+                (updates as any)[field] = await q.receive((before as any)[field]);
             }
-            return finishDraft(draft) as T;
+            return updateIfChanged(before, updates);
         },
 
         async rpcSend(after: T, q: RpcSendQueue): Promise<void> {
@@ -227,15 +228,15 @@ registerSimpleCodec<SpacesStyle.Other>(SpacesStyleDetailKind.SpacesStyleOther, [
 // SpacesStyle - has nested objects
 RpcCodecs.registerCodec(StyleKind.SpacesStyle, {
     async rpcReceive(before: SpacesStyle, q: RpcReceiveQueue): Promise<SpacesStyle> {
-        const draft = createDraft(before);
-        draft.beforeParentheses = await q.receive(before.beforeParentheses);
-        draft.aroundOperators = await q.receive(before.aroundOperators);
-        draft.beforeLeftBrace = await q.receive(before.beforeLeftBrace);
-        draft.beforeKeywords = await q.receive(before.beforeKeywords);
-        draft.within = await q.receive(before.within);
-        draft.ternaryOperator = await q.receive(before.ternaryOperator);
-        draft.other = await q.receive(before.other);
-        return finishDraft(draft) as SpacesStyle;
+        return updateIfChanged(before, {
+            beforeParentheses: await q.receive(before.beforeParentheses),
+            aroundOperators: await q.receive(before.aroundOperators),
+            beforeLeftBrace: await q.receive(before.beforeLeftBrace),
+            beforeKeywords: await q.receive(before.beforeKeywords),
+            within: await q.receive(before.within),
+            ternaryOperator: await q.receive(before.ternaryOperator),
+            other: await q.receive(before.other),
+        });
     },
 
     async rpcSend(after: SpacesStyle, q: RpcSendQueue): Promise<void> {
@@ -262,10 +263,10 @@ registerSimpleCodec<WrappingAndBracesStyle.KeepWhenReformatting>(
 
 RpcCodecs.registerCodec(StyleKind.WrappingAndBracesStyle, {
     async rpcReceive(before: WrappingAndBracesStyle, q: RpcReceiveQueue): Promise<WrappingAndBracesStyle> {
-        const draft = createDraft(before);
-        draft.ifStatement = await q.receive(before.ifStatement);
-        draft.keepWhenReformatting = await q.receive(before.keepWhenReformatting);
-        return finishDraft(draft) as WrappingAndBracesStyle;
+        return updateIfChanged(before, {
+            ifStatement: await q.receive(before.ifStatement),
+            keepWhenReformatting: await q.receive(before.keepWhenReformatting),
+        });
     },
 
     async rpcSend(after: WrappingAndBracesStyle, q: RpcSendQueue): Promise<void> {
