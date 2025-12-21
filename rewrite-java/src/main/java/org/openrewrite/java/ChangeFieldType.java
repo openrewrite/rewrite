@@ -43,8 +43,8 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
         J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, p);
         if (typeAsClass != null && oldFullyQualifiedTypeName.equals(typeAsClass.getFullyQualifiedName())) {
 
-            maybeAddImport(newFieldType);
             maybeRemoveImport(typeAsClass);
+            maybeAddImport(newFieldType);
 
             mv = mv.withTypeExpression(mv.getTypeExpression() == null ?
                     null :

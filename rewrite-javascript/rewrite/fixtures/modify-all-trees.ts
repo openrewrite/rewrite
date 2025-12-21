@@ -25,7 +25,7 @@ import {
     RecipeMarketplace,
     Tree,
     TreeVisitor
-} from "../src";
+} from "@openrewrite/rewrite";
 
 export async function activate(marketplace: RecipeMarketplace) {
     await marketplace.install(ModifyAllTrees, JavaScript);

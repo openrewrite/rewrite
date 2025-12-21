@@ -20,7 +20,7 @@ import {createDraft, Draft, finishDraft} from "immer";
 
 export const MarkersKind = {
     Markers: "org.openrewrite.marker.Markers",
-    NamedStyles: "org.openrewrite.marker.NamedStyles",
+    NamedStyles: "org.openrewrite.style.NamedStyles",
     SearchResult: "org.openrewrite.marker.SearchResult",
     ParseExceptionResult: "org.openrewrite.ParseExceptionResult",
 

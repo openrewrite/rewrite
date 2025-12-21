@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JavaScript, RecipeMarketplace} from "../src";
+import {JavaScript, RecipeMarketplace} from "@openrewrite/rewrite";
 import {FindIdentifier} from "./search-recipe";
 import {CreateText} from "./create-text";
 import {ChangeText} from "./change-text";
@@ -26,6 +26,7 @@ import {MarkTypes} from "./mark-types";
 import {MarkPrimitiveTypes} from "./mark-primitive-types";
 import {MarkClassTypes} from "./mark-class-types";
 import {ScanningEditor} from "./scanning-editor";
+import {ReplaceAssignment} from "./replace-assignment";
 
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ChangeText, JavaScript);
@@ -40,4 +41,5 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(MarkPrimitiveTypes, JavaScript);
     await marketplace.install(MarkClassTypes, JavaScript);
     await marketplace.install(ScanningEditor, JavaScript);
+    await marketplace.install(ReplaceAssignment, JavaScript);
 }

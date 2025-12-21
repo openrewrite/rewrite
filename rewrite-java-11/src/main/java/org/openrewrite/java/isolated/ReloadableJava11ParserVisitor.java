@@ -1573,7 +1573,10 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             // `node.declaredUsingVar()` was only added around 11.0.15
             int nextTokenIdx = indexOfNextNonWhitespace(cursor, source);
             boolean nextTokenStartsWithVar = source.startsWith("var", nextTokenIdx);
-            if (nextTokenStartsWithVar && Character.isWhitespace(source.charAt(nextTokenIdx + 3))) {
+            if (nextTokenStartsWithVar &&
+                node.getStartPosition() <= nextTokenIdx &&
+                nextTokenIdx + 3 < node.getPreferredPosition()
+            ) {
                 typeExpr = new J.Identifier(randomId(), sourceBefore("var"),
                     Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var",
                     typeMapping.type(vartype), null);

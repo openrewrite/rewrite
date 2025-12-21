@@ -1723,54 +1723,54 @@ class MavenParserTest implements RewriteTest {
           mavenProject("a-parent",
             pomXml(
               """
-                    <project>
-                        <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>d</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
-                    </project>
+                <project>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>d</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                </project>
                 """
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>a-parent</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
-                        <packaging>pom</packaging>
+                <project>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>a-parent</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
 
-                        <dependencyManagement>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>org.openrewrite.maven</groupId>
-                                    <artifactId>d</artifactId>
-                                    <version>0.1.0-SNAPSHOT</version>
-                                </dependency>
-                            </dependencies>
-                        </dependencyManagement>
-                    </project>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.openrewrite.maven</groupId>
+                                <artifactId>d</artifactId>
+                                <version>0.1.0-SNAPSHOT</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
                 """
             ),
             mavenProject("a",
               pomXml(
                 """
-                      <project>
-                          <parent>
+                  <project>
+                      <parent>
+                          <groupId>org.openrewrite.maven</groupId>
+                          <artifactId>a-parent</artifactId>
+                          <version>0.1.0-SNAPSHOT</version>
+                          <relativePath />
+                      </parent>
+
+                      <artifactId>a</artifactId>
+
+                      <dependencies>
+                          <dependency>
                               <groupId>org.openrewrite.maven</groupId>
-                              <artifactId>a-parent</artifactId>
+                              <artifactId>b</artifactId>
                               <version>0.1.0-SNAPSHOT</version>
-                              <relativePath />
-                          </parent>
-
-                          <artifactId>a</artifactId>
-
-                          <dependencies>
-                              <dependency>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>b</artifactId>
-                                  <version>0.1.0-SNAPSHOT</version>
-                              </dependency>
-                          </dependencies>
-                      </project>
+                          </dependency>
+                      </dependencies>
+                  </project>
                   """,
                 spec -> spec.afterRecipe(pomXml -> {
                     var compileDependencies = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
@@ -1785,52 +1785,52 @@ class MavenParserTest implements RewriteTest {
               mavenProject("b-parent",
                 pomXml(
                   """
-                        <project>
-                            <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>d</artifactId>
-                            <version>0.2.0-SNAPSHOT</version>
-                        </project>
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>d</artifactId>
+                        <version>0.2.0-SNAPSHOT</version>
+                    </project>
                     """
                 ),
                 pomXml(
                   """
-                        <project>
-                            <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>b-parent</artifactId>
-                            <version>0.1.0-SNAPSHOT</version>
-                            <packaging>pom</packaging>
-                            <dependencyManagement>
-                                <dependencies>
-                                    <dependency>
-                                        <groupId>org.openrewrite.maven</groupId>
-                                        <artifactId>d</artifactId>
-                                        <version>0.2.0-SNAPSHOT</version>
-                                    </dependency>
-                                </dependencies>
-                            </dependencyManagement>
-                        </project>
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>b-parent</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.openrewrite.maven</groupId>
+                                    <artifactId>d</artifactId>
+                                    <version>0.2.0-SNAPSHOT</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
                     """
                 ),
                 mavenProject("b",
                   pomXml(
                     """
-                          <project>
-                              <parent>
+                      <project>
+                          <parent>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>b-parent</artifactId>
+                              <version>0.1.0-SNAPSHOT</version>
+                              <relativePath />
+                          </parent>
+
+                          <artifactId>b</artifactId>
+
+                          <dependencies>
+                              <dependency>
                                   <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>b-parent</artifactId>
-                                  <version>0.1.0-SNAPSHOT</version>
-                                  <relativePath />
-                              </parent>
-
-                              <artifactId>b</artifactId>
-
-                              <dependencies>
-                                  <dependency>
-                                      <groupId>org.openrewrite.maven</groupId>
-                                      <artifactId>d</artifactId>
-                                  </dependency>
-                              </dependencies>
-                          </project>
+                                  <artifactId>d</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
                       """
                   )
                 )
@@ -3662,7 +3662,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getVersion()).isEqualTo("1.0.0");
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               }
             )
@@ -3700,10 +3700,10 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getVersion()).isEqualTo("1.0.0");
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
                   assert results.getParent() != null;
-                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("1.0.0");
                   assertThat(results.getParent().getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               })
             )

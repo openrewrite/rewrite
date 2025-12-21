@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isDocuments, isMapping, isScalar, isSequence, Yaml, YamlParser} from "../../src/yaml";
+import {isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
 import {printer} from "../../src";
+import {RecipeSpec} from "../../src/test";
 
 async function parseAndPrint(yaml: string): Promise<string> {
     const parser = new YamlParser();
@@ -322,4 +323,13 @@ block:
         const block = mapping.entries[1].value as Yaml.Mapping;
         expect(block.openingBracePrefix).toBeUndefined();
     });
+});
+
+describe('yaml assertion helper', () => {
+    const spec = new RecipeSpec();
+
+    test('simple mapping', () =>
+        spec.rewriteRun(
+            yaml('key: value')
+        ));
 });

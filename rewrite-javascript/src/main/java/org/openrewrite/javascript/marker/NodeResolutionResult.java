@@ -237,19 +237,27 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
 
         @Override
         public ResolvedDependency rpcReceive(ResolvedDependency before, RpcReceiveQueue q) {
-            return before
-                    .withName(q.receive(before.name))
-                    .withVersion(q.receive(before.version))
+            before = before
+                    .withName(q.receive(before.name));
+            before = before
+                    .withVersion(q.receive(before.version));
+            before = before
                     .withDependencies(q.receiveList(before.dependencies,
-                            dep -> dep.rpcReceive(dep, q)))
+                            dep -> dep.rpcReceive(dep, q)));
+            before = before
                     .withDevDependencies(q.receiveList(before.devDependencies,
-                            dep -> dep.rpcReceive(dep, q)))
+                            dep -> dep.rpcReceive(dep, q)));
+            before = before
                     .withPeerDependencies(q.receiveList(before.peerDependencies,
-                            dep -> dep.rpcReceive(dep, q)))
+                            dep -> dep.rpcReceive(dep, q)));
+            before = before
                     .withOptionalDependencies(q.receiveList(before.optionalDependencies,
-                            dep -> dep.rpcReceive(dep, q)))
-                    .withEngines(q.receive(before.engines))
+                            dep -> dep.rpcReceive(dep, q)));
+            before = before
+                    .withEngines(q.receive(before.engines));
+            before = before
                     .withLicense(q.receive(before.license));
+            return before;
         }
     }
 

@@ -137,8 +137,8 @@ describe('BlankLinesVisitor', () => {
                 `
                     const x=["1",2,3];
                     let y = 2;
-                    const z = 3;
-                `)
+                    const z = 3;`
+            )
             // @formatter:on
         );
     });
@@ -164,8 +164,8 @@ describe('BlankLinesVisitor', () => {
                     }
                     const list:TodoItem[]=[new TodoItem("Buy milk"),new TodoItem("Walk the dog")];
                     list[1].toggle();
-                    list.forEach(item=>console.log(item.toString()));
-                `)
+                    list.forEach(item=>console.log(item.toString()));`
+            )
             // @formatter:on
         );
     });

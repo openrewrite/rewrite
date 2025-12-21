@@ -366,6 +366,75 @@ class ResolvedPomTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6391")
+    @Test
+    void propertyWithNullValue() {
+        rewriteRun(
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>artifact</artifactId>
+                  <version>${revision}${sha1}${changelist}</version>
+                  <properties>
+                      <revision>1.2.3</revision>
+                      <changelist>-SNAPSHOT</changelist>
+                      <sha1 />
+                  </properties>
+              </project>
+              """,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(doc.getMarkers().findFirst(MavenResolutionResult.class))
+                .map(MavenResolutionResult::getPom)
+                .map(ResolvedPom::getVersion)
+                .contains("1.2.3-SNAPSHOT")
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6391")
+    @Test
+    void resolveParentWithPropertiesFromParent() {
+        rewriteRun(
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>${revision}${sha1}${changelist}</version>
+                  <properties>
+                      <revision>1.2.3</revision>
+                      <changelist>-SNAPSHOT</changelist>
+                      <sha1 />
+                  </properties>
+            </project>
+            """
+          ),
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <artifactId>child</artifactId>
+                  <parent>
+                      <groupId>org.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>${revision}${sha1}${changelist}</version>
+                  </parent>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml").afterRecipe(doc ->
+              assertThat(doc.getMarkers().findFirst(MavenResolutionResult.class))
+                .map(MavenResolutionResult::getPom)
+                .map(ResolvedPom::getVersion)
+                .contains("1.2.3-SNAPSHOT")
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4687")
     @Nested
     class TolerateMissingPom {
@@ -792,7 +861,6 @@ class ResolvedPomTest implements RewriteTest {
                   <artifactId>api-parent</artifactId>
                   <version>1.0.0-SNAPSHOT</version>
                   <packaging>pom</packaging>
-
                   <modules>
                       <module>api-definitions</module>
                       <module>api-codegen</module>
@@ -806,7 +874,6 @@ class ResolvedPomTest implements RewriteTest {
                 <project>
                     <artifactId>api-definitions</artifactId>
                     <packaging>tgz</packaging>
-
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
@@ -823,14 +890,12 @@ class ResolvedPomTest implements RewriteTest {
             pomXml("""
                 <project>
                     <artifactId>api-codegen</artifactId>
-
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
                         <version>1.0.0-SNAPSHOT</version>
                         <relativePath>../pom.xml</relativePath>
                     </parent>
-
                     <dependencies>
                         <dependency>
                             <groupId>org.example</groupId>

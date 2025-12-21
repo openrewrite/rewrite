@@ -47,11 +47,11 @@
   "scripts": {
     "build": "rm -rf ./dist tsconfig.build.tsbuildinfo && tsc --build tsconfig.build.json",
     "postbuild": "chmod +x dist/rpc/server.js && npm link",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "dev": "tsc --watch -p tsconfig.json",
-    "test": "npm run typecheck && npm run build && NODE_OPTIONS='--max-old-space-size=4096' jest",
+    "test": "npm run typecheck && npm run build && NODE_OPTIONS='--max-old-space-size=4096 --experimental-vm-modules' jest",
     "build:fixtures": "tsc --build fixtures/tsconfig.json",
-    "ci:test": "NODE_OPTIONS='--max-old-space-size=4096' jest",
+    "ci:test": "NODE_OPTIONS='--max-old-space-size=4096 --experimental-vm-modules' jest",
     "start": "npm run build && node ./dist/rpc/server.js"
   },
   "dependencies": {
@@ -78,6 +78,7 @@
     "benchmark": "^2.1.4",
     "jest": "^29.7.0",
     "jest-junit": "^16.0.0",
+    "prettier": "^3.7.4",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2"
   },

@@ -13,19 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JS} from "./tree";
-import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../java";
+import {JS} from "../tree";
+import {JavaScriptVisitor} from "../visitor";
+import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../../java";
 import {Draft, produce} from "immer";
-import {Cursor, isScope, Tree} from "../tree";
-import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "./style";
-import {NamedStyles} from "../style";
-import {produceAsync} from "../visitor";
-import {findMarker} from "../markers";
-import {Generator} from "./markers";
+import {Cursor, isScope, Tree} from "../../tree";
+import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
+import {NamedStyles} from "../../style";
+import {produceAsync} from "../../visitor";
+import {Generator} from "../markers";
 import {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
+import {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
+import {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
+import {applyPrettierFormatting, getPrettierStyle} from "./prettier-format";
 
 export {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
+export {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
+export {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
 
 export const maybeAutoFormat = async <J2 extends J, P>(before: J2, after: J2, p: P, stopAfter?: J, parent?: Cursor): Promise<J2> => {
     if (before !== after) {
@@ -34,7 +38,13 @@ export const maybeAutoFormat = async <J2 extends J, P>(before: J2, after: J2, p:
     return after;
 }
 
-export const autoFormat = async <J2 extends J, P>(j: J2, p: P, stopAfter?: J, parent?: Cursor, styles?: NamedStyles[]): Promise<J2> =>
+export const autoFormat = async <J2 extends J, P>(
+    j: J2,
+    p: P,
+    stopAfter?: J,
+    parent?: Cursor,
+    styles?: NamedStyles<string>[]
+): Promise<J2> =>
     (await new AutoformatVisitor(stopAfter, styles).visit(j, p, parent) as J2);
 
 /**
@@ -44,16 +54,26 @@ export const autoFormat = async <J2 extends J, P>(j: J2, p: P, stopAfter?: J, pa
  * 1. Styles passed to the constructor
  * 2. Styles from source file markers (NamedStyles)
  * 3. IntelliJ defaults
+ *
+ * When a PrettierStyle is present (either in the styles array or as a marker on the source file),
+ * Prettier is used for formatting. Otherwise, built-in formatting visitors are used.
  */
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
-    private readonly styles?: NamedStyles[];
+    private readonly styles?: NamedStyles<string>[];
 
-    constructor(private stopAfter?: Tree, styles?: NamedStyles[]) {
+    constructor(private stopAfter?: Tree, styles?: NamedStyles<string>[]) {
         super();
         this.styles = styles;
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
+        // Check for PrettierStyle in styles array or as marker on source file
+        // If found, delegate entirely to Prettier (skip other formatting visitors)
+        const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
+        if (prettierStyle) {
+            return applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
+        }
+
         const visitors = [
             new NormalizeWhitespaceVisitor(this.stopAfter),
             new MinimumViableSpacingVisitor(this.stopAfter),
@@ -72,29 +92,6 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
         }
 
         return t;
-    }
-}
-
-export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
-    // called NormalizeFormat in Java
-    // Ensures that whitespace is on the outermost AST element possible
-
-    constructor(private stopAfter?: Tree) {
-        super();
-    }
-
-    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
-        if (this.cursor?.getNearestMessage("stop") != null) {
-            return tree as R;
-        }
-        return super.visit(tree, p, parent);
-    }
-
-    override async postVisit(tree: J, p: P): Promise<J | undefined> {
-        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
-            this.cursor?.root.messages.set("stop", true);
-        }
-        return super.postVisit(tree, p);
     }
 }
 
@@ -431,8 +428,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, p: P): Promise<J | undefined> {
         const pa = await super.visitPropertyAssignment(propertyAssignment, p) as JS.PropertyAssignment;
-        // Only adjust the space before the colon if there's an initializer (not a shorthand property)
-        // For shorthand properties like { headers }, name.after.whitespace is the space before }
+        // Only adjust the space before the colon/equals if there's an initializer (not a shorthand property)
         if (pa.initializer) {
             return produceAsync(pa, draft => {
                 draft.name.after.whitespace = this.style.other.beforePropertyNameValueSeparator ? " " : "";
@@ -513,14 +509,18 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitTypeLiteral(typeLiteral: JS.TypeLiteral, p: P): Promise<J | undefined> {
         const ret = await super.visitTypeLiteral(typeLiteral, p) as JS.TypeLiteral;
         // Apply objectLiteralTypeBraces spacing for single-line type literals
-        const isSingleLine = !ret.members.end.whitespace.includes("\n") &&
-            ret.members.statements.every(s => !s.element.prefix.whitespace.includes("\n"));
-        if (isSingleLine && ret.members.statements.length > 0) {
-            return produce(ret, draft => {
-                const space = this.style.within.objectLiteralTypeBraces ? " " : "";
-                draft.members.statements[0].element.prefix.whitespace = space;
-                draft.members.end.whitespace = space;
-            });
+        if (ret.members && ret.members.statements.length > 0) {
+            const stmts = ret.members.statements;
+            const isSingleLine = !ret.members.end.whitespace.includes("\n") &&
+                stmts.every(s => !s.element.prefix.whitespace.includes("\n"));
+            if (isSingleLine) {
+                return produce(ret, draft => {
+                    const space = this.style.within.objectLiteralTypeBraces ? " " : "";
+                    draft.members.statements[0].element.prefix.whitespace = space;
+                    // For type literals, the space before } is in members.end, not in last statement's after
+                    draft.members.end.whitespace = space;
+                });
+            }
         }
         return ret;
     }
@@ -574,6 +574,30 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
             draft.body = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(ret.body, this.style.beforeLeftBrace.whileLeftBrace), false);
             draft.condition = await this.spaceBefore(draft.condition, this.style.beforeParentheses.whileParentheses);
             draft.condition.tree = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.condition.tree, this.style.within.whileParentheses), this.style.within.whileParentheses);
+        });
+    }
+
+    protected async visitTypeParameter(typeParam: J.TypeParameter, p: P): Promise<J | undefined> {
+        const ret = await super.visitTypeParameter(typeParam, p) as J.TypeParameter;
+        return produce(ret, draft => {
+            if (draft.bounds && draft.bounds.elements.length >= 2) {
+                const constraintType = draft.bounds.elements[0];
+                const defaultType = draft.bounds.elements[1];
+                const hasConstraint = constraintType.element.kind !== J.Kind.Empty;
+                const hasDefault = defaultType.element.kind !== J.Kind.Empty;
+
+                if (hasConstraint) {
+                    // Space before '=' for default type (in the `after` of constraint type)
+                    if (hasDefault && !constraintType.after.whitespace.includes("\n")) {
+                        constraintType.after.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                    }
+                } else if (hasDefault) {
+                    // No constraint, just default: space before '=' is in bounds.before
+                    if (!draft.bounds.before.whitespace.includes("\n")) {
+                        draft.bounds.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                    }
+                }
+            }
         });
     }
 
@@ -679,6 +703,33 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     private static isNotSingleSpace(str: string): boolean {
         return this.isOnlySpaces(str) && str !== " ";
     }
+
+    protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
+        const ret = await super.visitNewClass(newClass, p) as J.NewClass;
+
+        // Only handle object literals (NewClass with no class/constructor)
+        if (ret.class) {
+            return ret;
+        }
+
+        // Handle object literal brace spacing: { foo: 1 } vs {foo: 1}
+        if (ret.body && ret.body.statements.length > 0) {
+            return produce(ret, draft => {
+                const stmts = draft.body!.statements;
+                // Check if this is a multi-line object literal
+                const isMultiLine = stmts.some(s => s.element.prefix.whitespace.includes("\n")) ||
+                    draft.body!.end.whitespace.includes("\n");
+
+                if (!isMultiLine) {
+                    // Single-line: apply objectLiteralBraces spacing
+                    const space = this.style.within.objectLiteralBraces ? " " : "";
+                    stmts[0].element.prefix.whitespace = space;
+                    draft.body!.end.whitespace = space;
+                }
+            });
+        }
+        return ret;
+    }
 }
 
 export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
@@ -773,12 +824,56 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitBlock(block: J.Block, p: P): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
-            if (!draft.end.whitespace.includes("\n") && (draft.statements.length == 0 || !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n"))) {
-                // Skip newline for object literals, type literals, and empty lambda/function bodies
-                const parentKind = this.cursor.parent?.value.kind;
-                if (parentKind !== J.Kind.NewClass &&
-                    parentKind !== JS.Kind.TypeLiteral &&
-                    !(draft.statements.length === 0 && (parentKind === J.Kind.Lambda || parentKind === J.Kind.MethodDeclaration))) {
+            const parentKind = this.cursor.parent?.value.kind;
+
+            // Check if this is a "simple" block (empty or contains only a single J.Empty)
+            const isSimpleBlock = draft.statements.length === 0 ||
+                (draft.statements.length === 1 && draft.statements[0].element.kind === J.Kind.Empty);
+
+            // Helper to format block on one line
+            const formatOnOneLine = () => {
+                // Format as {} - remove any newlines from end whitespace
+                if (draft.end.whitespace.includes("\n")) {
+                    draft.end.whitespace = draft.end.whitespace.replace(/\n\s*/g, "");
+                }
+                // Also remove newlines from statement padding if there's a J.Empty
+                if (draft.statements.length === 1) {
+                    if (draft.statements[0].element.prefix.whitespace.includes("\n")) {
+                        draft.statements[0].element.prefix.whitespace = "";
+                    }
+                    if (draft.statements[0].after.whitespace.includes("\n")) {
+                        draft.statements[0].after.whitespace = "";
+                    }
+                }
+            };
+
+            // Object literals and type literals: always format empty ones as {} on single line
+            if (parentKind === J.Kind.NewClass || parentKind === JS.Kind.TypeLiteral) {
+                if (isSimpleBlock) {
+                    formatOnOneLine();
+                }
+                return;
+            }
+
+            if (isSimpleBlock) {
+                // Determine which style option applies based on parent
+                const isMethodOrFunctionBody = parentKind === J.Kind.Lambda ||
+                    parentKind === J.Kind.MethodDeclaration;
+                const keepInOneLine = isMethodOrFunctionBody
+                    ? this.style.keepWhenReformatting.simpleMethodsInOneLine
+                    : this.style.keepWhenReformatting.simpleBlocksInOneLine;
+
+                if (keepInOneLine) {
+                    formatOnOneLine();
+                } else {
+                    // Format with newline between { and }
+                    if (!draft.end.whitespace.includes("\n")) {
+                        draft.end = this.withNewlineSpace(draft.end);
+                    }
+                }
+            } else {
+                // Non-simple blocks: ensure closing brace is on its own line
+                if (!draft.end.whitespace.includes("\n") && !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n")) {
                     draft.end = this.withNewlineSpace(draft.end);
                 }
             }
@@ -828,238 +923,6 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
             ];
         }
         return modifiers;
-    }
-}
-
-
-export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
-    constructor(private stopAfter?: Tree) {
-        super();
-    }
-
-    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
-        if (this.cursor?.getNearestMessage("stop") != null) {
-            return tree as R;
-        }
-        return super.visit(tree, p, parent);
-    }
-
-    override async postVisit(tree: J, p: P): Promise<J | undefined> {
-        if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
-            this.cursor?.root.messages.set("stop", true);
-        }
-        return super.postVisit(tree, p);
-    }
-
-    protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
-        const ret = await super.visitAwait(await_, p) as JS.Await;
-        return produce(ret, draft => {
-            this.ensureSpace(draft.expression.prefix)
-        });
-    }
-
-    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
-        let c = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
-        let first = c.leadingAnnotations.length === 0;
-
-        if (c.modifiers.length > 0) {
-            if (!first && c.modifiers[0].prefix.whitespace === "") {
-                c = produce(c, draft => {
-                    this.ensureSpace(draft.modifiers[0].prefix);
-                });
-            }
-            c = produce(c, draft => {
-                for (let i = 1; i < draft.modifiers.length; i++) {
-                    this.ensureSpace(draft.modifiers[i].prefix);
-                }
-            });
-            first = false;
-        }
-
-        if (c.classKind.prefix.whitespace === "" && !first) {
-            c = produce(c, draft => {
-                this.ensureSpace(draft.classKind.prefix);
-            });
-            first = false;
-        }
-
-        // anonymous classes have an empty name
-        if (c.name.simpleName !== "") {
-            c = produce(c, draft => {
-                this.ensureSpace(draft.name.prefix);
-            });
-        }
-
-        // Note: typeParameters should NOT have space before them - they immediately follow the class name
-        // e.g., "class DataTable<Row>" not "class DataTable <Row>"
-
-        if (c.extends && c.extends.before.whitespace === "") {
-            c = produce(c, draft => {
-                this.ensureSpace(draft.extends!.before);
-            });
-        }
-
-        if (c.implements && c.implements.before.whitespace === "") {
-            c = produce(c, draft => {
-                this.ensureSpace(draft.implements!.before);
-                if (draft.implements != undefined && draft.implements.elements.length > 0) {
-                    this.ensureSpace(draft.implements.elements[0].element.prefix);
-                }
-            });
-        }
-
-        c = produce(c, draft => {
-            draft.body.prefix.whitespace = "";
-        });
-
-        return c;
-    }
-
-    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: P): Promise<J | undefined> {
-        let m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
-        let first = m.leadingAnnotations.length === 0;
-
-        if (m.modifiers.length > 0) {
-            if (!first && m.modifiers[0].prefix.whitespace === "") {
-                m = produce(m, draft => {
-                    this.ensureSpace(draft.modifiers[0].prefix);
-                });
-            }
-            m = produce(m, draft => {
-                for (let i = 1; i < draft.modifiers.length; i++) {
-                    this.ensureSpace(draft.modifiers[i].prefix);
-                }
-            });
-            first = false;
-        }
-
-        // FunctionDeclaration marker check must come AFTER modifiers processing
-        // to avoid adding unwanted space before the first modifier (e.g., 'async')
-        if (findMarker(method, JS.Markers.FunctionDeclaration)) {
-            first = false;
-        }
-
-        if (!first && m.name.prefix.whitespace === "") {
-            m = produce(m, draft => {
-                this.ensureSpace(draft.name.prefix);
-            });
-        }
-
-        if (m.throws && m.throws.before.whitespace === "") {
-            m = produce(m, draft => {
-                this.ensureSpace(draft.throws!.before);
-            });
-        }
-
-        return m;
-    }
-
-    protected async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, p: P): Promise<J | undefined> {
-        const ret = await super.visitNamespaceDeclaration(namespaceDeclaration, p) as JS.NamespaceDeclaration;
-        return produce(ret, draft => {
-            if (draft.modifiers.length > 0) {
-                draft.keywordType.before.whitespace=" ";
-            }
-            this.ensureSpace(draft.name.element.prefix);
-        });
-    }
-
-    protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
-        const ret = await super.visitNewClass(newClass, p) as J.NewClass;
-        return produce(ret, draft => {
-            if (draft.class) {
-                if (draft.class.kind == J.Kind.Identifier) {
-                    this.ensureSpace((draft.class as Draft<J.Identifier>).prefix);
-                }
-            }
-        });
-    }
-
-    protected async visitReturn(returnNode: J.Return, p: P): Promise<J | undefined> {
-        const r = await super.visitReturn(returnNode, p) as J.Return;
-        if (r.expression && r.expression.prefix.whitespace === "" &&
-            !r.markers.markers.find(m => m.id === "org.openrewrite.java.marker.ImplicitReturn")) {
-            return produce(r, draft => {
-                this.ensureSpace(draft.expression!.prefix);
-            });
-        }
-        return r;
-    }
-
-    protected async visitThrow(thrown: J.Throw, p: P): Promise<J | undefined> {
-        const ret = await super.visitThrow(thrown, p) as J.Throw;
-        return ret && produce(ret, draft => {
-           this.ensureSpace(draft.exception.prefix);
-        });
-    }
-
-    protected async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, p: P): Promise<J | undefined> {
-        const ret = await super.visitTypeDeclaration(typeDeclaration, p) as JS.TypeDeclaration;
-        return produce(ret, draft => {
-            if (draft.modifiers.length > 0) {
-                this.ensureSpace(draft.name.before);
-            }
-            this.ensureSpace(draft.name.element.prefix);
-        });
-    }
-
-    protected async visitTypeOf(typeOf: JS.TypeOf, p: P): Promise<J | undefined> {
-        const ret = await super.visitTypeOf(typeOf, p) as JS.TypeOf;
-        return produce(ret, draft => {
-            this.ensureSpace(draft.expression.prefix);
-        });
-    }
-
-    protected async visitTypeParameter(typeParam: J.TypeParameter, p: P): Promise<J | undefined> {
-        const ret = await super.visitTypeParameter(typeParam, p) as J.TypeParameter;
-        return produce(ret, draft => {
-            if (draft.bounds && draft.bounds.elements.length > 0) {
-                this.ensureSpace(draft.bounds.before);
-                this.ensureSpace(draft.bounds.elements[0].element.prefix);
-            }
-        });
-    }
-
-    protected async visitVariableDeclarations(v: J.VariableDeclarations, p: P): Promise<J | undefined> {
-        let ret = await super.visitVariableDeclarations(v, p) as J.VariableDeclarations;
-        let first = ret.leadingAnnotations.length === 0;
-
-        if (first && ret.modifiers.length > 0) {
-            ret = produce(ret, draft => {
-                for (let i = 1; i < draft.modifiers.length; i++) {
-                    this.ensureSpace(draft.modifiers[i].prefix);
-                }
-            });
-            first = false;
-        }
-
-        if (!first) {
-            ret = produce(ret, draft => {
-                this.ensureSpace(draft.variables[0].element.prefix);
-            });
-        }
-
-        return ret;
-    }
-
-
-    protected async visitCase(caseNode: J.Case, p: P): Promise<J | undefined> {
-        const c = await super.visitCase(caseNode, p) as J.Case;
-
-        if (c.guard && c.caseLabels.elements.length > 0 && c.caseLabels.elements[c.caseLabels.elements.length - 1].after.whitespace === "") {
-            return produce(c, draft => {
-                const last = draft.caseLabels.elements.length - 1;
-                draft.caseLabels.elements[last].after.whitespace = " ";
-            });
-        }
-
-        return c;
-    }
-
-    private ensureSpace(spaceDraft: Draft<J.Space>) {
-        if (spaceDraft.whitespace.length === 0 && spaceDraft.comments.length === 0) {
-            spaceDraft.whitespace = " ";
-        }
     }
 }
 
@@ -1265,3 +1128,6 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         return super.postVisit(tree, p);
     }
 }
+
+// Re-export prettier formatting utilities
+export {prettierFormat} from "./prettier-format";
