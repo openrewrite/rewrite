@@ -113,14 +113,18 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     public static ClasspathScanningLoader onlyYaml(Properties properties) {
-        return onlyYaml(properties, emptyList());
-    }
-
-    public static ClasspathScanningLoader onlyYaml(Properties properties,
-                                                   Collection<? extends ResourceLoader> dependencyResourceLoaders) {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
         classpathScanningLoader.scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
-                properties, dependencyResourceLoaders, null);
+                properties, emptyList(), null);
+        return classpathScanningLoader;
+    }
+
+    public static ClasspathScanningLoader onlyYaml(Properties properties, Collection<Path> dependencies) {
+        ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
+        classpathScanningLoader.scanYaml(new ClassGraph()
+                        .acceptPaths("META-INF/rewrite")
+                        .overrideClasspath(dependencies),
+                properties, emptyList(), null);
         return classpathScanningLoader;
     }
 
