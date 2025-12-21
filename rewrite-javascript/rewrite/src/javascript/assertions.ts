@@ -22,7 +22,7 @@ import {json, Json} from "../json";
 import {DependencyWorkspace} from "./dependency-workspace";
 import {setTemplateSourceFileCache} from "./templating/engine";
 import {PrettierConfigLoader} from "./format/prettier-config-loader";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import * as fs from "fs";
 import * as path from "path";
 import {Autodetect} from "./autodetect";

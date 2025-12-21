@@ -13,28 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {immerable, setAutoFreeze} from "immer";
-
-// this is required because otherwise `asRef()` won't work for objects created using immer
-setAutoFreeze(false);
-
-/**
- * Base class for objects that should not be treated as draftable by Immer.
- *
- * Immer considers plain objects draftable by default (via `isPlainObject()` check).
- * The `[immerable]: false` property only works for non-plain objects (class instances).
- * By extending this class, objects fail `isPlainObject()` AND have `[immerable] = false`,
- * ensuring Immer won't create proxies for them.
- *
- * This is critical for objects with cyclic references (like Type objects) that would
- * cause infinite recursion in Immer's finalize function.
- *
- * Usage: `Object.assign(new NonDraftable(), { kind: 'foo', ... })`
- */
-export class NonDraftable {
-    [immerable] = false;
-}
-
 const REFERENCE_KEY = Symbol.for("org.openrewrite.rpc.Reference");
 
 export interface Reference {

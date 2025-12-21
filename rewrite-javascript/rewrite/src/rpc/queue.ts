@@ -18,7 +18,6 @@ import {emptyMarkers, Markers} from "../markers";
 import {saveTrace, trace} from "./trace";
 import {updateIfChanged} from "../util";
 import {isRef, ReferenceMap} from "../reference";
-import {immerable} from "immer";
 
 /**
  * Interface representing an RPC codec that defines methods
@@ -45,13 +44,11 @@ export interface RpcCodec<T> {
     /**
      * Optional factory method to create a new instance of T.
      * If provided, this is used instead of the default `{kind: type}` object.
-     * Useful for adding properties like `[immerable]: false` to prevent
-     * Immer from drafting objects with cyclic references.
      *
      * @param type - The string identifier of the object type (kind).
      * @returns A new instance of T with the appropriate properties.
      */
-    rpcNew?(type: string): Partial<T> & {[immerable]?: boolean};
+    rpcNew?(type: string): Partial<T>;
 }
 
 /**

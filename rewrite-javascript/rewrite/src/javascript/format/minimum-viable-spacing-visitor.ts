@@ -17,7 +17,7 @@ import {JavaScriptVisitor} from "../visitor";
 import {J} from "../../java";
 import {Cursor, isScope, Tree} from "../../tree";
 import {JS} from "../tree";
-import {Draft, produce} from "immer";
+import {create as produce, Draft} from "mutative";
 import {findMarker} from "../../markers";
 
 /**

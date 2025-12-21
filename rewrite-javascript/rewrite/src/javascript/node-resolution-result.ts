@@ -15,9 +15,9 @@
  */
 import {findMarker, Marker, Markers} from "../markers";
 import {randomId, UUID} from "../uuid";
-import {asRef, NonDraftable} from "../reference";
+import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {castDraft} from "immer";
+import {castDraft} from "mutative";
 import {updateIfChanged} from "../util";
 import * as semver from "semver";
 import * as fsp from "fs/promises";
@@ -337,8 +337,7 @@ export function createNodeResolutionResultMarker(
         let resolved = resolvedDependencyCache.get(key);
         if (!resolved) {
             // Create a placeholder first - dependencies will be populated later
-            // Using NonDraftable class to prevent Immer from creating proxies for cyclic structures
-            resolved = asRef(Object.assign(new NonDraftable(), {
+            resolved = asRef({
                 kind: ResolvedDependencyKind,
                 name,
                 version,
@@ -348,7 +347,7 @@ export function createNodeResolutionResultMarker(
                 optionalDependencies: undefined,
                 engines: normalizeEngines(pkgEntry?.engines),
                 license: normalizeLicense(pkgEntry?.license),
-            })) as ResolvedDependency;
+            }) as ResolvedDependency;
             resolvedDependencyCache.set(key, resolved);
 
             // Maintain name index for O(1) lookup during semver fallback
@@ -466,13 +465,12 @@ export function createNodeResolutionResultMarker(
 
         let dep = dependencyCache.get(key);
         if (!dep) {
-            // Using NonDraftable class to prevent Immer from creating proxies for cyclic structures
-            dep = asRef(Object.assign(new NonDraftable(), {
+            dep = asRef({
                 kind: DependencyKind,
                 name,
                 versionConstraint,
                 resolved,
-            })) as Dependency;
+            }) as Dependency;
             dependencyCache.set(key, dep);
         }
         return dep;
@@ -537,7 +535,7 @@ export function createNodeResolutionResultMarker(
         // Note: Using castDraft here is safe because all objects are created within this
         // parsing context and haven't been returned to callers yet. The objects in
         // resolvedDependencyCache are plain JS objects marked with asRef() for RPC
-        // reference deduplication, not frozen Immer drafts.
+        // reference deduplication.
         for (const {path: pkgPath, name, version, entry} of packageInfos) {
             const key = `${name}@${version}`;
             const resolved = resolvedDependencyCache.get(key);
@@ -575,8 +573,7 @@ export function createNodeResolutionResultMarker(
         ''
     );
 
-    // Using NonDraftable class to prevent Immer from creating proxies for cyclic structures
-    return Object.assign(new NonDraftable(), {
+    return {
         kind: NodeResolutionResultKind,
         id: randomId(),
         name: packageJsonContent.name,
@@ -593,7 +590,7 @@ export function createNodeResolutionResultMarker(
         packageManager,
         engines: packageJsonContent.engines,
         npmrcConfigs,
-    }) as NodeResolutionResult;
+    } as NodeResolutionResult;
 }
 
 /**
@@ -836,7 +833,7 @@ RpcCodecs.registerCodec(NpmrcKind, {
  */
 RpcCodecs.registerCodec(DependencyKind, {
     rpcNew(_type: string): Dependency {
-        return Object.assign(new NonDraftable(), {kind: DependencyKind}) as unknown as Dependency;
+        return {kind: DependencyKind} as unknown as Dependency;
     },
 
     async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
@@ -859,7 +856,7 @@ RpcCodecs.registerCodec(DependencyKind, {
  */
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
     rpcNew(_type: string): ResolvedDependency {
-        return Object.assign(new NonDraftable(), {kind: ResolvedDependencyKind}) as unknown as ResolvedDependency;
+        return {kind: ResolvedDependencyKind} as unknown as ResolvedDependency;
     },
 
     async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
@@ -894,13 +891,10 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
 /**
  * Register RPC codec for NodeResolutionResult marker.
  * This handles serialization/deserialization for communication between JS and Java.
- * Note: We use NonDraftable here because the dependency graph can contain cycles
- * (e.g., Dependency -> ResolvedDependency -> Dependency[]), and Immer's proxies
- * don't handle cyclic structures correctly.
  */
 RpcCodecs.registerCodec(NodeResolutionResultKind, {
     rpcNew(_type: string): NodeResolutionResult {
-        return Object.assign(new NonDraftable(), {kind: NodeResolutionResultKind}) as unknown as NodeResolutionResult;
+        return {kind: NodeResolutionResultKind} as unknown as NodeResolutionResult;
     },
 
     async rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): Promise<NodeResolutionResult> {

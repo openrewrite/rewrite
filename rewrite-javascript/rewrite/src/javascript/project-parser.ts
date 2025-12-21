@@ -18,7 +18,7 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import {spawnSync} from "child_process";
 import picomatch from "picomatch";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {SourceFile} from "../tree";
 import {Parsers} from "../parser";
 import {PrettierConfigLoader} from "./format/prettier-config-loader";

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaVisitor} from "./visitor";
-import {asRef, NonDraftable, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {Expression, isSpace, J, TextComment} from "./tree";
 import {isTree} from "../tree";
 import {Type} from "./type";
@@ -260,16 +260,13 @@ class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
     }
 }
 
-// Register RPC codecs for Type kinds using NonDraftable to prevent Immer from
-// creating proxies for these objects. Types can have cyclic references (e.g.,
-// Class.supertype -> Class, Method.declaringType -> Class), which would cause
-// infinite recursion in Immer's finalize function.
+// Register RPC codecs for Type kinds
 const typeReceiver = new TypeReceiver();
 const typeSender = new TypeSender();
 for (const kind of Object.values(Type.Kind)) {
     RpcCodecs.registerCodec(kind, {
-        rpcNew(type: string): Type {
-            return Object.assign(new NonDraftable(), {kind: type}) as unknown as Type;
+        rpcNew(type: string): Partial<Type> {
+            return {kind: type};
         },
         async rpcReceive(before: Type, q: RpcReceiveQueue): Promise<Type> {
             return (await typeReceiver.visit(before, q))!;
