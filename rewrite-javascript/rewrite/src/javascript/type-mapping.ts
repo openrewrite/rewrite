@@ -174,7 +174,8 @@ export class JavaScriptTypeMapping {
                             }
 
                             // Create the parameterized type wrapper
-                            const parameterized = {                                kind: Type.Kind.Parameterized,
+                            const parameterized = {
+                                kind: Type.Kind.Parameterized,
                                 type: classType,
                                 typeParameters: typeParameters,
                                 fullyQualifiedName: classType.fullyQualifiedName,
@@ -411,7 +412,8 @@ export class JavaScriptTypeMapping {
                     if (ts.isStringLiteral(importDecl.moduleSpecifier)) {
                         const moduleSpecifier = importDecl.moduleSpecifier.text;
                         // Create a Type.Class representing the module
-                        ownerType = {                            kind: Type.Kind.Class,
+                        ownerType = {
+                            kind: Type.Kind.Class,
                             flags: 0,
                             classKind: Type.Class.Kind.Interface,
                             fullyQualifiedName: moduleSpecifier,
@@ -453,7 +455,8 @@ export class JavaScriptTypeMapping {
                                     // Store the module as the owningClass for now
                                     // (This is a bit of a hack, but works with the current type system)
                                     if (Type.isClass(ownerType)) {
-                                        (ownerType as any).owningClass = {                                            kind: Type.Kind.Class,
+                                        (ownerType as any).owningClass = {
+                                            kind: Type.Kind.Class,
                                             flags: 0,
                                             classKind: Type.Class.Kind.Interface,
                                             fullyQualifiedName: moduleName,
@@ -476,7 +479,8 @@ export class JavaScriptTypeMapping {
         }
 
         // Create the Type.Variable
-        const variable = {            kind: Type.Kind.Variable,
+        const variable = {
+            kind: Type.Kind.Variable,
             name: actualSymbol.getName(),
             owner: ownerType,
             type: mappedType,
@@ -583,7 +587,8 @@ export class JavaScriptTypeMapping {
         }
 
         // Create the Type.Method object
-        const method = {            kind: Type.Kind.Method,
+        const method = {
+            kind: Type.Kind.Method,
             flags: 0, // FIXME - determine flags
             declaringType: declaringType,
             name: name,
@@ -1051,7 +1056,8 @@ export class JavaScriptTypeMapping {
         }
 
         // Create empty class type shell (no members yet to avoid recursion)
-        return {            kind: Type.Kind.Class,
+        return {
+            kind: Type.Kind.Class,
             flags: 0, // TODO - determine flags
             classKind: classKind,
             fullyQualifiedName: fullyQualifiedName,
@@ -1179,7 +1185,8 @@ export class JavaScriptTypeMapping {
             } else {
                 // Create Type.Variable for fields/properties
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
-                const variable: Type.Variable = {                    kind: Type.Kind.Variable,
+                const variable: Type.Variable = {
+                    kind: Type.Kind.Variable,
                     name: prop.getName(),
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
                     type: this.getType(propType), // This will find classType in cache if it's recursive
@@ -1248,7 +1255,8 @@ export class JavaScriptTypeMapping {
      */
     private createUnionType(unionType: ts.UnionType, cacheKey: string | number): Type.Union {
         // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
-        const union = {            kind: Type.Kind.Union,
+        const union = {
+            kind: Type.Kind.Union,
             bounds: []
         } as Type.Union;
 
@@ -1272,7 +1280,8 @@ export class JavaScriptTypeMapping {
      */
     private createIntersectionType(intersectionType: ts.IntersectionType, cacheKey: string | number): Type.Intersection {
         // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
-        const intersection = {            kind: Type.Kind.Intersection,
+        const intersection = {
+            kind: Type.Kind.Intersection,
             bounds: []
         } as Type.Intersection;
 
@@ -1300,7 +1309,8 @@ export class JavaScriptTypeMapping {
         const name = symbol ? symbol.getName() : '?';
 
         // Shell-cache: Create stub, cache it, then populate (prevents cycles)
-        const gtv = {            kind: Type.Kind.GenericTypeVariable,
+        const gtv = {
+            kind: Type.Kind.GenericTypeVariable,
             name: name,
             variance: Type.GenericTypeVariable.Variance.Invariant,
             bounds: []
@@ -1334,7 +1344,8 @@ export class JavaScriptTypeMapping {
      * The shell will be populated later to handle circular references.
      */
     private createEmptyFunctionType(): Type.Class {
-        return {            kind: Type.Kind.Class,
+        return {
+            kind: Type.Kind.Class,
             flags: 0,
             classKind: Type.Class.Kind.Interface,
             fullyQualifiedName: FUNCTION_TYPE_NAME,
@@ -1377,7 +1388,8 @@ export class JavaScriptTypeMapping {
         const typeParameters: Type[] = [];
 
         // Return type parameter (covariant)
-        typeParameters.push({            kind: Type.Kind.GenericTypeVariable,
+        typeParameters.push({
+            kind: Type.Kind.GenericTypeVariable,
             name: 'R',
             variance: Type.GenericTypeVariable.Variance.Covariant,
             bounds: [returnType]
@@ -1385,7 +1397,8 @@ export class JavaScriptTypeMapping {
 
         // Parameter type variables (contravariant)
         parameterTypes.forEach((paramType, index) => {
-            typeParameters.push({                kind: Type.Kind.GenericTypeVariable,
+            typeParameters.push({
+                kind: Type.Kind.GenericTypeVariable,
                 name: `P${index + 1}`,
                 variance: Type.GenericTypeVariable.Variance.Contravariant,
                 bounds: [paramType]
@@ -1395,7 +1408,8 @@ export class JavaScriptTypeMapping {
         functionClass.typeParameters = typeParameters;
 
         // Create the apply() method
-        const applyMethod = {            kind: Type.Kind.Method,
+        const applyMethod = {
+            kind: Type.Kind.Method,
             flags: 0,
             declaringType: functionClass,
             name: 'apply',

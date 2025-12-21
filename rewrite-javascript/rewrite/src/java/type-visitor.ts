@@ -142,7 +142,7 @@ export class TypeVisitor<P> {
                     referenceValues: newReferenceValues,
                 } as Partial<Type.Annotation.ArrayElementValue>);
             }
-            return updateIfChanged(v, { element: newElement });
+            return updateIfChanged(v, {element: newElement});
         });
         return updateIfChanged(annotation, {
             type: newType,

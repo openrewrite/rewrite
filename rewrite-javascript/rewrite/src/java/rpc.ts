@@ -260,20 +260,6 @@ class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
     }
 }
 
-// Register RPC codecs for Type kinds
-const typeReceiver = new TypeReceiver();
-const typeSender = new TypeSender();
-for (const kind of Object.values(Type.Kind)) {
-    RpcCodecs.registerCodec(kind, {
-        async rpcReceive(before: Type, q: RpcReceiveQueue): Promise<Type> {
-            return (await typeReceiver.visit(before, q))!;
-        },
-        async rpcSend(after: Type, q: RpcSendQueue): Promise<void> {
-            await typeSender.visit(after, q);
-        }
-    });
-}
-
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async preVisit(j: J, q: RpcSendQueue): Promise<J | undefined> {
