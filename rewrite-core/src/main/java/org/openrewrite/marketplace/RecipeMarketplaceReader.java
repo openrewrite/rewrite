@@ -16,7 +16,11 @@
 package org.openrewrite.marketplace;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.dataformat.toml.TomlMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
 import lombok.Getter;
@@ -25,7 +29,6 @@ import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.CategoryDescriptor;
-import org.openrewrite.config.ColumnDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.StringUtils;
@@ -39,7 +42,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class RecipeMarketplaceReader {
-    private static final TomlMapper TOML_MAPPER = new TomlMapper();
+    private static final ObjectMapper JSON_MAPPER = JsonMapper.builder()
+            .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+            .build()
+            .registerModule(new ParameterNamesModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     /**
      * Returns the recipe marketplace from CSV.
@@ -140,7 +147,7 @@ public class RecipeMarketplaceReader {
         Map<Integer, String> categoryDisplayNames = new TreeMap<>();
         Map<Integer, String> categoryDescriptions = new TreeMap<>();
         List<OptionDescriptor> options = new ArrayList<>();
-        Map<Integer, DataTableDescriptor> dataTables = new TreeMap<>();
+        List<DataTableDescriptor> dataTables = new ArrayList<>();
         Map<String, Object> metadata = new LinkedHashMap<>();
 
         for (int i = 0; i < row.length && i < headers.size(); i++) {
@@ -200,16 +207,12 @@ public class RecipeMarketplaceReader {
                     break;
                 case OPTIONS:
                     if (value != null) {
-                        options.addAll(parseOptionsFromToml(value));
+                        options.addAll(parseOptionsFromJson(value));
                     }
                     break;
-                case DATA_TABLE:
+                case DATA_TABLES:
                     if (value != null) {
-                        int dataTableIndex = column.getIndex();
-                        DataTableDescriptor dataTable = parseDataTableFromToml(value);
-                        if (dataTable != null) {
-                            dataTables.put(dataTableIndex, dataTable);
-                        }
+                        dataTables.addAll(parseDataTablesFromJson(value));
                     }
                     break;
                 case UNKNOWN:
@@ -239,7 +242,7 @@ public class RecipeMarketplaceReader {
                 description != null ? description : "",
                 estimatedEffortPerOccurrence,
                 options,
-                new ArrayList<>(dataTables.values()),
+                dataTables,
                 bundle
         );
 
@@ -268,90 +271,20 @@ public class RecipeMarketplaceReader {
         marketplace.install(listing, categoryPath);
     }
 
-    private List<OptionDescriptor> parseOptionsFromToml(String toml) {
+    private List<OptionDescriptor> parseOptionsFromJson(String json) {
         try {
-            // Parse TOML with multiple tables like [groupId], [artifactId], etc.
-            Map<String, Map<String, Object>> parsed = TOML_MAPPER.readValue(toml,
-                    new TypeReference<Map<String, Map<String, Object>>>() {});
-
-            List<OptionDescriptor> options = new ArrayList<>();
-            for (Map.Entry<String, Map<String, Object>> entry : parsed.entrySet()) {
-                String optionName = entry.getKey();
-                Map<String, Object> values = entry.getValue();
-
-                options.add(new OptionDescriptor(
-                        optionName,
-                        getStringValue(values, "type", "String"),
-                        getStringValue(values, "displayName", ""),
-                        getStringValue(values, "description", ""),
-                        getStringValue(values, "example", null),
-                        null, // valid
-                        getBooleanValue(values, "required", false),
-                        null  // value
-                ));
-            }
-            return options;
+            return JSON_MAPPER.readValue(json, new TypeReference<List<OptionDescriptor>>() {});
         } catch (IOException e) {
-            throw new IllegalArgumentException("Failed to parse options TOML: " + toml, e);
+            throw new IllegalArgumentException("Failed to parse options JSON: " + json, e);
         }
     }
 
-    @Nullable
-    private DataTableDescriptor parseDataTableFromToml(String toml) {
+    private List<DataTableDescriptor> parseDataTablesFromJson(String json) {
         try {
-            // Parse flat TOML format with name = "...", displayName = "...", etc.
-            Map<String, Object> values = TOML_MAPPER.readValue(toml,
-                    new TypeReference<Map<String, Object>>() {});
-            if (values.isEmpty()) {
-                return null;
-            }
-
-            // Parse columns if present - columns is a map keyed by column name
-            List<ColumnDescriptor> columns = new ArrayList<>();
-            Object columnsObj = values.get("columns");
-            if (columnsObj instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Map<String, Object>> columnsMap = (Map<String, Map<String, Object>>) columnsObj;
-                for (Map.Entry<String, Map<String, Object>> entry : columnsMap.entrySet()) {
-                    String columnName = entry.getKey();
-                    Map<String, Object> colMap = entry.getValue();
-                    columns.add(new ColumnDescriptor(
-                            columnName,
-                            getStringValue(colMap, "type", "String"),
-                            getStringValue(colMap, "displayName", null),
-                            getStringValue(colMap, "description", null)
-                    ));
-                }
-            }
-
-            return new DataTableDescriptor(
-                    getStringValue(values, "name", ""),
-                    getStringValue(values, "displayName", ""),
-                    getStringValue(values, "description", ""),
-                    columns
-            );
+            return JSON_MAPPER.readValue(json, new TypeReference<List<DataTableDescriptor>>() {});
         } catch (IOException e) {
-            throw new IllegalArgumentException("Failed to parse data table TOML: " + toml, e);
+            throw new IllegalArgumentException("Failed to parse data tables JSON: " + json, e);
         }
-    }
-
-    private String getStringValue(Map<String, Object> values, String key, @Nullable String defaultValue) {
-        Object value = values.get(key);
-        if (value == null) {
-            return defaultValue;
-        }
-        return value.toString();
-    }
-
-    private boolean getBooleanValue(Map<String, Object> values, String key, boolean defaultValue) {
-        Object value = values.get(key);
-        if (value == null) {
-            return defaultValue;
-        }
-        if (value instanceof Boolean) {
-            return (Boolean) value;
-        }
-        return Boolean.parseBoolean(value.toString());
     }
 
     @Getter
@@ -368,14 +301,13 @@ public class RecipeMarketplaceReader {
         VERSION("version"),
         TEAM("team"),
         OPTIONS("options"),
-        DATA_TABLE("dataTable"),
+        DATA_TABLES("dataTables"),
         UNKNOWN("_unknown");
 
         private final String columnName;
 
         private static final Pattern CATEGORY_PATTERN = Pattern.compile("category(\\d*)", Pattern.CASE_INSENSITIVE);
         private static final Pattern CATEGORY_DESCRIPTION_PATTERN = Pattern.compile("category(\\d*)Description", Pattern.CASE_INSENSITIVE);
-        private static final Pattern DATA_TABLE_PATTERN = Pattern.compile("dataTable(\\d+)", Pattern.CASE_INSENSITIVE);
 
         public static NamedColumn fromString(String key) {
             // Check for category description columns first (category1Description, category2Description, ...)
@@ -393,13 +325,6 @@ public class RecipeMarketplaceReader {
                 String indexStr = categoryMatcher.group(1);
                 int index = indexStr.isEmpty() ? 1 : Integer.parseInt(indexStr);
                 return new NamedColumn(CATEGORY, key, index);
-            }
-
-            // Check for data table columns (dataTable1, dataTable2, ...)
-            Matcher dataTableMatcher = DATA_TABLE_PATTERN.matcher(key);
-            if (dataTableMatcher.matches()) {
-                int index = Integer.parseInt(dataTableMatcher.group(1));
-                return new NamedColumn(DATA_TABLE, key, index);
             }
 
             // Check for standard columns

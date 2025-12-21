@@ -15,11 +15,13 @@
  */
 package org.openrewrite.marketplace;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.univocity.parsers.csv.CsvWriter;
 import com.univocity.parsers.csv.CsvWriterSettings;
 import io.micrometer.core.instrument.util.StringUtils;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.config.ColumnDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
 
@@ -30,8 +32,18 @@ import java.nio.file.StandardOpenOption;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 public class RecipeMarketplaceWriter {
+    private static final Set<String> EXCLUDED_DATA_TABLES = new HashSet<>(Arrays.asList(
+            "org.openrewrite.table.SearchResults",
+            "org.openrewrite.table.SourcesFileResults",
+            "org.openrewrite.table.SourcesFileErrors",
+            "org.openrewrite.table.RecipeRunStats",
+            "org.openrewrite.table.ParseFailures"
+    ));
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper()
+            .setSerializationInclusion(JsonInclude.Include.NON_DEFAULT);
 
     public @Language("csv") String toCsv(RecipeMarketplace marketplace) {
         StringWriter sw = new StringWriter();
@@ -56,6 +68,7 @@ public class RecipeMarketplaceWriter {
         try {
             int maxCategoryDepth = calculateMaxCategoryDepth(marketplace.getRoot(), -1) + 1;
             boolean hasOptions = hasAnyOptions(marketplace.getRoot());
+            boolean hasDataTables = hasAnyDataTables(marketplace.getRoot());
             boolean hasVersion = hasAnyVersion(marketplace);
             boolean hasTeam = hasAnyTeam(marketplace);
             boolean hasCategoryDescription = hasAnyCategoryDescription(marketplace.getRoot());
@@ -83,15 +96,6 @@ public class RecipeMarketplaceWriter {
                 }
             }
 
-            if (hasAnyOptions(marketplace.getRoot())) {
-                headers.add("options");
-            }
-
-            int maxDataTables = calculateMaxDataTables(marketplace.getRoot());
-            for (int i = 1; i <= maxDataTables; i++) {
-                headers.add("dataTable" + i);
-            }
-
             // Add metadata headers
             headers.addAll(metadataKeys);
 
@@ -99,9 +103,18 @@ public class RecipeMarketplaceWriter {
                 headers.add("team");
             }
 
+            // Add options and dataTables columns last (less human-readable JSON content)
+            if (hasOptions) {
+                headers.add("options");
+            }
+
+            if (hasDataTables) {
+                headers.add("dataTables");
+            }
+
             csv.writeHeaders(headers);
             writeCsvRecursive(csv, marketplace.getRoot(), emptyList(), emptyList(),
-                    maxCategoryDepth, hasOptions, maxDataTables, hasTeam, hasVersion, hasCategoryDescription, metadataKeys);
+                    maxCategoryDepth, hasOptions, hasDataTables, hasTeam, hasVersion, hasCategoryDescription, metadataKeys);
         } finally {
             csv.close();
         }
@@ -109,7 +122,7 @@ public class RecipeMarketplaceWriter {
 
     private void writeCsvRecursive(CsvWriter csv, RecipeMarketplace.Category category,
                                    List<String> categoryPath, List<String> categoryDescriptionPath,
-                                   int maxCategoryDepth, boolean hasOptions, int maxDataTables, boolean hasTeam,
+                                   int maxCategoryDepth, boolean hasOptions, boolean hasDataTables, boolean hasTeam,
                                    boolean hasVersion, boolean hasCategoryDescription,
                                    List<String> metadataKeys) {
         for (RecipeListing recipe : category.getRecipes()) {
@@ -145,22 +158,6 @@ public class RecipeMarketplaceWriter {
                 }
             }
 
-            // Options column (all options in one TOML cell)
-            if (hasOptions) {
-                row.add(optionsToToml(recipe.getOptions()));
-            }
-
-            // Data table columns (TOML format, one per column)
-            List<DataTableDescriptor> dataTables = recipe.getDataTables();
-            for (int i = 0; i < maxDataTables; i++) {
-                if (i < dataTables.size()) {
-                    DataTableDescriptor dataTable = dataTables.get(i);
-                    row.add(dataTableToToml(dataTable));
-                } else {
-                    row.add("");
-                }
-            }
-
             // Metadata columns
             Map<String, Object> metadata = recipe.getMetadata();
             for (String key : metadataKeys) {
@@ -172,6 +169,16 @@ public class RecipeMarketplaceWriter {
                 row.add(StringUtils.isBlank(bundle.getTeam()) ? "" : bundle.getTeam());
             }
 
+            // Options column (all options in one JSON cell) - at the end for readability
+            if (hasOptions) {
+                row.add(optionsToJson(recipe.getOptions()));
+            }
+
+            // DataTables column (all data tables in one JSON array) - at the end for readability
+            if (hasDataTables) {
+                row.add(dataTablesToJson(recipe.getDataTables()));
+            }
+
             csv.writeRow(row.toArray(new String[0]));
         }
 
@@ -180,62 +187,34 @@ public class RecipeMarketplaceWriter {
             childPath.add(0, child.getDisplayName());
             List<String> childDescriptionPath = new ArrayList<>(categoryDescriptionPath);
             childDescriptionPath.add(0, child.getDescription());
-            writeCsvRecursive(csv, child, childPath, childDescriptionPath, maxCategoryDepth, hasOptions, maxDataTables,
+            writeCsvRecursive(csv, child, childPath, childDescriptionPath, maxCategoryDepth, hasOptions, hasDataTables,
                     hasTeam, hasVersion, hasCategoryDescription, metadataKeys);
         }
     }
 
-    private String optionsToToml(List<OptionDescriptor> options) {
+    private String optionsToJson(List<OptionDescriptor> options) {
         if (options.isEmpty()) {
             return "";
         }
-        StringBuilder toml = new StringBuilder();
-        for (OptionDescriptor option : options) {
-            toml.append("[").append(option.getName()).append("]\n");
-            toml.append("displayName = ").append(toTomlString(option.getDisplayName())).append("\n");
-            toml.append("description = ").append(toTomlString(option.getDescription())).append("\n");
-            toml.append("required = ").append(option.isRequired()).append("\n");
-            if (option.getExample() != null) {
-                toml.append("example = ").append(toTomlString(option.getExample())).append("\n");
-            }
-            toml.append("\n");
+        try {
+            return JSON_MAPPER.writeValueAsString(options);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize options to JSON", e);
         }
-        return toml.toString().trim();
     }
 
-    private String dataTableToToml(DataTableDescriptor dataTable) {
-        StringBuilder toml = new StringBuilder();
-        toml.append("name = ").append(toTomlString(dataTable.getName())).append("\n");
-        toml.append("displayName = ").append(toTomlString(dataTable.getDisplayName())).append("\n");
-        toml.append("description = ").append(toTomlString(dataTable.getDescription())).append("\n");
-        // Write columns as TOML tables keyed by column name
-        if (dataTable.getColumns() != null && !dataTable.getColumns().isEmpty()) {
-            for (ColumnDescriptor col : dataTable.getColumns()) {
-                toml.append("\n[columns.").append(col.getName()).append("]\n");
-                toml.append("type = ").append(toTomlString(col.getType())).append("\n");
-                if (col.getDisplayName() != null) {
-                    toml.append("displayName = ").append(toTomlString(col.getDisplayName())).append("\n");
-                }
-                if (col.getDescription() != null) {
-                    toml.append("description = ").append(toTomlString(col.getDescription())).append("\n");
-                }
-            }
+    private String dataTablesToJson(List<DataTableDescriptor> dataTables) {
+        List<DataTableDescriptor> filtered = dataTables.stream()
+                .filter(dt -> dt.getName() != null && !EXCLUDED_DATA_TABLES.contains(dt.getName()))
+                .collect(toList());
+        if (filtered.isEmpty()) {
+            return "";
         }
-        return toml.toString().trim();
-    }
-
-    private String toTomlString(String value) {
-        if (value == null) {
-            return "\"\"";
+        try {
+            return JSON_MAPPER.writeValueAsString(filtered);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize data tables to JSON", e);
         }
-        // Escape special characters for TOML string
-        String escaped = value
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
-        return "\"" + escaped + "\"";
     }
 
     private int calculateMaxCategoryDepth(RecipeMarketplace.Category category, int currentDepth) {
@@ -261,15 +240,20 @@ public class RecipeMarketplaceWriter {
         return false;
     }
 
-    private int calculateMaxDataTables(RecipeMarketplace.Category category) {
-        int max = 0;
+    private boolean hasAnyDataTables(RecipeMarketplace.Category category) {
         for (RecipeListing recipe : category.getRecipes()) {
-            max = Math.max(max, recipe.getDataTables().size());
+            for (DataTableDescriptor dt : recipe.getDataTables()) {
+                if (dt.getName() != null && !EXCLUDED_DATA_TABLES.contains(dt.getName())) {
+                    return true;
+                }
+            }
         }
         for (RecipeMarketplace.Category child : category.getCategories()) {
-            max = Math.max(max, calculateMaxDataTables(child));
+            if (hasAnyDataTables(child)) {
+                return true;
+            }
         }
-        return max;
+        return false;
     }
 
     private boolean hasAnyTeam(RecipeMarketplace marketplace) {

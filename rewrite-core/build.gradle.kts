@@ -17,7 +17,6 @@ dependencies {
 
     // Recipe marketplace
     implementation("com.univocity:univocity-parsers:latest.release")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml")
 
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")

@@ -77,16 +77,7 @@ class RecipeMarketplaceReaderTest {
     void readMarketplaceWithOptions() {
         @Language("csv") String csv = """
           name,displayName,options,category,ecosystem,packageName
-          org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,"[groupId]
-          displayName = ""Group ID""
-          description = ""The group ID of the dependency""
-          required = true
-          example = ""org.openrewrite""
-
-          [artifactId]
-          displayName = ""Artifact ID""
-          description = ""The artifact ID of the dependency""
-          required = false",Maven,maven,org.openrewrite:rewrite-maven
+          org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,"[{""name"":""groupId"",""type"":""String"",""displayName"":""Group ID"",""description"":""The group ID of the dependency"",""required"":true,""example"":""org.openrewrite""},{""name"":""artifactId"",""type"":""String"",""displayName"":""Artifact ID"",""description"":""The artifact ID of the dependency"",""required"":false}]",Maven,maven,org.openrewrite:rewrite-maven
           """;
 
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
@@ -108,12 +99,8 @@ class RecipeMarketplaceReaderTest {
     @Test
     void readMarketplaceWithDataTables() {
         @Language("csv") String csv = """
-          name,displayName,dataTable1,dataTable2,category,ecosystem,packageName
-          org.openrewrite.java.dependencies.DependencyList,List Dependencies,"name = ""org.openrewrite.java.dependencies.DependencyListTable""
-          displayName = ""Dependencies""
-          description = ""Lists all dependencies found in the project""\","name = ""org.openrewrite.java.dependencies.RepositoryTable""
-          displayName = ""Repositories""
-          description = ""Lists all repositories""\",Java,maven,org.openrewrite:rewrite-java
+          name,displayName,dataTables,category,ecosystem,packageName
+          org.openrewrite.java.dependencies.DependencyList,List Dependencies,"[{""name"":""org.openrewrite.java.dependencies.DependencyListTable"",""displayName"":""Dependencies"",""description"":""Lists all dependencies found in the project""},{""name"":""org.openrewrite.java.dependencies.RepositoryTable"",""displayName"":""Repositories"",""description"":""Lists all repositories""}]",Java,maven,org.openrewrite:rewrite-java
           """;
 
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);
@@ -135,19 +122,8 @@ class RecipeMarketplaceReaderTest {
     @Test
     void readMarketplaceWithDataTableColumns() {
         @Language("csv") String csv = """
-          name,displayName,dataTable1,category,ecosystem,packageName
-          org.openrewrite.java.dependencies.DependencyList,List Dependencies,"name = ""org.openrewrite.java.dependencies.DependencyListTable""
-          displayName = ""Dependencies""
-          description = ""Lists all dependencies""
-
-          [columns.groupId]
-          type = ""String""
-          displayName = ""Group ID""
-          description = ""The dependency group""
-
-          [columns.artifactId]
-          type = ""String""
-          displayName = ""Artifact ID""\",Java,maven,org.openrewrite:rewrite-java
+          name,displayName,dataTables,category,ecosystem,packageName
+          org.openrewrite.java.dependencies.DependencyList,List Dependencies,"[{""name"":""org.openrewrite.java.dependencies.DependencyListTable"",""displayName"":""Dependencies"",""description"":""Lists all dependencies"",""columns"":[{""name"":""groupId"",""type"":""String"",""displayName"":""Group ID"",""description"":""The dependency group""},{""name"":""artifactId"",""type"":""String"",""displayName"":""Artifact ID""}]}]",Java,maven,org.openrewrite:rewrite-java
           """;
 
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(csv);

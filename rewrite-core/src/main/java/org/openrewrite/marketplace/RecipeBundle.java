@@ -25,10 +25,8 @@ import org.openrewrite.rpc.request.RpcRequest;
 public class RecipeBundle implements RpcRequest {
     String packageEcosystem;
     String packageName;
-    String version;
-
-    @Nullable
-    String team;
+    @Nullable String version;
+    @Nullable String team;
 
     /**
      * @return Bundle that corresponds to {@link org.openrewrite.config.Environment.Builder#scanRuntimeClasspath(String...)}.
