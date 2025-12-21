@@ -16,8 +16,9 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {emptyMarkers, Markers} from "../markers";
 import {saveTrace, trace} from "./trace";
-import {createDraft, finishDraft} from "immer";
+import {updateIfChanged} from "../util";
 import {isRef, ReferenceMap} from "../reference";
+import {immerable} from "immer";
 
 /**
  * Interface representing an RPC codec that defines methods
@@ -40,6 +41,17 @@ export interface RpcCodec<T> {
      * @returns A Promise resolving to the deserialized object.
      */
     rpcReceive(before: T, q: RpcReceiveQueue): Promise<T>;
+
+    /**
+     * Optional factory method to create a new instance of T.
+     * If provided, this is used instead of the default `{kind: type}` object.
+     * Useful for adding properties like `[immerable]: false` to prevent
+     * Immer from drafting objects with cyclic references.
+     *
+     * @param type - The string identifier of the object type (kind).
+     * @returns A new instance of T with the appropriate properties.
+     */
+    rpcNew?(type: string): Partial<T> & {[immerable]?: boolean};
 }
 
 /**
@@ -288,10 +300,10 @@ export class RpcReceiveQueue {
         }
         return this.receive(markers, async m => {
             return saveTrace(this.trace, async () => {
-                const draft = createDraft(markers!);
-                draft.id = await this.receive(m.id);
-                draft.markers = (await this.receiveList(m.markers))!;
-                return finishDraft(draft);
+                return updateIfChanged(markers!, {
+                    id: await this.receive(m.id),
+                    markers: (await this.receiveList(m.markers))!,
+                });
             })
         })
     }
@@ -397,6 +409,10 @@ export class RpcReceiveQueue {
     }
 
     private newObj<T>(type: string): T {
+        const codec = RpcCodecs.forType(type, this.sourceFileType);
+        if (codec?.rpcNew) {
+            return codec.rpcNew(type) as T;
+        }
         return {
             kind: type
         } as T;

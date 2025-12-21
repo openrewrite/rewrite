@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 import {isIdentifier, isLiteral, isSpace, J, Type} from '../../java';
-import {produce} from "immer";
 
 /**
  * Union type for all tree node types that the reconciler handles.
@@ -244,9 +243,7 @@ export class WhitespaceReconciler {
             // Space values and markers: copy from formatted when reconciling
             if ((isSpace(originalValue)) || key === 'markers') {
                 if (this.shouldReconcile() && formattedValue !== originalValue) {
-                    result = produce(result, (draft) => {
-                        (draft as Record<string, unknown>)[key] = formattedValue;
-                    });
+                    result = { ...result, [key]: formattedValue } as VisitableNode;
                 }
                 continue;
             }
@@ -269,9 +266,7 @@ export class WhitespaceReconciler {
                 }
 
                 if (changed) {
-                    result = produce(result, (draft) => {
-                        (draft as Record<string, unknown>)[key] = newArray;
-                    });
+                    result = { ...result, [key]: newArray } as VisitableNode;
                 }
             } else {
                 // Visit the property
@@ -279,9 +274,7 @@ export class WhitespaceReconciler {
                 if (!this.compatible) return original;
 
                 if (visited !== originalValue) {
-                    result = produce(result, (draft) => {
-                        (draft as Record<string, unknown>)[key] = visited;
-                    });
+                    result = { ...result, [key]: visited } as VisitableNode;
                 }
             }
         }

@@ -16,7 +16,7 @@
 import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
 import {createDraft, Draft, finishDraft, nothing, Objectish} from "immer";
-import {mapAsync} from "./util";
+import {mapAsync, updateIfChanged} from "./util";
 
 /* Not exported beyond the internal immer module */
 export type ValidImmerRecipeReturnType<State> =
@@ -136,9 +136,9 @@ export abstract class TreeVisitor<T extends Tree, P> {
         } else if ((markers.markers?.length || 0) === 0) {
             return markers;
         }
-        return (await produceAsync<Markers>(markers, async (draft) => {
-            draft.markers = await mapAsync(markers.markers, m => this.visitMarker(m, p))
-        }))!;
+        return updateIfChanged(markers, {
+            markers: await mapAsync(markers.markers, m => this.visitMarker(m, p))
+        });
     }
 
     protected async visitMarker<M extends Marker>(marker: M, p: P): Promise<M> {
@@ -152,12 +152,22 @@ export abstract class TreeVisitor<T extends Tree, P> {
             ((draft: Draft<T>) => ValidImmerRecipeReturnType<Draft<T>>) |
             ((draft: Draft<T>) => Promise<ValidImmerRecipeReturnType<Draft<T>>>)
     ): Promise<T | undefined> {
-        return produceAsync(before, async draft => {
-            draft.markers = await this.visitMarkers(before.markers, p);
-            if (recipe) {
-                await recipe(draft);
+        // Visit markers separately to avoid Immer drafting cyclic marker structures
+        const newMarkers = await this.visitMarkers(before.markers, p);
+
+        if (recipe) {
+            // Remove markers before Immer drafting to avoid cycles, then restore after
+            const withoutMarkers = { ...before, markers: emptyMarkers };
+            const result = await produceAsync(withoutMarkers, recipe);
+            if (result === undefined) {
+                return undefined;
             }
-        });
+            // Restore markers (use newMarkers since we visited them)
+            return { ...result, markers: newMarkers } as T;
+        }
+
+        // No recipe - just update markers if changed
+        return updateIfChanged(before, { markers: newMarkers } as Partial<T>);
     }
 }
 

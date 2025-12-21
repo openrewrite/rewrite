@@ -54,11 +54,14 @@ export function trimIndent(str: string | null | undefined): string {
  * Helper function to create a new object only if any properties have changed.
  * Compares each property in updates with the original object.
  * Returns the original object if nothing changed, or a new object with updates applied.
+ * Preserves the prototype chain (important for NonDraftable class instances).
  */
 export function updateIfChanged<O extends object>(original: O, updates: Partial<O>): O {
     for (const key in updates) {
         if (updates[key] !== original[key]) {
-            return { ...original, ...updates };
+            // Use Object.assign with prototype preservation instead of spread
+            // This ensures class instances (like NonDraftable) keep their prototype
+            return Object.assign(Object.create(Object.getPrototypeOf(original)), original, updates);
         }
     }
     return original;

@@ -17,7 +17,6 @@ import * as rpc from "vscode-jsonrpc/node";
 import * as path from "path";
 import {ExecutionContext} from "../../execution";
 import {randomId, UUID} from "../../uuid";
-import {produce} from "immer";
 import {SourceFile} from "../../tree";
 import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
@@ -82,9 +81,7 @@ export class ParseProject {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
-                                return produce(sourceFile, (draft) => {
-                                    draft.id = id;
-                                });
+                                return { ...sourceFile, id };
                             });
                             resultItems.push({
                                 id,
@@ -102,9 +99,7 @@ export class ParseProject {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
-                                return produce(sourceFile, (draft) => {
-                                    draft.id = id;
-                                });
+                                return { ...sourceFile, id };
                             });
                             resultItems.push({
                                 id,
@@ -122,9 +117,7 @@ export class ParseProject {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
-                                return produce(sourceFile, (draft) => {
-                                    draft.id = id;
-                                });
+                                return { ...sourceFile, id };
                             });
                             resultItems.push({
                                 id,
@@ -142,9 +135,7 @@ export class ParseProject {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
-                                return produce(sourceFile, (draft) => {
-                                    draft.id = id;
-                                });
+                                return { ...sourceFile, id };
                             });
                             resultItems.push({
                                 id,
@@ -173,12 +164,13 @@ export class ParseProject {
                                     const sourceFile: SourceFile = (await generator.next()).value;
                                     // Add PrettierStyle marker if Prettier is available
                                     const prettierMarker = await prettierLoader.getConfigMarker(filePath);
-                                    return produce(sourceFile, (draft) => {
-                                        draft.id = id;
-                                        if (prettierMarker) {
-                                            draft.markers.markers = draft.markers.markers.concat([prettierMarker]);
-                                        }
-                                    });
+                                    return {
+                                        ...sourceFile,
+                                        id,
+                                        markers: prettierMarker
+                                            ? { ...sourceFile.markers, markers: sourceFile.markers.markers.concat([prettierMarker]) }
+                                            : sourceFile.markers
+                                    };
                                 });
                                 resultItems.push({
                                     id,
@@ -202,10 +194,11 @@ export class ParseProject {
                             // Store thunks that add the Autodetect marker
                             for (const {id, sourceFile} of parsedFiles) {
                                 localObjects.set(id, async (newId: string) => {
-                                    return produce(sourceFile, (draft) => {
-                                        draft.id = newId;
-                                        draft.markers.markers = draft.markers.markers.concat([autodetectMarker]);
-                                    });
+                                    return {
+                                        ...sourceFile,
+                                        id: newId,
+                                        markers: { ...sourceFile.markers, markers: sourceFile.markers.markers.concat([autodetectMarker]) }
+                                    };
                                 });
                                 resultItems.push({
                                     id,
@@ -224,9 +217,7 @@ export class ParseProject {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
-                                return produce(sourceFile, (draft) => {
-                                    draft.id = id;
-                                });
+                                return { ...sourceFile, id };
                             });
                             resultItems.push({
                                 id,
@@ -244,9 +235,7 @@ export class ParseProject {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
-                                return produce(sourceFile, (draft) => {
-                                    draft.id = id;
-                                });
+                                return { ...sourceFile, id };
                             });
                             resultItems.push({
                                 id,
@@ -264,9 +253,7 @@ export class ParseProject {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
-                                return produce(sourceFile, (draft) => {
-                                    draft.id = id;
-                                });
+                                return { ...sourceFile, id };
                             });
                             resultItems.push({
                                 id,

@@ -15,7 +15,7 @@
  */
 import {findMarker, Marker, Markers} from "../markers";
 import {randomId, UUID} from "../uuid";
-import {asRef} from "../reference";
+import {asRef, NonDraftable} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {castDraft} from "immer";
 import {updateIfChanged} from "../util";
@@ -295,7 +295,7 @@ export function createNodeResolutionResultMarker(
     function extractPackageInfo(pkgPath: string): { name: string; version?: string } {
         // For nested packages, we want the last package name
         const nodeModulesIndex = pkgPath.lastIndexOf('node_modules/');
-        if (nodeModulesIndex === -1) return { name: pkgPath };
+        if (nodeModulesIndex === -1) return {name: pkgPath};
 
         let nameWithVersion = pkgPath.slice(nodeModulesIndex + 'node_modules/'.length);
 
@@ -320,7 +320,7 @@ export function createNodeResolutionResultMarker(
             }
         }
 
-        return { name: nameWithVersion };
+        return {name: nameWithVersion};
     }
 
     /**
@@ -337,7 +337,8 @@ export function createNodeResolutionResultMarker(
         let resolved = resolvedDependencyCache.get(key);
         if (!resolved) {
             // Create a placeholder first - dependencies will be populated later
-            resolved = asRef({
+            // Using NonDraftable class to prevent Immer from creating proxies for cyclic structures
+            resolved = asRef(Object.assign(new NonDraftable(), {
                 kind: ResolvedDependencyKind,
                 name,
                 version,
@@ -347,7 +348,7 @@ export function createNodeResolutionResultMarker(
                 optionalDependencies: undefined,
                 engines: normalizeEngines(pkgEntry?.engines),
                 license: normalizeLicense(pkgEntry?.license),
-            });
+            })) as ResolvedDependency;
             resolvedDependencyCache.set(key, resolved);
 
             // Maintain name index for O(1) lookup during semver fallback
@@ -465,12 +466,13 @@ export function createNodeResolutionResultMarker(
 
         let dep = dependencyCache.get(key);
         if (!dep) {
-            dep = asRef({
+            // Using NonDraftable class to prevent Immer from creating proxies for cyclic structures
+            dep = asRef(Object.assign(new NonDraftable(), {
                 kind: DependencyKind,
                 name,
                 versionConstraint,
                 resolved,
-            });
+            })) as Dependency;
             dependencyCache.set(key, dep);
         }
         return dep;
@@ -514,7 +516,7 @@ export function createNodeResolutionResultMarker(
         const packages = lockContent.packages;
 
         // First pass: Create all ResolvedDependency placeholders and build path map
-        const packageInfos: Array<{path: string; name: string; version: string; entry: PackageLockEntry}> = [];
+        const packageInfos: Array<{ path: string; name: string; version: string; entry: PackageLockEntry }> = [];
         for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
             // Skip the root package (empty string key)
             if (pkgPath === '') continue;
@@ -573,7 +575,8 @@ export function createNodeResolutionResultMarker(
         ''
     );
 
-    return {
+    // Using NonDraftable class to prevent Immer from creating proxies for cyclic structures
+    return Object.assign(new NonDraftable(), {
         kind: NodeResolutionResultKind,
         id: randomId(),
         name: packageJsonContent.name,
@@ -590,7 +593,7 @@ export function createNodeResolutionResultMarker(
         packageManager,
         engines: packageJsonContent.engines,
         npmrcConfigs,
-    };
+    }) as NodeResolutionResult;
 }
 
 /**
@@ -817,7 +820,6 @@ export namespace NodeResolutionResultQueries {
 RpcCodecs.registerCodec(NpmrcKind, {
     async rpcReceive(before: Npmrc, q: RpcReceiveQueue): Promise<Npmrc> {
         return updateIfChanged(before, {
-            kind: NpmrcKind,
             scope: await q.receive(before.scope),
             properties: await q.receive(before.properties),
         });
@@ -833,9 +835,12 @@ RpcCodecs.registerCodec(NpmrcKind, {
  * Register RPC codec for Dependency.
  */
 RpcCodecs.registerCodec(DependencyKind, {
+    rpcNew(_type: string): Dependency {
+        return Object.assign(new NonDraftable(), {kind: DependencyKind}) as unknown as Dependency;
+    },
+
     async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
         return updateIfChanged(before, {
-            kind: DependencyKind,
             name: await q.receive(before.name),
             versionConstraint: await q.receive(before.versionConstraint),
             resolved: await q.receive(before.resolved),
@@ -853,9 +858,12 @@ RpcCodecs.registerCodec(DependencyKind, {
  * Register RPC codec for ResolvedDependency.
  */
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
+    rpcNew(_type: string): ResolvedDependency {
+        return Object.assign(new NonDraftable(), {kind: ResolvedDependencyKind}) as unknown as ResolvedDependency;
+    },
+
     async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
         return updateIfChanged(before, {
-            kind: ResolvedDependencyKind,
             name: await q.receive(before.name),
             version: await q.receive(before.version),
             dependencies: (await q.receiveList(before.dependencies)) || undefined,
@@ -886,11 +894,15 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
 /**
  * Register RPC codec for NodeResolutionResult marker.
  * This handles serialization/deserialization for communication between JS and Java.
- * Note: We avoid Immer here because the dependency graph can contain cycles
+ * Note: We use NonDraftable here because the dependency graph can contain cycles
  * (e.g., Dependency -> ResolvedDependency -> Dependency[]), and Immer's proxies
  * don't handle cyclic structures correctly.
  */
 RpcCodecs.registerCodec(NodeResolutionResultKind, {
+    rpcNew(_type: string): NodeResolutionResult {
+        return Object.assign(new NonDraftable(), {kind: NodeResolutionResultKind}) as unknown as NodeResolutionResult;
+    },
+
     async rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): Promise<NodeResolutionResult> {
         return updateIfChanged(before, {
             id: await q.receive(before.id),

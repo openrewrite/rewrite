@@ -14,6 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// MUST be first - disable Immer's autoFreeze to prevent infinite recursion on cyclic structures
+import {setAutoFreeze} from "immer";
+setAutoFreeze(false);
+
 import * as rpc from "vscode-jsonrpc/node";
 import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";

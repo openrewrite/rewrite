@@ -15,13 +15,8 @@
  */
 import ts from "typescript";
 import {Type} from "../java";
-import {immerable} from "immer";
+import {NonDraftable} from "../rpc";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
-
-// Helper class to create Type objects that immer won't traverse
-class NonDraftableType {
-    [immerable] = false;
-}
 
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
@@ -180,7 +175,7 @@ export class JavaScriptTypeMapping {
                             }
 
                             // Create the parameterized type wrapper
-                            const parameterized = Object.assign(new NonDraftableType(), {
+                            const parameterized = Object.assign(new NonDraftable(), {
                                 kind: Type.Kind.Parameterized,
                                 type: classType,
                                 typeParameters: typeParameters,
@@ -418,7 +413,7 @@ export class JavaScriptTypeMapping {
                     if (ts.isStringLiteral(importDecl.moduleSpecifier)) {
                         const moduleSpecifier = importDecl.moduleSpecifier.text;
                         // Create a Type.Class representing the module
-                        ownerType = Object.assign(new NonDraftableType(), {
+                        ownerType = Object.assign(new NonDraftable(), {
                             kind: Type.Kind.Class,
                             flags: 0,
                             classKind: Type.Class.Kind.Interface,
@@ -461,7 +456,7 @@ export class JavaScriptTypeMapping {
                                     // Store the module as the owningClass for now
                                     // (This is a bit of a hack, but works with the current type system)
                                     if (Type.isClass(ownerType)) {
-                                        (ownerType as any).owningClass = Object.assign(new NonDraftableType(), {
+                                        (ownerType as any).owningClass = Object.assign(new NonDraftable(), {
                                             kind: Type.Kind.Class,
                                             flags: 0,
                                             classKind: Type.Class.Kind.Interface,
@@ -485,7 +480,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Create the Type.Variable
-        const variable = Object.assign(new NonDraftableType(), {
+        const variable = Object.assign(new NonDraftable(), {
             kind: Type.Kind.Variable,
             name: actualSymbol.getName(),
             owner: ownerType,
@@ -593,7 +588,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Create the Type.Method object
-        const method = Object.assign(new NonDraftableType(), {
+        const method = Object.assign(new NonDraftable(), {
             kind: Type.Kind.Method,
             flags: 0, // FIXME - determine flags
             declaringType: declaringType,
@@ -1062,7 +1057,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Create empty class type shell (no members yet to avoid recursion)
-        return Object.assign(new NonDraftableType(), {
+        return Object.assign(new NonDraftable(), {
             kind: Type.Kind.Class,
             flags: 0, // TODO - determine flags
             classKind: classKind,
@@ -1191,7 +1186,7 @@ export class JavaScriptTypeMapping {
             } else {
                 // Create Type.Variable for fields/properties
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
-                const variable: Type.Variable = Object.assign(new NonDraftableType(), {
+                const variable: Type.Variable = Object.assign(new NonDraftable(), {
                     kind: Type.Kind.Variable,
                     name: prop.getName(),
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
@@ -1261,7 +1256,7 @@ export class JavaScriptTypeMapping {
      */
     private createUnionType(unionType: ts.UnionType, cacheKey: string | number): Type.Union {
         // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
-        const union = Object.assign(new NonDraftableType(), {
+        const union = Object.assign(new NonDraftable(), {
             kind: Type.Kind.Union,
             bounds: []
         }) as Type.Union;
@@ -1286,7 +1281,7 @@ export class JavaScriptTypeMapping {
      */
     private createIntersectionType(intersectionType: ts.IntersectionType, cacheKey: string | number): Type.Intersection {
         // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
-        const intersection = Object.assign(new NonDraftableType(), {
+        const intersection = Object.assign(new NonDraftable(), {
             kind: Type.Kind.Intersection,
             bounds: []
         }) as Type.Intersection;
@@ -1315,7 +1310,7 @@ export class JavaScriptTypeMapping {
         const name = symbol ? symbol.getName() : '?';
 
         // Shell-cache: Create stub, cache it, then populate (prevents cycles)
-        const gtv = Object.assign(new NonDraftableType(), {
+        const gtv = Object.assign(new NonDraftable(), {
             kind: Type.Kind.GenericTypeVariable,
             name: name,
             variance: Type.GenericTypeVariable.Variance.Invariant,
@@ -1350,7 +1345,7 @@ export class JavaScriptTypeMapping {
      * The shell will be populated later to handle circular references.
      */
     private createEmptyFunctionType(): Type.Class {
-        return Object.assign(new NonDraftableType(), {
+        return Object.assign(new NonDraftable(), {
             kind: Type.Kind.Class,
             flags: 0,
             classKind: Type.Class.Kind.Interface,
@@ -1394,7 +1389,7 @@ export class JavaScriptTypeMapping {
         const typeParameters: Type[] = [];
 
         // Return type parameter (covariant)
-        typeParameters.push(Object.assign(new NonDraftableType(), {
+        typeParameters.push(Object.assign(new NonDraftable(), {
             kind: Type.Kind.GenericTypeVariable,
             name: 'R',
             variance: Type.GenericTypeVariable.Variance.Covariant,
@@ -1403,7 +1398,7 @@ export class JavaScriptTypeMapping {
 
         // Parameter type variables (contravariant)
         parameterTypes.forEach((paramType, index) => {
-            typeParameters.push(Object.assign(new NonDraftableType(), {
+            typeParameters.push(Object.assign(new NonDraftable(), {
                 kind: Type.Kind.GenericTypeVariable,
                 name: `P${index + 1}`,
                 variance: Type.GenericTypeVariable.Variance.Contravariant,
@@ -1414,7 +1409,7 @@ export class JavaScriptTypeMapping {
         functionClass.typeParameters = typeParameters;
 
         // Create the apply() method
-        const applyMethod = Object.assign(new NonDraftableType(), {
+        const applyMethod = Object.assign(new NonDraftable(), {
             kind: Type.Kind.Method,
             flags: 0,
             declaringType: functionClass,
