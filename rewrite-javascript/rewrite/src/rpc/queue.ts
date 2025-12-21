@@ -40,15 +40,6 @@ export interface RpcCodec<T> {
      * @returns A Promise resolving to the deserialized object.
      */
     rpcReceive(before: T, q: RpcReceiveQueue): Promise<T>;
-
-    /**
-     * Optional factory method to create a new instance of T.
-     * If provided, this is used instead of the default `{kind: type}` object.
-     *
-     * @param type - The string identifier of the object type (kind).
-     * @returns A new instance of T with the appropriate properties.
-     */
-    rpcNew?(type: string): Partial<T>;
 }
 
 /**
@@ -406,13 +397,7 @@ export class RpcReceiveQueue {
     }
 
     private newObj<T>(type: string): T {
-        const codec = RpcCodecs.forType(type, this.sourceFileType);
-        if (codec?.rpcNew) {
-            return codec.rpcNew(type) as T;
-        }
-        return {
-            kind: type
-        } as T;
+        return {kind: type} as T;
     }
 }
 

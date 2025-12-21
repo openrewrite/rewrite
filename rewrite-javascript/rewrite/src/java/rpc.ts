@@ -265,9 +265,6 @@ const typeReceiver = new TypeReceiver();
 const typeSender = new TypeSender();
 for (const kind of Object.values(Type.Kind)) {
     RpcCodecs.registerCodec(kind, {
-        rpcNew(type: string): Partial<Type> {
-            return {kind: type};
-        },
         async rpcReceive(before: Type, q: RpcReceiveQueue): Promise<Type> {
             return (await typeReceiver.visit(before, q))!;
         },

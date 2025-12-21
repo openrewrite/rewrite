@@ -832,10 +832,6 @@ RpcCodecs.registerCodec(NpmrcKind, {
  * Register RPC codec for Dependency.
  */
 RpcCodecs.registerCodec(DependencyKind, {
-    rpcNew(_type: string): Dependency {
-        return {kind: DependencyKind} as unknown as Dependency;
-    },
-
     async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
         return updateIfChanged(before, {
             name: await q.receive(before.name),
@@ -855,10 +851,6 @@ RpcCodecs.registerCodec(DependencyKind, {
  * Register RPC codec for ResolvedDependency.
  */
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
-    rpcNew(_type: string): ResolvedDependency {
-        return {kind: ResolvedDependencyKind} as unknown as ResolvedDependency;
-    },
-
     async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
         return updateIfChanged(before, {
             name: await q.receive(before.name),
@@ -893,10 +885,6 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
  * This handles serialization/deserialization for communication between JS and Java.
  */
 RpcCodecs.registerCodec(NodeResolutionResultKind, {
-    rpcNew(_type: string): NodeResolutionResult {
-        return {kind: NodeResolutionResultKind} as unknown as NodeResolutionResult;
-    },
-
     async rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): Promise<NodeResolutionResult> {
         return updateIfChanged(before, {
             id: await q.receive(before.id),
