@@ -16,7 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {emptyMarkers, Markers} from "../markers";
 import {saveTrace, trace} from "./trace";
-import {createDraft, finishDraft} from "immer";
+import {updateIfChanged} from "../util";
 import {isRef, ReferenceMap} from "../reference";
 
 /**
@@ -288,10 +288,10 @@ export class RpcReceiveQueue {
         }
         return this.receive(markers, async m => {
             return saveTrace(this.trace, async () => {
-                const draft = createDraft(markers!);
-                draft.id = await this.receive(m.id);
-                draft.markers = (await this.receiveList(m.markers))!;
-                return finishDraft(draft);
+                return updateIfChanged(markers!, {
+                    id: await this.receive(m.id),
+                    markers: (await this.receiveList(m.markers))!,
+                });
             })
         })
     }
@@ -397,9 +397,7 @@ export class RpcReceiveQueue {
     }
 
     private newObj<T>(type: string): T {
-        return {
-            kind: type
-        } as T;
+        return {kind: type} as T;
     }
 }
 

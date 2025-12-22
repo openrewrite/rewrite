@@ -19,7 +19,7 @@ import {produceAsync, TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor, JS} from "../index";
 import {J} from "../../java";
-import {Draft, produce} from "immer";
+import {create as produce, Draft} from "mutative";
 import {SpacesStyle, styleFromSourceFile, StyleKind} from "../style";
 
 /**

@@ -15,9 +15,9 @@
  */
 import {Checksum, FileAttributes, TreeKind} from "../tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./queue";
-import {createDraft, finishDraft} from "immer";
 import {Markers, MarkersKind, MarkupDebug, MarkupError, MarkupInfo, MarkupWarn, SearchResult} from "../markers";
 import {asRef} from "../reference";
+import {updateIfChanged} from "../util";
 
 export * from "./queue";
 export * from "../reference";
@@ -26,10 +26,10 @@ export * from "../reference";
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
     async rpcReceive(before: Checksum, q: RpcReceiveQueue): Promise<Checksum> {
-        const draft = createDraft(before);
-        draft.algorithm = await q.receive(before.algorithm);
-        draft.value = await q.receive(before.value);
-        return finishDraft(draft) as Checksum;
+        return updateIfChanged(before, {
+            algorithm: await q.receive(before.algorithm),
+            value: await q.receive(before.value),
+        });
     },
 
     async rpcSend(after: Checksum, q: RpcSendQueue): Promise<void> {
@@ -40,15 +40,15 @@ RpcCodecs.registerCodec(TreeKind.Checksum, {
 
 RpcCodecs.registerCodec(TreeKind.FileAttributes, {
     async rpcReceive(before: FileAttributes, q: RpcReceiveQueue): Promise<FileAttributes> {
-        const draft = createDraft(before);
-        draft.creationDate = await q.receive(before.creationDate);
-        draft.lastModifiedTime = await q.receive(before.lastModifiedTime);
-        draft.lastAccessTime = await q.receive(before.lastAccessTime);
-        draft.isReadable = await q.receive(before.isReadable);
-        draft.isWritable = await q.receive(before.isWritable);
-        draft.isExecutable = await q.receive(before.isExecutable);
-        draft.size = await q.receive(before.size);
-        return finishDraft(draft) as FileAttributes;
+        return updateIfChanged(before, {
+            creationDate: await q.receive(before.creationDate),
+            lastModifiedTime: await q.receive(before.lastModifiedTime),
+            lastAccessTime: await q.receive(before.lastAccessTime),
+            isReadable: await q.receive(before.isReadable),
+            isWritable: await q.receive(before.isWritable),
+            isExecutable: await q.receive(before.isExecutable),
+            size: await q.receive(before.size),
+        });
     },
 
     async rpcSend(after: FileAttributes, q: RpcSendQueue): Promise<void> {
@@ -63,11 +63,11 @@ RpcCodecs.registerCodec(TreeKind.FileAttributes, {
 });
 
 RpcCodecs.registerCodec(MarkersKind.Markers, {
-    async rpcReceive(before: Markers, q: RpcReceiveQueue): Promise<any> {
-        const draft = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.markers = (await q.receiveList(before.markers))!;
-        return finishDraft(draft);
+    async rpcReceive(before: Markers, q: RpcReceiveQueue): Promise<Markers> {
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            markers: (await q.receiveList(before.markers))!,
+        });
     },
 
     async rpcSend(after: Markers, q: RpcSendQueue): Promise<void> {
@@ -79,10 +79,10 @@ RpcCodecs.registerCodec(MarkersKind.Markers, {
 // Register codecs for all Java markers with additional properties
 RpcCodecs.registerCodec(MarkersKind.SearchResult, {
     async rpcReceive(before: SearchResult, q: RpcReceiveQueue): Promise<SearchResult> {
-        const draft = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.description = await q.receive(before.description)
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            description: await q.receive(before.description),
+        });
     },
 
     async rpcSend(after: SearchResult, q: RpcSendQueue): Promise<void> {
@@ -93,11 +93,11 @@ RpcCodecs.registerCodec(MarkersKind.SearchResult, {
 
 RpcCodecs.registerCodec(MarkersKind.MarkupError, {
     async rpcReceive(before: MarkupError, q: RpcReceiveQueue): Promise<MarkupError> {
-        const draft = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.message = await q.receive(before.message);
-        draft.detail = await q.receive(before.detail);
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            message: await q.receive(before.message),
+            detail: await q.receive(before.detail),
+        });
     },
 
     async rpcSend(after: MarkupError, q: RpcSendQueue): Promise<void> {
@@ -109,11 +109,11 @@ RpcCodecs.registerCodec(MarkersKind.MarkupError, {
 
 RpcCodecs.registerCodec(MarkersKind.MarkupWarn, {
     async rpcReceive(before: MarkupWarn, q: RpcReceiveQueue): Promise<MarkupWarn> {
-        const draft = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.message = await q.receive(before.message);
-        draft.detail = await q.receive(before.detail);
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            message: await q.receive(before.message),
+            detail: await q.receive(before.detail),
+        });
     },
 
     async rpcSend(after: MarkupWarn, q: RpcSendQueue): Promise<void> {
@@ -125,11 +125,11 @@ RpcCodecs.registerCodec(MarkersKind.MarkupWarn, {
 
 RpcCodecs.registerCodec(MarkersKind.MarkupInfo, {
     async rpcReceive(before: MarkupInfo, q: RpcReceiveQueue): Promise<MarkupInfo> {
-        const draft = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.message = await q.receive(before.message);
-        draft.detail = await q.receive(before.detail);
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            message: await q.receive(before.message),
+            detail: await q.receive(before.detail),
+        });
     },
 
     async rpcSend(after: MarkupInfo, q: RpcSendQueue): Promise<void> {
@@ -141,11 +141,11 @@ RpcCodecs.registerCodec(MarkersKind.MarkupInfo, {
 
 RpcCodecs.registerCodec(MarkersKind.MarkupDebug, {
     async rpcReceive(before: MarkupDebug, q: RpcReceiveQueue): Promise<MarkupDebug> {
-        const draft = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.message = await q.receive(before.message);
-        draft.detail = await q.receive(before.detail);
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            message: await q.receive(before.message),
+            detail: await q.receive(before.detail),
+        });
     },
 
     async rpcSend(after: MarkupDebug, q: RpcSendQueue): Promise<void> {

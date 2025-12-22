@@ -32,9 +32,9 @@ import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.rpc.request.Print;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 
 import java.io.File;
 import java.io.IOException;

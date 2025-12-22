@@ -17,9 +17,9 @@
  */
 import {mapAsync, updateIfChanged} from "../util";
 import {Cursor, SourceFile} from "../tree";
-import {ValidImmerRecipeReturnType} from "../visitor";
+import {ValidRecipeReturnType} from "../visitor";
 import {Expression, J, Type, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
-import {createDraft, Draft, finishDraft} from "immer";
+import {create, Draft} from "mutative";
 import {isJavaScript, JS, JSX} from "./tree";
 import ComputedPropertyName = JS.ComputedPropertyName;
 
@@ -58,16 +58,16 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         before: J2,
         p: P,
         recipe?: (draft: Draft<J2>) =>
-            ValidImmerRecipeReturnType<Draft<J2>> |
-            PromiseLike<ValidImmerRecipeReturnType<Draft<J2>>>
+            ValidRecipeReturnType<Draft<J2>> |
+            PromiseLike<ValidRecipeReturnType<Draft<J2>>>
     ): Promise<J2> {
-        const draft: Draft<J2> = createDraft(before!);
+        const [draft, finishDraft] = create(before!);
         (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, p);
         (draft as Draft<J>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
             await recipe(draft);
         }
-        return finishDraft(draft) as J2;
+        return finishDraft() as J2;
     }
 
     protected async visitAlias(alias: JS.Alias, p: P): Promise<J | undefined> {

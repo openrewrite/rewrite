@@ -19,14 +19,14 @@ import {Cursor, Tree} from '../../tree';
 import {TreePrinters} from '../../print';
 import {JavaScriptParser} from '../parser';
 import {WhitespaceReconciler} from './whitespace-reconciler';
-import {produce} from 'immer';
 import {randomId} from '../../uuid';
 import {PrettierStyle, StyleKind} from '../style';
 import {NamedStyles} from '../../style';
-import {findMarker} from '../../markers';
+import {emptyMarkers, findMarker} from '../../markers';
 import {NormalizeWhitespaceVisitor} from './normalize-whitespace-visitor';
 import {MinimumViableSpacingVisitor} from './minimum-viable-spacing-visitor';
 import {loadPrettierVersion} from './prettier-config-loader';
+import {updateIfChanged} from "../../util";
 
 /**
  * Loads Prettier for formatting.
@@ -310,7 +310,7 @@ function createNullPlaceholder(prefix: J.Space): J.Identifier {
     return {
         kind: J.Kind.Identifier,
         id: randomId(),
-        markers: { kind: "org.openrewrite.marker.Markers", id: randomId(), markers: [] },
+        markers: emptyMarkers,
         prefix: prefix,
         annotations: [],
         simpleName: "null",
@@ -388,9 +388,7 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number, target: an
         }
         // Following siblings are omitted
 
-        return produce(node, (draft: any) => {
-            draft.statements = prunedStatements;
-        });
+        return updateIfChanged(node, {statements: prunedStatements});
     }
 
     // For other properties, just recurse without pruning
@@ -399,17 +397,16 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number, target: an
         const prunedChild = pruneNode(childNode, path, pathIndex + 1, target);
 
         if (prunedChild !== childNode) {
-            return produce(node, (draft: any) => {
-                draft[segment.property][segment.index!] = prunedChild;
-            });
+            // Create a copy of the array with the updated element
+            const newArray = [...value];
+            newArray[segment.index] = prunedChild;
+            return { ...node, [segment.property]: newArray };
         }
     } else if (!Array.isArray(value)) {
         const prunedChild = pruneNode(value, path, pathIndex + 1, target);
 
         if (prunedChild !== value) {
-            return produce(node, (draft: any) => {
-                draft[segment.property] = prunedChild;
-            });
+            return { ...node, [segment.property]: prunedChild };
         }
     }
 

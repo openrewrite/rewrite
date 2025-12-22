@@ -15,9 +15,9 @@
  */
 import {Cursor, isTree, SourceFile} from "../tree";
 import {mapAsync, updateIfChanged} from "../util";
-import {produceAsync, TreeVisitor, ValidImmerRecipeReturnType} from "../visitor";
+import {produceAsync, TreeVisitor, ValidRecipeReturnType} from "../visitor";
 import {Expression, isSpace, J, NameTree, Statement, TypedTree, TypeTree} from "./tree";
-import {createDraft, Draft, finishDraft, nothing} from "immer";
+import {create, Draft, rawReturn} from "mutative";
 import {Type} from "./type";
 
 const javaKindValues = new Set(Object.values(J.Kind));
@@ -1224,7 +1224,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.markers = await this.visitMarkers(right.markers, p);
             this.cursor = this.cursor.parent!;
             if (draft.element === undefined) {
-                return nothing;
+                return rawReturn(undefined);
             }
         });
     }
@@ -1245,7 +1245,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.markers = await this.visitMarkers(left.markers, p);
             this.cursor = this.cursor.parent!;
             if (draft.element === undefined) {
-                return nothing;
+                return rawReturn(undefined);
             }
         });
     }
@@ -1268,16 +1268,16 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         before: J2,
         p: P,
         recipe?: (draft: Draft<J2>) =>
-            ValidImmerRecipeReturnType<Draft<J2>> |
-            PromiseLike<ValidImmerRecipeReturnType<Draft<J2>>>
+            ValidRecipeReturnType<Draft<J2>> |
+            PromiseLike<ValidRecipeReturnType<Draft<J2>>>
     ): Promise<J2> {
-        const draft: Draft<J2> = createDraft(before);
+        const [draft, finishDraft] = create(before);
         (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, p);
         (draft as Draft<J>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
             await recipe(draft);
         }
-        return finishDraft(draft) as J2;
+        return finishDraft() as J2;
     }
 
     protected accept(t: J, p: P): Promise<J | undefined> {

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
-import {createDraft, Draft, finishDraft} from "immer";
 import {MarkersKind, ParseExceptionResult} from "./markers";
+import {updateIfChanged} from "./util";
 import {RecipeRegistry} from "./recipe";
 
 export * from "./data-table";
@@ -67,12 +67,12 @@ RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
         await q.getAndSend(after, a => a.treeType);
     },
     async rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): Promise<ParseExceptionResult> {
-        const draft: Draft<ParseExceptionResult> = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.parserType = await q.receive(before.parserType);
-        draft.exceptionType = await q.receive(before.exceptionType);
-        draft.message = await q.receive(before.message);
-        draft.treeType = await q.receive(before.treeType);
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            parserType: await q.receive(before.parserType),
+            exceptionType: await q.receive(before.exceptionType),
+            message: await q.receive(before.message),
+            treeType: await q.receive(before.treeType),
+        });
     }
 });

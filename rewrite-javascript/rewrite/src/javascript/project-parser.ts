@@ -18,12 +18,12 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import {spawnSync} from "child_process";
 import picomatch from "picomatch";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {SourceFile} from "../tree";
 import {Parsers} from "../parser";
 import {PrettierConfigLoader} from "./format/prettier-config-loader";
 import {ExecutionContext} from "../execution";
-import {Marker} from "../markers";
+import {Marker, replaceMarkerByKind} from "../markers";
 
 // Lock file names defined here to avoid circular dependency with package-manager.ts
 // These must be kept in sync with the definitions in package-manager.ts
@@ -303,7 +303,7 @@ export class ProjectParser {
                     );
                     if (prettierMarker) {
                         yield produce(sf, draft => {
-                            draft.markers.markers = draft.markers.markers.concat([prettierMarker]);
+                            draft.markers = replaceMarkerByKind(draft.markers, prettierMarker);
                         });
                     } else {
                         yield sf;
@@ -341,7 +341,7 @@ export class ProjectParser {
                 // Yield all files with the Autodetect marker
                 for (const sf of parsedFiles) {
                     yield produce(sf, draft => {
-                        draft.markers.markers = draft.markers.markers.concat([autodetectMarker]);
+                        draft.markers = replaceMarkerByKind(draft.markers, autodetectMarker);
                     });
                 }
             }

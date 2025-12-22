@@ -17,7 +17,7 @@ import {findMarker, Marker, Markers} from "../markers";
 import {randomId, UUID} from "../uuid";
 import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {castDraft} from "immer";
+import {castDraft} from "mutative";
 import {updateIfChanged} from "../util";
 import * as semver from "semver";
 import * as fsp from "fs/promises";
@@ -295,7 +295,7 @@ export function createNodeResolutionResultMarker(
     function extractPackageInfo(pkgPath: string): { name: string; version?: string } {
         // For nested packages, we want the last package name
         const nodeModulesIndex = pkgPath.lastIndexOf('node_modules/');
-        if (nodeModulesIndex === -1) return { name: pkgPath };
+        if (nodeModulesIndex === -1) return {name: pkgPath};
 
         let nameWithVersion = pkgPath.slice(nodeModulesIndex + 'node_modules/'.length);
 
@@ -320,7 +320,7 @@ export function createNodeResolutionResultMarker(
             }
         }
 
-        return { name: nameWithVersion };
+        return {name: nameWithVersion};
     }
 
     /**
@@ -347,7 +347,7 @@ export function createNodeResolutionResultMarker(
                 optionalDependencies: undefined,
                 engines: normalizeEngines(pkgEntry?.engines),
                 license: normalizeLicense(pkgEntry?.license),
-            });
+            }) as ResolvedDependency;
             resolvedDependencyCache.set(key, resolved);
 
             // Maintain name index for O(1) lookup during semver fallback
@@ -470,7 +470,7 @@ export function createNodeResolutionResultMarker(
                 name,
                 versionConstraint,
                 resolved,
-            });
+            }) as Dependency;
             dependencyCache.set(key, dep);
         }
         return dep;
@@ -514,7 +514,7 @@ export function createNodeResolutionResultMarker(
         const packages = lockContent.packages;
 
         // First pass: Create all ResolvedDependency placeholders and build path map
-        const packageInfos: Array<{path: string; name: string; version: string; entry: PackageLockEntry}> = [];
+        const packageInfos: Array<{ path: string; name: string; version: string; entry: PackageLockEntry }> = [];
         for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
             // Skip the root package (empty string key)
             if (pkgPath === '') continue;
@@ -535,7 +535,7 @@ export function createNodeResolutionResultMarker(
         // Note: Using castDraft here is safe because all objects are created within this
         // parsing context and haven't been returned to callers yet. The objects in
         // resolvedDependencyCache are plain JS objects marked with asRef() for RPC
-        // reference deduplication, not frozen Immer drafts.
+        // reference deduplication.
         for (const {path: pkgPath, name, version, entry} of packageInfos) {
             const key = `${name}@${version}`;
             const resolved = resolvedDependencyCache.get(key);
@@ -590,7 +590,7 @@ export function createNodeResolutionResultMarker(
         packageManager,
         engines: packageJsonContent.engines,
         npmrcConfigs,
-    };
+    } as NodeResolutionResult;
 }
 
 /**
@@ -817,7 +817,6 @@ export namespace NodeResolutionResultQueries {
 RpcCodecs.registerCodec(NpmrcKind, {
     async rpcReceive(before: Npmrc, q: RpcReceiveQueue): Promise<Npmrc> {
         return updateIfChanged(before, {
-            kind: NpmrcKind,
             scope: await q.receive(before.scope),
             properties: await q.receive(before.properties),
         });
@@ -835,7 +834,6 @@ RpcCodecs.registerCodec(NpmrcKind, {
 RpcCodecs.registerCodec(DependencyKind, {
     async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
         return updateIfChanged(before, {
-            kind: DependencyKind,
             name: await q.receive(before.name),
             versionConstraint: await q.receive(before.versionConstraint),
             resolved: await q.receive(before.resolved),
@@ -855,7 +853,6 @@ RpcCodecs.registerCodec(DependencyKind, {
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
     async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
         return updateIfChanged(before, {
-            kind: ResolvedDependencyKind,
             name: await q.receive(before.name),
             version: await q.receive(before.version),
             dependencies: (await q.receiveList(before.dependencies)) || undefined,
@@ -886,9 +883,6 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
 /**
  * Register RPC codec for NodeResolutionResult marker.
  * This handles serialization/deserialization for communication between JS and Java.
- * Note: We avoid Immer here because the dependency graph can contain cycles
- * (e.g., Dependency -> ResolvedDependency -> Dependency[]), and Immer's proxies
- * don't handle cyclic structures correctly.
  */
 RpcCodecs.registerCodec(NodeResolutionResultKind, {
     async rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): Promise<NodeResolutionResult> {

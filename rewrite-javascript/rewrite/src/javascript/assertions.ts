@@ -22,11 +22,11 @@ import {json, Json} from "../json";
 import {DependencyWorkspace} from "./dependency-workspace";
 import {setTemplateSourceFileCache} from "./templating/engine";
 import {PrettierConfigLoader} from "./format/prettier-config-loader";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import * as fs from "fs";
 import * as path from "path";
 import {Autodetect} from "./autodetect";
-import {Marker} from "../markers";
+import {Marker, replaceMarkerByKind} from "../markers";
 
 /**
  * Shared TypeScript source file cache for test parsers.
@@ -174,7 +174,7 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
                     // Compose with existing beforeRecipe if present
                     beforeRecipe: styleMarker ? (sf: JS.CompilationUnit) => {
                         const withMarker = produce(sf, draft => {
-                            draft.markers.markers = draft.markers.markers.concat([styleMarker]);
+                            draft.markers = replaceMarkerByKind(draft.markers, styleMarker);
                         });
                         return spec.beforeRecipe ? spec.beforeRecipe(withMarker) : withMarker;
                     } : spec.beforeRecipe
