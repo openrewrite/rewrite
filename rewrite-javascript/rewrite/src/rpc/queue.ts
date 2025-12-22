@@ -25,6 +25,14 @@ import {isRef, ReferenceMap} from "../reference";
  */
 export interface RpcCodec<T> {
     /**
+     * Creates a new instance of the object type with proper constructor defaults.
+     * If not provided, a plain object `{kind: type}` will be created.
+     *
+     * @returns A new instance of the object type.
+     */
+    rpcNew?(): T;
+
+    /**
      * Serializes and sends an object over an RPC send queue.
      *
      * @param after - The object to be sent.
@@ -397,6 +405,10 @@ export class RpcReceiveQueue {
     }
 
     private newObj<T>(type: string): T {
+        const codec = RpcCodecs.forType(type, this.sourceFileType);
+        if (codec?.rpcNew) {
+            return codec.rpcNew();
+        }
         return {kind: type} as T;
     }
 }
