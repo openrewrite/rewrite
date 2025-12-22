@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 import {mapAsync, updateIfChanged} from "../util";
-import {Cursor, SourceFile} from "../tree";
+import {SourceFile} from "../tree";
 import {ValidRecipeReturnType} from "../visitor";
-import {Expression, J, Type, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
+import {Expression, J, JavaVisitor, NameTree, Statement, Type, TypedTree} from "../java";
 import {create, Draft} from "mutative";
 import {isJavaScript, JS, JSX} from "./tree";
-import ComputedPropertyName = JS.ComputedPropertyName;
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
@@ -957,7 +956,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             modifiers: await mapAsync(computedPropMethod.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
             typeParameters: computedPropMethod.typeParameters && await this.visitDefined<J.TypeParameters>(computedPropMethod.typeParameters, p),
             returnTypeExpression: computedPropMethod.returnTypeExpression && await this.visitDefined<TypedTree>(computedPropMethod.returnTypeExpression, p),
-            name: await this.visitDefined<ComputedPropertyName>(computedPropMethod.name, p),
+            name: await this.visitDefined<JS.ComputedPropertyName>(computedPropMethod.name, p),
             parameters: await this.visitContainer(computedPropMethod.parameters, p),
             body: computedPropMethod.body && await this.visitDefined<J.Block>(computedPropMethod.body, p),
             methodType: computedPropMethod.methodType && (await this.visitType(computedPropMethod.methodType, p) as Type.Method)
