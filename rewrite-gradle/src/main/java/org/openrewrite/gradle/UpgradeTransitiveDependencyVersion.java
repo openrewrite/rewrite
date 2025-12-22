@@ -245,11 +245,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             }
                         }
                         for (ResolvedDependency resolved : configuration.getResolved()) {
-                            // Process both transitive dependencies and plugin-provided direct dependencies.
-                            // Plugin-provided dependencies are not in getRequested() but appear as direct (depth=0) in resolved.
-                            // Since we already skip configurations with matching requested dependencies above,
-                            // any remaining matches are either transitive or plugin-provided.
-                            if (dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
+                            // Only process transitive dependencies (depth > 0).
+                            // Direct dependencies (depth=0), whether user-declared or plugin-provided, are not handled here.
+                            // User-declared direct dependencies are skipped above via getRequested() check.
+                            // Plugin-provided direct dependencies should use a different mechanism to upgrade.
+                            if (resolved.isTransitive() && dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
                                 try {
                                     String selected = versionSelector.select(resolved.getGav(), configuration.getName(), version, versionPattern, ctx);
                                     if (selected == null || resolved.getVersion().equals(selected)) {

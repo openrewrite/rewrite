@@ -975,7 +975,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null, "CVE-2022-24329", List.of("implementation"))),
+              "org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null, "CVE-2022-24329", null)),
           buildGradle(
             """
               plugins {
