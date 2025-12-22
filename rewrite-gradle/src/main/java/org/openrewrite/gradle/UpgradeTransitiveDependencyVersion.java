@@ -443,18 +443,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         return null;
                     }
                 } else {
-                    // Check direct parents first
-                    for (GradleDependencyConfiguration extended : config.getExtendsFrom()) {
+                    // Check direct parents only when there are user-declared deps, otherwise check all ancestors
+                    // (allExtendsFrom() returns direct parents first, so no separate direct-parent loop needed)
+                    Collection<GradleDependencyConfiguration> extendsFromConfigs =
+                            declaredConfigurationsWithDeps.isEmpty() ? config.allExtendsFrom() : config.getExtendsFrom();
+                    for (GradleDependencyConfiguration extended : extendsFromConfigs) {
                         if (extended.getName().equals(constraintConfigName)) {
                             return extended;
-                        }
-                    }
-                    // Only check all ancestors when there are no user-declared deps (plugin-provided deps case)
-                    if (declaredConfigurationsWithDeps.isEmpty()) {
-                        for (GradleDependencyConfiguration extended : config.allExtendsFrom()) {
-                            if (extended.getName().equals(constraintConfigName)) {
-                                return extended;
-                            }
                         }
                     }
                 }
