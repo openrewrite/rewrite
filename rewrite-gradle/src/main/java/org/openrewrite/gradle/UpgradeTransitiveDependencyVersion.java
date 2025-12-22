@@ -225,28 +225,38 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
                     DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
 
-                    // Determine the configurations used to declare dependencies that requested dependencies in the build
-                    List<GradleDependencyConfiguration> declaredConfigurations = gradleProject.getConfigurations().stream()
+                    // Determine the configurations used to declare dependencies.
+                    // Include both configurations with user-declared dependencies (preferred for constraint target)
+                    // and all declarable configurations (fallback for plugin-provided dependencies).
+                    List<GradleDependencyConfiguration> declaredConfigurationsWithDeps = gradleProject.getConfigurations().stream()
                             .filter(c -> c.isCanBeDeclared() && !c.getRequested().isEmpty())
+                            .collect(toList());
+                    List<GradleDependencyConfiguration> allDeclarableConfigurations = gradleProject.getConfigurations().stream()
+                            .filter(GradleDependencyConfiguration::isCanBeDeclared)
                             .collect(toList());
 
                     configurations:
                     for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
-                        // Skip when there's a direct dependency, as per openrewrite/rewrite#5355
+                        // Skip when there's a direct dependency declared in the build script, as per openrewrite/rewrite#5355.
+                        // UpgradeDependencyVersion is responsible for upgrading those.
                         for (Dependency dependency : configuration.getRequested()) {
                             if (dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                                 continue configurations;
                             }
                         }
                         for (ResolvedDependency resolved : configuration.getResolved()) {
-                            if (resolved.isTransitive() && dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
+                            // Process both transitive dependencies and plugin-provided direct dependencies.
+                            // Plugin-provided dependencies are not in getRequested() but appear as direct (depth=0) in resolved.
+                            // Since we already skip configurations with matching requested dependencies above,
+                            // any remaining matches are either transitive or plugin-provided.
+                            if (dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
                                 try {
                                     String selected = versionSelector.select(resolved.getGav(), configuration.getName(), version, versionPattern, ctx);
                                     if (selected == null || resolved.getVersion().equals(selected)) {
                                         continue;
                                     }
 
-                                    GradleDependencyConfiguration constraintConfig = constraintConfiguration(configuration, declaredConfigurations);
+                                    GradleDependencyConfiguration constraintConfig = constraintConfiguration(configuration, declaredConfigurationsWithDeps, allDeclarableConfigurations);
                                     if (constraintConfig == null) {
                                         continue;
                                     }
@@ -400,13 +410,28 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
              *     implementation("g:a:v") { }
              * }
              */
-            private @Nullable GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config, List<GradleDependencyConfiguration> declaredConfigurations) {
+            private @Nullable GradleDependencyConfiguration constraintConfiguration(
+                    GradleDependencyConfiguration config,
+                    List<GradleDependencyConfiguration> declaredConfigurationsWithDeps,
+                    List<GradleDependencyConfiguration> allDeclarableConfigurations) {
                 // Check if the resolved configuration e.g. compileClasspath extends from a declared configuration
                 // defined in the build e.g. implementation. Constraints should only use the configuration name of the
                 // dependency declared in the build.
+                // For configurations with user-declared dependencies, prefer direct parents (getExtendsFrom)
+                // to preserve the original behavior.
                 Optional<GradleDependencyConfiguration> declaredConfig = config.getExtendsFrom().stream()
-                        .filter(declaredConfigurations::contains)
+                        .filter(declaredConfigurationsWithDeps::contains)
                         .findFirst();
+
+                // Only use allExtendsFrom fallback when there are no user-declared dependencies at all.
+                // This is needed for plugin-provided dependencies when user hasn't declared any dependencies.
+                // If there are user-declared deps but not in this config's parents, the original fallback
+                // to config.getName() will be used below.
+                if (!declaredConfig.isPresent() && declaredConfigurationsWithDeps.isEmpty()) {
+                    declaredConfig = config.allExtendsFrom().stream()
+                            .filter(allDeclarableConfigurations::contains)
+                            .findFirst();
+                }
 
                 // The configuration name for the used constraint should be the name of the declared configuration if it exists,
                 // otherwise the name of the current configuration
@@ -418,9 +443,18 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         return null;
                     }
                 } else {
+                    // Check direct parents first
                     for (GradleDependencyConfiguration extended : config.getExtendsFrom()) {
                         if (extended.getName().equals(constraintConfigName)) {
                             return extended;
+                        }
+                    }
+                    // Only check all ancestors when there are no user-declared deps (plugin-provided deps case)
+                    if (declaredConfigurationsWithDeps.isEmpty()) {
+                        for (GradleDependencyConfiguration extended : config.allExtendsFrom()) {
+                            if (extended.getName().equals(constraintConfigName)) {
+                                return extended;
+                            }
                         }
                     }
                 }
@@ -499,6 +533,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 GradleProject gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
                 Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
                 if (projectRequiredUpdates.keySet().stream().anyMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
+                    // Ensure a dependencies block exists before adding constraints
+                    cu = (JavaSourceFile) new AddDependenciesBlockVisitor(cu instanceof K.CompilationUnit)
+                            .visitNonNull(cu, ctx);
+
                     cu = (JavaSourceFile) Preconditions.check(
                             not(new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
@@ -592,6 +630,84 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return entry.withValue(entry.getValue().withText(acc.dependenciesToUpdate(dependencyMatcher).get(ga)));
             }
             return entry;
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class AddDependenciesBlockVisitor extends JavaVisitor<ExecutionContext> {
+        boolean isKotlinDsl;
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof G.CompilationUnit && !isKotlinDsl) {
+                G.CompilationUnit g = (G.CompilationUnit) tree;
+                if (!hasDependenciesBlock(g.getStatements())) {
+                    J.MethodInvocation dependencies = parseAsGradle(
+                            //language=groovy
+                            "dependencies {\n" +
+                            "}\n", false, ctx)
+                            .map(G.CompilationUnit.class::cast)
+                            .map(parsed -> (J.MethodInvocation) parsed.getStatements().get(0))
+                            .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
+                            .withPrefix(Space.format("\n\n"));
+                    return g.withStatements(ListUtils.concat(g.getStatements(), dependencies));
+                }
+                return g;
+            } else if (tree instanceof K.CompilationUnit && isKotlinDsl) {
+                K.CompilationUnit k = (K.CompilationUnit) tree;
+                List<Statement> statements = k.getStatements().stream()
+                        .filter(J.Block.class::isInstance)
+                        .map(J.Block.class::cast)
+                        .flatMap(block -> block.getStatements().stream())
+                        .collect(toList());
+                if (!hasDependenciesBlock(statements)) {
+                    J.MethodInvocation dependencies = parseAsGradle(
+                            //language=kotlin
+                            "dependencies {\n" +
+                            "}\n", true, ctx)
+                            .map(K.CompilationUnit.class::cast)
+                            .map(parsed -> (J.Block) parsed.getStatements().get(0))
+                            .map(block -> (J.MethodInvocation) block.getStatements().get(0))
+                            // Ensure the lambda body has proper end spacing for the closing brace
+                            .map(m -> m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                                if (!(arg instanceof J.Lambda)) {
+                                    return arg;
+                                }
+                                J.Lambda lambda = (J.Lambda) arg;
+                                if (!(lambda.getBody() instanceof J.Block)) {
+                                    return arg;
+                                }
+                                J.Block body = (J.Block) lambda.getBody();
+                                return lambda.withBody(body.withEnd(Space.format("\n")));
+                            })))
+                            .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
+                            .withPrefix(Space.format("\n\n"));
+                    // For Kotlin, we need to add to the block inside the compilation unit
+                    if (!k.getStatements().isEmpty() && k.getStatements().get(0) instanceof J.Block) {
+                        J.Block block = (J.Block) k.getStatements().get(0);
+                        return k.withStatements(singletonList(block.withStatements(
+                                ListUtils.concat(block.getStatements(), dependencies))));
+                    }
+                }
+                return k;
+            }
+            return super.visit(tree, ctx);
+        }
+
+        private boolean hasDependenciesBlock(List<Statement> statements) {
+            for (Statement statement : statements) {
+                if (statement instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) statement, true)) {
+                    return true;
+                } else if (statement instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) statement).getSimpleName())) {
+                    return true;
+                } else if (statement instanceof J.Return &&
+                        ((J.Return) statement).getExpression() instanceof J.MethodInvocation &&
+                        DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) ((J.Return) statement).getExpression(), true)) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

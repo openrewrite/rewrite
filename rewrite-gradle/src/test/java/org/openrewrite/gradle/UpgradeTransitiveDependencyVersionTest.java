@@ -967,6 +967,97 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    /**
+     * Makes no changes when a Gradle plugin (like the Kotlin JVM plugin) provides a direct dependency.
+     */
+    @Test
+    void doesNotAddConstraintForPluginProvidedDirectDependency() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null, "CVE-2022-24329", List.of("implementation"))),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """
+          )
+        );
+    }
+
+    /**
+     * When a Gradle plugin (like the Kotlin JVM plugin) provides transitive dependencies directly without user declaration,
+     * we can still add constraints for those dependencies.
+     */
+    @Test
+    void groovyDslAddConstraintForPluginProvidedTransitiveDependency() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.jetbrains.kotlin", "kotlin-stdlib", "2.1.0", null, "CVE-2022-24329", List.of("implementation"))),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """,
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation('org.jetbrains.kotlin:kotlin-stdlib:2.1.0') {
+                          because 'CVE-2022-24329'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * When a Gradle plugin (like the Kotlin JVM plugin) provides dependencies directly without user declaration,
+     * we can still add constraints for those dependencies.
+     */
+    @Test
+    void kotlinDslAddConstraintForPluginProvidedDependency() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.jetbrains.kotlin", "kotlin-stdlib", "2.1.0", null, "CVE-2022-24329", List.of("implementation"))),
+          buildGradleKts(
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+              """,
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+
+                  constraints {
+                      implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.0") {
+                          because("CVE-2022-24329")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void kotlinDslAddConstraint() {
         rewriteRun(
