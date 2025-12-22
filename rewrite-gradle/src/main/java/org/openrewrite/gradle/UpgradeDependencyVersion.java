@@ -382,12 +382,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 JavaSourceFile sourceFile = (JavaSourceFile) tree;
                 gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class)
                         .orElse(null);
-
-                // Apply plugin-provided direct dependencies
-                if (gradleProject != null) {
-                    sourceFile = applyPluginProvidedDependencies(sourceFile, ctx);
-                }
-
+                sourceFile = applyPluginProvidedDependencies(sourceFile, ctx);
                 return super.visit(sourceFile, ctx);
             }
             return super.visit(tree, ctx);
