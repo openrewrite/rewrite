@@ -403,41 +403,29 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return sourceFile;
             }
 
-            String projectKey = getGradleProjectKey(gradleProject);
-            Map<GroupArtifact, Set<String>> astDependencies = acc.configurationPerGAPerModule.getOrDefault(projectKey, emptyMap());
             DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
 
             for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
-                // Skip non-resolvable configurations
                 if (!configuration.isCanBeResolved()) {
                     continue;
                 }
 
                 for (ResolvedDependency resolved : configuration.getResolved()) {
-                    // Only process direct dependencies (depth=0)
                     if (!resolved.isDirect()) {
                         continue;
                     }
 
-                    // Check if this dependency matches our pattern
                     if (!dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                         continue;
                     }
 
-                    // Check if this dependency was found in the AST scan (in any build script)
-                    // or if it's in the configuration's requested list (declared somewhere, even if not parseable)
                     GroupArtifact ga = new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId());
-                    if (astDependencies.containsKey(ga) || acc.allDeclaredDependencies.contains(ga)) {
-                        // This dependency has an AST node in some build script, skip it
-                        continue;
-                    }
 
-                    // Also check if the dependency is in the requested list of this configuration
-                    // This catches dependencies declared in formats we can't parse (e.g., string concatenation)
-                    boolean isRequested = configuration.getRequested().stream()
-                            .anyMatch(req -> ga.getGroupId().equals(req.getGroupId()) &&
-                                    ga.getArtifactId().equals(req.getArtifactId()));
-                    if (isRequested) {
+                    // Skip if declared in any build script or in this configuration's requested list
+                    if (acc.allDeclaredDependencies.contains(ga) ||
+                            configuration.getRequested().stream().anyMatch(req ->
+                                    ga.getGroupId().equals(req.getGroupId()) &&
+                                    ga.getArtifactId().equals(req.getArtifactId()))) {
                         continue;
                     }
 
