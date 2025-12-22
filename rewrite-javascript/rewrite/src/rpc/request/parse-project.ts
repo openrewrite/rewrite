@@ -21,6 +21,7 @@ import {SourceFile} from "../../tree";
 import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
 import {DEFAULT_EXCLUSIONS, ProjectParser} from "../../javascript";
+import {replaceMarkerByKind} from "../../markers";
 
 /**
  * Response item with object ID and source file type for proper deserialization.
@@ -168,7 +169,7 @@ export class ParseProject {
                                         ...sourceFile,
                                         id,
                                         markers: prettierMarker
-                                            ? { ...sourceFile.markers, markers: sourceFile.markers.markers.concat([prettierMarker]) }
+                                            ? replaceMarkerByKind(sourceFile.markers, prettierMarker)
                                             : sourceFile.markers
                                     };
                                 });
@@ -197,7 +198,7 @@ export class ParseProject {
                                     return {
                                         ...sourceFile,
                                         id: newId,
-                                        markers: { ...sourceFile.markers, markers: sourceFile.markers.markers.concat([autodetectMarker]) }
+                                        markers: replaceMarkerByKind(sourceFile.markers, autodetectMarker)
                                     };
                                 });
                                 resultItems.push({

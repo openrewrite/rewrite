@@ -30,7 +30,7 @@ import {
     VariableDeclarator,
 } from '../java';
 import {DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
-import {emptyMarkers, markers, Markers, MarkersKind, ParseExceptionResult} from "../markers";
+import {emptyMarkers, markers, Markers, MarkersKind, ParseExceptionResult, replaceMarkerByKind} from "../markers";
 import {NamedStyles} from "../style";
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers, SourcePath} from "../parser";
 import {randomId} from "../uuid";
@@ -51,6 +51,7 @@ import {create as produce} from "mutative";
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
+
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
     sourceFileCache?: Map<string, ts.SourceFile>,
@@ -168,7 +169,7 @@ export class JavaScriptParser extends Parser {
             if (this.styles) {
                 const styles = this.styles;
                 return produce(result, draft => {
-                    draft.markers.markers = draft.markers.markers.concat(styles);
+                    draft.markers = styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
                 });
             }
             return result;
@@ -359,7 +360,7 @@ export class JavaScriptParser extends Parser {
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
-                            draft.markers.markers = draft.markers.markers.concat(this.styles);
+                            draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
                         }
                     });
             } catch (error) {

@@ -122,7 +122,7 @@ export class TypeVisitor<P> {
         const newType = await this.visit(annotation.type, p) as Type.FullyQualified;
         // Note: values contain element values which themselves contain Type references
         const newValues = await mapAsync(annotation.values || [], async v => {
-            const newElement = await this.visit(v.element, p) as Type;
+            const newElement = await this.visit(v.element, p);
             if (v.kind === Type.Kind.SingleElementValue) {
                 const single = v as Type.Annotation.SingleElementValue;
                 const newReferenceValue = single.referenceValue
@@ -131,7 +131,7 @@ export class TypeVisitor<P> {
                 return updateIfChanged(v, {
                     element: newElement,
                     referenceValue: newReferenceValue,
-                } as Partial<Type.Annotation.SingleElementValue>);
+                });
             } else if (v.kind === Type.Kind.ArrayElementValue) {
                 const array = v as Type.Annotation.ArrayElementValue;
                 const newReferenceValues = array.referenceValues
@@ -140,7 +140,7 @@ export class TypeVisitor<P> {
                 return updateIfChanged(v, {
                     element: newElement,
                     referenceValues: newReferenceValues,
-                } as Partial<Type.Annotation.ArrayElementValue>);
+                });
             }
             return updateIfChanged(v, {element: newElement});
         });
@@ -152,32 +152,32 @@ export class TypeVisitor<P> {
 
     protected async visitArray(array: Type.Array, p: P): Promise<Type | undefined> {
         return updateIfChanged(array, {
-            elemType: await this.visit(array.elemType, p) as Type,
-            annotations: await this.visitList(array.annotations, p) as Type.Annotation[] || [],
+            elemType: await this.visit(array.elemType, p),
+            annotations: await this.visitList(array.annotations, p) || [],
         });
     }
 
     protected async visitClass(aClass: Type.Class, p: P): Promise<Type | undefined> {
         return updateIfChanged(aClass, {
-            supertype: await this.visit(aClass.supertype, p) as Type.Class | undefined,
-            owningClass: await this.visit(aClass.owningClass, p) as Type.Class | undefined,
-            annotations: await mapAsync(aClass.annotations || [], a => this.visit(a, p) as Promise<Type.Annotation>),
-            interfaces: await mapAsync(aClass.interfaces || [], i => this.visit(i, p) as Promise<Type.Class>),
-            members: await mapAsync(aClass.members || [], m => this.visit(m, p) as Promise<Type.Variable>),
-            methods: await mapAsync(aClass.methods || [], m => this.visit(m, p) as Promise<Type.Method>),
-            typeParameters: await this.visitList(aClass.typeParameters, p) as Type[] || [],
+            supertype: await this.visit(aClass.supertype, p),
+            owningClass: await this.visit(aClass.owningClass, p),
+            annotations: await mapAsync(aClass.annotations || [], a => this.visit(a, p)),
+            interfaces: await mapAsync(aClass.interfaces || [], i => this.visit(i, p)),
+            members: await mapAsync(aClass.members || [], m => this.visit(m, p)),
+            methods: await mapAsync(aClass.methods || [], m => this.visit(m, p)),
+            typeParameters: await this.visitList(aClass.typeParameters, p) || [],
         });
     }
 
     protected async visitGenericTypeVariable(generic: Type.GenericTypeVariable, p: P): Promise<Type | undefined> {
         return updateIfChanged(generic, {
-            bounds: await mapAsync(generic.bounds || [], b => this.visit(b, p)) as Type[],
+            bounds: await mapAsync(generic.bounds || [], b => this.visit(b, p)),
         });
     }
 
     protected async visitIntersection(intersection: Type.Intersection, p: P): Promise<Type | undefined> {
         return updateIfChanged(intersection, {
-            bounds: await mapAsync(intersection.bounds || [], b => this.visit(b, p)) as Type[],
+            bounds: await mapAsync(intersection.bounds || [], b => this.visit(b, p)),
         });
     }
 
@@ -190,18 +190,18 @@ export class TypeVisitor<P> {
      */
     protected async visitMethod(method: Type.Method, p: P): Promise<Type | undefined> {
         return updateIfChanged(method, {
-            declaringType: await this.visit(method.declaringType, p) as Type.FullyQualified,
-            returnType: await this.visit(method.returnType, p) as Type,
-            parameterTypes: await mapAsync(method.parameterTypes || [], pt => this.visit(pt, p)) as Type[],
-            thrownExceptions: await mapAsync(method.thrownExceptions || [], t => this.visit(t, p)) as Type[],
-            annotations: await mapAsync(method.annotations || [], a => this.visit(a, p) as Promise<Type.Annotation>),
+            declaringType: await this.visit(method.declaringType, p),
+            returnType: await this.visit(method.returnType, p),
+            parameterTypes: await mapAsync(method.parameterTypes || [], pt => this.visit(pt, p)),
+            thrownExceptions: await mapAsync(method.thrownExceptions || [], t => this.visit(t, p)),
+            annotations: await mapAsync(method.annotations || [], a => this.visit(a, p)),
         });
     }
 
     protected async visitParameterized(parameterized: Type.Parameterized, p: P): Promise<Type | undefined> {
         return updateIfChanged(parameterized, {
-            type: await this.visit(parameterized.type, p) as Type.FullyQualified,
-            typeParameters: await mapAsync(parameterized.typeParameters || [], t => this.visit(t, p)) as Type[],
+            type: await this.visit(parameterized.type, p),
+            typeParameters: await mapAsync(parameterized.typeParameters || [], t => this.visit(t, p)),
         });
     }
 
@@ -220,8 +220,8 @@ export class TypeVisitor<P> {
     protected async visitVariable(variable: Type.Variable, p: P): Promise<Type | undefined> {
         return updateIfChanged(variable, {
             owner: await this.visit(variable.owner, p),
-            type: await this.visit(variable.type, p) as Type,
-            annotations: await mapAsync(variable.annotations || [], a => this.visit(a, p) as Promise<Type.Annotation>),
+            type: await this.visit(variable.type, p),
+            annotations: await mapAsync(variable.annotations || [], a => this.visit(a, p)),
         });
     }
 
