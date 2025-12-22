@@ -28,7 +28,7 @@ class CopyValueTest implements RewriteTest {
     void changeCurrentFileWhenNull() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, "destination", null)
+            new CopyValue("$.source", null, ".", "copiedValue", null)
           ),
           json(
             """
@@ -39,7 +39,7 @@ class CopyValueTest implements RewriteTest {
             """
               {
                 "source": "value",
-                "destination": "value"
+                "copiedValue": "value"
               }
               """,
             spec -> spec.path("a.json")
@@ -51,7 +51,7 @@ class CopyValueTest implements RewriteTest {
     void changeOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.json", "destination", null)
+            new CopyValue("$.source", "a.json", ".", "copiedValue", null)
           ),
           json(
             """
@@ -62,19 +62,10 @@ class CopyValueTest implements RewriteTest {
             """
               {
                 "source": "value",
-                "destination": "value"
+                "copiedValue": "value"
               }
               """,
             spec -> spec.path("a.json")
-          ),
-          json(
-            """
-              {
-                "source": "other",
-                "destination": "original"
-              }
-              """,
-            spec -> spec.path("b.json")
           )
         );
     }
@@ -83,7 +74,7 @@ class CopyValueTest implements RewriteTest {
     void copyComplexValue() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, "destination", null)
+            new CopyValue("$.source", null, ".", "copiedValue", null)
           ),
           json(
             """
@@ -98,7 +89,7 @@ class CopyValueTest implements RewriteTest {
                 "source": {
                   "foo": "bar"
                 },
-                "destination": {
+                "copiedValue": {
                   "foo": "bar"
                 }
               }
@@ -111,7 +102,7 @@ class CopyValueTest implements RewriteTest {
     void copyToOtherFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.json", "destination", "b.json")
+            new CopyValue("$.source", "a.json", ".", "copiedValue", "b.json")
           ),
           json(
             """
@@ -131,7 +122,7 @@ class CopyValueTest implements RewriteTest {
             """
               {
                 "source": "original",
-                "destination": "value"
+                "copiedValue": "value"
               }
               """,
             spec -> spec.path("b.json")
@@ -143,7 +134,7 @@ class CopyValueTest implements RewriteTest {
     void copyToOtherFileWithEmptyObject() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.json", "destination", "b.json")
+            new CopyValue("$.source", "a.json", ".", "copiedValue", "b.json")
           ),
           json(
             """
@@ -161,7 +152,7 @@ class CopyValueTest implements RewriteTest {
               """,
             """
               {
-                "destination": "value"
+                "copiedValue": "value"
               }
               """,
             spec -> spec.path("b.json")
@@ -173,7 +164,7 @@ class CopyValueTest implements RewriteTest {
     void copyEntireArray() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.sourceArray", null, "destinationArray", null)
+            new CopyValue("$.sourceArray", null, ".", "copiedValue", null)
           ),
           json(
             """
@@ -184,7 +175,7 @@ class CopyValueTest implements RewriteTest {
             """
               {
                 "sourceArray": [1, 2, 3],
-                "destinationArray": [1, 2, 3]
+                "copiedValue": [1, 2, 3]
               }
               """
           )

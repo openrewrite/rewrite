@@ -29,38 +29,41 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.json.tree.Json;
 
 import java.nio.file.Path;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @SuppressWarnings("LanguageMismatch")
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
-    @Option(displayName = "Old key path",
-            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a JSON key/value pair to copy.",
+    @Option(displayName = "Source key path",
+            description = "A [JSONPath](https://www.rfc-editor.org/rfc/rfc9535.html) expression to locate a JSON value to copy.",
             example = "$.source.kind")
-    String oldKeyPath;
+    String sourceKeyPath;
 
-    @Option(displayName = "Old file path",
+    @Option(displayName = "Source file path",
             description = "The file path to the JSON file to copy the value from. " +
                           "If `null` then the value will be copied from any JSON file it appears within.",
             example = "src/main/resources/application.json",
             required = false)
     @Nullable
-    String oldFilePath;
+    String sourceFilePath;
 
-    @Option(displayName = "New key path",
-            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression defining where the value should be written.",
-            example = "$.dest.kind")
-    String newKey;
+    @Option(displayName = "Destination key path",
+            description = "A [JSONPath](https://www.rfc-editor.org/rfc/rfc9535.html) expression to locate the *parent* JSON entry.",
+            example = "'$.subjects.*' or '$.' or '$.x[1].y.*' etc.")
+    String destinationKeyPath;
 
-    @Option(displayName = "New file path",
+    @Option(displayName = "Destination key",
+            description = "The key to create.",
+            example = "myKey")
+    String destinationKey;
+
+    @Option(displayName = "Destination file path",
             description = "The file path to the JSON file to copy the value to. " +
                           "If `null` then the value will be copied only into the same file it was found in.",
             example = "src/main/resources/application.json",
             required = false)
     @Nullable
-    String newFilePath;
+    String destinationFilePath;
 
     @Override
     public String getDisplayName() {
@@ -70,10 +73,10 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Override
     public String getInstanceNameSuffix() {
         return String.format("%s`%s` to %s`%s`",
-                (oldFilePath == null) ? "" : oldFilePath + ":",
-                oldKeyPath,
-                (newFilePath == null) ? "" : newFilePath + ":",
-                newKey);
+                (sourceFilePath == null) ? "" : sourceFilePath + ":",
+                sourceKeyPath,
+                (destinationFilePath == null) ? "" : destinationFilePath + ":",
+                destinationKeyPath);
     }
 
     @Override
@@ -101,7 +104,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         TreeVisitor<?, ExecutionContext> visitor = new JsonIsoVisitor<ExecutionContext>() {
-            final JsonPathMatcher oldPathMatcher = new JsonPathMatcher(oldKeyPath);
+            final JsonPathMatcher sourcePathMatcher = new JsonPathMatcher(sourceKeyPath);
 
             @Override
             public Json.Document visitDocument(Json.Document document, ExecutionContext ctx) {
@@ -114,15 +117,15 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
                 Json.Member source = super.visitMember(member, ctx);
-                if (oldPathMatcher.matches(getCursor())) {
+                if (sourcePathMatcher.matches(getCursor())) {
                     acc.snippet = member.getValue().print(getCursor());
                     acc.path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
                 }
                 return source;
             }
         };
-        if (oldFilePath != null) {
-            visitor = Preconditions.check(new FindSourceFiles(oldFilePath), visitor);
+        if (sourceFilePath != null) {
+            visitor = Preconditions.check(new FindSourceFiles(sourceFilePath), visitor);
         }
 
         return visitor;
@@ -133,20 +136,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         if (acc.snippet == null) {
             return TreeVisitor.noop();
         }
-        return Preconditions.check(new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
-                new AddKeyValue(extractParent(oldKeyPath), newKey, acc.snippet, false).getVisitor());
-    }
-
-    private String extractParent(String keyPath) {
-        // Extract the parent from the JsonPath expression
-        // For example, "$.dest.kind" should return "$.dest"
-        // For "$.destination" should return "$"
-        // For bracket notation like "$['dest']['kind']" should return "$['dest']"
-        int index = keyPath.lastIndexOf(".");
-        if (index == -1) {
-            index = keyPath.lastIndexOf("[");
-        }
-        keyPath = index > 0 ? keyPath.substring(0, index) : keyPath;
-        return "$".equals(keyPath) ? "$." : keyPath;
+        return Preconditions.check(new FindSourceFiles(destinationFilePath == null ? acc.path.toString() : destinationFilePath),
+                new AddKeyValue(destinationKeyPath, destinationKey, acc.snippet, false).getVisitor());
     }
 }
