@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import {isIdentifier, isLiteral, isSpace, J, Type} from '../../java';
+import {JS} from "../tree";
 
 /**
  * Union type for all tree node types that the reconciler handles.
@@ -233,7 +234,10 @@ export class WhitespaceReconciler {
             // Skip: kind, id, type properties
             if (key === 'kind' || key === 'id' ||
                 key === 'type' || key === 'fieldType' || key === 'variableType' ||
-                key === 'methodType' || key === 'constructorType') {
+                key === 'methodType' || key === 'constructorType' ||
+                original.kind === JS.Kind.CompilationUnit && key == 'charsetName' ||
+                // TODO In Java `null` and `undefined` are both the same
+                original.kind === J.Kind.Literal && key === 'value') {
                 continue;
             }
 
@@ -251,6 +255,10 @@ export class WhitespaceReconciler {
             // Handle arrays
             if (Array.isArray(originalValue)) {
                 if (!Array.isArray(formattedValue) || originalValue.length !== formattedValue.length) {
+                    if (originalValue.length === 0 && formattedValue === undefined && original.kind == J.Kind.ArrayType) {
+                        // TODO Somehow J.ArrayType#annotations ends up as `[]`
+                        continue;
+                    }
                     return this.structureMismatch(original);
                 }
 
