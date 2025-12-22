@@ -19,23 +19,26 @@ import {Cursor, isSourceFile, isTree, rootCursor, SourceFile, Tree} from "../tre
 import {Recipe, RecipeDescriptor, RecipeRegistry} from "../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {
-    Generate, GenerateResponse,
+    Generate,
+    GenerateResponse,
     GetObject,
     GetRecipes,
     Parse,
+    ParseProject,
     PrepareRecipe,
     PrepareRecipeResponse,
     Print,
+    TraceGetObject,
     Visit,
     VisitResponse
 } from "./request";
+import {initializeMetricsCsv} from "./request/metrics";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
-import {Writable} from "node:stream";
 import {GetLanguages} from "./request/get-languages";
 
 export class RewriteRpc {
@@ -52,6 +55,8 @@ export class RewriteRpc {
     readonly localRefs: ReferenceMap = new ReferenceMap();
 
     private remoteLanguages?: string[];
+    private readonly logger?: rpc.Logger;
+    private traceGetObject: TraceGetObject = {receive: false, send: false};
 
     constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
@@ -61,30 +66,44 @@ export class RewriteRpc {
                     batchSize?: number,
                     registry?: RecipeRegistry,
                     logger?: rpc.Logger,
-                    traceGetObjectOutput?: boolean,
-                    traceGetObjectInput?: Writable,
+                    metricsCsv?: string,
                     recipeInstallDir?: string
                 }) {
+        // Initialize metrics CSV file if configured
+        initializeMetricsCsv(options.metricsCsv, options.logger);
+        this.logger = options.logger;
+
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
 
         // Need this indirection, otherwise `this` will be undefined when executed in the handlers.
         const getObject = (id: string, sourceFileType?: string) => this.getObject(id, sourceFileType);
         const getCursor = (cursorIds: string[] | undefined, sourceFileType?: string) => this.getCursor(cursorIds, sourceFileType);
+        const traceGetObject = () => this.traceGetObject.send;
 
         const registry = options.registry || new RecipeRegistry();
 
-        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
-        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
+        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
+        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
-            this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput);
-        GetRecipes.handle(this.connection, registry);
-        GetLanguages.handle(this.connection);
-        PrepareRecipe.handle(this.connection, registry, preparedRecipes);
-        Parse.handle(this.connection, this.localObjects);
-        Print.handle(this.connection, getObject);
-        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger);
+            this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
+        GetRecipes.handle(this.connection, registry, options.metricsCsv);
+        GetLanguages.handle(this.connection, options.metricsCsv);
+        PrepareRecipe.handle(this.connection, registry, preparedRecipes, options.metricsCsv);
+        Parse.handle(this.connection, this.localObjects, options.metricsCsv);
+        ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
+        Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger, options.metricsCsv);
 
+        this.connection.onRequest(
+            new rpc.RequestType<TraceGetObject, boolean, Error>("TraceGetObject"),
+            async (request) => {
+                this.traceGetObject = request;
+                return true;
+            }
+        )
+
+        RewriteRpc.set(this);
         this.connection.listen();
     }
 
@@ -107,14 +126,15 @@ export class RewriteRpc {
         const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, () => {
             return this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-                new GetObject(id, sourceFileType)
+                new GetObject(id, sourceFileType),
             );
-        }, this.options.traceGetObjectInput);
+        }, this.logger, this.traceGetObject.receive);
 
         const remoteObject = await q.receive<P>(localObject);
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
+            RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
             throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
         }
 
@@ -154,10 +174,10 @@ export class RewriteRpc {
             throw new Error("Cursor is required for non-SourceFile trees");
         }
         this.localObjects.set(tree.id.toString(), tree);
+        const sourceFile = isSourceFile(tree) ? tree : cursor!.firstEnclosing(t => isSourceFile(t))!;
         return await this.connection.sendRequest(
             new rpc.RequestType<Print, string, Error>("Print"),
-            new Print(tree.id, isSourceFile(tree) ? tree.kind :
-                cursor!.firstEnclosing(t => isSourceFile(t))!.kind)
+            new Print(tree.id, sourceFile.kind)
         );
     }
 

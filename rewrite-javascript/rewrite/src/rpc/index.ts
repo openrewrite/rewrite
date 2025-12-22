@@ -16,11 +16,13 @@
 import {Checksum, FileAttributes, TreeKind} from "../tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./queue";
 import {createDraft, finishDraft} from "immer";
-import {Markers, MarkersKind, SearchResult} from "../markers";
+import {Markers, MarkersKind, MarkupDebug, MarkupError, MarkupInfo, MarkupWarn, SearchResult} from "../markers";
+import {asRef} from "../reference";
 
-export * from "./queue"
-export * from "../reference"
-export * from "./rewrite-rpc"
+export * from "./queue";
+export * from "../reference";
+// rewrite-rpc is not exported here to avoid circular dependency
+// Import directly from "./rewrite-rpc" if needed
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
     async rpcReceive(before: Checksum, q: RpcReceiveQueue): Promise<Checksum> {
@@ -70,7 +72,7 @@ RpcCodecs.registerCodec(MarkersKind.Markers, {
 
     async rpcSend(after: Markers, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, m => m.id);
-        await q.getAndSendList(after, m => m.markers, m => m.id);
+        await q.getAndSendList(after, m => m.markers.map(marker => asRef(marker)), m => m.id);
     }
 });
 
@@ -86,5 +88,69 @@ RpcCodecs.registerCodec(MarkersKind.SearchResult, {
     async rpcSend(after: SearchResult, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.id);
         await q.getAndSend(after, a => a.description);
+    }
+});
+
+RpcCodecs.registerCodec(MarkersKind.MarkupError, {
+    async rpcReceive(before: MarkupError, q: RpcReceiveQueue): Promise<MarkupError> {
+        const draft = createDraft(before);
+        draft.id = await q.receive(before.id);
+        draft.message = await q.receive(before.message);
+        draft.detail = await q.receive(before.detail);
+        return finishDraft(draft);
+    },
+
+    async rpcSend(after: MarkupError, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.message);
+        await q.getAndSend(after, a => a.detail);
+    }
+});
+
+RpcCodecs.registerCodec(MarkersKind.MarkupWarn, {
+    async rpcReceive(before: MarkupWarn, q: RpcReceiveQueue): Promise<MarkupWarn> {
+        const draft = createDraft(before);
+        draft.id = await q.receive(before.id);
+        draft.message = await q.receive(before.message);
+        draft.detail = await q.receive(before.detail);
+        return finishDraft(draft);
+    },
+
+    async rpcSend(after: MarkupWarn, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.message);
+        await q.getAndSend(after, a => a.detail);
+    }
+});
+
+RpcCodecs.registerCodec(MarkersKind.MarkupInfo, {
+    async rpcReceive(before: MarkupInfo, q: RpcReceiveQueue): Promise<MarkupInfo> {
+        const draft = createDraft(before);
+        draft.id = await q.receive(before.id);
+        draft.message = await q.receive(before.message);
+        draft.detail = await q.receive(before.detail);
+        return finishDraft(draft);
+    },
+
+    async rpcSend(after: MarkupInfo, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.message);
+        await q.getAndSend(after, a => a.detail);
+    }
+});
+
+RpcCodecs.registerCodec(MarkersKind.MarkupDebug, {
+    async rpcReceive(before: MarkupDebug, q: RpcReceiveQueue): Promise<MarkupDebug> {
+        const draft = createDraft(before);
+        draft.id = await q.receive(before.id);
+        draft.message = await q.receive(before.message);
+        draft.detail = await q.receive(before.detail);
+        return finishDraft(draft);
+    },
+
+    async rpcSend(after: MarkupDebug, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.message);
+        await q.getAndSend(after, a => a.detail);
     }
 });

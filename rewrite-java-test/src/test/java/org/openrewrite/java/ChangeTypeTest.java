@@ -2306,6 +2306,54 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6410")
+    @Test
+    void nestedClassTypeInfoUpdatedWhenOuterClassRenamed() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeType(
+              "a.b.c.A",
+              "a.b.c.B",
+              false),
+            new ChangeMethodName(
+              "a.b.c.B foo()",
+              "newFoo",
+              null,
+              null),
+            // After ChangeType, the nested class should be referenced as a.b.c.B.NestedInA, not a.b.c.A.NestedInA
+            new ChangeMethodName(
+              "a.b.c.B$NestedInA bar()",
+              "newBar",
+              null,
+              null)
+          ),
+          java(
+            """
+              package a.b.c;
+
+              class A {
+                  void foo() {}
+
+                  class NestedInA {
+                      void bar() {}
+                  }
+              }
+              """,
+            """
+              package a.b.c;
+
+              class B {
+                  void newFoo() {}
+
+                  class NestedInA {
+                      void newBar() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4773")
     @Test
     void noRenameOfTypeWithMatchingPrefix() {

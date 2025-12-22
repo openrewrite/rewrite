@@ -89,6 +89,7 @@ export namespace JS {
         PropertyAssignment: "org.openrewrite.javascript.tree.JS$PropertyAssignment",
         SatisfiesExpression: "org.openrewrite.javascript.tree.JS$SatisfiesExpression",
         ScopedVariableDeclarations: "org.openrewrite.javascript.tree.JS$ScopedVariableDeclarations",
+        Shebang: "org.openrewrite.javascript.tree.JS$Shebang",
         StatementExpression: "org.openrewrite.javascript.tree.JS$StatementExpression",
         TaggedTemplateExpression: "org.openrewrite.javascript.tree.JS$TaggedTemplateExpression",
         TemplateExpression: "org.openrewrite.javascript.tree.JS$TemplateExpression",
@@ -355,7 +356,7 @@ export namespace JS {
     export interface LiteralType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.LiteralType;
         readonly literal: Expression;
-        readonly type: Type;
+        type: Type;
     }
 
 
@@ -447,6 +448,15 @@ export namespace JS {
         readonly kind: typeof Kind.ScopedVariableDeclarations;
         readonly modifiers: J.Modifier[];
         readonly variables: J.RightPadded<J>[];
+    }
+
+    /**
+     * Represents a shebang line at the beginning of a script.
+     * @example #!/usr/bin/env node
+     */
+    export interface Shebang extends JS, Statement {
+        readonly kind: typeof Kind.Shebang;
+        readonly text: string;
     }
 
     /**

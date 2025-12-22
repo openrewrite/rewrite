@@ -26,8 +26,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.Style;
 
-import java.util.Optional;
-
 import static java.util.Objects.requireNonNull;
 
 public class TypecastParenPad extends Recipe {
@@ -53,7 +51,7 @@ public class TypecastParenPad extends Recipe {
         TypecastParenPadStyle typecastParenPadStyle;
 
         @Override
-        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
                 spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
@@ -66,7 +64,7 @@ public class TypecastParenPad extends Recipe {
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
             J.TypeCast tc = super.visitTypeCast(typeCast, ctx);
-            return (J.TypeCast) new SpacesVisitor<>(spacesStyle, null, null, tc)
+            return (J.TypeCast) new SpacesVisitor<>(spacesStyle, tc)
                     .visitNonNull(tc, ctx, getCursor().getParentTreeCursor().fork());
         }
     }

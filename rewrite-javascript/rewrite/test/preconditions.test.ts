@@ -15,7 +15,7 @@
  */
 import {RecipeSpec} from "../src/test";
 import {javascript} from "../src/javascript";
-import {FindIdentifierWithPathPrecondition, ConditionalFindIdentifier} from "../fixtures/path-precondition";
+import {ConditionalFindIdentifier, FindIdentifierWithPathPrecondition} from "../fixtures/path-precondition";
 
 describe('Preconditions', () => {
     test('visitor precondition - should only mark identifiers in matching path', async () => {

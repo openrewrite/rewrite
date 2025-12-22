@@ -17,6 +17,8 @@ export * from "./generate";
 export * from "./get-object";
 export * from "./get-recipes";
 export * from "./parse";
+export * from "./parse-project";
 export * from "./prepare-recipe";
 export * from "./print";
 export * from "./visit";
+export * from "./trace-get-object";

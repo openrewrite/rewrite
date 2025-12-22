@@ -23,7 +23,6 @@ val allProjects = listOf(
     "rewrite-java-tck",
     "rewrite-java-test",
     "rewrite-java-lombok",
-    "rewrite-java-17", // remove this when rewrite recipe gradle plugin moves to 21
     "rewrite-java-21",
     "rewrite-java-25",
     "rewrite-javascript",
@@ -50,10 +49,6 @@ val includedProjects = file("IDE.properties").let {
     }
 }.toSet()
 
-if (!file("IDE.properties").exists() || includedProjects.contains("tools")) {
-    includeBuild("tools")
-}
-
 include(*allProjects.toTypedArray())
 
 gradle.allprojects {
@@ -61,7 +56,13 @@ gradle.allprojects {
         resolutionStrategy.dependencySubstitution {
             allProjects
                 .minus(includedProjects)
-                .minus(arrayOf("rewrite-bom", "rewrite-gradle-tooling-model:model", "rewrite-gradle-tooling-model:plugin"))
+                .minus(
+                    arrayOf(
+                        "rewrite-bom",
+                        "rewrite-gradle-tooling-model:model",
+                        "rewrite-gradle-tooling-model:plugin"
+                    )
+                )
                 .forEach {
                     substitute(project(":$it"))
                         .using(module("org.openrewrite:$it:latest.integration"))

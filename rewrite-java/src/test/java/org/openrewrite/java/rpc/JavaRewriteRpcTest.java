@@ -55,7 +55,9 @@ class JavaRewriteRpcTest implements RewriteTest {
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
         client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env);
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env);
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env)
+          .log(System.out);
+//        client.traceGetObject(true, true);
     }
 
     @AfterEach

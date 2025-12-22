@@ -16,6 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../../reference";
+import {extractSourcePath, withMetrics} from "./metrics";
 
 export class GetObject {
     constructor(private readonly id: string,
@@ -28,44 +29,57 @@ export class GetObject {
         localObjects: Map<string, any | ((input: string) => any)>,
         localRefs: ReferenceMap,
         batchSize: number,
-        trace: boolean
+        trace: () => boolean,
+        metricsCsv?: string,
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
 
-        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
-            let objId = request.id;
-            if (!localObjects.has(objId)) {
-                return [
-                    {state: RpcObjectState.DELETE},
-                    {state: RpcObjectState.END_OF_OBJECT}
-                ];
-            }
+        connection.onRequest(
+            new rpc.RequestType<GetObject, any, Error>("GetObject"),
+            withMetrics<GetObject, any>(
+                "GetObject",
+                metricsCsv,
+                (context) => async request => {
+                    const objId = request.id;
+                    if (!localObjects.has(objId)) {
+                        context.target = '';
+                        return [
+                            {state: RpcObjectState.DELETE},
+                            {state: RpcObjectState.END_OF_OBJECT}
+                        ];
+                    }
 
-            let objectOrGenerator = localObjects.get(objId)!;
-            if (typeof objectOrGenerator === 'function') {
-                let obj = await objectOrGenerator(objId);
-                localObjects.set(objId, obj);
-            }
+                    const objectOrGenerator = localObjects.get(objId)!;
+                    if (typeof objectOrGenerator === 'function') {
+                        const obj = await objectOrGenerator(objId);
+                        localObjects.set(objId, obj);
+                    }
 
-            let allData = pendingData.get(objId);
-            if (!allData) {
-                const after = localObjects.get(objId);
-                const before = remoteObjects.get(objId);
+                    const obj = localObjects.get(objId);
+                    context.target = extractSourcePath(obj);
 
-                allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace).generate(after, before);
-                pendingData.set(objId, allData);
+                    let allData = pendingData.get(objId);
+                    if (!allData) {
+                        const after = obj;
+                        const before = remoteObjects.get(objId);
 
-                remoteObjects.set(objId, after);
-            }
+                        allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                            .generate(after, before);
+                        pendingData.set(objId, allData);
 
-            const batch = allData.splice(0, batchSize);
+                        remoteObjects.set(objId, after);
+                    }
 
-            // If we've sent all data, remove from pending
-            if (allData.length === 0) {
-                pendingData.delete(objId);
-            }
+                    const batch = allData.splice(0, batchSize);
 
-            return batch;
-        });
+                    // If we've sent all data, remove from pending
+                    if (allData.length === 0) {
+                        pendingData.delete(objId);
+                    }
+
+                    return batch;
+                }
+            )
+        );
     }
 }

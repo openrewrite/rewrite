@@ -208,21 +208,11 @@ public class Result {
 
     @Incubating(since = "7.34.0")
     public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
-        Path beforePath = before == null ? null : before.getSourcePath();
-        Path afterPath = null;
-        if (before == null && after == null) {
-            afterPath = (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + System.nanoTime());
-        } else if (after != null) {
-            afterPath = after.getSourcePath();
-        }
+        return diff(relativeTo, markerPrinter, ignoreAllWhitespace, false);
+    }
 
-        PrintOutputCapture<Integer> out = markerPrinter == null ?
-                new PrintOutputCapture<>(0) :
-                new PrintOutputCapture<>(0, markerPrinter);
-
-        FileMode beforeMode = before != null && before.getFileAttributes() != null && before.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
-        FileMode afterMode = after != null && after.getFileAttributes() != null && after.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
-
+    @Incubating(since = "8.69.0")
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace, boolean binaryPatch) {
         Set<Recipe> recipeSet = new HashSet<>(recipes.size());
         for (List<Recipe> rs : recipes) {
             if (!rs.isEmpty()) {
@@ -231,14 +221,12 @@ public class Result {
         }
 
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
-                beforePath,
-                afterPath,
+                before,
+                after,
                 relativeTo,
-                before == null ? "" : before.printAll(out),
-                after == null ? "" : after.printAll(out.clone()),
+                markerPrinter,
                 recipeSet,
-                beforeMode,
-                afterMode
+                binaryPatch
         )) {
             return diffEntry.getDiff(ignoreAllWhitespace);
         }
@@ -270,10 +258,10 @@ public class Result {
     public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
         try {
             return (before == after) ||
-                    (before != null && after != null &&
-                            // Remote source files are fetched on `printAll`, let's avoid that cost.
-                            !(before instanceof Remote) && !(after instanceof Remote) &&
-                            before.printAll().equals(after.printAll()));
+                   (before != null && after != null &&
+                    // Remote source files are fetched on `printAll`, let's avoid that cost.
+                    !(before instanceof Remote) && !(after instanceof Remote) &&
+                    before.printAll().equals(after.printAll()));
         } catch (Exception e) {
             return false;
         }

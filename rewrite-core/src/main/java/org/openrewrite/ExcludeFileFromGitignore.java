@@ -29,10 +29,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.*;
 
+import static java.lang.String.join;
 import static java.util.Collections.*;
 import static java.util.Comparator.comparingInt;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.join;
 import static org.openrewrite.ExcludeFileFromGitignore.Repository;
 import static org.openrewrite.PathUtils.separatorsToUnix;
 import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.*;
@@ -94,7 +94,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                     String separator = text.getText().contains("\r\n") ? "\r\n" : "\n";
                     List<String> newRules = ignoreNode.getRules().stream().map(IgnoreRule::getText).collect(toList());
                     String[] currentContent = text.getText().split(separator);
-                    text = text.withText(join(sortRules(currentContent, newRules), separator));
+                    text = text.withText(join(separator, sortRules(currentContent, newRules)));
                 }
                 return text;
             }

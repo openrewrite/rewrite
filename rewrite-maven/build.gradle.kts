@@ -57,6 +57,8 @@ tasks.register<JavaExec>("generateAntlrSources") {
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
     classpath = sourceSets["main"].runtimeClasspath
+
+    finalizedBy("licenseFormat")
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -75,4 +77,23 @@ tasks.withType<Javadoc>().configureEach {
 
 configure<LicenseExtension> {
     excludePatterns.add("**/unresolvable.txt")
+}
+
+tasks.register<JavaExec>("generateRecipeMarketplace") {
+    group = "build"
+    description = "Generate recipe marketplace CSV from the rewrite-maven JAR"
+
+    dependsOn("jar")
+
+    mainClass.set("org.openrewrite.maven.marketplace.MavenRecipeMarketplaceGenerator")
+
+    val jarFile = tasks.jar.get().archiveFile.get().asFile
+    val outputCsv = project.file("build/recipes.csv")
+    val groupId = project.group.toString()
+    val artifactId = project.name
+
+    args = listOf("$groupId:$artifactId", outputCsv.absolutePath, jarFile.absolutePath) +
+           configurations.runtimeClasspath.get().files.map { it.absolutePath }
+
+    classpath = configurations.runtimeClasspath.get() + files(jarFile)
 }

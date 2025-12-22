@@ -62,11 +62,9 @@ public class PlainTextRpcCodec extends DynamicDispatchRpcCodec<PlainText> {
                 .withChecksum(q.receive(t.getChecksum()))
                 .withFileAttributes(q.receive(t.getFileAttributes()))
                 .withText(q.receive(t.getText()));
-        return p.withSnippets(q.receiveList(t.getSnippets(), s -> {
-            return s
+        return p.withSnippets(q.receiveList(t.getSnippets(), s -> s
                     .withId(q.receiveAndGet(s.getId(), UUID::fromString))
                     .withMarkers(q.receive(s.getMarkers()))
-                    .withText(q.receive(s.getText()));
-        }));
+                    .withText(q.receive(s.getText()))));
     }
 }

@@ -16,13 +16,13 @@
 package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.style.Style;
 
 import static java.util.Objects.requireNonNull;
 
@@ -45,11 +45,10 @@ public class NormalizeTabsOrSpaces extends Recipe {
 
     private static class TabsAndIndentsFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
-                return new NormalizeTabsOrSpacesVisitor<>(style).visit(cu, ctx);
+                return new NormalizeTabsOrSpacesVisitor<>(cu, null).visit(cu, ctx);
             }
             return (J) tree;
         }

@@ -24,8 +24,6 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 @Getter
 public class JavaScriptSpaceRpcCodec extends DynamicDispatchRpcCodec<Space> {
-    private final JavaScriptSender sender = new JavaScriptSender();
-    private final JavaScriptReceiver receiver = new JavaScriptReceiver();
 
     @Override
     public String getSourceFileType() {
@@ -39,11 +37,11 @@ public class JavaScriptSpaceRpcCodec extends DynamicDispatchRpcCodec<Space> {
 
     @Override
     public void rpcSend(Space after, RpcSendQueue q) {
-        sender.visitSpace(after, q);
+        new JavaScriptSender().visitSpace(after, q);
     }
 
     @Override
     public Space rpcReceive(Space before, RpcReceiveQueue q) {
-        return receiver.visitSpace(before, q);
+        return new JavaScriptReceiver().visitSpace(before, q);
     }
 }

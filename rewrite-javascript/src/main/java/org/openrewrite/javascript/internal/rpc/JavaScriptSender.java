@@ -117,7 +117,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return expressionWithTypeArguments;
     }
 
-
     @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcSendQueue q) {
         q.getAndSendList(functionType, JS.FunctionType::getModifiers, J.Modifier::getId, el -> visit(el, q));
@@ -273,6 +272,12 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSendList(scopedVariableDeclarations, JS.ScopedVariableDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSendList(scopedVariableDeclarations, el -> el.getPadding().getVariables(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return scopedVariableDeclarations;
+    }
+
+    @Override
+    public J visitShebang(JS.Shebang shebang, RpcSendQueue q) {
+        q.getAndSend(shebang, JS.Shebang::getText);
+        return shebang;
     }
 
     @Override

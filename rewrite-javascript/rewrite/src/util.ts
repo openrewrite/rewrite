@@ -49,3 +49,17 @@ export function trimIndent(str: string | null | undefined): string {
         .join("\n")
         .trim();
 }
+
+/**
+ * Helper function to create a new object only if any properties have changed.
+ * Compares each property in updates with the original object.
+ * Returns the original object if nothing changed, or a new object with updates applied.
+ */
+export function updateIfChanged<O extends object>(original: O, updates: Partial<O>): O {
+    for (const key in updates) {
+        if (updates[key] !== original[key]) {
+            return { ...original, ...updates };
+        }
+    }
+    return original;
+}

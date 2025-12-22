@@ -17,11 +17,3 @@ dependencies {
             .forEach { api(it) }
     }
 }
-
-publishing {
-    publications {
-        named("nebula", MavenPublication::class.java) {
-            from(components["javaPlatform"])
-        }
-    }
-}

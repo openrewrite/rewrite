@@ -28,15 +28,17 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.*;
-import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.toList;
+
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
+import static java.util.Optional.ofNullable;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 /**
@@ -253,11 +255,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
                                 doAfterVisit(upgradeManagedDependency);
-                                maybeUpdateModel();
                             }
                         }
-                    } else if (isPluginDependencyTag(groupId, artifactId)) {
-                        t = upgradePluginDependency(ctx, t);
+                    } else if (isPluginDependencyTag(groupId, artifactId) || isAnnotationProcessorPathTag(groupId, artifactId)) {
+                        t = upgradeTag(ctx, t);
                     }
                 } catch (MavenDownloadingException e) {
                     return e.warn(t);
@@ -392,7 +393,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return null;
             }
 
-            private Xml.Tag upgradePluginDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
+            private Xml.Tag upgradeTag(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
                 String groupId = t.getChildValue("groupId").orElse(null);
                 String artifactId = t.getChildValue("artifactId").orElse(null);
                 String version = t.getChildValue("version").orElse(null);

@@ -44,6 +44,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
+    static final XPathMatcher ANNOTATION_PROCESSORS_PATH_MATCHER = new XPathMatcher("//annotationProcessorPaths/path");
     static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
     static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
@@ -218,6 +219,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
     }
 
+    public boolean isAnnotationProcessorPathTag(String groupId, String artifactId) {
+        if (!isTag("path") || !ANNOTATION_PROCESSORS_PATH_MATCHER.matches(getCursor())) {
+            return false;
+        }
+        Xml.Tag tag = getCursor().getValue();
+        return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+    }
+
     public void maybeUpdateModel() {
         for (TreeVisitor<?, P> afterVisit : getAfterVisit()) {
             if (afterVisit instanceof UpdateMavenModel) {
@@ -246,7 +256,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (tag.getChildValue("groupId").isPresent() && tag.getChildValue("groupId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("groupId").get().trim();
                 String value = getResolutionResult().getPom().getValue(propertyKey);
-                isGroupIdFound = value != null && matchesGlob(value, groupId);
+                isGroupIdFound = matchesGlob(value, groupId);
             }
         }
         return isGroupIdFound;
@@ -261,7 +271,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (tag.getChildValue("artifactId").isPresent() && tag.getChildValue("artifactId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("artifactId").get().trim();
                 String value = getResolutionResult().getPom().getValue(propertyKey);
-                isArtifactIdFound = value != null && matchesGlob(value, artifactId);
+                isArtifactIdFound = matchesGlob(value, artifactId);
             }
         }
         return isArtifactIdFound;
@@ -276,7 +286,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return isTag("project") && PROJECT_MATCHER.matches(getCursor());
     }
 
-    private boolean isTag(String name) {
+    protected boolean isTag(String name) {
         // `XPathMatcher` is still a bit expensive
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }

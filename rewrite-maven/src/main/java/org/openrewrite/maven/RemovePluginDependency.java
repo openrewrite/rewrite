@@ -24,15 +24,13 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Optional;
-
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemovePluginDependency extends Recipe {
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
+    private static final XPathMatcher PLUGIN_WITH_DEPENDENCIES_MATCHER = new XPathMatcher("/project/build/plugins/plugin[dependencies]");
 
     @Option(displayName = "Plugin group ID",
             description = "Group ID of the plugin from which the dependency will be removed. Supports glob." +
@@ -79,32 +77,28 @@ public class RemovePluginDependency extends Recipe {
     private class RemoveDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag plugins = super.visitTag(tag, ctx);
-            if (!PLUGINS_MATCHER.matches(getCursor())) {
-                return plugins;
+            Xml.Tag plugin = super.visitTag(tag, ctx);
+            if (!PLUGIN_WITH_DEPENDENCIES_MATCHER.matches(getCursor())) {
+                return plugin;
             }
-            Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
-                    .filter(plugin ->
-                            "plugin".equals(plugin.getName()) &&
-                                    childValueMatches(plugin, "groupId", pluginGroupId) &&
-                                    childValueMatches(plugin, "artifactId", pluginArtifactId)
-                    )
-                    .findAny();
-            if (!maybePlugin.isPresent()) {
-                return plugins;
+            if (!childValueMatches(plugin, "groupId", pluginGroupId) ||
+                    !childValueMatches(plugin, "artifactId", pluginArtifactId)) {
+                return plugin;
             }
-            Xml.Tag plugin = maybePlugin.get();
-            Optional<Xml.Tag> maybeDependencies = plugin.getChild("dependencies");
-            if (!maybeDependencies.isPresent()) {
-                return plugins;
-            }
-            Xml.Tag dependencies = maybeDependencies.get();
-            plugins = filterTagChildren(plugins, dependencies, dependencyTag ->
+            //noinspection OptionalGetWithoutIsPresent - XPath predicate [dependencies] guarantees this child exists
+            Xml.Tag dependencies = plugin.getChild("dependencies").get();
+            plugin = filterTagChildren(plugin, dependencies, dependencyTag ->
                     !(childValueMatches(dependencyTag, "groupId", groupId) &&
                             childValueMatches(dependencyTag, "artifactId", artifactId))
             );
-            return filterTagChildren(plugins, plugin, pluginChildTag ->
-                    !("dependencies".equals(pluginChildTag.getName()) && pluginChildTag.getChildren().isEmpty()));
+            // Remove empty dependencies element
+            //noinspection OptionalGetWithoutIsPresent
+            Xml.Tag updatedDependencies = plugin.getChild("dependencies").get();
+            if (updatedDependencies.getChildren().isEmpty()) {
+                plugin = filterTagChildren(plugin, plugin, pluginChildTag ->
+                        !"dependencies".equals(pluginChildTag.getName()));
+            }
+            return plugin;
         }
 
         private boolean childValueMatches(Xml.Tag tag, String childValueName, String globPattern) {

@@ -33,6 +33,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -42,6 +43,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -62,6 +64,10 @@ public class RewriteRpc {
     private final AtomicInteger batchSize = new AtomicInteger(200);
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
+    private final AtomicReference<PrintStream> log = new AtomicReference<>();
+    private final AtomicReference<TraceGetObject> traceGetObject = new AtomicReference<>(
+            new TraceGetObject(false, false));
+    private final AtomicReference<PrepareRecipe.Loader> recipeLoader = new AtomicReference<>();
 
     final PreparedRecipeCache preparedRecipes = new PreparedRecipeCache();
 
@@ -102,11 +108,19 @@ public class RewriteRpc {
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 this::getObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, localRefs));
+        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects,
+                localRefs, log, () -> traceGetObject.get().isSend()));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
                 return marketplace.listRecipeDescriptors();
+            }
+        });
+        jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {
+            @Override
+            protected Boolean handle(TraceGetObject request) {
+                traceGetObject.set(request);
+                return true;
             }
         });
         jsonRpc.rpc("GetLanguages", new JsonRpcMethod<Void>() {
@@ -129,7 +143,7 @@ public class RewriteRpc {
                 }
             }
         });
-        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes));
+        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, recipeLoader));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
 
         jsonRpc.bind();
@@ -150,7 +164,23 @@ public class RewriteRpc {
         return this;
     }
 
+    public RewriteRpc log(@Nullable PrintStream logFile) {
+        //noinspection DataFlowIssue
+        this.log.set(logFile);
+        return this;
+    }
+
+    public RewriteRpc recipeLoader(PrepareRecipe.@Nullable Loader recipeLoader) {
+        //noinspection DataFlowIssue
+        this.recipeLoader.set(recipeLoader);
+        return this;
+    }
+
     public void shutdown() {
+        //noinspection ConstantValue
+        if (log.get() != null) {
+            log.get().close();
+        }
         jsonRpc.shutdown();
     }
 
@@ -312,7 +342,10 @@ public class RewriteRpc {
                 SourceFile sourceFile = null;
                 parsingListener.startedParsing(input);
                 try {
-                    sourceFile = parser.requirePrintEqualsInput(getObject(id, sourceFileType), input, relativeTo, ctx);
+                    // input.getRelativePath(relativeTo)
+                    sourceFile = getObject(id, sourceFileType);
+                    // TODO this should be handled on the remote side.
+//                    sourceFile = parser.requirePrintEqualsInput(sourceFile, input, relativeTo, ctx);
                 } catch (Exception e) {
                     sourceFile = ParseError.build(parser, input, relativeTo, ctx, e);
                 } finally {
@@ -355,16 +388,23 @@ public class RewriteRpc {
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
         localObjects.put(tree.getId().toString(), tree);
+        SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
         return send(
                 "Print",
                 new Print(
                         tree.getId().toString(),
-                        (tree instanceof SourceFile ? tree : parent.firstEnclosingOrThrow(SourceFile.class))
-                                .getClass().getName(),
+                        sourceFile.getSourcePath(),
+                        sourceFile.getClass().getName(),
                         markerPrinter
                 ),
                 String.class
         );
+    }
+
+    public RewriteRpc traceGetObject(boolean receive, boolean send) {
+        this.traceGetObject.set(new TraceGetObject(receive, send));
+        send("TraceGetObject", new TraceGetObject(receive, send), Boolean.class);
+        return this;
     }
 
     @VisibleForTesting
@@ -391,26 +431,28 @@ public class RewriteRpc {
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
                 () -> send("GetObject", new GetObject(id, sourceFileType), GetObjectResponse.class),
-                sourceFileType
+                sourceFileType,
+                log.get()
         );
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
 
+        //noinspection ConstantValue
         if (remoteObject != null) {
             // We are now in sync with the remote state of the object.
             remoteObjects.put(id, requireNonNull(remoteObject));
             localObjects.put(id, remoteObject);
         }
 
-        //noinspection unchecked,DataFlowIssue
+        //noinspection unchecked
         return (T) remoteObject;
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
+        checkLiveness();
         try {
-            checkLiveness();
 
             // Send the request and get the future
             CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
@@ -433,6 +475,10 @@ public class RewriteRpc {
 
             // If we get here, we've hit the total timeout
             throw new RuntimeException("Request timed out after " + timeout.getSeconds() + " seconds");
+        } catch (RuntimeException e) {
+            // Check if process crashed during the request
+            checkLiveness();
+            throw e;
         } catch (ExecutionException | InterruptedException e) {
             // Check if process crashed during the request
             checkLiveness();
