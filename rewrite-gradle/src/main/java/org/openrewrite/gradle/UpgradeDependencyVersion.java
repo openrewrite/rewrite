@@ -21,10 +21,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.AddDependencyVisitor;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
-import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -41,6 +43,7 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
@@ -48,6 +51,7 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
+import java.util.function.Predicate;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
@@ -134,6 +138,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         Map<GroupArtifact, @Nullable Object> gaToNewVersion = new HashMap<>();
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
+
+        /**
+         * All dependencies found in AST across all build scripts (including freestanding scripts).
+         * Used to detect if a resolved dependency was declared somewhere.
+         */
+        Set<GroupArtifact> allDeclaredDependencies = new HashSet<>();
     }
 
     @Override
@@ -186,6 +196,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 // Record the dependency and resolve its version if needed
                 GroupArtifact ga = new GroupArtifact(groupId, artifactId);
                 String configName = gradleDependency.getConfigurationName();
+
+                // Track all declared dependencies across all build scripts
+                acc.allDeclaredDependencies.add(ga);
+
                 if (gradleProject != null) {
                     acc.getConfigurationPerGAPerModule()
                         .computeIfAbsent(getGradleProjectKey(gradleProject), k -> new HashMap<>())
@@ -368,9 +382,142 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 JavaSourceFile sourceFile = (JavaSourceFile) tree;
                 gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class)
                         .orElse(null);
+
+                // Apply plugin-provided direct dependencies
+                if (gradleProject != null) {
+                    sourceFile = applyPluginProvidedDependencies(sourceFile, ctx);
+                }
+
                 return super.visit(sourceFile, ctx);
             }
             return super.visit(tree, ctx);
+        }
+
+        /**
+         * Scans for and applies plugin-provided direct dependencies that are not declared in the build script.
+         * A dependency is considered plugin-provided if it appears in resolved dependencies but was not
+         * found during the AST scan (not in acc.configurationPerGAPerModule).
+         */
+        private JavaSourceFile applyPluginProvidedDependencies(JavaSourceFile sourceFile, ExecutionContext ctx) {
+            if (gradleProject == null) {
+                return sourceFile;
+            }
+
+            String projectKey = getGradleProjectKey(gradleProject);
+            Map<GroupArtifact, Set<String>> astDependencies = acc.configurationPerGAPerModule.getOrDefault(projectKey, emptyMap());
+            DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
+
+            for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
+                // Skip non-resolvable configurations
+                if (!configuration.isCanBeResolved()) {
+                    continue;
+                }
+
+                for (ResolvedDependency resolved : configuration.getResolved()) {
+                    // Only process direct dependencies (depth=0)
+                    if (!resolved.isDirect()) {
+                        continue;
+                    }
+
+                    // Check if this dependency matches our pattern
+                    if (!dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
+                        continue;
+                    }
+
+                    // Check if this dependency was found in the AST scan (in any build script)
+                    // or if it's in the configuration's requested list (declared somewhere, even if not parseable)
+                    GroupArtifact ga = new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId());
+                    if (astDependencies.containsKey(ga) || acc.allDeclaredDependencies.contains(ga)) {
+                        // This dependency has an AST node in some build script, skip it
+                        continue;
+                    }
+
+                    // Also check if the dependency is in the requested list of this configuration
+                    // This catches dependencies declared in formats we can't parse (e.g., string concatenation)
+                    boolean isRequested = configuration.getRequested().stream()
+                            .anyMatch(req -> ga.getGroupId().equals(req.getGroupId()) &&
+                                    ga.getArtifactId().equals(req.getArtifactId()));
+                    if (isRequested) {
+                        continue;
+                    }
+
+                    try {
+                        String selectedVersion = versionSelector.select(
+                                resolved.getGav(), configuration.getName(),
+                                newVersion, versionPattern, ctx);
+                        if (selectedVersion == null || resolved.getVersion().equals(selectedVersion)) {
+                            continue;
+                        }
+
+                        // Find a declarable configuration to add the dependency to
+                        GradleDependencyConfiguration depConfig = findDependencyConfiguration(configuration);
+                        if (depConfig == null) {
+                            continue;
+                        }
+
+                        // Add a direct dependency declaration using internal AddDependencyVisitor
+                        // We use the internal visitor directly because the outer one checks if the
+                        // dependency is already in the requested list (which it is for plugin-provided deps)
+                        boolean isKotlinDsl = sourceFile instanceof K.CompilationUnit;
+                        // For Groovy, the predicate triggers at the root level (JavaSourceFile)
+                        // For Kotlin, it triggers at the block level when the parent is the compilation unit
+                        Predicate<Cursor> insertPredicate = cursor -> {
+                            Object value = cursor.getValue();
+                            if (value instanceof JavaSourceFile) {
+                                return true;
+                            }
+                            if (value instanceof J.Block) {
+                                Cursor parent = cursor.getParentTreeCursor();
+                                return parent != null && parent.getValue() instanceof K.CompilationUnit;
+                            }
+                            return false;
+                        };
+                        AddDependencyVisitor addDepVisitor =
+                                new AddDependencyVisitor(
+                                        depConfig.getName(),
+                                        ga.getGroupId(),
+                                        ga.getArtifactId(),
+                                        selectedVersion,
+                                        null, // classifier
+                                        null, // extension
+                                        insertPredicate,
+                                        null, // dependencyModifier
+                                        isKotlinDsl
+                                );
+
+                        JavaSourceFile before = sourceFile;
+                        Tree result = addDepVisitor.visit(sourceFile, ctx);
+                        if (result instanceof JavaSourceFile) {
+                            sourceFile = (JavaSourceFile) result;
+                            // If the AST was modified, update the dependency model as well
+                            if (sourceFile != before) {
+                                sourceFile = AddDependencyVisitor.addDependency(
+                                        sourceFile,
+                                        depConfig,
+                                        new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), selectedVersion),
+                                        null, // classifier
+                                        ctx
+                                );
+                            }
+                        }
+                    } catch (MavenDownloadingException e) {
+                        // Ignore errors for plugin-provided dependencies
+                    }
+                }
+            }
+            return sourceFile;
+        }
+
+        /**
+         * Finds a declarable configuration to add the dependency to.
+         */
+        private @Nullable GradleDependencyConfiguration findDependencyConfiguration(GradleDependencyConfiguration config) {
+            for (GradleDependencyConfiguration parent : config.allExtendsFrom()) {
+                if (parent.isCanBeDeclared()) {
+                    return parent;
+                }
+            }
+            return null;
         }
 
         @Override
