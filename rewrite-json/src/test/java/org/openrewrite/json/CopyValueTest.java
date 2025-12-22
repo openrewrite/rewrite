@@ -28,7 +28,7 @@ class CopyValueTest implements RewriteTest {
     void changeCurrentFileWhenNull() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, ".", "copiedValue", null)
+            new CopyValue("$.source", null, "$.", "copiedValue", null)
           ),
           json(
             """
@@ -51,7 +51,7 @@ class CopyValueTest implements RewriteTest {
     void changeOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.json", ".", "copiedValue", null)
+            new CopyValue("$.source", "a.json", "$.", "copiedValue", null)
           ),
           json(
             """
@@ -74,7 +74,7 @@ class CopyValueTest implements RewriteTest {
     void copyComplexValue() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, ".", "copiedValue", null)
+            new CopyValue("$.source", null, "$.", "copiedValue", null)
           ),
           json(
             """
@@ -102,7 +102,7 @@ class CopyValueTest implements RewriteTest {
     void copyToOtherFile() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.json", ".", "copiedValue", "b.json")
+            new CopyValue("$.source", "a.json", "$.", "copiedValue", "b.json")
           ),
           json(
             """
@@ -134,7 +134,7 @@ class CopyValueTest implements RewriteTest {
     void copyToOtherFileWithEmptyObject() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", "a.json", ".", "copiedValue", "b.json")
+            new CopyValue("$.source", "a.json", "$.", "copiedValue", "b.json")
           ),
           json(
             """
@@ -164,7 +164,7 @@ class CopyValueTest implements RewriteTest {
     void copyEntireArray() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.sourceArray", null, ".", "copiedValue", null)
+            new CopyValue("$.sourceArray", null, "$.", "copiedValue", null)
           ),
           json(
             """
