@@ -181,4 +181,32 @@ class CopyValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void copyToOtherJsonObject() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new CopyValue("$.source", null, "$.other.*", "copiedValue", null)
+          ),
+          json(
+            """
+              {
+                "source": "value",
+                "other": {
+                  "other-key": "other-value"
+                }
+              }
+              """,
+            """
+              {
+                "source": "value",
+                "other": {
+                  "other-key": "other-value",
+                  "copiedValue": "value"
+                }
+              }
+              """
+          )
+        );
+    }
 }
