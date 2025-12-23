@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {emptyMarkers, markers, MarkersKind, ParseExceptionResult} from "../markers";
-import {Parser, ParserInput, parserInputRead} from "../parser";
+import {Parser, ParserInput, parserInputRead, Parsers} from "../parser";
 import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
 import {Yaml} from "./tree";
@@ -389,15 +389,49 @@ class YamlCstReader {
 
     private convertSequenceEntry(item: CstCollectionItem, dash: boolean, pendingPrefix: string = ""): {entry: Yaml.SequenceEntry, trailingContent: string} {
         // Build prefix from start tokens, but exclude the dash indicator itself
+        // Also extract anchor and tag if present
         let prefix = pendingPrefix;
         let afterDashSpace = "";
         let seenDash = false;
+        let anchorForValue: Yaml.Anchor | undefined;
+        let tagForValue: Yaml.Tag | undefined;
 
-        for (const token of item.start || []) {
+        const startTokens = item.start || [];
+        for (let i = 0; i < startTokens.length; i++) {
+            const token = startTokens[i];
             if (token.type === 'seq-item-ind') {
                 seenDash = true;
             } else if (seenDash) {
-                afterDashSpace += token.source;
+                if (token.type === 'anchor') {
+                    // Collect all remaining tokens after anchor as postfix
+                    let postfix = "";
+                    for (let j = i + 1; j < startTokens.length; j++) {
+                        const nextToken = startTokens[j];
+                        if (nextToken.type === 'tag') {
+                            tagForValue = this.parseTagTokenWithSuffix(nextToken.source, postfix, startTokens, j + 1);
+                            postfix = "";
+                            break;
+                        } else {
+                            postfix += nextToken.source;
+                        }
+                    }
+                    anchorForValue = {
+                        kind: Yaml.Kind.Anchor,
+                        id: randomId(),
+                        prefix: afterDashSpace,
+                        markers: emptyMarkers,
+                        postfix,
+                        key: token.source.substring(1) // Remove &
+                    };
+                    afterDashSpace = "";
+                    break; // We've consumed all remaining tokens
+                } else if (token.type === 'tag') {
+                    tagForValue = this.parseTagTokenWithSuffix(token.source, afterDashSpace, startTokens, i + 1);
+                    afterDashSpace = "";
+                    break; // Tag handler consumed remaining tokens
+                } else {
+                    afterDashSpace += token.source;
+                }
             } else {
                 prefix += token.source;
             }
@@ -410,8 +444,20 @@ class YamlCstReader {
             const valueResult = this.convertTokenWithTrailing(item.value);
             block = valueResult.node as Yaml.Block;
             trailing = valueResult.trailing;
-            // Prepend the space after dash to the block's prefix
-            block = {...block, prefix: afterDashSpace + block.prefix} as Yaml.Block;
+
+            // Apply anchor and tag if found in start tokens
+            if (anchorForValue && 'anchor' in block) {
+                block = {...block, anchor: anchorForValue} as Yaml.Block;
+            }
+            if (tagForValue && 'tag' in block) {
+                block = {...block, tag: tagForValue} as Yaml.Block;
+            }
+
+            // Prepend the space after dash to the block
+            // Use prependWhitespaceToValue to ensure Mapping/Sequence keep empty prefix
+            if (afterDashSpace) {
+                block = this.prependWhitespaceToValue(block, afterDashSpace);
+            }
         } else {
             block = this.createEmptyScalar(afterDashSpace);
         }
@@ -848,3 +894,5 @@ class YamlCstReader {
         return tokens.map(t => t.source).join('');
     }
 }
+
+Parsers.registerParser("yaml", YamlParser);

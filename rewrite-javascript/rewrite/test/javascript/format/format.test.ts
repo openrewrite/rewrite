@@ -40,14 +40,13 @@ import {
     autoFormat,
     AutoformatVisitor,
     JavaScriptVisitor,
-    SpacesVisitor,
-    tsx,
     typescript
 } from "../../../src/javascript";
 
 
 describe('AutoformatVisitor', () => {
     const spec = new RecipeSpec()
+    // No PrettierStyle passed, so uses built-in TabsAndIndentsVisitor
     spec.recipe = fromVisitor(new AutoformatVisitor());
 
     test('everything', () => {
@@ -326,8 +325,7 @@ describe('AutoformatVisitor', () => {
                 `
                 const x = function () {
                     return 136;
-                };
-                `
+                };`
             )
             // @formatter:on
         )
@@ -344,8 +342,7 @@ describe('AutoformatVisitor', () => {
                 const x =
                     function () {
                         return 136;
-                    };
-                `
+                    };`
             )
             // @formatter:on
         )
@@ -705,3 +702,4 @@ const x = 1;`
         )
     });
 });
+

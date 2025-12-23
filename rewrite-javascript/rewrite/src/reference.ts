@@ -13,11 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {setAutoFreeze} from "immer";
-
-// this is required because otherwise `asRef()` won't work for objects created using immer
-setAutoFreeze(false);
-
 const REFERENCE_KEY = Symbol.for("org.openrewrite.rpc.Reference");
 
 export interface Reference {

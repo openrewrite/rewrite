@@ -27,6 +27,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -1450,22 +1451,16 @@ class ChangeParentPomTest implements RewriteTest {
                     </parent>
                   </project>
                   """,
-                """
-                  <project>
-                    <groupId>org.sample</groupId>
-                    <artifactId>sample</artifactId>
-                    <version>1.0.0</version>
-                    <properties>
-                      <maven.repo.local>${user.home}/.m2/repository</maven.repo.local>
-                      <owaspDb>${maven.repo.local}/blah</owaspDb>
-                    </properties>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>3.5.8</version>
-                    </parent>
-                  </project>
-                  """
+                spec -> spec.after(actual ->
+                    assertThat(actual)
+                      .as("Does not bring in Maven arguments.")
+                      .contains("<maven.repo.local>${user.home}/.m2/repository</maven.repo.local>")
+                      .contains("<owaspDb>${maven.repo.local}/blah</owaspDb>")
+                      .as("Any version of Spring boot parent above `3.5.7`")
+                      .doesNotContain("3.5.7")
+                      .containsPattern("<version>3\\.5\\.\\d+</version>")
+                      .actual()
+                )
               )
             );
         }

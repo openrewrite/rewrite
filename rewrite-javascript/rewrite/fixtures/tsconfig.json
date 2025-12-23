@@ -2,7 +2,12 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": "../dist-fixtures"
+    "outDir": "../dist-fixtures",
+    "baseUrl": "..",
+    "paths": {
+      "@openrewrite/rewrite": ["./src/index.ts"],
+      "@openrewrite/rewrite/*": ["./src/*/index.ts"]
+    }
   },
   "include": [
     "./**/*.ts"

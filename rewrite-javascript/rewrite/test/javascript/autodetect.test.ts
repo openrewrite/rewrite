@@ -269,7 +269,7 @@ describe('Autodetect', () => {
 
             expect(autodetect.name).toBe('org.openrewrite.javascript.Autodetect');
             expect(autodetect.displayName).toBe('Auto-detected');
-            expect(autodetect.kind).toBe('org.openrewrite.marker.NamedStyles');
+            expect(autodetect.kind).toBe('org.openrewrite.javascript.style.Autodetect');
             expect(autodetect.id).toBeDefined();
             expect(autodetect.styles.length).toBeGreaterThan(0);
         });

@@ -30,7 +30,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {BlankLinesStyle, IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../../src/javascript";
 import {AutoformatVisitor, SpacesVisitor} from "../../../src/javascript/format";
-import {Draft, produce} from "immer";
+import {create as produce, Draft} from "mutative";
 import {MarkersKind, NamedStyles, randomId, Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
@@ -340,6 +340,26 @@ const c = {shorthand};
 const d = {x, y, z};`
             )
             // @formatter:on
+        )
+    });
+
+    test('type parameter default should have space before equals', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            typescript(
+                `type Test<TFieldValues extends FieldValues= FieldValues> = TFieldValues;`,
+                `type Test<TFieldValues extends FieldValues = FieldValues> = TFieldValues;`
+            )
+        )
+    });
+
+    test('type parameter default without extends should have space before equals', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            typescript(
+                `function createArray<T= string>(value: T): T[] { return [value]; }`,
+                `function createArray<T = string>(value: T): T[] { return [value]; }`
+            )
         )
     });
 });
