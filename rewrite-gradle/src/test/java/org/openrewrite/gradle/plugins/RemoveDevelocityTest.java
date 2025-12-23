@@ -92,4 +92,58 @@ class RemoveDevelocityTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void develocityBuildCacheConnectorConfiguration() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17.6'
+              }
+              
+              develocity {
+                  server = "https://develocity.example.com"
+              }
+              
+              buildCache {
+                  remote(develocity.buildCache) {
+                      // Build Cache connector is registered and configured
+                      enabled = true
+                  }
+              }
+              """,
+            ""
+          )
+        );
+    }
+
+    @Test
+    void develocityBuildCacheWithAdvancedConfiguration() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17.6'
+              }
+              
+              develocity {
+                  server = "https://develocity.example.com"
+                  allowUntrustedServer = false
+              }
+              
+              buildCache {
+                  remote(develocity.buildCache) {
+                      enabled = true
+                      push = true
+                      // DevelocityBuildCache connector configuration
+                  }
+              }
+              """,
+            ""
+          )
+        );
+    }
+
+    
 }
