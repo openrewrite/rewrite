@@ -228,17 +228,17 @@ class RecipeMarketplaceReaderTest {
           .findFirst()
           .orElseThrow();
         assertThat(first.getMetadata())
-          .containsEntry("author", "Jon Schneider")
-          .containsEntry("recipeCount", "42");
+          .containsEntry("author", "Jon Schneider");
+        assertThat(first.getRecipeCount()).isEqualTo(42);
 
         RecipeListing second = marketplace.getAllRecipes().stream()
           .filter(r -> r.getName().equals("org.openrewrite.java.format.AutoFormat"))
           .findFirst()
           .orElseThrow();
-        // Empty values should not be included in metadata
         assertThat(second.getMetadata())
-          .containsEntry("author", "Jon Schneider")
-          .doesNotContainKey("recipeCount");
+          .containsEntry("author", "Jon Schneider");
+        // recipeCount defaults to 1 when not specified
+        assertThat(second.getRecipeCount()).isEqualTo(1);
     }
 
     @Test
@@ -254,8 +254,8 @@ class RecipeMarketplaceReaderTest {
 
         RecipeListing listing = roundTripped.getAllRecipes().iterator().next();
         assertThat(listing.getMetadata())
-          .containsEntry("author", "Jon Schneider")
-          .containsEntry("recipeCount", "42");
+          .containsEntry("author", "Jon Schneider");
+        assertThat(listing.getRecipeCount()).isEqualTo(42);
     }
 
     @Test
@@ -266,26 +266,26 @@ class RecipeMarketplaceReaderTest {
           """);
         String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
 
-        // Should only contain known headers
+        // Should contain known headers including recipeCount (now a regular field)
         assertThat(writtenCsv.lines().findFirst().orElseThrow())
-          .contains("ecosystem", "packageName", "name", "displayName", "description", "category")
-          .doesNotContain("author", "recipeCount");
+          .contains("ecosystem", "packageName", "name", "displayName", "description", "recipeCount", "category")
+          .doesNotContain("author");
     }
 
     @Test
     void metadataColumnsAreSortedAlphabetically() {
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
-          name,category,ecosystem,packageName,recipeCount,author
-          org.openrewrite.java.cleanup.UnnecessaryParentheses,Java,maven,org.openrewrite:rewrite-java,42,Jon Schneider
+          name,category,ecosystem,packageName,recipeCount,zebra,author
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Java,maven,org.openrewrite:rewrite-java,42,value,Jon Schneider
           """);
         String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
 
-        // Metadata columns should be sorted alphabetically (author before recipeCount)
+        // Metadata columns should be sorted alphabetically (author before zebra)
         String header = writtenCsv.lines().findFirst().orElseThrow();
         int authorIndex = header.indexOf("author");
-        int recipeCountIndex = header.indexOf("recipeCount");
+        int zebraIndex = header.indexOf("zebra");
 
-        assertThat(authorIndex).isLessThan(recipeCountIndex);
+        assertThat(authorIndex).isLessThan(zebraIndex);
     }
 
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {
