@@ -528,10 +528,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 GradleProject gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
                 Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
                 if (projectRequiredUpdates.keySet().stream().anyMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
-                    // Ensure a dependencies block exists before adding constraints
-                    cu = (JavaSourceFile) new AddDependenciesBlockVisitor(cu instanceof K.CompilationUnit)
-                            .visitNonNull(cu, ctx);
-
                     cu = (JavaSourceFile) Preconditions.check(
                             not(new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
@@ -630,62 +626,63 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class AddDependenciesBlockVisitor extends JavaVisitor<ExecutionContext> {
+    private static class AddConstraintsBlock extends JavaIsoVisitor<ExecutionContext> {
         boolean isKotlinDsl;
 
         @Override
         public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-            if (tree instanceof G.CompilationUnit && !isKotlinDsl) {
-                G.CompilationUnit g = (G.CompilationUnit) tree;
-                if (!hasDependenciesBlock(g.getStatements())) {
-                    J.MethodInvocation dependencies = parseAsGradle(
-                            //language=groovy
-                            "dependencies {\n" +
-                            "}\n", false, ctx)
-                            .map(G.CompilationUnit.class::cast)
-                            .map(parsed -> (J.MethodInvocation) parsed.getStatements().get(0))
-                            .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
-                            .withPrefix(Space.format("\n\n"));
-                    return g.withStatements(ListUtils.concat(g.getStatements(), dependencies));
-                }
-                return g;
-            } else if (tree instanceof K.CompilationUnit && isKotlinDsl) {
-                K.CompilationUnit k = (K.CompilationUnit) tree;
-                List<Statement> statements = k.getStatements().stream()
-                        .filter(J.Block.class::isInstance)
-                        .map(J.Block.class::cast)
-                        .flatMap(block -> block.getStatements().stream())
-                        .collect(toList());
-                if (!hasDependenciesBlock(statements)) {
-                    J.MethodInvocation dependencies = parseAsGradle(
-                            //language=kotlin
-                            "dependencies {\n" +
-                            "}\n", true, ctx)
-                            .map(K.CompilationUnit.class::cast)
-                            .map(parsed -> (J.Block) parsed.getStatements().get(0))
-                            .map(block -> (J.MethodInvocation) block.getStatements().get(0))
-                            // Ensure the lambda body has proper end spacing for the closing brace
-                            .map(m -> m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                                if (!(arg instanceof J.Lambda)) {
-                                    return arg;
-                                }
-                                J.Lambda lambda = (J.Lambda) arg;
-                                if (!(lambda.getBody() instanceof J.Block)) {
-                                    return arg;
-                                }
-                                J.Block body = (J.Block) lambda.getBody();
-                                return lambda.withBody(body.withEnd(Space.format("\n")));
-                            })))
-                            .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
-                            .withPrefix(Space.format("\n\n"));
-                    // For Kotlin, we need to add to the block inside the compilation unit
-                    if (!k.getStatements().isEmpty() && k.getStatements().get(0) instanceof J.Block) {
-                        J.Block block = (J.Block) k.getStatements().get(0);
-                        return k.withStatements(singletonList(block.withStatements(
-                                ListUtils.concat(block.getStatements(), dependencies))));
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) tree;
+                if (cu instanceof G.CompilationUnit && !isKotlinDsl) {
+                    G.CompilationUnit g = (G.CompilationUnit) cu;
+                    if (!hasDependenciesBlock(g.getStatements())) {
+                        J.MethodInvocation dependencies = parseAsGradle(
+                                //language=groovy
+                                "dependencies {\n" +
+                                "}\n", false, ctx)
+                                .map(G.CompilationUnit.class::cast)
+                                .map(parsed -> (J.MethodInvocation) parsed.getStatements().get(0))
+                                .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
+                                .withPrefix(Space.format("\n\n"));
+                        cu = g.withStatements(ListUtils.concat(g.getStatements(), dependencies));
+                    }
+                } else if (cu instanceof K.CompilationUnit && isKotlinDsl) {
+                    K.CompilationUnit k = (K.CompilationUnit) cu;
+                    List<Statement> statements = k.getStatements().stream()
+                            .filter(J.Block.class::isInstance)
+                            .map(J.Block.class::cast)
+                            .flatMap(block -> block.getStatements().stream())
+                            .collect(toList());
+                    if (!hasDependenciesBlock(statements)) {
+                        J.MethodInvocation dependencies = parseAsGradle(
+                                //language=kotlin
+                                "dependencies {\n" +
+                                "}\n", true, ctx)
+                                .map(K.CompilationUnit.class::cast)
+                                .map(parsed -> (J.Block) parsed.getStatements().get(0))
+                                .map(block -> (J.MethodInvocation) block.getStatements().get(0))
+                                .map(m -> m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                                    if (!(arg instanceof J.Lambda)) {
+                                        return arg;
+                                    }
+                                    J.Lambda lambda = (J.Lambda) arg;
+                                    if (!(lambda.getBody() instanceof J.Block)) {
+                                        return arg;
+                                    }
+                                    J.Block body = (J.Block) lambda.getBody();
+                                    return lambda.withBody(body.withEnd(Space.format("\n")));
+                                })))
+                                .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
+                                .withPrefix(Space.format("\n\n"));
+                        if (!k.getStatements().isEmpty() && k.getStatements().get(0) instanceof J.Block) {
+                            J.Block block = (J.Block) k.getStatements().get(0);
+                            cu = k.withStatements(singletonList(block.withStatements(
+                                    ListUtils.concat(block.getStatements(), dependencies))));
+                        }
                     }
                 }
-                return k;
+                // Continue with the visit to add constraints inside the dependencies block
+                return super.visit(cu, ctx);
             }
             return super.visit(tree, ctx);
         }
@@ -704,12 +701,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             }
             return false;
         }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false)
-    private static class AddConstraintsBlock extends JavaIsoVisitor<ExecutionContext> {
-        boolean isKotlinDsl;
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
