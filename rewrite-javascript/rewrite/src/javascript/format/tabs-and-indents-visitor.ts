@@ -26,7 +26,7 @@ import {
     spaceContainsNewline,
     stripLeadingIndent
 } from "../../java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {Cursor, isScope, isTree, Tree} from "../../tree";
 import {mapAsync} from "../../util";
 import {produceAsync} from "../../visitor";

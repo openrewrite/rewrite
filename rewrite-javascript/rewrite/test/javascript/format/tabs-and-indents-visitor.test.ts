@@ -29,7 +29,7 @@
 
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {IntelliJ, TabsAndIndentsStyle, TabsAndIndentsVisitor, tsx, typescript} from "../../../src/javascript";
-import {Draft, produce} from "immer";
+import {create as produce, Draft} from "mutative";
 import {Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;

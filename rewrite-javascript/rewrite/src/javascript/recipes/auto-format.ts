@@ -14,93 +14,31 @@
  * limitations under the License.
  */
 
-import {ScanningRecipe} from "../../recipe";
+import {Recipe} from "../../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {AutoformatVisitor} from "../format";
-import {Autodetect, Detector} from "../autodetect";
-import {JavaScriptVisitor} from "../visitor";
-import {JS} from "../tree";
-import {J} from "../../java";
-import {findMarker, MarkersKind} from "../../markers";
-import {StyleKind} from "../style";
-import {NamedStyles} from "../../style";
-
-/**
- * Accumulator for the AutoFormat scanning recipe.
- * Holds the Detector that collects formatting statistics during the scan phase.
- */
-interface AutoFormatAccumulator {
-    detector: Detector;
-    detectedStyles?: Autodetect;
-}
-
-/**
- * Checks if a compilation unit already has formatting styles attached.
- * Returns true if either PrettierStyle or Autodetect markers are present.
- */
-function hasFormattingStyles(cu: JS.CompilationUnit): boolean {
-    // Check for PrettierStyle marker
-    if (findMarker(cu, StyleKind.PrettierStyle)) {
-        return true;
-    }
-
-    // Check for Autodetect marker (NamedStyles with specific name)
-    const namedStyles = cu.markers.markers.filter(
-        m => m.kind === MarkersKind.NamedStyles
-    ) as NamedStyles[];
-
-    return namedStyles.some(s => s.name === "org.openrewrite.javascript.Autodetect");
-}
 
 /**
  * Formats JavaScript/TypeScript code using a comprehensive set of formatting rules.
  *
- * This is a scanning recipe that:
- * 1. Scans all source files to detect the project's existing formatting style
- * 2. Applies consistent formatting based on the detected style
+ * This recipe applies formatting based on styles detected at parse time:
+ * - If PrettierStyle marker is present, uses Prettier formatting
+ * - If Autodetect marker is present, uses auto-detected project style
+ * - Otherwise, defaults to IntelliJ IDEA style
  *
  * The detected formatting includes:
  * - Tabs vs spaces preference
  * - Indent size (2, 4, etc.)
  * - ES6 import/export brace spacing
- *
- * If no clear style is detected, defaults to IntelliJ IDEA style.
- *
- * Files with existing formatting styles (PrettierStyle or Autodetect markers)
- * are skipped during style detection since they already have their formatting configured.
  */
-export class AutoFormat extends ScanningRecipe<AutoFormatAccumulator> {
+export class AutoFormat extends Recipe {
     readonly name = "org.openrewrite.javascript.format.auto-format";
     readonly displayName = "Auto-format JavaScript/TypeScript code";
     readonly description = "Format JavaScript and TypeScript code using formatting rules auto-detected from the project's existing code style.";
 
-    initialValue(_ctx: ExecutionContext): AutoFormatAccumulator {
-        return {
-            detector: Autodetect.detector()
-        };
-    }
-
-    async scanner(acc: AutoFormatAccumulator): Promise<TreeVisitor<any, ExecutionContext>> {
-        return new class extends JavaScriptVisitor<ExecutionContext> {
-            protected async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
-                // Skip sampling files that already have formatting styles attached
-                if (!hasFormattingStyles(cu)) {
-                    await acc.detector.sample(cu);
-                }
-                return cu;
-            }
-        };
-    }
-
-    async editorWithData(acc: AutoFormatAccumulator): Promise<TreeVisitor<any, ExecutionContext>> {
-        // Build detected styles once (lazily on first edit)
-        if (!acc.detectedStyles) {
-            acc.detectedStyles = acc.detector.build();
-        }
-
-        // Pass detected styles to the AutoformatVisitor
-        // Autodetect is a NamedStyles, so pass it as an array
-        return new AutoformatVisitor(undefined, [acc.detectedStyles]);
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+        // AutoformatVisitor looks up styles from source file markers
+        return new AutoformatVisitor();
     }
 }

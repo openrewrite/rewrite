@@ -182,7 +182,7 @@ function preloadCoreModules(logger?: rpc.Logger) {
  * same package is installed in multiple node_modules directories.
  */
 function setupSharedDependencies(targetModulePath: string, logger?: rpc.Logger) {
-    const sharedDeps = ['@openrewrite/rewrite', 'vscode-jsonrpc'];
+    const sharedDeps = ['@openrewrite/rewrite', 'vscode-jsonrpc', 'mutative'];
     const targetDir = path.dirname(targetModulePath);
 
     sharedDeps.forEach(depName => {

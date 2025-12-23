@@ -31,7 +31,7 @@
 
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {BlankLinesStyle, BlankLinesVisitor, IntelliJ, typescript} from "../../../src/javascript";
-import {Draft, produce} from "immer";
+import {create as produce, Draft} from "mutative";
 import {Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
