@@ -50,6 +50,7 @@ import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
+@SuppressWarnings("JSUnusedLocalSymbols")
 class JavaScriptRewriteRpcTest implements RewriteTest {
     @TempDir
     Path tempDir;
