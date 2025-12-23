@@ -29,10 +29,12 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 
 import java.io.File;
 import java.io.IOException;
@@ -462,6 +464,68 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             "const v = 'http://unused:3128'"
           )
         );
+    }
+
+    @Test
+    void parseProject(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+            {"name": "test-project", "version": "1.0.0"}
+            """);
+        Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
+        Files.writeString(projectDir.resolve("other.js"), "const y = 2;");
+
+        List<SourceFile> sourceFiles = client()
+            .parseProject(projectDir, new InMemoryExecutionContext())
+            .toList();
+
+        assertThat(sourceFiles).hasSize(3);
+
+        List<String> paths = sourceFiles.stream()
+            .map(sf -> sf.getSourcePath().toString())
+            .toList();
+        assertThat(paths).containsExactlyInAnyOrder("package.json", "index.js", "other.js");
+
+        // Verify content is parseable and printable
+        for (SourceFile sf : sourceFiles) {
+            assertThat(sf).isNotInstanceOf(ParseError.class);
+            assertThat(client().print(sf)).isNotEmpty();
+        }
+
+        // Verify that both JS files share the same Autodetect marker instance (deduplication)
+        SourceFile indexJs = sourceFiles.stream()
+            .filter(sf -> sf.getSourcePath().toString().equals("index.js"))
+            .findFirst().orElseThrow();
+        SourceFile otherJs = sourceFiles.stream()
+            .filter(sf -> sf.getSourcePath().toString().equals("other.js"))
+            .findFirst().orElseThrow();
+
+        Autodetect indexAutodetect = indexJs.getMarkers().findFirst(Autodetect.class).orElseThrow();
+        Autodetect otherAutodetect = otherJs.getMarkers().findFirst(Autodetect.class).orElseThrow();
+
+        assertThat(indexAutodetect).isSameAs(otherAutodetect);
+    }
+
+    @Test
+    void parseProjectWithExclusions(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+            {"name": "test-project", "version": "1.0.0"}
+            """);
+        Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
+        Files.createDirectories(projectDir.resolve("vendor"));
+        Files.writeString(projectDir.resolve("vendor/external.js"), "const y = 2;");
+
+        List<SourceFile> sourceFiles = client()
+            .parseProject(projectDir, List.of("**/vendor/**"), new InMemoryExecutionContext())
+            .toList();
+
+        assertThat(sourceFiles).hasSize(2);
+
+        List<String> paths = sourceFiles.stream()
+            .map(sf -> sf.getSourcePath().toString())
+            .toList();
+        assertThat(paths)
+            .containsExactlyInAnyOrder("package.json", "index.js")
+            .noneMatch(p -> p.contains("vendor"));
     }
 
     private void installRecipes() {

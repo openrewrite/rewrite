@@ -24,6 +24,7 @@ import {
     GetObject,
     GetRecipes,
     Parse,
+    ParseProject,
     PrepareRecipe,
     PrepareRecipeResponse,
     Print,
@@ -90,6 +91,7 @@ export class RewriteRpc {
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
+        ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger, options.metricsCsv);
 

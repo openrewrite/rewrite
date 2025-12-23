@@ -15,8 +15,7 @@
  */
 import {describe} from "@jest/globals";
 import {RecipeSpec} from "../../../src/test";
-import {ChangeImport} from "../../../src/javascript/recipes/change-import";
-import {npm, packageJson, tsx, typescript} from "../../../src/javascript";
+import {ChangeImport, npm, packageJson, tsx, typescript} from "../../../src/javascript";
 import {withDir} from "tmp-promise";
 
 describe("change-import", () => {
