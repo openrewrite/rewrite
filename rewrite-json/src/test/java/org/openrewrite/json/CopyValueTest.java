@@ -66,6 +66,15 @@ class CopyValueTest implements RewriteTest {
               }
               """,
             spec -> spec.path("a.json")
+          ),
+          // Unrelated unchanged file
+          json(
+            """
+              {
+                "source": "value"
+              }
+              """,
+            spec -> spec.path("b.json")
           )
         );
     }
@@ -108,7 +117,7 @@ class CopyValueTest implements RewriteTest {
             """
               {
                 "source": "value",
-                "destination": "original"
+                "unrelated": "other value"
               }
               """,
             spec -> spec.path("a.json")
@@ -116,12 +125,12 @@ class CopyValueTest implements RewriteTest {
           json(
             """
               {
-                "source": "original"
+                "source": "unchanged"
               }
               """,
             """
               {
-                "source": "original",
+                "source": "unchanged",
                 "copiedValue": "value"
               }
               """,
@@ -140,7 +149,7 @@ class CopyValueTest implements RewriteTest {
             """
               {
                 "source": "value",
-                "destination": "original"
+                "unrelated": "other value"
               }
               """,
             spec -> spec.path("a.json")
@@ -186,13 +195,13 @@ class CopyValueTest implements RewriteTest {
     void copyToOtherJsonObject() {
         rewriteRun(
           spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.other.*", "copiedValue", null)
+            new CopyValue("$.source", null, "$.nested.*", "copiedValue", null)
           ),
           json(
             """
               {
                 "source": "value",
-                "other": {
+                "nested": {
                   "other-key": "other-value"
                 }
               }
@@ -200,7 +209,7 @@ class CopyValueTest implements RewriteTest {
             """
               {
                 "source": "value",
-                "other": {
+                "nested": {
                   "other-key": "other-value",
                   "copiedValue": "value"
                 }

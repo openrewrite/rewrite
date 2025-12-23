@@ -123,11 +123,10 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
                 return source;
             }
         };
-        if (sourceFilePath != null) {
-            visitor = Preconditions.check(new FindSourceFiles(sourceFilePath), visitor);
+        if (sourceFilePath == null) {
+            return visitor;
         }
-
-        return visitor;
+        return Preconditions.check(new FindSourceFiles(sourceFilePath), visitor);
     }
 
     @Override
@@ -135,7 +134,8 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         if (acc.snippet == null) {
             return TreeVisitor.noop();
         }
-        return Preconditions.check(new FindSourceFiles(destinationFilePath == null ? acc.path.toString() : destinationFilePath),
+        return Preconditions.check(
+                new FindSourceFiles(destinationFilePath == null ? acc.path.toString() : destinationFilePath),
                 new AddKeyValue(destinationKeyPath, destinationKey, acc.snippet, false).getVisitor());
     }
 }
