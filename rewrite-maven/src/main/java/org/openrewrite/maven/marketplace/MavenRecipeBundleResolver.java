@@ -59,7 +59,8 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
                     .map(mrr -> {
                         ResolvedDependency resolvedDependency = mrr.getDependencies().get(Scope.Runtime).stream().filter(ResolvedDependency::isDirect)
                                 .findFirst().orElseThrow(() -> new IllegalStateException("Failed to find direct dependency for " + gav));
-                        bundle.setVersion(resolvedDependency.getVersion());
+                        bundle.setVersion(resolvedDependency.getDatedSnapshotVersion() == null ?
+                                resolvedDependency.getVersion() : resolvedDependency.getDatedSnapshotVersion());
                         reader = new MavenRecipeBundleReader(bundle, mrr, downloader, classLoaderFactory);
                         return (RecipeBundleReader) reader;
                     })
