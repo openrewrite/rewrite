@@ -1087,18 +1087,20 @@ public class ResolvedPom {
                     MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
-                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
+                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), dPom.getProperties(),
                                 emptyList(), true, initialRepositories, emptyList(), emptyList(),
                                 emptyList(), emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
 
+                    String resolvedClassifier = dd.getDefinedIn().getValue(resolvedPom.getValue(dd.getDependency().getClassifier()));
+                    // TODO: Uncertain if we should be resolving `type` and `optional` or the dependency's GAV similarly
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
-                            resolvedPom.getGav(), dd.getDependency(), emptyList(),
+                            resolvedPom.getGav(), dd.getDependency().withClassifier(resolvedClassifier), emptyList(),
                             resolvedPom.getRequested().getLicenses(),
                             resolvedPom.getValue(dd.getDependency().getType()),
-                            resolvedPom.getValue(dd.getDependency().getClassifier()),
+                            resolvedClassifier,
                             Boolean.valueOf(resolvedPom.getValue(dd.getDependency().getOptional())),
                             depth,
                             emptyList());
@@ -1185,17 +1187,20 @@ public class ResolvedPom {
         Scope scopeInContainingPom;
         //noinspection ConstantConditions
         if (d2.getScope() != null) {
+            // TODO: Unsure if should be resolving scope similarly to classifier below
             scopeInContainingPom = Scope.fromName(getValue(d2.getScope()));
         } else {
+            // TODO: Unsure if should be resolving group id / artifact id / version similarly to classifier
             scopeInContainingPom = containingPom.getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
-                    getValue(d2.getClassifier()));
+                    containingPom.getValue(getValue(d2.getClassifier())));
             if (scopeInContainingPom == null) {
                 scopeInContainingPom = Scope.Compile;
             }
         }
+        // TODO: Unsure if should be resolving group id / artifact id / type similarly to classifier
         //noinspection ConstantConditions
         Scope scopeInThisProject = getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
-                getValue(d2.getClassifier()));
+                containingPom.getValue(getValue(d2.getClassifier())));
         // project POM's dependency management overrules the containingPom's dependencyManagement
         // IFF the dependency is in the runtime classpath of the containingPom;
         // if the dependency was not already in the classpath of the containingPom, then project POM cannot override scope / "promote" it into the classpath

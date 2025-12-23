@@ -1376,4 +1376,28 @@ class MavenPomDownloaderTest implements RewriteTest {
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
         assertThat(deps).hasSize(35);
     }
+
+    @Test
+    void resolveDependencies2() throws Exception {
+        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
+                  <project>
+                      <groupId>com.example</groupId>
+                      <artifactId>demo</artifactId>
+                      <version>1.0.0</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.azure</groupId>
+                              <artifactId>azure-spring-data-cosmos</artifactId>
+                              <version>3.45.0</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+        """).toList().getFirst();
+        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+        resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
+        List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
+        assertThat(deps).anyMatch(rd -> "io.netty".equals(rd.getGroupId())
+          && "netty-tcnative-boringssl-static".equals(rd.getArtifactId())
+          && !"${boring-ssl-classifier}".equals(rd.getClassifier()));
+    }
 }
