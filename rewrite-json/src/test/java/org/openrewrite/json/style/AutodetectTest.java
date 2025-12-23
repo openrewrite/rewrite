@@ -22,50 +22,48 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.json.Assertions.json;
 
 class AutodetectTest implements RewriteTest {
 
-    private static String sgml =
+    private static final String sgml =
       """
-      {
-        "glossary": {
-          "title": "example glossary",
-          "GlossDiv": {
-            "title": "S",
-            "GlossList": {
-              "GlossEntry": {
-                "ID": "SGML",
-                "SortAs": "SGML",
-                "GlossTerm": "Standard Generalized Markup Language",
-                "Acronym": "SGML",
-                "Abbrev": "ISO 8879:1986",
-                "GlossDef": {
-                  "para": "A meta-markup language, used to create markup languages such as DocBook.",
-                  "GlossSeeAlso": [
-                    "GML",
-                    "XML"
-                  ]
-                },
-                "GlossSee": "markup"
+        {
+          "glossary": {
+            "title": "example glossary",
+            "GlossDiv": {
+              "title": "S",
+              "GlossList": {
+                "GlossEntry": {
+                  "ID": "SGML",
+                  "SortAs": "SGML",
+                  "GlossTerm": "Standard Generalized Markup Language",
+                  "Acronym": "SGML",
+                  "Abbrev": "ISO 8879:1986",
+                  "GlossDef": {
+                    "para": "A meta-markup language, used to create markup languages such as DocBook.",
+                    "GlossSeeAlso": [
+                      "GML",
+                      "XML"
+                    ]
+                  },
+                  "GlossSee": "markup"
+                }
               }
             }
           }
         }
-      }
-      """;
+        """;
 
     @Test
     void autodetectSimple() {
         rewriteRun(
           withDetectedIndentation(tabsAndIndents -> {
-            assertThat(tabsAndIndents.getTabSize()).isEqualTo(1);
-            assertThat(tabsAndIndents.getIndentSize()).isEqualTo(2);
-            assertThat(tabsAndIndents.getUseTabCharacter()).isEqualTo(false);
-            return null;
+              assertThat(tabsAndIndents.getTabSize()).isEqualTo(1);
+              assertThat(tabsAndIndents.getIndentSize()).isEqualTo(2);
+              assertThat(tabsAndIndents.getUseTabCharacter()).isEqualTo(false);
           }),
           json(sgml)
         );
@@ -74,18 +72,16 @@ class AutodetectTest implements RewriteTest {
     @Test
     void tabs() {
         rewriteRun(
-          withDetectedIndentation( tabsAndIndents -> {
-                assertThat(tabsAndIndents.getUseTabCharacter()).isEqualTo(true);
-                return null;
-            }),
+          withDetectedIndentation(tabsAndIndents ->
+            assertThat(tabsAndIndents.getUseTabCharacter()).isEqualTo(true)),
           json(
             """
-            {
-            TAB"name": "John",
-            TAB"age": 30,
-            TAB"car": null
-            }
-            """.replaceAll("TAB", "\t")
+              {
+              TAB"name": "John",
+              TAB"age": 30,
+              TAB"car": null
+              }
+              """.replaceAll("TAB", "\t")
           )
         );
     }
@@ -96,12 +92,11 @@ class AutodetectTest implements RewriteTest {
           withDetectedWrappingAndBraces(wrappingAndBraces -> {
               assertThat(wrappingAndBraces.getWrapArrays()).isEqualTo(LineWrapSetting.DoNotWrap);
               assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.DoNotWrap);
-              return null;
-            }),
+          }),
           json(
-           """
-           {"pl":[{"pid":"2544","fn":"LeBron","ln":"James","val":"38","tid":1610612747,"ta":"LAL","tn":"Lakers","tc":"Los Angeles"}]}
-           """
+            """
+              {"pl":[{"pid":"2544","fn":"LeBron","ln":"James","val":"38","tid":1610612747,"ta":"LAL","tn":"Lakers","tc":"Los Angeles"}]}
+              """
           )
         );
     }
@@ -112,7 +107,6 @@ class AutodetectTest implements RewriteTest {
           withDetectedWrappingAndBraces(wrappingAndBraces -> {
               assertThat(wrappingAndBraces.getWrapArrays()).isEqualTo(LineWrapSetting.WrapAlways);
               assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.WrapAlways);
-              return null;
           }),
           json(sgml)
         );
@@ -121,13 +115,12 @@ class AutodetectTest implements RewriteTest {
     @Test
     void wrapObjectsButNotArrays() {
         rewriteRun(
-            withDetectedWrappingAndBraces(wrappingAndBraces -> {
-                assertThat(wrappingAndBraces.getWrapArrays()).isEqualTo(LineWrapSetting.DoNotWrap);
-                assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.WrapAlways);
-                return null;
-            }),
-            json(
-              """
+          withDetectedWrappingAndBraces(wrappingAndBraces -> {
+              assertThat(wrappingAndBraces.getWrapArrays()).isEqualTo(LineWrapSetting.DoNotWrap);
+              assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.WrapAlways);
+          }),
+          json(
+            """
               {
                   "x": "x",
                   "l": [1, 2],
@@ -143,38 +136,36 @@ class AutodetectTest implements RewriteTest {
     @Test
     void emptyObjectsAlsoCounted() {
         rewriteRun(
-          withDetectedWrappingAndBraces( wrappingAndBraces -> {
-              assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.WrapAlways);
-              return null;
-          }),
+          withDetectedWrappingAndBraces(wrappingAndBraces ->
+            assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.WrapAlways)),
           json(
             //(outer object + 3 members + 1 empty object + 1 nested + 1 nested empty value) 7 == 7 (3 members + 1 empty, 1 empty with space + 1 nested + 1 nested empty value)
             """
-            { "non-wrapped-empty": {}, "non-wrapped-empty-space": { }, "non-wrapped": { "nested": {} },
-              "wrapped-empty": {
-              },
-              "wrapped-empty-line": {
-
-              },
-              "wrapped": {
-                "nested": {
+              { "non-wrapped-empty": {}, "non-wrapped-empty-space": { }, "non-wrapped": { "nested": {} },
+                "wrapped-empty": {
+                },
+                "wrapped-empty-line": {
+              
+                },
+                "wrapped": {
+                  "nested": {
+                  }
                 }
               }
-            }
-            """
+              """
           )
         );
     }
 
-    private static Consumer<RecipeSpec> withDetectedIndentation(Function<TabsAndIndentsStyle, Void> fn) {
+    private static Consumer<RecipeSpec> withDetectedIndentation(Consumer<TabsAndIndentsStyle> fn) {
         return withDetectedStyle(TabsAndIndentsStyle.class, fn);
     }
 
-    private static Consumer<RecipeSpec> withDetectedWrappingAndBraces(Function<WrappingAndBracesStyle, Void> fn) {
+    private static Consumer<RecipeSpec> withDetectedWrappingAndBraces(Consumer<WrappingAndBracesStyle> fn) {
         return withDetectedStyle(WrappingAndBracesStyle.class, fn);
     }
 
-    private static <S extends Style> Consumer<RecipeSpec> withDetectedStyle(Class<S> styleClass, Function<S, Void> fn) {
+    private static <S extends Style> Consumer<RecipeSpec> withDetectedStyle(Class<S> styleClass, Consumer<S> fn) {
         return spec -> spec.beforeRecipe(sources -> {
             Autodetect.Detector detector = Autodetect.detector();
             sources.forEach(detector::sample);
@@ -183,7 +174,7 @@ class AutodetectTest implements RewriteTest {
             S foundStyle = (S) detector.build().getStyles().stream()
               .filter(styleClass::isInstance)
               .findAny().orElseThrow();
-            fn.apply(foundStyle);
+            fn.accept(foundStyle);
         });
     }
 }
