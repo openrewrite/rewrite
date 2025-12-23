@@ -23,6 +23,8 @@ import {
     GenerateResponse,
     GetObject,
     GetMarketplace,
+    GetMarketplaceResponseRow,
+    toMarketplace,
     Parse,
     ParseProject,
     PrepareRecipe,
@@ -32,6 +34,7 @@ import {
     Visit,
     VisitResponse
 } from "./request";
+import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv} from "./request/metrics";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
@@ -40,7 +43,6 @@ import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes"
 import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
-import {RecipeMarketplace} from "../marketplace";
 
 export class RewriteRpc {
     private static _global?: RewriteRpc;
@@ -189,6 +191,13 @@ export class RewriteRpc {
             );
         }
         return this.remoteLanguages;
+    }
+
+    async marketplace(): Promise<RecipeMarketplace> {
+        const rows = await this.connection.sendRequest(
+            new rpc.RequestType0<GetMarketplaceResponseRow[], Error>("GetMarketplace")
+        );
+        return await toMarketplace(rows);
     }
 
     async prepareRecipe(id: string, options?: any): Promise<RpcRecipe> {

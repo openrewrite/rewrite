@@ -23,6 +23,18 @@ export interface GetMarketplaceResponseRow {
     readonly categories: CategoryDescriptor[]
 }
 
+/**
+ * Converts GetMarketplace response rows into a hydrated RecipeMarketplace.
+ * This is used by the RPC client to reconstruct the marketplace structure.
+ */
+export async function toMarketplace(rows: GetMarketplaceResponseRow[]): Promise<RecipeMarketplace> {
+    const marketplace = new RecipeMarketplace();
+    for (const row of rows) {
+        await marketplace.root.install(row.descriptor, row.categories);
+    }
+    return marketplace;
+}
+
 export class GetMarketplace {
     static handle(connection: rpc.MessageConnection, marketplace: RecipeMarketplace, metricsCsv?: string): void {
         connection.onRequest(

@@ -17,6 +17,10 @@ import {Recipe, RecipeDescriptor} from "./recipe";
 
 export type RecipeConstructor = new (options?: any) => Recipe;
 
+function isRecipeConstructor(recipe: RecipeConstructor | RecipeDescriptor): recipe is RecipeConstructor {
+    return typeof recipe === 'function';
+}
+
 export class RecipeMarketplace {
     readonly root: RecipeMarketplace.Category = new RecipeMarketplace.Category({
         displayName: "Root",
@@ -24,26 +28,27 @@ export class RecipeMarketplace {
     });
 
     /**
-     * Install a recipe class into the marketplace under the specified category path.
-     * The recipe is instantiated to extract its descriptor and create a listing.
+     * Install a recipe into the marketplace under the specified category path.
+     * If a RecipeConstructor is provided, it is instantiated to extract its descriptor.
+     * If a RecipeDescriptor is provided, it is used directly (for client-side hydration).
      * Categories are specified top-down (shallowest to deepest).
      * Intermediate categories are created as needed.
      *
-     * @param recipeClass The recipe class to install
+     * @param recipe The recipe class or descriptor to install
      * @param categoryPath Category path from shallowest to deepest (e.g., ["Java", "Search"])
      */
     public async install(
-        recipeClass: RecipeConstructor,
+        recipe: RecipeConstructor | RecipeDescriptor,
         categoryPath: CategoryDescriptor[]
     ): Promise<void> {
-        await this.root.install(recipeClass, categoryPath);
+        await this.root.install(recipe, categoryPath);
     }
 
     public categories(): RecipeMarketplace.Category[] {
         return this.root.categories;
     }
 
-    public findRecipe(name: string): [ RecipeDescriptor, RecipeConstructor] | undefined {
+    public findRecipe(name: string): [RecipeDescriptor, RecipeConstructor | undefined] | undefined {
         return this.root.findRecipe(name)
     }
 
@@ -55,7 +60,7 @@ export class RecipeMarketplace {
 export namespace RecipeMarketplace {
     export class Category {
         readonly categories: Category[] = [];
-        readonly recipes: Map<RecipeDescriptor, RecipeConstructor> = new Map();
+        readonly recipes: Map<RecipeDescriptor, RecipeConstructor | undefined> = new Map();
 
         constructor(
             readonly descriptor: CategoryDescriptor,
@@ -63,24 +68,29 @@ export namespace RecipeMarketplace {
         }
 
         /**
-         * Install a recipe class into this category or a subcategory.
-         * The recipe is instantiated to extract its descriptor and create a listing.
+         * Install a recipe into this category or a subcategory.
+         * If a RecipeConstructor is provided, it is instantiated to extract its descriptor.
+         * If a RecipeDescriptor is provided, it is used directly (for client-side hydration).
          * Categories are specified top-down (shallowest to deepest).
          * Intermediate categories are created as needed.
          *
-         * @param recipeConstructor The recipe class to install
+         * @param recipe The recipe class or descriptor to install
          * @param categoryPath Category path from shallowest to deepest
          */
-        public async install<T extends Recipe>(
-            recipeConstructor: new (options?: any) => T,
+        public async install(
+            recipe: RecipeConstructor | RecipeDescriptor,
             categoryPath: CategoryDescriptor[]
         ): Promise<void> {
             if (categoryPath.length === 0) {
-                try {
-                    const recipe = new recipeConstructor({});
-                    this.recipes.set(await recipe.descriptor(), recipeConstructor);
-                } catch (e) {
-                    throw new Error(`Failed to install recipe. Ensure the constructor can be called without any arguments.`);
+                if (isRecipeConstructor(recipe)) {
+                    try {
+                        const recipeInst = new recipe({});
+                        this.recipes.set(await recipeInst.descriptor(), recipe);
+                    } catch (e) {
+                        throw new Error(`Failed to install recipe. Ensure the constructor can be called without any arguments.`);
+                    }
+                } else {
+                    this.recipes.set(recipe, undefined);
                 }
                 return;
             }
@@ -90,7 +100,7 @@ export namespace RecipeMarketplace {
             const targetCategory = this.findOrCreateCategory(firstCategory);
 
             // Recursively add to the child category
-            await targetCategory.install(recipeConstructor, categoryPath.slice(1));
+            await targetCategory.install(recipe, categoryPath.slice(1));
         }
 
         private findOrCreateCategory(categoryDescriptor: CategoryDescriptor): Category {
@@ -104,7 +114,7 @@ export namespace RecipeMarketplace {
             return newCategory;
         }
 
-        public findRecipe(name: string): [ RecipeDescriptor, RecipeConstructor] | undefined {
+        public findRecipe(name: string): [RecipeDescriptor, RecipeConstructor | undefined] | undefined {
             for (const [recipe, ctor] of this.recipes.entries()) {
                 if (recipe.name === name) {
                     return [recipe, ctor];

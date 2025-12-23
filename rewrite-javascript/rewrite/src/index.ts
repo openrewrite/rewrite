@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 import {JavaScript, RecipeMarketplace} from "./marketplace";
+import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
+import {updateIfChanged} from "./util";
+import {MarkersKind, ParseExceptionResult} from "./markers";
 
 export * from "./data-table";
 export * from "./execution";
@@ -79,4 +82,23 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ModernizeOctalLiterals, MigrateES6);
     await marketplace.install(RemoveDuplicateObjectKeys, MigrateES6);
 }
+
+RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
+    async rpcSend(after: ParseExceptionResult, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.parserType);
+        await q.getAndSend(after, a => a.exceptionType);
+        await q.getAndSend(after, a => a.message);
+        await q.getAndSend(after, a => a.treeType);
+    },
+    async rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): Promise<ParseExceptionResult> {
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            parserType: await q.receive(before.parserType),
+            exceptionType: await q.receive(before.exceptionType),
+            message: await q.receive(before.message),
+            treeType: await q.receive(before.treeType),
+        });
+    }
+});
 

@@ -45,6 +45,9 @@ export class PrepareRecipe {
                     if (!recipeCtor) {
                         throw new Error(`Could not find recipe with id ${request.id}`);
                     }
+                    if (!recipeCtor[1]) {
+                        throw new Error(`Recipe ${request.id} was installed without a constructor`);
+                    }
                     let recipe = new recipeCtor[1](request.options);
 
                     const editPreconditions: Precondition[] = [];
