@@ -16,7 +16,7 @@
 import {randomId, UUID} from "./uuid";
 import {asRef} from "./reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
-import {createDraft, Draft, finishDraft} from "immer";
+import {updateIfChanged} from "./util";
 
 export const MarkersKind = {
     Markers: "org.openrewrite.marker.Markers",
@@ -173,16 +173,15 @@ RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
         await q.getAndSend(after, a => a.treeType);
     },
     async rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): Promise<ParseExceptionResult> {
-        const draft: Draft<ParseExceptionResult> = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.parserType = await q.receive(before.parserType);
-        draft.exceptionType = await q.receive(before.exceptionType);
-        draft.message = await q.receive(before.message);
-        draft.treeType = await q.receive(before.treeType);
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            parserType: await q.receive(before.parserType),
+            exceptionType: await q.receive(before.exceptionType),
+            message: await q.receive(before.message),
+            treeType: await q.receive(before.treeType),
+        });
     }
 });
-
 
 /**
  * Base interface for Markup markers that attach messages to AST nodes.

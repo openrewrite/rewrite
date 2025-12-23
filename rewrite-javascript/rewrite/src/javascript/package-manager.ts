@@ -704,7 +704,13 @@ export function createYamlLockFileVisitor<T>(
             const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
             if (updatedLockContent) {
                 const lockFileName = path.basename(sourcePath);
-                return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Yaml.Documents;
+                const parsed = await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Yaml.Documents;
+                // Preserve original ID for RPC compatibility
+                return {
+                    ...docs,
+                    documents: parsed.documents,
+                    suffix: parsed.suffix
+                } as Yaml.Documents;
             }
             return docs;
         }

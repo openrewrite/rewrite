@@ -30,7 +30,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {BlankLinesStyle, IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../../src/javascript";
 import {AutoformatVisitor, SpacesVisitor} from "../../../src/javascript/format";
-import {Draft, produce} from "immer";
+import {create as produce, Draft} from "mutative";
 import {MarkersKind, NamedStyles, randomId, Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;

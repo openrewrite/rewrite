@@ -79,3 +79,4 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ModernizeOctalLiterals, MigrateES6);
     await marketplace.install(RemoveDuplicateObjectKeys, MigrateES6);
 }
+

@@ -18,7 +18,6 @@ import {J} from "../java";
 import {JS} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {
-    prettierStyle,
     PrettierStyle,
     SpacesStyle,
     SpacesStyleDetailKind,
@@ -120,11 +119,12 @@ registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration)
 // Only serialize the variable fields; constant fields are defined in the interface
 RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
     async rpcReceive(before: PrettierStyle, q: RpcReceiveQueue): Promise<PrettierStyle> {
-        const id = await q.receive(before.id);
-        const config = await q.receive(before.config);
-        const version = await q.receive(before.prettierVersion);
-        const ignored = await q.receive(before.ignored);
-        return prettierStyle(id, config, version, ignored);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            config: await q.receive(before.config),
+            prettierVersion: await q.receive(before.prettierVersion),
+            ignored: await q.receive(before.ignored),
+        });
     },
 
     async rpcSend(after: PrettierStyle, q: RpcSendQueue): Promise<void> {
