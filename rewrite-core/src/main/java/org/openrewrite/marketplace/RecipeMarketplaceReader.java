@@ -142,7 +142,9 @@ public class RecipeMarketplaceReader {
         Duration estimatedEffortPerOccurrence = null;
         String ecosystem = null;
         String packageName = null;
+        String requestedVersion = null;
         String version = null;
+        int recipeCount = 1;
         String team = null;
         Map<Integer, String> categoryDisplayNames = new TreeMap<>();
         Map<Integer, String> categoryDescriptions = new TreeMap<>();
@@ -199,8 +201,14 @@ public class RecipeMarketplaceReader {
                 case PACKAGE_NAME:
                     packageName = value;
                     break;
+                case REQUESTED_VERSION:
+                    requestedVersion = value;
+                    break;
                 case VERSION:
                     version = value;
+                    break;
+                case RECIPE_COUNT:
+                    recipeCount = value == null ? 1 : Integer.parseInt(value);
                     break;
                 case TEAM:
                     team = value;
@@ -233,7 +241,7 @@ public class RecipeMarketplaceReader {
         }
 
         // Create bundle if ecosystem information is present
-        RecipeBundle bundle = new RecipeBundle(ecosystem.toLowerCase(), packageName, version, team);
+        RecipeBundle bundle = new RecipeBundle(ecosystem.toLowerCase(), packageName, requestedVersion, version, team);
 
         RecipeListing listing = new RecipeListing(
                 marketplace,
@@ -243,6 +251,7 @@ public class RecipeMarketplaceReader {
                 estimatedEffortPerOccurrence,
                 options,
                 dataTables,
+                recipeCount,
                 bundle
         );
 
@@ -273,7 +282,8 @@ public class RecipeMarketplaceReader {
 
     private List<OptionDescriptor> parseOptionsFromJson(String json) {
         try {
-            return JSON_MAPPER.readValue(json, new TypeReference<List<OptionDescriptor>>() {});
+            return JSON_MAPPER.readValue(json, new TypeReference<List<OptionDescriptor>>() {
+            });
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed to parse options JSON: " + json, e);
         }
@@ -281,7 +291,8 @@ public class RecipeMarketplaceReader {
 
     private List<DataTableDescriptor> parseDataTablesFromJson(String json) {
         try {
-            return JSON_MAPPER.readValue(json, new TypeReference<List<DataTableDescriptor>>() {});
+            return JSON_MAPPER.readValue(json, new TypeReference<List<DataTableDescriptor>>() {
+            });
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed to parse data tables JSON: " + json, e);
         }
@@ -298,7 +309,9 @@ public class RecipeMarketplaceReader {
         CATEGORY_DESCRIPTION("categoryDescription"),
         ECOSYSTEM("ecosystem"),
         PACKAGE_NAME("packageName"),
+        REQUESTED_VERSION("requestedVersion"),
         VERSION("version"),
+        RECIPE_COUNT("recipeCount"),
         TEAM("team"),
         OPTIONS("options"),
         DATA_TABLES("dataTables"),

@@ -24,9 +24,9 @@ import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
+import static java.util.Collections.singleton;
 
 @Getter
 @RequiredArgsConstructor
@@ -44,6 +44,23 @@ public class RecipeListing implements Comparable<RecipeListing> {
     private final @Nullable Duration estimatedEffortPerOccurrence;
     private final List<OptionDescriptor> options;
     private final List<DataTableDescriptor> dataTables;
+
+    /**
+     * The count of all recipes listed in {@link Recipe#getRecipeList()} both directly
+     * and transitively. This simple count is a useful measure to expose in the recipe
+     * marketplace because it can be used as a sorting criteria. In the "more is better"
+     * view of relevance, the higher the recipe count, the more likely the recipe is to
+     * be complete.
+     * <br>
+     * It also recognizes another design consideration. Migration recipes generally are
+     * built incrementally by version so that developers can use migration recipes to get
+     * to a version short of the absolute latest version that a recipe is available for.
+     * Migration recipes for a particular version compose the migration recipe from the prior
+     * version. As a result, the latest available version migration will "by construction" always
+     * have a greater recipe count than a migration for an earlier version.
+     */
+    private final int recipeCount;
+
     private final Map<String, Object> metadata = new LinkedHashMap<>();
 
     @With(AccessLevel.PACKAGE)
@@ -74,12 +91,21 @@ public class RecipeListing implements Comparable<RecipeListing> {
     }
 
     public static RecipeListing fromDescriptor(RecipeDescriptor descriptor, RecipeBundle bundle) {
+        int recipeCount = 1;
+        RecipeDescriptor d = descriptor;
+        for (Queue<RecipeDescriptor> queue = new LinkedList<>(singleton(descriptor)); !queue.isEmpty();
+             d = queue.poll()) {
+            recipeCount += d.getRecipeList().size();
+            queue.addAll(d.getRecipeList());
+        }
+
         return new RecipeListing(null, descriptor.getName(),
                 descriptor.getDisplayName(),
                 descriptor.getDescription(),
                 descriptor.getEstimatedEffortPerOccurrence(),
                 descriptor.getOptions(),
                 descriptor.getDataTables(),
+                recipeCount,
                 bundle
         );
     }

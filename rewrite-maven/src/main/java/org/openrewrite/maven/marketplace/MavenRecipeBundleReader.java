@@ -119,7 +119,8 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
             marketplace.install(
                     RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
                             "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                            requireNonNull(gav.getVersion()), null)),
+                            bundle.getRequestedVersion() == null ? gav.getVersion() : bundle.getRequestedVersion(),
+                            gav.getVersion(), null)),
                     descriptor.inferCategoriesFromName(envWithCategories)
             );
         }

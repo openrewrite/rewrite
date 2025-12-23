@@ -47,7 +47,8 @@ public class MavenRecipeMarketplaceGenerator {
         }
 
         @SuppressWarnings("DataFlowIssue") MavenRecipeBundleReader bundleReader = new MavenRecipeBundleReader(
-                new RecipeBundle("maven", gav.getGroupId() + ":" + gav.getArtifactId(), gav.getVersion(), null),
+                new RecipeBundle("maven", gav.getGroupId() + ":" + gav.getArtifactId(),
+                        gav.getVersion(), gav.getVersion(), null),
                 // Since we're going to directly set recipeJar and classpath, we can get away with this
                 null, null,
                 RecipeClassLoader::new

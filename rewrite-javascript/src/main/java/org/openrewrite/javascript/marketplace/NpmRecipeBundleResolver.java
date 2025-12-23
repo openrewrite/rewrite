@@ -36,28 +36,12 @@ public class NpmRecipeBundleResolver implements RecipeBundleResolver {
 
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
-        String pkg = bundle.getPackageName();
-        Path pkgPath = Paths.get(pkg);
+        Path pkgPath = Paths.get(bundle.getPackageName());
         if (Files.exists(pkgPath)) {
             rpc.installRecipes(pkgPath.toFile());
         } else {
-            String scopeName = "";
-            String[] pkgParts;
-
-            // check if package is scoped
-            if (pkg.startsWith("@")) {
-                scopeName = pkg.substring(0, pkg.indexOf("/")) + "/";
-                String scopelessPart = pkg.substring(pkg.indexOf("/") + 1);
-                pkgParts = scopelessPart.split("@", 2);
-            } else {
-                pkgParts = pkg.split("@", 2);
-            }
-
-            String packageName = scopeName + pkgParts[0];
-            String version = pkgParts.length > 1 ? pkgParts[1] : null;
-            rpc.installRecipes(packageName, version);
+            rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
         }
-
         return new NpmRecipeBundleReader(bundle, rpc);
     }
 }

@@ -78,11 +78,13 @@ public class RecipeMarketplaceWriter {
             headers.add("ecosystem");
             headers.add("packageName");
             if (hasVersion) {
+                headers.add("requestedVersion");
                 headers.add("version");
             }
             headers.add("name");
             headers.add("displayName");
             headers.add("description");
+            headers.add("recipeCount");
 
             // Add category headers (left = deepest, right = shallowest)
             for (int i = 1; i <= maxCategoryDepth; i++) {
@@ -131,11 +133,13 @@ public class RecipeMarketplaceWriter {
             row.add(bundle.getPackageEcosystem());
             row.add(bundle.getPackageName());
             if (hasVersion) {
+                row.add(StringUtils.isBlank(bundle.getRequestedVersion()) ? "" : bundle.getRequestedVersion());
                 row.add(StringUtils.isBlank(bundle.getVersion()) ? "" : bundle.getVersion());
             }
             row.add(recipe.getName());
             row.add(recipe.getDisplayName());
             row.add(recipe.getDescription());
+            row.add(Integer.toString(recipe.getRecipeCount()));
 
             // Category columns (right-aligned: empty columns first, then categories from deepest to shallowest)
             int padding = maxCategoryDepth - categoryPath.size();
@@ -205,7 +209,7 @@ public class RecipeMarketplaceWriter {
 
     private String dataTablesToJson(List<DataTableDescriptor> dataTables) {
         List<DataTableDescriptor> filtered = dataTables.stream()
-                .filter(dt -> dt.getName() != null && !EXCLUDED_DATA_TABLES.contains(dt.getName()))
+                .filter(dt -> !EXCLUDED_DATA_TABLES.contains(dt.getName()))
                 .collect(toList());
         if (filtered.isEmpty()) {
             return "";
@@ -243,7 +247,7 @@ public class RecipeMarketplaceWriter {
     private boolean hasAnyDataTables(RecipeMarketplace.Category category) {
         for (RecipeListing recipe : category.getRecipes()) {
             for (DataTableDescriptor dt : recipe.getDataTables()) {
-                if (dt.getName() != null && !EXCLUDED_DATA_TABLES.contains(dt.getName())) {
+                if (!EXCLUDED_DATA_TABLES.contains(dt.getName())) {
                     return true;
                 }
             }

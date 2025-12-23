@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
@@ -108,7 +109,7 @@ public class RecipeDescriptor {
             }
 
             if (!part.isEmpty()) {
-                String capitalized = Character.toUpperCase(part.charAt(0)) + part.substring(1);
+                @Language("markdown") String capitalized = Character.toUpperCase(part.charAt(0)) + part.substring(1);
                 categories.add(new CategoryDescriptor(capitalized, partialPackage, "", emptySet(),
                         false, 0, false));
             }

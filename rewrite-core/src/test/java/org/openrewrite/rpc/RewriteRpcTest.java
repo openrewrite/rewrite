@@ -104,7 +104,7 @@ class RewriteRpcTest implements RewriteTest {
     @Test
     void getMarketplace() {
         assertThat(client.getMarketplace(new RecipeBundle("maven",
-          "org.openrewrite:rewrite-core", "LATEST", null)).getAllRecipes()).isNotEmpty();
+          "org.openrewrite:rewrite-core", "LATEST", null,null)).getAllRecipes()).isNotEmpty();
     }
 
     @Test
