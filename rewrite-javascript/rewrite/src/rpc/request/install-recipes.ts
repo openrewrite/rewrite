@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
-import {RecipeRegistry} from "../../recipe";
 import * as path from "path";
 import * as fs from "fs";
 import {spawn} from "child_process";
 import {withMetrics} from "./metrics";
+import {RecipeMarketplace} from "../../marketplace";
 
 export interface InstallRecipesResponse {
     recipesInstalled: number
+    version?: string
 }
 
 /**
@@ -68,7 +69,7 @@ export class InstallRecipes {
     constructor(private readonly recipes: string | { packageName: string, version?: string }) {
     }
 
-    static handle(connection: rpc.MessageConnection, installDir: string, registry: RecipeRegistry,
+    static handle(connection: rpc.MessageConnection, installDir: string, marketplace: RecipeMarketplace,
                   logger?: rpc.Logger, metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"),
@@ -77,10 +78,11 @@ export class InstallRecipes {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = typeof request.recipes === "object" ? request.recipes.packageName : request.recipes;
-                    const beforeInstall = registry.all.size;
+                    const beforeInstall = marketplace.allRecipes().length;
                     let resolvedPath;
                     let recipesName = request.recipes;
 
+                    let installedVersion: string | undefined;
                     if (typeof request.recipes === "object") {
                         const recipePackage = request.recipes;
                         const absoluteInstallDir = path.isAbsolute(installDir) ? installDir : path.join(process.cwd(), installDir);
@@ -112,6 +114,13 @@ export class InstallRecipes {
                         await spawnNpmCommand("npm", ["install", packageSpec, "--no-fund"], absoluteInstallDir, logger);
                         resolvedPath = require.resolve(path.join(absoluteInstallDir, "node_modules", recipePackage.packageName));
                         recipesName = request.recipes.packageName;
+
+                        // Read the installed package's version from its package.json
+                        const installedPackageJsonPath = path.join(absoluteInstallDir, "node_modules", recipePackage.packageName, "package.json");
+                        if (fs.existsSync(installedPackageJsonPath)) {
+                            const installedPackageJson = JSON.parse(fs.readFileSync(installedPackageJsonPath, "utf8"));
+                            installedVersion = installedPackageJson.version;
+                        }
                     } else {
                         resolvedPath = request.recipes;
                     }
@@ -130,7 +139,7 @@ export class InstallRecipes {
 
                     if (typeof recipeModule.activate === "function") {
                         // noinspection JSVoidFunctionReturnValueUsed
-                        const activatePromise = recipeModule.activate(registry);
+                        const activatePromise = recipeModule.activate(marketplace);
                         // noinspection SuspiciousTypeOfGuard
                         if (activatePromise instanceof Promise) {
                             await activatePromise;
@@ -139,7 +148,10 @@ export class InstallRecipes {
                         throw new Error(`${recipesName} does not export an 'activate' function`);
                     }
 
-                    return {recipesInstalled: registry.all.size - beforeInstall};
+                    return {
+                        recipesInstalled: marketplace.allRecipes().length - beforeInstall,
+                        version: installedVersion
+                    };
                 }
             )
         );
@@ -182,7 +194,7 @@ function preloadCoreModules(logger?: rpc.Logger) {
  * same package is installed in multiple node_modules directories.
  */
 function setupSharedDependencies(targetModulePath: string, logger?: rpc.Logger) {
-    const sharedDeps = ['@openrewrite/rewrite', 'vscode-jsonrpc'];
+    const sharedDeps = ['@openrewrite/rewrite', 'vscode-jsonrpc', 'mutative'];
     const targetDir = path.dirname(targetModulePath);
 
     sharedDeps.forEach(depName => {

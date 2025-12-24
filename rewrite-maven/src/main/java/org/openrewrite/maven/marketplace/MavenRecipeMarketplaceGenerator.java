@@ -15,11 +15,8 @@
  */
 package org.openrewrite.maven.marketplace;
 
-import org.openrewrite.config.ClasspathScanningLoader;
-import org.openrewrite.config.Environment;
-import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.marketplace.RecipeBundle;
-import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeClassLoader;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.marketplace.RecipeMarketplaceWriter;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -32,10 +29,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
-
-import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 
 public class MavenRecipeMarketplaceGenerator {
     private final GroupArtifactVersion gav;
@@ -49,49 +42,22 @@ public class MavenRecipeMarketplaceGenerator {
     }
 
     public RecipeMarketplace generate() {
-        try {
-            if (Files.notExists(recipeJar)) {
-                throw new IllegalArgumentException("Recipe JAR does not exist " + recipeJar);
-            }
-
-            // First pass: Scan only the target jar for recipes (using scanJar with jar name filter)
-            // This gives us the correct set of recipes but without root categories
-            Environment env1 = Environment.builder()
-                    .scanJar(
-                            recipeJar.toAbsolutePath(),
-                            classpath.stream().map(Path::toAbsolutePath).collect(toList()),
-                            RecipeClassLoader.forScanning(recipeJar, classpath)
-                    )
-                    .build();
-
-            // Collect recipe names from first pass
-            List<String> targetRecipeNames = env1.listRecipeDescriptors().stream()
-                    .map(RecipeDescriptor::getName)
-                    .collect(toList());
-
-            // Second pass: Scan all jars in classpath for recipes and categories
-            // This gives us proper root categories from category YAMLs.
-            Environment env2 = Environment.builder()
-                    .load(new ClasspathScanningLoader(new Properties(), new RecipeClassLoader(recipeJar, classpath)))
-                    .build();
-
-            RecipeMarketplace marketplace = new RecipeMarketplace();
-            for (RecipeDescriptor descriptor : env2.listRecipeDescriptors()) {
-                // Only include recipes that were found in the first pass (i.e., from target jar)
-                if (!targetRecipeNames.contains(descriptor.getName())) {
-                    continue;
-                }
-                marketplace.install(
-                        RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
-                                "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                                requireNonNull(gav.getVersion()), null)),
-                        descriptor.inferCategoriesFromName(env2)
-                );
-            }
-            return marketplace;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to generate marketplace for " + gav, e);
+        if (Files.notExists(recipeJar)) {
+            throw new IllegalArgumentException("Recipe JAR does not exist " + recipeJar);
         }
+
+        @SuppressWarnings("DataFlowIssue") MavenRecipeBundleReader bundleReader = new MavenRecipeBundleReader(
+                new RecipeBundle("maven", gav.getGroupId() + ":" + gav.getArtifactId(),
+                        gav.getVersion(), gav.getVersion(), null),
+                // Since we're going to directly set recipeJar and classpath, we can get away with this
+                null, null,
+                RecipeClassLoader::new
+        );
+
+        bundleReader.recipeJar = recipeJar;
+        bundleReader.classpath = classpath;
+
+        return bundleReader.read();
     }
 
     /**

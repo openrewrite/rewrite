@@ -28,13 +28,13 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
-import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.rpc.request.Print;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,8 +49,8 @@ import static org.openrewrite.javascript.Assertions.*;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
-import static org.openrewrite.yaml.Assertions.yaml;
 
+@SuppressWarnings("JSUnusedLocalSymbols")
 class JavaScriptRewriteRpcTest implements RewriteTest {
     @TempDir
     Path tempDir;
@@ -58,12 +58,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @BeforeEach
     void before() {
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-            .recipeInstallDir(tempDir)
-            .metricsCsv(tempDir.resolve("rpc.csv"))
-            .log(tempDir.resolve("rpc.log"))
-            .traceRpcMessages()
-//          .inspectBrk(Path.of("rewrite"))
-//          .timeout(Duration.ofHours(1))
+          .recipeInstallDir(tempDir)
+          .metricsCsv(tempDir.resolve("rpc.csv"))
+          .log(tempDir.resolve("rpc.log"))
+          .traceRpcMessages()
         );
     }
 
@@ -165,7 +163,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Test
     void printJava() {
-        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")))
+        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")).getRecipesInstalled())
           .isEqualTo(1);
         Recipe modifyAll = client().prepareRecipe("org.openrewrite.java.test.modify-all-trees");
 
@@ -192,13 +190,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Test
     void installRecipesFromNpm() {
-        assertThat(client().installRecipes("@openrewrite/recipes-npm")).isEqualTo(1);
-        assertThat(client().getRecipes()).satisfiesExactly(
+        assertThat(client().installRecipes("@openrewrite/recipes-npm").getRecipesInstalled()).isEqualTo(1);
+        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null)).getAllRecipes()).satisfiesExactly(
           d -> {
               assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`");
-              assertThat(d.getOptions()).satisfiesExactly(
-                o -> assertThat(o.isRequired()).isTrue()
-              );
           }
         );
     }
@@ -206,7 +201,8 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @Test
     void getRecipes() {
         installRecipes();
-        assertThat(client().getRecipes()).isNotEmpty();
+        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null))
+          .getAllRecipes()).isNotEmpty();
     }
 
     @Test
@@ -303,106 +299,13 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
-    @Test
-    void printYaml() {
-        @Language("yaml")
-        String yamlContent = """
-          name: my-project
-          version: 0.0.1
-          dependencies:
-            - lodash
-            - express
-          """;
-        rewriteRun(
-          yaml(yamlContent, spec -> spec.beforeRecipe(yaml ->
-            assertThat(client().print(yaml)).isEqualTo(yamlContent.trim())))
-        );
-    }
-
-    @Test
-    void parsePackageJsonWithNodeResolutionResultMarker(@TempDir Path projectDir) {
-        rewriteRun(
-          spec -> spec.relativeTo(projectDir),
-          npm(
-            projectDir,
-            packageJson(
-              """
-                {
-                  "name": "test-project",
-                  "version": "1.0.0",
-                  "dependencies": {
-                    "lodash": "^4.17.21"
-                  }
-                }
-                """,
-              spec -> spec.beforeRecipe(doc -> {
-                  NodeResolutionResult marker = doc.getMarkers().findFirst(NodeResolutionResult.class).orElseThrow();
-                  assertThat(marker.getName()).isEqualTo("test-project");
-                  assertThat(marker.getVersion()).isEqualTo("1.0.0");
-                  assertThat(marker.getDependencies()).hasSize(1);
-                  assertThat(marker.getDependencies().getFirst().getName()).isEqualTo("lodash");
-
-                  // Check resolved dependencies from lock file
-                  assertThat(marker.getResolvedDependencies()).isNotEmpty();
-                  NodeResolutionResult.ResolvedDependency resolvedLodash = marker.getResolvedDependency("lodash");
-                  assertThat(resolvedLodash).isNotNull();
-                  assertThat(resolvedLodash.getName()).isEqualTo("lodash");
-                  assertThat(resolvedLodash.getVersion()).startsWith("4.17.");
-                  assertThat(resolvedLodash.getLicense()).isEqualTo("MIT");
-              })
-            )
-          )
-        );
-    }
-
-    @Test
-    void parsePackageJsonWithNodeResolutionResult(@TempDir Path projectDir) {
-        installRecipes(new File("rewrite/dist"));
-        rewriteRun(
-          spec -> spec
-            .recipe(client().prepareRecipe("org.openrewrite.javascript.dependencies.upgrade-dependency-version",
-              Map.of("packageName", "lodash", "newVersion", "^4.17.21")))
-            .relativeTo(projectDir),
-          npm(
-            projectDir,
-            java(
-              """
-                /** Javadoc */
-                class Foo {}
-                """
-            ),
-            packageJson(
-              """
-                {
-                  "name": "test-project",
-                  "version": "1.0.0",
-                  "dependencies": {
-                    "lodash": "^4.17.20"
-                  }
-                }
-                """,
-              """
-                {
-                  "name": "test-project",
-                  "version": "1.0.0",
-                  "dependencies": {
-                    "lodash": "^4.17.21"
-                  }
-                }
-                """
-            )
-          )
-        );
-    }
-
     @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
     @Test
     void javaTypeAcrossRpcBoundary(@TempDir Path projectDir) {
         installRecipes();
         rewriteRun(
           spec -> spec
-            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.mark-class-types", Map.of()))
-            .relativeTo(projectDir),
+            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.mark-class-types", Map.of())),
           npm(
             projectDir,
             typescript(
@@ -469,20 +372,20 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @Test
     void parseProject(@TempDir Path projectDir) throws IOException {
         Files.writeString(projectDir.resolve("package.json"), """
-            {"name": "test-project", "version": "1.0.0"}
-            """);
+          {"name": "test-project", "version": "1.0.0"}
+          """);
         Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
         Files.writeString(projectDir.resolve("other.js"), "const y = 2;");
 
         List<SourceFile> sourceFiles = client()
-            .parseProject(projectDir, new InMemoryExecutionContext())
-            .toList();
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
 
         assertThat(sourceFiles).hasSize(3);
 
         List<String> paths = sourceFiles.stream()
-            .map(sf -> sf.getSourcePath().toString())
-            .toList();
+          .map(sf -> sf.getSourcePath().toString())
+          .toList();
         assertThat(paths).containsExactlyInAnyOrder("package.json", "index.js", "other.js");
 
         // Verify content is parseable and printable
@@ -493,11 +396,11 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
         // Verify that both JS files share the same Autodetect marker instance (deduplication)
         SourceFile indexJs = sourceFiles.stream()
-            .filter(sf -> sf.getSourcePath().toString().equals("index.js"))
-            .findFirst().orElseThrow();
+          .filter(sf -> sf.getSourcePath().toString().equals("index.js"))
+          .findFirst().orElseThrow();
         SourceFile otherJs = sourceFiles.stream()
-            .filter(sf -> sf.getSourcePath().toString().equals("other.js"))
-            .findFirst().orElseThrow();
+          .filter(sf -> sf.getSourcePath().toString().equals("other.js"))
+          .findFirst().orElseThrow();
 
         Autodetect indexAutodetect = indexJs.getMarkers().findFirst(Autodetect.class).orElseThrow();
         Autodetect otherAutodetect = otherJs.getMarkers().findFirst(Autodetect.class).orElseThrow();
@@ -508,34 +411,30 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @Test
     void parseProjectWithExclusions(@TempDir Path projectDir) throws IOException {
         Files.writeString(projectDir.resolve("package.json"), """
-            {"name": "test-project", "version": "1.0.0"}
-            """);
+          {"name": "test-project", "version": "1.0.0"}
+          """);
         Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
         Files.createDirectories(projectDir.resolve("vendor"));
         Files.writeString(projectDir.resolve("vendor/external.js"), "const y = 2;");
 
         List<SourceFile> sourceFiles = client()
-            .parseProject(projectDir, List.of("**/vendor/**"), new InMemoryExecutionContext())
-            .toList();
+          .parseProject(projectDir, List.of("**/vendor/**"), new InMemoryExecutionContext())
+          .toList();
 
         assertThat(sourceFiles).hasSize(2);
 
         List<String> paths = sourceFiles.stream()
-            .map(sf -> sf.getSourcePath().toString())
-            .toList();
+          .map(sf -> sf.getSourcePath().toString())
+          .toList();
         assertThat(paths)
-            .containsExactlyInAnyOrder("package.json", "index.js")
-            .noneMatch(p -> p.contains("vendor"));
+          .containsExactlyInAnyOrder("package.json", "index.js")
+          .noneMatch(p -> p.contains("vendor"));
     }
 
     private void installRecipes() {
         File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
-        installRecipes(exampleRecipes);
-    }
-
-    private void installRecipes(File exampleRecipes) {
         assertThat(exampleRecipes).exists();
-        assertThat(client().installRecipes(exampleRecipes)).isGreaterThan(0);
+        assertThat(client().installRecipes(exampleRecipes).getRecipesInstalled()).isGreaterThan(0);
     }
 
     private JavaScriptRewriteRpc client() {

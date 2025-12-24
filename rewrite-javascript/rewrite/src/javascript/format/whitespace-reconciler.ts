@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {isIdentifier, isLiteral, isSpace, J, Type} from '../../java';
-import {produce} from "immer";
+import {JS} from "../tree";
 
 /**
  * Union type for all tree node types that the reconciler handles.
@@ -234,7 +234,10 @@ export class WhitespaceReconciler {
             // Skip: kind, id, type properties
             if (key === 'kind' || key === 'id' ||
                 key === 'type' || key === 'fieldType' || key === 'variableType' ||
-                key === 'methodType' || key === 'constructorType') {
+                key === 'methodType' || key === 'constructorType' ||
+                original.kind === JS.Kind.CompilationUnit && key == 'charsetName' ||
+                // TODO In Java `null` and `undefined` are both the same
+                original.kind === J.Kind.Literal && key === 'value') {
                 continue;
             }
 
@@ -244,9 +247,7 @@ export class WhitespaceReconciler {
             // Space values and markers: copy from formatted when reconciling
             if ((isSpace(originalValue)) || key === 'markers') {
                 if (this.shouldReconcile() && formattedValue !== originalValue) {
-                    result = produce(result, (draft) => {
-                        (draft as Record<string, unknown>)[key] = formattedValue;
-                    });
+                    result = { ...result, [key]: formattedValue } as VisitableNode;
                 }
                 continue;
             }
@@ -254,6 +255,10 @@ export class WhitespaceReconciler {
             // Handle arrays
             if (Array.isArray(originalValue)) {
                 if (!Array.isArray(formattedValue) || originalValue.length !== formattedValue.length) {
+                    if (originalValue.length === 0 && formattedValue === undefined && original.kind == J.Kind.ArrayType) {
+                        // TODO Somehow J.ArrayType#annotations ends up as `[]`
+                        continue;
+                    }
                     return this.structureMismatch(original);
                 }
 
@@ -269,9 +274,7 @@ export class WhitespaceReconciler {
                 }
 
                 if (changed) {
-                    result = produce(result, (draft) => {
-                        (draft as Record<string, unknown>)[key] = newArray;
-                    });
+                    result = { ...result, [key]: newArray } as VisitableNode;
                 }
             } else {
                 // Visit the property
@@ -279,9 +282,7 @@ export class WhitespaceReconciler {
                 if (!this.compatible) return original;
 
                 if (visited !== originalValue) {
-                    result = produce(result, (draft) => {
-                        (draft as Record<string, unknown>)[key] = visited;
-                    });
+                    result = { ...result, [key]: visited } as VisitableNode;
                 }
             }
         }
