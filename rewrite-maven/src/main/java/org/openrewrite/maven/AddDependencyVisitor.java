@@ -93,6 +93,13 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                 groupId.equals(tag.getChildValue("groupId").orElse(null)) &&
                 artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
             getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "alreadyHasDependency", true);
+            Scope existingScope = Scope.fromName(tag.getChildValue("scope").orElse(null));
+            getCursor().putMessageOnFirstEnclosing(
+                    Xml.Document.class,
+                    "existingDependencyScopeGreaterOrEqual",
+                    Scope.fromName(scope).isInClasspathOf(existingScope) &&
+                            Scope.maxPrecedence(existingScope, Scope.fromName(scope)) == existingScope
+            );
             return tag;
         }
         return super.visitTag(tag, executionContext);
@@ -104,7 +111,11 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
         Xml.Document maven = super.visitDocument(document, executionContext);
 
         if (getCursor().getMessage("alreadyHasDependency", false)) {
-            return document;
+            if (getCursor().getMessage("existingDependencyScopeGreaterOrEqual", false)) {
+                return document;
+            }
+            Xml.Document updatedMaven = (Xml.Document) new ChangeDependencyScope(groupId, artifactId, scope).getVisitor().visitNonNull(maven, executionContext);
+            return (Xml.Document) new UpgradeDependencyVersion(groupId, artifactId, version, versionPattern, null, null).getVisitor().visitNonNull(updatedMaven, executionContext);
         }
 
         Scope resolvedScope = scope == null ? Scope.Compile : Scope.fromName(scope);
