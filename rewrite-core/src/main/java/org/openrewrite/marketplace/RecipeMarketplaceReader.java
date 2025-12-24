@@ -41,6 +41,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptySet;
+
 public class RecipeMarketplaceReader {
     private static final ObjectMapper JSON_MAPPER = JsonMapper.builder()
             .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
@@ -270,7 +272,7 @@ public class RecipeMarketplaceReader {
                     catDisplayName,
                     "", // packageName not used for marketplace categories
                     catDescription,
-                    Collections.emptySet(),
+                    emptySet(),
                     false,
                     CategoryDescriptor.LOWEST_PRECEDENCE,
                     true // synthetic

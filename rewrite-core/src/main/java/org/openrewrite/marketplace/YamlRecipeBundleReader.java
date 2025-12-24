@@ -23,11 +23,11 @@ import org.openrewrite.config.YamlResourceLoader;
 
 import java.io.InputStream;
 import java.net.URI;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
 
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.singleton;
 
 public class YamlRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
@@ -60,7 +60,7 @@ public class YamlRecipeBundleReader implements RecipeBundleReader {
 
     @Override
     public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
-        return new Environment(Collections.singleton(yamlLoader))
+        return new Environment(singleton(yamlLoader))
                 .activateRecipes(listing.getName());
     }
 }
