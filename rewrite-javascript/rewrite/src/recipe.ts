@@ -102,7 +102,8 @@ export abstract class Recipe {
                 value: (this as any)[key],
                 required: descriptor.required ?? true,
                 ...descriptor
-            }))
+            })),
+            dataTables: this.dataTables
         }
     }
 
@@ -136,6 +137,7 @@ export interface RecipeDescriptor {
     readonly estimatedEffortPerOccurrence: Minutes
     readonly recipeList: RecipeDescriptor[]
     readonly options: ({ name: string, value?: any } & OptionDescriptor)[]
+    readonly dataTables: DataTableDescriptor[]
 }
 
 export interface OptionDescriptor {
