@@ -15,20 +15,12 @@
  */
 package org.openrewrite.maven.marketplace;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.ClasspathScanningLoader;
 import org.openrewrite.config.Environment;
-import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.marketplace.*;
 import org.openrewrite.maven.tree.*;
@@ -36,9 +28,11 @@ import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -46,6 +40,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
 public class MavenRecipeBundleReader implements RecipeBundleReader {
@@ -57,16 +52,17 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private final RecipeClassLoaderFactory classLoaderFactory;
 
     private transient @Nullable Environment environment;
-    private transient @Nullable Path recipeJar;
-    private transient @Nullable List<Path> classpath;
+    transient @Nullable Path recipeJar;
+    transient @Nullable List<Path> classpath;
     private transient @Nullable ClassLoader classLoader;
 
     @Override
     public RecipeMarketplace read() {
         if (recipeJar == null) {
             for (ResolvedDependency resolvedDependency : mrr.getDependencies().get(Scope.Runtime)) {
-                if (resolvedDependency.isDirect() && recipeJar != null) {
+                if (isResolvedBundle(resolvedDependency)) {
                     recipeJar = downloader.downloadArtifact(resolvedDependency);
+                    break;
                 }
             }
             if (recipeJar != null) {
@@ -74,7 +70,15 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                     JarEntry entry = jarFile.getJarEntry("META-INF/rewrite/recipes.csv");
                     if (entry != null) {
                         try (InputStream recipesCsv = jarFile.getInputStream(entry)) {
-                            return new RecipeMarketplaceReader().fromCsv(recipesCsv);
+                            RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(recipesCsv);
+                            for (RecipeListing recipe : marketplace.getAllRecipes()) {
+                                // The recipes.csv inside a JAR may be generated without a version,
+                                // since the version of a published Maven artifact is determined at
+                                // publish time if the artifact is a snapshot. Having resolved the
+                                // JAR containing the recipes.csv, we now know the version.
+                                recipe.getBundle().setVersion(bundle.getVersion());
+                            }
+                            return marketplace;
                         }
                     }
                 } catch (IOException e) {
@@ -92,16 +96,32 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
      */
     private RecipeMarketplace marketplaceFromClasspathScan() {
         String[] ga = bundle.getPackageName().split(":");
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        List<Path> classpath = classpath();
+        RecipeClassLoader classLoader = new RecipeClassLoader(requireNonNull(recipeJar), classpath);
+
+        // First pass: Scan only the recipe jar for recipes and don't list recipes from dependencies
+        Environment env = Environment.builder().scanJar(
+                requireNonNull(recipeJar).toAbsolutePath(),
+                classpath.stream().map(Path::toAbsolutePath).collect(toList()),
+                classLoader
+        ).build();
+
+        // Second pass: Scan all jars in classpath for recipes and categories
+        // This gives us proper root categories from category YAMLs.
+        Environment envWithCategories = environment();
+
+        // Bundle version may be set in the environment() call above (as the JARs making up
+        // the classpath are resolved)
         GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
 
-        RecipeMarketplace marketplace = new RecipeMarketplace();
-        Environment env = environment();
         for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
             marketplace.install(
                     RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
                             "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                            requireNonNull(gav.getVersion()), null)),
-                    descriptor.inferCategoriesFromName(env)
+                            bundle.getRequestedVersion() == null ? gav.getVersion() : bundle.getRequestedVersion(),
+                            gav.getVersion(), null)),
+                    descriptor.inferCategoriesFromName(envWithCategories)
             );
         }
         return marketplace;
@@ -115,7 +135,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     @Override
     public Recipe prepare(RecipeListing listing, @Nullable Map<String, Object> options) {
         Recipe r = environment().activateRecipes(listing.getName());
-        return applyOptions(r, options);
+        return r.withOptions(options);
     }
 
     private Environment environment() {
@@ -141,16 +161,16 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         if (classpath == null) {
             classpath = new ArrayList<>();
             for (ResolvedDependency resolvedDependency : mrr.getDependencies().get(Scope.Runtime)) {
+                if (recipeJar != null && isResolvedBundle(resolvedDependency)) {
+                    // recipeJar may be non-null if the listRecipes() method was previously
+                    // used and the recipe JAR contains a recipes.csv that didn't necessitate
+                    // the whole classpath to be scanned.
+                    classpath.add(recipeJar);
+                    continue;
+                }
                 Lock lock = DEPENDENCY_LOCKS.computeIfAbsent(resolvedDependency.getGav(), g -> new ReentrantLock());
                 lock.lock();
                 try {
-                    if (resolvedDependency.isDirect() && recipeJar != null) {
-                        // recipeJar may be non-null if the listRecipes() method was previously
-                        // used and the recipe JAR contains a recipes.csv that didn't necessitate
-                        // the whole classpath to be scanned.
-                        classpath.add(recipeJar);
-                        continue;
-                    }
                     Path path = downloader.downloadArtifact(resolvedDependency);
                     if (path == null) {
                         throw new IllegalStateException("Unable to download dependency " + resolvedDependency.getGav());
@@ -167,37 +187,8 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         return classpath;
     }
 
-    private <R extends Recipe> R applyOptions(R recipe, @Nullable Map<String, Object> options) {
-        Map<String, Object> m = new HashMap<>();
-        m.put("@c", recipe.getName());
-        ObjectMapper objectMapper = JsonMapper.builder()
-                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
-                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
-                .configure(MapperFeature.PROPAGATE_TRANSIENT_MARKER, true)
-                .build()
-                .registerModule(new ParameterNamesModule())
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        // This is necessary to allow setting options like `FindTags#xPath`, as Jackson otherwise only sees a `xpath`
-        // property, which it derives from the `getXPath()` method generated by Lombok
-        objectMapper.setVisibility(objectMapper.getSerializationConfig().getDefaultVisibilityChecker()
-                .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
-        try {
-            //noinspection unchecked
-            R clone = (R) recipe.clone();
-            if (options != null) {
-                m.putAll(options);
-                for (OptionDescriptor optionDescriptor : clone.getDescriptor().getOptions()) {
-                    Object value = options.get(optionDescriptor.getName());
-                    if (value instanceof String) {
-                        Map<String, Object> option = new HashMap<>();
-                        option.put("value", value);
-                        objectMapper.updateValue(optionDescriptor, option);
-                    }
-                }
-            }
-            return objectMapper.updateValue(clone, m);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    private boolean isResolvedBundle(ResolvedDependency resolvedDependency) {
+        return resolvedDependency.isDirect() && bundle.getPackageName()
+                .equals(resolvedDependency.getGroupId() + ":" + resolvedDependency.getArtifactId());
     }
 }

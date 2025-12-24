@@ -16,16 +16,24 @@
  * limitations under the License.
  */
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, RecipeRegistry, rootCursor} from "@openrewrite/rewrite";
-import {RewriteRpc} from "@openrewrite/rewrite/rpc";
-import {PlainText, text} from "@openrewrite/rewrite/text";
-import {json} from "@openrewrite/rewrite/json";
-import {RecipeSpec} from "@openrewrite/rewrite/test";
+import {Cursor, RecipeMarketplace, rootCursor} from "../../src";
+import {RewriteRpc} from "../../src/rpc/rewrite-rpc";
+import {PlainText, text} from "../../src/text";
+import {json, Json} from "../../src/json";
+import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
-import {javascript, JavaScriptVisitor, JS, npm, packageJson, typescript} from "@openrewrite/rewrite/javascript";
-import {J} from "@openrewrite/rewrite/java";
+import {
+    findNodeResolutionResult,
+    javascript,
+    JavaScriptVisitor,
+    JS,
+    npm,
+    packageJson,
+    typescript
+} from "../../src/javascript";
+import {J} from "../../src/java";
 import {withDir} from "tmp-promise";
 
 describe("Rewrite RPC", () => {
@@ -51,10 +59,10 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageReader(clientToServer),
             new rpc.StreamMessageWriter(serverToClient)
         );
-        const registry = new RecipeRegistry();
-        activate(registry as any);
+        const marketplace = new RecipeMarketplace();
+        await activate(marketplace);
         server = new RewriteRpc(serverConnection, {
-            registry: registry
+            marketplace: marketplace
         });
     });
 
@@ -99,8 +107,31 @@ describe("Rewrite RPC", () => {
         return sourceFile;
     });
 
-    test("getRecipes", async () =>
-        expect((await client.recipes()).length).toBeGreaterThan(0)
+    test("parse package.json with PackageJsonParser", async () => {
+        // Parser type is automatically detected from the file path
+        const sourceFile = (await client.parse([{
+            text: JSON.stringify({
+                name: "test-project",
+                version: "1.0.0",
+                dependencies: {
+                    "lodash": "^4.17.21"
+                }
+            }, null, 2),
+            sourcePath: "package.json"
+        }], Json.Kind.Document))[0];
+        expect(sourceFile.kind).toEqual(Json.Kind.Document);
+        expect(sourceFile.sourcePath).toEqual("package.json");
+        // Check that the NodeResolutionResult marker is attached
+        const marker = findNodeResolutionResult(sourceFile as Json.Document);
+        expect(marker).toBeDefined();
+        expect(marker!.name).toEqual("test-project");
+        expect(marker!.version).toEqual("1.0.0");
+        expect(marker!.dependencies).toHaveLength(1);
+        expect(marker!.dependencies[0].name).toEqual("lodash");
+    });
+
+    test("getMarketplace", async () =>
+        expect((await client.marketplace()).allRecipes().length).toBeGreaterThan(0)
     );
 
     test("prepareRecipe", async () => {
@@ -109,7 +140,8 @@ describe("Rewrite RPC", () => {
         expect(recipe.instanceName()).toEqual("Change text to 'hello'");
     });
 
-    test("installRecipes", async () => {
+    // TODO: Re-enable once @openrewrite/recipes-npm is updated to use RecipeMarketplace API
+    test.skip("installRecipes", async () => {
         const installed = await client.installRecipes(
             {packageName: "@openrewrite/recipes-npm"}
         );
@@ -181,6 +213,16 @@ describe("Rewrite RPC", () => {
                 ),
                 path: "hello.txt"
             }
+        );
+    });
+
+    test("runScanningRecipeThatEdits", async () => {
+        // This test verifies that the accumulator from the scanning phase
+        // is correctly passed to the editor phase over RPC.
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.scanning-editor");
+        await spec.rewriteRun(
+            text("file1", "file1 (count: 2)"),
+            text("file2", "file2 (count: 2)")
         );
     });
 

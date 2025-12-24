@@ -209,6 +209,66 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/6406")
+    @Test
+    void shouldNotAddNewIfDependencyAlreadyExists2() {
+        rewriteRun(
+          spec -> spec.recipes(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.X",
+            null
+          ), new ChangeDependencyGroupIdAndArtifactId(
+            "com.google.guava",
+            "guava",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.X",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>23.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                          <version>1.2.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.2</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void shouldAddNewIfDependencyAlreadyExistsInOlderVersion() {
@@ -1726,6 +1786,74 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                                       <version>1.2.0</version>
                                   </dependency>
                               </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeAnnotationProcessorPathGroupIdAndArtifactId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.hibernate",
+            "hibernate-jpamodelgen",
+            "org.hibernate.orm",
+            "hibernate-processor",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.14.1</version>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.hibernate</groupId>
+                                          <artifactId>hibernate-jpamodelgen</artifactId>
+                                          <version>7.1.10.Final</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.14.1</version>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.hibernate.orm</groupId>
+                                          <artifactId>hibernate-processor</artifactId>
+                                          <version>7.1.10.Final</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
                           </plugin>
                       </plugins>
                   </build>

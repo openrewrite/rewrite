@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, Template, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {produceAsync} from "../../../src";
 
 describe('template2 replace', () => {
@@ -27,7 +27,7 @@ describe('template2 replace', () => {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 if (literal.valueSource === '1') {
                     // Use the new template API with tagged template literals
-                    return template`2`.apply(this.cursor, literal);
+                    return template`2`.apply(literal, this.cursor);
                 }
                 return literal;
             }
@@ -49,7 +49,7 @@ describe('template2 replace', () => {
                     });
 
                     // Use the new template API with tagged template literals and AST node substitution
-                    return template`${two}`.apply(this.cursor, literal);
+                    return template`${two}`.apply(literal, this.cursor);
                 }
                 return literal;
             }
@@ -67,8 +67,8 @@ describe('template2 replace', () => {
                     return await produceAsync(binary, async draft => {
 
                         draft.left = (await template`${binary.right}`.apply(
-                            this.cursor,
-                            binary
+                            binary,
+                            this.cursor
                         )) as Expression;
 
                     });
@@ -94,7 +94,7 @@ describe('template2 replace', () => {
 
                     // Use capture for late binding - myValue capture is looked up in the values map
                     const myValue = capture();
-                    return template`${myValue}`.apply(this.cursor, literal, new Map([[myValue, replacement]]));
+                    return template`${myValue}`.apply(literal, this.cursor, {values: new Map([[myValue, replacement]])});
                 }
                 return literal;
             }
@@ -112,9 +112,9 @@ describe('template2 replace', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await pat.match(method);
+                const match = await pat.match(method, this.cursor);
                 if (match) {
-                    return await tmpl.apply(this.cursor, method, match);
+                    return await tmpl.apply(method, this.cursor, {values: match});
                 }
                 return method;
             }
@@ -135,9 +135,9 @@ describe('template2 replace', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await pat.match(method);
+                const match = await pat.match(method, this.cursor);
                 if (match) {
-                    return await tmpl.apply(this.cursor, method, match);
+                    return await tmpl.apply(method, this.cursor, {values: match});
                 }
                 return method;
             }
@@ -157,9 +157,9 @@ describe('template2 replace', () => {
                 if ((method.name as J.Identifier).simpleName === 'oldMethod' && method.select) {
                     const select = capture();
                     return await template`${select}.newMethod()`.apply(
-                        this.cursor,
                         method,
-                        new Map([[select, method.select.element]])
+                        this.cursor,
+                        {values: new Map([[select, method.select.element]])}
                     );
                 }
                 return method;

@@ -38,7 +38,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
                 spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                     override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
                         if ((methodInvocation.name as J.Identifier).simpleName === 'isDate') {
-                            const m = await pat.match(methodInvocation);
+                            const m = await pat.match(methodInvocation, this.cursor);
                             if (m) {
                                 const importStyle = methodInvocation.select ? 'namespace' : 'named';
                                 matches.push(importStyle);
@@ -95,7 +95,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
                 spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                     override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
                         if ((methodInvocation.name as J.Identifier).simpleName === 'isArray') {
-                            const m = await pat.match(methodInvocation);
+                            const m = await pat.match(methodInvocation, this.cursor);
                             if (m) {
                                 matchFound = true;
                             }
@@ -148,7 +148,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
                 spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                     override async visitBinary(binary: J.Binary, _p: any): Promise<J | undefined> {
-                        const m = await pat.match(binary);
+                        const m = await pat.match(binary, this.cursor);
                         if (m) {
                             matchCount++;
                         }
@@ -197,7 +197,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
                 spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                     override async visitIdentifier(identifier: J.Identifier, _p: any): Promise<J | undefined> {
                         if (identifier.simpleName === 'x') {
-                            const m = await pat.match(identifier);
+                            const m = await pat.match(identifier, this.cursor);
                             if (m) {
                                 matchCount++;
                             }
@@ -245,7 +245,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
-                    const m = await pat.match(arrow);
+                    const m = await pat.match(arrow, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -275,7 +275,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
-                    const m = await pat.match(arrow);
+                    const m = await pat.match(arrow, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -305,7 +305,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
-                    const m = await pat.match(arrow);
+                    const m = await pat.match(arrow, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -340,7 +340,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitVariableDeclarations(vd: any, _p: any): Promise<any> {
-                    const m = await pat.match(vd);
+                    const m = await pat.match(vd, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -372,7 +372,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitVariableDeclarations(vd: any, _p: any): Promise<any> {
-                    const m = await pat.match(vd);
+                    const m = await pat.match(vd, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -404,7 +404,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitVariableDeclarations(vd: any, _p: any): Promise<any> {
-                    const m = await pat.match(vd);
+                    const m = await pat.match(vd, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -438,7 +438,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
-                    const m = await pat.match(arrow);
+                    const m = await pat.match(arrow, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -468,7 +468,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
-                    const m = await pat.match(arrow);
+                    const m = await pat.match(arrow, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -498,7 +498,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
-                    const m = await pat.match(arrow);
+                    const m = await pat.match(arrow, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -530,7 +530,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitIdentifier(identifier: J.Identifier, _p: any): Promise<J.Identifier | undefined> {
                     if (identifier.simpleName === 'undefined') {
-                        const m = await pat.match(identifier);
+                        const m = await pat.match(identifier, this.cursor);
                         if (m) {
                             matchCount++;
                         }
@@ -539,7 +539,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
                 }
 
                 protected async visitVoid(voidExpr: any, _p: any): Promise<any> {
-                    const m = await pat.match(voidExpr);
+                    const m = await pat.match(voidExpr, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -572,7 +572,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitIdentifier(identifier: J.Identifier, _p: any): Promise<J.Identifier | undefined> {
                     if (identifier.simpleName === 'undefined') {
-                        const m = await pat.match(identifier);
+                        const m = await pat.match(identifier, this.cursor);
                         if (m) {
                             matchCount++;
                         }
@@ -581,7 +581,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
                 }
 
                 protected async visitVoid(voidExpr: any, _p: any): Promise<any> {
-                    const m = await pat.match(voidExpr);
+                    const m = await pat.match(voidExpr, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -614,7 +614,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitLiteral(literal: J.Literal, _p: any): Promise<J.Literal | undefined> {
-                    const m = await pat.match(literal);
+                    const m = await pat.match(literal, this.cursor);
                     if (m) {
                         matchCount++;
                     }
@@ -646,7 +646,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitLiteral(literal: J.Literal, _p: any): Promise<J.Literal | undefined> {
-                    const m = await pat.match(literal);
+                    const m = await pat.match(literal, this.cursor);
                     if (m) {
                         matchCount++;
                     }

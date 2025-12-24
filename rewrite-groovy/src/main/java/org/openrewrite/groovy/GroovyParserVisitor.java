@@ -1748,7 +1748,7 @@ public class GroovyParserVisitor {
                     String value = sourceSubstring(cursor, delimiter.close);
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
-                    while (indexNextSign > 0 && source.charAt(indexNextSign - 1) == '\\') {
+                    while (isEscaped(indexNextSign, delimiter)) {
                         indexNextSign = source.indexOf("$", indexNextSign + 1);
                     }
                     if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
@@ -2751,7 +2751,7 @@ public class GroovyParserVisitor {
      */
     private boolean isEscaped(int index) {
         int backslashCount = 0;
-        while (index >= 0 && source.charAt(index) == '\\') {
+        while (index > 0 && source.charAt(index - 1) == '\\') {
             backslashCount++;
             index--;
         }
@@ -2759,15 +2759,52 @@ public class GroovyParserVisitor {
     }
 
     /**
+     * Determines if a $ character in a GString is escaped based on the delimiter type.
+     * For slashy strings, $$ escapes a dollar sign and $ followed by the closing delimiter is treated as literal.
+     * For other string types, backslash escaping is used.
+     */
+    private boolean isEscaped(int index, Delimiter delimiter) {
+        if (index < 0) {
+            return false;
+        }
+
+        // Slashy-type strings use different escaping: $$ for literal $ and $ before closing delimiter
+        if (delimiter.isSlashyStringDelimiter() || delimiter.isDollarSlashyStringDelimiter()) {
+            if (index + 1 < source.length()) {
+                if (source.charAt(index + 1) == '$') {
+                    return true; // $$ escapes a dollar sign
+                }
+                // For slashy strings (not dollar-slashy), $ before closing delimiter is also literal
+                return delimiter.isSlashyStringDelimiter() && source.startsWith(delimiter.close, index + 1);
+            }
+            return false;
+        }
+
+        // Regular strings use backslash escaping
+        return isEscaped(index);
+    }
+
+    /**
      * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
      * The cursor will not be moved.
      */
     private String sourceSubstring(int beginIndex, String untilDelim) {
-        int endIndex = source.indexOf(untilDelim, Math.max(beginIndex, cursor + untilDelim.length()));
-        // don't stop if last char is escaped.
-        // Fixed potential infinite loop by correctly handling escaped delimiters in the source string.
-        while (endIndex > 0 && isEscaped(endIndex - 1)) {
+        int fromIndex = Math.max(beginIndex, cursor + untilDelim.length());
+        int endIndex = source.indexOf(untilDelim, fromIndex);
+        if (endIndex < 0) {
+            throw new IllegalArgumentException(
+                "Couldn't find delimiter: " + untilDelim + " with fromIndex: " + fromIndex
+            );
+        }
+        // don't stop if the last char is escaped.
+        // Fixed a potential infinite loop by correctly handling escaped delimiters in the source string.
+        while (isEscaped(endIndex)) {
             endIndex = source.indexOf(untilDelim, endIndex + 1);
+        }
+        if (endIndex < 0) {
+            throw new IllegalArgumentException(
+                "Couldn't find unescaped delimiter: " + untilDelim + " with fromIndex: " + fromIndex
+            );
         }
         return source.substring(beginIndex, endIndex);
     }

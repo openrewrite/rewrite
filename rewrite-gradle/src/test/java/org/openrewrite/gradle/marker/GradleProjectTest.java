@@ -582,8 +582,108 @@ class GradleProjectTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeConstraint() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveConstraint(
+            List.of(new GroupArtifact("com.fasterxml.jackson.core", "jackson-databind")),
+            (original, updated) -> {
+                assertThat(updated).isNotSameAs(original);
+
+                GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
+                assertThat(implementation).isNotNull();
+
+                // Verify the constraint was removed
+                List<GradleDependencyConstraint> constraints = implementation.getConstraints();
+                assertThat(constraints).isNotNull();
+
+                GradleDependencyConstraint jacksonConstraint = constraints.stream()
+                  .filter(c -> "com.fasterxml.jackson.core".equals(c.getGroupId()) &&
+                    "jackson-databind".equals(c.getArtifactId()))
+                  .findFirst()
+                  .orElse(null);
+
+                assertThat(jacksonConstraint)
+                  .as("jackson-databind constraint should have been removed")
+                  .isNull();
+            }
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
+                  }
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeConstraintRequiredForResolution() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveConstraint(
+            List.of(new GroupArtifact("org.openrewrite", "rewrite-core")),
+            (original, updated) -> {
+                assertThat(updated).isNotSameAs(original);
+
+                GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
+                assertThat(implementation).isNotNull();
+
+                List<GradleDependencyConstraint> constraints = implementation.getConstraints();
+                assertThat(constraints).isNotNull();
+
+                GradleDependencyConstraint rewriteCoreConstraint = constraints.stream()
+                  .filter(c -> "org.openrewrite".equals(c.getGroupId()) &&
+                    "rewrite-core".equals(c.getArtifactId()))
+                  .findFirst()
+                  .orElse(null);
+
+                assertThat(rewriteCoreConstraint)
+                  .as("rewrite-core constraint should have been removed from marker")
+                  .isNull();
+
+                // When attempting resolution, it should fail with an exception because there's no version
+                GradleDependencyConfiguration runtimeClasspath = updated.getConfiguration("runtimeClasspath");
+                assertThat(runtimeClasspath).isNotNull();
+                assertThat(runtimeClasspath.getExceptionType())
+                  .as("Should have exception type set when resolution fails")
+                  .isNotNull();
+                assertThat(runtimeClasspath.getMessage())
+                  .as("Should have exception message")
+                  .isNotNull();
+            }
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  constraints {
+                      implementation("org.openrewrite:rewrite-core:8.56.0")
+                  }
+                  implementation("org.openrewrite:rewrite-core")
+              }
+              """
+          )
+        );
+    }
 }
 
+@SuppressWarnings("NullableProblems")
 @EqualsAndHashCode(callSuper = false)
 @Value
 class UpgradeDependencyInMarker extends Recipe {
@@ -604,7 +704,6 @@ class UpgradeDependencyInMarker extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        //noinspection NullableProblems
         return new TreeVisitor<>() {
             @Override
             @SneakyThrows
@@ -624,6 +723,7 @@ class UpgradeDependencyInMarker extends Recipe {
 
 @EqualsAndHashCode(callSuper = false)
 @Value
+@SuppressWarnings("NullableProblems")
 class RemoveDependency extends Recipe {
 
     List<GroupArtifact> gas;
@@ -651,7 +751,6 @@ class RemoveDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        //noinspection NullableProblems
         return new TreeVisitor<>() {
             @Override
             @SneakyThrows
@@ -665,6 +764,7 @@ class RemoveDependency extends Recipe {
     }
 }
 
+@SuppressWarnings("NullableProblems")
 @EqualsAndHashCode(callSuper = false)
 @Value
 class ChangeConstraint extends Recipe {
@@ -684,13 +784,45 @@ class ChangeConstraint extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        //noinspection NullableProblems
         return new TreeVisitor<>() {
             @Override
             @SneakyThrows
             public Tree visit(Tree tree, ExecutionContext ctx) {
                 GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
                 GradleProject updated = original.addOrUpdateConstraints(configToConstraint, ctx);
+                testAssertion.accept(original, updated);
+                return tree;
+            }
+        };
+    }
+}
+
+@SuppressWarnings("NullableProblems")
+@EqualsAndHashCode(callSuper = false)
+@Value
+class RemoveConstraint extends Recipe {
+
+    List<GroupArtifact> gas;
+    BiConsumer<GradleProject, GradleProject> testAssertion;
+
+    @Override
+    public String getDisplayName() {
+        return "Remove a constraint within the GradleProject marker";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Remove a constraint within the GradleProject marker. Makes no changes to the source file itself";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<>() {
+            @Override
+            @SneakyThrows
+            public Tree visit(Tree tree, ExecutionContext ctx) {
+                GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
+                GradleProject updated = original.removeConstraints(gas, ctx);
                 testAssertion.accept(original, updated);
                 return tree;
             }

@@ -15,7 +15,10 @@
  */
 package org.openrewrite.gradle;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -553,5 +556,40 @@ class GradleParserTest implements RewriteTest {
         assertThat(optionalSourceFile).isPresent();
         SourceFile sourceFile = optionalSourceFile.get();
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @ParameterizedTest
+    @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(
+          Parser.Input.fromString(groovy)
+        ), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    /**
+     * Produces a stream of test expressions like `def a = "\\${System.getProperty('user.name')}"`
+     */
+    static Stream<String> escapedBackslashesAndInterpolationInGStringParams() {
+        return Stream.of(
+            "1 + 1",
+            "System.getProperty('user.name')"
+        ).flatMap(exp ->
+            """
+            %s
+            "%s"
+            "${%s}"
+            "\\${%s}"
+            "\\\\${%s}"
+            "\\\\\\${%s}"
+            "${%s}\\\\"
+            "\\t${%s}"
+            "${%s}\\t"
+            """.lines().map(s -> ("def a = " + s).formatted(exp))
+        );
     }
 }

@@ -27,8 +27,8 @@ import java.util.Set;
 
 public class RemoveDuplicatePluginDeclarations extends Recipe {
 
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("//project/build/plugins");
-    private static final XPathMatcher PLUGIN_MANAGEMENT_PLUGINS_MATCHER = new XPathMatcher("//project/build/pluginManagement/plugins");
+    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
+    private static final XPathMatcher PLUGIN_MANAGEMENT_PLUGINS_MATCHER = new XPathMatcher("/project/build/pluginManagement/plugins");
 
     @Override
     public String getDisplayName() {

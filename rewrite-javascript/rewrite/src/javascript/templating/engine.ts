@@ -16,7 +16,7 @@
 import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
-import {produce} from 'immer';
+import {create as produce} from 'mutative';
 import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
@@ -136,7 +136,7 @@ class TemplateCache {
         // the same dependencies will automatically share the same workspace
         let workspaceDir: string | undefined;
         if (dependencies && Object.keys(dependencies).length > 0) {
-            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
         }
 
         // Prepend context statements for type attribution context
