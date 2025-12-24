@@ -1408,7 +1408,7 @@ class MavenPomDownloaderTest implements RewriteTest {
           .isNotEmpty()
           .extracting(ResolvedDependency::getClassifier)
           .doesNotContain("${boring-ssl-classifier}")
-          .anyMatch(""::equals)
+          .contains("")
           .anyMatch(c -> !"".equals(c));
     }
 }
