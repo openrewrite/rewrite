@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,7 +32,7 @@ describe('dependency workspace', () => {
             'lodash': '^4.17.21'
         };
 
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
 
         // Check workspace exists
         expect(fs.existsSync(workspaceDir)).toBe(true);
@@ -59,8 +59,8 @@ describe('dependency workspace', () => {
             'uuid': '^9.0.0'
         };
 
-        const workspace1 = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
-        const workspace2 = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+        const workspace1 = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
+        const workspace2 = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
 
         // Should return the same workspace directory
         expect(workspace1).toBe(workspace2);
@@ -70,8 +70,8 @@ describe('dependency workspace', () => {
         const deps1 = { 'lodash': '^4.17.21' };
         const deps2 = { 'uuid': '^9.0.0' };
 
-        const workspace1 = await DependencyWorkspace.getOrCreateWorkspace(deps1);
-        const workspace2 = await DependencyWorkspace.getOrCreateWorkspace(deps2);
+        const workspace1 = await DependencyWorkspace.getOrCreateWorkspace({dependencies: deps1});
+        const workspace2 = await DependencyWorkspace.getOrCreateWorkspace({dependencies: deps2});
 
         // Should return different workspace directories
         expect(workspace1).not.toBe(workspace2);
@@ -84,7 +84,7 @@ describe('dependency workspace', () => {
         };
 
         // Create a workspace directory with the dependencies
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
 
         // Create parser with workspace directory as relativeTo
         const parser = new JavaScriptParser({relativeTo: workspaceDir});

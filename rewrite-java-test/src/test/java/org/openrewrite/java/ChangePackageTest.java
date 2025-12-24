@@ -19,8 +19,10 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -29,6 +31,7 @@ import org.openrewrite.test.SourceSpec;
 import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.xml.Assertions.xml;
@@ -1789,4 +1792,43 @@ class ChangePackageTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void innerType() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangePackage("com.demo", "com.newdemo", true),
+            new ChangeType("com.newdemo.A.B", "some.thing.X.Y", true)
+          ).parser(JavaParser.fromJavaVersion().dependsOn(
+            """
+              package com.demo;
+              
+              public class A {
+                  public static class B {}
+              }
+              """
+          )),
+          java(
+            """
+              package app;
+              
+              import com.demo.A.B;
+
+              interface Test {
+                  B foo();
+              }
+              """,
+            """
+              package app;
+              
+              import some.thing.X.Y;
+
+              interface Test {
+                  Y foo();
+              }
+              """
+          )
+        );
+    }
+
 }

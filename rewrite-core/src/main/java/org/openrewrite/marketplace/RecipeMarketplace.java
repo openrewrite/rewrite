@@ -17,26 +17,25 @@ package org.openrewrite.marketplace;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.NlsRewrite;
+import org.openrewrite.config.CategoryDescriptor;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
-
-import static java.util.Collections.addAll;
+import java.util.*;
 
 @Incubating(since = "8.66.0")
 public class RecipeMarketplace {
-    private final @Getter Category root = new Category("Root");
+    private final @Getter Category root = new Category("Root",
+            "This is the root of all categories. " +
+            "When displaying the category hierarchy of a marketplace, " +
+            "this is typically not shown.");
+
     private final @Getter List<RecipeBundleResolver> resolvers = new ArrayList<>();
 
-    public RecipeMarketplace setResolvers(RecipeBundleResolver... resolvers) {
+    public RecipeMarketplace setResolvers(Collection<RecipeBundleResolver> resolvers) {
         this.resolvers.clear();
-        addAll(this.resolvers, resolvers);
+        this.resolvers.addAll(resolvers);
         return this;
     }
 
@@ -52,7 +51,7 @@ public class RecipeMarketplace {
         return root.getCategories();
     }
 
-    public void install(RecipeListing recipe, List<String> categoryPath) {
+    public void install(RecipeListing recipe, List<CategoryDescriptor> categoryPath) {
         root.install(recipe, categoryPath);
     }
 
@@ -74,9 +73,8 @@ public class RecipeMarketplace {
         @NlsRewrite.DisplayName
         private final String displayName;
 
-        @Setter
         @NlsRewrite.DisplayName
-        private String description = "";
+        private final String description;
 
         private final List<Category> categories = new ArrayList<>();
         private final List<RecipeListing> recipes = new ArrayList<>();
@@ -146,7 +144,7 @@ public class RecipeMarketplace {
          * @param recipe       The recipe to add
          * @param categoryPath Category path from shallowest to deepest (e.g., "Java", "Search")
          */
-        public void install(RecipeListing recipe, List<String> categoryPath) {
+        public void install(RecipeListing recipe, List<CategoryDescriptor> categoryPath) {
             recipe = recipe.withMarketplace(RecipeMarketplace.this);
 
             if (categoryPath.isEmpty()) {
@@ -155,22 +153,22 @@ public class RecipeMarketplace {
             }
 
             // Get the first category in the path
-            String firstCategory = categoryPath.get(0);
+            CategoryDescriptor firstCategory = categoryPath.get(0);
             Category targetCategory = findOrCreateCategory(firstCategory);
 
             // Recursively add to the child category
             targetCategory.install(recipe, categoryPath.subList(1, categoryPath.size()));
         }
 
-        private Category findOrCreateCategory(String categoryName) {
+        private Category findOrCreateCategory(CategoryDescriptor categoryDescriptor) {
             for (Category category : categories) {
-                if (category.getDisplayName().equals(categoryName)) {
+                if (category.getDisplayName().equals(categoryDescriptor.getDisplayName())) {
                     return category;
                 }
             }
-
-            // FIXME how do we overlay CategoryDescriptor on these so that the descriptions are set?
-            Category newCategory = new Category(categoryName);
+            Category newCategory = new Category(
+                    categoryDescriptor.getDisplayName(),
+                    categoryDescriptor.getDescription());
             categories.add(newCategory);
             return newCategory;
         }

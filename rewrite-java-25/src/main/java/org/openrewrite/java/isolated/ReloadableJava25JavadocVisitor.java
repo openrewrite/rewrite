@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
@@ -981,7 +982,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
             if (i+1 <= node.length() -1 && node.charAt(i+1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
-                text.append(whitespaceBeforeAsString());
+                text.append(whitespaceBeforeAsString(Character::isSpaceChar));
             }
         }
 
@@ -1085,13 +1086,17 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     private String whitespaceBeforeAsString() {
+        return whitespaceBeforeAsString(Character::isWhitespace);
+    }
+
+    private String whitespaceBeforeAsString(Predicate<Character> whitespace) {
         if (cursor >= source.length()) {
             return "";
         }
 
         int i = cursor;
         for (; i < source.length(); i++) {
-            if (!Character.isWhitespace(source.charAt(i))) {
+            if (!whitespace.test(source.charAt(i))) {
                 break;
             }
         }

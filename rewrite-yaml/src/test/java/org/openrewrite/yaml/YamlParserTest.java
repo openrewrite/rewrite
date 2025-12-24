@@ -559,4 +559,63 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void flowStyleMappingsInSequences() {
+        rewriteRun(
+          yaml(
+            """
+              tasks:
+                - {"task_type": "Shell"}
+                - { "task_type": "Shell2"}
+              """
+          ),
+          yaml(
+            """
+              items:
+                - name: block-style
+                  type: mapping
+                - {"name": "flow-style", "type": "mapping"}
+                - key: another-block
+              """
+          ),
+          yaml(
+            """
+              items:
+                - {}
+                - {"key": "value"}
+              """
+          ),
+          yaml(
+            """
+              data:
+                - {"list": [1, 2, 3], "map": {"nested": "value"}}
+                - {"array": [{"inner": "map"}]}
+              """
+          ),
+          yaml(
+            """
+              items:
+                - {
+                    "key": "value",
+                    "another": "test"
+                  }
+              """
+          ),
+          yaml(
+            """
+              items:
+                - {"key": "value",}
+              """
+          ),
+          yaml(
+            """
+              defaults: &defaults {"type": "default", "enabled": true}
+              items:
+                - *defaults
+                - {"type": "custom"}
+              """
+          )
+        );
+    }
 }

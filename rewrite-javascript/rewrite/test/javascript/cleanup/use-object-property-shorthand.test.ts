@@ -174,4 +174,18 @@ describe("UseObjectPropertyShorthand", () => {
             expect(foundShorthandProperty).toBe(true);
         }
     }));
+
+    test("does not simplify object literal with non-null assertion", () => spec.rewriteRun(
+        //language=typescript
+        typescript(
+            `const icon: string | null = null; const obj = { icon: icon! };`
+        )
+    ));
+
+    test("does not simplify destructuring with non-null assertion in default value", () => spec.rewriteRun(
+        //language=typescript
+        typescript(
+            `const obj = { x: null }; const { x = x! } = obj;`
+        )
+    ));
 });

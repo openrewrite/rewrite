@@ -25,6 +25,7 @@ import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlType;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @Value
@@ -58,15 +59,17 @@ public class ChangeValue extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TomlPathMatcher matcher = new TomlPathMatcher(keyPath);
+        int optionsHash = Objects.hash(keyPath, newValue);
         return new TomlIsoVisitor<ExecutionContext>() {
             @Override
             public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
 
-                if (matcher.matches(getCursor()) && !kv.getMarkers().findFirst(Changed.class).isPresent()) {
+                if (matcher.matches(getCursor()) &&
+                    !kv.getMarkers().findFirst(Changed.class).map(c -> c.getRecipeOptionsHash() == optionsHash).orElse(false)) {
                     Toml newValueNode = parseValue(newValue, kv.getValue().getPrefix());
                     kv = kv.withValue(newValueNode)
-                            .withMarkers(kv.getMarkers().add(new Changed(Tree.randomId())));
+                            .withMarkers(kv.getMarkers().add(new Changed(Tree.randomId(), optionsHash)));
                 }
 
                 return kv;
@@ -233,5 +236,6 @@ public class ChangeValue extends Recipe {
     @With
     static class Changed implements Marker {
         UUID id;
+        int recipeOptionsHash;
     }
 }

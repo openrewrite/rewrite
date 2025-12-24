@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -54,6 +55,12 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Nullable
     String newFilePath;
 
+    @Option(displayName = "Create new keys",
+            description = "When the key path does _not_ match any keys, create new keys on the spot. Default is `true`.",
+            required = false)
+    @Nullable
+    Boolean createNewKeys;
+
     @Override
     public String getDisplayName() {
         return "Copy YAML value";
@@ -73,7 +80,21 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         return "Copies a YAML value from one key to another. " +
                "The existing key/value pair remains unaffected by this change. " +
                "Attempts to merge the copied value into the new key if it already exists. " +
-               "Attempts to create the new key if it does not exist.";
+               "By default, attempts to create the new key if it does not exist.";
+    }
+
+    @JsonCreator
+    public CopyValue(String oldKeyPath, @Nullable String oldFilePath, String newKey, @Nullable String newFilePath, @Nullable Boolean createNewKeys) {
+        this.oldKeyPath = oldKeyPath;
+        this.oldFilePath = oldFilePath;
+        this.newKey = newKey;
+        this.newFilePath = newFilePath;
+        this.createNewKeys = createNewKeys;
+    }
+
+    @Deprecated
+    public CopyValue(String oldKeyPath, String oldFilePath, String newKey, String newFilePath) {
+        this(oldKeyPath, oldFilePath, newKey, newFilePath, null);
     }
 
     @Data
@@ -126,6 +147,6 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
             return TreeVisitor.noop();
         }
         return Preconditions.check(new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
-                new MergeYaml(newKey, acc.snippet, false, null, null, null, null, null).getVisitor());
+                new MergeYaml(newKey, acc.snippet, false, null, null, null, null, createNewKeys).getVisitor());
     }
 }

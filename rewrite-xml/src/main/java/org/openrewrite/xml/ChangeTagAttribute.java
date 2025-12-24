@@ -82,7 +82,7 @@ public class ChangeTagAttribute extends Recipe {
                 return t;
             }
 
-            public  Xml.@Nullable Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
+            public Xml.@Nullable Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
                 if (!attribute.getKeyAsString().equals(attributeName)) {
                     return attribute;
                 }
@@ -92,13 +92,12 @@ public class ChangeTagAttribute extends Recipe {
                     if (Boolean.TRUE.equals(regex) && !Pattern.matches(oldValue, stringValue)) {
                         return attribute;
                     }
-                    if ((regex == null || Boolean.FALSE.equals(regex)) && !stringValue.startsWith(oldValue)) {
+                    if ((regex == null || !regex) && !stringValue.startsWith(oldValue)) {
                         return attribute;
                     }
                 }
 
                 if (newValue == null) {
-                    //noinspection DataFlowIssue
                     return null;
                 }
 
