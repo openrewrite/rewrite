@@ -20,7 +20,7 @@ import {RecipeDescriptor} from "../../recipe";
 
 export interface GetMarketplaceResponseRow {
     readonly descriptor: RecipeDescriptor
-    readonly categories: CategoryDescriptor[]
+    readonly categoryPaths: CategoryDescriptor[][]
 }
 
 /**
@@ -30,7 +30,9 @@ export interface GetMarketplaceResponseRow {
 export async function toMarketplace(rows: GetMarketplaceResponseRow[]): Promise<RecipeMarketplace> {
     const marketplace = new RecipeMarketplace();
     for (const row of rows) {
-        await marketplace.root.install(row.descriptor, row.categories);
+        for (const categoryPath of row.categoryPaths) {
+            await marketplace.root.install(row.descriptor, categoryPath);
+        }
     }
     return marketplace;
 }
@@ -43,17 +45,23 @@ export class GetMarketplace {
                 "GetMarketplace",
                 metricsCsv,
                 (context) => async () => {
-                    const rows: GetMarketplaceResponseRow[] = [];
+                    // Group recipes by name, collecting all category paths for each
+                    const rowByRecipeId = new Map<string, { descriptor: RecipeDescriptor, categoryPaths: CategoryDescriptor[][] }>();
 
                     function collectRecipes(category: RecipeMarketplace.Category, categoryPath: CategoryDescriptor[]): void {
                         const currentPath = [...categoryPath, category.descriptor];
 
                         // Add all recipes in this category
                         for (const recipe of category.recipes.keys()) {
-                            rows.push({
-                                descriptor: recipe,
-                                categories: currentPath
-                            });
+                            const existing = rowByRecipeId.get(recipe.name);
+                            if (existing) {
+                                existing.categoryPaths.push(currentPath);
+                            } else {
+                                rowByRecipeId.set(recipe.name, {
+                                    descriptor: recipe,
+                                    categoryPaths: [currentPath]
+                                });
+                            }
                         }
 
                         // Recursively process subcategories
@@ -68,7 +76,7 @@ export class GetMarketplace {
                     }
 
                     context.target = '';
-                    return rows;
+                    return Array.from(rowByRecipeId.values());
                 }
             )
         );
