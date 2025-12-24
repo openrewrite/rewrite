@@ -349,9 +349,12 @@ public interface JavaType {
          * @return The class name without package qualification. If an inner class, outer/inner classes are separated by '.'.
          */
         public String getClassName() {
+            return TypeUtils.toFullyQualifiedName(getRawClassName());
+        }
+
+        public String getRawClassName() {
             String fqn = getFullyQualifiedName();
-            String className = fqn.substring(fqn.lastIndexOf('.') + 1);
-            return TypeUtils.toFullyQualifiedName(className);
+            return fqn.substring(fqn.lastIndexOf('.') + 1);
         }
 
         public String getPackageName() {
