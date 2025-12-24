@@ -332,8 +332,8 @@ class AddMethodParameterTest implements RewriteTest {
             
             public class Sheep {
                 public int size() {
-                                return 0;
-                            }
+                    return 0;
+                }
             }
             """
           ),

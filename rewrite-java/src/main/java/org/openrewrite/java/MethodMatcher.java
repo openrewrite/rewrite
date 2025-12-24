@@ -333,29 +333,6 @@ public class MethodMatcher {
         return matchesParameterTypes(parameterTypes);
     }
 
-    public boolean matchesWithInheritance(J.MethodDeclaration method, J.ClassDeclaration enclosing) {
-        if (enclosing.getType() == null) {
-            return false;
-        }
-
-        if (!TypeUtils.isAssignableTo(this::matchesTargetType, enclosing.getType())) {
-            return false;
-        }
-
-        if (method.getMethodType() != null && !matchesMethodName(method.getMethodType().getName())) {
-            return false;
-        }
-
-        List<JavaType> parameterTypes = method
-                .getParameters()
-                .stream()
-                .map(MethodMatcher::variableDeclarationsType)
-                .filter(Objects::nonNull)
-                .collect(toList());
-
-        return matchesParameterTypes(parameterTypes);
-    }
-
     private static @Nullable JavaType variableDeclarationsType(Statement v) {
         if (v instanceof J.VariableDeclarations) {
             J.VariableDeclarations vd = (J.VariableDeclarations) v;

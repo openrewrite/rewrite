@@ -83,21 +83,25 @@ public class AddMethodParameter extends Recipe {
         int idx = methodPattern.indexOf('#');
         idx = idx == -1 ? methodPattern.indexOf(' ') : idx;
         boolean typePattern = idx != -1 && methodPattern.lastIndexOf('*', idx) != -1;
-        return Preconditions.check(typePattern ? new DeclaresMatchingType(methodPattern.substring(0, idx)) : new DeclaresType<>(methodPattern.substring(0, idx)), new AddNullMethodArgumentVisitor(methodPattern));
+        return Preconditions.check(
+                typePattern ?
+                        new DeclaresMatchingType(methodPattern.substring(0, idx)) :
+                        new DeclaresType<>(methodPattern.substring(0, idx), true),
+                new AddNullMethodArgumentVisitor(methodPattern));
     }
 
     private class AddNullMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
 
         public AddNullMethodArgumentVisitor(String methodPattern) {
-            this.methodMatcher = new MethodMatcher(methodPattern);
+            this.methodMatcher = new MethodMatcher(methodPattern, true);
         }
 
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             method = super.visitMethodDeclaration(method, ctx);
             J.ClassDeclaration enclosing = getCursor().firstEnclosing(J.ClassDeclaration.class);
-            if (enclosing != null && (methodMatcher.matches(method, enclosing) || methodMatcher.matchesWithInheritance(method, enclosing))) {
+            if (enclosing != null && methodMatcher.matches(method, enclosing)) {
                 for (Statement parameter : method.getParameters()) {
                     if (parameter instanceof J.VariableDeclarations && ((J.VariableDeclarations) parameter).getVariables().get(0).getSimpleName().equals(parameterName)) {
                         return method;
@@ -263,7 +267,7 @@ public class AddMethodParameter extends Recipe {
         private final TypeMatcher typeMatcher;
 
         public DeclaresMatchingType(String type) {
-            this.typeMatcher = new TypeMatcher(type,true);
+            this.typeMatcher = new TypeMatcher(type, true);
         }
 
         @Override

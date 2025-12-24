@@ -17,23 +17,27 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 public class DeclaresType<P> extends JavaIsoVisitor<P> {
     private final String type;
+    private final boolean assignable;
 
     public DeclaresType(String type) {
+        this(type, false);
+    }
+
+    public DeclaresType(String type, boolean assignable) {
         this.type = type;
+        this.assignable = assignable;
     }
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         if (classDecl.getType() != null) {
-            JavaType targetType = JavaType.ShallowClass.build(type);
-
-            if (TypeUtils.isAssignableTo(targetType, classDecl.getType())) {
+            if (assignable && TypeUtils.isAssignableTo(type, classDecl.getType()) ||
+                    TypeUtils.isOfClassType(classDecl.getType(), type)) {
                 return SearchResult.found(classDecl);
             }
         }
