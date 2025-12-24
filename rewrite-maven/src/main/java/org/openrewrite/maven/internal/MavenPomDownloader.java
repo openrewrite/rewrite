@@ -98,7 +98,8 @@ public class MavenPomDownloader {
      * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
      *                       set on the execution context.
      */
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx,
+    public MavenPomDownloader(Map<Path, Pom> projectPoms,
+                              ExecutionContext ctx,
                               @Nullable MavenSettings mavenSettings,
                               @Nullable List<String> activeProfiles) {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
