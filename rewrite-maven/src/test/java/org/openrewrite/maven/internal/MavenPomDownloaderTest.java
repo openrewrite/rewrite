@@ -1396,8 +1396,8 @@ class MavenPomDownloaderTest implements RewriteTest {
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
         resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
-        assertThat(deps).anyMatch(rd -> "io.netty".equals(rd.getGroupId())
-          && "netty-tcnative-boringssl-static".equals(rd.getArtifactId())
-          && !"${boring-ssl-classifier}".equals(rd.getClassifier()));
+        assertThat(deps).anyMatch(rd -> "io.netty".equals(rd.getGroupId()) &&
+          "netty-tcnative-boringssl-static".equals(rd.getArtifactId()) &&
+          !"${boring-ssl-classifier}".equals(rd.getClassifier()));
     }
 }
