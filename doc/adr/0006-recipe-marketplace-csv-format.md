@@ -1,6 +1,6 @@
 # 6. Recipe Marketplace CSV Format
 
-Date: 2025-01-27
+Date: 2025-11-14
 
 ## Status
 
@@ -24,24 +24,23 @@ We will use a CSV format for recipe marketplace data with the following structur
 
 ### Required Columns
 
+- **`ecosystem`**: The package ecosystem (e.g., `maven`, `npm`, `yaml`)
+- **`packageName`**: The package identifier (e.g., `org.openrewrite:rewrite-java`)
 - **`name`**: The fully qualified recipe name (e.g., `org.openrewrite.java.cleanup.UnnecessaryParentheses`)
-- **`category1, category2, ..., categoryN`**: Zero or more category columns, read **left to right** with **left representing the deepest level category**
 
-### Optional Recipe Columns
+### Optional Recipe Metadata Columns
 
 - **`displayName`**: Human-readable recipe display name
 - **`description`**: Recipe description
+- **`estimatedEffortPerOccurrence`**: ISO-8601 duration format (e.g., PT5M, PT1H)
+- **`category1, category2, ..., categoryN`**: Zero or more category columns, read **left to right** with **left representing the deepest level category**
 - **`option1Name, option1DisplayName, option1Description`**: First recipe option
 - **`option2Name, option2DisplayName, option2Description`**: Second recipe option
 - **`optionNName, optionNDisplayName, optionNDescription`**: Additional options following the same pattern
 
 ### Optional Bundle Columns
 
-Bundle columns describe where a recipe can be installed from. When absent, the marketplace represents a minimal catalog:
-
-- **`ecosystem`**: Package ecosystem (e.g., `Maven`, `npm`, `yaml`)
-- **`packageName`**: Package identifier (e.g., `org.openrewrite:rewrite-java`, npm package name)
-- **`version`**: Package version
+- **`version`**: Package version (optional, allows version-independent recipe catalogs)
 - **`team`**: Optional team identifier for marketplace partitioning
 
 ### Category Structure
@@ -57,39 +56,57 @@ This creates the hierarchy: `Best Practices > Java > Cleanup > UnnecessaryParent
 
 The displayName of a category corresponds to the value in its category column.
 
-### Epsilon Root
+### Root Category
 
-When a CSV contains multiple top-level categories, a synthetic "epsilon root" (`ε`) is created similar to `moderne-organizations-format`. This root:
+The `RecipeMarketplace` maintains an internal root category that contains all top-level categories. The root is not exposed in the CSV format but allows the marketplace to support multiple top-level category trees.
 
-- Uses the epsilon character (`\u03B5`) as its display name
-- Is identified via `RecipeMarketplace.isRoot()`
-- Is never written to CSV output
-- Allows the reader to return a single root when multiple disparate category trees exist
+### Version-Independent Catalogs
 
-### Minimal vs. Enriched Marketplaces
-
-**Minimal Marketplace**: Contains only recipe metadata (name, categories, options) without bundle information. Useful for describing what recipes exist and their categorization.
-
-**Enriched Marketplace**: Includes bundle columns (ecosystem, packageName, version, team). Created when recipes are "installed" into an environment, combining the minimal catalog with actual bundle provenance.
+Since `version` is optional, marketplaces can represent version-independent recipe catalogs that describe what recipes exist and their categorization without tying them to specific package versions. Version information can be added later when recipes are installed or resolved in a specific environment.
 
 ### Implementation
 
+- **Data Model**:
+  - `RecipeBundle`: Simple data class containing ecosystem, packageName, version (optional), and team (optional)
+  - `RecipeListing`: Represents a recipe with metadata (name, displayName, description, options) and an associated `RecipeBundle`
+  - `RecipeMarketplace`: Hierarchical structure with nested `Category` instances and a list of `RecipeBundleResolver` instances
+
 - **Reader**: `RecipeMarketplaceReader` (using univocity-parsers)
   - Parses CSV into `RecipeMarketplace` hierarchies
-  - Accepts optional `RecipeBundleLoader` instances via constructor
-  - Creates bundle instances via loaders when ecosystem, packageName, and version are present
-  - Creates `RecipeOffering` instances with null bundles when bundle columns are absent or no loader is configured
-  - Returns epsilon root when multiple top-level categories exist
+  - Creates `RecipeListing` instances with `RecipeBundle` objects from CSV data
+  - Requires `ecosystem` and `packageName` columns; `version` and `team` are optional
+  - Dynamically detects category and option columns
 
 - **Writer**: `RecipeMarketplaceWriter` (using univocity-parsers)
-  - Dynamically determines required category and option columns
-  - Filters epsilon root from output
-  - Only includes bundle columns if at least one recipe has bundle information
+  - Dynamically determines required category and option columns based on marketplace content
+  - Always includes `ecosystem` and `packageName` columns
+  - Only includes `version` column if at least one recipe has version information
+  - Only includes `team` column if at least one recipe has team information
 
-- **Bundle Loaders**: Configurable implementations passed to the reader
-  - `MavenRecipeBundleLoader` in `rewrite-maven`: Creates `MavenRecipeBundle` instances, requires `MavenExecutionContextView` and `MavenArtifactDownloader`
-  - `NpmRecipeBundleLoader` in `rewrite-javascript`: Creates `NpmRecipeBundle` instances
-  - `RecipeBundleLoader` interface allows additional ecosystems to be added without modifying core
+- **Bundle Resolution**: Two-phase resolution system
+  - `RecipeBundleResolver`: Interface with `getEcosystem()` and `resolve(RecipeBundle)` methods
+    - Ecosystem-specific resolvers are registered with the `RecipeMarketplace`
+    - Examples: `MavenRecipeBundleResolver` in `rewrite-maven`, `NpmRecipeBundleResolver` in `rewrite-javascript`
+  - `RecipeBundleReader`: Interface returned by resolvers with methods:
+    - `getBundle()`: Returns the associated `RecipeBundle`
+    - `read()`: Reads the bundle and returns a `RecipeMarketplace`
+    - `describe(RecipeListing)`: Returns a `RecipeDescriptor` for a listing
+    - `prepare(RecipeListing, Map<String, Object>)`: Creates a configured `Recipe` instance
+  - `RecipeListing.resolve()`: Convenience method that finds the appropriate resolver and returns a `RecipeBundleReader`
+
+- **Validators**: Tools for ensuring marketplace quality and completeness
+  - `RecipeMarketplaceContentValidator` in `rewrite-core`: Validates content formatting rules
+    - Display names must start with uppercase and not end with a period
+    - Descriptions must end with a period
+    - Returns `Validated<RecipeMarketplace>` with all formatting errors found
+    - Recursively validates all categories and recipes in the hierarchy
+  - `RecipeMarketplaceCompletenessValidator` in `rewrite-core`: Validates CSV ↔ JAR synchronization
+    - Ensures every recipe in CSV exists in the JAR's `Environment`
+    - Ensures every recipe in the JAR has at least one entry in the CSV
+    - Detects "phantom recipes" (in CSV but not in JAR) and "missing recipes" (in JAR but not in CSV)
+    - Returns `Validated<RecipeMarketplace>` with all completeness errors found
+    - Uses `RecipeMarketplace.getAllRecipes()` to handle recipes appearing in multiple categories
+    - Intended to prevent CSV from becoming stale as recipes are added/removed from source code
 
 ## Consequences
 
@@ -97,55 +114,63 @@ When a CSV contains multiple top-level categories, a synthetic "epsilon root" (`
 
 1. **Human-editable**: CSV files can be created and modified in spreadsheet tools or text editors
 2. **Flexible schema**: Dynamic column detection accommodates varying numbers of categories and options
-3. **Separation of concerns**: Minimal marketplaces can describe recipes independently of their installation source
+3. **Version-independent catalogs**: Optional version column allows describing recipes independently of specific package versions
 4. **Composable**: Multiple marketplace CSVs can be combined by merging rows
 5. **Round-trip compatible**: Reader and writer preserve all information
 6. **Familiar pattern**: Mirrors `moderne-organizations-format` conventions, reducing learning curve
-7. **Extensible bundle loading**: RecipeBundleLoader interface allows new package ecosystems to be added without modifying core modules
+7. **Extensible bundle resolution**: Two-phase resolution (RecipeBundleResolver → RecipeBundleReader) allows new package ecosystems to be added without modifying core modules
+8. **Quality assurance**: Validators ensure content quality (formatting) and completeness (CSV ↔ JAR synchronization)
+9. **Lazy resolution**: RecipeListing stores bundle metadata but only resolves to actual Recipe instances when needed via resolve()
 
 ### Negative
 
 1. **CSV limitations**: No native support for nested structures (mitigated by column naming conventions)
 2. **Sparse data**: Recipes with few options result in many empty cells in CSVs with high option counts
-3. **Manual maintenance**: Keeping bundle information synchronized with actual artifact versions requires tooling
-4. **No validation**: CSV format doesn't enforce recipe name uniqueness or category integrity
+3. **Always requires bundle metadata**: Unlike earlier designs, ecosystem and packageName are always required, even for basic recipe catalogs
 
 ### Trade-offs
 
 - **Left-to-right category ordering** (left = deepest): This matches the `moderne-organizations-format` convention but may be counterintuitive to some users who expect left-to-right to represent root-to-leaf
-- **Null bundles for minimal marketplaces**: Simplifies the model but means `RecipeOffering.describe()` and `prepare()` throw exceptions until bundles are associated
+- **Two-phase resolution**: Separating RecipeBundleResolver and RecipeBundleReader provides flexibility but adds complexity compared to a single interface
 - **Dynamic columns**: Provides flexibility but means schema varies between files, making generic CSV processing tools less effective
-- **Bundle loader configuration**: Bundle loaders require runtime dependencies (e.g., MavenExecutionContextView) that must be provided when constructing the loader and passed to RecipeMarketplaceReader constructor
+- **Resolver configuration**: RecipeBundleResolvers must be registered with the RecipeMarketplace instance before calling RecipeListing.resolve(), describe(), or prepare()
 
 ## Examples
 
-### Minimal Marketplace
+### Basic Recipe Catalog (No Version)
 
 ```csv
-name,displayName,description,category
-org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses,Java Cleanup
+ecosystem,packageName,name,displayName,description,category1
+maven,org.openrewrite:rewrite-java,org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses.,Java Cleanup
 ```
 
-### With Options
+### With Version Information
 
 ```csv
-name,displayName,option1Name,option1DisplayName,option1Description,option2Name,option2DisplayName,option2Description,category
-org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,groupId,Group ID,The group ID,artifactId,Artifact ID,The artifact ID,Maven
+ecosystem,packageName,version,name,displayName,description,category1
+maven,org.openrewrite:rewrite-java,8.0.0,org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses.,Java Cleanup
 ```
 
-### Enriched with Bundle Information
+### With Recipe Options
 
 ```csv
-name,displayName,category,ecosystem,packageName,version,team
-org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Java Cleanup,Maven,org.openrewrite:rewrite-java,8.0.0,java-team
+ecosystem,packageName,name,displayName,description,category1,option1Name,option1DisplayName,option1Description,option2Name,option2DisplayName,option2Description
+maven,org.openrewrite:rewrite-maven,org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,Upgrades a Maven dependency.,Maven,groupId,Group ID,The group ID.,artifactId,Artifact ID,The artifact ID.
+```
+
+### With Team Partitioning
+
+```csv
+ecosystem,packageName,version,name,displayName,description,category1,team
+maven,org.openrewrite:rewrite-java,8.0.0,org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses.,Java Cleanup,java-team
 ```
 
 ### Multi-level Categories
 
 ```csv
-name,category1,category2,category3
-org.openrewrite.java.cleanup.UnnecessaryParentheses,Cleanup,Java,Best Practices
-org.openrewrite.java.format.AutoFormat,Formatting,Java,Best Practices
+ecosystem,packageName,name,category1,category2,category3
+maven,org.openrewrite:rewrite-java,org.openrewrite.java.cleanup.UnnecessaryParentheses,Cleanup,Java,Best Practices
+maven,org.openrewrite:rewrite-java,org.openrewrite.java.format.AutoFormat,Formatting,Java,Best Practices
 ```
 
 Creates: `Best Practices > Java > Cleanup > UnnecessaryParentheses` and `Best Practices > Java > Formatting > AutoFormat`

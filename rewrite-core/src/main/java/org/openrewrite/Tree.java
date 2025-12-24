@@ -17,8 +17,10 @@ package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.binary.Binary;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.quark.Quark;
 
 import java.util.UUID;
 
@@ -79,6 +81,24 @@ public interface Tree {
 
     default <P> String print(Cursor cursor, PrintOutputCapture<P> out) {
         this.<P>printer(cursor).visit(this, out, cursor);
+
+        // Restore BOM if the source file originally had one
+        // should be in sync with the BOM restore logic in SourceFile.printEqualsInput()
+        if (this instanceof SourceFile &&
+            !(this instanceof Quark) &&
+            !(this instanceof Binary)) {
+            SourceFile sourceFile = (SourceFile) this;
+            try {
+                if (sourceFile.isCharsetBomMarked() &&
+                        out.out.length() > 0 &&
+                        out.out.charAt(0) != '\uFEFF') {
+                    out.out.insert(0, '\uFEFF');
+                }
+            } catch (UnsupportedOperationException e) {
+                // Defensive fallback for any other SourceFile implementations that don't support charset operations
+            }
+        }
+
         return out.getOut();
     }
 

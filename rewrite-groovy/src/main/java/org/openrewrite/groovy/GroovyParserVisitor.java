@@ -890,18 +890,14 @@ public class GroovyParserVisitor {
                     }
 
                     Space after = EMPTY;
+                    Space trailingCommaSuffix = null;
                     if (i == unparsedArgs.size() - 1) {
                         if (hasParentheses) {
                             saveCursor = cursor;
-                            Space before = whitespace();
+                            after = whitespace();
                             if (source.charAt(cursor) == ',') {
                                 skip(",");
-                                JRightPadded<Expression> arg = JRightPadded.build(exp)
-                                        .withMarkers(exp.getMarkers().add(new TrailingComma(randomId(), sourceBefore(")"))))
-                                        .withAfter(before);
-
-                                args.add(arg);
-                                continue;
+                                trailingCommaSuffix = sourceBefore(")");
                             } else {
                                 cursor = saveCursor;
                                 after = sourceBefore(")");
@@ -909,14 +905,24 @@ public class GroovyParserVisitor {
                         }
                     } else if (!(exp instanceof J.Lambda && lastArgumentsAreAllClosures && !hasParentheses)) {
                         after = whitespace();
+                        saveCursor = cursor;
+                        if (source.charAt(cursor) == ',') {
+                            // we might have a trailing comma
+                            skip(",");
+                            trailingCommaSuffix = whitespace();
+                        }
                         if (source.charAt(cursor) == ')') {
                             // next argument(s), if they exists, are trailing closures and will have an OmitParentheses marker
                             hasParentheses = false;
+                        } else if (trailingCommaSuffix != null) {
+                            // we don't have a trailing comma, just a regular comma
+                            trailingCommaSuffix = null;
+                            cursor = saveCursor;
                         }
                         cursor++;
                     }
 
-                    args.add(JRightPadded.build(exp).withAfter(after));
+                  args.add(newRightPadded(exp, after, trailingCommaSuffix));
                 }
             }
 
@@ -1742,7 +1748,7 @@ public class GroovyParserVisitor {
                     String value = sourceSubstring(cursor, delimiter.close);
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
-                    while (indexNextSign > 0 && source.charAt(indexNextSign - 1) == '\\') {
+                    while (isEscaped(indexNextSign, delimiter)) {
                         indexNextSign = source.indexOf("$", indexNextSign + 1);
                     }
                     if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
@@ -2148,9 +2154,18 @@ public class GroovyParserVisitor {
                     }
 
                     Space after = EMPTY;
+                    Space trailingCommaSuffix = null;
                     if (i == mapEntryExpressions.size() - 1) {
                         if (omitParentheses == null) {
-                            after = sourceBefore(")");
+                            saveCursor = cursor;
+                            after = whitespace();
+                            if (source.charAt(cursor) == ',') {
+                                skip(",");
+                                trailingCommaSuffix = sourceBefore(")");
+                            } else {
+                                cursor = saveCursor;
+                                after = sourceBefore(")");
+                            }
                         }
                     } else {
                         after = whitespace();
@@ -2161,7 +2176,7 @@ public class GroovyParserVisitor {
                         cursor++;
                     }
 
-                    args.add(JRightPadded.build(arg).withAfter(after));
+                  args.add(newRightPadded(arg, after, trailingCommaSuffix));
                 }
             }
 
@@ -2363,7 +2378,19 @@ public class GroovyParserVisitor {
         }
     }
 
-    // handle the obscure case where there are empty parens ahead of a closure
+    private static JRightPadded<Expression> newRightPadded(
+        Expression exp,
+        Space after,
+        @Nullable Space trailingCommaSuffix
+    ) {
+        JRightPadded<Expression> arg = JRightPadded.build(exp).withAfter(after);
+        if (trailingCommaSuffix != null) {
+            arg = arg.withMarkers(exp.getMarkers().add(new TrailingComma(randomId(), trailingCommaSuffix)));
+        }
+        return arg;
+    }
+
+  // handle the obscure case where there are empty parens ahead of a closure
     private Markers handlesCaseWhereEmptyParensAheadOfClosure(ArgumentListExpression args, Markers markers) {
         if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
             int saveCursor = cursor;
@@ -2724,7 +2751,7 @@ public class GroovyParserVisitor {
      */
     private boolean isEscaped(int index) {
         int backslashCount = 0;
-        while (index >= 0 && source.charAt(index) == '\\') {
+        while (index > 0 && source.charAt(index - 1) == '\\') {
             backslashCount++;
             index--;
         }
@@ -2732,15 +2759,52 @@ public class GroovyParserVisitor {
     }
 
     /**
+     * Determines if a $ character in a GString is escaped based on the delimiter type.
+     * For slashy strings, $$ escapes a dollar sign and $ followed by the closing delimiter is treated as literal.
+     * For other string types, backslash escaping is used.
+     */
+    private boolean isEscaped(int index, Delimiter delimiter) {
+        if (index < 0) {
+            return false;
+        }
+
+        // Slashy-type strings use different escaping: $$ for literal $ and $ before closing delimiter
+        if (delimiter.isSlashyStringDelimiter() || delimiter.isDollarSlashyStringDelimiter()) {
+            if (index + 1 < source.length()) {
+                if (source.charAt(index + 1) == '$') {
+                    return true; // $$ escapes a dollar sign
+                }
+                // For slashy strings (not dollar-slashy), $ before closing delimiter is also literal
+                return delimiter.isSlashyStringDelimiter() && source.startsWith(delimiter.close, index + 1);
+            }
+            return false;
+        }
+
+        // Regular strings use backslash escaping
+        return isEscaped(index);
+    }
+
+    /**
      * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
      * The cursor will not be moved.
      */
     private String sourceSubstring(int beginIndex, String untilDelim) {
-        int endIndex = source.indexOf(untilDelim, Math.max(beginIndex, cursor + untilDelim.length()));
-        // don't stop if last char is escaped.
-        // Fixed potential infinite loop by correctly handling escaped delimiters in the source string.
-        while (endIndex > 0 && isEscaped(endIndex - 1)) {
+        int fromIndex = Math.max(beginIndex, cursor + untilDelim.length());
+        int endIndex = source.indexOf(untilDelim, fromIndex);
+        if (endIndex < 0) {
+            throw new IllegalArgumentException(
+                "Couldn't find delimiter: " + untilDelim + " with fromIndex: " + fromIndex
+            );
+        }
+        // don't stop if the last char is escaped.
+        // Fixed a potential infinite loop by correctly handling escaped delimiters in the source string.
+        while (isEscaped(endIndex)) {
             endIndex = source.indexOf(untilDelim, endIndex + 1);
+        }
+        if (endIndex < 0) {
+            throw new IllegalArgumentException(
+                "Couldn't find unescaped delimiter: " + untilDelim + " with fromIndex: " + fromIndex
+            );
         }
         return source.substring(beginIndex, endIndex);
     }

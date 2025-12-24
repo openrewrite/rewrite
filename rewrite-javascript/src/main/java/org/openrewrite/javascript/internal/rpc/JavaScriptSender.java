@@ -275,6 +275,12 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitShebang(JS.Shebang shebang, RpcSendQueue q) {
+        q.getAndSend(shebang, JS.Shebang::getText);
+        return shebang;
+    }
+
+    @Override
     public J visitStatementExpression(JS.StatementExpression statementExpression, RpcSendQueue q) {
         q.getAndSend(statementExpression, JS.StatementExpression::getStatement, el -> visit(el, q));
         return statementExpression;

@@ -25,6 +25,10 @@ import org.openrewrite.remote.RemoteResource;
 import org.openrewrite.semver.LatestRelease;
 
 import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
@@ -32,8 +36,7 @@ import static java.util.Objects.requireNonNull;
 
 public class GradleWrapperScriptLoader {
     @Getter
-    private final NavigableMap<String, Version> allVersions = new TreeMap<>(
-            new LatestRelease(null));
+    private final Map<String, Version> allVersions = new HashMap<>();
 
     public GradleWrapperScriptLoader() {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(requireNonNull(
@@ -42,21 +45,16 @@ public class GradleWrapperScriptLoader {
             String line;
             while ((line = in.readLine()) != null) {
                 String[] row = line.split(",");
-                allVersions.put(row[0], new Version(row[0], row[1], row[2]));
+                Version version = new Version(row[0], row[1], row[2]);
+                allVersions.put(row[0], version);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    /**
-     * When the requested version is unavailable we pick the nearest available.
-     */
-    public Nearest findNearest(@Nullable String requestedVersion) {
-        if (requestedVersion == null) {
-            return new Nearest(null, allVersions.lastEntry().getValue());
-        }
-        return new Nearest(requestedVersion, allVersions.floorEntry(requestedVersion).getValue());
+    public Nearest findNearest(String requestedVersion) {
+        return new Nearest(requestedVersion, allVersions.get(requestedVersion));
     }
 
     @SuppressWarnings("resource")
@@ -71,6 +69,7 @@ public class GradleWrapperScriptLoader {
             InputStream script = getClass().getResourceAsStream("/META-INF/rewrite/gradle-wrapper/unix/" + resolved.getGradlewChecksum() + ".txt");
             return maybeWarn(Remote.builder(GradleWrapper.WRAPPER_SCRIPT_LOCATION)
                     .description(String.format("Unix Gradle wrapper script template for %s", resolved.getVersion()))
+                    .charset(StandardCharsets.UTF_8)
                     .build(requireNonNull(script)));
         }
 
@@ -78,6 +77,7 @@ public class GradleWrapperScriptLoader {
             InputStream script = getClass().getResourceAsStream("/META-INF/rewrite/gradle-wrapper/windows/" + resolved.getGradlewBatChecksum() + ".txt");
             return maybeWarn(Remote.builder(GradleWrapper.WRAPPER_BATCH_LOCATION)
                     .description(String.format("Windows Gradle wrapper script template for %s", resolved.getVersion()))
+                    .charset(Charset.forName("Windows-1252"))
                     .build(requireNonNull(script)));
         }
 

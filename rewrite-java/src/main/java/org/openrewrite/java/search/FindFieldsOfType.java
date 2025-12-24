@@ -139,7 +139,7 @@ public class FindFieldsOfType extends Recipe {
                                           boolean matchOverrides) {
         if (type instanceof JavaType.Array) {
             return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName, matchOverrides);
-        } else if (type instanceof JavaType.FullyQualified) {
+        } else if (type instanceof JavaType.FullyQualified || type instanceof JavaType.Primitive) {
             return new TypeMatcher(fullyQualifiedName, matchOverrides).matches(type);
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;

@@ -32,6 +32,8 @@ public class WrappingAndBracesStyle implements JavaStyle {
     int hardWrapAt;
     IfStatement ifStatement;
     ChainedMethodCalls chainedMethodCalls;
+    MethodDeclarationParameters methodDeclarationParameters;
+    MethodCallArguments methodCallArguments;
     @Nullable Annotations classAnnotations;
     @Nullable Annotations methodAnnotations;
     @Nullable Annotations fieldAnnotations;
@@ -46,7 +48,10 @@ public class WrappingAndBracesStyle implements JavaStyle {
 
     public ChainedMethodCalls getChainedMethodCalls() {
         //noinspection ConstantConditions
-        return chainedMethodCalls == null ? new ChainedMethodCalls(LineWrapSetting.DoNotWrap, emptyList(), false) : chainedMethodCalls;
+        return chainedMethodCalls == null ? new ChainedMethodCalls(
+                LineWrapSetting.DoNotWrap,
+                emptyList(),
+                false) : chainedMethodCalls;
     }
 
     @Value
@@ -81,6 +86,64 @@ public class WrappingAndBracesStyle implements JavaStyle {
         public Boolean getAlignWhenMultiline() {
             //noinspection ConstantConditions
             return alignWhenMultiline == null ? false : alignWhenMultiline;
+        }
+    }
+
+    @Value
+    @With
+    public static class MethodDeclarationParameters {
+        LineWrapSetting wrap;
+        Boolean alignWhenMultiline;
+        Boolean openNewLine;
+        Boolean closeNewLine;
+
+        public LineWrapSetting getWrap() {
+            //noinspection ConstantConditions
+            return wrap == null ? LineWrapSetting.DoNotWrap : wrap;
+        }
+
+        public Boolean getAlignWhenMultiline() {
+            //noinspection ConstantConditions
+            return alignWhenMultiline == null ? false : alignWhenMultiline;
+        }
+
+        public Boolean getOpenNewLine() {
+            //noinspection ConstantConditions
+            return openNewLine == null ? false : openNewLine;
+        }
+
+        public Boolean getCloseNewLine() {
+            //noinspection ConstantConditions
+            return closeNewLine == null ? false : closeNewLine;
+        }
+    }
+
+    @Value
+    @With
+    public static class MethodCallArguments {
+        LineWrapSetting wrap;
+        Boolean alignWhenMultiline;
+        Boolean openNewLine;
+        Boolean closeNewLine;
+
+        public LineWrapSetting getWrap() {
+            //noinspection ConstantConditions
+            return wrap == null ? LineWrapSetting.DoNotWrap : wrap;
+        }
+
+        public Boolean getAlignWhenMultiline() {
+            //noinspection ConstantConditions
+            return alignWhenMultiline == null ? false : alignWhenMultiline;
+        }
+
+        public Boolean getOpenNewLine() {
+            //noinspection ConstantConditions
+            return openNewLine == null ? false : openNewLine;
+        }
+
+        public Boolean getCloseNewLine() {
+            //noinspection ConstantConditions
+            return closeNewLine == null ? false : closeNewLine;
         }
     }
 }
