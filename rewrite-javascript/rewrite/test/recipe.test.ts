@@ -45,7 +45,8 @@ describe("recipes", () => {
                 }
             ],
             recipeList: [],
-            tags: []
+            tags: [],
+            dataTables: []
         });
     });
 });
