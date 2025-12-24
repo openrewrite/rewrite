@@ -18,18 +18,3 @@ type: specs.openrewrite.org/v1beta/category
 name: Java
 packageName: org.openrewrite.java
 description: Basic building blocks for transforming Java code.
----
-type: specs.openrewrite.org/v1beta/category
-name: Dataflow analysis
-packageName: org.openrewrite.java.dataflow
-description: Analysis that helps recipes understand the flow of data across a codebase.
----
-type: specs.openrewrite.org/v1beta/category
-name: OpenRewrite best practices
-packageName: org.openrewrite.java.recipes
-description: Apply best practices to OpenRewrite recipes.
----
-type: specs.openrewrite.org/v1beta/category
-name: AI tools
-packageName: org.openrewrite.java.ai
-description: Tools for researching AI integrations.

@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.marketplace;
+package org.openrewrite.marketplace;
+
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -26,9 +28,12 @@ public interface RecipeClassLoaderFactory {
     /**
      * Create a new recipe classloader for the given recipe JAR and classpath.
      *
-     * @param recipeJar Recipe JAR to load
+     * @param recipeJar Recipe JAR to load. If nullable, there is no primary recipe JAR and
+     *                  the resultant classloader is being used to load sub-recipes, such as
+     *                  in a non-Java recipe which re-uses Java-written recipes in its
+     *                  implementation.
      * @param classpath Runtime dependencies of the recipe JAR
      * @return A new recipe classloader instance.
      */
-    RecipeClassLoader create(Path recipeJar, List<Path> classpath);
+    RecipeClassLoader create(@Nullable Path recipeJar, List<Path> classpath);
 }

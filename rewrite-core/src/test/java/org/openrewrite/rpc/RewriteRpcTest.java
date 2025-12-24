@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.marketplace.*;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
@@ -37,6 +39,7 @@ import java.util.concurrent.CountDownLatch;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -45,6 +48,7 @@ class RewriteRpcTest implements RewriteTest {
       .scanRuntimeClasspath("org.openrewrite.text")
       .build();
 
+    RecipeMarketplace marketplace;
     RewriteRpc client;
     RewriteRpc server;
 
@@ -55,10 +59,13 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env)
+        marketplace = env.toMarketplace(runtimeClasspath())
+          .setResolvers(new TestRecipeBundleResolver());
+
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), marketplace)
           .batchSize(1);
 
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env)
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), marketplace)
           .batchSize(1);
     }
 
@@ -100,8 +107,9 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void getRecipes() {
-        assertThat(client.getRecipes()).isNotEmpty();
+    void getMarketplace() {
+        assertThat(client.getMarketplace(new RecipeBundle("runtime",
+          "", null, null, null)).getAllRecipes()).isNotEmpty();
     }
 
     @Test
@@ -197,6 +205,42 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public void buildRecipeList(RecipeList recipes) {
             recipes.recipe(new org.openrewrite.text.ChangeText("hello"));
+        }
+    }
+
+    /**
+     * A trivial resolver for testing that returns the existing marketplace without
+     * requiring any actual dependency resolution.
+     */
+    class TestRecipeBundleResolver implements RecipeBundleResolver {
+        @Override
+        public String getEcosystem() {
+            return "runtime";
+        }
+
+        @Override
+        public RecipeBundleReader resolve(RecipeBundle bundle) {
+            return new RecipeBundleReader() {
+                @Override
+                public RecipeBundle getBundle() {
+                    return bundle;
+                }
+
+                @Override
+                public RecipeMarketplace read() {
+                    return marketplace;
+                }
+
+                @Override
+                public RecipeDescriptor describe(RecipeListing listing) {
+                    return env.activateRecipes(listing.getName()).getDescriptor();
+                }
+
+                @Override
+                public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+                    return requireNonNull(marketplace.findRecipe(listing.getName())).prepare(options);
+                }
+            };
         }
     }
 }

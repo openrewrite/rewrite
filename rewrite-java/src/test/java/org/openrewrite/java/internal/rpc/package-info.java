@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.marketplace;
+@NullMarked
+package org.openrewrite.java.internal.rpc;
 
-import org.openrewrite.Recipe;
-import org.openrewrite.config.RecipeDescriptor;
-
-import java.util.Map;
-
-public interface RecipeBundleReader {
-    RecipeBundle getBundle();
-
-    RecipeMarketplace read();
-
-    RecipeDescriptor describe(RecipeListing listing);
-
-    Recipe prepare(RecipeListing listing, Map<String, Object> options);
-}
+import org.jspecify.annotations.NullMarked;

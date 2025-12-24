@@ -19,6 +19,9 @@ import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.File;
@@ -119,15 +122,6 @@ public class Environment {
             }
         }
         return result;
-    }
-
-    @Deprecated
-    public Recipe activateRecipes(Iterable<String> activeRecipes) {
-        List<String> asList = new ArrayList<>();
-        for (String activeRecipe : activeRecipes) {
-            asList.add(activeRecipe);
-        }
-        return activateRecipes(asList);
     }
 
     public Recipe activateRecipes(Collection<String> activeRecipes) {
@@ -263,6 +257,17 @@ public class Environment {
         return activateStyles(Arrays.asList(activeStyles));
     }
 
+    public RecipeMarketplace toMarketplace(RecipeBundle bundle) {
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        for (RecipeDescriptor descriptor : listRecipeDescriptors()) {
+            marketplace.install(
+                    RecipeListing.fromDescriptor(descriptor, bundle),
+                    descriptor.inferCategoriesFromName(this)
+            );
+        }
+        return marketplace;
+    }
+
     public Environment(Collection<? extends ResourceLoader> resourceLoaders) {
         this.resourceLoaders = resourceLoaders;
         this.dependencyResourceLoaders = emptyList();
@@ -344,12 +349,12 @@ public class Environment {
         }
 
         public Builder load(ResourceLoader resourceLoader) {
-            resourceLoaders.add(resourceLoader);
+            this.resourceLoaders.add(resourceLoader);
             return this;
         }
 
         public Builder load(ResourceLoader resourceLoader, Collection<? extends ResourceLoader> dependencyResourceLoaders) {
-            resourceLoaders.add(resourceLoader);
+            this.resourceLoaders.add(resourceLoader);
             this.dependencyResourceLoaders.addAll(dependencyResourceLoaders);
             return this;
         }

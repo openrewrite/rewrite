@@ -18,8 +18,8 @@ package org.openrewrite.javascript.rpc;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.config.Environment;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
@@ -58,7 +58,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     private final Map<String, String> commandEnv;
     private final RewriteRpcProcess process;
 
-    JavaScriptRewriteRpc(RewriteRpcProcess process, Environment marketplace, String command, Map<String, String> commandEnv) {
+    JavaScriptRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, String command, Map<String, String> commandEnv) {
         super(process.getRpcClient(), marketplace);
         this.command = command;
         this.commandEnv = commandEnv;
@@ -181,8 +181,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     @RequiredArgsConstructor
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
+        private RecipeMarketplace marketplace = new RecipeMarketplace();
         private final Map<String, String> environment = new HashMap<>();
-        private Environment marketplace = Environment.builder().build();
         private Path npxPath = Paths.get("npx");
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
@@ -197,7 +197,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Path workingDirectory;
         private PrepareRecipe.@Nullable Loader recipeLoader;
 
-        public Builder marketplace(Environment marketplace) {
+        public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
             return this;
         }
