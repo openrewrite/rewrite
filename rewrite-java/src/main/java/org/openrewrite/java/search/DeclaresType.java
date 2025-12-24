@@ -22,21 +22,21 @@ import org.openrewrite.marker.SearchResult;
 
 public class DeclaresType<P> extends JavaIsoVisitor<P> {
     private final String type;
-    private final boolean assignable;
+    private final boolean includeSubtypes;
 
     public DeclaresType(String type) {
         this(type, false);
     }
 
-    public DeclaresType(String type, boolean assignable) {
+    public DeclaresType(String type, boolean includeSubtypes) {
         this.type = type;
-        this.assignable = assignable;
+        this.includeSubtypes = includeSubtypes;
     }
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         if (classDecl.getType() != null) {
-            if (assignable && TypeUtils.isAssignableTo(type, classDecl.getType()) ||
+            if (includeSubtypes && TypeUtils.isAssignableTo(type, classDecl.getType()) ||
                     TypeUtils.isOfClassType(classDecl.getType(), type)) {
                 return SearchResult.found(classDecl);
             }
