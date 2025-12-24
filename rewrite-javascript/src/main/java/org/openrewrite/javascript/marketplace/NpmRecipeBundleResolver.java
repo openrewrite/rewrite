@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.marketplace;
 
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.javascript.rpc.InstallRecipesResponse;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
@@ -37,10 +38,14 @@ public class NpmRecipeBundleResolver implements RecipeBundleResolver {
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
         Path pkgPath = Paths.get(bundle.getPackageName());
+        InstallRecipesResponse response;
         if (Files.exists(pkgPath)) {
-            rpc.installRecipes(pkgPath.toFile());
+            response = rpc.installRecipes(pkgPath.toFile());
         } else {
-            rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+            response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+        }
+        if (response.getVersion() != null) {
+            bundle.setVersion(response.getVersion());
         }
         return new NpmRecipeBundleReader(bundle, rpc);
     }

@@ -22,6 +22,7 @@ import {RecipeMarketplace} from "../../marketplace";
 
 export interface InstallRecipesResponse {
     recipesInstalled: number
+    version?: string
 }
 
 /**
@@ -81,6 +82,7 @@ export class InstallRecipes {
                     let resolvedPath;
                     let recipesName = request.recipes;
 
+                    let installedVersion: string | undefined;
                     if (typeof request.recipes === "object") {
                         const recipePackage = request.recipes;
                         const absoluteInstallDir = path.isAbsolute(installDir) ? installDir : path.join(process.cwd(), installDir);
@@ -112,6 +114,13 @@ export class InstallRecipes {
                         await spawnNpmCommand("npm", ["install", packageSpec, "--no-fund"], absoluteInstallDir, logger);
                         resolvedPath = require.resolve(path.join(absoluteInstallDir, "node_modules", recipePackage.packageName));
                         recipesName = request.recipes.packageName;
+
+                        // Read the installed package's version from its package.json
+                        const installedPackageJsonPath = path.join(absoluteInstallDir, "node_modules", recipePackage.packageName, "package.json");
+                        if (fs.existsSync(installedPackageJsonPath)) {
+                            const installedPackageJson = JSON.parse(fs.readFileSync(installedPackageJsonPath, "utf8"));
+                            installedVersion = installedPackageJson.version;
+                        }
                     } else {
                         resolvedPath = request.recipes;
                     }
@@ -139,7 +148,10 @@ export class InstallRecipes {
                         throw new Error(`${recipesName} does not export an 'activate' function`);
                     }
 
-                    return {recipesInstalled: marketplace.allRecipes().length - beforeInstall};
+                    return {
+                        recipesInstalled: marketplace.allRecipes().length - beforeInstall,
+                        version: installedVersion
+                    };
                 }
             )
         );

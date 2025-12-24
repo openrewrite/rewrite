@@ -22,12 +22,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.NlsRewrite;
 import org.openrewrite.config.CategoryDescriptor;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
-
-import static java.util.Collections.addAll;
+import java.util.*;
 
 @Incubating(since = "8.66.0")
 public class RecipeMarketplace {
@@ -38,9 +33,9 @@ public class RecipeMarketplace {
 
     private final @Getter List<RecipeBundleResolver> resolvers = new ArrayList<>();
 
-    public RecipeMarketplace setResolvers(RecipeBundleResolver... resolvers) {
+    public RecipeMarketplace setResolvers(Collection<RecipeBundleResolver> resolvers) {
         this.resolvers.clear();
-        addAll(this.resolvers, resolvers);
+        this.resolvers.addAll(resolvers);
         return this;
     }
 

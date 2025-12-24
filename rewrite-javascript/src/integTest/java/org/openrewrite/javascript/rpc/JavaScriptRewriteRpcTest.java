@@ -163,7 +163,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Test
     void printJava() {
-        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")))
+        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")).getRecipesInstalled())
           .isEqualTo(1);
         Recipe modifyAll = client().prepareRecipe("org.openrewrite.java.test.modify-all-trees");
 
@@ -190,7 +190,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Test
     void installRecipesFromNpm() {
-        assertThat(client().installRecipes("@openrewrite/recipes-npm")).isEqualTo(1);
+        assertThat(client().installRecipes("@openrewrite/recipes-npm").getRecipesInstalled()).isEqualTo(1);
         assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null)).getAllRecipes()).satisfiesExactly(
           d -> {
               assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`");
@@ -434,7 +434,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     private void installRecipes() {
         File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
         assertThat(exampleRecipes).exists();
-        assertThat(client().installRecipes(exampleRecipes)).isGreaterThan(0);
+        assertThat(client().installRecipes(exampleRecipes).getRecipesInstalled()).isGreaterThan(0);
     }
 
     private JavaScriptRewriteRpc client() {

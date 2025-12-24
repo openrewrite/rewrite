@@ -87,25 +87,25 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.shutdown();
     }
 
-    public int installRecipes(File recipes) {
+    public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
                 new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
                 InstallRecipesResponse.class
-        ).getRecipesInstalled();
+        );
     }
 
-    public int installRecipes(String packageName) {
+    public InstallRecipesResponse installRecipes(String packageName) {
         return installRecipes(packageName, null);
     }
 
-    public int installRecipes(String packageName, @Nullable String version) {
+    public InstallRecipesResponse installRecipes(String packageName, @Nullable String version) {
         return send(
                 "InstallRecipes",
                 new InstallRecipesByPackage(
                         new InstallRecipesByPackage.Package(packageName, version)),
                 InstallRecipesResponse.class
-        ).getRecipesInstalled();
+        );
     }
 
     /**
