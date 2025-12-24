@@ -42,6 +42,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.reverse;
 
 public class RecipeMarketplaceReader {
     private static final ObjectMapper JSON_MAPPER = JsonMapper.builder()
@@ -278,7 +279,7 @@ public class RecipeMarketplaceReader {
                     true // synthetic
             ));
         }
-        Collections.reverse(categoryPath);
+        reverse(categoryPath);
         marketplace.install(listing, categoryPath);
     }
 

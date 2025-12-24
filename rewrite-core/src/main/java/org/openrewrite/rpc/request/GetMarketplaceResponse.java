@@ -22,7 +22,12 @@ import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static java.util.Collections.emptySet;
 
 
 public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row> {
@@ -57,7 +62,7 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
                                      List<CategoryDescriptor> parentCategory) {
         List<CategoryDescriptor> categoryPath = new ArrayList<>(parentCategory);
         categoryPath.add(new CategoryDescriptor(category.getDisplayName(), "",
-                category.getDescription(), Collections.emptySet(), false, 0, false));
+                category.getDescription(), emptySet(), false, 0, false));
         for (RecipeListing recipe : category.getRecipes()) {
             rowByRecipeId.computeIfAbsent(recipe.getName(), recipeId ->
                     new Row(recipe.describe(), new ArrayList<>())).categoryPaths.add(categoryPath);
