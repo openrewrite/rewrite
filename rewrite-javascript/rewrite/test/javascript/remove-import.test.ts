@@ -1112,7 +1112,9 @@ describe('RemoveImport visitor', () => {
 
                         console.log('test');
                     `,
-                    `console.log('test');`
+                    `
+                        console.log('test');
+                    `
                 )
             );
         });
@@ -1175,7 +1177,8 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         const foo = 1;
-                        console.log(foo);`
+                        console.log(foo);
+                        `
                 )
             );
         });

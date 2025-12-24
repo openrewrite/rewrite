@@ -83,14 +83,15 @@ public interface Tree {
         this.<P>printer(cursor).visit(this, out, cursor);
 
         // Restore BOM if the source file originally had one
+        // should be in sync with the BOM restore logic in SourceFile.printEqualsInput()
         if (this instanceof SourceFile &&
             !(this instanceof Quark) &&
             !(this instanceof Binary)) {
             SourceFile sourceFile = (SourceFile) this;
             try {
                 if (sourceFile.isCharsetBomMarked() &&
-                    out.out.length() > 0 &&
-                    out.out.charAt(0) != '\uFEFF') {
+                        out.out.length() > 0 &&
+                        out.out.charAt(0) != '\uFEFF') {
                     out.out.insert(0, '\uFEFF');
                 }
             } catch (UnsupportedOperationException e) {

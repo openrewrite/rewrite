@@ -24,9 +24,9 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.rpc.request.*;
 import org.openrewrite.tree.ParseError;
@@ -64,10 +64,10 @@ public class RewriteRpc {
     private final AtomicInteger batchSize = new AtomicInteger(200);
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
-    private final AtomicReference<PrintStream> log = new AtomicReference<>();
+    private final AtomicReference<@Nullable PrintStream> log = new AtomicReference<>();
     private final AtomicReference<TraceGetObject> traceGetObject = new AtomicReference<>(
             new TraceGetObject(false, false));
-    private final AtomicReference<PrepareRecipe.Loader> recipeLoader = new AtomicReference<>();
+    private final AtomicReference<PrepareRecipe.@Nullable Loader> recipeLoader = new AtomicReference<>();
 
     final PreparedRecipeCache preparedRecipes = new PreparedRecipeCache();
 
@@ -101,7 +101,7 @@ public class RewriteRpc {
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
-    public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
+    public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace) {
         this.jsonRpc = jsonRpc;
 
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
@@ -110,10 +110,10 @@ public class RewriteRpc {
                 this::getObject));
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects,
                 localRefs, log, () -> traceGetObject.get().isSend()));
-        jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
+        jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
-                return marketplace.listRecipeDescriptors();
+                return GetMarketplaceResponse.fromMarketplace(marketplace);
             }
         });
         jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {
@@ -165,21 +165,19 @@ public class RewriteRpc {
     }
 
     public RewriteRpc log(@Nullable PrintStream logFile) {
-        //noinspection DataFlowIssue
         this.log.set(logFile);
         return this;
     }
 
     public RewriteRpc recipeLoader(PrepareRecipe.@Nullable Loader recipeLoader) {
-        //noinspection DataFlowIssue
         this.recipeLoader.set(recipeLoader);
         return this;
     }
 
     public void shutdown() {
-        //noinspection ConstantValue
-        if (log.get() != null) {
-            log.get().close();
+        PrintStream logOut = log.get();
+        if (logOut != null) {
+            logOut.close();
         }
         jsonRpc.shutdown();
     }
@@ -240,8 +238,9 @@ public class RewriteRpc {
         return pId;
     }
 
-    public List<RecipeDescriptor> getRecipes() {
-        return send("GetRecipes", null, GetRecipesResponse.class);
+    public RecipeMarketplace getMarketplace(RecipeBundle bundle) {
+        return send("GetMarketplace", null, GetMarketplaceResponse.class)
+                .toMarketplace(bundle);
     }
 
     public List<String> getLanguages() {
@@ -282,12 +281,12 @@ public class RewriteRpc {
 
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 Tree t = tree;
                 for (TreeVisitor<?, ExecutionContext> v : visitors) {
                     //noinspection unchecked
-                    t = ((TreeVisitor<Tree, ExecutionContext>) v).visit(tree, ctx);
+                    t = ((TreeVisitor<Tree, @NonNull ExecutionContext>) v).visit(tree, ctx);
                     if (t == tree) {
                         // One of the preconditions didn't match, so we fail the whole precondition
                         return tree;

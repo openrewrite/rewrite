@@ -87,8 +87,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                     JavaType newType = JavaType.buildType(newReturnType);
                     JavaType.FullyQualified newFieldType = TypeUtils.asFullyQualified(newType);
 
-                    maybeAddImport(newFieldType);
                     maybeRemoveImport(originalType);
+                    maybeAddImport(newFieldType);
 
                     mv = mv.withTypeExpression(mv.getTypeExpression() == null ?
                             null :

@@ -26,6 +26,7 @@ import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.*;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.table.RecipeRunStats;
@@ -257,9 +258,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 effortSeconds,
                 cycle));
 
-        List<String> searchMarkers = collectSearchResults(before, after);
-        for (String searchResult : searchMarkers) {
-            searchResults.insertRow(ctx, new SearchResults.Row(beforePath, afterPath, searchResult, recipe.getInstanceName()));
+        List<SearchResults.Row> searchMarkers = collectSearchResults(before, after, recipe.getInstanceName());
+        for (SearchResults.Row searchResult : searchMarkers) {
+            searchResults.insertRow(ctx, searchResult);
         }
 
         if (hierarchical) {
@@ -352,30 +353,40 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         return false;
     }
 
-    private List<String> collectSearchResults(@Nullable SourceFile before, @Nullable SourceFile after) {
+    private List<SearchResults.Row> collectSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, String recipeName) {
         if (after == null) {
             return emptyList();
         }
-        Set<SearchResult> alreadyPresentMarkers = new TreeVisitor<Tree, Set<SearchResult>>() {
-            @Override
-            public <M extends Marker> M visitMarker(Marker marker, Set<SearchResult> ctx) {
-                if (marker instanceof SearchResult) {
-                    ctx.add((SearchResult) marker);
+        Set<SearchResult> alreadyPresentMarkers;
+        if (before != null) {
+            alreadyPresentMarkers = new TreeVisitor<Tree, Set<SearchResult>>() {
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, Set<SearchResult> ctx) {
+                    if (marker instanceof SearchResult) {
+                        ctx.add((SearchResult) marker);
+                    }
+                    return super.visitMarker(marker, ctx);
                 }
-                return super.visitMarker(marker, ctx);
-            }
-        }.reduce(before, newSetFromMap(new IdentityHashMap<>()));
+            }.reduce(before, newSetFromMap(new IdentityHashMap<>()));
+        } else {
+            alreadyPresentMarkers = emptySet();
+        }
 
-        return new TreeVisitor<Tree, List<String>>() {
+        return new TreeVisitor<Tree, List<SearchResults.Row>>() {
             @Override
-            public <M extends Marker> M visitMarker(Marker marker, List<String> ctx) {
+            public <M extends Marker> M visitMarker(Marker marker, List<SearchResults.Row> ctx) {
                 if (marker instanceof SearchResult && !alreadyPresentMarkers.contains(marker)) {
                     Cursor cursor = getCursor();
                     if (!(cursor.getValue() instanceof Tree)) {
                         cursor = cursor.getParentTreeCursor();
                     }
                     if (cursor.getValue() instanceof Tree) {
-                        ctx.add(((Tree) cursor.getValue()).print(getCursor(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)));
+                        ctx.add(new SearchResults.Row(
+                                (before == null) ? "" : before.getSourcePath().toString(),
+                                after.getSourcePath().toString(),
+                                StringUtils.trimIndent(((Tree) cursor.getValue()).print(getCursor(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED))),
+                                ((SearchResult) marker).getDescription(),
+                                recipeName));
                     }
                 }
                 return super.visitMarker(marker, ctx);
