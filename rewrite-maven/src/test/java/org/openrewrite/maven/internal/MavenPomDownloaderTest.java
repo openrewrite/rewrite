@@ -1407,6 +1407,8 @@ class MavenPomDownloaderTest implements RewriteTest {
           .filteredOn(rd -> "netty-tcnative-boringssl-static".equals(rd.getArtifactId()))
           .isNotEmpty()
           .extracting(ResolvedDependency::getClassifier)
-          .doesNotContain("${boring-ssl-classifier}");
+          .doesNotContain("${boring-ssl-classifier}")
+          .anyMatch(""::equals)
+          .anyMatch(c -> !"".equals(c));
     }
 }
