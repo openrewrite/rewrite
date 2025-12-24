@@ -1087,17 +1087,30 @@ public class ResolvedPom {
                     MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
-                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), dPom.getProperties(),
-                                emptyList(), true, initialRepositories, emptyList(), emptyList(),
-                                emptyList(), emptyList(), emptyList(), emptyList());
+                        resolvedPom = new ResolvedPom(
+                                dPom,
+                                getActiveProfiles(),
+                                dPom.getProperties(),
+                                emptyList(),
+                                true,
+                                initialRepositories,
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
 
                     String resolvedClassifier = dd.getDefinedIn().getValue(resolvedPom.getValue(dd.getDependency().getClassifier()));
                     // TODO: Uncertain if we should be resolving `type` and `optional` or the dependency's GAV similarly
-                    ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
-                            resolvedPom.getGav(), dd.getDependency().withClassifier(resolvedClassifier), emptyList(),
+                    ResolvedDependency resolved = new ResolvedDependency(
+                            dPom.getRepository(),
+                            resolvedPom.getGav(),
+                            dd.getDependency().withClassifier(resolvedClassifier),
+                            emptyList(),
                             resolvedPom.getRequested().getLicenses(),
                             resolvedPom.getValue(dd.getDependency().getType()),
                             resolvedClassifier,
