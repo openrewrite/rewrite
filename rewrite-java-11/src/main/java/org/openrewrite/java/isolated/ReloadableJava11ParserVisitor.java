@@ -1348,9 +1348,22 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         Space prefix = whitespace();
         TypeTree elemType = convert(typeIdent);
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
-        JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+
+        // Check if this is varargs (...) or regular array brackets ([])
+        Markers markers = Markers.EMPTY;
+        JLeftPadded<Space> dimension;
+        int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
+        if (source.startsWith("...", nextNonWhitespace)) {
+            // Varargs syntax
+            markers = markers.addIfAbsent(new org.openrewrite.java.marker.Varargs(randomId()));
+            dimension = padLeft(sourceBefore("..."), EMPTY);
+        } else {
+            // Regular array brackets
+            dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+        }
+
         assert arrayTypeTree != null;
-        return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
+        return new J.ArrayType(randomId(), prefix, markers,
                 count == 1 ? elemType : mapDimensions(elemType, arrayTypeTree.getType(), annotationPosTable),
                 annotations,
                 dimension,
@@ -1366,22 +1379,32 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
         if (typeIdent instanceof JCArrayTypeTree) {
             List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
-            int saveCursor = cursor;
-            whitespace();
-            if (source.startsWith("[", cursor)) {
-                cursor = saveCursor;
-                JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
-                return new J.ArrayType(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
-                        annotations,
-                        dimension,
-                        typeMapping.type(tree)
-                );
+
+            // Check if this is varargs (...) or regular array brackets ([])
+            Markers markers = Markers.EMPTY;
+            JLeftPadded<Space> dimension;
+            int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
+            if (source.startsWith("...", nextNonWhitespace)) {
+                // Varargs syntax
+                markers = markers.addIfAbsent(new org.openrewrite.java.marker.Varargs(randomId()));
+                dimension = padLeft(sourceBefore("..."), EMPTY);
+            } else if (source.startsWith("[", nextNonWhitespace)) {
+                // Regular array brackets
+                dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+            } else {
+                // No dimension found
+                return baseType;
             }
-            cursor = saveCursor;
+
+            return new J.ArrayType(
+                    randomId(),
+                    EMPTY,
+                    markers,
+                    mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
+                    annotations,
+                    dimension,
+                    typeMapping.type(tree)
+            );
         }
         return baseType;
     }
@@ -1562,7 +1585,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
             int idx = indexOfNextNonWhitespace(elementType.getEndPosition(endPosTable), source);
-            typeExpr = idx != -1 && (source.charAt(idx) == '[' || source.charAt(idx) == '@') ? convert(vartype) :
+            typeExpr = idx != -1 && (source.charAt(idx) == '[' || source.charAt(idx) == '@' || source.startsWith("...", idx)) ? convert(vartype) :
                     // we'll capture the array dimensions in a bit, just convert the element type
                     convert(elementType);
         } else {
@@ -1586,17 +1609,6 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
             Space prefix = typeExprAnnotations.get(0).getPrefix();
             typeExpr = new J.AnnotatedType(randomId(), prefix, Markers.EMPTY, ListUtils.mapFirst(typeExprAnnotations, a -> a.withPrefix(EMPTY)), typeExpr);
-        }
-
-        List<JLeftPadded<Space>> beforeDimensions = emptyList();
-
-        Space varargs = null;
-        if (typeExpr != null && typeExpr.getMarkers().findFirst(JavaVarKeyword.class).isEmpty()) {
-            int varargStart = indexOfNextNonWhitespace(cursor, source);
-            if (source.startsWith("...", varargStart)) {
-                varargs = format(source, cursor, varargStart);
-                cursor = varargStart + 3;
-            }
         }
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(nodes.size());
@@ -1624,7 +1636,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
-        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, beforeDimensions, vars);
+        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, null, vars);
     }
 
     private List<JLeftPadded<Space>> arrayDimensions() {
