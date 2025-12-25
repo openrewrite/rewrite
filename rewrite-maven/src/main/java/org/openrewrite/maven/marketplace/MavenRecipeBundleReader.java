@@ -94,7 +94,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
      * @return Build a marketplace that consists of just the recipes found via classpath scanning
      * in the resolved recipe JAR (not including its dependencies)
      */
-    private RecipeMarketplace marketplaceFromClasspathScan() {
+    RecipeMarketplace marketplaceFromClasspathScan() {
         String[] ga = bundle.getPackageName().split(":");
         RecipeMarketplace marketplace = new RecipeMarketplace();
         List<Path> classpath = classpath();

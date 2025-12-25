@@ -1,2 +1,0 @@
-ecosystem,packageName,name,displayName,description,recipeCount,category1,category2
-maven,org.openrewrite:rewrite-groovy,org.openrewrite.groovy.format.OmitParenthesesFormat,Stylize Groovy code to omit parentheses,Omit parentheses for last argument lambdas in Groovy code.,1,Format,Groovy
