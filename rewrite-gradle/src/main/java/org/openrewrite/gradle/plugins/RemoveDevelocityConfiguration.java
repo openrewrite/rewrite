@@ -43,8 +43,8 @@ public class RemoveDevelocityConfiguration extends Recipe {
         List<Recipe> recipes = new ArrayList<>();
         recipes.add(new RemoveExtension("develocity"));
         recipes.add(new RemoveExtension("gradleEnterprise"));
-        
-        if (removeBuildCache) {
+
+
             recipes.add(new RemoveExtension("buildCache"));
         }
         
