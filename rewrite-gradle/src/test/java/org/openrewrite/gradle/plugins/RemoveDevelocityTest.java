@@ -21,9 +21,16 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class RemoveDevelocityTest implements RewriteTest {
+    
+    static class RemoveDevelocityConfigurationWithBuildCache extends RemoveDevelocityConfiguration {
+        public RemoveDevelocityConfigurationWithBuildCache() {
+            this.removeBuildCache = true;
+        }
+    }
     @Override
     public void defaults(RecipeSpec spec) {
         spec
@@ -94,7 +101,7 @@ class RemoveDevelocityTest implements RewriteTest {
     }
 
     @Test
-    void develocityBuildCacheConnectorConfiguration() {
+    void develocityBuildCacheConnectorConfigurationRemainsWhenFlagFalse() {
         rewriteRun(
           settingsGradle(
             """
@@ -108,18 +115,26 @@ class RemoveDevelocityTest implements RewriteTest {
               
               buildCache {
                   remote(develocity.buildCache) {
-                      // Build Cache connector is registered and configured
                       enabled = true
                   }
               }
               """,
-            ""
+            """
+
+
+
+              buildCache {
+                  remote(develocity.buildCache) {
+                      enabled = true
+                  }
+              }
+              """
           )
         );
     }
 
     @Test
-    void develocityBuildCacheWithAdvancedConfiguration() {
+    void develocityBuildCacheWithAdvancedConfigurationRemainsWhenFlagFalse() {
         rewriteRun(
           settingsGradle(
             """
@@ -136,14 +151,80 @@ class RemoveDevelocityTest implements RewriteTest {
                   remote(develocity.buildCache) {
                       enabled = true
                       push = true
-                      // DevelocityBuildCache connector configuration
                   }
               }
               """,
-            ""
+            """
+              
+
+              
+              buildCache {
+                  remote(develocity.buildCache) {
+                      enabled = true
+                      push = true
+                  }
+              }
+              """
           )
         );
     }
 
-    
+    @Test
+    void removeDevelocityAndBuildCacheWhenFlagTrue() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDevelocityConfigurationWithBuildCache()),
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17.6'
+              }
+              
+              develocity {
+                  server = "https://develocity.example.com"
+              }
+              
+              buildCache {
+                  remote(develocity.buildCache) {
+                      enabled = true
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17.6'
+              }
+            """
+          )
+        );
+    }
+
+    @Test
+    void removeDevelocityAndBuildCacheWithAdvancedConfigWhenFlagTrue() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDevelocityConfigurationWithBuildCache()),
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17.6'
+              }
+              
+              develocity {
+                  server = "https://develocity.example.com"
+                  allowUntrustedServer = false
+              }
+              
+              buildCache {
+                  remote(develocity.buildCache) {
+                      enabled = true
+                      push = true
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17.6'
+              }
+            """)
+        );
+    }
 }

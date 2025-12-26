@@ -15,13 +15,19 @@
  */
 package org.openrewrite.gradle.plugins;
 
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.gradle.RemoveExtension;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 public class RemoveDevelocityConfiguration extends Recipe {
+    @Option(displayName = "Also remove buildCache configuration",
+            description = "Also remove buildCache configuration when removing Develocity Configurations. Defaults to false.",
+            required = false)
+    public Boolean removeBuildCache = false;
+
     @Override
     public String getDisplayName() {
         return "Remove Develocity configuration";
@@ -34,8 +40,14 @@ public class RemoveDevelocityConfiguration extends Recipe {
 
     @Override
     public List<Recipe> getRecipeList() {
-        return Arrays.asList(
-                new RemoveExtension("develocity"),
-                new RemoveExtension("gradleEnterprise"));
+        List<Recipe> recipes = new ArrayList<>();
+        recipes.add(new RemoveExtension("develocity"));
+        recipes.add(new RemoveExtension("gradleEnterprise"));
+        
+        if (removeBuildCache) {
+            recipes.add(new RemoveExtension("buildCache"));
+        }
+        
+        return recipes;
     }
 }
