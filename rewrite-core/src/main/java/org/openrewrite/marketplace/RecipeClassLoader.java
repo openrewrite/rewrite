@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.marketplace;
+package org.openrewrite.marketplace;
+
+import org.jspecify.annotations.Nullable;
 
 import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
@@ -22,6 +24,7 @@ import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -77,7 +80,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.MethodMatcher"
     );
 
-    public RecipeClassLoader(Path recipeJar, List<Path> classpath) {
+    public RecipeClassLoader(@Nullable Path recipeJar, List<Path> classpath) {
         this(getUrls(recipeJar, classpath), RecipeClassLoader.class.getClassLoader());
     }
 
@@ -101,7 +104,15 @@ public class RecipeClassLoader extends URLClassLoader {
             // Determine delegation strategy
             try {
                 if (shouldDelegateToParent(name)) {
-                    foundClass = parent.loadClass(name);
+                    try {
+                        foundClass = parent.loadClass(name);
+                    } catch (ClassNotFoundException e) {
+                        // Fall back to child if parent doesn't have the class.
+                        // This handles marker/tree/style types from language-specific modules
+                        // (e.g., org.openrewrite.gradle.marker.GradlePluginDescriptor)
+                        // that aren't on the parent classloader.
+                        foundClass = findClass(name);
+                    }
                 } else {
                     // Try child-first for non-delegated classes
                     foundClass = findClass(name);
@@ -181,21 +192,11 @@ public class RecipeClassLoader extends URLClassLoader {
     }
 
     /**
-     * Create a standard ClassLoader for the recipe JAR and its dependencies.
-     * This is primarily used for scanning operations where ClassGraph needs standard parent delegation.
-     */
-    public static ClassLoader forScanning(Path recipeJar, List<Path> classpath) {
-        return new URLClassLoader(
-                getUrls(recipeJar, classpath),
-                RecipeClassLoader.class.getClassLoader()
-        );
-    }
-
-    /**
      * Convert paths to URL array for URLClassLoader.
      */
-    public static URL[] getUrls(Path recipeJar, List<Path> classpath) {
+    public static URL[] getUrls(@Nullable Path recipeJar, List<Path> classpath) {
         return Stream.concat(classpath.stream(), Stream.of(recipeJar))
+                .filter(Objects::nonNull)
                 .map(Path::toUri)
                 .map(uri -> {
                     try {

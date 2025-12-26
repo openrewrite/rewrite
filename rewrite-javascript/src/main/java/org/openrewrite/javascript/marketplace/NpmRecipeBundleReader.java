@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,32 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.marketplace;
+package org.openrewrite.javascript.marketplace;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
+import org.openrewrite.marketplace.*;
 
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 @RequiredArgsConstructor
-public class ThrowingRecipeBundleReader implements RecipeBundleReader {
+public class NpmRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
-    private final RuntimeException t;
+    private final JavaScriptRewriteRpc rpc;
 
     @Override
     public RecipeMarketplace read() {
-        throw t;
+        return rpc.getMarketplace(bundle);
     }
 
     @Override
     public RecipeDescriptor describe(RecipeListing listing) {
-        throw t;
+        return rpc.prepareRecipe(listing.getName()).getDescriptor();
     }
 
     @Override
     public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
-        throw t;
+        return rpc.prepareRecipe(listing.getName(), options);
     }
 }
