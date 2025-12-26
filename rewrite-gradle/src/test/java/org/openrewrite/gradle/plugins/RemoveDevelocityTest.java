@@ -25,7 +25,6 @@ import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class RemoveDevelocityTest implements RewriteTest {
-    
     static class RemoveDevelocityConfigurationWithBuildCache extends RemoveDevelocityConfiguration {
         public RemoveDevelocityConfigurationWithBuildCache() {
             this.removeBuildCache = true;
