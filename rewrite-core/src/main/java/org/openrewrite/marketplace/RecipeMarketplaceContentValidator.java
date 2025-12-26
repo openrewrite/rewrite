@@ -46,8 +46,8 @@ public class RecipeMarketplaceContentValidator {
         for (RecipeListing recipe : category.getRecipes()) {
             String value = recipe.getName() + (categoryPath.isEmpty() ? "" : categoryPath.stream()
                     .collect(joining(" > ", "[", "]")));
-            validation = validation.and(validateDisplayName(validation, recipe.getDisplayName(), value));
-            validation = validation.and(validateDescription(validation, recipe.getDescription(), value));
+            validation = validation.and(validateDisplayName(recipe.getDisplayName(), value));
+            validation = validation.and(validateDescription(recipe.getDescription(), value));
         }
 
         for (RecipeMarketplace.Category child : category.getCategories()) {
@@ -59,9 +59,8 @@ public class RecipeMarketplaceContentValidator {
         return validation;
     }
 
-    private Validated<RecipeMarketplace> validateDisplayName(Validated<RecipeMarketplace> validation,
-                                                             String displayName,
-                                                             String recipe) {
+    private Validated<RecipeMarketplace> validateDisplayName(String displayName, String recipe) {
+        Validated<RecipeMarketplace> validation = Validated.none();
         String property = recipe + ".displayName";
         if (displayName.isEmpty()) {
             validation = validation.and(Validated.invalid(property, displayName, "Display must not be empty"));
@@ -75,12 +74,11 @@ public class RecipeMarketplaceContentValidator {
         return validation;
     }
 
-    private Validated<RecipeMarketplace> validateDescription(Validated<RecipeMarketplace> validation,
-                                                             String description,
-                                                             String recipe) {
+    private Validated<RecipeMarketplace> validateDescription(String description, String recipe) {
         if (description.isEmpty()) {
-            return validation;
+            return Validated.none();
         }
+        Validated<RecipeMarketplace> validation = Validated.none();
         String property = recipe + ".description";
         if (!Character.isUpperCase(description.charAt(0))) {
             validation = validation.and(Validated.invalid(property, description, "Description must be sentence cased"));
