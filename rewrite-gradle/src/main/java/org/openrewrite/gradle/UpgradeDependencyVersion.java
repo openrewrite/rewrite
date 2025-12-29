@@ -138,12 +138,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         Map<GroupArtifact, @Nullable Object> gaToNewVersion = new HashMap<>();
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
-
-        /**
-         * All dependencies found in AST across all build scripts (including freestanding scripts).
-         * Used to detect if a resolved dependency was declared somewhere.
-         */
-        Set<GroupArtifact> allDeclaredDependencies = new HashSet<>();
     }
 
     @Override
@@ -196,9 +190,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 // Record the dependency and resolve its version if needed
                 GroupArtifact ga = new GroupArtifact(groupId, artifactId);
                 String configName = gradleDependency.getConfigurationName();
-
-                // Track all declared dependencies across all build scripts
-                acc.allDeclaredDependencies.add(ga);
 
                 if (gradleProject != null) {
                     acc.getConfigurationPerGAPerModule()
@@ -416,11 +407,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                     GroupArtifact ga = new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId());
 
-                    // Skip if declared in any build script or in this configuration's requested list
-                    if (acc.allDeclaredDependencies.contains(ga) ||
-                            configuration.getRequested().stream().anyMatch(req ->
-                                    ga.getGroupId().equals(req.getGroupId()) &&
-                                    ga.getArtifactId().equals(req.getArtifactId()))) {
+                    // Skip if declared in this configuration's requested list
+                    if (configuration.getRequested().stream().anyMatch(req ->
+                            ga.getGroupId().equals(req.getGroupId()) &&
+                            ga.getArtifactId().equals(req.getArtifactId()))) {
                         continue;
                     }
 
