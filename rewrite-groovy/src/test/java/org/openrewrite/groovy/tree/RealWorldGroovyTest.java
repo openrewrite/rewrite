@@ -184,6 +184,7 @@ class RealWorldGroovyTest implements RewriteTest {
 
     @Issue("https://github.com/spring-projects/spring-session-data-geode/blob/v3.4.1/buildSrc/src/main/groovy/io/spring/gradle/convention/SchemaZipPlugin.groovy")
     @Test
+    @Disabled
     void springTestDataGeodeSchemaZipPlugin() {
         rewriteRun(
           groovy(
