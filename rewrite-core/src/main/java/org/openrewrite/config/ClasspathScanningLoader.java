@@ -93,6 +93,34 @@ public class ClasspathScanningLoader implements ResourceLoader {
         };
     }
 
+    /**
+     * Construct a ClasspathScanningLoader that only scans a specific jar for recipes.
+     *
+     * @param properties    YAML placeholder properties
+     * @param onlyAcceptJar Limit scan to this jar file
+     * @param classLoader   Limit scan to classes loadable by this classloader
+     */
+    public ClasspathScanningLoader(Properties properties, Path onlyAcceptJar, ClassLoader classLoader) {
+        this.classLoader = classLoader;
+        this.recipeLoader = new RecipeLoader(classLoader);
+        this.performScan = () -> {
+            scanClasses(new ClassGraph()
+                            .acceptJars(onlyAcceptJar.getFileName().toString())
+                            .ignoreParentClassLoaders()
+                            .overrideClassLoaders(classLoader),
+                    classLoader);
+
+            scanYaml(new ClassGraph()
+                            .acceptJars(onlyAcceptJar.getFileName().toString())
+                            .ignoreParentClassLoaders()
+                            .overrideClassLoaders(classLoader)
+                            .acceptPaths("META-INF/rewrite"),
+                    properties,
+                    emptyList(),
+                    classLoader);
+        };
+    }
+
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
