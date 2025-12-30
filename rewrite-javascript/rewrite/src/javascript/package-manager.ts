@@ -19,8 +19,7 @@ import {
     findNodeResolutionResult,
     PackageJsonContent,
     PackageLockContent,
-    PackageManager,
-    readNpmrcConfigs
+    PackageManager
 } from "./node-resolution-result";
 import {replaceMarkerByKind} from "../markers";
 import {Json, JsonParser, JsonVisitor} from "../json";
@@ -59,35 +58,37 @@ interface PackageManagerConfig {
 const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
     [PackageManager.Npm]: {
         lockFile: 'package-lock.json',
-        installLockOnlyCommand: ['npm', 'install', '--package-lock-only'],
-        installCommand: ['npm', 'install'],
+        // --ignore-scripts prevents prepublish/prepare scripts from running in temp directory
+        installLockOnlyCommand: ['npm', 'install', '--package-lock-only', '--ignore-scripts'],
+        installCommand: ['npm', 'install', '--ignore-scripts'],
         listCommand: ['npm', 'list', '--json', '--all'],
     },
     [PackageManager.YarnClassic]: {
         lockFile: 'yarn.lock',
-        // Yarn Classic doesn't have a lock-only mode
+        // Yarn Classic doesn't have a lock-only mode; --ignore-scripts prevents lifecycle scripts
         installLockOnlyCommand: ['yarn', 'install', '--ignore-scripts'],
-        installCommand: ['yarn', 'install'],
+        installCommand: ['yarn', 'install', '--ignore-scripts'],
         listCommand: ['yarn', 'list', '--json'],
     },
     [PackageManager.YarnBerry]: {
         lockFile: 'yarn.lock',
-        // Yarn Berry's mode skip-build skips post-install scripts
+        // --mode skip-build skips post-install scripts in Yarn Berry
         installLockOnlyCommand: ['yarn', 'install', '--mode', 'skip-build'],
-        installCommand: ['yarn', 'install'],
+        installCommand: ['yarn', 'install', '--mode', 'skip-build'],
         listCommand: ['yarn', 'info', '--all', '--json'],
     },
     [PackageManager.Pnpm]: {
         lockFile: 'pnpm-lock.yaml',
-        installLockOnlyCommand: ['pnpm', 'install', '--lockfile-only'],
-        installCommand: ['pnpm', 'install'],
+        // --ignore-scripts prevents lifecycle scripts from running in temp directory
+        installLockOnlyCommand: ['pnpm', 'install', '--lockfile-only', '--ignore-scripts'],
+        installCommand: ['pnpm', 'install', '--ignore-scripts'],
         listCommand: ['pnpm', 'list', '--json', '--depth=Infinity'],
     },
     [PackageManager.Bun]: {
         lockFile: 'bun.lock',
-        // Bun doesn't have a lock-only mode, but is very fast anyway
+        // Bun doesn't have a lock-only mode; --ignore-scripts prevents lifecycle scripts
         installLockOnlyCommand: ['bun', 'install', '--ignore-scripts'],
-        installCommand: ['bun', 'install'],
+        installCommand: ['bun', 'install', '--ignore-scripts'],
     },
 };
 
