@@ -29,6 +29,8 @@ import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
 import {getLockFileDetectionConfig, runList} from "./package-manager";
+import picomatch from "picomatch";
+import {DEFAULT_DIR_EXCLUSIONS, walkDirs} from "../path-utils";
 
 /**
  * Bun.lock package entry metadata.
@@ -222,11 +224,24 @@ export class PackageJsonParser extends Parser {
             const projectDir = this.relativeTo || dir;
             const npmrcConfigs = await readNpmrcConfigs(projectDir);
 
+            // Detect workspace member paths if this is a workspace root
+            let workspacePackagePaths: string[] | undefined;
+            if (packageJson.workspaces) {
+                const absoluteDir = this.relativeTo && !path.isAbsolute(dir)
+                    ? path.resolve(this.relativeTo, dir)
+                    : dir;
+                workspacePackagePaths = await this.resolveWorkspacePackagePaths(
+                    packageJson.workspaces,
+                    absoluteDir,
+                    this.relativeTo
+                );
+            }
+
             return createNodeResolutionResultMarker(
                 relativePath,
                 packageJson,
                 lockContent,
-                undefined,
+                workspacePackagePaths,
                 packageManager,
                 npmrcConfigs.length > 0 ? npmrcConfigs : undefined
             );
@@ -234,6 +249,131 @@ export class PackageJsonParser extends Parser {
             console.warn(`Failed to create NodeResolutionResult marker: ${error}`);
             return null;
         }
+    }
+
+    /**
+     * Resolves workspace glob patterns to actual package.json paths.
+     *
+     * Workspaces can be specified as:
+     * - Array of globs: ["packages/*", "apps/*", "packages/**", "{apps,libs}/*"]
+     * - Object with packages array: { packages: ["packages/*"] }
+     * - Negation patterns: ["packages/*", "!packages/internal"]
+     *
+     * @param workspaces The workspaces field from package.json
+     * @param projectDir The absolute path to the project directory
+     * @param relativeTo Optional base path for creating relative paths
+     * @returns Array of relative paths to workspace member package.json files
+     */
+    private async resolveWorkspacePackagePaths(
+        workspaces: string[] | { packages?: string[] },
+        projectDir: string,
+        relativeTo?: string
+    ): Promise<string[] | undefined> {
+        // Normalize workspaces to array format
+        const patterns = Array.isArray(workspaces)
+            ? workspaces
+            : workspaces.packages;
+
+        if (!patterns || patterns.length === 0) {
+            return undefined;
+        }
+
+        // Separate include and exclude patterns
+        const includePatterns = patterns.filter(p => !p.startsWith('!'));
+        const excludePatterns = patterns.filter(p => p.startsWith('!')).map(p => p.slice(1));
+
+        // Create picomatch matchers
+        const isIncluded = includePatterns.length > 0
+            ? picomatch(includePatterns, { dot: false })
+            : () => false;
+        const isExcluded = excludePatterns.length > 0
+            ? picomatch(excludePatterns, { dot: false })
+            : () => false;
+
+        // Collect all candidate directories by walking the project
+        const candidateDirs = await this.collectCandidateWorkspaceDirs(projectDir, includePatterns);
+
+        const memberPaths: string[] = [];
+        const basePath = relativeTo || projectDir;
+
+        for (const candidateDir of candidateDirs) {
+            // Get relative path from project root for pattern matching
+            const relativeDir = path.relative(projectDir, candidateDir);
+
+            // Check if directory matches include patterns and not exclude patterns
+            if (isIncluded(relativeDir) && !isExcluded(relativeDir)) {
+                const packageJsonPath = path.join(candidateDir, 'package.json');
+                if (fs.existsSync(packageJsonPath)) {
+                    const relativePath = path.relative(basePath, packageJsonPath);
+                    memberPaths.push(relativePath);
+                }
+            }
+        }
+
+        return memberPaths.length > 0 ? memberPaths : undefined;
+    }
+
+    /**
+     * Collects candidate directories that might match workspace patterns.
+     * Uses the patterns to determine how deep to scan.
+     */
+    private async collectCandidateWorkspaceDirs(
+        projectDir: string,
+        patterns: string[]
+    ): Promise<string[]> {
+        const candidates: string[] = [];
+
+        // Determine the maximum depth we need to scan based on patterns
+        // "packages/*" -> depth 1 under packages/
+        // "packages/**" -> unlimited depth under packages/
+        // "{apps,libs}/*" -> depth 1 under apps/ and libs/
+
+        for (const pattern of patterns) {
+            // Extract base directories from pattern (before any wildcards)
+            const baseDirs = this.extractBaseDirs(pattern);
+            const hasRecursive = pattern.includes('**');
+
+            for (const baseDir of baseDirs) {
+                const absoluteBaseDir = path.join(projectDir, baseDir);
+
+                if (!fs.existsSync(absoluteBaseDir)) {
+                    continue;
+                }
+
+                // Use walkDirs with appropriate depth limit
+                const dirs = await walkDirs(absoluteBaseDir, {
+                    maxDepth: hasRecursive ? undefined : 0,
+                    excludeDirs: DEFAULT_DIR_EXCLUSIONS
+                });
+
+                candidates.push(...dirs);
+            }
+        }
+
+        return candidates;
+    }
+
+    /**
+     * Extracts base directory paths from a glob pattern.
+     * Handles brace expansion like "{apps,libs}/*" -> ["apps", "libs"]
+     */
+    private extractBaseDirs(pattern: string): string[] {
+        // Find the first wildcard character
+        const wildcardIndex = pattern.search(/[*?]/);
+        const beforeWildcard = wildcardIndex >= 0 ? pattern.slice(0, wildcardIndex) : pattern;
+
+        // Remove trailing slash if present
+        const basePath = beforeWildcard.replace(/\/$/, '');
+
+        // Handle brace expansion at the end of basePath: "dir/{a,b}" or "{a,b}"
+        const braceMatch = basePath.match(/^(.*?)(?:\{([^}]+)\})?$/);
+        if (braceMatch && braceMatch[2]) {
+            const prefix = braceMatch[1];
+            const options = braceMatch[2].split(',').map(s => s.trim());
+            return options.map(opt => prefix + opt);
+        }
+
+        return basePath ? [basePath] : ['.'];
     }
 
     /**

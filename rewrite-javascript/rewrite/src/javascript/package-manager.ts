@@ -602,34 +602,48 @@ export interface TempInstallOptions {
 }
 
 /**
- * Runs package manager install in a temporary directory.
- *
- * This function:
- * 1. Creates a temp directory
- * 2. Writes the provided package.json content
- * 3. Writes the lock file content (if provided)
- * 4. Writes config files (if provided)
- * 5. Runs the package manager install
- * 6. Returns the updated lock file content
- * 7. Cleans up the temp directory
- *
- * @param pm The package manager to use
- * @param modifiedPackageJson The modified package.json content to use
- * @param options Optional settings for timeout, lock-only mode, and file contents
- * @returns Result containing success status and lock file content or error
+ * Options for running install in a temporary directory with workspace support.
  */
-export async function runInstallInTempDir(
+export interface WorkspaceTempInstallOptions extends TempInstallOptions {
+    /**
+     * Workspace package.json files. Keys are relative paths from the project root
+     * (e.g., "packages/foo/package.json"), values are the package.json content.
+     * The root package.json should have a "workspaces" field pointing to these packages.
+     */
+    workspacePackages?: Record<string, string>;
+}
+
+/**
+ * Internal implementation for running package manager install in a temporary directory.
+ * Supports both simple projects and workspaces.
+ */
+async function runInstallInTempDirCore(
     pm: PackageManager,
-    modifiedPackageJson: string,
-    options: TempInstallOptions = {}
+    rootPackageJson: string,
+    options: WorkspaceTempInstallOptions = {}
 ): Promise<TempInstallResult> {
-    const {timeout = 120000, lockOnly = true, originalLockFileContent, configFiles: configFileContents} = options;
+    const {
+        timeout = 120000,
+        lockOnly = true,
+        originalLockFileContent,
+        configFiles: configFileContents,
+        workspacePackages
+    } = options;
     const lockFileName = getLockFileName(pm);
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
 
     try {
-        // Write modified package.json to temp directory
-        await fsp.writeFile(path.join(tempDir, 'package.json'), modifiedPackageJson);
+        // Write root package.json to temp directory
+        await fsp.writeFile(path.join(tempDir, 'package.json'), rootPackageJson);
+
+        // Write workspace package.json files (creating subdirectories as needed)
+        if (workspacePackages) {
+            for (const [relativePath, content] of Object.entries(workspacePackages)) {
+                const fullPath = path.join(tempDir, relativePath);
+                await fsp.mkdir(path.dirname(fullPath), {recursive: true});
+                await fsp.writeFile(fullPath, content);
+            }
+        }
 
         // Write lock file if provided
         if (originalLockFileContent !== undefined) {
@@ -689,6 +703,57 @@ export async function runInstallInTempDir(
             // Ignore cleanup errors
         }
     }
+}
+
+/**
+ * Runs package manager install in a temporary directory.
+ *
+ * This function:
+ * 1. Creates a temp directory
+ * 2. Writes the provided package.json content
+ * 3. Writes the lock file content (if provided)
+ * 4. Writes config files (if provided)
+ * 5. Runs the package manager install
+ * 6. Returns the updated lock file content
+ * 7. Cleans up the temp directory
+ *
+ * @param pm The package manager to use
+ * @param modifiedPackageJson The modified package.json content to use
+ * @param options Optional settings for timeout, lock-only mode, and file contents
+ * @returns Result containing success status and lock file content or error
+ */
+export async function runInstallInTempDir(
+    pm: PackageManager,
+    modifiedPackageJson: string,
+    options: TempInstallOptions = {}
+): Promise<TempInstallResult> {
+    return runInstallInTempDirCore(pm, modifiedPackageJson, options);
+}
+
+/**
+ * Runs package manager install in a temporary directory with workspace support.
+ *
+ * This function:
+ * 1. Creates a temp directory
+ * 2. Writes the root package.json content
+ * 3. Writes workspace package.json files (creating subdirectories as needed)
+ * 4. Writes the lock file content (if provided)
+ * 5. Writes config files (if provided)
+ * 6. Runs the package manager install at the root
+ * 7. Returns the updated lock file content
+ * 8. Cleans up the temp directory
+ *
+ * @param pm The package manager to use
+ * @param rootPackageJson The root package.json content (should contain "workspaces" field)
+ * @param options Optional settings including workspace packages, timeout, lock-only mode, and file contents
+ * @returns Result containing success status and lock file content or error
+ */
+export async function runWorkspaceInstallInTempDir(
+    pm: PackageManager,
+    rootPackageJson: string,
+    options: WorkspaceTempInstallOptions = {}
+): Promise<TempInstallResult> {
+    return runInstallInTempDirCore(pm, rootPackageJson, options);
 }
 
 /**
