@@ -32,15 +32,16 @@ class RecipeMarketplaceContentValidatorTest {
       VALID_DISPLAY_NAME  + ',' + VALID_DESCRIPTION,
       VALID_DISPLAY_NAME  + ',' + "`Removes` unnecessary parentheses from code.",
       VALID_DISPLAY_NAME  + ',' + "[Removes](link) unnecessary parentheses from code.",
+      VALID_DISPLAY_NAME  + ',' + " - Some list item." ,
+      VALID_DISPLAY_NAME  + ',' + " - `other` list item." ,
       "`Remove` unnecessary parentheses"  + ',' + VALID_DESCRIPTION,
       "[Remove](link) unnecessary parentheses"  + ',' + VALID_DESCRIPTION,
     })
-    void validMarketplace() {
-        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+    void validMarketplace(String displayName, String description) {
+         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
           name,displayName,description,category,ecosystem,packageName
-          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove unnecessary parentheses,Removes unnecessary parentheses from code.,Java,maven,org.openrewrite:rewrite-java
-          """);
-
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,%s,%s,Java,maven,org.openrewrite:rewrite-java
+          """.formatted(displayName, description));
         RecipeMarketplaceContentValidator validator = new RecipeMarketplaceContentValidator();
         Validated<RecipeMarketplace> validation = validator.validate(marketplace);
 
