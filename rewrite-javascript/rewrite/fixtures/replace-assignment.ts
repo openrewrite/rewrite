@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {createDraft, finishDraft} from "immer";
 import {emptyMarkers, ExecutionContext, Option, randomId, Recipe, TreeVisitor} from "@openrewrite/rewrite";
+import {create} from "mutative";
 import {JavaScriptVisitor} from "@openrewrite/rewrite/javascript";
 import {J, singleSpace, Type} from "@openrewrite/rewrite/java";
 
@@ -41,7 +41,7 @@ export class ReplaceAssignment extends Recipe {
                 if ((variable.initializer!.element as J.Literal).valueSource === envVarValue) {
                     return super.visitVariable(variable, c);
                 }
-                let draft = createDraft(variable);
+                const [draft, finishDraft] = create(variable);
                 draft.initializer = {
                     kind: J.Kind.LeftPadded,
                     markers: emptyMarkers,
@@ -52,10 +52,10 @@ export class ReplaceAssignment extends Recipe {
                         markers: emptyMarkers,
                         valueSource: envVarValue,
                         type: Type.Primitive.String,
-                    },
+                    } as J.Literal,
                     before: singleSpace,
                 };
-                return finishDraft(draft);
+                return finishDraft();
             }
         }
     }

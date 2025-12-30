@@ -16,7 +16,7 @@
 import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
-import {produce} from 'immer';
+import {create as produce} from 'mutative';
 import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';

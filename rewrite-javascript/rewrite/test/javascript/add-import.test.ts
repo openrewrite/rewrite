@@ -37,7 +37,7 @@ import {emptySpace, J} from "../../src/java";
 import {MarkersKind} from "../../src/markers";
 import {randomId} from "../../src/uuid";
 import {NamedStyles} from "../../src/style";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {withDir} from "tmp-promise";
 
 /**

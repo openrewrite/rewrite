@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JS, JSX} from "./tree";
-import {JavaScriptVisitor} from "./visitor";
+import {JS, JSX} from "../tree";
+import {JavaScriptVisitor} from "../visitor";
 import {
     isJava,
     isSpace,
@@ -25,13 +25,13 @@ import {
     replaceLastWhitespace,
     spaceContainsNewline,
     stripLeadingIndent
-} from "../java";
-import {produce} from "immer";
-import {Cursor, isScope, isTree, Tree} from "../tree";
-import {mapAsync} from "../util";
-import {produceAsync} from "../visitor";
-import {TabsAndIndentsStyle} from "./style";
-import {findMarker} from "../markers";
+} from "../../java";
+import {create as produce} from "mutative";
+import {Cursor, isScope, isTree, Tree} from "../../tree";
+import {mapAsync} from "../../util";
+import {produceAsync} from "../../visitor";
+import {TabsAndIndentsStyle} from "../style";
+import {findMarker} from "../../markers";
 
 type IndentKind = 'block' | 'continuation' | 'align';
 type IndentContext = [number, IndentKind];  // [indent, kind]

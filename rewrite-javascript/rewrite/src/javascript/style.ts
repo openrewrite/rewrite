@@ -27,8 +27,62 @@ export const StyleKind = {
     SpacesStyle: "org.openrewrite.javascript.style.SpacesStyle",
     WrappingAndBracesStyle: "org.openrewrite.javascript.style.WrappingAndBracesStyle",
     BlankLinesStyle: "org.openrewrite.javascript.style.BlankLinesStyle",
-    TabsAndIndentsStyle: "org.openrewrite.javascript.style.TabsAndIndentsStyle"
+    TabsAndIndentsStyle: "org.openrewrite.javascript.style.TabsAndIndentsStyle",
+    PrettierStyle: "org.openrewrite.javascript.style.PrettierStyle",
+    Autodetect: "org.openrewrite.javascript.style.Autodetect"
 } as const;
+
+/**
+ * Style for Prettier-based formatting.
+ *
+ * This implements NamedStyles so it can be both:
+ * - A marker attached to source files (detected from project's .prettierrc)
+ * - A style that can be passed via the styles parameter or found via getStyle
+ *
+ * When this style is present, AutoformatVisitor will use Prettier for formatting
+ * instead of the built-in formatting visitors.
+ */
+export interface PrettierStyle extends NamedStyles<typeof StyleKind.PrettierStyle> {
+    readonly kind: typeof StyleKind.PrettierStyle;
+    readonly name: "org.openrewrite.javascript.Prettier";
+    readonly displayName: "Prettier";
+    readonly description: "Prettier code formatter configuration.";
+    /**
+     * The resolved Prettier options for this file (with overrides applied).
+     */
+    readonly config: Record<string, unknown>;
+    /**
+     * The Prettier version from the project's package.json.
+     * At formatting time, this version of Prettier will be loaded dynamically
+     * to ensure consistent formatting.
+     */
+    readonly prettierVersion?: string;
+    /**
+     * Whether this file is ignored by .prettierignore.
+     * When true, Prettier formatting should be skipped for this file.
+     */
+    readonly ignored: boolean;
+}
+
+export function prettierStyle(
+    id: string,
+    config: Record<string, unknown>,
+    prettierVersion?: string,
+    ignored: boolean = false
+): PrettierStyle {
+    return {
+        kind: StyleKind.PrettierStyle,
+        id,
+        name: "org.openrewrite.javascript.Prettier",
+        displayName: "Prettier",
+        description: "Prettier code formatter configuration.",
+        tags: [],
+        styles: [],
+        config,
+        prettierVersion,
+        ignored
+    };
+}
 
 export const SpacesStyleDetailKind = {
     SpacesStyleBeforeParentheses: "org.openrewrite.javascript.style.SpacesStyle$BeforeParentheses",
@@ -148,7 +202,7 @@ export namespace SpacesStyle {
 }
 
 export const WrappingAndBracesStyleDetailKind = {
-    WrappingAndBracesStyleIfStatement: "org.openrewrite.java.style.WrappingAndBracesStyle$IfStatement",
+    WrappingAndBracesStyleIfStatement: "org.openrewrite.javascript.style.WrappingAndBracesStyle$IfStatement",
     WrappingAndBracesStyleKeepWhenReformatting: "org.openrewrite.javascript.style.WrappingAndBracesStyle$KeepWhenReformatting",
 } as const;
 
@@ -525,7 +579,7 @@ export function styleFromSourceFile(styleKind: string, sourceFile: Tree): Style 
  * @param sourceFile The source file to check for styles
  * @param styles Optional array of NamedStyles that take precedence over source file styles
  */
-export function getStyle(styleKind: string, sourceFile: Tree, styles?: NamedStyles[]): Style | undefined {
+export function getStyle(styleKind: string, sourceFile: Tree, styles?: NamedStyles<string>[]): Style | undefined {
     // First check passed-in styles (highest precedence)
     if (styles) {
         for (const namedStyle of styles) {

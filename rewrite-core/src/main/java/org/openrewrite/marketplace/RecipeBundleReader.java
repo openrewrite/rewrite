@@ -28,6 +28,4 @@ public interface RecipeBundleReader {
     RecipeDescriptor describe(RecipeListing listing);
 
     Recipe prepare(RecipeListing listing, Map<String, Object> options);
-
-    ClassLoader classLoader();
 }

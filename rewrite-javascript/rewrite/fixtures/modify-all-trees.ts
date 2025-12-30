@@ -17,17 +17,18 @@
  */
 import {
     ExecutionContext,
+    JavaScript,
     marker,
     Marker,
     randomId,
     Recipe,
-    RecipeRegistry,
+    RecipeMarketplace,
     Tree,
     TreeVisitor
 } from "@openrewrite/rewrite";
 
-export function activate(registry: RecipeRegistry) {
-    registry.register(ModifyAllTrees);
+export async function activate(marketplace: RecipeMarketplace) {
+    await marketplace.install(ModifyAllTrees, JavaScript);
 }
 
 const changed: Marker = marker(randomId());

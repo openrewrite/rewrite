@@ -25,7 +25,7 @@ import {
     typescript
 } from "../../../src/javascript";
 import { Expression, J } from "../../../src/java";
-import { createDraft, produce } from "immer";
+import { castDraft, create as produce } from "mutative";
 
 describe('match extraction', () => {
     const spec = new RecipeSpec();
@@ -41,9 +41,9 @@ describe('match extraction', () => {
                         // Extract the captured parts
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
-                            draft.left = createDraft((m.get("right"))!);
+                            draft.left = castDraft((m.get("right"))!);
                             draft.prefix = binary.left.prefix;
-                            draft.right = createDraft((m.get("left"))!);
+                            draft.right = castDraft((m.get("left"))!);
                             draft.right.prefix = binary.right.prefix;
                         });
                     }
@@ -115,9 +115,9 @@ describe('match extraction', () => {
 
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
-                            draft.left = createDraft(rightValue!);
+                            draft.left = castDraft(rightValue!);
                             draft.prefix = binary.left.prefix;
-                            draft.right = createDraft(leftValue!);
+                            draft.right = castDraft(leftValue!);
                             draft.right.prefix = binary.right.prefix;
                         });
                     }

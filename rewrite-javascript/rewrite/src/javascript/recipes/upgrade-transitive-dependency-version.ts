@@ -225,7 +225,13 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                 if (getAllLockFileNames().includes(lockFileName)) {
                     const updatedLockContent = acc.updatedLockFiles.get(sourcePath);
                     if (updatedLockContent) {
-                        return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
+                        const parsed = await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
+                        // Preserve original ID for RPC compatibility
+                        return {
+                            ...doc,
+                            value: parsed.value,
+                            eof: parsed.eof
+                        } as Json.Document;
                     }
                 }
 
@@ -268,10 +274,12 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                     sourcePath: doc.sourcePath
                 }) as Json.Document;
 
+                // Preserve original ID for RPC compatibility
                 return {
-                    ...parsed,
-                    markers: doc.markers
-                };
+                    ...doc,
+                    value: parsed.value,
+                    eof: parsed.eof
+                } as Json.Document;
             }
         };
 

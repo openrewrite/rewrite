@@ -107,10 +107,28 @@ export class PackageJsonParser extends Parser {
             entry.engines = pkgJson.engines;
         }
         if (pkgJson.license) {
-            entry.license = pkgJson.license;
+            // Normalize legacy license formats to string
+            entry.license = PackageJsonParser.normalizeLicense(pkgJson.license);
         }
 
         return entry;
+    }
+
+    /**
+     * Normalizes the license field from package.json.
+     * Older packages may have license in legacy formats:
+     * - Array: ["MIT", "Apache2"] -> "(MIT OR Apache2)"
+     * - Object: { type: "MIT", url: "..." } -> "MIT"
+     */
+    private static normalizeLicense(license: any): string | undefined {
+        if (!license) return undefined;
+        if (Array.isArray(license)) {
+            return license.length > 0 ? `(${license.join(' OR ')})` : undefined;
+        }
+        if (typeof license === 'object' && license.type) {
+            return license.type;
+        }
+        return typeof license === 'string' ? license : undefined;
     }
 
     /**
@@ -394,12 +412,21 @@ export class PackageJsonParser extends Parser {
             }
 
             // Parse name@version from directory name
+            // pnpm directory format: <name>@<version> or <name>@<version>_<peer-deps-context>
             // Handle scoped packages: @scope+name@version
-            const atIndex = entry.name.lastIndexOf('@');
+            // Example: @babel+helper-module-transforms@7.28.3_@babel+core@7.28.5
+            //   -> name: @babel/helper-module-transforms, version: 7.28.3
+
+            // First, strip peer dependency context (everything after first _)
+            const underscoreIndex = entry.name.indexOf('_');
+            const mainPart = underscoreIndex > 0 ? entry.name.substring(0, underscoreIndex) : entry.name;
+
+            // Now parse name@version from the main part
+            const atIndex = mainPart.lastIndexOf('@');
             if (atIndex <= 0) return;
 
-            let name = entry.name.substring(0, atIndex);
-            const version = entry.name.substring(atIndex + 1);
+            let name = mainPart.substring(0, atIndex);
+            const version = mainPart.substring(atIndex + 1);
 
             // pnpm encodes @ as + in scoped packages: @scope+name -> @scope/name
             if (name.startsWith('@') && name.includes('+')) {
