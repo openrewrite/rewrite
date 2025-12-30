@@ -16,13 +16,25 @@
 package org.openrewrite.marketplace;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Validated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeMarketplaceContentValidatorTest {
 
-    @Test
+    private static final String VALID_DISPLAY_NAME = "Remove unnecessary parentheses";
+    private static final String VALID_DESCRIPTION = "Removes unnecessary parentheses from code.";
+
+    @ParameterizedTest
+    @CsvSource({
+      VALID_DISPLAY_NAME  + ',' + VALID_DESCRIPTION,
+      VALID_DISPLAY_NAME  + ',' + "`Removes` unnecessary parentheses from code.",
+      VALID_DISPLAY_NAME  + ',' + "[Removes](link) unnecessary parentheses from code.",
+      "`Remove` unnecessary parentheses"  + ',' + VALID_DESCRIPTION,
+      "[Remove](link) unnecessary parentheses"  + ',' + VALID_DESCRIPTION,
+    })
     void validMarketplace() {
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
           name,displayName,description,category,ecosystem,packageName
