@@ -65,7 +65,7 @@ public class RecipeMarketplaceContentValidator {
         if (displayName.isEmpty()) {
             validation = validation.and(Validated.invalid(property, displayName, "Display must not be empty"));
         }
-        if (!Character.isUpperCase(displayName.charAt(0))) {
+        if (doesNotStartWithUppercase(displayName)) {
             validation = validation.and(Validated.invalid(property, displayName, "Display name must be sentence cased"));
         }
         if (displayName.endsWith(".")) {
@@ -80,7 +80,7 @@ public class RecipeMarketplaceContentValidator {
         }
         Validated<RecipeMarketplace> validation = Validated.none();
         String property = recipe + ".description";
-        if (!Character.isUpperCase(description.charAt(0))) {
+        if (doesNotStartWithUppercase(description)) {
             validation = validation.and(Validated.invalid(property, description, "Description must be sentence cased"));
         }
         if (!description.endsWith(".")) {
@@ -88,5 +88,14 @@ public class RecipeMarketplaceContentValidator {
         }
 
         return validation;
+    }
+
+    private static boolean doesNotStartWithUppercase(String text) {
+        char firstChar = text.charAt(0);
+        if (Character.isUpperCase(firstChar)) {
+            return false;
+        }
+        return Character.isLetter(firstChar) || !Character.isUpperCase(text.charAt(1));
+        // Allow backticks, links, etc. at the start of the text, provided the next character is uppercase
     }
 }
