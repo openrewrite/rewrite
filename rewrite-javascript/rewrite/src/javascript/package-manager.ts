@@ -447,8 +447,6 @@ export async function parseLockFileContent(
  * Recipes extend this with additional fields specific to their needs.
  */
 export interface BaseProjectUpdateInfo {
-    /** Absolute path to the project directory */
-    projectDir: string;
     /** Relative path to package.json (from source root) */
     packageJsonPath: string;
     /** The package manager used by this project */
@@ -559,17 +557,15 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
         }
     }
 
-    // Read npmrc configs from the project directory
-    const npmrcConfigs = await readNpmrcConfigs(updateInfo.projectDir);
-
-    // Create new marker
+    // Create new marker, preserving existing npmrc configs from the parser
+    // (recipes don't have filesystem access to re-read them)
     const newMarker = createNodeResolutionResultMarker(
         existingMarker.path,
         packageJsonContent,
         lockContent,
         existingMarker.workspacePackagePaths,
         existingMarker.packageManager,
-        npmrcConfigs.length > 0 ? npmrcConfigs : undefined
+        existingMarker.npmrcConfigs
     );
 
     // Replace the marker in the document
@@ -591,6 +587,17 @@ export interface TempInstallOptions {
      * Default: true (lock-only is faster and sufficient for most cases)
      */
     lockOnly?: boolean;
+    /**
+     * Original lock file content to use. If provided, this content will be written
+     * to the temp directory instead of copying from projectDir.
+     * This allows recipes to work with in-memory SourceFiles without filesystem access.
+     */
+    originalLockFileContent?: string;
+    /**
+     * Config file contents to use. Keys are filenames (e.g., '.npmrc'), values are content.
+     * If provided, these will be written to the temp directory instead of copying from projectDir.
+     */
+    configFiles?: Record<string, string>;
 }
 
 /**
@@ -599,25 +606,23 @@ export interface TempInstallOptions {
  * This function:
  * 1. Creates a temp directory
  * 2. Writes the provided package.json content
- * 3. Copies the existing lock file (if present)
- * 4. Copies config files (.npmrc, .yarnrc, etc.)
+ * 3. Writes the lock file content (if provided)
+ * 4. Writes config files (if provided)
  * 5. Runs the package manager install
  * 6. Returns the updated lock file content
  * 7. Cleans up the temp directory
  *
- * @param projectDir The original project directory (for copying lock file and configs)
  * @param pm The package manager to use
  * @param modifiedPackageJson The modified package.json content to use
- * @param options Optional settings for timeout and lock-only mode
+ * @param options Optional settings for timeout, lock-only mode, and file contents
  * @returns Result containing success status and lock file content or error
  */
 export async function runInstallInTempDir(
-    projectDir: string,
     pm: PackageManager,
     modifiedPackageJson: string,
     options: TempInstallOptions = {}
 ): Promise<TempInstallResult> {
-    const {timeout = 120000, lockOnly = true} = options;
+    const {timeout = 120000, lockOnly = true, originalLockFileContent, configFiles: configFileContents} = options;
     const lockFileName = getLockFileName(pm);
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
 
@@ -625,18 +630,15 @@ export async function runInstallInTempDir(
         // Write modified package.json to temp directory
         await fsp.writeFile(path.join(tempDir, 'package.json'), modifiedPackageJson);
 
-        // Copy existing lock file if present
-        const originalLockPath = path.join(projectDir, lockFileName);
-        if (fs.existsSync(originalLockPath)) {
-            await fsp.copyFile(originalLockPath, path.join(tempDir, lockFileName));
+        // Write lock file if provided
+        if (originalLockFileContent !== undefined) {
+            await fsp.writeFile(path.join(tempDir, lockFileName), originalLockFileContent);
         }
 
-        // Copy config files if present (for registry configuration and workspace setup)
-        const configFiles = ['.npmrc', '.yarnrc', '.yarnrc.yml', '.pnpmfile.cjs', 'pnpm-workspace.yaml'];
-        for (const configFile of configFiles) {
-            const configPath = path.join(projectDir, configFile);
-            if (fs.existsSync(configPath)) {
-                await fsp.copyFile(configPath, path.join(tempDir, configFile));
+        // Write config files if provided
+        if (configFileContents) {
+            for (const [configFile, content] of Object.entries(configFileContents)) {
+                await fsp.writeFile(path.join(tempDir, configFile), content);
             }
         }
 
