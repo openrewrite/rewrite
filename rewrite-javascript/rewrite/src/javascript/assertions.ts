@@ -190,7 +190,9 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
     }
 
     for (const spec of sourceSpecs) {
-        if (spec.path !== 'package.json' && spec.path !== 'package-lock.json') {
+        const isPackageJson = spec.path?.endsWith('package.json');
+        const isPackageLock = spec.path === 'package-lock.json';
+        if (!isPackageJson && !isPackageLock) {
             if (spec.kind === JS.Kind.CompilationUnit) {
                 // For JS/TS files, use a parser that adds style marker if available
                 // spec.path may be undefined, so generate a reasonable path from the extension

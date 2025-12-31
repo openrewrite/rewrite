@@ -142,52 +142,42 @@ export class PackageJsonParser extends Parser {
     }
 
     async *parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
-        // Group inputs by directory to share NodeResolutionResult markers
-        const inputsByDir = new Map<string, ParserInput[]>();
+        // Cache markers by directory to share NodeResolutionResult markers
+        // but maintain input order for output
+        const markersByDir = new Map<string, NodeResolutionResult | null>();
 
+        // Process each input in order, caching markers per directory
         for (const input of inputs) {
             const filePath = parserInputFile(input);
             const dir = path.dirname(filePath);
 
-            if (!inputsByDir.has(dir)) {
-                inputsByDir.set(dir, []);
+            // Parse as JSON first
+            const jsonGenerator = this.jsonParser.parse(input);
+            const jsonResult = await jsonGenerator.next();
+
+            if (jsonResult.done || !jsonResult.value) {
+                continue;
             }
-            inputsByDir.get(dir)!.push(input);
-        }
 
-        // Process each directory's package.json files
-        for (const [dir, dirInputs] of inputsByDir) {
-            // Create a shared marker for this directory
-            let marker: NodeResolutionResult | null = null;
+            const jsonDoc = jsonResult.value as Json.Document;
 
-            for (const input of dirInputs) {
-                // Parse as JSON first
-                const jsonGenerator = this.jsonParser.parse(input);
-                const jsonResult = await jsonGenerator.next();
+            // Create NodeResolutionResult marker if not already created for this directory
+            if (!markersByDir.has(dir)) {
+                markersByDir.set(dir, await this.createMarker(input, dir));
+            }
+            const marker = markersByDir.get(dir)!;
 
-                if (jsonResult.done || !jsonResult.value) {
-                    continue;
-                }
-
-                const jsonDoc = jsonResult.value as Json.Document;
-
-                // Create NodeResolutionResult marker if not already created for this directory
-                if (!marker) {
-                    marker = await this.createMarker(input, dir);
-                }
-
-                // Attach the marker to the JSON document
-                if (marker) {
-                    yield {
-                        ...jsonDoc,
-                        markers: {
-                            ...jsonDoc.markers,
-                            markers: [...jsonDoc.markers.markers, marker]
-                        }
-                    };
-                } else {
-                    yield jsonDoc;
-                }
+            // Attach the marker to the JSON document
+            if (marker) {
+                yield {
+                    ...jsonDoc,
+                    markers: {
+                        ...jsonDoc.markers,
+                        markers: [...jsonDoc.markers.markers, marker]
+                    }
+                };
+            } else {
+                yield jsonDoc;
             }
         }
     }
