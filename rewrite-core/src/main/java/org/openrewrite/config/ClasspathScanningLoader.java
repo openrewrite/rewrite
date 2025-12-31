@@ -120,7 +120,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * Construct a ClasspathScanningLoader to load Yaml categories and recipes from the runtime classpath, as part of
      * running tests or inferring local recipe categories.
      */
-    public static ClasspathScanningLoader onlyYaml(Properties properties) { // Environment.scanYamlResources
+    public static ClasspathScanningLoader onlyYaml(Properties properties) {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
         classpathScanningLoader.scanYaml(
                 new ClassGraph().acceptPaths("META-INF/rewrite"),
