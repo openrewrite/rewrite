@@ -71,9 +71,9 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 randomId(),
                 Space.format(prefix),
                 Markers.EMPTY,
-                (Hcl.Identifier) (c.identifierLike() != null
-                        ? visitIdentifierLike(c.identifierLike())
-                        : visitIdentifier(c.NULL())),
+                (Hcl.Identifier) (c.identifierLike() != null ?
+                        visitIdentifierLike(c.identifierLike()) :
+                        visitIdentifier(c.NULL())),
                 new HclLeftPadded<>(
                         sourceBefore("="),
                         Hcl.Attribute.Type.Assignment,
