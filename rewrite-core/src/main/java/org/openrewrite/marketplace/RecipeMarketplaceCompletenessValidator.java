@@ -16,7 +16,7 @@
 package org.openrewrite.marketplace;
 
 import org.openrewrite.Validated;
-import org.openrewrite.config.Environment;
+import org.openrewrite.config.ClasspathScanningLoader;
 import org.openrewrite.config.RecipeDescriptor;
 
 import java.util.HashSet;
@@ -35,10 +35,10 @@ public class RecipeMarketplaceCompletenessValidator {
      * Validate that the CSV marketplace is complete and in sync with the JAR environment.
      *
      * @param csv The recipe marketplace loaded from CSV.
-     * @param env The environment loaded from the recipe JAR.
+     * @param scanner The classpath scanner to validate against.
      * @return A validation result containing all errors found.
      */
-    public Validated<RecipeMarketplace> validate(RecipeMarketplace csv, Environment env) {
+    public Validated<RecipeMarketplace> validate(RecipeMarketplace csv, ClasspathScanningLoader scanner) {
         Validated<RecipeMarketplace> validation = Validated.none();
 
         Set<String> csvRecipeNames = new HashSet<>();
@@ -48,7 +48,7 @@ public class RecipeMarketplaceCompletenessValidator {
 
         // Get all recipe names from JAR
         Set<String> jarRecipeNames = new HashSet<>();
-        for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
+        for (RecipeDescriptor descriptor : scanner.listRecipeDescriptors()) {
             jarRecipeNames.add(descriptor.getName());
         }
 
