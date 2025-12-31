@@ -52,7 +52,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private @Nullable Runnable performScan;
 
     /**
-     * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
+     * Construct a ClasspathScanningLoader that scans the runtime classpath of the current java process for recipes,
+     * mostly for use in tests.
      *
      * @param properties     Yaml placeholder properties
      * @param acceptPackages Limit scan to specified packages
@@ -70,7 +71,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     /**
-     * Construct a ClasspathScanningLoader scans the provided classloader for recipes
+     * Construct a ClasspathScanningLoader scans the provided classloader for recipes.
      *
      * @param properties  YAML placeholder properties
      * @param classLoader Limit scan to classes loadable by this classloader
@@ -141,25 +142,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 properties,
                 emptyList(),
                 null);
-        return classpathScanningLoader;
-    }
-
-    /**
-     * Construct a ClasspathScanningLoader that only scans the provided jar for recipes, whilst still being able to load
-     * classes (but not recipes) from the argument classloader. Useful for completeness task validation comparison.
-     */
-    public static ClasspathScanningLoader onlyDirect(Path onlyAcceptJar, ClassLoader classLoader) { // Completeness task
-        ClassGraph classGraph = new ClassGraph()
-                .acceptJars(onlyAcceptJar.getFileName().toString())
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader);
-        ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
-        classpathScanningLoader.scanClasses(classGraph, classLoader);
-        classpathScanningLoader.scanYaml(
-                classGraph.acceptPaths("META-INF/rewrite"),
-                new Properties(),
-                emptyList(),
-                classLoader);
         return classpathScanningLoader;
     }
 

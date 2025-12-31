@@ -300,7 +300,7 @@ public class Environment {
             return load(new ClasspathScanningLoader(properties, acceptPackages));
         }
 
-        @SuppressWarnings("unused")
+        @SuppressWarnings("unused") // Used by rewrite-gradle-plugin
         public Builder scanClassLoader(ClassLoader classLoader) {
             return load(new ClasspathScanningLoader(properties, classLoader));
         }
@@ -335,7 +335,7 @@ public class Environment {
             return load(new ClasspathScanningLoader(jar, properties, secondPassLoaderList, classLoader), secondPassLoaderList);
         }
 
-        @SuppressWarnings("unused")
+        @SuppressWarnings("unused") // Used by rewrite-maven-plugin and CLI
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {
