@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
+// Generated from /Users/rigelsmacbook/PR/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -82,6 +82,16 @@ public interface HCLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitBlockLabel(HCLParser.BlockLabelContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link HCLParser#identifierLike}.
+	 * @param ctx the parse tree
+	 */
+	void enterIdentifierLike(HCLParser.IdentifierLikeContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link HCLParser#identifierLike}.
+	 * @param ctx the parse tree
+	 */
+	void exitIdentifierLike(HCLParser.IdentifierLikeContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code OperationExpression}
 	 * labeled alternative in {@link HCLParser#expression}.

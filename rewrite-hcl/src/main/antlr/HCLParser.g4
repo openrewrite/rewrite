@@ -31,6 +31,13 @@ blockLabel
     | Identifier
     ;
 
+identifierLike
+    : Identifier
+    | IF
+    ;
+
+
+
 // Expressions
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#expressions
 
@@ -87,8 +94,14 @@ object
     ;
 
 objectelem
-    : (qualifiedIdentifier | NULL | LPAREN qualifiedIdentifier RPAREN | QUOTE quotedTemplatePart* QUOTE | expression) (ASSIGN | COLON) expression COMMA?
+    : (identifierLike
+      | NULL
+      | LPAREN qualifiedIdentifier RPAREN
+      | QUOTE quotedTemplatePart* QUOTE
+      | expression)
+      (ASSIGN | COLON) expression COMMA?
     ;
+
 
 qualifiedIdentifier
     : Identifier (DOT Identifier)*

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
+// Generated from /Users/rigelsmacbook/PR/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -99,6 +99,18 @@ public class HCLParserBaseListener implements HCLParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitBlockLabel(HCLParser.BlockLabelContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterIdentifierLike(HCLParser.IdentifierLikeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitIdentifierLike(HCLParser.IdentifierLikeContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
