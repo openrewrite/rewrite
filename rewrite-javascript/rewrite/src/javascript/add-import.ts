@@ -39,6 +39,11 @@ export interface AddImportOptions {
      * Cannot be combined with `member`, `alias`, or `onlyIfReferenced`. */
     sideEffectOnly?: boolean;
 
+    /** If true, adds a type-only import (e.g., `import type { Foo } from 'module'`).
+     * Type-only imports are erased at compile time and do not generate runtime code.
+     * Cannot be combined with `sideEffectOnly`. */
+    typeOnly?: boolean;
+
     /** Optional import style to use. If not specified, auto-detects from file and existing imports */
     style?: ImportStyle;
 }
@@ -77,7 +82,8 @@ export function maybeAddImport(
             v.module === options.module &&
             v.member === options.member &&
             v.alias === options.alias &&
-            v.sideEffectOnly === (options.sideEffectOnly ?? false)) {
+            v.sideEffectOnly === (options.sideEffectOnly ?? false) &&
+            v.typeOnly === (options.typeOnly ?? false)) {
             return;
         }
     }
@@ -90,6 +96,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     readonly alias?: string;
     readonly onlyIfReferenced: boolean;
     readonly sideEffectOnly: boolean;
+    readonly typeOnly: boolean;
     readonly style?: ImportStyle;
 
     constructor(options: AddImportOptions) {
@@ -116,6 +123,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             if (options.onlyIfReferenced !== undefined) {
                 throw new Error("Cannot combine sideEffectOnly with onlyIfReferenced");
             }
+            if (options.typeOnly) {
+                throw new Error("Cannot combine sideEffectOnly with typeOnly");
+            }
         }
 
         this.module = options.module;
@@ -123,6 +133,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         this.alias = options.alias;
         this.onlyIfReferenced = options.onlyIfReferenced ?? true;
         this.sideEffectOnly = options.sideEffectOnly ?? false;
+        this.typeOnly = options.typeOnly ?? false;
         this.style = options.style;
     }
 
@@ -444,6 +455,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     continue;
                 }
 
+                // Only merge into imports with matching typeOnly - don't mix type and value imports
+                if (importClause.typeOnly !== this.typeOnly) {
+                    continue;
+                }
+
                 // Case 1: Existing import has named bindings - merge into them
                 if (importClause.namedBindings) {
                     // Only merge into NamedImports, not namespace imports
@@ -628,6 +644,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // If we're adding a side-effect import but there's an existing import with bindings,
         // it's not a match (side-effect import should be separate)
         if (this.sideEffectOnly) {
+            return false;
+        }
+
+        // Check if the typeOnly flag matches - type-only and value imports are separate
+        if (importClause.typeOnly !== this.typeOnly) {
             return false;
         }
 
@@ -1053,9 +1074,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause = {
                 id: randomId(),
                 kind: JS.Kind.ImportClause,
-                prefix: emptySpace,
+                prefix: this.typeOnly ? singleSpace : emptySpace,
                 markers: emptyMarkers,
-                typeOnly: false,
+                typeOnly: this.typeOnly,
                 name: undefined,
                 namedBindings: namespaceBinding
             };
@@ -1076,9 +1097,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause = {
                 id: randomId(),
                 kind: JS.Kind.ImportClause,
-                prefix: emptySpace,
+                prefix: this.typeOnly ? singleSpace : emptySpace,
                 markers: emptyMarkers,
-                typeOnly: false,
+                typeOnly: this.typeOnly,
                 name: rightPadded(defaultName, emptySpace),
                 namedBindings: undefined
             };
@@ -1110,9 +1131,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause = {
                 id: randomId(),
                 kind: JS.Kind.ImportClause,
-                prefix: emptySpace,
+                prefix: this.typeOnly ? singleSpace : emptySpace,
                 markers: emptyMarkers,
-                typeOnly: false,
+                typeOnly: this.typeOnly,
                 name: undefined,
                 namedBindings: namedImports
             };

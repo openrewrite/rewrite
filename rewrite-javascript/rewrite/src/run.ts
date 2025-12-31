@@ -149,7 +149,11 @@ export async function* scheduleRunStreaming(
     } else {
         // For non-scanning recipes, process files immediately as they come in
         const iterable = Array.isArray(before) ? before : before;
+        const knownTotal = Array.isArray(before) ? before.length : -1; // -1 = unknown total
+        let processCount = 0;
         for await (const b of iterable) {
+            processCount++;
+            onProgress?.('processing', processCount, knownTotal, b.sourcePath);
             const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
             // Always yield a result so the caller knows when each file is processed
             yield new Result(b, editedB !== b ? editedB : b);
