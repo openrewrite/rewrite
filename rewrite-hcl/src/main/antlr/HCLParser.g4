@@ -19,7 +19,7 @@ bodyContent
     ;
 
 attribute
-    : (Identifier | NULL) ASSIGN expression
+    : (identifierLike | NULL) ASSIGN expression
     ;
 
 block
