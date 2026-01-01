@@ -34,9 +34,7 @@ import {
     typescript
 } from "../../src/javascript";
 import {emptySpace, J} from "../../src/java";
-import {MarkersKind} from "../../src/markers";
-import {randomId} from "../../src/uuid";
-import {NamedStyles} from "../../src/style";
+import {MarkersKind, NamedStyles, randomId} from "../../src";
 import {create as produce} from "mutative";
 import {withDir} from "tmp-promise";
 
@@ -1775,6 +1773,276 @@ describe('AddImport visitor', () => {
                     `
                 )
             );
+        });
+    });
+
+    describe('type-only imports', () => {
+        test('should add type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactNode',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type {ReactNode} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not add type-only import if one already exists', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactNode',
+                typeOnly: true
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {ReactNode} from 'react';
+
+                        function example(): ReactNode {
+                            return null;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add value import even when type-only import exists for same member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'useState',
+                typeOnly: false,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type {useState} from 'react';
+                        import {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add type-only import even when value import exists for same member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'useState',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {useState} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `,
+                    `
+                        import {useState} from 'react';
+                        import type {useState} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not merge value import into type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'useEffect',
+                typeOnly: false,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type {useState} from 'react';
+                        import {useEffect} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not merge type-only import into value import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactNode',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {useState} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `,
+                    `
+                        import {useState} from 'react';
+                        import type {ReactNode} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should merge type-only imports from same module', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactElement',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {ReactNode} from 'react';
+
+                        function example(): ReactNode {
+                            return null;
+                        }
+                    `,
+                    `
+                        import type {ReactElement, ReactNode} from 'react';
+
+                        function example(): ReactNode {
+                            return null;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add type-only default import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'default',
+                alias: 'React',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type React from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add type-only namespace import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: '*',
+                alias: 'React',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type * as React from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should throw error when combining typeOnly with sideEffectOnly', async () => {
+            expect(() => {
+                new AddImport({ module: "react", sideEffectOnly: true, typeOnly: true });
+            }).toThrow("Cannot combine sideEffectOnly with typeOnly");
         });
     });
 });

@@ -16,19 +16,32 @@
 package org.openrewrite.marketplace;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Validated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeMarketplaceContentValidatorTest {
 
-    @Test
-    void validMarketplace() {
-        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
-          name,displayName,description,category,ecosystem,packageName
-          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove unnecessary parentheses,Removes unnecessary parentheses from code.,Java,maven,org.openrewrite:rewrite-java
-          """);
+    private static final String VALID_DISPLAY_NAME = "Remove unnecessary parentheses";
+    private static final String VALID_DESCRIPTION = "Removes unnecessary parentheses from code.";
 
+    @ParameterizedTest
+    @CsvSource({
+      VALID_DISPLAY_NAME  + ',' + VALID_DESCRIPTION,
+      VALID_DISPLAY_NAME  + ',' + "`Removes` unnecessary parentheses from code.",
+      VALID_DISPLAY_NAME  + ',' + "[Removes](link) unnecessary parentheses from code.",
+      VALID_DISPLAY_NAME  + ',' + " - Some list item." ,
+      VALID_DISPLAY_NAME  + ',' + " - `other` list item." ,
+      "`Remove` unnecessary parentheses"  + ',' + VALID_DESCRIPTION,
+      "[Remove](link) unnecessary parentheses"  + ',' + VALID_DESCRIPTION,
+    })
+    void validMarketplace(String displayName, String description) {
+         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,%s,%s,Java,maven,org.openrewrite:rewrite-java
+          """.formatted(displayName, description));
         RecipeMarketplaceContentValidator validator = new RecipeMarketplaceContentValidator();
         Validated<RecipeMarketplace> validation = validator.validate(marketplace);
 

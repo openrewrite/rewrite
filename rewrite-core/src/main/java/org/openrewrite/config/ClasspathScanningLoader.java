@@ -52,7 +52,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private @Nullable Runnable performScan;
 
     /**
-     * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
+     * Construct a ClasspathScanningLoader that scans the runtime classpath of the current java process for recipes,
+     * mostly for use in tests.
      *
      * @param properties     Yaml placeholder properties
      * @param acceptPackages Limit scan to specified packages
@@ -70,7 +71,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     /**
-     * Construct a ClasspathScanningLoader scans the provided classloader for recipes
+     * Construct a ClasspathScanningLoader scans the provided classloader for recipes.
      *
      * @param properties  YAML placeholder properties
      * @param classLoader Limit scan to classes loadable by this classloader
@@ -93,6 +94,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
         };
     }
 
+    /**
+     * Construct a ClasspathScanningLoader as used from `Environment.scanJar` for
+     * `MavenRecipeBundleReader.marketplaceFromClasspathScan`.
+     */
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
@@ -112,19 +117,31 @@ public class ClasspathScanningLoader implements ResourceLoader {
         };
     }
 
+    /**
+     * Construct a ClasspathScanningLoader to load Yaml categories and recipes from the runtime classpath, as part of
+     * running tests or inferring local recipe categories.
+     */
     public static ClasspathScanningLoader onlyYaml(Properties properties) {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
-        classpathScanningLoader.scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
-                properties, emptyList(), null);
+        classpathScanningLoader.scanYaml(
+                new ClassGraph().acceptPaths("META-INF/rewrite"),
+                properties,
+                emptyList(),
+                null);
         return classpathScanningLoader;
     }
 
+    /**
+     * Construct a ClasspathScanningLoader to load categories from the provided dependencies only, as part of migration
+     * in the CLI.
+     */
     public static ClasspathScanningLoader onlyYaml(Properties properties, Collection<Path> dependencies) {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
-        classpathScanningLoader.scanYaml(new ClassGraph()
-                        .acceptPaths("META-INF/rewrite")
-                        .overrideClasspath(dependencies),
-                properties, emptyList(), null);
+        classpathScanningLoader.scanYaml(
+                new ClassGraph().acceptPaths("META-INF/rewrite").overrideClasspath(dependencies),
+                properties,
+                emptyList(),
+                null);
         return classpathScanningLoader;
     }
 
@@ -190,9 +207,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
         for (ClassInfo classInfo : result.getSubclasses(className)) {
             Class<?> recipeClass = classInfo.loadClass();
             if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) ||
-                (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
-                // `ScanningRecipe` is an example of an abstract `Recipe` subtype
-                (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                    (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
+                    // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                    (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
             }
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
