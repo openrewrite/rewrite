@@ -238,12 +238,8 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 // Apply afterComma rule to elements after the first
                 for (let i = 1; i < draft.elements.length; i++) {
                     const currentWs = draft.elements[i].element.prefix.whitespace;
-                    // Also check for Spread marker with newline (for spread elements the newline is in the marker)
-                    const element = draft.elements[i].element as J;
-                    const spreadMarker = element.markers?.markers?.find(m => m.kind === JS.Markers.Spread) as { prefix: J.Space } | undefined;
-                    const hasNewlineInSpread = spreadMarker?.prefix?.whitespace?.includes("\n");
                     // Preserve original newlines - only adjust spacing when elements are on same line
-                    if (!currentWs.includes("\n") && !hasNewlineInSpread) {
+                    if (!currentWs.includes("\n")) {
                         draft.elements[i].element.prefix.whitespace = this.style.other.afterComma ? " " : "";
                     }
                 }
