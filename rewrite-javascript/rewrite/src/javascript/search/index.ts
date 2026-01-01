@@ -1,7 +1,6 @@
 import {CategoryDescriptor, JavaScript} from "../../marketplace";
 
 export * from './find-dependency';
-export * from './package-has-dependency';
 export * from './uses-method';
 export * from './uses-type';
 
