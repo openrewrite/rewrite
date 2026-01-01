@@ -444,8 +444,8 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if ("asList".equals(method.getSimpleName())) {
-                      maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
+                      maybeAddImport("java.util.Collections");
 
                       return JavaTemplate.builder("Collections.singletonList(#{any()})")
                         .imports("java.util.Collections")
@@ -492,8 +492,8 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if ("asList".equals(method.getSimpleName())) {
-                      maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
+                      maybeAddImport("java.util.Collections");
                       return JavaTemplate.builder("Collections.singletonList(#{any()})")
                         .imports("java.util.Collections")
                         .build()
@@ -541,8 +541,8 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if ("asList".equals(method.getSimpleName())) {
-                      maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
+                      maybeAddImport("java.util.Collections");
                       return JavaTemplate.builder("Collections.singletonList(#{any()})")
                         .imports("java.util.Collections")
                         .build()
@@ -1192,8 +1192,8 @@ class JavaTemplateTest implements RewriteTest {
                     Expression expected = args.getFirst();
                     Expression actual = args.get(1);
 
-                    maybeAddImport("org.assertj.core.api.Assertions", "assertThat");
                     maybeRemoveImport("org.junit.jupiter.api.Assertions");
+                    maybeAddImport("org.assertj.core.api.Assertions", "assertThat");
 
                     if (args.size() == 2) {
                         return JavaTemplate.builder("assertThat(#{any()}).isEqualTo(#{any()});")

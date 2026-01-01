@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeRegistry} from "../src";
+import {RecipeMarketplace} from "../src";
 import {describe} from "@jest/globals";
 import {activate} from "../fixtures/example-recipe";
 import {ChangeText} from "../fixtures/change-text";
@@ -21,14 +21,15 @@ import {ChangeText} from "../fixtures/change-text";
 describe("recipes", () => {
 
     test("register a recipe with options", async () => {
-        const recipeRegistry = new RecipeRegistry();
-        activate(recipeRegistry);
-        const recipe = recipeRegistry.all.get(
-            "org.openrewrite.example.text.change-text")
-        expect(recipe).toBeDefined()
-        expect(new recipe!()).toBeInstanceOf(ChangeText)
+        const marketplace = new RecipeMarketplace();
+        await activate(marketplace);
+        const result = marketplace.findRecipe("org.openrewrite.example.text.change-text");
+        expect(result).toBeDefined();
+        const [descriptor, RecipeClass] = result!;
+        expect(RecipeClass).toBeDefined();
+        expect(new RecipeClass!()).toBeInstanceOf(ChangeText);
 
-        expect(await new recipe!().descriptor()).toEqual({
+        expect(descriptor).toEqual({
             name: "org.openrewrite.example.text.change-text",
             displayName: "Change text",
             instanceName: "Change text to 'undefined'",
@@ -44,7 +45,8 @@ describe("recipes", () => {
                 }
             ],
             recipeList: [],
-            tags: []
-        })
+            tags: [],
+            dataTables: []
+        });
     });
 });

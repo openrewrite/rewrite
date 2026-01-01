@@ -35,7 +35,7 @@ public class RecipeMarketplaceCompletenessValidator {
      * Validate that the CSV marketplace is complete and in sync with the JAR environment.
      *
      * @param csv The recipe marketplace loaded from CSV.
-     * @param env The environment loaded from the recipe JAR.
+     * @param env The environment to validate against.
      * @return A validation result containing all errors found.
      */
     public Validated<RecipeMarketplace> validate(RecipeMarketplace csv, Environment env) {

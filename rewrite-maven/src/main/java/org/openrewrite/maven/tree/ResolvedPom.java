@@ -212,6 +212,10 @@ public class ResolvedPom {
                 emptyList()
         ).resolver(ctx, downloader).resolve();
 
+        if (!getVersion().equals(resolved.getVersion())) {
+            return resolved;
+        }
+
         for (Map.Entry<String, String> property : resolved.getProperties().entrySet()) {
             if (properties == null || (property.getValue() != null && !property.getValue().equals(properties.get(property.getKey())))) {
                 return resolved;
@@ -319,12 +323,13 @@ public class ResolvedPom {
         if (propVal != null) {
             // Check if this would create a circular reference
             // e.g., <project.version>${project.version}</project.version>
-            if (propVal.equals("${" + property + "}")) {
-                // Skip the user-defined property and fall through to built-in resolution
-                propVal = null;
-            } else {
+            if (!propVal.equals("${" + property + "}")) {
                 return propVal;
             }
+            // Skip the user-defined property and fall through to built-in resolution
+        } else if (properties.containsKey(property)) {
+            // An existing property key with a `null` value should be regarded as an empty string.
+            return "";
         }
         switch (property) {
             case "groupId":
@@ -963,8 +968,14 @@ public class ResolvedPom {
                             null
                     );
                     managedDependencyMap.compute(createDependencyManagementKey(defined), (key, existing) -> {
-                        if (existing == null || existing.getBomGav() != null) {
+                        if (existing == null) {
                             return resolvedDefined;
+                        }
+                        if (existing.getBomGav() != null) {
+                            if (resolvedDefined.getVersion() != null) {
+                                return resolvedDefined;
+                            }
+                            return mergeProperties(resolvedDefined, existing);
                         }
                         return mergeProperties(existing, resolvedDefined);
                     });

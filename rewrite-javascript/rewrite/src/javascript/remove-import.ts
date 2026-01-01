@@ -2,7 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
 import {JS, JSX} from "./tree";
 import {mapAsync} from "../util";
-import {ElementRemovalFormatter} from "../java/formatting-utils";
+import {ElementRemovalFormatter} from "../java";
 
 /**
  * @param visitor The visitor to add the import removal to

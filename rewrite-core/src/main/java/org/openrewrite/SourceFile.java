@@ -48,14 +48,18 @@ public interface SourceFile extends Tree {
         }
 
         // Restore BOM if the source file originally had one
-        if (isCharsetBomMarked() && !(this instanceof Quark) && !(this instanceof Binary)) {
-            try {
-                if (!readFromInput.isEmpty() && readFromInput.charAt(0) != '\uFEFF') {
-                    readFromInput = '\uFEFF' + readFromInput;
-                }
-            } catch (UnsupportedOperationException e) {
-                // Defensive fallback for any other SourceFile implementations that don't support charset operations
+        // should be in sync with the BOM restore logic in Tree.print()
+        try {
+            if (!(this instanceof Quark) &&
+                !(this instanceof Binary) &&
+                isCharsetBomMarked() &&
+                !readFromInput.isEmpty() &&
+                readFromInput.charAt(0) != '\uFEFF'
+            ) {
+                readFromInput = '\uFEFF' + readFromInput;
             }
+        } catch (UnsupportedOperationException e) {
+            // Defensive fallback for any other SourceFile implementations that don't support charset operations
         }
 
         return printed.equals(readFromInput);
