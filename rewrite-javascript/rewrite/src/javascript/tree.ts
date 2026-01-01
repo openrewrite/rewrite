@@ -462,12 +462,15 @@ export namespace JS {
 
     /**
      * Represents the spread syntax (...) applied to an expression.
-     * Used in array literals, object literals, and function call arguments.
+     * Used in array literals, object literals, function call arguments,
+     * and rest syntax in function parameters and destructuring patterns.
      * @example [...arr]
      * @example {...obj}
      * @example f(...args)
+     * @example function f(...args) {}
+     * @example const [first, ...rest] = arr
      */
-    export interface Spread extends JS, Statement, Expression, TypedTree {
+    export interface Spread extends JS, Statement, Expression, TypedTree, VariableDeclarator {
         readonly kind: typeof Kind.Spread;
         readonly expression: Expression;
         readonly type?: Type;
