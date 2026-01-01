@@ -976,6 +976,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             if (jsxAttr.value) {
                 await this.collectUsedIdentifiers(jsxAttr.value, usedIdentifiers, usedTypes);
             }
+        } else if (node.kind === JS.Kind.TypeDeclaration) {
+            // Handle type alias declarations like: type Props = { children: React.ReactNode }
+            const typeDecl = node as JS.TypeDeclaration;
+            // The initializer contains the type expression (the right side of the =)
+            if (typeDecl.initializer?.element) {
+                await this.collectTypeUsage(typeDecl.initializer.element, usedTypes);
+            }
         } else if ((node as any).statements) {
             // Generic handler for nodes with statements
             await this.traverseStatements((node as any).statements, usedIdentifiers, usedTypes);
