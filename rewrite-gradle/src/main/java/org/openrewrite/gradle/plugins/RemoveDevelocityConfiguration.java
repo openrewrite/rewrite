@@ -29,6 +29,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
+
 public class RemoveDevelocityConfiguration extends Recipe {
 
     @Override
@@ -83,7 +86,7 @@ public class RemoveDevelocityConfiguration extends Recipe {
                     List<Statement> originalStatements = body.getStatements();
                     List<Statement> filteredStatements = originalStatements.stream()
                             .filter(stmt -> !isRemoteCacheStatement(stmt))
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
                     if (filteredStatements.size() == originalStatements.size()) {
                         return m;
@@ -95,7 +98,7 @@ public class RemoveDevelocityConfiguration extends Recipe {
 
                     J.Block newBody = body.withStatements(filteredStatements);
                     J.Lambda newLambda = lambda.withBody(newBody);
-                    return m.withArguments(Collections.singletonList(newLambda));
+                    return m.withArguments(singletonList(newLambda));
                 }
             }
 
