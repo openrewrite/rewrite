@@ -16,13 +16,9 @@
 package org.openrewrite.groovy.format;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ToBeRemoved;
-import org.openrewrite.java.style.EmptyForInitializerPadStyle;
-import org.openrewrite.java.style.EmptyForIteratorPadStyle;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.SpacesStyle;
+import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
@@ -34,16 +30,12 @@ import java.util.List;
 import java.util.function.Supplier;
 
 public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<P> {
-    public SpacesVisitor(SourceFile sourceFile, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(sourceFile.getMarkers().findAll(NamedStyles.class), removeCustomLineBreaks, stopAfter);
+    public SpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
     }
 
-    private SpacesVisitor(List<NamedStyles> styles, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), stopAfter, removeCustomLineBreaks);
-    }
-
-    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
-        super(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, stopAfter, removeCustomLineBreaks);
+    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
+        super(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, stopAfter);
     }
 
     @Override
