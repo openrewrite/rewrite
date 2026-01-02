@@ -104,7 +104,15 @@ public class RecipeClassLoader extends URLClassLoader {
             // Determine delegation strategy
             try {
                 if (shouldDelegateToParent(name)) {
-                    foundClass = parent.loadClass(name);
+                    try {
+                        foundClass = parent.loadClass(name);
+                    } catch (ClassNotFoundException e) {
+                        // Fall back to child if parent doesn't have the class.
+                        // This handles marker/tree/style types from language-specific modules
+                        // (e.g., org.openrewrite.gradle.marker.GradlePluginDescriptor)
+                        // that aren't on the parent classloader.
+                        foundClass = findClass(name);
+                    }
                 } else {
                     // Try child-first for non-delegated classes
                     foundClass = findClass(name);

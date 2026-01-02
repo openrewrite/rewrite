@@ -77,6 +77,13 @@ export interface ProjectParserOptions {
      * If not provided, all discovered files are parsed.
      */
     fileFilter?: (absolutePath: string) => boolean;
+
+    /**
+     * Optional path to make source file paths relative to.
+     * If not specified, paths are relative to projectPath.
+     * Use this when parsing a subdirectory but wanting paths relative to the repository root.
+     */
+    relativeTo?: string;
 }
 
 /**
@@ -153,6 +160,7 @@ const TEXT_CONFIG_FILES = new Set([
  */
 export class ProjectParser {
     private readonly projectPath: string;
+    private readonly relativeTo: string;
     private readonly exclusions: string[];
     private readonly ctx: ExecutionContext;
     private readonly useGit: boolean;
@@ -162,6 +170,7 @@ export class ProjectParser {
 
     constructor(projectPath: string, options: ProjectParserOptions = {}) {
         this.projectPath = path.resolve(projectPath);
+        this.relativeTo = options.relativeTo ? path.resolve(options.relativeTo) : this.projectPath;
         this.exclusions = options.exclusions ?? DEFAULT_EXCLUSIONS;
         this.ctx = options.ctx ?? new ExecutionContext();
         this.useGit = options.useGit ?? this.isGitRepository();
@@ -230,7 +239,7 @@ export class ProjectParser {
             this.log(`Parsing ${discovered.packageJsonFiles.length} package.json files...`);
             const parser = Parsers.createParser("packageJson", {
                 ctx: this.ctx,
-                relativeTo: this.projectPath
+                relativeTo: this.relativeTo
             });
             for await (const sf of parser.parse(...discovered.packageJsonFiles)) {
                 current++;
@@ -244,7 +253,7 @@ export class ProjectParser {
             this.log(`Parsing ${discovered.lockFiles.json.length} JSON lock files...`);
             const parser = Parsers.createParser("json", {
                 ctx: this.ctx,
-                relativeTo: this.projectPath
+                relativeTo: this.relativeTo
             });
             for await (const sf of parser.parse(...discovered.lockFiles.json)) {
                 current++;
@@ -258,7 +267,7 @@ export class ProjectParser {
             this.log(`Parsing ${discovered.lockFiles.yaml.length} YAML lock files...`);
             const parser = Parsers.createParser("yaml", {
                 ctx: this.ctx,
-                relativeTo: this.projectPath
+                relativeTo: this.relativeTo
             });
             for await (const sf of parser.parse(...discovered.lockFiles.yaml)) {
                 current++;
@@ -272,7 +281,7 @@ export class ProjectParser {
             this.log(`Parsing ${discovered.lockFiles.text.length} text lock files...`);
             const parser = Parsers.createParser("plainText", {
                 ctx: this.ctx,
-                relativeTo: this.projectPath
+                relativeTo: this.relativeTo
             });
             for await (const sf of parser.parse(...discovered.lockFiles.text)) {
                 current++;
@@ -286,7 +295,7 @@ export class ProjectParser {
             this.log(`Parsing ${discovered.jsFiles.length} JavaScript/TypeScript files...`);
             const parser = Parsers.createParser("javascript", {
                 ctx: this.ctx,
-                relativeTo: this.projectPath
+                relativeTo: this.relativeTo
             });
 
             // Check if Prettier is available
@@ -299,7 +308,7 @@ export class ProjectParser {
                     this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
 
                     const prettierMarker = await prettierLoader.getConfigMarker(
-                        path.join(this.projectPath, sf.sourcePath)
+                        path.join(this.relativeTo, sf.sourcePath)
                     );
                     if (prettierMarker) {
                         yield produce(sf, draft => {
@@ -352,7 +361,7 @@ export class ProjectParser {
             this.log(`Parsing ${discovered.yamlFiles.length} YAML files...`);
             const parser = Parsers.createParser("yaml", {
                 ctx: this.ctx,
-                relativeTo: this.projectPath
+                relativeTo: this.relativeTo
             });
             for await (const sf of parser.parse(...discovered.yamlFiles)) {
                 current++;
@@ -366,7 +375,7 @@ export class ProjectParser {
             this.log(`Parsing ${discovered.jsonFiles.length} JSON files...`);
             const parser = Parsers.createParser("json", {
                 ctx: this.ctx,
-                relativeTo: this.projectPath
+                relativeTo: this.relativeTo
             });
             for await (const sf of parser.parse(...discovered.jsonFiles)) {
                 current++;
@@ -380,7 +389,7 @@ export class ProjectParser {
             this.log(`Parsing ${discovered.textFiles.length} text config files...`);
             const parser = Parsers.createParser("plainText", {
                 ctx: this.ctx,
-                relativeTo: this.projectPath
+                relativeTo: this.relativeTo
             });
             for await (const sf of parser.parse(...discovered.textFiles)) {
                 current++;

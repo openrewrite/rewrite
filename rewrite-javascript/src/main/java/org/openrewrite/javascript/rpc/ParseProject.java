@@ -40,12 +40,25 @@ class ParseProject implements RpcRequest {
     @Nullable
     List<String> exclusions;
 
+    /**
+     * Optional path to make source file paths relative to.
+     * If not specified, paths are relative to projectPath.
+     * Use this when parsing a subdirectory but wanting paths relative to the repository root.
+     */
+    @Nullable
+    Path relativeTo;
+
     ParseProject(Path projectPath) {
-        this(projectPath, null);
+        this(projectPath, null, null);
     }
 
     ParseProject(Path projectPath, @Nullable List<String> exclusions) {
+        this(projectPath, exclusions, null);
+    }
+
+    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo) {
         this.projectPath = projectPath;
         this.exclusions = exclusions;
+        this.relativeTo = relativeTo;
     }
 }

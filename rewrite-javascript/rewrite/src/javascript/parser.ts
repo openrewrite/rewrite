@@ -29,7 +29,7 @@ import {
     TypeTree,
     VariableDeclarator,
 } from '../java';
-import {DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
+import {DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional} from '.';
 import {emptyMarkers, markers, Markers, MarkersKind, ParseExceptionResult, replaceMarkerByKind} from "../markers";
 import {NamedStyles} from "../style";
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers, SourcePath} from "../parser";
@@ -1028,6 +1028,21 @@ export class JavaScriptParserVisitor {
     }
 
     visitParameter(node: ts.ParameterDeclaration): J.VariableDeclarations {
+        let name: VariableDeclarator = produce(this.convert<VariableDeclarator>(node.name), draft => {
+            draft.markers = this.maybeAddOptionalMarker(draft, node);
+        });
+        if (node.dotDotDotToken) {
+            // Wrap in JS.Spread; prefix between ... and identifier stays on the inner expression
+            const spread: JS.Spread = {
+                kind: JS.Kind.Spread,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                expression: name as Expression,
+                type: this.mapType(node)
+            };
+            name = spread;
+        }
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
@@ -1042,16 +1057,7 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: node.dotDotDotToken ? this.prefix(node.dotDotDotToken) : this.prefix(node.name),
                     markers: emptyMarkers,
-                    name: produce(this.convert<VariableDeclarator>(node.name), draft => {
-                        draft.markers = this.maybeAddOptionalMarker(draft, node);
-                        if (node.dotDotDotToken) {
-                            draft.markers.markers.push({
-                                kind: JS.Markers.Spread,
-                                id: randomId(),
-                                prefix: this.prefix(node.name)
-                            } satisfies Spread as Spread);
-                        }
-                    }),
+                    name: name,
                     dimensionsAfterName: [],
                     initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
                     variableType: this.mapVariableType(node)
@@ -1579,14 +1585,16 @@ export class JavaScriptParserVisitor {
         });
     }
 
-    visitRestType(node: ts.RestTypeNode): Expression {
-        return produce(this.convert<Expression>(node.type), draft => {
-            draft.markers.markers.push({
-                kind: JS.Markers.Spread,
-                id: randomId(),
-                prefix: this.prefix(node)
-            } satisfies Spread as Spread);
-        });
+    visitRestType(node: ts.RestTypeNode): JS.Spread {
+        const innerExpr = this.convert<Expression>(node.type);
+        return {
+            kind: JS.Kind.Spread,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: {...innerExpr, prefix: emptySpace},
+            type: this.mapType(node)
+        };
     }
 
     visitUnionType(node: ts.UnionTypeNode): JS.Union {
@@ -1818,6 +1826,22 @@ export class JavaScriptParserVisitor {
     //  and this would potentially just trip up flow analyses. The names exist purely for documentation purposes,
     //  they has no semantics. See https://stackoverflow.com/questions/63629315/what-are-named-or-labeled-tuples-in-typescript.
     visitNamedTupleMember(node: ts.NamedTupleMember): J.VariableDeclarations {
+        let name: VariableDeclarator = produce(this.convert<J.Identifier>(node.name), draft => {
+            draft.markers = this.maybeAddOptionalMarker(draft, node);
+        });
+        if (node.dotDotDotToken) {
+            // Wrap in JS.Spread; use emptySpace since the whitespace belongs
+            // to VariableDeclarations.prefix, not to the spread itself
+            const spread: JS.Spread = {
+                kind: JS.Kind.Spread,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                expression: name as Expression,
+                type: this.mapType(node)
+            };
+            name = spread;
+        }
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
@@ -1832,16 +1856,7 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: emptySpace,
                     markers: emptyMarkers,
-                    name: produce(this.convert<J.Identifier>(node.name), draft => {
-                        draft.markers = this.maybeAddOptionalMarker(draft, node);
-                        if (node.dotDotDotToken) {
-                            draft.markers.markers.push({
-                                kind: JS.Markers.Spread,
-                                id: randomId(),
-                                prefix: this.prefix(node.dotDotDotToken)
-                            } satisfies Spread as Spread);
-                        }
-                    }),
+                    name: name,
                     dimensionsAfterName: [],
                     variableType: this.mapVariableType(node),
                 },
@@ -1937,21 +1952,28 @@ export class JavaScriptParserVisitor {
     }
 
     visitBindingElement(node: ts.BindingElement): JS.BindingElement {
+        // Capture prefix before converting name, as convert may consume whitespace
+        const elementPrefix = this.prefix(node);
+        let name: Expression = this.convert<Expression>(node.name);
+        if (node.dotDotDotToken) {
+            // Wrap in JS.Spread; use emptySpace for prefix since the whitespace
+            // belongs to BindingElement.prefix, not to the spread itself
+            name = {
+                kind: JS.Kind.Spread,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                expression: name,
+                type: this.mapType(node)
+            } satisfies JS.Spread as Expression;
+        }
         return {
             kind: JS.Kind.BindingElement,
             id: randomId(),
-            prefix: this.prefix(node),
+            prefix: elementPrefix,
             markers: emptyMarkers,
             propertyName: node.propertyName && this.rightPadded(this.convert<J.Identifier>(node.propertyName), this.suffix(node.propertyName)),
-            name: produce(this.convert<Expression>(node.name), draft => {
-                if (node.dotDotDotToken) {
-                    draft.markers.markers.push({
-                        kind: JS.Markers.Spread,
-                        id: randomId(),
-                        prefix: this.prefix(node.dotDotDotToken)
-                    } satisfies Spread as Spread);
-                }
-            }),
+            name: name,
             initializer: node.initializer && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert<Expression>(node.initializer)),
             variableType: this.mapVariableType(node)
         };
@@ -2622,14 +2644,15 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitSpreadElement(node: ts.SpreadElement): Expression {
-        return produce(this.convert<Expression>(node.expression), draft => {
-            draft.markers.markers.push({
-                kind: JS.Markers.Spread,
-                id: randomId(),
-                prefix: this.prefix(node)
-            } satisfies Spread as Spread);
-        });
+    visitSpreadElement(node: ts.SpreadElement): JS.Spread {
+        return {
+            kind: JS.Kind.Spread,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: this.convert(node.expression),
+            type: this.mapType(node)
+        };
     }
 
     visitClassExpression(node: ts.ClassExpression): JS.StatementExpression {
@@ -3903,13 +3926,16 @@ export class JavaScriptParserVisitor {
         let expr: Expression;
         if (node.expression) {
             if (node.dotDotDotToken) {
-                expr = produce(this.convert<Expression>(node.expression), draft => {
-                    draft.markers.markers.push({
-                        kind: JS.Markers.Spread,
-                        id: randomId(),
-                        prefix: this.prefix(node.dotDotDotToken!)
-                    } satisfies Spread as Spread);
-                });
+                // Wrap in JS.Spread
+                const innerExpr = this.convert<Expression>(node.expression);
+                expr = {
+                    kind: JS.Kind.Spread,
+                    id: randomId(),
+                    prefix: this.prefix(node.dotDotDotToken!),
+                    markers: emptyMarkers,
+                    expression: innerExpr,
+                    type: this.mapType(node.expression)
+                } satisfies JS.Spread as Expression;
             } else {
                 expr = this.convert<Expression>(node.expression);
             }
@@ -4086,23 +4112,14 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitSpreadAssignment(node: ts.SpreadAssignment): JS.PropertyAssignment {
+    visitSpreadAssignment(node: ts.SpreadAssignment): JS.Spread {
         return {
-            kind: JS.Kind.PropertyAssignment,
+            kind: JS.Kind.Spread,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            name: this.rightPadded(
-                produce(this.convert<Expression>(node.expression), draft => {
-                    draft.markers.markers.push({
-                        kind: JS.Markers.Spread,
-                        id: randomId(),
-                        prefix: this.prefix(node)
-                    } satisfies Spread as Spread);
-                }),
-                this.suffix(node.expression)
-            ),
-            assigmentToken: JS.PropertyAssignment.Token.Empty,
+            expression: this.convert(node.expression),
+            type: this.mapType(node)
         };
     }
 

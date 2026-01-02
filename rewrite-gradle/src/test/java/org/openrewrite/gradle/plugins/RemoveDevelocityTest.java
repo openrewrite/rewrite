@@ -19,11 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class RemoveDevelocityTest implements RewriteTest {
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec
@@ -89,6 +91,220 @@ class RemoveDevelocityTest implements RewriteTest {
               }
               """,
             ""
+          )
+        );
+    }
+
+    @Test
+    void removeRemoteCacheWithLocalPreserved() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+              }
+              
+              buildCache {
+                  local {
+                      enabled = true
+                      directory = file('build-cache')
+                  }
+                  remote(develocity.buildCache) {
+                      enabled = true
+                  }
+              }
+              """,
+            """
+              
+              
+              buildCache {
+                  local {
+                      enabled = true
+                      directory = file('build-cache')
+                  }
+              }
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
+    void removeEntireBuildCacheWhenOnlyRemoteExists() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+              }
+              
+              buildCache {
+                  remote(develocity.buildCache) {
+                      enabled = true
+                  }
+              }
+              """,
+            ""
+          )
+        );
+    }
+
+    @Test
+    void removeGradleEnterpriseConfiguration() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.16.2'
+              }
+              
+              gradleEnterprise {
+                  server = 'https://ge.example.com'
+                  buildScan {
+                      publishAlways()
+                  }
+              }
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+                  remote(gradleEnterprise.buildCache) {
+                      enabled = true
+                      push = true
+                  }
+              }
+              """,
+            """
+              
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+              }
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
+    void noChangesWhenNoRemoteCache() {
+        rewriteRun(
+          settingsGradle(
+            """                
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeEntireBuildCacheWithOnlyHttpBuildCache() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+              }
+              
+              buildCache {
+                  remote(HttpBuildCache) {
+                      url = 'https://cache.example.com'
+                  }
+              }
+              """,
+            """
+
+
+              buildCache {
+                  remote(HttpBuildCache) {
+                      url = 'https://cache.example.com'
+                  }
+              }
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
+    void removeOnlyExtensionsWhenNoBuildCacheBlock() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+                  buildScan {
+                      termsOfUseUrl = 'https://gradle.com/terms-of-service'
+                      termsOfUseAgree = 'yes'
+                  }
+              }
+              """,
+            ""
+          )
+        );
+    }
+
+    @Test
+    void preserveOtherExtensionsAndPlugins() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+                  id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+              }
+              
+              rootProject.name = 'my-project'
+              
+              develocity {
+                  server = 'https://ge.example.com'
+              }
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+                  remote(develocity.buildCache) {
+                      enabled = true
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+              }
+              
+              rootProject.name = 'my-project'
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+              }
+              """
           )
         );
     }

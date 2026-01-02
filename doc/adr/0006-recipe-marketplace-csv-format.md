@@ -32,16 +32,75 @@ We will use a CSV format for recipe marketplace data with the following structur
 
 - **`displayName`**: Human-readable recipe display name
 - **`description`**: Recipe description
+- **`recipeCount`**: Integer count of recipes (direct + transitive), defaults to 1
 - **`estimatedEffortPerOccurrence`**: ISO-8601 duration format (e.g., PT5M, PT1H)
 - **`category1, category2, ..., categoryN`**: Zero or more category columns, read **left to right** with **left representing the deepest level category**
-- **`option1Name, option1DisplayName, option1Description`**: First recipe option
-- **`option2Name, option2DisplayName, option2Description`**: Second recipe option
-- **`optionNName, optionNDisplayName, optionNDescription`**: Additional options following the same pattern
+- **`category1Description, category2Description, ..., categoryNDescription`**: Optional descriptions for each category level
+- **`options`**: JSON array of `OptionDescriptor` objects (see JSON Format section below)
+- **`dataTables`**: JSON array of `DataTableDescriptor` objects (see JSON Format section below)
 
 ### Optional Bundle Columns
 
-- **`version`**: Package version (optional, allows version-independent recipe catalogs)
+- **`version`**: Resolved package version (optional, allows version-independent recipe catalogs)
+- **`requestedVersion`**: Version constraint as requested (e.g., `LATEST`, `0.2.0-SNAPSHOT`)
 - **`team`**: Optional team identifier for marketplace partitioning
+
+### Metadata Columns
+
+Any unrecognized columns are preserved as metadata in `RecipeListing.getMetadata()` as a `Map<String, Object>`, allowing forward compatibility with future extensions.
+
+### JSON Format for Options
+
+The `options` column contains a JSON array of option descriptors:
+
+```json
+[
+  {
+    "name": "groupId",
+    "type": "String",
+    "displayName": "Group ID",
+    "description": "The group ID of the dependency.",
+    "example": "org.openrewrite",
+    "required": true
+  },
+  {
+    "name": "artifactId",
+    "type": "String",
+    "displayName": "Artifact ID",
+    "description": "The artifact ID of the dependency.",
+    "required": false
+  }
+]
+```
+
+### JSON Format for DataTables
+
+The `dataTables` column contains a JSON array of data table descriptors:
+
+```json
+[
+  {
+    "name": "org.openrewrite.java.dependencies.DependencyListTable",
+    "displayName": "Dependencies",
+    "description": "Lists all dependencies found in the project.",
+    "columns": [
+      {
+        "name": "groupId",
+        "type": "String",
+        "displayName": "Group ID",
+        "description": "The dependency group."
+      }
+    ]
+  }
+]
+```
+
+The following data tables are excluded during writing as they are internal infrastructure tables:
+- `org.openrewrite.table.SearchResults`
+- `org.openrewrite.table.SourcesFileResults`
+- `org.openrewrite.table.SourcesFileErrors`
+- `org.openrewrite.table.RecipeRunStats`
+- `org.openrewrite.table.ParseFailures`
 
 ### Category Structure
 
@@ -67,31 +126,53 @@ Since `version` is optional, marketplaces can represent version-independent reci
 ### Implementation
 
 - **Data Model**:
-  - `RecipeBundle`: Simple data class containing ecosystem, packageName, version (optional), and team (optional)
-  - `RecipeListing`: Represents a recipe with metadata (name, displayName, description, options) and an associated `RecipeBundle`
+  - `RecipeBundle`: Data class containing:
+    - `packageEcosystem`: The package ecosystem (e.g., `maven`, `npm`, `yaml`)
+    - `packageName`: The package identifier
+    - `requestedVersion`: Version constraint as requested (optional)
+    - `version`: Resolved version (optional)
+    - `team`: Team identifier (optional)
+  - `RecipeListing`: Represents a recipe with metadata:
+    - `name`, `displayName`, `description`
+    - `estimatedEffortPerOccurrence`: ISO-8601 duration
+    - `options`: List of `OptionDescriptor` objects
+    - `dataTables`: List of `DataTableDescriptor` objects
+    - `recipeCount`: Total count of recipes (direct + transitive)
+    - `metadata`: Map of custom key-value pairs from unknown columns
+    - `bundle`: Associated `RecipeBundle`
   - `RecipeMarketplace`: Hierarchical structure with nested `Category` instances and a list of `RecipeBundleResolver` instances
 
 - **Reader**: `RecipeMarketplaceReader` (using univocity-parsers)
   - Parses CSV into `RecipeMarketplace` hierarchies
   - Creates `RecipeListing` instances with `RecipeBundle` objects from CSV data
-  - Requires `ecosystem` and `packageName` columns; `version` and `team` are optional
-  - Dynamically detects category and option columns
+  - Uses Jackson `ObjectMapper` for JSON deserialization of options and dataTables
+  - Requires `ecosystem` and `packageName` columns; other columns are optional
+  - Dynamically detects category columns by header prefix
+  - Preserves unknown columns as metadata
 
 - **Writer**: `RecipeMarketplaceWriter` (using univocity-parsers)
-  - Dynamically determines required category and option columns based on marketplace content
-  - Always includes `ecosystem` and `packageName` columns
-  - Only includes `version` column if at least one recipe has version information
-  - Only includes `team` column if at least one recipe has team information
+  - Dynamically determines required columns based on marketplace content
+  - Always includes `ecosystem`, `packageName`, and `name` columns
+  - Only includes optional columns if at least one recipe has data for them
+  - Uses Jackson for JSON serialization with `NON_DEFAULT` inclusion
+  - Places `options` and `dataTables` columns last for human readability
 
 - **Bundle Resolution**: Two-phase resolution system
   - `RecipeBundleResolver`: Interface with `getEcosystem()` and `resolve(RecipeBundle)` methods
     - Ecosystem-specific resolvers are registered with the `RecipeMarketplace`
-    - Examples: `MavenRecipeBundleResolver` in `rewrite-maven`, `NpmRecipeBundleResolver` in `rewrite-javascript`
+    - Implementations:
+      - `MavenRecipeBundleResolver` in `rewrite-maven`
+      - `NpmRecipeBundleResolver` in `rewrite-javascript`
+      - `YamlRecipeBundleResolver` in `rewrite-core`
   - `RecipeBundleReader`: Interface returned by resolvers with methods:
     - `getBundle()`: Returns the associated `RecipeBundle`
     - `read()`: Reads the bundle and returns a `RecipeMarketplace`
     - `describe(RecipeListing)`: Returns a `RecipeDescriptor` for a listing
     - `prepare(RecipeListing, Map<String, Object>)`: Creates a configured `Recipe` instance
+  - Implementations:
+    - `MavenRecipeBundleReader`: Downloads Maven artifacts, reads `META-INF/rewrite/recipes.csv` from JAR, falls back to classpath scanning
+    - `NpmRecipeBundleReader`: Uses `JavaScriptRewriteRpc` for remote communication with npm packages
+    - `YamlRecipeBundleReader`: Reads recipes from YAML files by path or URI
   - `RecipeListing.resolve()`: Convenience method that finds the appropriate resolver and returns a `RecipeBundleReader`
 
 - **Validators**: Tools for ensuring marketplace quality and completeness
@@ -124,16 +205,18 @@ Since `version` is optional, marketplaces can represent version-independent reci
 
 ### Negative
 
-1. **CSV limitations**: No native support for nested structures (mitigated by column naming conventions)
-2. **Sparse data**: Recipes with few options result in many empty cells in CSVs with high option counts
+1. **CSV limitations**: No native support for nested structures (mitigated by JSON columns and column naming conventions)
+2. **JSON in CSV cells**: Options and dataTables are stored as JSON strings, which can be harder to edit manually in spreadsheet tools
 3. **Always requires bundle metadata**: Unlike earlier designs, ecosystem and packageName are always required, even for basic recipe catalogs
 
 ### Trade-offs
 
 - **Left-to-right category ordering** (left = deepest): This matches the `moderne-organizations-format` convention but may be counterintuitive to some users who expect left-to-right to represent root-to-leaf
 - **Two-phase resolution**: Separating RecipeBundleResolver and RecipeBundleReader provides flexibility but adds complexity compared to a single interface
-- **Dynamic columns**: Provides flexibility but means schema varies between files, making generic CSV processing tools less effective
+- **JSON for complex data**: Using JSON for options and dataTables provides a fixed column structure but requires JSON parsing/writing
+- **Dynamic category columns**: The number of category columns varies between files based on hierarchy depth
 - **Resolver configuration**: RecipeBundleResolvers must be registered with the RecipeMarketplace instance before calling RecipeListing.resolve(), describe(), or prepare()
+- **Requested vs resolved version**: Supporting both `requestedVersion` (constraint) and `version` (resolved) adds flexibility but also complexity in version handling
 
 ## Examples
 
@@ -151,11 +234,25 @@ ecosystem,packageName,version,name,displayName,description,category1
 maven,org.openrewrite:rewrite-java,8.0.0,org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses.,Java Cleanup
 ```
 
-### With Recipe Options
+### With Requested Version
 
 ```csv
-ecosystem,packageName,name,displayName,description,category1,option1Name,option1DisplayName,option1Description,option2Name,option2DisplayName,option2Description
-maven,org.openrewrite:rewrite-maven,org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,Upgrades a Maven dependency.,Maven,groupId,Group ID,The group ID.,artifactId,Artifact ID,The artifact ID.
+ecosystem,packageName,requestedVersion,version,name,displayName,description,category1
+maven,org.openrewrite:rewrite-java,LATEST,8.45.0,org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses.,Java Cleanup
+```
+
+### With Recipe Options (JSON Format)
+
+```csv
+ecosystem,packageName,name,displayName,description,category1,options
+maven,org.openrewrite:rewrite-maven,org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,Upgrades a Maven dependency.,Maven,"[{""name"":""groupId"",""displayName"":""Group ID"",""description"":""The group ID.""},{""name"":""artifactId"",""displayName"":""Artifact ID"",""description"":""The artifact ID.""}]"
+```
+
+### With Recipe Count
+
+```csv
+ecosystem,packageName,name,displayName,description,recipeCount,category1
+maven,org.openrewrite:rewrite-java,org.openrewrite.java.format.Autoformat,Autoformat,Formats Java source code.,15,Java Formatting
 ```
 
 ### With Team Partitioning
@@ -174,3 +271,10 @@ maven,org.openrewrite:rewrite-java,org.openrewrite.java.format.AutoFormat,Format
 ```
 
 Creates: `Best Practices > Java > Cleanup > UnnecessaryParentheses` and `Best Practices > Java > Formatting > AutoFormat`
+
+### YAML Ecosystem Example
+
+```csv
+ecosystem,packageName,name,displayName,description
+yaml,/path/to/recipes.yml,org.example.MyRecipe,My Custom Recipe,A custom recipe from a YAML file.
+```

@@ -2148,4 +2148,86 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration.
+     * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
+     */
+    @Test
+    void groovyDslUpgradesPluginProvidedDirectDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """,
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0"
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration (Kotlin DSL).
+     * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
+     */
+    @Test
+    void kotlinDslUpgradesPluginProvidedDirectDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
+          buildGradleKts(
+            //language=kotlin
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+              """,
+            //language=kotlin
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  api("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0")
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Transitive dependencies from plugins should not be upgraded by this recipe.
+     * kotlin-stdlib is a transitive dependency of kotlin-stdlib-jdk8 which is added by the Kotlin plugin.
+     */
+    @Test
+    void doesNotUpgradePluginProvidedTransitiveDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib", "1.9.0", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """
+          )
+        );
+    }
 }

@@ -864,4 +864,91 @@ describe("NodeResolutionResult marker", () => {
             "npm": ">=1.0.0"
         });
     });
+
+    test("should resolve pnpm-style paths with version suffix", () => {
+        // pnpm stores packages with version in the path: node_modules/package@version
+        // This is different from npm's node_modules/package
+        const packageJsonContent = {
+            name: "test-project",
+            version: "1.0.0",
+            dependencies: {
+                "micromatch": "^4.0.0"
+            }
+        };
+
+        // pnpm-style lockfile with version-suffixed paths
+        const packageLockContent = {
+            name: "test-project",
+            version: "1.0.0",
+            lockfileVersion: 3,
+            packages: {
+                "": {
+                    name: "test-project",
+                    version: "1.0.0",
+                    dependencies: {
+                        "micromatch": "^4.0.0"
+                    }
+                },
+                // pnpm path format: node_modules/name@version
+                "node_modules/micromatch@4.0.5": {
+                    version: "4.0.5",
+                    license: "MIT",
+                    dependencies: {
+                        "braces": "^3.0.2",
+                        "picomatch": "^2.3.1"
+                    }
+                },
+                "node_modules/braces@3.0.2": {
+                    version: "3.0.2",
+                    license: "MIT",
+                    dependencies: {
+                        "fill-range": "^7.0.1"
+                    }
+                },
+                "node_modules/picomatch@2.3.1": {
+                    version: "2.3.1",
+                    license: "MIT"
+                },
+                "node_modules/fill-range@7.0.1": {
+                    version: "7.0.1",
+                    license: "MIT"
+                }
+            }
+        };
+
+        const marker = createNodeResolutionResultMarker(
+            "package.json",
+            packageJsonContent,
+            packageLockContent
+        );
+
+        // micromatch should be resolved via semver fallback
+        const micromatchDep = marker.dependencies.find(d => d.name === "micromatch");
+        expect(micromatchDep?.resolved).toBeDefined();
+        expect(micromatchDep!.resolved!.name).toBe("micromatch");
+        expect(micromatchDep!.resolved!.version).toBe("4.0.5");
+
+        // micromatch should have braces as a dependency
+        expect(micromatchDep!.resolved!.dependencies).toBeDefined();
+        const bracesDep = micromatchDep!.resolved!.dependencies!.find(d => d.name === "braces");
+        expect(bracesDep).toBeDefined();
+        expect(bracesDep!.versionConstraint).toBe("^3.0.2");
+
+        // braces should be resolved (this is the key test - transitive dep resolution)
+        expect(bracesDep!.resolved).toBeDefined();
+        expect(bracesDep!.resolved!.name).toBe("braces");
+        expect(bracesDep!.resolved!.version).toBe("3.0.2");
+
+        // braces should have fill-range as a dependency
+        expect(bracesDep!.resolved!.dependencies).toBeDefined();
+        const fillRangeDep = bracesDep!.resolved!.dependencies!.find(d => d.name === "fill-range");
+        expect(fillRangeDep).toBeDefined();
+        expect(fillRangeDep!.resolved).toBeDefined();
+        expect(fillRangeDep!.resolved!.version).toBe("7.0.1");
+
+        // All packages should be in resolvedDependencies
+        expect(marker.resolvedDependencies.length).toBe(4);
+        const names = marker.resolvedDependencies.map(r => r.name).sort();
+        expect(names).toEqual(["braces", "fill-range", "micromatch", "picomatch"]);
+    });
 });

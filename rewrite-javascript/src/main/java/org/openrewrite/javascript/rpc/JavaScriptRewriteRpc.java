@@ -117,7 +117,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, ExecutionContext ctx) {
-        return parseProject(projectPath, null, ctx);
+        return parseProject(projectPath, null, null, ctx);
     }
 
     /**
@@ -130,6 +130,22 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, ExecutionContext ctx) {
+        return parseProject(projectPath, exclusions, null, ctx);
+    }
+
+    /**
+     * Parses an entire JavaScript/TypeScript project directory.
+     * Discovers and parses all relevant source files, package.json files, and lock files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param exclusions  Optional glob patterns to exclude from parsing
+     * @param relativeTo  Optional path to make source file paths relative to. If not specified,
+     *                    paths are relative to projectPath. Use this when parsing a subdirectory
+     *                    but wanting paths relative to the repository root.
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
@@ -140,7 +156,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -187,7 +203,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
-        private Duration timeout = Duration.ofSeconds(30);
+        private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
 
         private @Nullable Integer inspectBrk;

@@ -264,6 +264,12 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
+    public JS.Spread visitSpread(JS.Spread spread, P p) {
+        visitAndValidateNonNull(spread.getExpression(), Expression.class, p);
+        return spread;
+    }
+
+    @Override
     public JS.StatementExpression visitStatementExpression(JS.StatementExpression statementExpression, P p) {
         visitAndValidateNonNull(statementExpression.getStatement(), Statement.class, p);
         return statementExpression;

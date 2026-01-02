@@ -17,11 +17,15 @@
 import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
-import {Json, JsonParser, JsonVisitor} from "../../json";
+import {Tree} from "../../tree";
+import {isJson, Json, JsonParser, JsonVisitor} from "../../json";
+import {isDocuments, isYaml, Yaml} from "../../yaml";
+import {isPlainText, PlainText} from "../../text";
 import {
     allDependencyScopes,
     findNodeResolutionResult,
     NodeResolutionResultQueries,
+    NpmrcScope,
     PackageManager
 } from "../node-resolution-result";
 import * as path from "path";
@@ -33,6 +37,7 @@ import {
     createLockFileEditor,
     DependencyRecipeAccumulator,
     getAllLockFileNames,
+    getLockFileName,
     parseLockFileContent,
     runInstallIfNeeded,
     runInstallInTempDir,
@@ -45,8 +50,6 @@ import {applyOverrideToPackageJson, DependencyPathSegment, parseDependencyPath} 
  * Information about a project that needs updating
  */
 interface ProjectUpdateInfo {
-    /** Absolute path to the project directory */
-    projectDir: string;
     /** Relative path to package.json (from source root) */
     packageJsonPath: string;
     /** Original package.json content */
@@ -62,9 +65,14 @@ interface ProjectUpdateInfo {
     skipInstall: boolean;
     /** Parsed dependency path for scoped overrides (if specified) */
     dependencyPathSegments?: DependencyPathSegment[];
+    /** Config file contents extracted from the project (e.g., .npmrc) */
+    configFiles?: Record<string, string>;
 }
 
-type Accumulator = DependencyRecipeAccumulator<ProjectUpdateInfo>;
+interface Accumulator extends DependencyRecipeAccumulator<ProjectUpdateInfo> {
+    /** Original lock file content, keyed by lock file path */
+    originalLockFiles: Map<string, string>;
+}
 
 /**
  * Upgrades the version of a transitive dependency by adding override entries to package.json.
@@ -108,15 +116,46 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
     dependencyPath?: string;
 
     initialValue(_ctx: ExecutionContext): Accumulator {
-        return createDependencyRecipeAccumulator();
+        return {
+            ...createDependencyRecipeAccumulator<ProjectUpdateInfo>(),
+            originalLockFiles: new Map()
+        };
     }
 
     async scanner(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
+        const LOCK_FILE_NAMES = getAllLockFileNames();
 
-        return new class extends JsonVisitor<ExecutionContext> {
-            protected async visitDocument(doc: Json.Document, _ctx: ExecutionContext): Promise<Json | undefined> {
-                // Only process package.json files
+        return new class extends TreeVisitor<Tree, ExecutionContext> {
+            protected async accept(tree: Tree, ctx: ExecutionContext): Promise<Tree | undefined> {
+                // Handle JSON documents (package.json and JSON lock files)
+                if (isJson(tree) && tree.kind === Json.Kind.Document) {
+                    return this.handleJsonDocument(tree as Json.Document, ctx);
+                }
+
+                // Handle YAML documents (pnpm-lock.yaml)
+                if (isYaml(tree) && isDocuments(tree)) {
+                    return this.handleYamlDocument(tree, ctx);
+                }
+
+                // Handle PlainText files (yarn.lock for Yarn Classic)
+                if (isPlainText(tree)) {
+                    return this.handlePlainTextDocument(tree as PlainText, ctx);
+                }
+
+                return tree;
+            }
+
+            private async handleJsonDocument(doc: Json.Document, _ctx: ExecutionContext): Promise<Json | undefined> {
+                const basename = path.basename(doc.sourcePath);
+
+                // Capture JSON lock file content (package-lock.json, bun.lock)
+                if (LOCK_FILE_NAMES.includes(basename)) {
+                    acc.originalLockFiles.set(doc.sourcePath, await TreePrinters.print(doc));
+                    return doc;
+                }
+
+                // Only process package.json files for dependency analysis
                 if (!doc.sourcePath.endsWith('package.json')) {
                     return doc;
                 }
@@ -126,8 +165,6 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                     return doc;
                 }
 
-                // Get the project directory and package manager
-                const projectDir = path.dirname(path.resolve(doc.sourcePath));
                 const pm = marker.packageManager ?? PackageManager.Npm;
 
                 // Check if package is a direct dependency - if so, skip (use UpgradeDependencyVersion instead)
@@ -167,21 +204,42 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                     ? parseDependencyPath(recipe.dependencyPath)
                     : undefined;
 
+                // Extract project-level .npmrc config from marker
+                const configFiles: Record<string, string> = {};
+                const projectNpmrc = marker.npmrcConfigs?.find(c => c.scope === NpmrcScope.Project);
+                if (projectNpmrc) {
+                    const lines = Object.entries(projectNpmrc.properties)
+                        .map(([key, value]) => `${key}=${value}`);
+                    configFiles['.npmrc'] = lines.join('\n');
+                }
+
                 acc.projectsToUpdate.set(doc.sourcePath, {
-                    projectDir,
                     packageJsonPath: doc.sourcePath,
-                    originalPackageJson: await this.printDocument(doc),
+                    originalPackageJson: await TreePrinters.print(doc),
                     newVersion: recipe.newVersion,
                     packageManager: pm,
                     skipInstall: false, // Always need to run install for overrides
-                    dependencyPathSegments
+                    dependencyPathSegments,
+                    configFiles: Object.keys(configFiles).length > 0 ? configFiles : undefined
                 });
 
                 return doc;
             }
 
-            private async printDocument(doc: Json.Document): Promise<string> {
-                return TreePrinters.print(doc);
+            private async handleYamlDocument(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml.Documents | undefined> {
+                const basename = path.basename(docs.sourcePath);
+                if (LOCK_FILE_NAMES.includes(basename)) {
+                    acc.originalLockFiles.set(docs.sourcePath, await TreePrinters.print(docs));
+                }
+                return docs;
+            }
+
+            private async handlePlainTextDocument(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                const basename = path.basename(text.sourcePath);
+                if (LOCK_FILE_NAMES.includes(basename)) {
+                    acc.originalLockFiles.set(text.sourcePath, await TreePrinters.print(text));
+                }
+                return text;
             }
         };
     }
@@ -289,6 +347,7 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
 
     /**
      * Runs the package manager in a temporary directory to update the lock file.
+     * All file contents are provided from in-memory sources (SourceFiles), not read from disk.
      */
     private async runPackageManagerInstall(
         acc: Accumulator,
@@ -301,10 +360,23 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
             updateInfo
         );
 
+        // Get the lock file path based on package manager
+        const lockFileName = getLockFileName(updateInfo.packageManager);
+        const packageJsonDir = path.dirname(updateInfo.packageJsonPath);
+        const lockFilePath = packageJsonDir === '.'
+            ? lockFileName
+            : path.join(packageJsonDir, lockFileName);
+
+        // Look up the original lock file content from captured SourceFiles
+        const originalLockFileContent = acc.originalLockFiles.get(lockFilePath);
+
         const result = await runInstallInTempDir(
-            updateInfo.projectDir,
             updateInfo.packageManager,
-            modifiedPackageJson
+            modifiedPackageJson,
+            {
+                originalLockFileContent,
+                configFiles: updateInfo.configFiles
+            }
         );
 
         storeInstallResult(result, acc, updateInfo, modifiedPackageJson);

@@ -55,9 +55,14 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
         );
     }
 
-    // Write non-JS/TS files to disk FIRST so Prettier config detection can find them
+    // Write non-JS/TS/JSON files to disk FIRST so Prettier config detection can find them
+    // Exclude all package.json files (root and workspace members) - they're handled separately
     for (const spec of sourceSpecs) {
-        if (spec.path !== 'package.json' && spec.path !== 'package-lock.json' && spec.kind !== JS.Kind.CompilationUnit) {
+        const isPackageJson = spec.path?.endsWith('package.json');
+        const isPackageLock = spec.path === 'package-lock.json';
+        const isJsTs = spec.kind === JS.Kind.CompilationUnit;
+
+        if (!isPackageJson && !isPackageLock && !isJsTs) {
             if (spec.before && spec.path) {
                 const filePath = path.join(relativeTo, spec.path);
                 const dir = path.dirname(filePath);
@@ -69,22 +74,37 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
         }
     }
 
+    // Collect all package.json specs (root and workspace members)
+    const allPackageJsonSpecs = sourceSpecs.filter(spec => spec.path?.endsWith('package.json'));
+
     // Yield package.json FIRST so its PackageJsonParser is used for all JSON specs
     // (The test framework uses the first spec's parser for all specs of the same kind)
     if (packageJsonSpec) {
-        // Parse package.json to check if there are dependencies
+        // Parse package.json to check if there are dependencies or workspaces
         const packageJsonContent = JSON.parse(packageJsonSpec.before!);
         const hasDependencies = Object.keys({
             ...packageJsonContent.dependencies,
             ...packageJsonContent.devDependencies
         }).length > 0;
+        const hasWorkspaces = Array.isArray(packageJsonContent.workspaces) && packageJsonContent.workspaces.length > 0;
 
         // Get or create cached workspace with node_modules
         // If packageLockSpec is provided, use it for deterministic installs with npm ci
-        if (hasDependencies) {
+        // For workspaces, include all workspace member package.json files
+        if (hasDependencies || hasWorkspaces) {
+            // Build workspace packages map for DependencyWorkspace
+            const workspacePackages: Record<string, string> | undefined = hasWorkspaces
+                ? Object.fromEntries(
+                    allPackageJsonSpecs
+                        .filter(spec => spec.path !== 'package.json' && spec.before)
+                        .map(spec => [spec.path!, spec.before!])
+                )
+                : undefined;
+
             const cachedWorkspace = await DependencyWorkspace.getOrCreateWorkspace({
                 packageJsonContent: packageJsonSpec.before!,
-                packageLockContent: packageLockSpec?.before ?? undefined
+                packageLockContent: packageLockSpec?.before ?? undefined,
+                workspacePackages
             });
 
             // Symlink node_modules from cached workspace to test directory
@@ -111,6 +131,26 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
             ...packageJsonSpec,
             parser: () => new PackageJsonParser({relativeTo})
         };
+    }
+
+    // Write and yield workspace member package.json files with PackageJsonParser
+    for (const spec of allPackageJsonSpecs) {
+        if (spec.path !== 'package.json') {
+            // Write workspace member package.json to disk
+            if (spec.before && spec.path) {
+                const filePath = path.join(relativeTo, spec.path);
+                const dir = path.dirname(filePath);
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true });
+                }
+                fs.writeFileSync(filePath, spec.before);
+            }
+
+            yield {
+                ...spec,
+                parser: () => new PackageJsonParser({relativeTo})
+            };
+        }
     }
 
     // Yield package-lock.json after package.json (so PackageJsonParser is used as the group parser)
@@ -150,7 +190,9 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
     }
 
     for (const spec of sourceSpecs) {
-        if (spec.path !== 'package.json' && spec.path !== 'package-lock.json') {
+        const isPackageJson = spec.path?.endsWith('package.json');
+        const isPackageLock = spec.path === 'package-lock.json';
+        if (!isPackageJson && !isPackageLock) {
             if (spec.kind === JS.Kind.CompilationUnit) {
                 // For JS/TS files, use a parser that adds style marker if available
                 // spec.path may be undefined, so generate a reasonable path from the extension
