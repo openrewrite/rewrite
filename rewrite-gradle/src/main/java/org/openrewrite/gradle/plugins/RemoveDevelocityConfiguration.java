@@ -89,7 +89,6 @@ public class RemoveDevelocityConfiguration extends Recipe {
     public List<Recipe> getRecipeList() {
         return Arrays.asList(
                 new RemoveExtension("develocity"),
-                new RemoveExtension("gradleEnterprise")
-        );
+                new RemoveExtension("gradleEnterprise"));
     }
 }
