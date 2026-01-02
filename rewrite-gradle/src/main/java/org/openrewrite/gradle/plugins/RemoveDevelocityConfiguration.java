@@ -62,18 +62,7 @@ public class RemoveDevelocityConfiguration extends Recipe {
                             J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
                             J.Block body = (J.Block) lambda.getBody();
 
-                            List<Statement> filteredStatements = ListUtils.filter(body.getStatements(),
-                                    stmt -> {
-                                        if (stmt instanceof J.Return && ((J.Return) stmt).getExpression() instanceof J.MethodInvocation) {
-                                            // Unpack J.Return wrapping last statement in closure
-                                            stmt = (J.MethodInvocation) ((J.Return) stmt).getExpression();
-                                        }
-                                        if (!(stmt instanceof J.MethodInvocation)) {
-                                            return true;
-                                        }
-                                        // Remove only 'remote' method invocations
-                                        return !"remote".equals(((J.MethodInvocation) stmt).getSimpleName());
-                                    });
+                            List<Statement> filteredStatements = ListUtils.filter(body.getStatements(), this::retainStatement);
                             if (filteredStatements.isEmpty()) {
                                 return null;
                             }
@@ -81,6 +70,29 @@ public class RemoveDevelocityConfiguration extends Recipe {
                         }
 
                         return m;
+                    }
+
+                    private boolean retainStatement(Statement stmt) {
+                        if (stmt instanceof J.Return && ((J.Return) stmt).getExpression() instanceof J.MethodInvocation) {
+                            // Unpack J.Return wrapping last statement in closure
+                            stmt = (J.MethodInvocation) ((J.Return) stmt).getExpression();
+                        }
+                        if (!(stmt instanceof J.MethodInvocation)) {
+                            return true;
+                        }
+                        J.MethodInvocation remote = (J.MethodInvocation) stmt;
+                        if (!"remote".equals(remote.getSimpleName())) {
+                            return true;
+                        }
+                        if (remote.getArguments().isEmpty() || !(remote.getArguments().get(0) instanceof J.FieldAccess)) {
+                            return true;
+                        }
+                        J.FieldAccess fieldAccess = (J.FieldAccess) remote.getArguments().get(0);
+                        if (!(fieldAccess.getTarget() instanceof J.Identifier)) {
+                            return true;
+                        }
+                        J.Identifier target = (J.Identifier) fieldAccess.getTarget();
+                        return !"develocity".equals(target.getSimpleName()) && !"gradleEnterprise".equals(target.getSimpleName());
                     }
                 });
     }
