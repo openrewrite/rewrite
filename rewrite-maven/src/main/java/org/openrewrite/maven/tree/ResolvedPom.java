@@ -968,8 +968,14 @@ public class ResolvedPom {
                             null
                     );
                     managedDependencyMap.compute(createDependencyManagementKey(defined), (key, existing) -> {
-                        if (existing == null || existing.getBomGav() != null) {
+                        if (existing == null) {
                             return resolvedDefined;
+                        }
+                        if (existing.getBomGav() != null) {
+                            if (resolvedDefined.getVersion() != null) {
+                                return resolvedDefined;
+                            }
+                            return mergeProperties(resolvedDefined, existing);
                         }
                         return mergeProperties(existing, resolvedDefined);
                     });

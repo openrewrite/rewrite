@@ -24,9 +24,11 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 /**
  * Marker containing the resolved Prettier configuration for a source file.
@@ -64,7 +66,7 @@ public class PrettierStyle extends NamedStyles implements RpcCodec<PrettierStyle
     private final boolean ignored;
 
     public PrettierStyle(UUID id, Map<String, Object> config, String prettierVersion, boolean ignored) {
-        super(id, NAME, DISPLAY_NAME, DESCRIPTION, Collections.emptySet(), Collections.emptyList());
+        super(id, NAME, DISPLAY_NAME, DESCRIPTION, emptySet(), emptyList());
         this.config = config;
         this.prettierVersion = prettierVersion;
         this.ignored = ignored;
