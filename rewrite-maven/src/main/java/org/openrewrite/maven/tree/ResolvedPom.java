@@ -1146,7 +1146,7 @@ public class ResolvedPom {
                         d2 = d2
                                 .withGav(d2.getGav()
                                         .withGroupId(resolvedPom.getValue(d2.getGroupId()))
-                                        .withArtifactId(resolvedPom.getValue(d2.getArtifactId()))
+                                        .withArtifactId(requireNonNull(resolvedPom.getValue(d2.getArtifactId())))
                                         .withVersion(resolvedPom.getValue(d2.getVersion()))
                                 )
                                 .withClassifier(resolvedPom.getValue(d2.getClassifier()))

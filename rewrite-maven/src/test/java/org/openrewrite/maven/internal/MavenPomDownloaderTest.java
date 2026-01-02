@@ -1389,6 +1389,9 @@ class MavenPomDownloaderTest implements RewriteTest {
               <groupId>com.example</groupId>
               <artifactId>demo</artifactId>
               <version>1.0.0</version>
+              <properties>
+                  <boring-ssl-classifier>something-else</boring-ssl-classifier>
+              </properties>
               <dependencies>
                   <dependency>
                       <groupId>com.azure</groupId>
@@ -1408,6 +1411,7 @@ class MavenPomDownloaderTest implements RewriteTest {
           .isNotEmpty()
           .extracting(ResolvedDependency::getClassifier)
           .doesNotContain("${boring-ssl-classifier}")
+          .doesNotContain("something-else")
           .contains("")
           .anyMatch(c -> !"".equals(c));
     }
