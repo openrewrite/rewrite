@@ -30,7 +30,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {BlankLinesStyle, IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../../src/javascript";
 import {AutoformatVisitor, SpacesVisitor} from "../../../src/javascript/format";
-import {Draft, produce} from "immer";
+import {create as produce, Draft} from "mutative";
 import {MarkersKind, NamedStyles, randomId, Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
@@ -150,6 +150,7 @@ describe('SpacesVisitor', () => {
 
     test('objectLiteralTypeBraces: true (TypeScript default)', () => {
         spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralBraces = true;
             draft.within.objectLiteralTypeBraces = true;
         })));
         return spec.rewriteRun(
@@ -158,7 +159,7 @@ describe('SpacesVisitor', () => {
             typescript(`
             type Values = {[key: string]: string}
             function foo(x:{name:string}): void {}
-            const bar: {html:string} = { html: "" };
+            const bar: {html:string} = {html: ""};
             `,
                 `
             type Values = { [key: string]: string }
@@ -297,6 +298,68 @@ describe('SpacesVisitor', () => {
                 `import Space = J.Space;`
             )
             // @formatter:on
+        )
+    });
+
+    test('objectLiteralBraces: true - adds spaces inside braces', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralBraces = true;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = {foo: 1};
+const b = {foo: 1, bar: 2};
+const c = {shorthand};
+const d = {x, y, z};`,
+                `const a = { foo: 1 };
+const b = { foo: 1, bar: 2 };
+const c = { shorthand };
+const d = { x, y, z };`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('objectLiteralBraces: false - removes spaces inside braces', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.objectLiteralBraces = false;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = { foo: 1 };
+const b = { foo: 1, bar: 2 };
+const c = { shorthand };
+const d = { x, y, z };`,
+                `const a = {foo: 1};
+const b = {foo: 1, bar: 2};
+const c = {shorthand};
+const d = {x, y, z};`
+            )
+            // @formatter:on
+        )
+    });
+
+    test('type parameter default should have space before equals', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            typescript(
+                `type Test<TFieldValues extends FieldValues= FieldValues> = TFieldValues;`,
+                `type Test<TFieldValues extends FieldValues = FieldValues> = TFieldValues;`
+            )
+        )
+    });
+
+    test('type parameter default without extends should have space before equals', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            typescript(
+                `function createArray<T= string>(value: T): T[] { return [value]; }`,
+                `function createArray<T = string>(value: T): T[] { return [value]; }`
+            )
         )
     });
 });

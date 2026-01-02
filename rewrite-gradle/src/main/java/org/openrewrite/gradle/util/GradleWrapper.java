@@ -37,6 +37,7 @@ import org.openrewrite.semver.VersionComparator;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -230,11 +231,13 @@ public class GradleWrapper {
 
     public RemoteArchive wrapperJar() {
         return Remote.builder(WRAPPER_JAR_LOCATION)
+                .charset(StandardCharsets.ISO_8859_1)
                 .build(URI.create(distributionInfos.getDownloadUrl()), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }
 
     public RemoteArchive wrapperJar(SourceFile before) {
         return Remote.builder(before)
+                .charset(StandardCharsets.ISO_8859_1)
                 .build(URI.create(distributionInfos.getDownloadUrl()), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }
 

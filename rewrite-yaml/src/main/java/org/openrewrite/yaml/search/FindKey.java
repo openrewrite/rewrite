@@ -73,7 +73,7 @@ public class FindKey extends Recipe {
 
     public static Set<Yaml> find(Yaml y, String jsonPath) {
         JsonPathMatcher matcher = new JsonPathMatcher(jsonPath);
-        YamlVisitor<Set<Yaml>> findVisitor = new YamlVisitor<Set<Yaml>>() {
+        return new YamlVisitor<Set<Yaml>>() {
             @Override
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml> es) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, es);
@@ -91,10 +91,6 @@ public class FindKey extends Recipe {
                 }
                 return m;
             }
-        };
-
-        Set<Yaml> es = new HashSet<>();
-        findVisitor.visit(y, es);
-        return es;
+        }.reduce(y, new HashSet<>());
     }
 }

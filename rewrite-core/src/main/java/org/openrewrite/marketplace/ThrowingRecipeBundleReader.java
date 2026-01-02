@@ -41,9 +41,4 @@ public class ThrowingRecipeBundleReader implements RecipeBundleReader {
     public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
         throw t;
     }
-
-    @Override
-    public ClassLoader classLoader() {
-        throw t;
-    }
 }

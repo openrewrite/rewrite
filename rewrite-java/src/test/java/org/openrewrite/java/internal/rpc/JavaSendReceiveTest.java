@@ -37,6 +37,7 @@ import java.io.PipedOutputStream;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaSendReceiveTest implements RewriteTest {
@@ -52,9 +53,9 @@ class JavaSendReceiveTest implements RewriteTest {
 
         Environment env = Environment.builder().build();
 
-        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverIn, serverOut))), env)
+        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverIn, serverOut))), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
-        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientIn, clientOut))), env)
+        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientIn, clientOut))), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
     }
 

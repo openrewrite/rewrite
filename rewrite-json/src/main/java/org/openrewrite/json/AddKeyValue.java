@@ -18,6 +18,7 @@ package org.openrewrite.json;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -56,7 +57,8 @@ public class AddKeyValue extends Recipe {
     @Option(displayName = "Prepend",
             required = false,
             description = "If set to `true` the value will be added to the beginning of the object")
-    boolean prepend;
+    @Nullable
+    Boolean prepend;
 
     @Override
     public String getDisplayName() {
@@ -81,7 +83,7 @@ public class AddKeyValue extends Recipe {
                 if (pathMatcher.matches(getCursor()) && objectDoesNotContainKey(obj, key)) {
                     List<Json> originalMembers = obj.getMembers();
                     boolean jsonIsEmpty = originalMembers.isEmpty() || originalMembers.get(0) instanceof Json.Empty;
-                    Space space = jsonIsEmpty || prepend ? originalMembers.get(0).getPrefix() : Space.build("\n", emptyList());
+                    Space space = jsonIsEmpty || Boolean.TRUE.equals(prepend) ? originalMembers.get(0).getPrefix() : Space.build("\n", emptyList());
 
                     Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, rightPaddedKey(), parsedValue());
 
@@ -89,7 +91,7 @@ public class AddKeyValue extends Recipe {
                         return autoFormat(obj.withMembers(singletonList(newMember)), ctx, getCursor().getParent());
                     }
 
-                    List<Json> newMembers = prepend ?
+                    List<Json> newMembers = Boolean.TRUE.equals(prepend) ?
                             ListUtils.concat(newMember, originalMembers) :
                             ListUtils.concat(originalMembers, newMember);
                     return autoFormat(obj.withMembers(newMembers), ctx, getCursor().getParent());

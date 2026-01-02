@@ -19,13 +19,14 @@ import lombok.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.NlsRewrite;
 import org.openrewrite.Recipe;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import static java.util.stream.Collectors.toList;
+import static java.util.Collections.singleton;
 
 @Getter
 @RequiredArgsConstructor
@@ -41,7 +42,26 @@ public class RecipeListing implements Comparable<RecipeListing> {
     private final @NlsRewrite.DisplayName String displayName;
     private final @NlsRewrite.Description String description;
     private final @Nullable Duration estimatedEffortPerOccurrence;
-    private final List<? extends Option> options;
+    private final List<OptionDescriptor> options;
+    private final List<DataTableDescriptor> dataTables;
+
+    /**
+     * The count of all recipes listed in {@link Recipe#getRecipeList()} both directly
+     * and transitively. This simple count is a useful measure to expose in the recipe
+     * marketplace because it can be used as a sorting criteria. In the "more is better"
+     * view of relevance, the higher the recipe count, the more likely the recipe is to
+     * be complete.
+     * <br>
+     * It also recognizes another design consideration. Migration recipes generally are
+     * built incrementally by version so that developers can use migration recipes to get
+     * to a version short of the absolute latest version that a recipe is available for.
+     * Migration recipes for a particular version compose the migration recipe from the prior
+     * version. As a result, the latest available version migration will "by construction" always
+     * have a greater recipe count than a migration for an earlier version.
+     */
+    private final int recipeCount;
+
+    private final Map<String, Object> metadata = new LinkedHashMap<>();
 
     @With(AccessLevel.PACKAGE)
     private final RecipeBundle bundle;
@@ -65,38 +85,27 @@ public class RecipeListing implements Comparable<RecipeListing> {
         return resolve().prepare(this, options);
     }
 
-    public ClassLoader classLoader() {
-        return resolve().classLoader();
-    }
-
     @Override
     public int compareTo(RecipeListing o) {
         return name.compareTo(o.name);
     }
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Option {
-        String name;
-
-        @NlsRewrite.DisplayName
-        String displayName;
-
-        @NlsRewrite.Description
-        String description;
-    }
-
     public static RecipeListing fromDescriptor(RecipeDescriptor descriptor, RecipeBundle bundle) {
+        int recipeCount = 1;
+        RecipeDescriptor d = descriptor;
+        for (Queue<RecipeDescriptor> queue = new LinkedList<>(singleton(descriptor)); !queue.isEmpty();
+             d = queue.poll()) {
+            recipeCount += d.getRecipeList().size();
+            queue.addAll(d.getRecipeList());
+        }
+
         return new RecipeListing(null, descriptor.getName(),
                 descriptor.getDisplayName(),
                 descriptor.getDescription(),
                 descriptor.getEstimatedEffortPerOccurrence(),
-                descriptor.getOptions().stream().map(opt -> new RecipeListing.Option(
-                        opt.getName(),
-                        opt.getDisplayName(),
-                        opt.getDescription()
-                )).collect(toList()),
+                descriptor.getOptions(),
+                descriptor.getDataTables(),
+                recipeCount,
                 bundle
         );
     }

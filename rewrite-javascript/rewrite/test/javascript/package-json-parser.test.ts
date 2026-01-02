@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://docs.moderne.io/licensing/moderate-source-available-license
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -378,6 +378,86 @@ empty-value=
             const projectConfig = configs.find((c: Npmrc) => c.scope === NpmrcScope.Project);
             expect(projectConfig).toBeDefined();
             expect(projectConfig!.properties['registry']).toBe('https://test.registry.com/');
+        }, {unsafeCleanup: true});
+    });
+
+    test("should correctly parse pnpm .pnpm directory with peer dependency context", async () => {
+        // Tests that pnpm directory names with peer dependency context (e.g., name@version_peer@version)
+        // are correctly parsed by stripping the peer dependency suffix
+        await withDir(async (dir) => {
+            // Write package.json
+            const packageJsonContent = {
+                name: "pnpm-project",
+                version: "1.0.0",
+                dependencies: {
+                    "@babel/helper-module-transforms": "^7.28.3"
+                }
+            };
+            fs.writeFileSync(
+                path.join(dir.path, 'package.json'),
+                JSON.stringify(packageJsonContent, null, 2)
+            );
+
+            // Create pnpm-style node_modules structure
+            // pnpm stores packages in node_modules/.pnpm/<name>@<version>_<peer-context>/node_modules/<name>/
+            const pnpmDir = path.join(dir.path, 'node_modules', '.pnpm');
+            fs.mkdirSync(pnpmDir, {recursive: true});
+
+            // Create directory with peer dependency context
+            const pkgWithPeerDeps = '@babel+helper-module-transforms@7.28.3_@babel+core@7.28.5';
+            const pkgInternalDir = path.join(pnpmDir, pkgWithPeerDeps, 'node_modules', '@babel', 'helper-module-transforms');
+            fs.mkdirSync(pkgInternalDir, {recursive: true});
+            fs.writeFileSync(
+                path.join(pkgInternalDir, 'package.json'),
+                JSON.stringify({
+                    name: "@babel/helper-module-transforms",
+                    version: "7.28.3",
+                    license: "MIT"
+                }, null, 2)
+            );
+
+            // Also create a simple package without peer context
+            const simplePkg = 'lodash@4.17.21';
+            const simplePkgDir = path.join(pnpmDir, simplePkg, 'node_modules', 'lodash');
+            fs.mkdirSync(simplePkgDir, {recursive: true});
+            fs.writeFileSync(
+                path.join(simplePkgDir, 'package.json'),
+                JSON.stringify({
+                    name: "lodash",
+                    version: "4.17.21",
+                    license: "MIT"
+                }, null, 2)
+            );
+
+            // Write pnpm-lock.yaml (empty but valid)
+            fs.writeFileSync(
+                path.join(dir.path, 'pnpm-lock.yaml'),
+                'lockfileVersion: 9.0\n'
+            );
+
+            // Parse
+            const parser = new PackageJsonParser({relativeTo: dir.path});
+            const results: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(dir.path, 'package.json'))) {
+                results.push(result as Json.Document);
+            }
+
+            expect(results).toHaveLength(1);
+            const marker = findNodeResolutionResult(results[0]);
+            expect(marker).toBeDefined();
+            expect(marker!.resolvedDependencies.length).toBeGreaterThanOrEqual(2);
+
+            // Check that the package with peer deps was parsed correctly
+            const babelTransforms = marker!.resolvedDependencies.find(
+                r => r.name === "@babel/helper-module-transforms"
+            );
+            expect(babelTransforms).toBeDefined();
+            expect(babelTransforms!.version).toBe("7.28.3");  // Should be 7.28.3, not 7.28.5
+
+            // Check simple package too
+            const lodash = marker!.resolvedDependencies.find(r => r.name === "lodash");
+            expect(lodash).toBeDefined();
+            expect(lodash!.version).toBe("4.17.21");
         }, {unsafeCleanup: true});
     });
 

@@ -29,8 +29,8 @@ import {
     TypeTree,
     VariableDeclarator,
 } from '../java';
-import {DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
-import {emptyMarkers, markers, Markers, MarkersKind, ParseExceptionResult} from "../markers";
+import {DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional} from '.';
+import {emptyMarkers, markers, Markers, MarkersKind, ParseExceptionResult, replaceMarkerByKind} from "../markers";
 import {NamedStyles} from "../style";
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers, SourcePath} from "../parser";
 import {randomId} from "../uuid";
@@ -47,28 +47,31 @@ import {
     TextSpan
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
-import {produce} from "immer";
-import Kind = JS.Kind;
+import {create as produce} from "mutative";
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
-    sourceFileCache?: Map<string, ts.SourceFile>
+    sourceFileCache?: Map<string, ts.SourceFile>,
 }
 
 function getScriptKindFromFileName(fileName: string): ts.ScriptKind {
-    const ext = fileName.toLowerCase();
-    if (ext.endsWith('.tsx')) return ts.ScriptKind.TSX;
-    if (ext.endsWith('.jsx')) return ts.ScriptKind.JSX;
-    if (ext.endsWith('.ts')) return ts.ScriptKind.TS;
-    if (ext.endsWith('.js')) return ts.ScriptKind.JS;
-    if (ext.endsWith('.mjs')) return ts.ScriptKind.JS;
-    if (ext.endsWith('.cjs')) return ts.ScriptKind.JS;
-    if (ext.endsWith('.mts')) return ts.ScriptKind.TS;
-    if (ext.endsWith('.cts')) return ts.ScriptKind.TS;
-    return ts.ScriptKind.TS;
+    const dotIndex = fileName.lastIndexOf('.');
+    if (dotIndex === -1) return ts.ScriptKind.TS;
+    const ext = fileName.slice(dotIndex);
+    switch (ext) {
+        case '.tsx': return ts.ScriptKind.TSX;
+        case '.jsx': return ts.ScriptKind.JSX;
+        case '.ts':
+        case '.mts':
+        case '.cts': return ts.ScriptKind.TS;
+        case '.js':
+        case '.mjs':
+        case '.cjs': return ts.ScriptKind.JS;
+        default: return ts.ScriptKind.TS;
+    }
 }
 
 export class JavaScriptParser extends Parser {
@@ -83,7 +86,7 @@ export class JavaScriptParser extends Parser {
             ctx,
             relativeTo,
             styles,
-            sourceFileCache
+            sourceFileCache,
         }: JavaScriptParserOptions = {},
     ) {
         super({ctx, relativeTo});
@@ -91,6 +94,7 @@ export class JavaScriptParser extends Parser {
             target: ts.ScriptTarget.Latest,
             module: ts.ModuleKind.CommonJS,
             moduleResolution: ts.ModuleResolutionKind.Node10,
+            noEmit: true,
             allowJs: true,
             checkJs: true,
             esModuleInterop: true,
@@ -103,6 +107,75 @@ export class JavaScriptParser extends Parser {
         };
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
+    }
+
+    /**
+     * Parses a single source file using only ts.createSourceFile(), bypassing
+     * the TypeScript type checker entirely. This is significantly faster than
+     * the full parse() method when type information is not needed.
+     *
+     * Use this method for formatting-only operations where AST structure is
+     * needed but type attribution is not required.
+     *
+     * @param input The parser input containing the source code
+     * @returns The parsed SourceFile, or a ParseExceptionResult if parsing failed
+     */
+    async parseOnly(input: ParserInput): Promise<SourceFile> {
+        const filePath = parserInputFile(input);
+        const sourcePath = this.relativeTo && !path.isAbsolute(filePath)
+            ? path.join(this.relativeTo, filePath)
+            : filePath;
+
+        const sourceText = parserInputRead(input);
+        const scriptKind = getScriptKindFromFileName(sourcePath);
+
+        // Create source file directly without a Program
+        const sourceFileOptions: ts.CreateSourceFileOptions = {
+            languageVersion: ts.ScriptTarget.Latest,
+            jsDocParsingMode: ts.JSDocParsingMode.ParseNone
+        };
+
+        const tsSourceFile = ts.createSourceFile(
+            sourcePath,
+            sourceText,
+            sourceFileOptions,
+            true, // setParentNodes
+            scriptKind
+        );
+
+        // Check for parse-time syntax errors (accessible via internal parseDiagnostics)
+        // TypeScript stores parse errors directly on the source file
+        const parseDiagnostics = (tsSourceFile as any).parseDiagnostics as ts.Diagnostic[] | undefined;
+        if (parseDiagnostics && parseDiagnostics.length > 0) {
+            const errors = parseDiagnostics.filter(d => d.category === ts.DiagnosticCategory.Error);
+            if (errors.length > 0) {
+                const errorMessages = errors.map(e => {
+                    if (e.file && e.start !== undefined) {
+                        const { line, character } = ts.getLineAndCharacterOfPosition(e.file, e.start);
+                        const message = ts.flattenDiagnosticMessageText(e.messageText, "\n");
+                        return `(${line + 1},${character + 1}): ${message} [${e.code}]`;
+                    }
+                    return `${ts.flattenDiagnosticMessageText(e.messageText, "\n")} [${e.code}]`;
+                }).join('; ');
+                return this.error(input, new SyntaxError(`Compiler error(s): ${errorMessages}`));
+            }
+        }
+
+        try {
+            // Parse without type mapping (no type checker available)
+            const result = new JavaScriptParserVisitor(tsSourceFile, this.relativePath(input), undefined)
+                .visit(tsSourceFile) as SourceFile;
+
+            if (this.styles) {
+                const styles = this.styles;
+                return produce(result, draft => {
+                    draft.markers = styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
+                });
+            }
+            return result;
+        } catch (error) {
+            return this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
+        }
     }
 
     // noinspection JSUnusedGlobalSymbols
@@ -255,11 +328,10 @@ export class JavaScriptParser extends Parser {
         // Update the oldProgram reference
         this.oldProgram = program;
 
-        const typeChecker = program.getTypeChecker();
-
         // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
         // This ensures that TypeScript types with the same type.id map to the same Type instance,
         // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
+        const typeChecker = program.getTypeChecker();
         const typeMapping = new JavaScriptTypeMapping(typeChecker);
 
         for (const input of inputFiles.values()) {
@@ -288,7 +360,7 @@ export class JavaScriptParser extends Parser {
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
-                            draft.markers.markers = draft.markers.markers.concat(this.styles);
+                            draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
                         }
                     });
             } catch (error) {
@@ -309,12 +381,12 @@ for (const [key, value] of Object.entries(ts.SyntaxKind)) {
 
 // noinspection JSUnusedGlobalSymbols
 export class JavaScriptParserVisitor {
-    private readonly typeMapping: JavaScriptTypeMapping;
+    private readonly typeMapping?: JavaScriptTypeMapping;
 
     constructor(
         private readonly sourceFile: ts.SourceFile,
         private readonly sourcePath: string,
-        typeMapping: JavaScriptTypeMapping) {
+        typeMapping?: JavaScriptTypeMapping) {
         this.typeMapping = typeMapping;
     }
 
@@ -396,6 +468,7 @@ export class JavaScriptParserVisitor {
             });
         }
 
+        const eof = this.prefix(node.endOfFileToken);
         let statements = this.semicolonPaddedStatementList(node.statements);
 
         // If there's trailing whitespace/comments after the shebang, prepend to first statement's prefix
@@ -425,7 +498,7 @@ export class JavaScriptParserVisitor {
             statements: shebangStatement
                 ? [shebangStatement, ...statements]
                 : statements,
-            eof: this.prefix(node.endOfFileToken)
+            eof
         };
     }
 
@@ -955,6 +1028,21 @@ export class JavaScriptParserVisitor {
     }
 
     visitParameter(node: ts.ParameterDeclaration): J.VariableDeclarations {
+        let name: VariableDeclarator = produce(this.convert<VariableDeclarator>(node.name), draft => {
+            draft.markers = this.maybeAddOptionalMarker(draft, node);
+        });
+        if (node.dotDotDotToken) {
+            // Wrap in JS.Spread; prefix between ... and identifier stays on the inner expression
+            const spread: JS.Spread = {
+                kind: JS.Kind.Spread,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                expression: name as Expression,
+                type: this.mapType(node)
+            };
+            name = spread;
+        }
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
@@ -969,16 +1057,7 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: node.dotDotDotToken ? this.prefix(node.dotDotDotToken) : this.prefix(node.name),
                     markers: emptyMarkers,
-                    name: produce(this.convert<VariableDeclarator>(node.name), draft => {
-                        draft.markers = this.maybeAddOptionalMarker(draft, node);
-                        if (node.dotDotDotToken) {
-                            draft.markers.markers.push({
-                                kind: JS.Markers.Spread,
-                                id: randomId(),
-                                prefix: this.prefix(node.name)
-                            } satisfies Spread as Spread);
-                        }
-                    }),
+                    name: name,
                     dimensionsAfterName: [],
                     initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
                     variableType: this.mapVariableType(node)
@@ -1506,14 +1585,16 @@ export class JavaScriptParserVisitor {
         });
     }
 
-    visitRestType(node: ts.RestTypeNode): Expression {
-        return produce(this.convert<Expression>(node.type), draft => {
-            draft.markers.markers.push({
-                kind: JS.Markers.Spread,
-                id: randomId(),
-                prefix: this.prefix(node)
-            } satisfies Spread as Spread);
-        });
+    visitRestType(node: ts.RestTypeNode): JS.Spread {
+        const innerExpr = this.convert<Expression>(node.type);
+        return {
+            kind: JS.Kind.Spread,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: {...innerExpr, prefix: emptySpace},
+            type: this.mapType(node)
+        };
     }
 
     visitUnionType(node: ts.UnionTypeNode): JS.Union {
@@ -1679,7 +1760,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 typeParameter: this.rightPadded(
                     {
-                        kind: Kind.MappedTypeParameter,
+                        kind: JS.Kind.MappedTypeParameter,
                         id: randomId(),
                         prefix: this.prefix(node.typeParameter),
                         markers: emptyMarkers,
@@ -1745,6 +1826,22 @@ export class JavaScriptParserVisitor {
     //  and this would potentially just trip up flow analyses. The names exist purely for documentation purposes,
     //  they has no semantics. See https://stackoverflow.com/questions/63629315/what-are-named-or-labeled-tuples-in-typescript.
     visitNamedTupleMember(node: ts.NamedTupleMember): J.VariableDeclarations {
+        let name: VariableDeclarator = produce(this.convert<J.Identifier>(node.name), draft => {
+            draft.markers = this.maybeAddOptionalMarker(draft, node);
+        });
+        if (node.dotDotDotToken) {
+            // Wrap in JS.Spread; use emptySpace since the whitespace belongs
+            // to VariableDeclarations.prefix, not to the spread itself
+            const spread: JS.Spread = {
+                kind: JS.Kind.Spread,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                expression: name as Expression,
+                type: this.mapType(node)
+            };
+            name = spread;
+        }
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
@@ -1759,16 +1856,7 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: emptySpace,
                     markers: emptyMarkers,
-                    name: produce(this.convert<J.Identifier>(node.name), draft => {
-                        draft.markers = this.maybeAddOptionalMarker(draft, node);
-                        if (node.dotDotDotToken) {
-                            draft.markers.markers.push({
-                                kind: JS.Markers.Spread,
-                                id: randomId(),
-                                prefix: this.prefix(node.dotDotDotToken)
-                            } satisfies Spread as Spread);
-                        }
-                    }),
+                    name: name,
                     dimensionsAfterName: [],
                     variableType: this.mapVariableType(node),
                 },
@@ -1864,21 +1952,28 @@ export class JavaScriptParserVisitor {
     }
 
     visitBindingElement(node: ts.BindingElement): JS.BindingElement {
+        // Capture prefix before converting name, as convert may consume whitespace
+        const elementPrefix = this.prefix(node);
+        let name: Expression = this.convert<Expression>(node.name);
+        if (node.dotDotDotToken) {
+            // Wrap in JS.Spread; use emptySpace for prefix since the whitespace
+            // belongs to BindingElement.prefix, not to the spread itself
+            name = {
+                kind: JS.Kind.Spread,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                expression: name,
+                type: this.mapType(node)
+            } satisfies JS.Spread as Expression;
+        }
         return {
             kind: JS.Kind.BindingElement,
             id: randomId(),
-            prefix: this.prefix(node),
+            prefix: elementPrefix,
             markers: emptyMarkers,
             propertyName: node.propertyName && this.rightPadded(this.convert<J.Identifier>(node.propertyName), this.suffix(node.propertyName)),
-            name: produce(this.convert<Expression>(node.name), draft => {
-                if (node.dotDotDotToken) {
-                    draft.markers.markers.push({
-                        kind: JS.Markers.Spread,
-                        id: randomId(),
-                        prefix: this.prefix(node.dotDotDotToken)
-                    } satisfies Spread as Spread);
-                }
-            }),
+            name: name,
             initializer: node.initializer && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert<Expression>(node.initializer)),
             variableType: this.mapVariableType(node)
         };
@@ -1911,6 +2006,8 @@ export class JavaScriptParserVisitor {
 
     private convertPropertyAssignments(nodes: ts.Node[]): J.Block {
         const prefix = this.prefix(nodes[0]);
+        // Capture end whitespace before processing statements to prevent shorthand properties from consuming it
+        const end = this.prefix(nodes[nodes.length - 1]);
         let statementList = nodes[1] as ts.SyntaxList;
 
         const statements: J.RightPadded<Statement>[] = this.rightPaddedSeparatedList(
@@ -1929,7 +2026,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             static: this.rightPadded(false, emptySpace),
             statements,
-            end: this.prefix(nodes[nodes.length - 1])
+            end
         };
     }
 
@@ -2547,14 +2644,15 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitSpreadElement(node: ts.SpreadElement): Expression {
-        return produce(this.convert<Expression>(node.expression), draft => {
-            draft.markers.markers.push({
-                kind: JS.Markers.Spread,
-                id: randomId(),
-                prefix: this.prefix(node)
-            } satisfies Spread as Spread);
-        });
+    visitSpreadElement(node: ts.SpreadElement): JS.Spread {
+        return {
+            kind: JS.Kind.Spread,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: this.convert(node.expression),
+            type: this.mapType(node)
+        };
     }
 
     visitClassExpression(node: ts.ClassExpression): JS.StatementExpression {
@@ -3828,13 +3926,16 @@ export class JavaScriptParserVisitor {
         let expr: Expression;
         if (node.expression) {
             if (node.dotDotDotToken) {
-                expr = produce(this.convert<Expression>(node.expression), draft => {
-                    draft.markers.markers.push({
-                        kind: JS.Markers.Spread,
-                        id: randomId(),
-                        prefix: this.prefix(node.dotDotDotToken!)
-                    } satisfies Spread as Spread);
-                });
+                // Wrap in JS.Spread
+                const innerExpr = this.convert<Expression>(node.expression);
+                expr = {
+                    kind: JS.Kind.Spread,
+                    id: randomId(),
+                    prefix: this.prefix(node.dotDotDotToken!),
+                    markers: emptyMarkers,
+                    expression: innerExpr,
+                    type: this.mapType(node.expression)
+                } satisfies JS.Spread as Expression;
             } else {
                 expr = this.convert<Expression>(node.expression);
             }
@@ -4011,23 +4112,14 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitSpreadAssignment(node: ts.SpreadAssignment): JS.PropertyAssignment {
+    visitSpreadAssignment(node: ts.SpreadAssignment): JS.Spread {
         return {
-            kind: JS.Kind.PropertyAssignment,
+            kind: JS.Kind.Spread,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            name: this.rightPadded(
-                produce(this.convert<Expression>(node.expression), draft => {
-                    draft.markers.markers.push({
-                        kind: JS.Markers.Spread,
-                        id: randomId(),
-                        prefix: this.prefix(node)
-                    } satisfies Spread as Spread);
-                }),
-                this.suffix(node.expression)
-            ),
-            assigmentToken: JS.PropertyAssignment.Token.Empty,
+            expression: this.convert(node.expression),
+            type: this.mapType(node)
         };
     }
 
@@ -4282,19 +4374,19 @@ export class JavaScriptParserVisitor {
     }
 
     private mapType(node: ts.Node): Type | undefined {
-        return this.typeMapping.type(node);
+        return this.typeMapping?.type(node);
     }
 
     private mapPrimitiveType(node: ts.Node): Type.Primitive {
-        return this.typeMapping.primitiveType(node);
+        return this.typeMapping?.primitiveType(node) ?? Type.Primitive.None;
     }
 
     private mapVariableType(node: ts.NamedDeclaration): Type.Variable | undefined {
-        return this.typeMapping.variableType(node);
+        return this.typeMapping?.variableType(node);
     }
 
     private mapMethodType(node: ts.Node): Type.Method | undefined {
-        return this.typeMapping.methodType(node);
+        return this.typeMapping?.methodType(node);
     }
 
     private mapCommaSeparatedList<T extends J>(nodes: readonly ts.Node[]): J.Container<T> {

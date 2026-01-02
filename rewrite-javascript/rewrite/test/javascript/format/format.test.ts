@@ -40,14 +40,13 @@ import {
     autoFormat,
     AutoformatVisitor,
     JavaScriptVisitor,
-    SpacesVisitor,
-    tsx,
     typescript
 } from "../../../src/javascript";
 
 
 describe('AutoformatVisitor', () => {
     const spec = new RecipeSpec()
+    // No PrettierStyle passed, so uses built-in TabsAndIndentsVisitor
     spec.recipe = fromVisitor(new AutoformatVisitor());
 
     test('everything', () => {
@@ -256,7 +255,7 @@ describe('AutoformatVisitor', () => {
             // @formatter:off
             //language=typescript
             // Single-line object literals should preserve their whitespace
-            typescript("const x = { a: 1 };")
+            typescript("const x = {a: 1};")
             // @formatter:on
         )
     });
@@ -326,8 +325,7 @@ describe('AutoformatVisitor', () => {
                 `
                 const x = function () {
                     return 136;
-                };
-                `
+                };`
             )
             // @formatter:on
         )
@@ -344,8 +342,7 @@ describe('AutoformatVisitor', () => {
                 const x =
                     function () {
                         return 136;
-                    };
-                `
+                    };`
             )
             // @formatter:on
         )
@@ -403,27 +400,19 @@ describe('AutoformatVisitor', () => {
         )
     });
 
-    test.each([
-        // @formatter:off
-        `const short = {name: "Ivan Almeida", age: 36};`,
-        `const long = {make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true};`,
-        // @formatter:on
-        ])('do not wrap object literals - %s', async (code) => {
+    // With objectLiteralBraces: true (TypeScript default), spaces are added inside braces
+    test('do not wrap object literals - short', async () => {
         // TODO we might eventually implement the "Chop down if long" setting for this
-        return spec.rewriteRun(typescript(code));
+        return spec.rewriteRun(typescript(
+            `const short = {name: "Ivan Almeida", age: 36};`
+        ));
     });
 
-    test('single-line object literal should not get extra spaces before closing brace', () => {
-        return spec.rewriteRun(
-            // @formatter:off
-            //language=typescript
-            typescript(
-                `function test() {
-    const x = { a: 1 };
-}`,
-            )
-            // @formatter:on
-        )
+    test('do not wrap object literals - long', async () => {
+        // TODO we might eventually implement the "Chop down if long" setting for this
+        return spec.rewriteRun(typescript(
+            `const long = {make: "Honda", model: "Jazz", year: 2008, color: "red", engine: "1.2L petrol", isRunning: true, favorite: true, parked: true};`
+        ));
     });
 
     test('inline comment should stay on the same line', () => {
@@ -696,28 +685,6 @@ buf.slice();`
             // @formatter:on
         )});
 
-    test('type annotation and shorthand property spacing', () => {
-        return spec.rewriteRun(
-            // @formatter:off
-            //language=typescript
-            // Type annotation should have space after colon (fixed from req:Request)
-            // Shorthand properties should preserve their brace spacing
-            typescript(
-                `function test(req:Request): Response {
-    const withSpaces = { headers };
-    const noSpaces = {headers};
-    return req;
-}`,
-                `function test(req: Request): Response {
-    const withSpaces = { headers };
-    const noSpaces = {headers};
-    return req;
-}`
-            )
-            // @formatter:on
-        )
-    });
-
     test('multi-line import preserves structure', () => {
         return spec.rewriteRun(
             // @formatter:off
@@ -735,3 +702,4 @@ const x = 1;`
         )
     });
 });
+

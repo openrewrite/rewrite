@@ -2,7 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
 import {JS, JSX} from "./tree";
 import {mapAsync} from "../util";
-import {ElementRemovalFormatter} from "../java/formatting-utils";
+import {ElementRemovalFormatter} from "../java";
 
 /**
  * @param visitor The visitor to add the import removal to
@@ -975,6 +975,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             const jsxAttr = node as any;
             if (jsxAttr.value) {
                 await this.collectUsedIdentifiers(jsxAttr.value, usedIdentifiers, usedTypes);
+            }
+        } else if (node.kind === JS.Kind.TypeDeclaration) {
+            // Handle type alias declarations like: type Props = { children: React.ReactNode }
+            const typeDecl = node as JS.TypeDeclaration;
+            // The initializer contains the type expression (the right side of the =)
+            if (typeDecl.initializer?.element) {
+                await this.collectTypeUsage(typeDecl.initializer.element, usedTypes);
             }
         } else if ((node as any).statements) {
             // Generic handler for nodes with statements

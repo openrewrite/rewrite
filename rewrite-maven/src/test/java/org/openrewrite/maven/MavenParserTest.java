@@ -34,6 +34,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
@@ -43,10 +44,7 @@ import org.openrewrite.tree.ParseError;
 
 import java.net.InetAddress;
 import java.nio.file.Path;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.groupingBy;
@@ -1723,54 +1721,54 @@ class MavenParserTest implements RewriteTest {
           mavenProject("a-parent",
             pomXml(
               """
-                    <project>
-                        <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>d</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
-                    </project>
+                <project>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>d</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                </project>
                 """
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>a-parent</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
-                        <packaging>pom</packaging>
+                <project>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>a-parent</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
 
-                        <dependencyManagement>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>org.openrewrite.maven</groupId>
-                                    <artifactId>d</artifactId>
-                                    <version>0.1.0-SNAPSHOT</version>
-                                </dependency>
-                            </dependencies>
-                        </dependencyManagement>
-                    </project>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.openrewrite.maven</groupId>
+                                <artifactId>d</artifactId>
+                                <version>0.1.0-SNAPSHOT</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
                 """
             ),
             mavenProject("a",
               pomXml(
                 """
-                      <project>
-                          <parent>
+                  <project>
+                      <parent>
+                          <groupId>org.openrewrite.maven</groupId>
+                          <artifactId>a-parent</artifactId>
+                          <version>0.1.0-SNAPSHOT</version>
+                          <relativePath />
+                      </parent>
+
+                      <artifactId>a</artifactId>
+
+                      <dependencies>
+                          <dependency>
                               <groupId>org.openrewrite.maven</groupId>
-                              <artifactId>a-parent</artifactId>
+                              <artifactId>b</artifactId>
                               <version>0.1.0-SNAPSHOT</version>
-                              <relativePath />
-                          </parent>
-
-                          <artifactId>a</artifactId>
-
-                          <dependencies>
-                              <dependency>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>b</artifactId>
-                                  <version>0.1.0-SNAPSHOT</version>
-                              </dependency>
-                          </dependencies>
-                      </project>
+                          </dependency>
+                      </dependencies>
+                  </project>
                   """,
                 spec -> spec.afterRecipe(pomXml -> {
                     var compileDependencies = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
@@ -1785,52 +1783,52 @@ class MavenParserTest implements RewriteTest {
               mavenProject("b-parent",
                 pomXml(
                   """
-                        <project>
-                            <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>d</artifactId>
-                            <version>0.2.0-SNAPSHOT</version>
-                        </project>
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>d</artifactId>
+                        <version>0.2.0-SNAPSHOT</version>
+                    </project>
                     """
                 ),
                 pomXml(
                   """
-                        <project>
-                            <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>b-parent</artifactId>
-                            <version>0.1.0-SNAPSHOT</version>
-                            <packaging>pom</packaging>
-                            <dependencyManagement>
-                                <dependencies>
-                                    <dependency>
-                                        <groupId>org.openrewrite.maven</groupId>
-                                        <artifactId>d</artifactId>
-                                        <version>0.2.0-SNAPSHOT</version>
-                                    </dependency>
-                                </dependencies>
-                            </dependencyManagement>
-                        </project>
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>b-parent</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.openrewrite.maven</groupId>
+                                    <artifactId>d</artifactId>
+                                    <version>0.2.0-SNAPSHOT</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
                     """
                 ),
                 mavenProject("b",
                   pomXml(
                     """
-                          <project>
-                              <parent>
+                      <project>
+                          <parent>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>b-parent</artifactId>
+                              <version>0.1.0-SNAPSHOT</version>
+                              <relativePath />
+                          </parent>
+
+                          <artifactId>b</artifactId>
+
+                          <dependencies>
+                              <dependency>
                                   <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>b-parent</artifactId>
-                                  <version>0.1.0-SNAPSHOT</version>
-                                  <relativePath />
-                              </parent>
-
-                              <artifactId>b</artifactId>
-
-                              <dependencies>
-                                  <dependency>
-                                      <groupId>org.openrewrite.maven</groupId>
-                                      <artifactId>d</artifactId>
-                                  </dependency>
-                              </dependencies>
-                          </project>
+                                  <artifactId>d</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
                       """
                   )
                 )
@@ -3662,7 +3660,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getVersion()).isEqualTo("1.0.0");
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               }
             )
@@ -3700,10 +3698,10 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getVersion()).isEqualTo("1.0.0");
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
                   assert results.getParent() != null;
-                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("1.0.0");
                   assertThat(results.getParent().getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               })
             )
@@ -4716,5 +4714,100 @@ class MavenParserTest implements RewriteTest {
             );
         }
 
+    }
+
+    @Test
+    void transitiveDependencyVersion() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        rewriteRun(
+          spec -> spec.executionContext(ctx),
+          pomXml(
+            """
+            <project>
+              <groupId>com.example.my-app</groupId>
+              <artifactId>my-app-bom</artifactId>
+              <version>1</version>
+              <packaging>pom</packaging>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcprov-jdk18on</artifactId>
+                    <version>1.79</version>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """
+          ),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example.my-app</groupId>
+                  <artifactId>my-app-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.example.my-app</groupId>
+                        <artifactId>my-app-bom</artifactId>
+                        <version>1</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                      <dependency>
+                        <groupId>org.bouncycastle</groupId>
+                        <artifactId>bcprov-jdk18on</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            )
+          ),
+          mavenProject("my-app",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example.my-app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.example.my-app</groupId>
+                    <artifactId>my-app-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <dependencies>
+                     <dependency>
+                       <groupId>org.bouncycastle</groupId>
+                       <artifactId>bcpkix-jdk18on</artifactId>
+                       <version>1.71</version>
+                     </dependency>
+                  </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  assertThat(pom).isNotNull();
+                  Optional<MavenResolutionResult> maybeMrr = pom.getMarkers().findFirst(MavenResolutionResult.class);
+                  assertThat(maybeMrr).isPresent();
+
+                  MavenResolutionResult mrr = maybeMrr.get();
+                  assertThat(mrr.getDependencies().get(Scope.Compile).stream())
+                    .anyMatch(resolvedDependency -> "org.bouncycastle".equals(resolvedDependency.getGroupId()) &&
+                      "bcprov-jdk18on".equals(resolvedDependency.getArtifactId()) &&
+                      "1.79".equals(resolvedDependency.getVersion()))
+                    .noneMatch(resolvedDependency -> "org.bouncycastle".equals(resolvedDependency.getGroupId()) &&
+                      "bcprov-jdk18on".equals(resolvedDependency.getArtifactId()) &&
+                      !"1.79".equals(resolvedDependency.getVersion()));
+
+                  MavenPomCache pomCache = MavenExecutionContextView.view(ctx).getPomCache();
+                  assertThat(pomCache.getPom(new ResolvedGroupArtifactVersion(MavenRepository.MAVEN_CENTRAL.getUri(), "org.bouncycastle", "bcprov-jdk18on", "1.79", "1.79"))).isPresent();
+                  assertThat(pomCache.getPom(new ResolvedGroupArtifactVersion(MavenRepository.MAVEN_CENTRAL.getUri(), "org.bouncycastle", "bcprov-jdk18on", "1.71", "1.71"))).isNull();
+              })
+            )
+          )
+        );
     }
 }

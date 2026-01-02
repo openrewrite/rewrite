@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {check, ExecutionContext, Option, Recipe, TreeVisitor} from "../src";
+import {check, ExecutionContext, Option, Recipe, TreeVisitor} from "@openrewrite/rewrite";
 import {FindIdentifier} from "./search-recipe";
-import {hasSourcePath} from "../src/javascript";
+import {hasSourcePath} from "@openrewrite/rewrite/javascript";
 
 /**
  * A recipe that finds identifiers in files matching a specific path
