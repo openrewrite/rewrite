@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class RemoveDevelocityTest implements RewriteTest {
@@ -98,304 +98,275 @@ class RemoveDevelocityTest implements RewriteTest {
     @Test
     void removeRemoteCacheWithLocalPreserved() {
         rewriteRun(
-            spec -> spec.recipe(new RemoveDevelocityConfiguration()),
-            settingsGradle(
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                
-                develocity {
-                    server = 'https://ge.example.com'
-                }
-                
-                buildCache {
-                    local {
-                        enabled = true
-                        directory = file('build-cache')
-                    }
-                    remote(develocity.buildCache) {
-                        enabled = true
-                    }
-                }
-                """,
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                
-                buildCache {
-                    local {
-                        enabled = true
-                        directory = file('build-cache')
-                    }
-                }
-                """
-            )
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+              }
+              
+              buildCache {
+                  local {
+                      enabled = true
+                      directory = file('build-cache')
+                  }
+                  remote(develocity.buildCache) {
+                      enabled = true
+                  }
+              }
+              """,
+            """
+              
+              
+              buildCache {
+                  local {
+                      enabled = true
+                      directory = file('build-cache')
+                  }
+              }
+              """,
+            SourceSpec::noTrim
+          )
         );
     }
 
     @Test
     void removeEntireBuildCacheWhenOnlyRemoteExists() {
         rewriteRun(
-            spec -> spec.recipe(new RemoveDevelocityConfiguration()),
-            settingsGradle(
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                
-                develocity {
-                    server = 'https://ge.example.com'
-                }
-                
-                buildCache {
-                    remote(develocity.buildCache) {
-                        enabled = true
-                    }
-                }
-                """,
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                """
-            )
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+              }
+              
+              buildCache {
+                  remote(develocity.buildCache) {
+                      enabled = true
+                  }
+              }
+              """,
+            ""
+          )
         );
     }
 
     @Test
     void removeHttpBuildCache() {
         rewriteRun(
-            spec -> spec.recipe(new RemoveDevelocityConfiguration()),
-            settingsGradle(
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                
-                develocity {
-                    server = 'https://ge.example.com'
-                }
-                
-                buildCache {
-                    remote(HttpBuildCache) {
-                        url = 'https://other-cache.com/cache/'
-                    }
-                    remote(develocity.buildCache) {
-                        enabled = true
-                    }
-                }
-                """,
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                """
-            )
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+              }
+              
+              buildCache {
+                  remote(HttpBuildCache) {
+                      url = 'https://other-cache.com/cache/'
+                  }
+                  remote(develocity.buildCache) {
+                      enabled = true
+                  }
+              }
+              """,
+            ""
+          )
         );
     }
 
     @Test
     void removeAllRemoteConfigurations() {
         rewriteRun(
-            spec -> spec.recipe(new RemoveDevelocityConfiguration()),
-            settingsGradle(
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                
-                develocity {
-                    server = 'https://ge.example.com'
-                    buildScan {
-                        termsOfUseUrl = 'https://gradle.com/terms-of-service'
-                        termsOfUseAgree = 'yes'
-                    }
-                }
-                
-                buildCache {
-                    local {
-                        enabled = true
-                    }
-                    remote(HttpBuildCache) {
-                        url = 'https://cache.com'
-                    }
-                    remote(develocity.buildCache) {
-                        push = true
-                    }
-                }
-                """,
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                
-                buildCache {
-                    local {
-                        enabled = true
-                    }
-                }
-                """
-            )
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+                  buildScan {
+                      termsOfUseUrl = 'https://gradle.com/terms-of-service'
+                      termsOfUseAgree = 'yes'
+                  }
+              }
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+                  remote(HttpBuildCache) {
+                      url = 'https://cache.com'
+                  }
+                  remote(develocity.buildCache) {
+                      push = true
+                  }
+              }
+              """,
+            """
+              
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+              }
+              """,
+            SourceSpec::noTrim
+          )
         );
     }
 
     @Test
     void removeGradleEnterpriseConfiguration() {
         rewriteRun(
-            spec -> spec.recipe(new RemoveDevelocityConfiguration()),
-            settingsGradle(
-                """
-                plugins {
-                    id 'com.gradle.enterprise' version '3.16.2'
-                }
-                
-                gradleEnterprise {
-                    server = 'https://ge.example.com'
-                    buildScan {
-                        publishAlways()
-                    }
-                }
-                
-                buildCache {
-                    local {
-                        enabled = true
-                    }
-                    remote(gradleEnterprise.buildCache) {
-                        enabled = true
-                        push = true
-                    }
-                }
-                """,
-                """
-                plugins {
-                    id 'com.gradle.enterprise' version '3.16.2'
-                }
-                
-                buildCache {
-                    local {
-                        enabled = true
-                    }
-                }
-                """
-            )
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.16.2'
+              }
+              
+              gradleEnterprise {
+                  server = 'https://ge.example.com'
+                  buildScan {
+                      publishAlways()
+                  }
+              }
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+                  remote(gradleEnterprise.buildCache) {
+                      enabled = true
+                      push = true
+                  }
+              }
+              """,
+            """
+              
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+              }
+              """,
+            SourceSpec::noTrim
+          )
         );
     }
 
     @Test
     void noChangesWhenNoRemoteCache() {
         rewriteRun(
-            spec -> spec.recipe(new RemoveDevelocityConfiguration()),
-            settingsGradle(
-                """                
-                buildCache {
-                    local {
-                        enabled = true
-                    }
-                }
-                """
-            )
+          settingsGradle(
+            """                
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void removeEntireBuildCacheWithOnlyHttpBuildCache() {
         rewriteRun(
-            spec -> spec.recipe(new RemoveDevelocityConfiguration()),
-            settingsGradle(
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                
-                develocity {
-                    server = 'https://ge.example.com'
-                }
-                
-                buildCache {
-                    remote(HttpBuildCache) {
-                        url = 'https://cache.example.com'
-                    }
-                }
-                """,
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                """
-            )
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+              }
+              
+              buildCache {
+                  remote(HttpBuildCache) {
+                      url = 'https://cache.example.com'
+                  }
+              }
+              """,
+            ""
+          )
         );
     }
 
     @Test
     void removeOnlyExtensionsWhenNoBuildCacheBlock() {
         rewriteRun(
-            spec -> spec.recipe(new RemoveDevelocityConfiguration()),
-            settingsGradle(
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                
-                develocity {
-                    server = 'https://ge.example.com'
-                    buildScan {
-                        termsOfUseUrl = 'https://gradle.com/terms-of-service'
-                        termsOfUseAgree = 'yes'
-                    }
-                }
-                """,
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                }
-                """
-            )
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+              }
+              
+              develocity {
+                  server = 'https://ge.example.com'
+                  buildScan {
+                      termsOfUseUrl = 'https://gradle.com/terms-of-service'
+                      termsOfUseAgree = 'yes'
+                  }
+              }
+              """,
+            ""
+          )
         );
     }
 
     @Test
     void preserveOtherExtensionsAndPlugins() {
         rewriteRun(
-            spec -> spec.recipe(new RemoveDevelocityConfiguration()),
-            settingsGradle(
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
-                }
-                
-                rootProject.name = 'my-project'
-                
-                develocity {
-                    server = 'https://ge.example.com'
-                }
-                
-                buildCache {
-                    local {
-                        enabled = true
-                    }
-                    remote(develocity.buildCache) {
-                        enabled = true
-                    }
-                }
-                """,
-                """
-                plugins {
-                    id 'com.gradle.develocity' version '3.17'
-                    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
-                }
-                
-                rootProject.name = 'my-project'
-                
-                buildCache {
-                    local {
-                        enabled = true
-                    }
-                }
-                """
-            )
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17'
+                  id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+              }
+              
+              rootProject.name = 'my-project'
+              
+              develocity {
+                  server = 'https://ge.example.com'
+              }
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+                  remote(develocity.buildCache) {
+                      enabled = true
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+              }
+              
+              rootProject.name = 'my-project'
+              
+              buildCache {
+                  local {
+                      enabled = true
+                  }
+              }
+              """
+          )
         );
     }
 }
