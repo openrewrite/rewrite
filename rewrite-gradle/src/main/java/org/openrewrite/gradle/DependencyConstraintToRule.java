@@ -408,7 +408,8 @@ public class DependencyConstraintToRule extends Recipe {
                                                     ("\n" +
                                                             "configurations.all {\n" +
                                                             "    resolutionStrategy.eachDependency { details ->}\n" +
-                                                            "}").getBytes(StandardCharsets.UTF_8)))
+                                                            "}").getBytes(StandardCharsets.UTF_8)),
+                                            true)
                             ), null, ctx)
                             .map(K.CompilationUnit.class::cast)
                             .map(k -> (J.Block) k.getStatements().get(0))

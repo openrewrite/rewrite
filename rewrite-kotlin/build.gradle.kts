@@ -7,7 +7,7 @@ plugins {
     kotlin("jvm") version "2.2.21"
 }
 
-val kotlinVersion = "1.9.25"
+val kotlinVersion = "2.2.21"
 
 dependencies {
     compileOnly(project(":rewrite-core"))
@@ -37,8 +37,8 @@ java {
 
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
-        apiVersion = KotlinVersion.KOTLIN_1_9
-        languageVersion = KotlinVersion.KOTLIN_1_9
+        apiVersion = KotlinVersion.KOTLIN_2_2
+        languageVersion = KotlinVersion.KOTLIN_2_2
         jvmTarget.set(if (name.contains("Test")) JvmTarget.JVM_21 else JvmTarget.JVM_1_8)
     }
 }
