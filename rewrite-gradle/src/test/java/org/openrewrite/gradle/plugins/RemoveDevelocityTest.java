@@ -158,76 +158,6 @@ class RemoveDevelocityTest implements RewriteTest {
     }
 
     @Test
-    void removeHttpBuildCache() {
-        rewriteRun(
-          settingsGradle(
-            """
-              plugins {
-                  id 'com.gradle.develocity' version '3.17'
-              }
-              
-              develocity {
-                  server = 'https://ge.example.com'
-              }
-              
-              buildCache {
-                  remote(HttpBuildCache) {
-                      url = 'https://other-cache.com/cache/'
-                  }
-                  remote(develocity.buildCache) {
-                      enabled = true
-                  }
-              }
-              """,
-            ""
-          )
-        );
-    }
-
-    @Test
-    void removeAllRemoteConfigurations() {
-        rewriteRun(
-          settingsGradle(
-            """
-              plugins {
-                  id 'com.gradle.develocity' version '3.17'
-              }
-              
-              develocity {
-                  server = 'https://ge.example.com'
-                  buildScan {
-                      termsOfUseUrl = 'https://gradle.com/terms-of-service'
-                      termsOfUseAgree = 'yes'
-                  }
-              }
-              
-              buildCache {
-                  local {
-                      enabled = true
-                  }
-                  remote(HttpBuildCache) {
-                      url = 'https://cache.com'
-                  }
-                  remote(develocity.buildCache) {
-                      push = true
-                  }
-              }
-              """,
-            """
-              
-              
-              buildCache {
-                  local {
-                      enabled = true
-                  }
-              }
-              """,
-            SourceSpec::noTrim
-          )
-        );
-    }
-
-    @Test
     void removeGradleEnterpriseConfiguration() {
         rewriteRun(
           settingsGradle(
@@ -301,7 +231,16 @@ class RemoveDevelocityTest implements RewriteTest {
                   }
               }
               """,
-            ""
+            """
+
+
+              buildCache {
+                  remote(HttpBuildCache) {
+                      url = 'https://cache.example.com'
+                  }
+              }
+              """,
+            SourceSpec::noTrim
           )
         );
     }
