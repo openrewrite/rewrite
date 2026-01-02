@@ -31,6 +31,7 @@ import {
 } from '../java';
 import {DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional} from '.';
 import {emptyMarkers, markers, Markers, MarkersKind, ParseExceptionResult, replaceMarkerByKind} from "../markers";
+import {TsConfig} from "./tsconfig";
 import {NamedStyles} from "../style";
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers, SourcePath} from "../parser";
 import {randomId} from "../uuid";
@@ -55,6 +56,11 @@ import SpreadAttribute = JSX.SpreadAttribute;
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
     sourceFileCache?: Map<string, ts.SourceFile>,
+    /**
+     * Optional TsConfig marker to attach to all parsed source files.
+     * The caller is responsible for discovering and providing the appropriate config.
+     */
+    tsConfig?: TsConfig,
 }
 
 function getScriptKindFromFileName(fileName: string): ts.ScriptKind {
@@ -80,6 +86,7 @@ export class JavaScriptParser extends Parser {
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
     private readonly sourceFileCache?: Map<string, ts.SourceFile>;
+    private readonly tsConfig?: TsConfig;
 
     constructor(
         {
@@ -87,6 +94,7 @@ export class JavaScriptParser extends Parser {
             relativeTo,
             styles,
             sourceFileCache,
+            tsConfig,
         }: JavaScriptParserOptions = {},
     ) {
         super({ctx, relativeTo});
@@ -107,6 +115,7 @@ export class JavaScriptParser extends Parser {
         };
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
+        this.tsConfig = tsConfig;
     }
 
     /**
@@ -361,6 +370,9 @@ export class JavaScriptParser extends Parser {
                     draft => {
                         if (this.styles) {
                             draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
+                        }
+                        if (this.tsConfig) {
+                            draft.markers = replaceMarkerByKind(draft.markers, this.tsConfig);
                         }
                     });
             } catch (error) {
