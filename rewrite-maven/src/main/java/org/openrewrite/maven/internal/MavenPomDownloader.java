@@ -176,8 +176,8 @@ public class MavenPomDownloader {
             List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
             Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
             GroupArtifactVersion gav = new GroupArtifactVersion(
-                    projectPom.getGroupId(),
-                    projectPom.getArtifactId(),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getGroupId(), mergedProperties::get),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getArtifactId(), mergedProperties::get),
                     ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getVersion(), mergedProperties::get)
             );
             result.put(gav, projectPom);

@@ -39,6 +39,7 @@ import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.tree.ParseError;
 
@@ -51,6 +52,7 @@ import static java.util.stream.Collectors.groupingBy;
 import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.test.SourceSpecs.dir;
 
 class MavenParserTest implements RewriteTest {
 
@@ -4806,6 +4808,88 @@ class MavenParserTest implements RewriteTest {
                   assertThat(pomCache.getPom(new ResolvedGroupArtifactVersion(MavenRepository.MAVEN_CENTRAL.getUri(), "org.bouncycastle", "bcprov-jdk18on", "1.79", "1.79"))).isPresent();
                   assertThat(pomCache.getPom(new ResolvedGroupArtifactVersion(MavenRepository.MAVEN_CENTRAL.getUri(), "org.bouncycastle", "bcprov-jdk18on", "1.71", "1.71"))).isNull();
               })
+            )
+          )
+        );
+    }
+
+    @Test
+    void groupIdAndArtifactIdAsProperties() {
+        rewriteRun(
+          mavenProject("my-app",
+            pomXml("""
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+                <properties>
+                  <my-app.child-a.groupId>com.example</my-app.child-a.groupId>
+                  <my-app.child-a.artifactId>child-a</my-app.child-a.artifactId>
+                </properties>
+                <modules>
+                  <module>child-a</module>
+                  <module>child-b</module>
+                </modules>
+              </project>
+              """
+            ),
+            dir("child-a",
+              pomXml(
+                """
+                  <project>
+                    <groupId>${my-app.child-a.groupId}</groupId>
+                    <artifactId>${my-app.child-a.artifactId}</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-core</artifactId>
+                        <version>6.2.15</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """
+              )
+            ),
+            dir("child-b",
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>child-b</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>${my-app.child-a.groupId}</groupId>
+                        <artifactId>${my-app.child-a.artifactId}</artifactId>
+                        <version>1</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pom -> {
+                    assertThat(pom).isNotNull();
+                    Optional<MavenResolutionResult> maybeMrr = pom.getMarkers().findFirst(MavenResolutionResult.class);
+                    assertThat(maybeMrr).isPresent();
+
+                    MavenResolutionResult mrr = maybeMrr.get();
+                    assertThat(mrr.getDependencies().get(Scope.Compile).stream())
+                      .anyMatch(resolvedDependency -> "org.springframework".equals(resolvedDependency.getGroupId()) &&
+                        "spring-core".equals(resolvedDependency.getArtifactId()) &&
+                        "6.2.15".equals(resolvedDependency.getVersion()));
+                })
+              )
             )
           )
         );
