@@ -4882,10 +4882,9 @@ class MavenParserTest implements RewriteTest {
                     assertThat(pom).isNotNull();
                     Optional<MavenResolutionResult> maybeMrr = pom.getMarkers().findFirst(MavenResolutionResult.class);
                     assertThat(maybeMrr).isPresent();
-
-                    MavenResolutionResult mrr = maybeMrr.get();
-                    assertThat(mrr.getDependencies().get(Scope.Compile).stream())
-                      .anyMatch(resolvedDependency -> "org.springframework".equals(resolvedDependency.getGroupId()) &&
+                    assertThat(maybeMrr.get().getDependencies().get(Scope.Compile))
+                      .anyMatch(resolvedDependency ->
+                        "org.springframework".equals(resolvedDependency.getGroupId()) &&
                         "spring-core".equals(resolvedDependency.getArtifactId()) &&
                         "6.2.15".equals(resolvedDependency.getVersion()));
                 })
