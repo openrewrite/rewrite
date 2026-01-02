@@ -179,7 +179,16 @@ class RemoveDevelocityTest implements RewriteTest {
                   }
               }
               """,
-            ""
+            """
+
+
+              buildCache {
+                  remote(HttpBuildCache) {
+                      url = 'https://other-cache.com/cache/'
+                  }
+              }
+              """,
+            SourceSpec::noTrim
           )
         );
     }
@@ -219,6 +228,9 @@ class RemoveDevelocityTest implements RewriteTest {
               buildCache {
                   local {
                       enabled = true
+                  }
+                  remote(HttpBuildCache) {
+                      url = 'https://cache.com'
                   }
               }
               """,
@@ -301,7 +313,16 @@ class RemoveDevelocityTest implements RewriteTest {
                   }
               }
               """,
-            ""
+            """
+
+
+              buildCache {
+                  remote(HttpBuildCache) {
+                      url = 'https://cache.example.com'
+                  }
+              }
+              """,
+            SourceSpec::noTrim
           )
         );
     }
