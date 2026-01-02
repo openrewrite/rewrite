@@ -2645,6 +2645,47 @@ public interface JS extends J {
         }
     }
 
+    /**
+     * Represents the spread syntax (...) applied to an expression.
+     * Used in array literals, object literals, function call arguments,
+     * and rest syntax in function parameters and destructuring patterns.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    @With
+    final class Spread implements JS, Expression, Statement, VariableDeclarator {
+
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Expression expression;
+
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
+            return v.visitSpread(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public List<J.Identifier> getNames() {
+            if (expression instanceof VariableDeclarator) {
+                return ((VariableDeclarator) expression).getNames();
+            }
+            return emptyList();
+        }
+    }
+
     @Getter
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
