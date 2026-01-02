@@ -57,7 +57,7 @@ public class MavenRecipeMarketplaceGenerator {
         bundleReader.recipeJar = recipeJar;
         bundleReader.classpath = classpath;
 
-        return bundleReader.read();
+        return bundleReader.marketplaceFromClasspathScan();
     }
 
     /**
