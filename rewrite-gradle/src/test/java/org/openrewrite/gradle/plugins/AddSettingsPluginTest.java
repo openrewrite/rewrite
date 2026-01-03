@@ -18,6 +18,7 @@ package org.openrewrite.gradle.plugins;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -28,6 +29,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class AddSettingsPluginTest implements RewriteTest {
@@ -146,7 +148,106 @@ class AddSettingsPluginTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addPluginWithPluginManagementAndBuildscriptBlocks() {
+        rewriteRun(
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              
+              rootProject.name = 'my-project'
+              """,
+            interpolateResolvedVersion(
+              """
+                pluginManagement {
+                    repositories {
+                        gradlePluginPortal()
+                    }
+                }
+                
+                buildscript {
+                    repositories {
+                        mavenCentral()
+                    }
+                }
+                
+                plugins {
+                    id 'com.gradle.enterprise' version '%s'
+                }
+                
+                rootProject.name = 'my-project'
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addPluginWithPluginManagementAndBuildscriptBlocksKotlin() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, null, null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              
+              rootProject.name = "my-project"
+              """,
+            interpolateResolvedVersionKotlin(
+              """
+                pluginManagement {
+                    repositories {
+                        gradlePluginPortal()
+                    }
+                }
+                
+                buildscript {
+                    repositories {
+                        mavenCentral()
+                    }
+                }
+                
+                plugins {
+                    id("com.gradle.enterprise") version "%s"
+                }
+                
+                rootProject.name = "my-project"
+                """
+            )
+          )
+        );
+    }
+
     private static Consumer<SourceSpec<G.CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
+        return spec -> spec.after(actual -> {
+            assertThat(actual).isNotNull();
+            Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
+            assertThat(version.find()).isTrue();
+            return after.formatted(version.group(0));
+        });
+    }
+
+    private static Consumer<SourceSpec<K.CompilationUnit>> interpolateResolvedVersionKotlin(@Language("kotlin") String after) {
         return spec -> spec.after(actual -> {
             assertThat(actual).isNotNull();
             Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
