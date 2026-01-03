@@ -83,6 +83,16 @@ public interface HCLParserListener extends ParseTreeListener {
 	 */
 	void exitBlockLabel(HCLParser.BlockLabelContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link HCLParser#identifierLike}.
+	 * @param ctx the parse tree
+	 */
+	void enterIdentifierLike(HCLParser.IdentifierLikeContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link HCLParser#identifierLike}.
+	 * @param ctx the parse tree
+	 */
+	void exitIdentifierLike(HCLParser.IdentifierLikeContext ctx);
+	/**
 	 * Enter a parse tree produced by the {@code OperationExpression}
 	 * labeled alternative in {@link HCLParser#expression}.
 	 * @param ctx the parse tree

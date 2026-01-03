@@ -57,6 +57,20 @@ class HclTemplateTest implements RewriteTest {
     }
 
     @Test
+    void allowsIfAsPropertyName() {
+        rewriteRun(
+          hcl(
+            """
+            resource "example" "test" {
+              if = "value"
+            }
+            """
+          )
+        );
+    }
+
+
+    @Test
     void firstInConfigFile() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new HclVisitor<>() {
