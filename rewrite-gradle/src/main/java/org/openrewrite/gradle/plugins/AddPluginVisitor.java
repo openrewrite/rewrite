@@ -360,7 +360,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
         }.reduce(cu, new AtomicBoolean());
         if (!hasPluginsBlock.get()) {
             J.Block block = (J.Block) cu.getStatements().get(0);
-            if (cu.getSourcePath().endsWith(Paths.get("settings.gradle")) &&
+            if (cu.getSourcePath().endsWith(Paths.get("settings.gradle.kts")) &&
                     !block.getStatements().isEmpty() &&
                     block.getStatements().get(0) instanceof J.MethodInvocation &&
                     "pluginManagement".equals(((J.MethodInvocation) block.getStatements().get(0)).getSimpleName())) {
