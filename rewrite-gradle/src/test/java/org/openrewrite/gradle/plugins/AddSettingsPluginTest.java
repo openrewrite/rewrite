@@ -15,19 +15,10 @@
  */
 package org.openrewrite.gradle.plugins;
 
-import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpec;
 
-import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
@@ -36,21 +27,19 @@ class AddSettingsPluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, null, null));
+          .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.4", null, null, null));
     }
 
     @Test
-    void addPluginToEmptyFile() {
+    void resolvePluginVersion() {
         rewriteRun(
           settingsGradle(
             "",
-            interpolateResolvedVersion(
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.11.4'
+              }
               """
-                plugins {
-                    id 'com.gradle.enterprise' version '%s'
-                }
-                """
-            )
           )
         );
     }
@@ -62,15 +51,13 @@ class AddSettingsPluginTest implements RewriteTest {
             """
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion(
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.11.4'
+              }
+              
+              rootProject.name = 'my-project'
               """
-                plugins {
-                    id 'com.gradle.enterprise' version '%s'
-                }
-
-                rootProject.name = 'my-project'
-                """
-            )
           )
         );
     }
@@ -82,18 +69,16 @@ class AddSettingsPluginTest implements RewriteTest {
             """
               plugins {
               }
-
+              
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion(
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.11.4'
+              }
+              
+              rootProject.name = 'my-project'
               """
-                plugins {
-                    id 'com.gradle.enterprise' version '%s'
-                }
-
-                rootProject.name = 'my-project'
-                """
-            )
           )
         );
     }
@@ -108,24 +93,22 @@ class AddSettingsPluginTest implements RewriteTest {
                       gradlePluginPortal()
                   }
               }
-
+              
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              
+              plugins {
+                  id 'com.gradle.enterprise' version '3.11.4'
+              }
+              
+              rootProject.name = 'my-project'
               """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-
-                plugins {
-                    id 'com.gradle.enterprise' version '%s'
-                }
-
-                rootProject.name = 'my-project'
-                """
-            )
           )
         );
     }
@@ -137,13 +120,11 @@ class AddSettingsPluginTest implements RewriteTest {
             .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, false, null)),
           settingsGradle(
             "",
-            interpolateResolvedVersion(
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.11.4' apply false
+              }
               """
-                plugins {
-                    id 'com.gradle.enterprise' version '%s' apply false
-                }
-                """
-            )
           )
         );
     }
@@ -167,27 +148,25 @@ class AddSettingsPluginTest implements RewriteTest {
               
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              
+              plugins {
+                  id 'com.gradle.enterprise' version '3.11.4'
+              }
+              
+              rootProject.name = 'my-project'
               """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-                
-                buildscript {
-                    repositories {
-                        mavenCentral()
-                    }
-                }
-                
-                plugins {
-                    id 'com.gradle.enterprise' version '%s'
-                }
-                
-                rootProject.name = 'my-project'
-                """
-            )
           )
         );
     }
@@ -195,8 +174,6 @@ class AddSettingsPluginTest implements RewriteTest {
     @Test
     void addPluginWithPluginManagementAndBuildscriptBlocksKotlin() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi())
-            .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, null, null)),
           settingsGradleKts(
             """
               pluginManagement {
@@ -213,50 +190,26 @@ class AddSettingsPluginTest implements RewriteTest {
               
               rootProject.name = "my-project"
               """,
-            interpolateResolvedVersionKotlin(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              
+              plugins {
+                  id("com.gradle.enterprise") version "3.11.4"
+              }
+              
+              rootProject.name = "my-project"
               """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-                
-                buildscript {
-                    repositories {
-                        mavenCentral()
-                    }
-                }
-                
-                plugins {
-                    id("com.gradle.enterprise") version "%s"
-                }
-                
-                rootProject.name = "my-project"
-                """
-            )
           )
         );
-    }
-
-    private static Consumer<SourceSpec<G.CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
-        return spec -> spec.after(actual -> {
-            assertThat(actual)
-                    .isNotNull()
-                    .containsPattern("3\\.\\d+(\\.\\d+)?");
-            Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-            assertThat(version.find()).isTrue();
-            return after.formatted(version.group(0));
-        });
-    }
-
-    private static Consumer<SourceSpec<K.CompilationUnit>> interpolateResolvedVersionKotlin(@Language("kotlin") String after) {
-        return spec -> spec.after(actual -> {
-            assertThat(actual)
-                .isNotNull()
-                .containsPattern("3\\.\\d+(\\.\\d+)?");
-            Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-            assertThat(version.find()).isTrue();
-            return after.formatted(version.group(0));
-        });
     }
 }
