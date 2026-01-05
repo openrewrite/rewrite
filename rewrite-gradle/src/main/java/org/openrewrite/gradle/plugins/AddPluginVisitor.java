@@ -352,7 +352,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                     return ((K.CompilationUnit) parsed);
                 })
                 .map(parsed -> parsed.getStatements().get(0))
-                .map(block -> ((J.Block)block).getStatements().get(0))
+                .map(block -> ((J.Block) block).getStatements().get(0))
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 
         AtomicBoolean hasPluginsBlock = new JavaIsoVisitor<AtomicBoolean>() {
@@ -407,7 +407,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             J.Block newStatement = block;
             return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), __ -> newStatement));
         } else {
-            J.MethodInvocation pluginDef = (J.MethodInvocation)(((J.Block) ((J.Lambda) ((J.MethodInvocation) statement).getArguments().get(0)).getBody()).getStatements().get(0));
+            J.MethodInvocation pluginDef = (J.MethodInvocation) (((J.Block) ((J.Lambda) ((J.MethodInvocation) statement).getArguments().get(0)).getBody()).getStatements().get(0));
             return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), b -> {
                 if (b instanceof J.Block) {
                     J.Block block = (J.Block) b;
