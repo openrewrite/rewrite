@@ -240,18 +240,22 @@ class AddSettingsPluginTest implements RewriteTest {
 
     private static Consumer<SourceSpec<G.CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
         return spec -> spec.after(actual -> {
-            assertThat(actual).isNotNull();
+            assertThat(actual)
+                    .isNotNull()
+                    .containsPattern("3\\.\\d+(\\.\\d+)?");
             Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-            assertThat(version.find()).isTrue();
+            version.find();
             return after.formatted(version.group(0));
         });
     }
 
     private static Consumer<SourceSpec<K.CompilationUnit>> interpolateResolvedVersionKotlin(@Language("kotlin") String after) {
         return spec -> spec.after(actual -> {
-            assertThat(actual).isNotNull();
+            assertThat(actual)
+                .isNotNull()
+                .containsPattern("3\\.\\d+(\\.\\d+)?");
             Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-            assertThat(version.find()).isTrue();
+            version.find();
             return after.formatted(version.group(0));
         });
     }
