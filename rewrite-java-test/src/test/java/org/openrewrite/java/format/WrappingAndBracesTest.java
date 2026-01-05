@@ -1780,45 +1780,6 @@ class WrappingAndBracesTest implements RewriteTest {
     }
 
     @Test
-    void wrapThrowsKeywordIfLong() {
-        rewriteRun(
-          autoFormat(
-            spaces -> spaces,
-            wrap -> wrap.withThrowsKeyword(wrap.getThrowsKeyword().withWrap(WrapIfTooLong))
-          ),
-          java(
-            """
-              import java.io.*;
-              
-              class Test {
-                  void testNameWhichIsRealyTooLongForThisLimitOf120SoThatTheMethodsThrowListWillBeTooLong() throws FileNotFoundException {
-                      FileReader fr = new FileReader("input.txt");
-                  }
-
-                  void test() throws FileNotFoundException {
-                      FileReader fr = new FileReader("input.txt");
-                  }
-              }
-              """,
-            """
-              import java.io.*;
-              
-              class Test {
-                  void testNameWhichIsRealyTooLongForThisLimitOf120SoThatTheMethodsThrowListWillBeTooLong()
-                          throws FileNotFoundException {
-                      FileReader fr = new FileReader("input.txt");
-                  }
-
-                  void test() throws FileNotFoundException {
-                      FileReader fr = new FileReader("input.txt");
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void alignThrowsToMethodStart() {
         rewriteRun(
           autoFormat(
@@ -1909,47 +1870,6 @@ class WrappingAndBracesTest implements RewriteTest {
                               FileNotFoundException,
                               IOException,
                               RuntimeException {
-                      FileReader fr = new FileReader("input.txt");
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void wrapThrowsListIfLong() {
-        rewriteRun(
-          autoFormat(
-            spaces -> spaces,
-            wrap -> wrap.withThrowsList(wrap.getThrowsList().withWrap(WrapIfTooLong))
-          ),
-          java(
-            """
-              import java.io.*;
-
-              class Test {
-                  void testNameWhichIsReallyWayTooLongForThisLimitOf120SoWraps() throws FileNotFoundException, IOException, RuntimeException {
-                      FileReader fr = new FileReader("input.txt");
-                  }
-
-                  void test() throws FileNotFoundException, IOException {
-                      FileReader fr = new FileReader("input.txt");
-                  }
-              }
-              """,
-            """
-              import java.io.*;
-
-              class Test {
-                  void testNameWhichIsReallyWayTooLongForThisLimitOf120SoWraps() throws
-                          FileNotFoundException,
-                          IOException,
-                          RuntimeException {
-                      FileReader fr = new FileReader("input.txt");
-                  }
-
-                  void test() throws FileNotFoundException, IOException {
                       FileReader fr = new FileReader("input.txt");
                   }
               }
@@ -2474,6 +2394,17 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               class Test {
+                  int[] numbers = {
+                    1, 
+                    2, 
+                    3, 
+                    4, 
+                    5
+                  };
+              }
+              """,
+            """
+              class Test {
                   int[] numbers = {1, 2, 3, 4, 5};
               }
               """
@@ -2705,6 +2636,14 @@ class WrappingAndBracesTest implements RewriteTest {
             wrap -> wrap.withAnnotationParameters(wrap.getAnnotationParameters().withWrap(DoNotWrap))
           ),
           java(
+            """
+              @SuppressWarnings(
+                value = "all", 
+                justification = "test"
+              )
+              class Test {
+              }
+              """,
             """
               @SuppressWarnings(value = "all", justification = "test")
               class Test {

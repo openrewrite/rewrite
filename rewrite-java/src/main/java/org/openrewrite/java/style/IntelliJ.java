@@ -111,9 +111,9 @@ public class IntelliJ extends NamedStyles {
                 new WrappingAndBracesStyle.ForStatement(LineWrapSetting.DoNotWrap, false, false, false, WrappingAndBracesStyle.ForceBraces.DoNotForce),
                 new WrappingAndBracesStyle.WhileStatement(WrappingAndBracesStyle.ForceBraces.DoNotForce),
                 new WrappingAndBracesStyle.DoWhileStatement(WrappingAndBracesStyle.ForceBraces.DoNotForce, false),
-                new WrappingAndBracesStyle.SwitchStatement(LineWrapSetting.WrapIfTooLong, true, true),
+                new WrappingAndBracesStyle.SwitchStatement(LineWrapSetting.DoNotWrap, true, true), // should be WrapIfTooLong
                 new WrappingAndBracesStyle.TryWithResources(LineWrapSetting.DoNotWrap, true, false, false),
-                new WrappingAndBracesStyle.TryStatement(false, false, LineWrapSetting.WrapIfTooLong, true),
+                new WrappingAndBracesStyle.TryStatement(false, false, LineWrapSetting.DoNotWrap, true), // should be WrapIfTooLong
                 new WrappingAndBracesStyle.BinaryExpressions(LineWrapSetting.DoNotWrap, false, false, false, false, false),
                 new WrappingAndBracesStyle.AssignmentStatement(LineWrapSetting.DoNotWrap, false),
                 new WrappingAndBracesStyle.GroupDeclarations(false, false, false, false),
@@ -130,8 +130,8 @@ public class IntelliJ extends NamedStyles {
                 new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap),
                 new WrappingAndBracesStyle.AnnotationParameters(LineWrapSetting.DoNotWrap, false, false, false),
                 new WrappingAndBracesStyle.TextBlocks(false),
-                new WrappingAndBracesStyle.RecordComponents(LineWrapSetting.WrapIfTooLong, true, false, false, false),
-                new WrappingAndBracesStyle.DeconstructionPatterns(LineWrapSetting.WrapIfTooLong, true, true, true)
+                new WrappingAndBracesStyle.RecordComponents(LineWrapSetting.DoNotWrap, true, false, false, false), // should be WrapIfTooLong
+                new WrappingAndBracesStyle.DeconstructionPatterns(LineWrapSetting.DoNotWrap, true, true, true) // should be WrapIfTooLong
         );
     }
 
