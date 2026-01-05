@@ -23,7 +23,8 @@ import {
     getLockFileFormat,
     getLockFileName,
     isYarnBerryLockFile,
-    PackageManager
+    PackageManager,
+    runWorkspaceInstallInTempDir
 } from "../../src/javascript";
 
 describe("detectPackageManager", () => {
@@ -238,4 +239,89 @@ __metadata:
 `;
         expect(getLockFileFormat("yarn.lock", yarnBerryLock)).toBe("yaml");
     });
+});
+
+describe("runWorkspaceInstallInTempDir", () => {
+
+    test("installs workspace packages and returns updated lock file", async () => {
+        const rootPackageJson = JSON.stringify({
+            name: "test-workspace-root",
+            private: true,
+            workspaces: ["packages/*"]
+        });
+
+        const workspaceAPackageJson = JSON.stringify({
+            name: "@test/workspace-a",
+            version: "1.0.0",
+            dependencies: {
+                "is-number": "^7.0.0"
+            }
+        });
+
+        const result = await runWorkspaceInstallInTempDir(PackageManager.Npm, rootPackageJson, {
+            workspacePackages: {
+                "packages/workspace-a/package.json": workspaceAPackageJson
+            },
+            timeout: 60000
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.lockFileContent).toBeDefined();
+        expect(result.lockFileContent).toContain("is-number");
+    }, 120000);
+
+    test("handles multiple workspace packages", async () => {
+        const rootPackageJson = JSON.stringify({
+            name: "test-workspace-root",
+            private: true,
+            workspaces: ["packages/*"]
+        });
+
+        const workspaceAPackageJson = JSON.stringify({
+            name: "@test/workspace-a",
+            version: "1.0.0",
+            dependencies: {
+                "is-number": "^7.0.0"
+            }
+        });
+
+        const workspaceBPackageJson = JSON.stringify({
+            name: "@test/workspace-b",
+            version: "1.0.0",
+            dependencies: {
+                "is-odd": "^3.0.0"
+            }
+        });
+
+        const result = await runWorkspaceInstallInTempDir(PackageManager.Npm, rootPackageJson, {
+            workspacePackages: {
+                "packages/workspace-a/package.json": workspaceAPackageJson,
+                "packages/workspace-b/package.json": workspaceBPackageJson
+            },
+            timeout: 60000
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.lockFileContent).toBeDefined();
+        expect(result.lockFileContent).toContain("is-number");
+        expect(result.lockFileContent).toContain("is-odd");
+    }, 120000);
+
+    test("works without workspace packages (same as runInstallInTempDir)", async () => {
+        const packageJson = JSON.stringify({
+            name: "test-simple-package",
+            version: "1.0.0",
+            dependencies: {
+                "is-number": "^7.0.0"
+            }
+        });
+
+        const result = await runWorkspaceInstallInTempDir(PackageManager.Npm, packageJson, {
+            timeout: 60000
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.lockFileContent).toBeDefined();
+        expect(result.lockFileContent).toContain("is-number");
+    }, 120000);
 });

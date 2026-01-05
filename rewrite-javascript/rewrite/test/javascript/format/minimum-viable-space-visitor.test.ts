@@ -30,7 +30,7 @@
 import {fromVisitor, RecipeSpec, SourceSpec} from "../../../src/test";
 import {MinimumViableSpacingVisitor} from "../../../src/javascript/format";
 import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../../src/javascript";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {mapAsync, ParserInput, SourceFile} from "../../../src";
 import {J} from "../../../src/java";
 

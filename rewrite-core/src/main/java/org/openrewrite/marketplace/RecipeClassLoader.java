@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.marketplace;
+package org.openrewrite.marketplace;
 
+import org.jspecify.annotations.Nullable;
+
+import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -77,7 +79,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.MethodMatcher"
     );
 
-    public RecipeClassLoader(Path recipeJar, List<Path> classpath) {
+    public RecipeClassLoader(@Nullable Path recipeJar, List<Path> classpath) {
         this(getUrls(recipeJar, classpath), RecipeClassLoader.class.getClassLoader());
     }
 
@@ -101,7 +103,15 @@ public class RecipeClassLoader extends URLClassLoader {
             // Determine delegation strategy
             try {
                 if (shouldDelegateToParent(name)) {
-                    foundClass = parent.loadClass(name);
+                    try {
+                        foundClass = parent.loadClass(name);
+                    } catch (ClassNotFoundException e) {
+                        // Fall back to child if parent doesn't have the class.
+                        // This handles marker/tree/style types from language-specific modules
+                        // (e.g., org.openrewrite.gradle.marker.GradlePluginDescriptor)
+                        // that aren't on the parent classloader.
+                        foundClass = findClass(name);
+                    }
                 } else {
                     // Try child-first for non-delegated classes
                     foundClass = findClass(name);
@@ -116,6 +126,27 @@ public class RecipeClassLoader extends URLClassLoader {
             }
             return foundClass;
         }
+    }
+
+    @Override
+    public @Nullable URL getResource(String name) {
+        Objects.requireNonNull(name);
+        URL url = findResource(name);
+        if (url == null) {
+            return parent.getResource(name);
+        }
+        return url;
+    }
+
+    @Override
+    public Enumeration<URL> getResources(String name) throws IOException {
+        Objects.requireNonNull(name);
+        @SuppressWarnings("unchecked")
+        Enumeration<URL>[] tmp = (Enumeration<URL>[]) new Enumeration<?>[2];
+        tmp[0] = findResources(name);
+        tmp[1] = parent.getResources(name);
+
+        return new CompoundEnumeration<>(tmp);
     }
 
     private boolean shouldDelegateToParent(String className) {
@@ -181,21 +212,11 @@ public class RecipeClassLoader extends URLClassLoader {
     }
 
     /**
-     * Create a standard ClassLoader for the recipe JAR and its dependencies.
-     * This is primarily used for scanning operations where ClassGraph needs standard parent delegation.
-     */
-    public static ClassLoader forScanning(Path recipeJar, List<Path> classpath) {
-        return new URLClassLoader(
-                getUrls(recipeJar, classpath),
-                RecipeClassLoader.class.getClassLoader()
-        );
-    }
-
-    /**
      * Convert paths to URL array for URLClassLoader.
      */
-    public static URL[] getUrls(Path recipeJar, List<Path> classpath) {
+    public static URL[] getUrls(@Nullable Path recipeJar, List<Path> classpath) {
         return Stream.concat(classpath.stream(), Stream.of(recipeJar))
+                .filter(Objects::nonNull)
                 .map(Path::toUri)
                 .map(uri -> {
                     try {
@@ -205,5 +226,41 @@ public class RecipeClassLoader extends URLClassLoader {
                     }
                 })
                 .toArray(URL[]::new);
+    }
+}
+
+/*
+ * A utility class that will enumerate over an array of enumerations.
+ * @see java.lang.CompoundEnumeration
+ */
+final class CompoundEnumeration<E> implements Enumeration<E> {
+    private final Enumeration<E>[] enums;
+    private int index;
+
+    public CompoundEnumeration(Enumeration<E>[] enums) {
+        this.enums = enums;
+    }
+
+    private boolean next() {
+        while (index < enums.length) {
+            if (enums[index] != null && enums[index].hasMoreElements()) {
+                return true;
+            }
+            index++;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean hasMoreElements() {
+        return next();
+    }
+
+    @Override
+    public E nextElement() {
+        if (!next()) {
+            throw new NoSuchElementException();
+        }
+        return enums[index].nextElement();
     }
 }

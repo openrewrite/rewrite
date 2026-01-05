@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JS, JSX} from "./tree";
-import {JavaScriptVisitor} from "./visitor";
+import {JS, JSX} from "../tree";
+import {JavaScriptVisitor} from "../visitor";
 import {
     isJava,
     isSpace,
@@ -25,13 +25,13 @@ import {
     replaceLastWhitespace,
     spaceContainsNewline,
     stripLeadingIndent
-} from "../java";
-import {produce} from "immer";
-import {Cursor, isScope, isTree, Tree} from "../tree";
-import {mapAsync} from "../util";
-import {produceAsync} from "../visitor";
-import {TabsAndIndentsStyle} from "./style";
-import {findMarker} from "../markers";
+} from "../../java";
+import {create as produce} from "mutative";
+import {Cursor, isScope, isTree, Tree} from "../../tree";
+import {mapAsync} from "../../util";
+import {produceAsync} from "../../visitor";
+import {TabsAndIndentsStyle} from "../style";
+import {findMarker} from "../../markers";
 
 type IndentKind = 'block' | 'continuation' | 'align';
 type IndentContext = [number, IndentKind];  // [indent, kind]
@@ -214,11 +214,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (tree.prefix && lastWhitespace(tree.prefix).includes("\n")) {
             return true;
         }
-        // For elements with Spread marker, check the Spread marker's prefix
-        const spreadMarker = tree.markers?.markers?.find(m => m.kind === JS.Markers.Spread) as { prefix: J.Space } | undefined;
-        if (spreadMarker && spaceContainsNewline(spreadMarker.prefix)) {
-            return true;
-        }
         return false;
     }
 
@@ -305,20 +300,8 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         let result = tree;
         const indentStr = this.indentString(myIndent);
 
-        // Check if the element has a Spread marker - if so, normalize its prefix instead
-        const spreadMarker = result.markers?.markers?.find(m => m.kind === JS.Markers.Spread) as { prefix: J.Space } | undefined;
-        if (spreadMarker && spaceContainsNewline(spreadMarker.prefix)) {
-            const normalizedPrefix = normalizeSpaceIndent(spreadMarker.prefix, indentStr);
-            if (normalizedPrefix !== spreadMarker.prefix) {
-                result = produce(result, draft => {
-                    const spreadIdx = draft.markers.markers.findIndex(m => m.kind === JS.Markers.Spread);
-                    if (spreadIdx !== -1) {
-                        (draft.markers.markers[spreadIdx] as any).prefix = normalizedPrefix;
-                    }
-                });
-            }
-        } else if (result.prefix && spaceContainsNewline(result.prefix)) {
-            // Normalize the entire prefix space including comment suffixes
+        // Normalize the prefix space including comment suffixes
+        if (result.prefix && spaceContainsNewline(result.prefix)) {
             const normalizedPrefix = normalizeSpaceIndent(result.prefix, indentStr);
             if (normalizedPrefix !== result.prefix) {
                 result = produce(result, draft => {
@@ -617,19 +600,19 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * Check if an element is a spread - either directly marked with Spread marker,
-     * or a PropertyAssignment whose name has a Spread marker (for object spreads).
+     * Check if an element is a spread - either a JS.Spread element
+     * or a PropertyAssignment wrapping a spread.
      */
     private isSpreadElement(element: J): boolean {
-        // Direct spread marker on element
-        if (findMarker(element, JS.Markers.Spread)) {
+        // JS.Spread AST element (for spread/rest expressions like `...arr`, `...obj`, `...args`)
+        if (element.kind === JS.Kind.Spread) {
             return true;
         }
         // PropertyAssignment wrapping a spread (for object spread like `...obj`)
         if (element.kind === JS.Kind.PropertyAssignment) {
             const propAssign = element as JS.PropertyAssignment;
             const nameElement = propAssign.name?.element;
-            if (findMarker(nameElement, JS.Markers.Spread)) {
+            if (nameElement?.kind === JS.Kind.Spread) {
                 return true;
             }
         }
