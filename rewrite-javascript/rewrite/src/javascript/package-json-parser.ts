@@ -215,16 +215,29 @@ export class PackageJsonParser extends Parser {
             const npmrcConfigs = await readNpmrcConfigs(projectDir);
 
             // Detect workspace member paths if this is a workspace root
+            // Check both package.json workspaces (npm/yarn) and pnpm-workspace.yaml (pnpm)
             let workspacePackagePaths: string[] | undefined;
+            const absoluteDir = this.relativeTo && !path.isAbsolute(dir)
+                ? path.resolve(this.relativeTo, dir)
+                : dir;
+
             if (packageJson.workspaces) {
-                const absoluteDir = this.relativeTo && !path.isAbsolute(dir)
-                    ? path.resolve(this.relativeTo, dir)
-                    : dir;
+                // npm/yarn style workspaces defined in package.json
                 workspacePackagePaths = await this.resolveWorkspacePackagePaths(
                     packageJson.workspaces,
                     absoluteDir,
                     this.relativeTo
                 );
+            } else if (packageManager === PackageManager.Pnpm) {
+                // pnpm workspaces defined in pnpm-workspace.yaml
+                const pnpmWorkspacePatterns = await this.readPnpmWorkspacePatterns(absoluteDir);
+                if (pnpmWorkspacePatterns && pnpmWorkspacePatterns.length > 0) {
+                    workspacePackagePaths = await this.resolveWorkspacePackagePaths(
+                        pnpmWorkspacePatterns,
+                        absoluteDir,
+                        this.relativeTo
+                    );
+                }
             }
 
             return createNodeResolutionResultMarker(
@@ -367,6 +380,38 @@ export class PackageJsonParser extends Parser {
     }
 
     /**
+     * Reads workspace patterns from pnpm-workspace.yaml file.
+     *
+     * pnpm-workspace.yaml format:
+     * ```yaml
+     * packages:
+     *   - 'packages/*'
+     *   - 'apps/*'
+     *   - '!packages/excluded'
+     * ```
+     *
+     * @param projectDir The absolute path to the project directory
+     * @returns Array of workspace patterns, or undefined if file doesn't exist
+     */
+    private async readPnpmWorkspacePatterns(projectDir: string): Promise<string[] | undefined> {
+        const pnpmWorkspacePath = path.join(projectDir, 'pnpm-workspace.yaml');
+
+        try {
+            const content = await fsp.readFile(pnpmWorkspacePath, 'utf-8');
+            const parsed = YAML.parse(content);
+
+            if (parsed && Array.isArray(parsed.packages)) {
+                return parsed.packages;
+            }
+
+            return undefined;
+        } catch {
+            // File doesn't exist or couldn't be parsed
+            return undefined;
+        }
+    }
+
+    /**
      * Attempts to find and read a lock file by walking up the directory tree.
      * Starts from the directory containing the package.json and walks up toward
      * the root directory (or relativeTo if specified).
@@ -424,6 +469,8 @@ export class PackageJsonParser extends Parser {
                 continue;
             }
 
+            // Lock file exists - determine package manager
+            // Once we find a lock file, we commit to this package manager even if parsing fails
             try {
                 const fileContent = await fsp.readFile(lockPath, 'utf-8');
                 const packageManager = typeof config.packageManager === 'function'
@@ -443,8 +490,17 @@ export class PackageJsonParser extends Parser {
                 if (content) {
                     return { content, packageManager };
                 }
+
+                // Lock file exists but couldn't be parsed - still return the package manager
+                // This ensures we use the correct package manager even without resolved dependencies
+                return { content: { lockfileVersion: 0, packages: {} }, packageManager };
             } catch (error) {
                 console.debug?.(`Failed to parse ${config.filename}: ${error}`);
+                // Even on error, we found this lock file - return the package manager with empty content
+                const packageManager = typeof config.packageManager === 'function'
+                    ? PackageManager.YarnClassic // Default for yarn.lock if we can't read content
+                    : config.packageManager;
+                return { content: { lockfileVersion: 0, packages: {} }, packageManager };
             }
         }
 
