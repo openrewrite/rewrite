@@ -15,7 +15,7 @@
  */
 
 import {J} from "../java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 
 /**
  * Gets the effective last whitespace from a Space.
@@ -34,7 +34,7 @@ export function lastWhitespace(space: J.Space): string {
  * When there are comments, updates the suffix of the last comment.
  * When there are no comments, updates the whitespace property.
  *
- * @param space The Space to modify (Immer draft)
+ * @param space The Space to modify (Mutative draft)
  * @param transform Function that receives the current last whitespace and returns the new value
  */
 export function replaceLastWhitespace(space: J.Space, transform: (ws: string) => string): J.Space {
@@ -62,6 +62,56 @@ export function stripLeadingIndent(s: string): string {
 export function replaceIndentAfterLastNewline(ws: string, newIndent: string): string {
     const lastNewline = ws.lastIndexOf("\n");
     return ws.substring(0, lastNewline + 1) + newIndent;
+}
+
+/**
+ * Checks if a Space contains any newlines (in whitespace or comment suffixes).
+ */
+export function spaceContainsNewline(space: J.Space | undefined): boolean {
+    if (!space) return false;
+    if (space.whitespace.includes("\n")) return true;
+    return space.comments.some(c => c.suffix.includes("\n"));
+}
+
+/**
+ * Normalizes indentation in an entire Space, including both whitespace and comment suffixes.
+ * Each newline followed by whitespace gets its indentation normalized to the target indent.
+ *
+ * @param space The Space to normalize
+ * @param targetIndent The indentation to use after newlines
+ * @returns The normalized Space, or the original if unchanged
+ */
+export function normalizeSpaceIndent(space: J.Space, targetIndent: string): J.Space {
+    let changed = false;
+
+    // Normalize whitespace
+    let newWhitespace = space.whitespace;
+    if (space.whitespace.includes("\n")) {
+        newWhitespace = replaceIndentAfterLastNewline(space.whitespace, targetIndent);
+        changed = changed || newWhitespace !== space.whitespace;
+    }
+
+    // Normalize comment suffixes
+    const newComments = space.comments.map(comment => {
+        if (comment.suffix.includes("\n")) {
+            const newSuffix = replaceIndentAfterLastNewline(comment.suffix, targetIndent);
+            if (newSuffix !== comment.suffix) {
+                changed = true;
+                return {...comment, suffix: newSuffix};
+            }
+        }
+        return comment;
+    });
+
+    if (!changed) {
+        return space;
+    }
+
+    return {
+        ...space,
+        whitespace: newWhitespace,
+        comments: newComments
+    };
 }
 
 /**

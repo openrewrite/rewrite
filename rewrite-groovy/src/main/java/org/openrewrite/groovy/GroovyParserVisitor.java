@@ -1752,7 +1752,7 @@ public class GroovyParserVisitor {
                     String value = sourceSubstring(cursor, delimiter.close);
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
-                    while (isEscaped(indexNextSign)) {
+                    while (isEscaped(indexNextSign, delimiter)) {
                         indexNextSign = source.indexOf("$", indexNextSign + 1);
                     }
                     if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
@@ -2757,6 +2757,32 @@ public class GroovyParserVisitor {
             index--;
         }
         return backslashCount % 2 != 0;
+    }
+
+    /**
+     * Determines if a $ character in a GString is escaped based on the delimiter type.
+     * For slashy strings, $$ escapes a dollar sign and $ followed by the closing delimiter is treated as literal.
+     * For other string types, backslash escaping is used.
+     */
+    private boolean isEscaped(int index, Delimiter delimiter) {
+        if (index < 0) {
+            return false;
+        }
+
+        // Slashy-type strings use different escaping: $$ for literal $ and $ before closing delimiter
+        if (delimiter.isSlashyStringDelimiter() || delimiter.isDollarSlashyStringDelimiter()) {
+            if (index + 1 < source.length()) {
+                if (source.charAt(index + 1) == '$') {
+                    return true; // $$ escapes a dollar sign
+                }
+                // For slashy strings (not dollar-slashy), $ before closing delimiter is also literal
+                return delimiter.isSlashyStringDelimiter() && source.startsWith(delimiter.close, index + 1);
+            }
+            return false;
+        }
+
+        // Regular strings use backslash escaping
+        return isEscaped(index);
     }
 
     /**

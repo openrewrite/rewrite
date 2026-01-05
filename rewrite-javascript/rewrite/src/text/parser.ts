@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Parser, ParserInput, readSourceSync} from "../parser";
+import {Parser, ParserInput, readSourceSync, Parsers} from "../parser";
 import {PlainText} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers} from "../markers";
@@ -32,3 +32,5 @@ export class PlainTextParser extends Parser {
         }
     }
 }
+
+Parsers.registerParser("plainText", PlainTextParser);

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -26,6 +25,7 @@ import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -296,26 +296,64 @@ class VariableDeclarationsTest implements RewriteTest {
       "j",
       "(j)",
       "vari",
-      "(vari)"
+      "(vari)",
+      "var",
+      "  var  ",
+      "(var)",
+      "(  var  )",
+      "(var var)",
+      "(  var var  )",
+      "(  @Deprecated  var var  )",
+      "(Object var)",
+      "(  Object var  )"
     })
-    void lambdaParameterVariableDeclarations(@Language("java") String variableDeclaration) {
-        @Language("java")
-        String java = String.format(
-          """
-            import java.util.function.Consumer;
-            
-            class Foo {
-                void main() {
-                    Consumer<Object> i = %s -> {};
-                }
-            }
-            """,
-          variableDeclaration
-        );
+    void lambdaParameterVariableDeclarations(String variableDeclaration) {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
-            java
+            format(
+              """
+                import java.util.function.Consumer;
+                
+                class Foo {
+                    void main() {
+                        Consumer<Object> i = %s -> {};
+                    }
+                }
+                """,
+              variableDeclaration)
+          )
+        );
+    }
+
+    @MinimumJava11
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "i, j",
+      "i, var",
+      "  i  , var  ",
+      "var, i",
+      "  var  , i  ",
+      "var i, var j",
+      "  var i  , var j  ",
+      "var i, var var",
+      "  var i  , var var  ",
+      "var var, var i",
+      "  var var  , var i  "
+    })
+    void multiLambdaParametersVariableDeclarations(String variableDeclarations) {
+        rewriteRun(
+          java(
+            format(
+              """
+                import java.util.function.BiFunction;
+                
+                class Foo {
+                    void main() {
+                        BiFunction<Object, Object, Object> f = (%s) -> null;
+                    }
+                }
+                """,
+              variableDeclarations)
           )
         );
     }

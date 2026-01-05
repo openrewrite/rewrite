@@ -15,9 +15,9 @@
  */
 import {Cursor, isTree, SourceFile} from "../tree";
 import {mapAsync, updateIfChanged} from "../util";
-import {produceAsync, TreeVisitor, ValidImmerRecipeReturnType} from "../visitor";
+import {TreeVisitor, ValidRecipeReturnType} from "../visitor";
 import {Expression, isSpace, J, NameTree, Statement, TypedTree, TypeTree} from "./tree";
-import {createDraft, Draft, finishDraft, nothing} from "immer";
+import {create, Draft, rawReturn} from "mutative";
 import {Type} from "./type";
 
 const javaKindValues = new Set(Object.values(J.Kind));
@@ -1215,18 +1215,15 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T> | undefined> {
-        return produceAsync<J.RightPadded<T>>(right, async draft => {
-            this.cursor = new Cursor(right, this.cursor);
-            if (isTree(right.element)) {
-                (draft.element as J) = await this.visitDefined(right.element, p);
-            }
-            draft.after = await this.visitSpace(right.after, p);
-            draft.markers = await this.visitMarkers(right.markers, p);
-            this.cursor = this.cursor.parent!;
-            if (draft.element === undefined) {
-                return nothing;
-            }
-        });
+        this.cursor = new Cursor(right, this.cursor);
+        const element = isTree(right.element) ? await this.visitDefined(right.element, p) as T : right.element;
+        const after = await this.visitSpace(right.after, p);
+        const markers = await this.visitMarkers(right.markers, p);
+        this.cursor = this.cursor.parent!;
+        if (element === undefined) {
+            return undefined;
+        }
+        return updateIfChanged(right, {element, after, markers});
     }
 
     protected async visitOptionalLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T> | undefined, p: P): Promise<J.LeftPadded<T> | undefined> {
@@ -1234,20 +1231,20 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T> | undefined> {
-        return produceAsync<J.LeftPadded<T>>(left, async draft => {
-            this.cursor = new Cursor(left, this.cursor);
-            draft.before = await this.visitSpace(left.before, p);
-            if (isTree(left.element)) {
-                draft.element = await this.visitDefined(left.element, p) as Draft<T>;
-            } else if (isSpace(left.element)) {
-                draft.element = await this.visitSpace(left.element, p) as Draft<T>;
-            }
-            draft.markers = await this.visitMarkers(left.markers, p);
-            this.cursor = this.cursor.parent!;
-            if (draft.element === undefined) {
-                return nothing;
-            }
-        });
+        this.cursor = new Cursor(left, this.cursor);
+        const before = await this.visitSpace(left.before, p);
+        let element: T | undefined = left.element;
+        if (isTree(left.element)) {
+            element = await this.visitDefined(left.element, p) as T | undefined;
+        } else if (isSpace(left.element)) {
+            element = await this.visitSpace(left.element, p) as T;
+        }
+        const markers = await this.visitMarkers(left.markers, p);
+        this.cursor = this.cursor.parent!;
+        if (element === undefined) {
+            return undefined;
+        }
+        return updateIfChanged(left, {before, element, markers});
     }
 
     protected async visitOptionalContainer<T extends J>(container: J.Container<T> | undefined, p: P): Promise<J.Container<T> | undefined> {
@@ -1255,29 +1252,28 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
-        return (await produceAsync<J.Container<T>>(container, async draft => {
-            this.cursor = new Cursor(container, this.cursor);
-            draft.before = await this.visitSpace(container.before, p);
-            (draft.elements as J.RightPadded<J>[]) = await mapAsync(container.elements, e => this.visitRightPadded(e, p));
-            draft.markers = await this.visitMarkers(container.markers, p);
-            this.cursor = this.cursor.parent!;
-        }))!;
+        this.cursor = new Cursor(container, this.cursor);
+        const before = await this.visitSpace(container.before, p);
+        const elements = await mapAsync(container.elements, e => this.visitRightPadded(e, p));
+        const markers = await this.visitMarkers(container.markers, p);
+        this.cursor = this.cursor.parent!;
+        return updateIfChanged(container, {before, elements, markers});
     }
 
     protected async produceJava<J2 extends J>(
         before: J2,
         p: P,
         recipe?: (draft: Draft<J2>) =>
-            ValidImmerRecipeReturnType<Draft<J2>> |
-            PromiseLike<ValidImmerRecipeReturnType<Draft<J2>>>
+            ValidRecipeReturnType<Draft<J2>> |
+            PromiseLike<ValidRecipeReturnType<Draft<J2>>>
     ): Promise<J2> {
-        const draft: Draft<J2> = createDraft(before);
+        const [draft, finishDraft] = create(before);
         (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, p);
         (draft as Draft<J>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
             await recipe(draft);
         }
-        return finishDraft(draft) as J2;
+        return finishDraft() as J2;
     }
 
     protected accept(t: J, p: P): Promise<J | undefined> {

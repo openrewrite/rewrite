@@ -1112,7 +1112,9 @@ describe('RemoveImport visitor', () => {
 
                         console.log('test');
                     `,
-                    `console.log('test');`
+                    `
+                        console.log('test');
+                    `
                 )
             );
         });
@@ -1175,7 +1177,8 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         const foo = 1;
-                        console.log(foo);`
+                        console.log(foo);
+                        `
                 )
             );
         });
@@ -1201,6 +1204,95 @@ describe('RemoveImport visitor', () => {
                     `
                 )
             );
+        });
+    });
+
+    describe('type declarations', () => {
+        test('should not remove React import when used in type alias declaration', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "default"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import React from 'react';
+
+                                type Props = {
+                                    children: React.ReactNode;
+                                };
+
+                                function App({ children }: Props) {
+                                    return <div>{children}</div>;
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test('should remove React import when not used in type alias declaration', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "default"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import React from 'react';
+
+                                type Props = {
+                                    children: string;
+                                };
+
+                                function App({ children }: Props) {
+                                    return <div>{children}</div>;
+                                }
+                            `,
+                            `
+                                type Props = {
+                                    children: string;
+                                };
+
+                                function App({ children }: Props) {
+                                    return <div>{children}</div>;
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
         });
     });
 

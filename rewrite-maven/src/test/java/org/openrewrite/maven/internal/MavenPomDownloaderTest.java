@@ -1352,28 +1352,67 @@ class MavenPomDownloaderTest implements RewriteTest {
     @Test
     void resolveDependencies() throws Exception {
         Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
-                  <project>
-                      <parent>
-                          <groupId>org.springframework.boot</groupId>
-                          <artifactId>spring-boot-starter-parent</artifactId>
-                          <version>3.2.0</version>
-                          <relativePath/>
-                      </parent>
-                      <groupId>com.example</groupId>
-                      <artifactId>demo</artifactId>
-                      <version>0.0.1-SNAPSHOT</version>
-                      <name>demo</name>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.springframework.boot</groupId>
-                              <artifactId>spring-boot-starter-web</artifactId>
-                          </dependency>
-                      </dependencies>
-                  </project>
-        """).toList().getFirst();
-        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-        resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
+          <project>
+              <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.0</version>
+                  <relativePath/>
+              </parent>
+              <groupId>com.example</groupId>
+              <artifactId>demo</artifactId>
+              <version>0.0.1-SNAPSHOT</version>
+              <name>demo</name>
+              <dependencies>
+                  <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+              </dependencies>
+          </project>
+          """).toList().getFirst();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+          .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
         assertThat(deps).hasSize(35);
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/6464")
+    @Test
+    void emptyClassifierPropertyInIntermediatePom() throws Exception {
+        // `azure-spring-data-cosmos` brings in `azure-core-http-netty`, which uses property `<boring-ssl-classifier/>`
+        // https://repo1.maven.org/maven2/com/azure/azure-spring-data-cosmos/3.45.0/azure-spring-data-cosmos-3.45.0.pom
+        // https://repo1.maven.org/maven2/com/azure/azure-core-http-netty/1.16.2/azure-core-http-netty-1.16.2.pom
+        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
+          <project>
+              <groupId>com.example</groupId>
+              <artifactId>demo</artifactId>
+              <version>1.0.0</version>
+              <properties>
+                  <boring-ssl-classifier>something-else</boring-ssl-classifier>
+              </properties>
+              <dependencies>
+                  <dependency>
+                      <groupId>com.azure</groupId>
+                      <artifactId>azure-spring-data-cosmos</artifactId>
+                      <version>3.45.0</version>
+                  </dependency>
+              </dependencies>
+          </project>
+          """).toList().getFirst();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+          .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
+        List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
+        assertThat(deps)
+          .filteredOn(rd -> "io.netty".equals(rd.getGroupId()))
+          .filteredOn(rd -> "netty-tcnative-boringssl-static".equals(rd.getArtifactId()))
+          .isNotEmpty()
+          .extracting(ResolvedDependency::getClassifier)
+          .doesNotContain("${boring-ssl-classifier}")
+          .doesNotContain("something-else")
+          .contains("")
+          .anyMatch(c -> !"".equals(c));
     }
 }

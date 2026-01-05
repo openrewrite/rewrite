@@ -90,6 +90,7 @@ export namespace JS {
         SatisfiesExpression: "org.openrewrite.javascript.tree.JS$SatisfiesExpression",
         ScopedVariableDeclarations: "org.openrewrite.javascript.tree.JS$ScopedVariableDeclarations",
         Shebang: "org.openrewrite.javascript.tree.JS$Shebang",
+        Spread: "org.openrewrite.javascript.tree.JS$Spread",
         StatementExpression: "org.openrewrite.javascript.tree.JS$StatementExpression",
         TaggedTemplateExpression: "org.openrewrite.javascript.tree.JS$TaggedTemplateExpression",
         TemplateExpression: "org.openrewrite.javascript.tree.JS$TemplateExpression",
@@ -457,6 +458,22 @@ export namespace JS {
     export interface Shebang extends JS, Statement {
         readonly kind: typeof Kind.Shebang;
         readonly text: string;
+    }
+
+    /**
+     * Represents the spread syntax (...) applied to an expression.
+     * Used in array literals, object literals, function call arguments,
+     * and rest syntax in function parameters and destructuring patterns.
+     * @example [...arr]
+     * @example {...obj}
+     * @example f(...args)
+     * @example function f(...args) {}
+     * @example const [first, ...rest] = arr
+     */
+    export interface Spread extends JS, Statement, Expression, TypedTree, VariableDeclarator {
+        readonly kind: typeof Kind.Spread;
+        readonly expression: Expression;
+        readonly type?: Type;
     }
 
     /**

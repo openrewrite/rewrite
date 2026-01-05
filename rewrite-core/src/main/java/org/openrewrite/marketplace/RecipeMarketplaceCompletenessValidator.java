@@ -35,7 +35,7 @@ public class RecipeMarketplaceCompletenessValidator {
      * Validate that the CSV marketplace is complete and in sync with the JAR environment.
      *
      * @param csv The recipe marketplace loaded from CSV.
-     * @param env The environment loaded from the recipe JAR.
+     * @param env The environment to validate against.
      * @return A validation result containing all errors found.
      */
     public Validated<RecipeMarketplace> validate(RecipeMarketplace csv, Environment env) {
@@ -55,14 +55,18 @@ public class RecipeMarketplaceCompletenessValidator {
         // Find recipes in CSV that don't exist in the environment (phantom recipes)
         for (String csvRecipeName : csvRecipeNames) {
             if (!jarRecipeNames.contains(csvRecipeName)) {
-                validation = validation.and(Validated.invalid(csvRecipeName, csvRecipeName, "Recipe listed in CSV must exist in the environment"));
+                validation = validation.and(Validated.invalid(csvRecipeName, csvRecipeName,
+                        "Recipe listed in CSV must exist in the environment; " +
+                                "remove this entry from `recipes.csv` or add the recipe to the environment."));
             }
         }
 
         // Find recipes in the environment that aren't in CSV (missing recipes)
         for (String envRecipeName : jarRecipeNames) {
             if (!csvRecipeNames.contains(envRecipeName)) {
-                validation = validation.and(Validated.invalid(envRecipeName, envRecipeName, "Recipe exists in environment but is not listed in CSV"));
+                validation = validation.and(Validated.invalid(envRecipeName, envRecipeName,
+                        "Recipe exists in environment but is not listed in CSV; " +
+                                "run `./gradlew recipeCsvGenerate` to update `recipes.csv`."));
             }
         }
 

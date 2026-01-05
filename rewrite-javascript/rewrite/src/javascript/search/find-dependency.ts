@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://docs.moderne.io/licensing/moderate-source-available-license
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,10 +17,12 @@
 import {Option, Recipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
-import {Json, JsonVisitor} from "../../json";
+import {getMemberKeyName, isMember, Json, JsonVisitor} from "../../json";
 import {foundSearchResult} from "../../markers";
 import {
+    allDependencyScopes,
     Dependency,
+    DependencyScope,
     findNodeResolutionResult,
     NodeResolutionResult,
     ResolvedDependency
@@ -29,12 +31,7 @@ import * as semver from "semver";
 import * as picomatch from "picomatch";
 
 /** Dependency section names in package.json */
-const DEPENDENCY_SECTIONS = new Set([
-    'dependencies',
-    'devDependencies',
-    'peerDependencies',
-    'optionalDependencies'
-]);
+const DEPENDENCY_SECTIONS = new Set<DependencyScope>(allDependencyScopes);
 
 /**
  * Finds npm/Node.js dependencies declared in package.json.
@@ -134,7 +131,7 @@ export class FindDependency extends Recipe {
                 }
 
                 // Get the package name from the member key
-                const depName = this.getMemberKeyName(member);
+                const depName = getMemberKeyName(member);
                 if (!depName) {
                     return super.visitMember(member, ctx);
                 }
@@ -179,18 +176,16 @@ export class FindDependency extends Recipe {
              * Checks if the current member's parent is a dependency section object.
              * Returns the section name if so, undefined otherwise.
              */
-            private getParentDependencySection(): string | undefined {
+            private getParentDependencySection(): DependencyScope | undefined {
                 // Walk up the cursor to find the parent member that contains this dependency
                 // Structure: Document > Object > Member("dependencies") > Object > Member("lodash")
                 let cursor = this.cursor.parent;
                 while (cursor) {
                     const tree = cursor.value;
-                    if (tree && typeof tree === 'object' && 'kind' in tree) {
-                        if (tree.kind === Json.Kind.Member) {
-                            const memberKey = this.getMemberKeyName(tree as Json.Member);
-                            if (memberKey && DEPENDENCY_SECTIONS.has(memberKey)) {
-                                return memberKey;
-                            }
+                    if (tree && typeof tree === 'object' && 'kind' in tree && isMember(tree as Json)) {
+                        const memberKey = getMemberKeyName(tree as Json.Member);
+                        if (memberKey && DEPENDENCY_SECTIONS.has(memberKey as DependencyScope)) {
+                            return memberKey as DependencyScope;
                         }
                     }
                     cursor = cursor.parent;
@@ -199,45 +194,11 @@ export class FindDependency extends Recipe {
             }
 
             /**
-             * Extracts the key name from a Json.Member
-             */
-            private getMemberKeyName(member: Json.Member): string | undefined {
-                const key = member.key.element;
-                if (key.kind === Json.Kind.Literal) {
-                    // Remove quotes from string literal
-                    const source = (key as Json.Literal).source;
-                    if (source.startsWith('"') && source.endsWith('"')) {
-                        return source.slice(1, -1);
-                    }
-                    return source;
-                } else if (key.kind === Json.Kind.Identifier) {
-                    return (key as Json.Identifier).name;
-                }
-                return undefined;
-            }
-
-            /**
              * Finds a dependency by name in the appropriate section of the resolution result.
              */
-            private findDependencyByName(name: string, section: string): Dependency | undefined {
+            private findDependencyByName(name: string, section: DependencyScope): Dependency | undefined {
                 if (!this.resolution) return undefined;
-
-                let deps: Dependency[] | undefined;
-                switch (section) {
-                    case 'dependencies':
-                        deps = this.resolution.dependencies;
-                        break;
-                    case 'devDependencies':
-                        deps = this.resolution.devDependencies;
-                        break;
-                    case 'peerDependencies':
-                        deps = this.resolution.peerDependencies;
-                        break;
-                    case 'optionalDependencies':
-                        deps = this.resolution.optionalDependencies;
-                        break;
-                }
-
+                const deps = this.resolution[section];
                 return deps?.find(d => d.name === name);
             }
         };
