@@ -30,20 +30,13 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
-    private final boolean removeCustomLineBreaks;
-
     @SuppressWarnings("unused")
     public AutoFormatVisitor() {
         this(null);
     }
 
     public AutoFormatVisitor(@Nullable Tree stopAfter) {
-        this(stopAfter, true);
-    }
-
-    public AutoFormatVisitor( @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
         this.stopAfter = stopAfter;
-        this.removeCustomLineBreaks = removeCustomLineBreaks;
     }
 
     @Override
