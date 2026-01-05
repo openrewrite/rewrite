@@ -244,7 +244,7 @@ class AddSettingsPluginTest implements RewriteTest {
                     .isNotNull()
                     .containsPattern("3\\.\\d+(\\.\\d+)?");
             Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-            version.find();
+            assertThat(version.find()).isTrue();
             return after.formatted(version.group(0));
         });
     }
@@ -255,7 +255,7 @@ class AddSettingsPluginTest implements RewriteTest {
                 .isNotNull()
                 .containsPattern("3\\.\\d+(\\.\\d+)?");
             Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-            version.find();
+            assertThat(version.find()).isTrue();
             return after.formatted(version.group(0));
         });
     }
