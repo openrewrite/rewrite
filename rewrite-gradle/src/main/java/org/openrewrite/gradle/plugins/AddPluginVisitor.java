@@ -244,7 +244,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                             insertAtIdx = i + 1;
                         }
                     }
-                }    
+                }
             } else {
                 for (int i = 0; i < cu.getStatements().size(); i++) {
                     Statement existingStatement = cu.getStatements().get(i);
