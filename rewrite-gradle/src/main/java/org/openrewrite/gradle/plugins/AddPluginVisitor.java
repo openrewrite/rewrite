@@ -232,13 +232,20 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 
         if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
-            if (cu.getSourcePath().endsWith(Paths.get("settings.gradle")) &&
-                !cu.getStatements().isEmpty() &&
-                cu.getStatements().get(0) instanceof J.MethodInvocation &&
-                "pluginManagement".equals(((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName())) {
-                return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), 1));
+            int insertAtIdx = 0;
+
+            if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))) {
+                // For settings.gradle, find the last position of pluginManagement or buildscript
+                for (int i = 0; i < cu.getStatements().size(); i++) {
+                    Statement existingStatement = cu.getStatements().get(i);
+                    if (existingStatement instanceof J.MethodInvocation) {
+                        String methodName = ((J.MethodInvocation) existingStatement).getSimpleName();
+                        if ("pluginManagement".equals(methodName) || "buildscript".equals(methodName)) {
+                            insertAtIdx = i + 1;
+                        }
+                    }
+                }    
             } else {
-                int insertAtIdx = 0;
                 for (int i = 0; i < cu.getStatements().size(); i++) {
                     Statement existingStatement = cu.getStatements().get(i);
                     if (existingStatement instanceof J.MethodInvocation && "buildscript".equals(((J.MethodInvocation) existingStatement).getSimpleName())) {
@@ -246,20 +253,20 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                         break;
                     }
                 }
-                if (insertAtIdx == 0) {
-                    Comment licenseHeader = getLicenseHeader(cu);
-                    if (licenseHeader != null) {
-                        cu = (G.CompilationUnit) removeLicenseHeader(cu);
-                        statement = statement.withComments(singletonList(licenseHeader));
-                    }
-                    Space leadingSpace = Space.firstPrefix(cu.getStatements());
-                    return cu.withStatements(ListUtils.insert(
-                            Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace())),
-                            autoFormat(statement, ctx, getCursor()),
-                            insertAtIdx));
-                } else {
-                    return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), insertAtIdx));
+            }
+            if (insertAtIdx == 0) {
+                Comment licenseHeader = getLicenseHeader(cu);
+                if (licenseHeader != null) {
+                    cu = (G.CompilationUnit) removeLicenseHeader(cu);
+                    statement = statement.withComments(singletonList(licenseHeader));
                 }
+                Space leadingSpace = Space.firstPrefix(cu.getStatements());
+                return cu.withStatements(ListUtils.insert(
+                        Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace())),
+                        autoFormat(statement, ctx, getCursor()),
+                        insertAtIdx));
+            } else {
+                return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), insertAtIdx));
             }
         } else {
             MethodMatcher buildPluginsMatcher = new MethodMatcher("RewriteGradleProject plugins(groovy.lang.Closure)");
@@ -360,35 +367,42 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
         }.reduce(cu, new AtomicBoolean());
         if (!hasPluginsBlock.get()) {
             J.Block block = (J.Block) cu.getStatements().get(0);
-            if (cu.getSourcePath().endsWith(Paths.get("settings.gradle")) &&
-                    !block.getStatements().isEmpty() &&
-                    block.getStatements().get(0) instanceof J.MethodInvocation &&
-                    "pluginManagement".equals(((J.MethodInvocation) block.getStatements().get(0)).getSimpleName())) {
-                block = block.withStatements(ListUtils.insert(block.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), 1));
+            int insertAtIdx = 0;
+
+            if (cu.getSourcePath().endsWith(Paths.get("settings.gradle.kts"))) {
+                for (int i = 0; i < block.getStatements().size(); i++) {
+                    Statement existingStatement = block.getStatements().get(i);
+                    if (existingStatement instanceof J.MethodInvocation) {
+                        String methodName = ((J.MethodInvocation) existingStatement).getSimpleName();
+                        if ("pluginManagement".equals(methodName) || "buildscript".equals(methodName)) {
+                            insertAtIdx = i + 1;
+                        }
+                    }
+                }
             } else {
-                int insertAtIdx = 0;
-                for (int i = 0; i < cu.getStatements().size(); i++) {
-                    Statement existingStatement = cu.getStatements().get(i);
+                for (int i = 0; i < block.getStatements().size(); i++) {
+                    Statement existingStatement = block.getStatements().get(i);
                     if (existingStatement instanceof J.MethodInvocation && "buildscript".equals(((J.MethodInvocation) existingStatement).getSimpleName())) {
                         insertAtIdx = i + 1;
                         break;
                     }
                 }
-                if (insertAtIdx == 0) {
-                    Comment licenseHeader = getLicenseHeader(cu);
-                    if (licenseHeader != null) {
-                        cu = (K.CompilationUnit) removeLicenseHeader(cu);
-                        block = (J.Block) cu.getStatements().get(0);
-                        statement = statement.withComments(singletonList(licenseHeader));
-                    }
-                    Space leadingSpace = Space.firstPrefix(block.getStatements());
-                    block = block.withStatements(ListUtils.insert(
-                            Space.formatFirstPrefix(block.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace())),
-                            statement,
-                            insertAtIdx));
-                } else {
-                    block = block.withStatements(ListUtils.insert(block.getStatements(), statement.withPrefix(Space.format("\n\n")), insertAtIdx));
+            }
+
+            if (insertAtIdx == 0) {
+                Comment licenseHeader = getLicenseHeader(cu);
+                if (licenseHeader != null) {
+                    cu = (K.CompilationUnit) removeLicenseHeader(cu);
+                    block = (J.Block) cu.getStatements().get(0);
+                    statement = statement.withComments(singletonList(licenseHeader));
                 }
+                Space leadingSpace = Space.firstPrefix(block.getStatements());
+                block = block.withStatements(ListUtils.insert(
+                        Space.formatFirstPrefix(block.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace())),
+                        statement,
+                        insertAtIdx));
+            } else {
+                block = block.withStatements(ListUtils.insert(block.getStatements(), statement.withPrefix(Space.format("\n\n")), insertAtIdx));
             }
             J.Block newStatement = block;
             return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), __ -> newStatement));
