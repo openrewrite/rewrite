@@ -61,7 +61,7 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
-    private final AtomicInteger batchSize = new AtomicInteger(200);
+    private final AtomicInteger batchSize = new AtomicInteger(1000);
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
     private final AtomicReference<@Nullable PrintStream> log = new AtomicReference<>();
