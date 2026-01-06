@@ -224,7 +224,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (dependencies.get(Scope.Compile) != null) {
                     for (ResolvedDependency d : dependencies.get(Scope.Compile)) {
                         if (hasAcceptableTransitivity(d, acc) &&
-                            groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                            groupId.equals(d.getGroupId()) &&
+                            artifactId.equals(d.getArtifactId()) &&
+                            version.equals(d.getVersion())
+                        ) {
                             return maven;
                         }
                     }

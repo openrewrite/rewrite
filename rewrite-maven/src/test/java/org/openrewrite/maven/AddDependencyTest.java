@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -106,43 +107,6 @@ class AddDependencyTest implements RewriteTest {
                                 <groupId>doesnotexist</groupId>
                                 <artifactId>doesnotexist</artifactId>
                                 <version>1</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """
-            )
-          )
-        );
-    }
-
-    @Test
-    void systemScope() {
-        rewriteRun(
-          spec -> spec
-            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath", "system")),
-          mavenProject("project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
-                """,
-              """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>doesnotexist</groupId>
-                                <artifactId>doesnotexist</artifactId>
-                                <version>1</version>
-                                <scope>system</scope>
                             </dependency>
                         </dependencies>
                     </project>
@@ -677,7 +641,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyDoesntAddWhenExistingDependency() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          spec -> spec.recipe(addDependency("com.google.guava:guava:28.0-jre", "com.google.common.math.IntMath")),
           mavenProject(
             "project",
             srcMainJava(
@@ -747,9 +711,9 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void useManaged() {
+    void useManagedIfSameVersion() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          spec -> spec.recipe(addDependency("com.google.guava:guava:28.0-jre", "com.google.common.math.IntMath")),
           pomXml(
             """
               <project>
@@ -800,6 +764,182 @@ class AddDependencyTest implements RewriteTest {
                             <dependency>
                                 <groupId>com.google.guava</groupId>
                                 <artifactId>guava</artifactId>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void useAndUpdateManagedIfLocallyManaged() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:28.0-jre", "com.google.common.math.IntMath")),
+          mavenProject(
+            "server",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>com.google.guava</groupId>
+                                    <artifactId>guava</artifactId>
+                                    <version>27.0-jre</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                """,
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>com.google.guava</groupId>
+                                    <artifactId>guava</artifactId>
+                                    <version>28.0-jre</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void useAndUpdateManagedIfLocallyManaged2() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:28.0-jre", "com.google.common.math.IntMath")),
+          mavenProject(
+            "other",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <properties>
+                            <guava.version>27.0-jre</guava.version>
+                        </properties>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>com.google.guava</groupId>
+                                    <artifactId>guava</artifactId>
+                                    <version>${guava.version}</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                """,
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <properties>
+                            <guava.version>28.0-jre</guava.version>
+                        </properties>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>com.google.guava</groupId>
+                                    <artifactId>guava</artifactId>
+                                    <version>${guava.version}</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void useRequestedVersionIfGreaterThanManaged() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:28.0-jre", "com.google.common.math.IntMath")),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>27.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject(
+            "server",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>my-parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    </project>
+                """,
+              """
+                    <project>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>my-parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>28.0-jre</version>
                             </dependency>
                         </dependencies>
                     </project>
@@ -1692,6 +1832,290 @@ class AddDependencyTest implements RewriteTest {
                     <artifactId>my-app-aggregate</artifactId>
                     <version>1</version>
                   </parent>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6426")
+    @Test
+    void handlesSystemScopeToAllowableScopeChange() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "runtime")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.0-jre</version>
+                            <scope>system</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>runtime</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6426")
+    @Test
+    void handlesVarietyOfPlaceholders() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:28.0-jre", null, "compile")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <guava-groupId>com.google.guava</guava-groupId>
+                        <guava-artifactId>guava</guava-artifactId>
+                        <guava-version>27.0-jre</guava-version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>${guava-groupId}</groupId>
+                                <artifactId>${guava-artifactId}</artifactId>
+                                <version>${guava-version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <guava-groupId>com.google.guava</guava-groupId>
+                        <guava-artifactId>guava</guava-artifactId>
+                        <guava-version>28.0-jre</guava-version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>${guava-groupId}</groupId>
+                                <artifactId>${guava-artifactId}</artifactId>
+                                <version>${guava-version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6426")
+    @Test
+    void addDependencyDoesntAddWhenExistingDependencyWithBroaderScope() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "runtime")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.0-jre</version>
+                            <scope>compile</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6426")
+    @Test
+    void addDependencyUpgradesScopeAndVersionWhenExistingDependencyHasNarrowerScopeAndLowerVersion() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "compile")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.0-jre</version>
+                            <scope>runtime</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>compile</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    // Also showcases that this works with placeholders
+    @Issue("https://github.com/openrewrite/rewrite/issues/6426")
+    @Test
+    void addDependencyUpgradesVersionOnlyWhenExistingDependencyHasEquivalentScopeAndLowerVersion() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "compile")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>${guava-version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <properties>
+                        <guava-version>28.0-jre</guava-version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <scope>compile</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>${guava-version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <properties>
+                        <guava-version>29.0-jre</guava-version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <scope>compile</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6426")
+    @Test
+    void addDependencyUpgradesScopeOnlyWhenExistingDependencyHasNarrowerScopeAndEqualVersion() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "compile")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>runtime</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>compile</scope>
+                        </dependency>
+                    </dependencies>
                 </project>
                 """
             )
