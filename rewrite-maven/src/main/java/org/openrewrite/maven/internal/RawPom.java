@@ -23,7 +23,6 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -101,6 +100,8 @@ public class RawPom {
     Dependencies dependencies;
 
     @Nullable
+    @NonFinal
+    @Setter(AccessLevel.PACKAGE)
     DependencyManagement dependencyManagement;
 
     @Nullable
@@ -498,7 +499,6 @@ public class RawPom {
         return profiles;
     }
 
-    @NonNull
     private List<MavenRepository> mapRepositories(@Nullable RawRepositories rawRepositories) {
         List<MavenRepository> pomRepositories = emptyList();
         if (rawRepositories != null) {
@@ -517,7 +517,6 @@ public class RawPom {
         return pomRepositories;
     }
 
-    @NonNull
     private List<MavenRepository> mapPluginRepositories(@Nullable RawPluginRepositories rawRepositories) {
         List<MavenRepository> pomRepositories = emptyList();
         if (rawRepositories != null) {
