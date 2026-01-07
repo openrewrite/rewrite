@@ -135,7 +135,7 @@ public class DependencyInsight extends Recipe {
 
                 Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByConfiguration = new HashMap<>();
                 DependencyTreeWalker.Matches<String> matches = new DependencyTreeWalker.Matches<>();
-                collectMatchingDependencies(projectName, sourceSetName, gp, dependencyPathsByConfiguration, matches, ctx);
+                collectMatchingDependencies(gp, dependencyPathsByConfiguration, matches);
 
                 if (matches.isEmpty()) {
                     return sourceFile;
@@ -144,6 +144,16 @@ public class DependencyInsight extends Recipe {
                 for (Map.Entry<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> configurationEntry : dependencyPathsByConfiguration.entrySet()) {
                     for (Map.Entry<ResolvedGroupArtifactVersion, DependencyGraph> entry : configurationEntry.getValue().entrySet()) {
                         ResolvedGroupArtifactVersion gav = entry.getKey();
+                        dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                gav.getGroupId(),
+                                gav.getArtifactId(),
+                                gav.getVersion(),
+                                gav.getDatedSnapshotVersion(),
+                                configurationEntry.getKey(),
+                                entry.getValue().getSize()
+                        ));
                         explainDependenciesInUse.insertRow(ctx, new ExplainDependenciesInUse.Row(
                                 projectName,
                                 sourceSetName,
@@ -152,6 +162,7 @@ public class DependencyInsight extends Recipe {
                                 gav.getVersion(),
                                 gav.getDatedSnapshotVersion(),
                                 configurationEntry.getKey(),
+                                entry.getValue().getSize(),
                                 entry.getValue().print()
                         ));
                     }
@@ -183,12 +194,9 @@ public class DependencyInsight extends Recipe {
             }
 
             private void collectMatchingDependencies(
-                    String projectName,
-                    String sourceSetName,
                     GradleProject gp,
                     Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByConfiguration,
-                    DependencyTreeWalker.Matches<String> matches,
-                    ExecutionContext ctx
+                    DependencyTreeWalker.Matches<String> matches
             ) {
                 VersionComparator versionComparator = version != null ? Semver.validate(version, null).getValue() : null;
                 DependencyMatcher dependencyMatcher = new DependencyMatcher(groupIdPattern, artifactIdPattern, versionComparator);
@@ -206,30 +214,9 @@ public class DependencyInsight extends Recipe {
                                 (matched, path) -> {
                                     dependencyPathsByConfiguration.computeIfAbsent(configName, __ -> new HashMap<>())
                                             .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(configName, path);
-                                    createDataTableRow(projectName, sourceSetName, configName, matched.getGav(), path, ctx);
                                 });
                     }
                 }
-            }
-
-            private void createDataTableRow(
-                    String projectName,
-                    String sourceSetName,
-                    String configurationName,
-                    ResolvedGroupArtifactVersion gav,
-                    Deque<ResolvedDependency> dependencyPath,
-                    ExecutionContext ctx
-            ) {
-                dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
-                        projectName,
-                        sourceSetName,
-                        gav.getGroupId(),
-                        gav.getArtifactId(),
-                        gav.getVersion(),
-                        gav.getDatedSnapshotVersion(),
-                        configurationName,
-                        dependencyPath.size() - 1
-                ));
             }
         };
     }

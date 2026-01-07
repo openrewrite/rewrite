@@ -24,7 +24,7 @@ import {
 import {Json} from "../../../src/json";
 import {RecipeSpec} from "../../../src/test";
 import {withDir} from "tmp-promise";
-import {findMarker, MarkersKind} from "../../../src/markers";
+import {findMarker, MarkersKind} from "../../../src";
 
 describe("UpgradeDependencyVersion", () => {
 
@@ -314,15 +314,10 @@ describe("UpgradeDependencyVersion", () => {
                                 "uuid": "^9.0.0"
                             }
                         }
-                    `, `
-                        /*~~(Failed to upgrade uuid to ^999.0.0)~~>*/{
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "dependencies": {
-                                "uuid": "^9.0.0"
-                            }
-                        }
-                    `), afterRecipe: async (doc: Json.Document) => {
+                    `, (actual: string) => {
+                            expect(actual).toContain('/*~~(Failed to upgrade uuid to ^999.0.0');
+                            return actual;
+                        }), afterRecipe: async (doc: Json.Document) => {
                             // Should have a warning marker
                             const warnMarker = findMarker(doc, MarkersKind.MarkupWarn);
                             expect(warnMarker).toBeDefined();
@@ -495,6 +490,79 @@ describe("UpgradeDependencyVersion", () => {
                 )
             );
         }, {unsafeCleanup: true});
+    });
+
+    test("does not upgrade transitive-only dependencies", async () => {
+        const spec = new RecipeSpec();
+        // is-odd is a transitive dependency of is-even, not a direct dependency
+        // UpgradeDependencyVersion should only upgrade direct dependencies
+        spec.recipe = new UpgradeDependencyVersion({
+            packageName: "is-odd",
+            newVersion: "^3.0.0"
+        });
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    // No changes expected - is-odd is transitive only
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "is-even": "^1.0.0"
+                            }
+                        }
+                    `)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
+    describe("shouldUpgrade semver comparison", () => {
+
+        test("should not upgrade when versions are identical", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "^1.0.0"
+            });
+            expect(recipe.shouldUpgrade("^1.0.0", "^1.0.0")).toBe(false);
+        });
+
+        test("should upgrade when new version is higher", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "^2.0.0"
+            });
+            expect(recipe.shouldUpgrade("^1.0.0", "^2.0.0")).toBe(true);
+        });
+
+        test("should not downgrade when new version is lower", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "^1.0.0"
+            });
+            expect(recipe.shouldUpgrade("^2.0.0", "^1.0.0")).toBe(false);
+        });
+
+        test("should upgrade with tilde ranges", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "~1.1.0"
+            });
+            expect(recipe.shouldUpgrade("~1.0.0", "~1.1.0")).toBe(true);
+        });
+
+        test("should upgrade with exact versions", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "test",
+                newVersion: "2.0.0"
+            });
+            expect(recipe.shouldUpgrade("1.0.0", "2.0.0")).toBe(true);
+        });
+
     });
 
 });

@@ -57,6 +57,23 @@ export abstract class Parser {
 
     abstract parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile>
 
+    /**
+     * Parses a single input and returns the first source file.
+     * This is a convenience method for when you know you're parsing exactly one input.
+     *
+     * @param input The input to parse
+     * @returns The parsed source file
+     * @throws Error if the parser produces no results
+     */
+    async parseOne(input: ParserInput): Promise<SourceFile> {
+        const result = await this.parse(input).next();
+        if (result.done) {
+            const sourcePath = typeof input === 'string' ? input : input.sourcePath;
+            throw new Error(`Parser produced no results for: ${sourcePath}`);
+        }
+        return result.value;
+    }
+
     protected relativePath(sourcePath: ParserInput): string {
         const path = typeof sourcePath === "string" ? sourcePath : sourcePath.sourcePath;
         return isAbsolute(path) && this.relativeTo ? relative(this.relativeTo, path) : path;
@@ -131,7 +148,7 @@ export function readSourceSync(sourcePath: ParserInput) {
 
 type ParserConstructor<T extends Parser> = new (options?: ParserOptions) => T;
 
-export type ParserType = "javascript" | "packageJson";
+export type ParserType = "javascript" | "packageJson" | "json" | "yaml" | "plainText";
 
 export class Parsers {
     private static registry = new Map<ParserType, ParserConstructor<Parser>>();

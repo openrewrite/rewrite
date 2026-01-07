@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeRegistry} from "../src";
+import {JavaScript, RecipeMarketplace} from "@openrewrite/rewrite";
 import {FindIdentifier} from "./search-recipe";
 import {CreateText} from "./create-text";
 import {ChangeText} from "./change-text";
@@ -26,18 +26,20 @@ import {MarkTypes} from "./mark-types";
 import {MarkPrimitiveTypes} from "./mark-primitive-types";
 import {MarkClassTypes} from "./mark-class-types";
 import {ScanningEditor} from "./scanning-editor";
+import {ReplaceAssignment} from "./replace-assignment";
 
-export function activate(registry: RecipeRegistry) {
-    registry.register(ChangeText);
-    registry.register(CreateText);
-    registry.register(ChangeVersion);
-    registry.register(RecipeWithRecipeList);
-    registry.register(ReplaceId);
-    registry.register(FindIdentifier);
-    registry.register(FindIdentifierWithRemotePathPrecondition);
-    registry.register(FindIdentifierWithPathPrecondition);
-    registry.register(MarkTypes);
-    registry.register(MarkPrimitiveTypes);
-    registry.register(MarkClassTypes);
-    registry.register(ScanningEditor);
+export async function activate(marketplace: RecipeMarketplace): Promise<void> {
+    await marketplace.install(ChangeText, JavaScript);
+    await marketplace.install(CreateText, JavaScript);
+    await marketplace.install(ChangeVersion, JavaScript);
+    await marketplace.install(RecipeWithRecipeList, JavaScript);
+    await marketplace.install(ReplaceId, JavaScript);
+    await marketplace.install(FindIdentifier, JavaScript);
+    await marketplace.install(FindIdentifierWithRemotePathPrecondition, JavaScript);
+    await marketplace.install(FindIdentifierWithPathPrecondition, JavaScript);
+    await marketplace.install(MarkTypes, JavaScript);
+    await marketplace.install(MarkPrimitiveTypes, JavaScript);
+    await marketplace.install(MarkClassTypes, JavaScript);
+    await marketplace.install(ScanningEditor, JavaScript);
+    await marketplace.install(ReplaceAssignment, JavaScript);
 }

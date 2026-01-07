@@ -49,6 +49,11 @@ interface PackageJsonWorkspaceOptions extends BaseWorkspaceOptions {
      * - `npm ci` is used instead of `npm install` (faster, deterministic)
      */
     packageLockContent?: string;
+    /**
+     * Optional workspace member package.json files.
+     * Keys are relative paths (e.g., "packages/foo/package.json"), values are content.
+     */
+    workspacePackages?: Record<string, string>;
 }
 
 /**
@@ -77,20 +82,44 @@ export class DependencyWorkspace {
         // Extract dependencies from package.json content if provided
         let dependencies: Record<string, string> | undefined = options.dependencies;
         let parsedPackageJson: Record<string, any> | undefined;
+        let workspacePackages: Record<string, string> | undefined;
+
         if (options.packageJsonContent) {
             parsedPackageJson = JSON.parse(options.packageJsonContent);
             dependencies = {
                 ...parsedPackageJson?.dependencies,
                 ...parsedPackageJson?.devDependencies
             };
+            workspacePackages = options.workspacePackages;
+
+            // For workspaces, also collect dependencies from workspace members
+            if (workspacePackages) {
+                for (const content of Object.values(workspacePackages)) {
+                    const memberPkg = JSON.parse(content);
+                    dependencies = {
+                        ...dependencies,
+                        ...memberPkg?.dependencies,
+                        ...memberPkg?.devDependencies
+                    };
+                }
+            }
         }
 
-        if (!dependencies || Object.keys(dependencies).length === 0) {
+        // For workspaces without explicit dependencies in root, we still need to run install
+        const hasWorkspaces = parsedPackageJson?.workspaces && Array.isArray(parsedPackageJson.workspaces);
+        if ((!dependencies || Object.keys(dependencies).length === 0) && !hasWorkspaces) {
             throw new Error('No dependencies provided');
         }
 
         // Use the refactored internal method
-        return this.createWorkspace(dependencies, parsedPackageJson, options.packageJsonContent, options.packageLockContent, options.targetDir);
+        return this.createWorkspace(
+            dependencies || {},
+            parsedPackageJson,
+            options.packageJsonContent,
+            options.packageLockContent,
+            options.targetDir,
+            workspacePackages
+        );
     }
 
     /**
@@ -101,17 +130,27 @@ export class DependencyWorkspace {
         parsedPackageJson: Record<string, any> | undefined,
         packageJsonContent: string | undefined,
         packageLockContent: string | undefined,
-        targetDir: string | undefined
+        targetDir: string | undefined,
+        workspacePackages?: Record<string, string>
     ): Promise<string> {
         // Determine hash based on lock file (most precise) or dependencies
         // Note: We always hash dependencies (not packageJsonContent) because whitespace/formatting
         // differences in package.json shouldn't create different workspaces
-        const hash = packageLockContent
-            ? this.hashContent(packageLockContent)
-            : this.hashDependencies(dependencies);
+        // For workspaces, include workspace package paths in the hash
+        let hash: string;
+        if (packageLockContent) {
+            hash = this.hashContent(packageLockContent);
+        } else if (workspacePackages) {
+            // Include workspace package paths in hash for workspace setups
+            const workspacePaths = Object.keys(workspacePackages).sort().join(',');
+            hash = this.hashContent(this.hashDependencies(dependencies) + ':' + workspacePaths);
+        } else {
+            hash = this.hashDependencies(dependencies);
+        }
 
         // Determine npm command: use `npm ci` when lock file is provided (faster, deterministic)
-        const npmCommand = packageLockContent ? 'npm ci --silent' : 'npm install --silent';
+        // Use --loglevel=error to suppress normal output but still capture errors in stderr
+        const npmCommand = packageLockContent ? 'npm ci --loglevel=error' : 'npm install --loglevel=error';
 
         // Helper to write package files to a directory
         const writePackageFiles = (dir: string) => {
@@ -134,11 +173,26 @@ export class DependencyWorkspace {
             if (packageLockContent) {
                 fs.writeFileSync(path.join(dir, 'package-lock.json'), packageLockContent);
             }
+
+            // Write workspace member package.json files
+            if (workspacePackages) {
+                for (const [relativePath, content] of Object.entries(workspacePackages)) {
+                    const fullPath = path.join(dir, relativePath);
+                    const memberDir = path.dirname(fullPath);
+                    if (!fs.existsSync(memberDir)) {
+                        fs.mkdirSync(memberDir, {recursive: true});
+                    }
+                    fs.writeFileSync(fullPath, content);
+                }
+            }
         };
+
+        // For workspaces, skip dependency validation (combined deps don't match root package.json)
+        const depsForValidation = workspacePackages ? undefined : dependencies;
 
         if (targetDir) {
             // Use provided directory - check if it's already valid
-            if (this.isWorkspaceValid(targetDir, dependencies)) {
+            if (this.isWorkspaceValid(targetDir, depsForValidation)) {
                 return targetDir;
             }
 
@@ -149,7 +203,7 @@ export class DependencyWorkspace {
             const cachedWorkspaceDir = path.join(this.WORKSPACE_BASE, hash);
             const cachedNodeModules = path.join(cachedWorkspaceDir, 'node_modules');
 
-            if (fs.existsSync(cachedNodeModules) && this.isWorkspaceValid(cachedWorkspaceDir, dependencies)) {
+            if (fs.existsSync(cachedNodeModules) && this.isWorkspaceValid(cachedWorkspaceDir, depsForValidation)) {
                 // Symlink node_modules from cached workspace
                 try {
                     const targetNodeModules = path.join(targetDir, 'node_modules');
@@ -181,8 +235,10 @@ export class DependencyWorkspace {
                 });
 
                 return targetDir;
-            } catch (error) {
-                throw new Error(`Failed to create dependency workspace: ${error}`);
+            } catch (error: any) {
+                const stderr = error?.stderr?.toString()?.trim();
+                const errorMsg = stderr || error?.message || String(error);
+                throw new Error(`Failed to create dependency workspace: ${errorMsg}`);
             }
         }
 
@@ -190,7 +246,7 @@ export class DependencyWorkspace {
 
         // Check cache
         const cached = this.cache.get(hash);
-        if (cached && fs.existsSync(cached) && this.isWorkspaceValid(cached, dependencies)) {
+        if (cached && fs.existsSync(cached) && this.isWorkspaceValid(cached, depsForValidation)) {
             return cached;
         }
 
@@ -198,7 +254,7 @@ export class DependencyWorkspace {
         const workspaceDir = path.join(this.WORKSPACE_BASE, hash);
 
         // Check if valid workspace already exists on disk (cross-VM reuse)
-        if (fs.existsSync(workspaceDir) && this.isWorkspaceValid(workspaceDir, dependencies)) {
+        if (fs.existsSync(workspaceDir) && this.isWorkspaceValid(workspaceDir, depsForValidation)) {
             this.cache.set(hash, workspaceDir);
             return workspaceDir;
         }
@@ -241,7 +297,7 @@ export class DependencyWorkspace {
                     if (error.code === 'EEXIST' || error.code === 'ENOTEMPTY' || error.code === 'EISDIR' ||
                         (error.code === 'EPERM' && fs.existsSync(workspaceDir))) {
                         // Target exists - check if it's valid
-                        if (this.isWorkspaceValid(workspaceDir, dependencies)) {
+                        if (this.isWorkspaceValid(workspaceDir, depsForValidation)) {
                             // Another process created a valid workspace - use theirs
                             moved = true; // Don't try again
                         } else {
@@ -261,7 +317,7 @@ export class DependencyWorkspace {
                             moved = true;
                         } catch (copyError) {
                             // Check if another process created it while we were copying
-                            if (this.isWorkspaceValid(workspaceDir, dependencies)) {
+                            if (this.isWorkspaceValid(workspaceDir, depsForValidation)) {
                                 moved = true;
                             } else {
                                 throw error;
@@ -284,7 +340,7 @@ export class DependencyWorkspace {
             }
 
             // Verify final workspace is valid (might be from another process)
-            if (!this.isWorkspaceValid(workspaceDir, dependencies)) {
+            if (!this.isWorkspaceValid(workspaceDir, depsForValidation)) {
                 throw new Error('Failed to create valid workspace due to concurrent modifications');
             }
 
@@ -292,7 +348,7 @@ export class DependencyWorkspace {
             this.cache.set(hash, workspaceDir);
 
             return workspaceDir;
-        } catch (error) {
+        } catch (error: any) {
             // Clean up temporary workspace on failure
             try {
                 if (fs.existsSync(tempWorkspaceDir)) {
@@ -301,7 +357,9 @@ export class DependencyWorkspace {
             } catch {
                 // Ignore cleanup errors
             }
-            throw new Error(`Failed to create dependency workspace: ${error}`);
+            const stderr = error?.stderr?.toString()?.trim();
+            const errorMsg = stderr || error?.message || String(error);
+            throw new Error(`Failed to create dependency workspace: ${errorMsg}`);
         }
     }
 

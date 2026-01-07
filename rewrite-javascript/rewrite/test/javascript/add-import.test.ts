@@ -20,6 +20,7 @@ import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
     ImportStyle,
+    IntelliJ,
     javascript,
     JavaScriptVisitor,
     JS,
@@ -27,11 +28,14 @@ import {
     npm,
     packageJson,
     RemoveImport,
+    SpacesStyle,
     Template,
     tsx,
     typescript
 } from "../../src/javascript";
 import {emptySpace, J} from "../../src/java";
+import {MarkersKind, NamedStyles, randomId} from "../../src";
+import {create as produce} from "mutative";
 import {withDir} from "tmp-promise";
 
 /**
@@ -548,6 +552,83 @@ describe('AddImport visitor', () => {
                     `,
                     `
                         import { forwardRef, memo } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve spacing style when inserting import before existing ones', async () => {
+            const spec = new RecipeSpec();
+            // 'act' comes alphabetically before 'forwardRef', so it will be inserted first
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "act", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import { forwardRef } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import { act, forwardRef } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve no-spacing style when merging imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "memo", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {forwardRef} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import {forwardRef, memo} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve no-spacing style when inserting import before existing ones', async () => {
+            const spec = new RecipeSpec();
+            // 'act' comes alphabetically before 'forwardRef', so it will be inserted first
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "act", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {forwardRef} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import {act, forwardRef} from 'react';
 
                         function example() {
                             const MyComponent = forwardRef(() => <div/>);
@@ -1699,6 +1780,346 @@ describe('AddImport visitor', () => {
                     `
                 )
             );
+        });
+    });
+
+    describe('style options', () => {
+        /**
+         * Helper function to create a visitor that:
+         * 1. Adds a NamedStyles marker to the compilation unit with es6ImportExportBraces: true
+         * 2. Then uses AddImport to add an import statement
+         */
+        function createAddImportWithBraceSpacingVisitor(
+            module: string,
+            member?: string,
+            alias?: string
+        ): JavaScriptVisitor<any> {
+            return new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    // Create a SpacesStyle with es6ImportExportBraces: true using produce
+                    const spacesStyle: SpacesStyle = produce(IntelliJ.TypeScript.spaces(), draft => {
+                        draft.within.es6ImportExportBraces = true;
+                    });
+
+                    // Create a NamedStyles marker
+                    const namedStyles: NamedStyles = {
+                        kind: MarkersKind.NamedStyles,
+                        id: randomId(),
+                        name: "test-style",
+                        displayName: "Test Style",
+                        tags: [],
+                        styles: [spacesStyle]
+                    };
+
+                    // Add the NamedStyles marker to the compilation unit
+                    let result: JS.CompilationUnit = {
+                        ...cu,
+                        markers: {
+                            ...cu.markers,
+                            markers: [...cu.markers.markers, namedStyles]
+                        }
+                    };
+
+                    // Then add the import
+                    const addImport = new AddImport({
+                        module,
+                        member,
+                        alias,
+                        onlyIfReferenced: false
+                    });
+                    result = await addImport.visit(result, p) as JS.CompilationUnit;
+
+                    return result;
+                }
+            };
+        }
+
+        test('should add spaces inside braces when es6ImportExportBraces style is true', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createAddImportWithBraceSpacingVisitor('fs', 'readFile'));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import { readFile } from 'fs';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+    });
+
+    describe('type-only imports', () => {
+        test('should add type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactNode',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type {ReactNode} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not add type-only import if one already exists', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactNode',
+                typeOnly: true
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {ReactNode} from 'react';
+
+                        function example(): ReactNode {
+                            return null;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add value import even when type-only import exists for same member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'useState',
+                typeOnly: false,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type {useState} from 'react';
+                        import {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add type-only import even when value import exists for same member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'useState',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {useState} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `,
+                    `
+                        import {useState} from 'react';
+                        import type {useState} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not merge value import into type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'useEffect',
+                typeOnly: false,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type {useState} from 'react';
+                        import {useEffect} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not merge type-only import into value import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactNode',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {useState} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `,
+                    `
+                        import {useState} from 'react';
+                        import type {ReactNode} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should merge type-only imports from same module', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactElement',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {ReactNode} from 'react';
+
+                        function example(): ReactNode {
+                            return null;
+                        }
+                    `,
+                    `
+                        import type {ReactElement, ReactNode} from 'react';
+
+                        function example(): ReactNode {
+                            return null;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add type-only default import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'default',
+                alias: 'React',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type React from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add type-only namespace import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: '*',
+                alias: 'React',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type * as React from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should throw error when combining typeOnly with sideEffectOnly', async () => {
+            expect(() => {
+                new AddImport({ module: "react", sideEffectOnly: true, typeOnly: true });
+            }).toThrow("Cannot combine sideEffectOnly with typeOnly");
         });
     });
 });

@@ -2,7 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
 import {JS, JSX} from "./tree";
 import {mapAsync} from "../util";
-import {ElementRemovalFormatter} from "../java/formatting-utils";
+import {ElementRemovalFormatter} from "../java";
 
 /**
  * @param visitor The visitor to add the import removal to
@@ -65,7 +65,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     /**
      * Generic helper to filter elements from a RightPadded array while preserving formatting.
      * When removing elements, the prefix from the first removed element is applied to the
-     * first remaining element to maintain proper spacing.
+     * first remaining element to maintain proper spacing. Also preserves trailing space
+     * from the last element if it's removed.
      */
     private async filterElementsWithPrefixPreservation<T extends J>(
         elements: RightPaddedElement<T>[],
@@ -75,6 +76,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     ): Promise<{ filtered: RightPaddedElement<T>[], allRemoved: boolean }> {
         const filtered: RightPaddedElement<T>[] = [];
         let removedPrefix: J.Space | undefined;
+
+        // Track the trailing space of the original last element
+        const originalLastElement = elements[elements.length - 1];
+        const originalTrailingSpace = originalLastElement?.after;
 
         for (const elem of elements) {
             if (elem.element && shouldKeep(elem.element)) {
@@ -96,6 +101,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 // Keep non-element entries (shouldn't happen but be safe)
                 filtered.push(elem);
             }
+        }
+
+        // If the original last element was removed and we have remaining elements,
+        // transfer its trailing space to the new last element
+        if (filtered.length > 0 && originalLastElement?.element && !shouldKeep(originalLastElement.element)) {
+            const lastIdx = filtered.length - 1;
+            filtered[lastIdx] = {...filtered[lastIdx], after: originalTrailingSpace};
         }
 
         return {
@@ -975,6 +987,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             const jsxAttr = node as any;
             if (jsxAttr.value) {
                 await this.collectUsedIdentifiers(jsxAttr.value, usedIdentifiers, usedTypes);
+            }
+        } else if (node.kind === JS.Kind.TypeDeclaration) {
+            // Handle type alias declarations like: type Props = { children: React.ReactNode }
+            const typeDecl = node as JS.TypeDeclaration;
+            // The initializer contains the type expression (the right side of the =)
+            if (typeDecl.initializer?.element) {
+                await this.collectTypeUsage(typeDecl.initializer.element, usedTypes);
             }
         } else if ((node as any).statements) {
             // Generic handler for nodes with statements

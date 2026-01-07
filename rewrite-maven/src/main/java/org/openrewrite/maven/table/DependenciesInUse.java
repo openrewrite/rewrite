@@ -62,8 +62,8 @@ public class DependenciesInUse extends DataTable<DependenciesInUse.@NonNull Row>
                               "specified in the POM.")
         String scope;
 
-        @Column(displayName = "Depth",
-                description = "How many levels removed from a direct dependency. This will be 0 for direct dependencies.")
-        Integer depth;
+        @Column(displayName = "Count",
+                description = "How many times does this dependency appear.")
+        Integer count;
     }
 }

@@ -195,9 +195,9 @@ class LiteralTest implements RewriteTest {
     void gStringMultiPropertyAccess() {
         rewriteRun(
           groovy(
-                """
-            "$System.env.BAR_BAZ"
             """
+              "$System.env.BAR_BAZ"
+              """
           )
         );
     }
@@ -206,9 +206,9 @@ class LiteralTest implements RewriteTest {
     void emptyGString() {
         rewriteRun(
           groovy(
-                """
-            "${}"
             """
+              "${}"
+              """
           )
         );
     }
@@ -217,9 +217,9 @@ class LiteralTest implements RewriteTest {
     void nestedGString() {
         rewriteRun(
           groovy(
-                """
-            " ${ " ${ " " } " } "
             """
+              " ${ " ${ " " } " } "
+              """
           )
         );
     }
@@ -228,9 +228,9 @@ class LiteralTest implements RewriteTest {
     void gStringInterpolateString() {
         rewriteRun(
           groovy(
-                """
-            " ${""}\\n${" "} "
             """
+              " ${""}\\n${" "} "
+              """
           )
         );
     }
@@ -401,10 +401,10 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            "\\\\\\\\n\\\\t"
-            '\\\\n\\t'
-            ///\\\\n\\t///
-            """
+              "\\\\\\\\n\\\\t"
+              '\\\\n\\t'
+              ///\\\\n\\t///
+              """
           )
         );
     }
@@ -414,9 +414,9 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            '\t'
-            '	'
-            """
+              '\t'
+              '	'
+              """
           )
         );
     }
@@ -451,6 +451,73 @@ class LiteralTest implements RewriteTest {
             """
               "".replaceAll('\\\\', '/')
               "a\\b".replaceAll('\\\\', '/')
+              """
+          )
+        );
+    }
+
+    @Test
+    void slashyStrings() {
+        rewriteRun(
+          groovy(
+            """
+              def text = "irrelevant"
+              def glassfishVersion = "1"
+              println text =~ /^.*ClassPath Element.*glassfish-embedded-all-${glassfishVersion}.jar.*$/
+              """
+          ),
+          groovy(
+            """
+              def pattern = /Price: $$\\d+/
+              """
+          ),
+          groovy(
+            """
+              def pattern = /test$/
+              """
+          ),
+          groovy(
+            """
+              def pattern = /$$foo $${bar} $$$$/
+              """
+          )
+        );
+    }
+
+    @Test
+    void dollarSlashyStrings() {
+        rewriteRun(
+          groovy(
+            """
+              def version = "1.0"
+              def path = $/C:\\Program Files\\App-${version}\\bin/$
+              """
+          ),
+          groovy(
+            """
+              def text = $/Price: $$100/$
+              """
+          ),
+          groovy(
+            """
+              def path = $/C:/path/to/file/$
+              """
+          )
+        );
+    }
+
+    @Test
+    void patternSlashyStrings() {
+        rewriteRun(
+          groovy(
+            """
+              def version = "3.0"
+              def pattern = ~/version-${version}\\.jar/
+              """
+          ),
+          groovy(
+            """
+              def pattern = ~/$$\\d+\\.\\d+/
               """
           )
         );

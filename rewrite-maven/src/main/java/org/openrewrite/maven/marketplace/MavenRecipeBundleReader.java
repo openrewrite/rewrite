@@ -52,8 +52,8 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private final RecipeClassLoaderFactory classLoaderFactory;
 
     private transient @Nullable Environment environment;
-    private transient @Nullable Path recipeJar;
-    private transient @Nullable List<Path> classpath;
+    transient @Nullable Path recipeJar;
+    transient @Nullable List<Path> classpath;
     private transient @Nullable ClassLoader classLoader;
 
     @Override
@@ -94,17 +94,22 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
      * @return Build a marketplace that consists of just the recipes found via classpath scanning
      * in the resolved recipe JAR (not including its dependencies)
      */
-    private RecipeMarketplace marketplaceFromClasspathScan() {
+    RecipeMarketplace marketplaceFromClasspathScan() {
         String[] ga = bundle.getPackageName().split(":");
         RecipeMarketplace marketplace = new RecipeMarketplace();
-
-        // Scan only the target jar for recipes (using scanJar with jar name filter)
         List<Path> classpath = classpath();
+        RecipeClassLoader classLoader = new RecipeClassLoader(requireNonNull(recipeJar), classpath);
+
+        // First pass: Scan only the recipe jar for recipes and don't list recipes from dependencies
         Environment env = Environment.builder().scanJar(
                 requireNonNull(recipeJar).toAbsolutePath(),
                 classpath.stream().map(Path::toAbsolutePath).collect(toList()),
-                RecipeClassLoader.forScanning(recipeJar, classpath)
+                classLoader
         ).build();
+
+        // Second pass: Scan all jars in classpath for recipes and categories
+        // This gives us proper root categories from category YAMLs.
+        Environment envWithCategories = environment();
 
         // Bundle version may be set in the environment() call above (as the JARs making up
         // the classpath are resolved)
@@ -114,8 +119,9 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
             marketplace.install(
                     RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
                             "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                            requireNonNull(gav.getVersion()), null)),
-                    descriptor.inferCategoriesFromName(env)
+                            bundle.getRequestedVersion() == null ? gav.getVersion() : bundle.getRequestedVersion(),
+                            gav.getVersion(), null)),
+                    descriptor.inferCategoriesFromName(envWithCategories)
             );
         }
         return marketplace;
@@ -141,7 +147,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         return environment;
     }
 
-    public ClassLoader classLoader() {
+    private ClassLoader classLoader() {
         if (classLoader == null) {
             // Create an isolated classloader with controlled parent delegation
             // This ensures maximum isolation while still allowing necessary shared types

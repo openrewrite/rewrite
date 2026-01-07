@@ -13,9 +13,72 @@
 # limitations under the License.
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.AddCommentToImport
+examples:
+- description: '`AddCommentToImportTest#wildcardAndStaticImportsRecognized`'
+  parameters:
+  - SHORT_COMMENT
+  - foo.bar.Baz
+  sources:
+  - before: |
+      package blah;
+      // Will not match direct package
+      import foo.*;
+      import foo.bar.*;
+      import foo.bar.Baz;
+      import static foo.bar.Baz.someStaticMethod;
+      class OtherOne {}
+    after: |
+      package blah;
+      // Will not match direct package
+      import foo.*;
+      /* Short comment to add */
+      import foo.bar.*;
+      import foo.bar.Baz;
+      import static foo.bar.Baz.someStaticMethod;
+      class OtherOne {}
+    language: java
+  - before: |
+      package blah;
+      // Will not match direct package
+      import foo.*;
+      import foo.bar.Baz;
+      import foo.bar.*;
+      import static foo.bar.Baz.someStaticMethod;
+      class OtherTwo {}
+    after: |
+      package blah;
+      // Will not match direct package
+      import foo.*;
+      /* Short comment to add */
+      import foo.bar.Baz;
+      import foo.bar.*;
+      import static foo.bar.Baz.someStaticMethod;
+      class OtherTwo {}
+    language: java
+  - before: |
+      package blah;
+      // Will not match direct package
+      import foo.*;
+      import static foo.bar.Baz.someStaticMethod;
+      import foo.bar.*;
+      import foo.bar.Baz;
+      class OtherThree {}
+    after: |
+      package blah;
+      // Will not match direct package
+      import foo.*;
+      /* Short comment to add */
+      import static foo.bar.Baz.someStaticMethod;
+      import foo.bar.*;
+      import foo.bar.Baz;
+      class OtherThree {}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.AddCommentToMethod
 examples:
-- description: ''
+- description: '`AddCommentToMethodTest#addSingleLineComment`'
   parameters:
   - SHORT_COMMENT
   - foo.Foo bar(..)
@@ -35,9 +98,44 @@ examples:
     language: java
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.AddCommentToMethodInvocations
+examples:
+- description: '`AddCommentToMethodInvocationsTest#addSingleLineComment`'
+  parameters:
+  - SHORT_COMMENT
+  - foo.Foo gar(..)
+  sources:
+  - before: |
+      import foo.Foo;
+
+      class Other {
+          void method() {
+              Foo foo = new Foo();
+              // Existing Comment
+              foo.bar("a");
+              boolean gar = /* Existing Comment */ foo.gar();
+              String har = foo.har(/* Existing Comment */foo.gar());
+          }
+      }
+    after: |
+      import foo.Foo;
+
+      class Other {
+          void method() {
+              Foo foo = new Foo();
+              // Existing Comment
+              /* Short comment to add */
+              foo.bar("a");
+              boolean gar = /* Existing Comment */ /* Short comment to add */ foo.gar();
+              String har = foo.har(/* Existing Comment *//* Short comment to add */foo.gar());
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.AddMethodParameter
 examples:
-- description: ''
+- description: '`AddMethodParameterTest#primitive`'
   parameters:
   - foo.Foo#bar(..)
   - int
@@ -63,7 +161,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeMethodInvocationReturnType
 examples:
-- description: ''
+- description: '`ChangeMethodInvocationReturnTypeTest#replaceVariableAssignment`'
   parameters:
   - java.lang.Integer parseInt(String)
   - long
@@ -85,7 +183,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangePackageInStringLiteral
 examples:
-- description: ''
+- description: '`ChangePackageInStringLiteralTest#changePackageInLiteral`'
   parameters:
   - javax.type
   - jakarta.type
@@ -105,7 +203,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeTypeInStringLiteral
 examples:
-- description: ''
+- description: '`ChangeTypeInStringLiteralTest#changeTypeInLiteral`'
   parameters:
   - javax.type.A
   - jakarta.type.B
@@ -125,9 +223,85 @@ examples:
     language: java
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.InlineMethodCalls
+examples:
+- description: '`InlineMethodCallsTest#inlineMeSimple`'
+  parameters:
+  - Lib deprecated()
+  - this.replacement()
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      class Lib {
+          @Deprecated
+          public void deprecated() {}
+
+          public void replacement() {}
+
+          public static void usage(Lib lib) {
+              lib.deprecated();
+          }
+      }
+    after: |
+      class Lib {
+          @Deprecated
+          public void deprecated() {}
+
+          public void replacement() {}
+
+          public static void usage(Lib lib) {
+              lib.replacement();
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.RemoveAnnotationAttribute
+examples:
+- description: '`SingleAnnotation#withTwoAttributesOnSingleLine`'
+  parameters:
+  - TestAnnotation
+  - deletedAttribute
+  sources:
+  - before: |
+      @TestAnnotation(attributeA = "attributeValue", deletedAttribute = "deletedAttributeValue")
+      class SomeClass {}
+    after: |
+      @TestAnnotation(attributeA = "attributeValue")
+      class SomeClass {}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.RemoveMethodThrows
+examples:
+- description: '`RemoveMethodThrowsTest#removeSingleException`'
+  parameters:
+  - A foo(..)
+  - 'true'
+  - java.io.IOException
+  sources:
+  - before: |
+      import java.io.IOException;
+
+      class A {
+          public void foo() throws IOException {
+              // no-op
+          }
+      }
+    after: |
+      class A {
+          public void foo() {
+              // no-op
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ReplaceAnnotation
 examples:
-- description: ''
+- description: '`ReplaceAnnotationTest#matchWithParams`'
   parameters:
   - '@org.jetbrains.annotations.NotNull("Test")'
   - '@lombok.NonNull'
@@ -152,7 +326,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ReplaceStringLiteralValue
 examples:
-- description: ''
+- description: '`ReplaceStringLiteralValueTest#replaceAppleWithOrange`'
   parameters:
   - apple
   - orange
@@ -168,9 +342,24 @@ examples:
     language: java
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.SimplifySingleElementAnnotation
+examples:
+- description: '`SimplifySingleElementAnnotationTest#simpleExample`'
+  sources:
+  - before: |
+      @Copyright(value = "2002 Yoyodyne Propulsion Systems, Inc.")
+      class OscillationOverthruster {
+      }
+    after: |
+      @Copyright("2002 Yoyodyne Propulsion Systems, Inc.")
+      class OscillationOverthruster {
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindCompileErrors
 examples:
-- description: ''
+- description: '`FindCompileErrorsTest#javaVisitorHandlesErroneousNodes`'
   sources:
   - before: |
       class A {
@@ -187,13 +376,27 @@ examples:
     language: java
 ---
 type: specs.openrewrite.org/v1beta/example
-recipeName: org.openrewrite.java.search.HasBuildToolVersion
+recipeName: org.openrewrite.text.FindAndReplace
 examples:
-- description: ''
+- description: '`PlainTextParserConversionTest#markersAreAddedWhenConvertingToTextLst`'
   parameters:
-  - BuildTool.Type.Maven
-  - 3.6.0-3.8.0
+  - class
+  - public class
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
   sources:
-  - before: class A {}
-    after: /*~~>*/class A {}
+  - before: |
+      package com.example;
+
+      class Test {
+      }
+    after: |
+      ~~(test)~~>package com.example;
+
+      public class Test {
+      }
     language: java
