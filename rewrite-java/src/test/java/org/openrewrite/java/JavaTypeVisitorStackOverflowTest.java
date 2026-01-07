@@ -31,12 +31,12 @@ import org.openrewrite.java.tree.J.CompilationUnit;
  */
 class JavaTypeVisitorStackOverflowTest {
 
-
     /**
      * Integration test with real Java code that has recursive generic bounds.
      *
      * This parses actual Java code with builder patterns and attempts to visit all types.
-     * Currently fails with StackOverflowError during AST type visiting.
+     * Without fix: StackOverflowError
+     * With fix: Should complete normally
      */
     @Test
     void testRealWorldBuilderPatternCausesStackOverflow() {

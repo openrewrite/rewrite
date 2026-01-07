@@ -22,14 +22,25 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.JavaType;
 
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
+import static java.util.Collections.newSetFromMap;
 import static org.openrewrite.internal.ListUtils.arrayOrNullIfEmpty;
 
 @Getter
 @Setter
 public class JavaTypeVisitor<P> {
     private Cursor cursor = new Cursor(null, "root");
+
+    /**
+     * Track types that have been visited to prevent infinite recursion and exponential
+     * explosion from revisiting the same types via different paths.
+     * Uses identity comparison since we care about the same object instance.
+     */
+    @Nullable
+    private Set<JavaType> visited;
 
     public @Nullable <JT extends JavaType> List<JT> visit(@Nullable List<JT> javaTypes, P p) {
         //noinspection unchecked
@@ -64,8 +75,26 @@ public class JavaTypeVisitor<P> {
 
     public JavaType visit(@Nullable JavaType javaType, P p) {
         if (javaType != null) {
+            // Check if we've already visited this type - if so, return it unchanged.
+            // This prevents both infinite recursion (cycles) and exponential explosion
+            // (revisiting the same types via different paths in the type graph).
+            if (visited != null && visited.contains(javaType)) {
+                return javaType;
+            }
+
+            // Mark this type as visited
+            if (visited == null) {
+                visited = newSetFromMap(new IdentityHashMap<>());
+            }
+            visited.add(javaType);
+
             cursor = new Cursor(cursor, javaType);
             javaType = preVisit(javaType, p);
+
+            // If preVisit returned a different object, also track that to prevent cycles
+            if (javaType != null && !visited.contains(javaType)) {
+                visited.add(javaType);
+            }
 
             if (javaType instanceof JavaType.Array) {
                 javaType = visitArray((JavaType.Array) javaType, p);
