@@ -23,7 +23,6 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.tree.Dependency.DependencyBuilder;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 
 import javax.xml.bind.annotation.XmlRootElement;
@@ -35,11 +34,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
-import static java.util.Collections.*;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonMap;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.ObjectMappers.propertyBasedMapper;
-import static org.openrewrite.maven.tree.Dependency.*;
 
 /**
  * A value object deserialized directly from POM XML
@@ -129,10 +127,9 @@ public class RawGradleModule {
                 .flatMap(Collection::stream)
                 .filter(d -> categories.length == 0 || (d.getAttributes() != null && d.getAttributes().getCategory() != null && Arrays.stream(categories).anyMatch(cat -> d.getAttributes().getCategory().equalsIgnoreCase(cat))))
                 .map(dep -> {
-                    DependencyBuilder builder = builder()
-                            .gav(dep.asGav());
+                    org.openrewrite.maven.tree.Dependency.DependencyBuilder builder = org.openrewrite.maven.tree.Dependency.builder().gav(dep.asGav());
                     if (dep.getAttributes() != null && dep.getAttributes().getCategory() != null) {
-                        //noinspection ResultOfMethodCallIgnored,NullableProblems
+                        //noinspection NullableProblems,ResultOfMethodCallIgnored
                         builder.attributes(singletonMap("org.gradle.category", dep.getAttributes().getCategory()));
                     }
                     return builder.build();
