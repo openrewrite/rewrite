@@ -27,6 +27,7 @@ import {MarkPrimitiveTypes} from "./mark-primitive-types";
 import {MarkClassTypes} from "./mark-class-types";
 import {ScanningEditor} from "./scanning-editor";
 import {ReplaceAssignment} from "./replace-assignment";
+import {JavaChangeMethodName} from "./java-change-method-name";
 
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ChangeText, JavaScript);
@@ -42,4 +43,5 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(MarkClassTypes, JavaScript);
     await marketplace.install(ScanningEditor, JavaScript);
     await marketplace.install(ReplaceAssignment, JavaScript);
+    await marketplace.install(JavaChangeMethodName, JavaScript);
 }
