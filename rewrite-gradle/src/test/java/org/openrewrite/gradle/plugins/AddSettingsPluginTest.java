@@ -212,4 +212,32 @@ class AddSettingsPluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addPluginRepositoryAndPluginCombined() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new AddSettingsPluginRepository("gradlePluginPortal", null),
+            new AddSettingsPlugin("org.gradle.toolchains.foojay-resolver-convention", "0.8.0", null, null, null)
+          ),
+          settingsGradleKts(
+            """
+              rootProject.name = "my-project"
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              plugins {
+                  id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
+              }
+
+              rootProject.name = "my-project"
+              """
+          )
+        );
+    }
 }

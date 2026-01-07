@@ -157,7 +157,10 @@ public class AddSettingsPluginRepository extends Recipe {
                     }));
                     statements.set(0, m);
                 } else {
-                    statements.add(0, pluginManagement instanceof J.Block ? (J.Block) pluginManagement : (J.MethodInvocation) pluginManagement);
+                    Statement pluginManagementStatement = pluginManagement instanceof J.Block
+                            ? ((J.Block) pluginManagement).getStatements().get(0)
+                            : (J.MethodInvocation) pluginManagement;
+                    statements.add(0, pluginManagementStatement);
                     statements.set(1, statements.get(1).withPrefix(Space.format("\n\n")));
                 }
                 return statements;
