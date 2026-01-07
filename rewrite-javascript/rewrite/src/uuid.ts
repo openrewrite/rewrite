@@ -13,10 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {randomUUID} from "crypto";
+import * as crypto from "crypto";
 
 export type UUID = string;
 
 export function randomId(): UUID {
-    return randomUUID();
+    // Use native randomUUID if available (Node 14.17.0+)
+    if (typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+
+    // Fallback for older Node versions using randomBytes
+    const bytes = crypto.randomBytes(16);
+
+    // Set version 4 bits (0100xxxx in byte 6)
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+
+    // Set variant bits (10xxxxxx in byte 8)
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    // Convert to hex string with dashes
+    const hex = bytes.toString('hex');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
