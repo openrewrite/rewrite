@@ -15,7 +15,7 @@
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.AddLiteralMethodArgument
 examples:
-- description: ''
+- description: '`AddLiteralMethodArgumentTest#addToMiddleArgument`'
   parameters:
   - B foo(int, int)
   - '1'
@@ -29,7 +29,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.AddNullMethodArgument
 examples:
-- description: ''
+- description: '`AddNullMethodArgumentTest#addToMiddleArgument`'
   parameters:
   - B foo(Integer, Integer)
   - '1'
@@ -44,7 +44,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.AddOrUpdateAnnotationAttribute
 examples:
-- description: ''
+- description: '`AddOrUpdateAnnotationAttributeTest#addValueAttribute`'
   parameters:
   - org.example.Foo
   - 'null'
@@ -76,7 +76,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeAnnotationAttributeName
 examples:
-- description: ''
+- description: '`ChangeAnnotationAttributeNameTest#renameAttributeName`'
   parameters:
   - java.lang.Deprecated
   - since
@@ -93,7 +93,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeMethodAccessLevel
 examples:
-- description: ''
+- description: '`ChangeMethodAccessLevelTest#publicToPrivate`'
   parameters:
   - com.abc.A aMethod(..)
   - private
@@ -144,7 +144,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeMethodName
 examples:
-- description: ''
+- description: '`ChangeMethodNameTest#changeMethodNameForMethodWithSingleArg`'
   parameters:
   - com.abc.B singleArg(String)
   - bar
@@ -170,7 +170,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangePackage
 examples:
-- description: ''
+- description: '`ChangePackageTest#renameUsingSimplePackageName`'
   parameters:
   - org.openrewrite
   - openrewrite
@@ -189,7 +189,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeType
 examples:
-- description: ''
+- description: '`ChangeTypeTest#doNotAddJavaLangWrapperImports`'
   parameters:
   - java.lang.Integer
   - java.lang.Long
@@ -202,7 +202,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.CreateEmptyJavaClass
 examples:
-- description: ''
+- description: '`CreateEmptyJavaClassTest#hasCreatedJavaClass`'
   parameters:
   - src/main/java
   - org.openrewrite.example
@@ -216,31 +216,13 @@ examples:
 
       public class ExampleClass {
       }
-    language: java
-- description: ''
-  parameters:
-  - src/main/java
-  - org.openrewrite.example
-  - protected
-  - ExampleClass
-  - 'true'
-  - 'null'
-  sources:
-  - before: |
-      package org.openrewrite.example;
-
-      public class ExampleClass { Object o = null; }
-    after: |
-      package org.openrewrite.example;
-
-      protected class ExampleClass {
-      }
+    path: foo/bar/src/main/java/org/openrewrite/example/ExampleClass.java
     language: java
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.DeleteMethodArgument
 examples:
-- description: ''
+- description: '`DeleteMethodArgumentTest#deleteMiddleArgumentDeclarative`'
   parameters:
   - B foo(int, int, int)
   - '1'
@@ -252,7 +234,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ExtractInterfaceTest$ExtractTestInterface
 examples:
-- description: ''
+- description: '`ExtractInterfaceTest#extractInterface`'
   sources:
   - after: |
       package org.openrewrite.interfaces;
@@ -261,6 +243,7 @@ examples:
 
           int test();
       }
+    path: org/openrewrite/interfaces/ITest.java
     language: java
   - before: |
       package org.openrewrite;
@@ -308,7 +291,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.NoStaticImport
 examples:
-- description: ''
+- description: '`NoStaticImportTest#replaceWithNoStaticImports`'
   parameters:
   - java.util.Collections emptyList()
   sources:
@@ -332,7 +315,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.OrderImports
 examples:
-- description: ''
+- description: '`OrderImportsTest#foldIntoStar`'
   parameters:
   - 'false'
   sources:
@@ -351,7 +334,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.RemoveAnnotation
 examples:
-- description: ''
+- description: '`RemoveAnnotationTest#removeAnnotation`'
   parameters:
   - '@java.lang.Deprecated'
   sources:
@@ -378,7 +361,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.RemoveAnnotationAttribute
 examples:
-- description: ''
+- description: '`RemoveAnnotationAttributeTest#removeNamedAttribute`'
   parameters:
   - java.lang.Deprecated
   - since
@@ -394,7 +377,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.RemoveImplements
 examples:
-- description: ''
+- description: '`RemoveImplementsTest#removeBasic`'
   parameters:
   - java.io.Serializable
   - 'null'
@@ -412,7 +395,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.RemoveUnusedImports
 examples:
-- description: ''
+- description: '`RemoveUnusedImportsTest#removeNamedImport`'
   sources:
   - before: |
       import java.util.List;
@@ -423,7 +406,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ReplaceConstant
 examples:
-- description: ''
+- description: '`ReplaceConstantTest#replaceConstant`'
   parameters:
   - com.google.common.base.Charsets
   - UTF_8
@@ -443,7 +426,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ReplaceConstantWithAnotherConstant
 examples:
-- description: ''
+- description: '`ReplaceConstantWithAnotherConstantTest#replaceConstant`'
   parameters:
   - java.io.File.pathSeparator
   - java.io.File.separator
@@ -477,7 +460,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ReplaceStringLiteralWithConstant
 examples:
-- description: ''
+- description: '`ReplaceStringLiteralWithConstantTest#shouldNotAddImportWhenUnnecessary`'
   parameters:
   - EXAMPLE_STRING_CONSTANT
   - EXAMPLE_STRING_FQN
@@ -499,7 +482,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ShortenFullyQualifiedTypeReferences
 examples:
-- description: ''
+- description: '`ShortenFullyQualifiedTypeReferencesTest#redundantImport`'
   sources:
   - before: |
       import java.util.List;
@@ -518,9 +501,9 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.SimplifyMethodChain
 examples:
-- description: ''
+- description: '`SimplifyMethodChainTest#simplify`'
   parameters:
-  - Arrays.asList("A b()", "B c()")
+  - List.of("A b()", "B c()")
   - c2
   - 'false'
   sources:
@@ -550,7 +533,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.UseStaticImport
 examples:
-- description: ''
+- description: '`UseStaticImportTest#junit5Assertions`'
   parameters:
   - org.junit.jupiter.api.Assertions assert*(..)
   sources:
@@ -584,7 +567,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.format.MethodParamPad
 examples:
-- description: ''
+- description: '`MethodParamPadTest#addSpacePadding`'
   sources:
   - before: |
       enum E {
@@ -627,7 +610,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.format.NoWhitespaceAfter
 examples:
-- description: ''
+- description: '`NoWhitespaceAfterTest#variableDeclaration`'
   sources:
   - before: |
       class Test {
@@ -650,7 +633,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.format.NoWhitespaceBefore
 examples:
-- description: ''
+- description: '`NoWhitespaceBeforeTest#fieldAccessDoNotAllowLineBreaks`'
   sources:
   - before: |
       class Test {
@@ -676,7 +659,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.format.PadEmptyForLoopComponents
 examples:
-- description: ''
+- description: '`PadEmptyForLoopComponentsTest#addSpaceToEmptyInitializer`'
   sources:
   - before: |
       public class A {
@@ -699,7 +682,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.format.RemoveTrailingWhitespace
 examples:
-- description: ''
+- description: '`RemoveTrailingWhitespaceTest#removeTrailing`'
   sources:
   - before: "class Test {\n\n    public void method(Test t) {  \n    }  \n}  \n"
     after: |
@@ -713,7 +696,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.format.SingleLineComments
 examples:
-- description: ''
+- description: '`SingleLineCommentsTest#startsWithWhitespace`'
   sources:
   - before: |
       //hi
@@ -728,7 +711,22 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.format.TabsAndIndents
 examples:
-- description: ''
+- description: '`NormalizeFormatTest#removeAnnotationFromMethod`'
+  sources:
+  - before: |
+      class Test {
+          @Deprecated
+          public void method(Test t) {
+          }
+      }
+    after: |
+      class Test {
+
+          public void method(Test t) {
+          }
+      }
+    language: java
+- description: '`TabsAndIndentsTest#rspec3973`'
   sources:
   - before: |
       class Test {{
@@ -761,26 +759,11 @@ examples:
           public static void foo() {}
       }
     language: java
-- description: ''
-  sources:
-  - before: |
-      class Test {
-          @Deprecated
-          public void method(Test t) {
-          }
-      }
-    after: |
-      class Test {
-
-          public void method(Test t) {
-          }
-      }
-    language: java
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.format.TypecastParenPad
 examples:
-- description: ''
+- description: '`TypecastParenPadTest#addTypecastPadding`'
   sources:
   - before: |
       class Test {
@@ -807,7 +790,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindAnnotations
 examples:
-- description: ''
+- description: '`FindAnnotationsTest#matchMetaAnnotation`'
   parameters:
   - '@org.jspecify.annotations.Nullable'
   - 'true'
@@ -827,9 +810,9 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindComments
 examples:
-- description: ''
+- description: '`FindCommentsTest#findText`'
   parameters:
-  - Arrays.asList("test", "12.*")
+  - List.of("test", "12.*")
   sources:
   - before: |
       // not this one
@@ -856,7 +839,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindCompileErrors
 examples:
-- description: ''
+- description: '`JavaParserTest#erroneousVariableDeclarations`'
   sources:
   - before: |
       package com.example.demo;
@@ -907,7 +890,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindDeprecatedClasses
 examples:
-- description: ''
+- description: '`FindDeprecatedClassesTest#findDeprecations`'
   parameters:
   - org.old..*
   - 'false'
@@ -928,7 +911,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindDeprecatedFields
 examples:
-- description: ''
+- description: '`FindDeprecatedFieldsTest#findDeprecations`'
   parameters:
   - org.old.types..*
   - 'null'
@@ -953,7 +936,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindDeprecatedMethods
 examples:
-- description: ''
+- description: '`FindDeprecatedMethodsTest#findDeprecations`'
   parameters:
   - 'null'
   - 'null'
@@ -981,7 +964,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindEmptyClasses
 examples:
-- description: ''
+- description: '`FindEmptyClassesTest#findEmptyClass`'
   sources:
   - before: |
       class IsEmpty {
@@ -994,7 +977,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindEmptyMethods
 examples:
-- description: ''
+- description: '`FindEmptyMethodsTest#matchOverride`'
   parameters:
   - 'true'
   sources:
@@ -1019,7 +1002,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindFields
 examples:
-- description: ''
+- description: '`FindFieldsTest#findFullyQualifiedFields`'
   parameters:
   - java.nio.charset.StandardCharsets
   - 'null'
@@ -1038,7 +1021,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindFieldsOfType
 examples:
-- description: ''
+- description: '`FindFieldsOfTypeTest#findArrayOfType`'
   parameters:
   - java.lang.String
   - 'null'
@@ -1058,7 +1041,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindImplementations
 examples:
-- description: ''
+- description: '`FindImplementationsTest#found`'
   parameters:
   - java.lang.Runnable
   sources:
@@ -1079,7 +1062,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindImports
 examples:
-- description: ''
+- description: '`FindImportsTest#exactMatch`'
   parameters:
   - java.util..*
   - 'null'
@@ -1097,7 +1080,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindLiterals
 examples:
-- description: ''
+- description: '`FindLiteralsTest#string`'
   parameters:
   - Hello.*
   sources:
@@ -1114,7 +1097,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindMethodDeclaration
 examples:
-- description: ''
+- description: '`FindMethodDeclarationTest#find`'
   parameters:
   - A a(int)
   - 'false'
@@ -1140,7 +1123,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindMethods
 examples:
-- description: ''
+- description: '`FindMethodsTest#findConstructors`'
   parameters:
   - A <constructor>(String)
   - 'false'
@@ -1163,7 +1146,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindMissingTypes
 examples:
-- description: ''
+- description: '`FindMissingTypesTest#missingAnnotationType`'
   parameters:
   - 'false'
   sources:
@@ -1186,7 +1169,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindRepeatableAnnotations
 examples:
-- description: ''
+- description: '`FindRepeatableAnnotationsTest#findRepeatable`'
   sources:
   - before: |
       import org.mapstruct.*;
@@ -1252,7 +1235,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindTypes
 examples:
-- description: ''
+- description: '`FindTypesTest#simpleName`'
   parameters:
   - a.A1
   - 'false'
@@ -1268,7 +1251,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.HasMinimumJavaVersion
 examples:
-- description: ''
+- description: '`HasMinimumJavaVersionTest#matches`'
   parameters:
   - 8-21
   - 'false'
@@ -1288,7 +1271,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.ResultOfMethodCallIgnored
 examples:
-- description: ''
+- description: '`ResultOfMethodCallIgnoredTest#resultOfMethodCallIgnored`'
   parameters:
   - java.io.File mkdir*()
   - 'false'
@@ -1322,7 +1305,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.text.FindAndReplace
 examples:
-- description: ''
+- description: '`FindAndReplaceJavaTest#findAndReplaceJava`'
   parameters:
   - Test
   - Replaced

@@ -300,7 +300,7 @@ public class MavenPomDownloader {
                         if (derivedMeta != null) {
                             Counter.builder("rewrite.maven.derived.metadata")
                                     .tag("repositoryUri", repo.getUri())
-                                    .tag("group", gav.getGroupId())
+                                    .tag("group", gav.getGroupId() == null ? "" : gav.getGroupId())
                                     .tag("artifact", gav.getArtifactId())
                                     .register(Metrics.globalRegistry)
                                     .increment();
@@ -636,13 +636,23 @@ public class MavenPomDownloader {
                                 String line;
                                 while ((line = reader.readLine()) != null) {
                                     if (line.contains("published-with-gradle-metadata")) {
-                                        // as some artifacts do not have the bom as dependency listed, we need to add it by fetching the gradle metadata module.
+                                        // Some artifacts do not have the bom as dependency listed, we need to add it by fetching the gradle metadata module.
+                                        // It isn't strictly correct to do this from a maven standpoint, but helps with emulating Gradle dependency resolution
                                         pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString().replaceFirst(".pom$", ".module"));
                                         RawGradleModule module = RawGradleModule.parse(new ByteArrayInputStream(pomResponseBody));
-                                        for (Dependency dependency : module.getDependencies("apiElements", "platform")) {
-                                            rawPom.getDependencies().getDependencies().add(
-                                                    new RawPom.Dependency(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), null, "bom", null, null, null)
-                                            );
+                                        for (Dependency dependency : module.getDependencies("apiElements", "platform", "enforcedPlatform")) {
+                                            String category = dependency.getAttributes().get("org.gradle.category");
+                                            // Platform and enforcedPlatform dependencies are BOMs that should be in dependencyManagement,
+                                            // not regular dependencies - they only provide version constraints
+                                            if ("platform".equalsIgnoreCase(category) || "enforcedPlatform".equalsIgnoreCase(category)) {
+                                                if (rawPom.getDependencyManagement() == null) {
+                                                    rawPom.setDependencyManagement(new RawPom.DependencyManagement(new RawPom.Dependencies()));
+                                                }
+                                                assert rawPom.getDependencyManagement().getDependencies() != null;
+                                                rawPom.getDependencyManagement().getDependencies().getDependencies().add(
+                                                        new RawPom.Dependency(dependency.getGroupId() == null ? "" : dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), "import", "pom", null, null, null)
+                                                );
+                                            }
                                         }
                                         break;
                                     }
@@ -999,7 +1009,7 @@ public class MavenPomDownloader {
     enum Reachability {
         SUCCESS,
         ERROR,
-        UNREACHABLE;
+        UNREACHABLE
     }
 
     private ReachabilityResult reachable(HttpSender.Request.Builder request) {
