@@ -18,15 +18,13 @@ package org.openrewrite.javascript.rpc;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
-import org.openrewrite.rpc.request.PrepareRecipe;
-
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -211,7 +209,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         private @Nullable Integer maxHeapSize;
         private @Nullable Path workingDirectory;
-        private PrepareRecipe.@Nullable Loader recipeLoader;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
@@ -320,11 +317,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
-        public Builder recipeLoader(PrepareRecipe.Loader recipeLoader) {
-            this.recipeLoader = recipeLoader;
-            return this;
-        }
-
         @Override
         public JavaScriptRewriteRpc get() {
             Stream<@Nullable String> cmd;
@@ -391,8 +383,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
-                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)))
-                        .recipeLoader(recipeLoader);
+                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
