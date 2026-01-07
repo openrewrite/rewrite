@@ -20,7 +20,6 @@ import {randomId, UUID} from "../../uuid";
 import {SourceFile} from "../../tree";
 import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
-import {DEFAULT_EXCLUSIONS, ProjectParser} from "../../javascript";
 import {replaceMarkerByKind} from "../../markers";
 
 /**
@@ -64,6 +63,9 @@ export class ParseProject {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = request.projectPath;
+
+                    // Dynamic import to break circular dependency
+                    const {DEFAULT_EXCLUSIONS, ProjectParser} = await import("../../javascript/index.js");
 
                     const projectPath = path.resolve(request.projectPath);
                     const exclusions = request.exclusions ?? DEFAULT_EXCLUSIONS;
