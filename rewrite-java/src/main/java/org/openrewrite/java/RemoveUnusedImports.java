@@ -53,8 +53,7 @@ public class RemoveUnusedImports extends Recipe {
     @Override
     public String getDescription() {
         return "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
-               "will be removed from any source where unknown types are referenced. The most common cause of unknown " +
-               "types is the use of annotation processors not supported by OpenRewrite, such as lombok.";
+               "will be removed from any source where unknown types are referenced.";
     }
 
     @Override
