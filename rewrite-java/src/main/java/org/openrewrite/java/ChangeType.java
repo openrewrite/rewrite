@@ -511,6 +511,14 @@ public class ChangeType extends Recipe {
                     JavaType.FullyQualified updatedNestedType = updateNestedType(original);
                     oldNameToChangedType.put(oldType, updatedNestedType);
                     return updatedNestedType;
+                } else if (oldType instanceof JavaType.Class) {
+                    JavaType.Class clazz = (JavaType.Class) oldType;
+                    clazz = clazz
+                            .withInterfaces(ListUtils.map(original.getInterfaces(), (i, t) -> (JavaType.FullyQualified) updateType(t)))
+                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
+                    oldNameToChangedType.put(oldType, clazz);
+                    oldNameToChangedType.put(clazz, clazz);
+                    return clazz;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;

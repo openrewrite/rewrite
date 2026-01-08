@@ -19,14 +19,17 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
@@ -2464,6 +2467,58 @@ class ChangeTypeTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void inheritedTypes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("com.demo.A", "com.demo.NewA", false)),
+          java("""
+             package com.demo;
+                
+             public class A {
+                
+             }
+             """, """
+             package com.demo;
+                
+             public class NewA {
+                
+             }
+             """
+          ),
+          java(
+            //language=java
+            """
+              package app;
+              
+              import com.demo.A;
+              
+              public class X extends A {
+              
+              }
+              """,
+            """
+              package app;
+              
+              import com.demo.NewA;
+              
+              public class X extends NewA {
+              
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                for (NameTree nt : FindTypes.find(cu, "app.X")) {
+                    if (!TypeUtils.isAssignableTo("com.demo.NewA", nt.getType())) {
+                        JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(nt.getType());
+                        assertThat(fqt).isNotNull();
+                        fail(String.format("The AST type '%s' does not inherit from 'com.demo.NewA'. Instead its superclass is '%s'", nt.getType(), fqt.getSupertype().getFullyQualifiedName()));
+                    }
+                }
+            })
+          )
+
         );
     }
 }
