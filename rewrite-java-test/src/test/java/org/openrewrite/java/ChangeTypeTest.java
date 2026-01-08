@@ -29,7 +29,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
@@ -46,11 +45,11 @@ class ChangeTypeTest implements RewriteTest {
 
     @Language("java")
     String a1 = """
-          package a;
-          public class A1 extends Exception {
-              public static void stat() {}
-              public void foo() {}
-          }
+      package a;
+      public class A1 extends Exception {
+          public static void stat() {}
+          public void foo() {}
+      }
       """;
 
     @Language("java")
