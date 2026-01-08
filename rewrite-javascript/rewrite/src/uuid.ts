@@ -17,13 +17,10 @@ import * as crypto from "crypto";
 
 export type UUID = string;
 
-export function randomId(): UUID {
-    // Use native randomUUID if available (Node 14.17.0+)
-    if (typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-
-    // Fallback for older Node versions using randomBytes
+/**
+ * Fallback UUID v4 generator for Node versions before 14.17.0
+ */
+function fallbackRandomId(): UUID {
     const bytes = crypto.randomBytes(16);
 
     // Set version 4 bits (0100xxxx in byte 6)
@@ -36,3 +33,14 @@ export function randomId(): UUID {
     const hex = bytes.toString('hex');
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
+
+/**
+ * Generate a random UUID v4.
+ *
+ * Uses native crypto.randomUUID() on Node 14.17.0+, falls back to
+ * crypto.randomBytes() on older versions. The implementation is
+ * selected once at module load time to avoid per-call overhead.
+ */
+export const randomId: () => UUID = typeof crypto.randomUUID === 'function'
+    ? () => crypto.randomUUID()
+    : fallbackRandomId;
