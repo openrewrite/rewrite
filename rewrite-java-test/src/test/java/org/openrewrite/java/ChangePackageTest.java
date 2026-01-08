@@ -1833,50 +1833,40 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    void inheritedTypes() {
+    void inheritedTypesUpdated() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("com.demo", "com.newdemo", true))
+          spec -> spec.recipe(new ChangePackage("com.before", "com.after", true))
             .parser(JavaParser.fromJavaVersion().dependsOn(
-              """
-                package com.demo;
-                
-                public class A {
-                
-                }
-                """)
+                """
+                  package com.before;
+                  
+                  public class A { }
+                  """
+              )
             ),
           java(
             //language=java
             """
               package app;
               
-              import com.demo.A;
+              import com.before.A;
               
-              public class X extends A {
-              
-              }
+              class X extends A { }
               """,
             """
               package app;
               
-              import com.newdemo.A;
+              import com.after.A;
               
-              public class X extends A {
-              
-              }
+              class X extends A { }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                for (NameTree nt : FindTypes.find(cu, "app.X")) {
-                    if (!TypeUtils.isAssignableTo("com.newdemo.A", nt.getType())) {
-                        JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(nt.getType());
-                        assertThat(fqt).isNotNull();
-                        fail(String.format("The AST type '%s' does not inherit from 'com.newdemo.A'. Instead its superclass is '%s'", nt.getType(), fqt.getSupertype().getFullyQualifiedName()));
-                    }
-                }
-            })
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindTypes.find(cu, "app.X"))
+                .singleElement()
+                .extracting(NameTree::getType)
+                .matches(type-> TypeUtils.isAssignableTo("com.after.A", type), "Assignable to updated type")
+            )
           )
-
         );
     }
-
 }
