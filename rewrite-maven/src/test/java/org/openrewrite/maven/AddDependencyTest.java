@@ -42,12 +42,12 @@ class AddDependencyTest implements RewriteTest {
 
     @Language("java")
     private final String usingGuavaIntMath = """
-          import com.google.common.math.IntMath;
-          public class A {
-              boolean getMap() {
-                  return IntMath.isPrime(5);
-              }
+      import com.google.common.math.IntMath;
+      public class A {
+          boolean getMap() {
+              return IntMath.isPrime(5);
           }
+      }
       """;
 
     @DocumentExample
@@ -89,26 +89,26 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <!--~~(Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
-                    https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
-                                <groupId>doesnotexist</groupId>
-                                <artifactId>doesnotexist</artifactId>
-                                <version>1</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <!--~~(Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
+                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
+                            <groupId>doesnotexist</groupId>
+                            <artifactId>doesnotexist</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -164,26 +164,26 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>29.0-jre</version>
-                                <scope>test</scope>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -249,26 +249,26 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>io.netty</groupId>
-                                <artifactId>netty-tcnative-boringssl-static</artifactId>
-                                <version>2.0.54.Final</version>
-                                <classifier>linux-x86_64</classifier>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.netty</groupId>
+                            <artifactId>netty-tcnative-boringssl-static</artifactId>
+                            <version>2.0.54.Final</version>
+                            <classifier>linux-x86_64</classifier>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -289,11 +289,11 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """
             )
           )
@@ -311,37 +311,37 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>commons-lang</groupId>
-                                <artifactId>commons-lang</artifactId>
-                                <version>1.0</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>29.0-jre</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>commons-lang</groupId>
-                                <artifactId>commons-lang</artifactId>
-                                <version>1.0</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -357,27 +357,27 @@ class AddDependencyTest implements RewriteTest {
             srcTestJava(
               java(
                 """
-                      class MyTest {
-                          @org.junit.jupiter.api.Test
-                          void test() {}
-                      }
+                  class MyTest {
+                      @org.junit.jupiter.api.Test
+                      void test() {}
+                  }
                   """
               )
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.junit.jupiter</groupId>
-                                <artifactId>junit-jupiter-engine</artifactId>
-                                <version>5.7.1</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-engine</artifactId>
+                            <version>5.7.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -501,25 +501,25 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>29.0-jre</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -537,38 +537,38 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>commons-lang</groupId>
-                                <artifactId>commons-lang</artifactId>
-                                <version>1.0</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>commons-lang</groupId>
-                                <artifactId>commons-lang</artifactId>
-                                <version>1.0</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>29.0-jre</version>
-                                <scope>test</scope>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -587,50 +587,50 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <!-- comment 1 -->
-                        <?processing instruction1?>
-                        <dependencies>
-                            <!-- comment 2 -->
-                            <?processing instruction2?>
-                            <dependency>
-                                <groupId>commons-lang</groupId>
-                                <artifactId>commons-lang</artifactId>
-                                <version>1.0</version>
-                            </dependency>
-                            <!-- comment 3 -->
-                            <?processing instruction3?>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <!-- comment 1 -->
+                    <?processing instruction1?>
+                    <dependencies>
+                        <!-- comment 2 -->
+                        <?processing instruction2?>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                        <!-- comment 3 -->
+                        <?processing instruction3?>
+                    </dependencies>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <!-- comment 1 -->
-                        <?processing instruction1?>
-                        <dependencies>
-                            <!-- comment 2 -->
-                            <?processing instruction2?>
-                            <dependency>
-                                <groupId>commons-lang</groupId>
-                                <artifactId>commons-lang</artifactId>
-                                <version>1.0</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>29.0-jre</version>
-                                <scope>test</scope>
-                            </dependency>
-                            <!-- comment 3 -->
-                            <?processing instruction3?>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <!-- comment 1 -->
+                    <?processing instruction1?>
+                    <dependencies>
+                        <!-- comment 2 -->
+                        <?processing instruction2?>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>test</scope>
+                        </dependency>
+                        <!-- comment 3 -->
+                        <?processing instruction3?>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -648,18 +648,18 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>28.0-jre</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -678,31 +678,31 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <!-- my cool dependencies section -->
-                            <!-- etc -->
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <!-- my cool dependencies section -->
+                        <!-- etc -->
+                    </dependencies>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <!-- my cool dependencies section -->
-                            <!-- etc -->
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>29.0-jre</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <!-- my cool dependencies section -->
+                        <!-- etc -->
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -738,34 +738,34 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <parent>
-                            <groupId>com.mycompany.app</groupId>
-                            <artifactId>my-parent</artifactId>
-                            <version>1</version>
-                        </parent>
+                <project>
+                    <parent>
                         <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
+                        <artifactId>my-parent</artifactId>
                         <version>1</version>
-                    </project>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <parent>
-                            <groupId>com.mycompany.app</groupId>
-                            <artifactId>my-parent</artifactId>
-                            <version>1</version>
-                        </parent>
+                <project>
+                    <parent>
                         <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
+                        <artifactId>my-parent</artifactId>
                         <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -783,42 +783,42 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencyManagement>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>com.google.guava</groupId>
-                                    <artifactId>guava</artifactId>
-                                    <version>27.0-jre</version>
-                                </dependency>
-                            </dependencies>
-                        </dependencyManagement>
-                    </project>
-                """,
-              """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencyManagement>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>com.google.guava</groupId>
-                                    <artifactId>guava</artifactId>
-                                    <version>28.0-jre</version>
-                                </dependency>
-                            </dependencies>
-                        </dependencyManagement>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
                         <dependencies>
                             <dependency>
                                 <groupId>com.google.guava</groupId>
                                 <artifactId>guava</artifactId>
+                                <version>27.0-jre</version>
                             </dependency>
                         </dependencies>
-                    </project>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>28.0-jre</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -836,48 +836,48 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <properties>
-                            <guava.version>27.0-jre</guava.version>
-                        </properties>
-                        <dependencyManagement>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>com.google.guava</groupId>
-                                    <artifactId>guava</artifactId>
-                                    <version>${guava.version}</version>
-                                </dependency>
-                            </dependencies>
-                        </dependencyManagement>
-                    </project>
-                """,
-              """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <properties>
-                            <guava.version>28.0-jre</guava.version>
-                        </properties>
-                        <dependencyManagement>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>com.google.guava</groupId>
-                                    <artifactId>guava</artifactId>
-                                    <version>${guava.version}</version>
-                                </dependency>
-                            </dependencies>
-                        </dependencyManagement>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <guava.version>27.0-jre</guava.version>
+                    </properties>
+                    <dependencyManagement>
                         <dependencies>
                             <dependency>
                                 <groupId>com.google.guava</groupId>
                                 <artifactId>guava</artifactId>
+                                <version>${guava.version}</version>
                             </dependency>
                         </dependencies>
-                    </project>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <guava.version>28.0-jre</guava.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>${guava.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -913,35 +913,35 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <parent>
-                            <groupId>com.mycompany.app</groupId>
-                            <artifactId>my-parent</artifactId>
-                            <version>1</version>
-                        </parent>
+                <project>
+                    <parent>
                         <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
+                        <artifactId>my-parent</artifactId>
                         <version>1</version>
-                    </project>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <parent>
-                            <groupId>com.mycompany.app</groupId>
-                            <artifactId>my-parent</artifactId>
-                            <version>1</version>
-                        </parent>
+                <project>
+                    <parent>
                         <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
+                        <artifactId>my-parent</artifactId>
                         <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>28.0-jre</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -958,51 +958,51 @@ class AddDependencyTest implements RewriteTest {
             srcMainJava(
               java(
                 """
-                      public class A {
-                          com.fasterxml.jackson.databind.ObjectMapper mapper;
-                      }
+                  public class A {
+                      com.fasterxml.jackson.databind.ObjectMapper mapper;
+                  }
                   """
               )
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <properties>
-                            <jackson.version>2.12.0</jackson.version>
-                        </properties>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.fasterxml.jackson.core</groupId>
-                                <artifactId>jackson-databind</artifactId>
-                                <version>${jackson.version}</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <jackson.version>2.12.0</jackson.version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>${jackson.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <properties>
-                            <jackson.version>2.12.0</jackson.version>
-                        </properties>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.fasterxml.jackson.core</groupId>
-                                <artifactId>jackson-databind</artifactId>
-                                <version>${jackson.version}</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>com.fasterxml.jackson.module</groupId>
-                                <artifactId>jackson-module-afterburner</artifactId>
-                                <version>${jackson.version}</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <jackson.version>2.12.0</jackson.version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>${jackson.version}</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.module</groupId>
+                            <artifactId>jackson-module-afterburner</artifactId>
+                            <version>${jackson.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -1022,45 +1022,45 @@ class AddDependencyTest implements RewriteTest {
             srcMainJava(
               java(
                 """
-                      public class A {
-                          com.fasterxml.jackson.core.Versioned v;
-                      }
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
                   """
               )
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.fasterxml.jackson.core</groupId>
-                                <artifactId>jackson-databind</artifactId>
-                                <version>2.12.0</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>2.12.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.fasterxml.jackson.core</groupId>
-                                <artifactId>jackson-core</artifactId>
-                                <version>2.12.0</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>com.fasterxml.jackson.core</groupId>
-                                <artifactId>jackson-databind</artifactId>
-                                <version>2.12.0</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-core</artifactId>
+                            <version>2.12.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>2.12.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -1082,34 +1082,34 @@ class AddDependencyTest implements RewriteTest {
             srcMainJava(
               java(
                 """
-                      public class A {
-                          com.fasterxml.jackson.core.Versioned v;
-                      }
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
                   """
               )
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.fasterxml.jackson.core</groupId>
-                                <artifactId>jackson-core</artifactId>
-                                <version>2.12.0</version>
-                                <scope>%s</scope>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-core</artifactId>
+                            <version>2.12.0</version>
+                            <scope>%s</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """.formatted(scope)
             )
           )
@@ -1289,19 +1289,19 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>29.0-jre</version>
-                                <scope>test</scope>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
