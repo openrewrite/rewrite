@@ -147,22 +147,8 @@ class CopyValueTest implements RewriteTest {
     @Test
     void mergeNewKeys() {
         rewriteRun(
-          spec -> spec.recipeFromYaml(
-            """
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.yaml.CopyValueTest
-              displayName: Merge new keys test
-              description: Merge new keys test.
-              recipeList:
-                - org.openrewrite.yaml.CopyValue:
-                    oldKeyPath: "$.a.b"
-                    newKey: "$.c.e"
-                - org.openrewrite.yaml.UnfoldProperties:
-                     exclusions:
-                     applyTo:
-              """,
-            "org.openrewrite.yaml.CopyValueTest"
+          spec -> spec.recipe(
+            new CopyValue("$.a.b", null, "$.c.e", null, null)
           ),
           yaml(
             """
