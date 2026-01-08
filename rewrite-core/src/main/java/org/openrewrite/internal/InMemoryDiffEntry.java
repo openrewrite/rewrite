@@ -286,6 +286,21 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
         return sourceFile.printAll(out).getBytes(charset);
     }
 
+    /**
+     * Determine the file mode for a source file.
+     * Returns MISSING if null, otherwise checks GitTreeEntry marker first, then fileAttributes.
+     */
+    @Incubating(since = "8.71.1")
+    public static FileMode getFileMode(@Nullable SourceFile sourceFile) {
+        if (sourceFile == null) {
+            return FileMode.MISSING;
+        }
+        return sourceFile.getMarkers().findFirst(GitTreeEntry.class)
+                .map(entry -> FileMode.fromBits(entry.getFileMode()))
+                .orElseGet(() -> sourceFile.getFileAttributes() != null && sourceFile.getFileAttributes().isExecutable() ?
+                        FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE);
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class VirtualInMemoryRepository extends Repository {
