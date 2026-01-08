@@ -512,9 +512,8 @@ public class ChangeType extends Recipe {
                     oldNameToChangedType.put(oldType, updatedNestedType);
                     return updatedNestedType;
                 } else if (oldType instanceof JavaType.Class) {
-                    JavaType.Class clazz = (JavaType.Class) oldType;
-                    clazz = clazz
-                            .withInterfaces(ListUtils.map(original.getInterfaces(), (i, t) -> (JavaType.FullyQualified) updateType(t)))
+                    JavaType.Class clazz = ((JavaType.Class) oldType)
+                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
                             .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
                     oldNameToChangedType.put(oldType, clazz);
                     oldNameToChangedType.put(clazz, clazz);

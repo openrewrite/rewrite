@@ -2471,54 +2471,45 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
-    void inheritedTypes() {
+    void inheritedTypesUpdated() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.demo.A", "com.demo.NewA", false)),
-          java("""
-             package com.demo;
-                
-             public class A {
-                
-             }
-             """, """
-             package com.demo;
-                
-             public class NewA {
-                
-             }
-             """
-          ),
+          spec -> spec.recipe(new ChangeType("com.demo.Before", "com.demo.After", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package com.demo;
+                  
+                  public class Before { }
+                  """,
+                """
+                  package com.demo;
+                  
+                  public class After { }
+                  """
+              )
+            ),
           java(
             //language=java
             """
               package app;
               
-              import com.demo.A;
+              import com.demo.Before;
               
-              public class X extends A {
-              
-              }
+              class X extends Before { }
               """,
             """
               package app;
               
-              import com.demo.NewA;
+              import com.demo.After;
               
-              public class X extends NewA {
-              
-              }
+              class X extends After { }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                for (NameTree nt : FindTypes.find(cu, "app.X")) {
-                    if (!TypeUtils.isAssignableTo("com.demo.NewA", nt.getType())) {
-                        JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(nt.getType());
-                        assertThat(fqt).isNotNull();
-                        fail(String.format("The AST type '%s' does not inherit from 'com.demo.NewA'. Instead its superclass is '%s'", nt.getType(), fqt.getSupertype().getFullyQualifiedName()));
-                    }
-                }
-            })
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindTypes.find(cu, "app.X"))
+                .singleElement()
+                .extracting(NameTree::getType)
+                .matches(type -> TypeUtils.isAssignableTo("com.demo.After", type), "Assignable to updated type")
+            )
           )
-
         );
     }
 }
