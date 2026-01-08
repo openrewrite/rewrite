@@ -24,6 +24,7 @@ import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.util.Collections;
 
 @SuppressWarnings("LanguageMismatch")
 @Value
@@ -101,7 +102,6 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     public static class Accumulator {
         @Nullable
         String snippet;
-
         Path path;
     }
 
@@ -147,6 +147,14 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
             return TreeVisitor.noop();
         }
         return Preconditions.check(new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
-                new MergeYaml(newKey, acc.snippet, false, null, null, null, null, createNewKeys).getVisitor());
+                new YamlIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                        doAfterVisit(new UnfoldProperties(null, Collections.singletonList(newKey)).getVisitor());
+                        return (Yaml.Documents) new MergeYaml(newKey, acc.snippet, false, null, null, null, null, createNewKeys)
+                                .getVisitor()
+                                .visitNonNull(documents, ctx);
+                    }
+                });
     }
 }
