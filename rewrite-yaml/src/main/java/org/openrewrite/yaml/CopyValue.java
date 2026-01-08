@@ -24,7 +24,8 @@ import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
-import java.util.Collections;
+
+import static java.util.Collections.singletonList;
 
 @SuppressWarnings("LanguageMismatch")
 @Value
@@ -150,7 +151,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
                 new YamlIsoVisitor<ExecutionContext>() {
                     @Override
                     public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                        doAfterVisit(new UnfoldProperties(null, Collections.singletonList(newKey)).getVisitor());
+                        doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
                         return (Yaml.Documents) new MergeYaml(newKey, acc.snippet, false, null, null, null, null, createNewKeys)
                                 .getVisitor()
                                 .visitNonNull(documents, ctx);
