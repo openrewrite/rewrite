@@ -17,7 +17,6 @@ package org.openrewrite.internal;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.PrintOutputCapture;
@@ -27,7 +26,8 @@ import org.openrewrite.jgit.attributes.AttributesNodeProvider;
 import org.openrewrite.jgit.diff.DiffEntry;
 import org.openrewrite.jgit.diff.DiffFormatter;
 import org.openrewrite.jgit.diff.RawTextComparator;
-import org.openrewrite.jgit.internal.storage.dfs.*;
+import org.openrewrite.jgit.internal.storage.dfs.DfsRepositoryDescription;
+import org.openrewrite.jgit.internal.storage.dfs.InMemoryRepository;
 import org.openrewrite.jgit.lib.*;
 import org.openrewrite.marker.GitTreeEntry;
 import org.openrewrite.quark.Quark;
@@ -235,7 +235,45 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
         this.repo.close();
     }
 
-    private static byte[] printAllAsBytes(@Nullable SourceFile sourceFile, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter) {
+    /**
+     * Compute a diff from pre-computed byte arrays.
+     * This allows callers to control when printAll() is called on source files,
+     * enabling optimizations like printing all variants of 'before' first, then all variants of 'after'.
+     */
+    @Incubating(since = "8.71.1")
+    public static String getDiff(
+            @Nullable Path oldPath,
+            @Nullable Path newPath,
+            @Nullable Path relativeTo,
+            byte[] oldContent,
+            byte[] newContent,
+            Set<Recipe> recipesThatMadeChanges,
+            FileMode oldMode,
+            FileMode newMode,
+            boolean ignoreAllWhitespace,
+            boolean binaryPatch
+    ) {
+        try (InMemoryDiffEntry entry = new InMemoryDiffEntry(
+                oldPath,
+                newPath,
+                relativeTo,
+                oldContent,
+                newContent,
+                recipesThatMadeChanges,
+                oldMode,
+                newMode,
+                binaryPatch
+        )) {
+            return entry.getDiff(ignoreAllWhitespace);
+        }
+    }
+
+    /**
+     * Print a source file to bytes using the specified marker printer.
+     * Returns an empty byte array if the source file is null or a Quark.
+     */
+    @Incubating(since = "8.71.1")
+    public static byte[] printAllAsBytes(@Nullable SourceFile sourceFile, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter) {
         if (sourceFile == null || sourceFile instanceof Quark) {
             return new byte[0];
         }

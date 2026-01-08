@@ -112,120 +112,165 @@ class YamlSender extends YamlVisitor<RpcSendQueue> {
     }
 }
 
-class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
+class YamlReceiver {
 
-    protected async preVisit(y: Yaml, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    public visit<T extends Yaml>(y: T | undefined, q: RpcReceiveQueue): T | undefined {
+        if (!y) return undefined;
+
+        let result: Yaml | undefined = this.preVisit(y, q);
+        if (result === undefined) return undefined;
+
+        switch (y.kind) {
+            case Yaml.Kind.Documents:
+                result = this.visitDocuments(result as Yaml.Documents, q);
+                break;
+            case Yaml.Kind.Document:
+                result = this.visitDocument(result as Yaml.Document, q);
+                break;
+            case Yaml.Kind.DocumentEnd:
+                result = this.visitDocumentEnd(result as Yaml.DocumentEnd, q);
+                break;
+            case Yaml.Kind.Mapping:
+                result = this.visitMapping(result as Yaml.Mapping, q);
+                break;
+            case Yaml.Kind.MappingEntry:
+                result = this.visitMappingEntry(result as Yaml.MappingEntry, q);
+                break;
+            case Yaml.Kind.Scalar:
+                result = this.visitScalar(result as Yaml.Scalar, q);
+                break;
+            case Yaml.Kind.Sequence:
+                result = this.visitSequence(result as Yaml.Sequence, q);
+                break;
+            case Yaml.Kind.SequenceEntry:
+                result = this.visitSequenceEntry(result as Yaml.SequenceEntry, q);
+                break;
+            case Yaml.Kind.Anchor:
+                result = this.visitAnchor(result as Yaml.Anchor, q);
+                break;
+            case Yaml.Kind.Alias:
+                result = this.visitAlias(result as Yaml.Alias, q);
+                break;
+            case Yaml.Kind.Tag:
+                result = this.visitTag(result as Yaml.Tag, q);
+                break;
+        }
+
+        return result as T | undefined;
+    }
+
+    preVisit(y: Yaml, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(y, {
-            id: await q.receive(y.id),
-            prefix: await q.receive(y.prefix),
-            markers: await q.receive(y.markers),
+            id: q.receive(y.id),
+            prefix: q.receive(y.prefix),
+            markers: q.receive(y.markers),
         });
     }
 
-    protected async visitDocuments(documents: Yaml.Documents, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitDocuments(documents: Yaml.Documents, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(documents, {
-            sourcePath: await q.receive(documents.sourcePath),
-            charsetName: await q.receive(documents.charsetName),
-            charsetBomMarked: await q.receive(documents.charsetBomMarked),
-            checksum: await q.receive(documents.checksum),
-            fileAttributes: await q.receive(documents.fileAttributes),
-            documents: await q.receiveListDefined(documents.documents,
-                async doc => await this.visit(doc, q) as Yaml.Document),
-            suffix: await q.receive(documents.suffix),
+            sourcePath: q.receive(documents.sourcePath),
+            charsetName: q.receive(documents.charsetName),
+            charsetBomMarked: q.receive(documents.charsetBomMarked),
+            checksum: q.receive(documents.checksum),
+            fileAttributes: q.receive(documents.fileAttributes),
+            documents: q.receiveListDefined(documents.documents,
+                doc => this.visit(doc, q) as Yaml.Document),
+            suffix: q.receive(documents.suffix),
         });
     }
 
-    protected async visitDocument(document: Yaml.Document, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitDocument(document: Yaml.Document, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(document, {
-            explicit: await q.receive(document.explicit),
-            block: await q.receive(document.block,
-                async b => await this.visit(b, q) as Yaml.Block),
-            end: await q.receive(document.end,
-                async e => await this.visit(e, q) as Yaml.DocumentEnd),
+            explicit: q.receive(document.explicit),
+            block: q.receive(document.block,
+                b => this.visit(b, q) as Yaml.Block),
+            end: q.receive(document.end,
+                e => this.visit(e, q) as Yaml.DocumentEnd),
         });
     }
 
-    protected async visitDocumentEnd(end: Yaml.DocumentEnd, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitDocumentEnd(end: Yaml.DocumentEnd, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(end, {
-            explicit: await q.receive(end.explicit),
+            explicit: q.receive(end.explicit),
         });
     }
 
-    protected async visitMapping(mapping: Yaml.Mapping, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitMapping(mapping: Yaml.Mapping, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(mapping, {
-            openingBracePrefix: await q.receive(mapping.openingBracePrefix),
-            entries: await q.receiveListDefined(mapping.entries,
-                async e => await this.visit(e, q) as Yaml.MappingEntry),
-            closingBracePrefix: await q.receive(mapping.closingBracePrefix),
-            anchor: await q.receive(mapping.anchor,
-                async a => a ? await this.visit(a, q) as Yaml.Anchor : undefined),
-            tag: await q.receive(mapping.tag,
-                async t => t ? await this.visit(t, q) as Yaml.Tag : undefined),
+            openingBracePrefix: q.receive(mapping.openingBracePrefix),
+            entries: q.receiveListDefined(mapping.entries,
+                e => this.visit(e, q) as Yaml.MappingEntry),
+            closingBracePrefix: q.receive(mapping.closingBracePrefix),
+            anchor: q.receive(mapping.anchor,
+                a => a ? this.visit(a, q) as Yaml.Anchor : undefined),
+            tag: q.receive(mapping.tag,
+                t => t ? this.visit(t, q) as Yaml.Tag : undefined),
         });
     }
 
-    protected async visitMappingEntry(entry: Yaml.MappingEntry, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitMappingEntry(entry: Yaml.MappingEntry, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(entry, {
-            key: await q.receive(entry.key,
-                async k => await this.visit(k, q) as Yaml.YamlKey),
-            beforeMappingValueIndicator: await q.receive(entry.beforeMappingValueIndicator),
-            value: await q.receive(entry.value,
-                async v => await this.visit(v, q) as Yaml.Block),
+            key: q.receive(entry.key,
+                k => this.visit(k, q) as Yaml.YamlKey),
+            beforeMappingValueIndicator: q.receive(entry.beforeMappingValueIndicator),
+            value: q.receive(entry.value,
+                v => this.visit(v, q) as Yaml.Block),
         });
     }
 
-    protected async visitScalar(scalar: Yaml.Scalar, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitScalar(scalar: Yaml.Scalar, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(scalar, {
-            style: await q.receive(scalar.style),
-            anchor: await q.receive(scalar.anchor,
-                async a => a ? await this.visit(a, q) as Yaml.Anchor : undefined),
-            tag: await q.receive(scalar.tag,
-                async t => t ? await this.visit(t, q) as Yaml.Tag : undefined),
-            value: await q.receive(scalar.value),
+            style: q.receive(scalar.style),
+            anchor: q.receive(scalar.anchor,
+                a => a ? this.visit(a, q) as Yaml.Anchor : undefined),
+            tag: q.receive(scalar.tag,
+                t => t ? this.visit(t, q) as Yaml.Tag : undefined),
+            value: q.receive(scalar.value),
         });
     }
 
-    protected async visitSequence(sequence: Yaml.Sequence, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitSequence(sequence: Yaml.Sequence, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(sequence, {
-            openingBracketPrefix: await q.receive(sequence.openingBracketPrefix),
-            entries: await q.receiveListDefined(sequence.entries,
-                async e => await this.visit(e, q) as Yaml.SequenceEntry),
-            closingBracketPrefix: await q.receive(sequence.closingBracketPrefix),
-            anchor: await q.receive(sequence.anchor,
-                async a => a ? await this.visit(a, q) as Yaml.Anchor : undefined),
-            tag: await q.receive(sequence.tag,
-                async t => t ? await this.visit(t, q) as Yaml.Tag : undefined),
+            openingBracketPrefix: q.receive(sequence.openingBracketPrefix),
+            entries: q.receiveListDefined(sequence.entries,
+                e => this.visit(e, q) as Yaml.SequenceEntry),
+            closingBracketPrefix: q.receive(sequence.closingBracketPrefix),
+            anchor: q.receive(sequence.anchor,
+                a => a ? this.visit(a, q) as Yaml.Anchor : undefined),
+            tag: q.receive(sequence.tag,
+                t => t ? this.visit(t, q) as Yaml.Tag : undefined),
         });
     }
 
-    protected async visitSequenceEntry(entry: Yaml.SequenceEntry, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitSequenceEntry(entry: Yaml.SequenceEntry, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(entry, {
-            block: await q.receive(entry.block,
-                async b => await this.visit(b, q) as Yaml.Block),
-            dash: await q.receive(entry.dash),
-            trailingCommaPrefix: await q.receive(entry.trailingCommaPrefix),
+            block: q.receive(entry.block,
+                b => this.visit(b, q) as Yaml.Block),
+            dash: q.receive(entry.dash),
+            trailingCommaPrefix: q.receive(entry.trailingCommaPrefix),
         });
     }
 
-    protected async visitAnchor(anchor: Yaml.Anchor, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitAnchor(anchor: Yaml.Anchor, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(anchor, {
-            postfix: await q.receive(anchor.postfix),
-            key: await q.receive(anchor.key),
+            postfix: q.receive(anchor.postfix),
+            key: q.receive(anchor.key),
         });
     }
 
-    protected async visitAlias(alias: Yaml.Alias, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitAlias(alias: Yaml.Alias, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(alias, {
-            anchor: await q.receive(alias.anchor,
-                async a => await this.visit(a, q) as Yaml.Anchor),
+            anchor: q.receive(alias.anchor,
+                a => this.visit(a, q) as Yaml.Anchor),
         });
     }
 
-    protected async visitTag(tag: Yaml.Tag, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+    protected visitTag(tag: Yaml.Tag, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(tag, {
-            name: await q.receive(tag.name),
-            suffix: await q.receive(tag.suffix),
-            tagKind: await q.receive(tag.tagKind),
+            name: q.receive(tag.name),
+            suffix: q.receive(tag.suffix),
+            tagKind: q.receive(tag.tagKind),
         });
     }
 }
@@ -236,8 +281,8 @@ const sender = new YamlSender();
 // Register codec for all YAML AST node types
 for (const kind of Object.values(Yaml.Kind)) {
     RpcCodecs.registerCodec(kind as string, {
-        async rpcReceive(before: Yaml, q: RpcReceiveQueue): Promise<Yaml> {
-            return (await receiver.visit(before, q))!;
+        rpcReceive(before: Yaml, q: RpcReceiveQueue): Yaml {
+            return receiver.visit(before, q)!;
         },
 
         async rpcSend(after: Yaml, q: RpcSendQueue): Promise<void> {

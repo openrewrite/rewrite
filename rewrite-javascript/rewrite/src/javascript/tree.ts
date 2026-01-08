@@ -62,7 +62,6 @@ export namespace JS {
         ImportType: "org.openrewrite.javascript.tree.JS$ImportType",
         ImportTypeAttributes: "org.openrewrite.javascript.tree.JS$ImportTypeAttributes",
         IndexSignatureDeclaration: "org.openrewrite.javascript.tree.JS$IndexSignatureDeclaration",
-        IndexType: "org.openrewrite.javascript.tree.JS$IndexedAccessType$IndexType",
         IndexedAccessType: "org.openrewrite.javascript.tree.JS$IndexedAccessType",
         IndexedAccessTypeIndexType: "org.openrewrite.javascript.tree.JS$IndexedAccessType$IndexType",
         InferType: "org.openrewrite.javascript.tree.JS$InferType",

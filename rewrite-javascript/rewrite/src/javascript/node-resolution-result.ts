@@ -815,10 +815,10 @@ export namespace NodeResolutionResultQueries {
  * Register RPC codec for Npmrc.
  */
 RpcCodecs.registerCodec(NpmrcKind, {
-    async rpcReceive(before: Npmrc, q: RpcReceiveQueue): Promise<Npmrc> {
+    rpcReceive(before: Npmrc, q: RpcReceiveQueue): Npmrc {
         return updateIfChanged(before, {
-            scope: await q.receive(before.scope),
-            properties: await q.receive(before.properties),
+            scope: q.receive(before.scope),
+            properties: q.receive(before.properties),
         });
     },
 
@@ -832,11 +832,11 @@ RpcCodecs.registerCodec(NpmrcKind, {
  * Register RPC codec for Dependency.
  */
 RpcCodecs.registerCodec(DependencyKind, {
-    async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
+    rpcReceive(before: Dependency, q: RpcReceiveQueue): Dependency {
         return updateIfChanged(before, {
-            name: await q.receive(before.name),
-            versionConstraint: await q.receive(before.versionConstraint),
-            resolved: await q.receive(before.resolved),
+            name: q.receive(before.name),
+            versionConstraint: q.receive(before.versionConstraint),
+            resolved: q.receive(before.resolved),
         });
     },
 
@@ -851,16 +851,16 @@ RpcCodecs.registerCodec(DependencyKind, {
  * Register RPC codec for ResolvedDependency.
  */
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
-    async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
+    rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): ResolvedDependency {
         return updateIfChanged(before, {
-            name: await q.receive(before.name),
-            version: await q.receive(before.version),
-            dependencies: (await q.receiveList(before.dependencies)) || undefined,
-            devDependencies: (await q.receiveList(before.devDependencies)) || undefined,
-            peerDependencies: (await q.receiveList(before.peerDependencies)) || undefined,
-            optionalDependencies: (await q.receiveList(before.optionalDependencies)) || undefined,
-            engines: await q.receive(before.engines),
-            license: await q.receive(before.license),
+            name: q.receive(before.name),
+            version: q.receive(before.version),
+            dependencies: (q.receiveList(before.dependencies)) || undefined,
+            devDependencies: (q.receiveList(before.devDependencies)) || undefined,
+            peerDependencies: (q.receiveList(before.peerDependencies)) || undefined,
+            optionalDependencies: (q.receiveList(before.optionalDependencies)) || undefined,
+            engines: q.receive(before.engines),
+            license: q.receive(before.license),
         });
     },
 
@@ -885,23 +885,23 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
  * This handles serialization/deserialization for communication between JS and Java.
  */
 RpcCodecs.registerCodec(NodeResolutionResultKind, {
-    async rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): Promise<NodeResolutionResult> {
+    rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): NodeResolutionResult {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            name: await q.receive(before.name),
-            version: await q.receive(before.version),
-            description: await q.receive(before.description),
-            path: await q.receive(before.path),
-            workspacePackagePaths: await q.receive(before.workspacePackagePaths),
-            dependencies: (await q.receiveList(before.dependencies)) || [],
-            devDependencies: (await q.receiveList(before.devDependencies)) || [],
-            peerDependencies: (await q.receiveList(before.peerDependencies)) || [],
-            optionalDependencies: (await q.receiveList(before.optionalDependencies)) || [],
-            bundledDependencies: (await q.receiveList(before.bundledDependencies)) || [],
-            resolvedDependencies: (await q.receiveList(before.resolvedDependencies)) || [],
-            packageManager: await q.receive(before.packageManager),
-            engines: await q.receive(before.engines),
-            npmrcConfigs: (await q.receiveList(before.npmrcConfigs)) || undefined,
+            id: q.receive(before.id),
+            name: q.receive(before.name),
+            version: q.receive(before.version),
+            description: q.receive(before.description),
+            path: q.receive(before.path),
+            workspacePackagePaths: q.receive(before.workspacePackagePaths),
+            dependencies: (q.receiveList(before.dependencies)) || [],
+            devDependencies: (q.receiveList(before.devDependencies)) || [],
+            peerDependencies: (q.receiveList(before.peerDependencies)) || [],
+            optionalDependencies: (q.receiveList(before.optionalDependencies)) || [],
+            bundledDependencies: (q.receiveList(before.bundledDependencies)) || [],
+            resolvedDependencies: (q.receiveList(before.resolvedDependencies)) || [],
+            packageManager: q.receive(before.packageManager),
+            engines: q.receive(before.engines),
+            npmrcConfigs: (q.receiveList(before.npmrcConfigs)) || undefined,
         });
     },
 

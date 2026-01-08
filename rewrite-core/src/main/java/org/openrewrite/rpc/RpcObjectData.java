@@ -15,28 +15,41 @@
  */
 package org.openrewrite.rpc;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 
+import java.io.IOException;
 import java.util.Map;
 
 /**
  * A single piece of data in a tree, which can be a marker, leaf value, tree element, etc.
+ * <p>
+ * Serialized as a compact array: [state, valueType, value, ref?, trace?]
+ * - 3 elements when ref is null and trace is null
+ * - 4 elements when ref is present but trace is null
+ * - 5 elements when trace is present
  */
 @Value
-@NoArgsConstructor(force = true, access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
+@NoArgsConstructor(force = true, access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@JsonSerialize(using = RpcObjectData.Serializer.class)
+@JsonDeserialize(using = RpcObjectData.Deserializer.class)
 public class RpcObjectData {
     private static final ObjectMapper mapper = JsonMapper.builder()
             // to be able to construct classes that have @Data and a single field
@@ -120,12 +133,89 @@ public class RpcObjectData {
         return (V) value;
     }
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    @JsonFormat(shape = JsonFormat.Shape.NUMBER)
     public enum State {
         NO_CHANGE,
         ADD,
         DELETE,
         CHANGE,
-        END_OF_OBJECT
+        END_OF_OBJECT;
+
+        public static State from(int ordinal) {
+            switch (ordinal) {
+                case 0: return NO_CHANGE;
+                case 1: return ADD;
+                case 2: return DELETE;
+                case 3: return CHANGE;
+                case 4: return END_OF_OBJECT;
+                default: throw new IllegalArgumentException("Unknown state ordinal: " + ordinal);
+            }
+        }
+    }
+
+    /**
+     * Custom serializer that outputs RpcObjectData as a compact array.
+     * Format: [state, valueType, value, ref?, trace?]
+     */
+    static class Serializer extends JsonSerializer<RpcObjectData> {
+        @Override
+        public void serialize(RpcObjectData data, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray(data, data.trace != null ? 5 : data.ref != null ? 4 : 3);
+            gen.writeNumber(data.state.ordinal());
+            gen.writeString(data.valueType);
+            gen.writeObject(data.value);
+            if (data.ref != null || data.trace != null) {
+                if (data.ref != null) {
+                    gen.writeNumber(data.ref);
+                } else {
+                    gen.writeNull();
+                }
+                if (data.trace != null) {
+                    gen.writeString(data.trace);
+                }
+            }
+            gen.writeEndArray();
+        }
+    }
+
+    /**
+     * Custom deserializer that reads RpcObjectData from a compact array.
+     * Format: [state, valueType, value, ref?, trace?]
+     */
+    static class Deserializer extends JsonDeserializer<RpcObjectData> {
+        @Override
+        public RpcObjectData deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            if (p.currentToken() != JsonToken.START_ARRAY) {
+                throw new IOException("Expected array start, got: " + p.currentToken());
+            }
+
+            // Read state (required)
+            p.nextToken();
+            State state = State.from(p.getIntValue());
+
+            // Read valueType (may be null)
+            p.nextToken();
+            String valueType = p.currentToken() == JsonToken.VALUE_NULL ? null : p.getText();
+
+            // Read value (may be null or any type)
+            p.nextToken();
+            Object value = p.currentToken() == JsonToken.VALUE_NULL ? null : p.readValueAs(Object.class);
+
+            // Read optional ref (may be null or not present)
+            Integer ref = null;
+            String trace = null;
+
+            if (p.nextToken() != JsonToken.END_ARRAY) {
+                ref = p.currentToken() == JsonToken.VALUE_NULL ? null : p.getIntValue();
+
+                // Read optional trace
+                if (p.nextToken() != JsonToken.END_ARRAY) {
+                    trace = p.currentToken() == JsonToken.VALUE_NULL ? null : p.getText();
+                    p.nextToken(); // consume END_ARRAY
+                }
+            }
+
+            return new RpcObjectData(state, valueType, value, ref, trace);
+        }
     }
 }

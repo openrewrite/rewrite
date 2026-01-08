@@ -24,6 +24,15 @@ import {ExecutionContext} from "../../execution";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
 
+/**
+ * A no-op recipe that does nothing. Used for performance testing.
+ */
+class NoopRecipe extends Recipe {
+    name = "org.openrewrite.noop";
+    displayName = "Do nothing";
+    description = "Default no-op recipe, does nothing.";
+}
+
 export class PrepareRecipe {
     constructor(private readonly id: string, private readonly options?: any) {
     }
@@ -41,14 +50,20 @@ export class PrepareRecipe {
                 (context) => async (request) => {
                     context.target = request.id;
                     const id = snowflake.generate();
-                    const recipeCtor = marketplace.findRecipe(request.id);
-                    if (!recipeCtor) {
-                        throw new Error(`Could not find recipe with id ${request.id}`);
+
+                    let recipe: Recipe;
+                    if (request.id === "noop") {
+                        recipe = new NoopRecipe();
+                    } else {
+                        const recipeCtor = marketplace.findRecipe(request.id);
+                        if (!recipeCtor) {
+                            throw new Error(`Could not find recipe with id ${request.id}`);
+                        }
+                        if (!recipeCtor[1]) {
+                            throw new Error(`Recipe ${request.id} was installed without a constructor`);
+                        }
+                        recipe = new recipeCtor[1](request.options);
                     }
-                    if (!recipeCtor[1]) {
-                        throw new Error(`Recipe ${request.id} was installed without a constructor`);
-                    }
-                    let recipe = new recipeCtor[1](request.options);
 
                     const editPreconditions: Precondition[] = [];
                     recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);

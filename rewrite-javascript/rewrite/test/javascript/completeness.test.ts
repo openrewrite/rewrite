@@ -85,12 +85,19 @@ describe('JS LST element tree', () => {
             [classCode.split(" ")[0], classCode]
         ));
 
-    test.each([
-        "JavaScriptReceiver",
-        "JavaScriptSender",
-    ])("rpc.ts / %s", (className) => {
-        const rpcTsMethods = Array.from(rpcTsContentByClass.get(className)!
+    test("rpc.ts / JavaScriptSender", () => {
+        const rpcTsMethods = Array.from(rpcTsContentByClass.get("JavaScriptSender")!
             .matchAll(/override async (visit\w+)[(<]/gm), m => m[1])
+            .filter(m => !excused.includes(m))
+            .sort();
+
+        expect(rpcTsMethods).toEqual(visitorJavascriptMethods);
+    })
+
+    test("rpc.ts / JavaScriptReceiver", () => {
+        // Receiver is sync, so it doesn't use 'override async'
+        const rpcTsMethods = Array.from(rpcTsContentByClass.get("JavaScriptReceiver")!
+            .matchAll(/^\s+(visit\w+)\([^)]+: (?:JS|JSX)\./gm), m => m[1])
             .filter(m => !excused.includes(m))
             .sort();
 

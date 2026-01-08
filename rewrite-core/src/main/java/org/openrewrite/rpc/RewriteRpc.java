@@ -185,6 +185,19 @@ public class RewriteRpc {
         jsonRpc.shutdown();
     }
 
+    /**
+     * Resets all caches. Used for benchmarking to ensure a clean state between runs.
+     */
+    public void reset() {
+        preparedRecipes.clear();
+        remoteObjects.clear();
+        localObjects.clear();
+        localObjectIds.clear();
+        remoteRefs.clear();
+        localRefs.clear();
+        remoteLanguages = null;
+    }
+
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
         return visit(sourceFile, visitorName, p, null);
     }

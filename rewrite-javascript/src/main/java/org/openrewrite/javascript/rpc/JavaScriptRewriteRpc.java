@@ -107,6 +107,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Resets all caches on both the Java and Node.js sides.
+     * Used for benchmarking to ensure a clean state between runs.
+     */
+    public void reset() {
+        super.reset();
+        send("Reset", null, Boolean.class);
+    }
+
+    /**
      * Parses an entire JavaScript/TypeScript project directory.
      * Discovers and parses all relevant source files, package.json files, and lock files.
      *
