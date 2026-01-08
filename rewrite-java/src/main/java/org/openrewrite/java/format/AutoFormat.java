@@ -34,8 +34,9 @@ import java.util.Properties;
 @EqualsAndHashCode(callSuper = false)
 public class AutoFormat extends Recipe {
 
-    @Option(displayName = "Style",
-            description = "See https://docs.openrewrite.org/concepts-and-explanations/styles for a description on styles.",
+    @Option(displayName = "Style YAML",
+            description = "An OpenRewrite [style](https://docs.openrewrite.org/concepts-and-explanations/styles) formatted in YAML.",
+            //language=yaml
             example = "type: specs.openrewrite.org/v1beta/style\n" +
                     "name: com.yourorg.YesTabsNoStarImports\n" +
                     "styleConfigs:\n" +
