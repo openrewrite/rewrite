@@ -826,7 +826,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void useAndUpdateManagedIfLocallyManaged2() {
+    void useAndUpdateManagedIfLocallyManagedWithProperty() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:28.0-jre", "com.google.common.math.IntMath")),
           mavenProject(
