@@ -42,5 +42,5 @@ function fallbackRandomId(): UUID {
  * selected once at module load time to avoid per-call overhead.
  */
 export const randomId: () => UUID = typeof crypto.randomUUID === 'function'
-    ? () => crypto.randomUUID()
+    ? crypto.randomUUID
     : fallbackRandomId;
