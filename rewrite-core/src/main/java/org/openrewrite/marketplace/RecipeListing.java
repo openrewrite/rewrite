@@ -15,57 +15,98 @@
  */
 package org.openrewrite.marketplace;
 
+import lombok.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.NlsRewrite;
 import org.openrewrite.Recipe;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-public interface RecipeListing {
-    String getName();
+import static java.util.Collections.singleton;
 
-    @NlsRewrite.DisplayName
-    String getDisplayName();
+@Getter
+@RequiredArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class RecipeListing implements Comparable<RecipeListing> {
+    /**
+     * The marketplace that this listing belongs to.
+     */
+    @With
+    private final @Nullable RecipeMarketplace marketplace;
 
-    @NlsRewrite.Description
-    String getDescription();
+    private final @EqualsAndHashCode.Include String name;
+    private final @NlsRewrite.DisplayName String displayName;
+    private final @NlsRewrite.Description String description;
+    private final @Nullable Duration estimatedEffortPerOccurrence;
+    private final List<OptionDescriptor> options;
+    private final List<DataTableDescriptor> dataTables;
 
     /**
-     * @return The bundle that contains this recipe, or null
-     * if the source of the recipe is unknown.
+     * The count of all recipes listed in {@link Recipe#getRecipeList()} both directly
+     * and transitively. This simple count is a useful measure to expose in the recipe
+     * marketplace because it can be used as a sorting criteria. In the "more is better"
+     * view of relevance, the higher the recipe count, the more likely the recipe is to
+     * be complete.
+     * <br>
+     * It also recognizes another design consideration. Migration recipes generally are
+     * built incrementally by version so that developers can use migration recipes to get
+     * to a version short of the absolute latest version that a recipe is available for.
+     * Migration recipes for a particular version compose the migration recipe from the prior
+     * version. As a result, the latest available version migration will "by construction" always
+     * have a greater recipe count than a migration for an earlier version.
      */
-    @Nullable
-    RecipeBundle getBundle();
+    private final int recipeCount;
 
-    @Nullable
-    Duration getEstimatedEffortPerOccurrence();
+    private final Map<String, Object> metadata = new LinkedHashMap<>();
 
-    List<? extends Option> getOptions();
+    @With(AccessLevel.PACKAGE)
+    private final RecipeBundle bundle;
 
-    default RecipeDescriptor describe() {
-        if (getBundle() == null) {
-            throw new IllegalStateException("Unable to describe a recipe whose bundle is unknown");
+    public RecipeBundleReader resolve() {
+        if (marketplace != null) {
+            for (RecipeBundleResolver resolver : marketplace.getResolvers()) {
+                if (resolver.getEcosystem().equals(bundle.getPackageEcosystem())) {
+                    return resolver.resolve(bundle);
+                }
+            }
         }
-        return getBundle().describe(this);
+        throw new IllegalStateException("This listing has not been configured with a resolver.");
     }
 
-    default Recipe prepare(Map<String, Object> options) {
-        if (getBundle() == null) {
-            throw new IllegalStateException("Unable to prepare a recipe whose bundle is unknown");
-        }
-        return getBundle().prepare(this, options);
+    public RecipeDescriptor describe() {
+        return resolve().describe(this);
     }
 
-    interface Option {
-        String getName();
+    public Recipe prepare(Map<String, Object> options) {
+        return resolve().prepare(this, options);
+    }
 
-        @NlsRewrite.DisplayName
-        String getDisplayName();
+    @Override
+    public int compareTo(RecipeListing o) {
+        return name.compareTo(o.name);
+    }
 
-        @NlsRewrite.Description
-        String getDescription();
+    public static RecipeListing fromDescriptor(RecipeDescriptor descriptor, RecipeBundle bundle) {
+        int recipeCount = 1;
+        RecipeDescriptor d = descriptor;
+        for (Queue<RecipeDescriptor> queue = new LinkedList<>(singleton(descriptor)); !queue.isEmpty();
+             d = queue.poll()) {
+            recipeCount += d.getRecipeList().size();
+            queue.addAll(d.getRecipeList());
+        }
+
+        return new RecipeListing(null, descriptor.getName(),
+                descriptor.getDisplayName(),
+                descriptor.getDescription(),
+                descriptor.getEstimatedEffortPerOccurrence(),
+                descriptor.getOptions(),
+                descriptor.getDataTables(),
+                recipeCount,
+                bundle
+        );
     }
 }

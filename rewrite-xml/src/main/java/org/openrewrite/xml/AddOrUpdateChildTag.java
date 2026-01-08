@@ -62,7 +62,7 @@ public class AddOrUpdateChildTag extends Recipe {
                 .and(Validated.notBlank("parentXPath", parentXPath))
                 .and(Validated.notBlank("newChildTag", newChildTag));
         try {
-            Xml.Tag.build(newChildTag);
+            Xml unused = Xml.Tag.build(newChildTag);
         } catch (Exception e) {
             validated = validated.and(Validated.invalid("newChildTag", newChildTag, "Invalid XML for child tag", e));
         }

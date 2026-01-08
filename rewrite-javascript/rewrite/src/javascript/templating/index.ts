@@ -22,10 +22,15 @@ export type {
     Any,
     TemplateParam,
     PatternOptions,
+    MatchOptions,
     TemplateParameter,
     TemplateOptions,
     RewriteRule,
-    RewriteConfig
+    RewriteConfig,
+    DebugOptions,
+    DebugLogEntry,
+    MatchExplanation,
+    MatchAttemptResult
 } from './types';
 
 // Export capture functionality
@@ -36,6 +41,7 @@ export {
     capture,
     any,
     param,
+    raw,
     _
 } from './capture';
 
@@ -50,7 +56,8 @@ export {
 // Export rewrite functionality
 export {
     rewrite,
-    fromRecipe
+    fromRecipe,
+    flattenBlock
 } from './rewrite';
 
 // Export template functionality
@@ -59,3 +66,8 @@ export {
     TemplateBuilder,
     template
 } from './template';
+
+// Export engine utilities (for testing)
+export {
+    clearTemplateCache
+} from './engine';

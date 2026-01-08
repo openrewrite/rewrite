@@ -15,22 +15,35 @@
  */
 package org.openrewrite.marketplace;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.univocity.parsers.csv.CsvWriter;
 import com.univocity.parsers.csv.CsvWriterSettings;
+import io.micrometer.core.instrument.util.StringUtils;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-import static java.util.Collections.reverse;
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 public class RecipeMarketplaceWriter {
+    private static final Set<String> EXCLUDED_DATA_TABLES = new HashSet<>(Arrays.asList(
+            "org.openrewrite.table.SearchResults",
+            "org.openrewrite.table.SourcesFileResults",
+            "org.openrewrite.table.SourcesFileErrors",
+            "org.openrewrite.table.RecipeRunStats",
+            "org.openrewrite.table.ParseFailures"
+    ));
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper()
+            .setSerializationInclusion(JsonInclude.Include.NON_DEFAULT);
 
     public @Language("csv") String toCsv(RecipeMarketplace marketplace) {
         StringWriter sw = new StringWriter();
@@ -53,236 +66,247 @@ public class RecipeMarketplaceWriter {
         CsvWriter csv = new CsvWriter(writer, settings);
 
         try {
-            // Determine the maximum depth for categories and options
-            // Start depth at 1 if this is not the root marketplace (since it will be in the path)
-            int startDepth = marketplace.isRoot() ? 0 : 1;
-            int maxCategoryDepth = calculateMaxCategoryDepth(marketplace, startDepth);
-            int maxOptions = calculateMaxOptions(marketplace);
+            int maxCategoryDepth = calculateMaxCategoryDepth(marketplace.getRoot(), -1) + 1;
+            boolean hasOptions = hasAnyOptions(marketplace.getRoot());
+            boolean hasDataTables = hasAnyDataTables(marketplace.getRoot());
+            boolean hasVersion = hasAnyVersion(marketplace);
+            boolean hasTeam = hasAnyTeam(marketplace);
+            boolean hasCategoryDescription = hasAnyCategoryDescription(marketplace.getRoot());
+            List<String> metadataKeys = collectMetadataKeys(marketplace);
 
-            // Write headers
             List<String> headers = new ArrayList<>();
-
-            // Add optional bundle columns first if any recipe has bundle info
-            Set<String> optionalColumns = findUsedOptionalColumns(marketplace);
-            if (optionalColumns.contains("ecosystem")) {
-                headers.add("ecosystem");
-            }
-            if (optionalColumns.contains("packageName")) {
-                headers.add("packageName");
-            }
-            if (optionalColumns.contains("version")) {
+            headers.add("ecosystem");
+            headers.add("packageName");
+            if (hasVersion) {
+                headers.add("requestedVersion");
                 headers.add("version");
             }
-
             headers.add("name");
             headers.add("displayName");
             headers.add("description");
+            headers.add("recipeCount");
 
             // Add category headers (left = deepest, right = shallowest)
             for (int i = 1; i <= maxCategoryDepth; i++) {
                 headers.add("category" + i);
             }
 
-            // Add option headers
-            for (int i = 1; i <= maxOptions; i++) {
-                headers.add("option" + i + "Name");
-                headers.add("option" + i + "DisplayName");
-                headers.add("option" + i + "Description");
+            // Add category description headers if any category has a description
+            if (hasCategoryDescription) {
+                for (int i = 1; i <= maxCategoryDepth; i++) {
+                    headers.add("category" + i + "Description");
+                }
             }
 
-            // Add team column at the end if present
-            if (optionalColumns.contains("team")) {
+            // Add metadata headers
+            headers.addAll(metadataKeys);
+
+            if (hasTeam) {
                 headers.add("team");
             }
 
-            csv.writeHeaders(headers);
-
-            // Write rows recursively
-            // Start with the marketplace's name in the path unless it's the epsilon root
-            List<String> categoryPath = new ArrayList<>();
-            if (!marketplace.isRoot()) {
-                categoryPath.add(marketplace.getDisplayName());
+            // Add options and dataTables columns last (less human-readable JSON content)
+            if (hasOptions) {
+                headers.add("options");
             }
-            writeCsvRecursive(csv, marketplace, categoryPath, maxCategoryDepth, maxOptions, optionalColumns);
+
+            if (hasDataTables) {
+                headers.add("dataTables");
+            }
+
+            csv.writeHeaders(headers);
+            writeCsvRecursive(csv, marketplace.getRoot(), emptyList(), emptyList(),
+                    maxCategoryDepth, hasOptions, hasDataTables, hasTeam, hasVersion, hasCategoryDescription, metadataKeys);
         } finally {
             csv.close();
         }
     }
 
-    private void writeCsvRecursive(CsvWriter csv, RecipeMarketplace marketplace,
-                                   List<String> categoryPath, int maxCategoryDepth,
-                                   int maxOptions, Set<String> optionalColumns) {
-        // Write all recipes in this category
-        for (RecipeListing recipe : marketplace.getRecipes()) {
+    private void writeCsvRecursive(CsvWriter csv, RecipeMarketplace.Category category,
+                                   List<String> categoryPath, List<String> categoryDescriptionPath,
+                                   int maxCategoryDepth, boolean hasOptions, boolean hasDataTables, boolean hasTeam,
+                                   boolean hasVersion, boolean hasCategoryDescription,
+                                   List<String> metadataKeys) {
+        for (RecipeListing recipe : category.getRecipes()) {
             List<String> row = new ArrayList<>();
-
-            // Optional bundle columns first (ecosystem, packageName, version)
             RecipeBundle bundle = recipe.getBundle();
-            if (optionalColumns.contains("ecosystem")) {
-                row.add(bundle != null ? bundle.getPackageEcosystem() : "");
+            row.add(bundle.getPackageEcosystem());
+            row.add(bundle.getPackageName());
+            if (hasVersion) {
+                row.add(StringUtils.isBlank(bundle.getRequestedVersion()) ? "" : bundle.getRequestedVersion());
+                row.add(StringUtils.isBlank(bundle.getVersion()) ? "" : bundle.getVersion());
             }
-            if (optionalColumns.contains("packageName")) {
-                row.add(bundle != null ? bundle.getPackageName() : "");
-            }
-            if (optionalColumns.contains("version")) {
-                if (bundle == null) {
-                    row.add("");
-                } else {
-                    row.add(bundle.getVersion() == null ? "" : bundle.getVersion());
-                }
-            }
-
-            // Required columns
             row.add(recipe.getName());
             row.add(recipe.getDisplayName());
             row.add(recipe.getDescription());
+            row.add(Integer.toString(recipe.getRecipeCount()));
 
             // Category columns (right-aligned: empty columns first, then categories from deepest to shallowest)
-            // Filter out the epsilon root from the path
-            List<String> filteredPath = new ArrayList<>();
-            for (String category : categoryPath) {
-                if (!RecipeMarketplace.ROOT.equals(category)) {
-                    filteredPath.add(category);
-                }
-            }
-            reverse(filteredPath);
-            // Right-align: pad with empty strings at the beginning
-            int padding = maxCategoryDepth - filteredPath.size();
+            int padding = maxCategoryDepth - categoryPath.size();
             for (int i = 0; i < maxCategoryDepth; i++) {
                 if (i < padding) {
                     row.add("");
                 } else {
-                    row.add(filteredPath.get(i - padding));
+                    row.add(categoryPath.get(i - padding));
                 }
             }
 
-            // Option columns
-            List<? extends RecipeListing.Option> options = recipe.getOptions();
-            for (int i = 0; i < maxOptions; i++) {
-                if (i < options.size()) {
-                    RecipeListing.Option option = options.get(i);
-                    row.add(option.getName());
-                    row.add(option.getDisplayName());
-                    row.add(option.getDescription());
-                } else {
-                    row.add("");
-                    row.add("");
-                    row.add("");
+            // Category description columns (if any category has a description)
+            if (hasCategoryDescription) {
+                for (int i = 0; i < maxCategoryDepth; i++) {
+                    if (i < padding) {
+                        row.add("");
+                    } else {
+                        row.add(categoryDescriptionPath.get(i - padding));
+                    }
                 }
             }
 
-            // Team column at the end if present
-            if (optionalColumns.contains("team")) {
-                String team = bundle != null ? bundle.getTeam() : null;
-                row.add(team != null ? team : "");
+            // Metadata columns
+            Map<String, Object> metadata = recipe.getMetadata();
+            for (String key : metadataKeys) {
+                Object value = metadata.get(key);
+                row.add(value != null ? String.valueOf(value) : "");
+            }
+
+            if (hasTeam) {
+                row.add(StringUtils.isBlank(bundle.getTeam()) ? "" : bundle.getTeam());
+            }
+
+            // Options column (all options in one JSON cell) - at the end for readability
+            if (hasOptions) {
+                row.add(optionsToJson(recipe.getOptions()));
+            }
+
+            // DataTables column (all data tables in one JSON array) - at the end for readability
+            if (hasDataTables) {
+                row.add(dataTablesToJson(recipe.getDataTables()));
             }
 
             csv.writeRow(row.toArray(new String[0]));
         }
 
-        // Recursively write child categories
-        for (RecipeMarketplace child : marketplace.getCategories()) {
+        for (RecipeMarketplace.Category child : category.getCategories()) {
             List<String> childPath = new ArrayList<>(categoryPath);
-            childPath.add(child.getDisplayName());
-            writeCsvRecursive(csv, child, childPath, maxCategoryDepth, maxOptions, optionalColumns);
+            childPath.add(0, child.getDisplayName());
+            List<String> childDescriptionPath = new ArrayList<>(categoryDescriptionPath);
+            childDescriptionPath.add(0, child.getDescription());
+            writeCsvRecursive(csv, child, childPath, childDescriptionPath, maxCategoryDepth, hasOptions, hasDataTables,
+                    hasTeam, hasVersion, hasCategoryDescription, metadataKeys);
         }
     }
 
-    private int calculateMaxCategoryDepth(RecipeMarketplace marketplace, int currentDepth) {
-        int maxDepth = 0;
-
-        // If this marketplace has recipes, count the current depth
-        if (!marketplace.getRecipes().isEmpty()) {
-            maxDepth = currentDepth;
+    private String optionsToJson(List<OptionDescriptor> options) {
+        if (options.isEmpty()) {
+            return "";
         }
+        try {
+            return JSON_MAPPER.writeValueAsString(options);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize options to JSON", e);
+        }
+    }
 
-        // Recurse into children
-        for (RecipeMarketplace child : marketplace.getCategories()) {
+    private String dataTablesToJson(List<DataTableDescriptor> dataTables) {
+        List<DataTableDescriptor> filtered = dataTables.stream()
+                .filter(dt -> !EXCLUDED_DATA_TABLES.contains(dt.getName()))
+                .collect(toList());
+        if (filtered.isEmpty()) {
+            return "";
+        }
+        try {
+            return JSON_MAPPER.writeValueAsString(filtered);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize data tables to JSON", e);
+        }
+    }
+
+    private int calculateMaxCategoryDepth(RecipeMarketplace.Category category, int currentDepth) {
+        int max = currentDepth;
+        for (RecipeMarketplace.Category child : category.getCategories()) {
             int childDepth = calculateMaxCategoryDepth(child, currentDepth + 1);
-            maxDepth = Math.max(maxDepth, childDepth);
+            max = Math.max(max, childDepth);
         }
-
-        return maxDepth;
-    }
-
-    private int calculateMaxOptions(RecipeMarketplace marketplace) {
-        int max = 0;
-
-        for (RecipeListing recipe : marketplace.getRecipes()) {
-            max = Math.max(max, recipe.getOptions().size());
-        }
-
-        for (RecipeMarketplace child : marketplace.getCategories()) {
-            max = Math.max(max, calculateMaxOptions(child));
-        }
-
         return max;
     }
 
-    private Set<String> findUsedOptionalColumns(RecipeMarketplace marketplace) {
-        Set<String> columns = new LinkedHashSet<>();
-
-        if (hasAnyBundle(marketplace)) {
-            columns.add("ecosystem");
-            columns.add("packageName");
-            if (hasAnyVersion(marketplace)) {
-                columns.add("version");
-            }
-            if (hasAnyTeam(marketplace)) {
-                columns.add("team");
+    private boolean hasAnyOptions(RecipeMarketplace.Category category) {
+        for (RecipeListing recipe : category.getRecipes()) {
+            if (!recipe.getOptions().isEmpty()) {
+                return true;
             }
         }
-
-        return columns;
+        for (RecipeMarketplace.Category child : category.getCategories()) {
+            if (hasAnyOptions(child)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private boolean hasAnyBundle(RecipeMarketplace marketplace) {
-        for (RecipeListing recipe : marketplace.getRecipes()) {
-            if (recipe.getBundle() != null) {
+    private boolean hasAnyDataTables(RecipeMarketplace.Category category) {
+        for (RecipeListing recipe : category.getRecipes()) {
+            for (DataTableDescriptor dt : recipe.getDataTables()) {
+                if (!EXCLUDED_DATA_TABLES.contains(dt.getName())) {
+                    return true;
+                }
+            }
+        }
+        for (RecipeMarketplace.Category child : category.getCategories()) {
+            if (hasAnyDataTables(child)) {
                 return true;
             }
         }
-
-        for (RecipeMarketplace child : marketplace.getCategories()) {
-            if (hasAnyBundle(child)) {
-                return true;
-            }
-        }
-
         return false;
     }
 
     private boolean hasAnyTeam(RecipeMarketplace marketplace) {
-        for (RecipeListing recipe : marketplace.getRecipes()) {
+        for (RecipeListing recipe : marketplace.getAllRecipes()) {
             RecipeBundle bundle = recipe.getBundle();
-            if (bundle != null && bundle.getTeam() != null) {
+            if (StringUtils.isNotBlank(bundle.getTeam())) {
                 return true;
             }
         }
-
-        for (RecipeMarketplace child : marketplace.getCategories()) {
-            if (hasAnyTeam(child)) {
-                return true;
-            }
-        }
-
         return false;
     }
 
     private boolean hasAnyVersion(RecipeMarketplace marketplace) {
-        for (RecipeListing recipe : marketplace.getRecipes()) {
+        for (RecipeListing recipe : marketplace.getAllRecipes()) {
             RecipeBundle bundle = recipe.getBundle();
-            if (bundle != null && bundle.getVersion() != null) {
+            if (StringUtils.isNotBlank(bundle.getVersion())) {
                 return true;
             }
         }
-
-        for (RecipeMarketplace child : marketplace.getCategories()) {
-            if (hasAnyVersion(child)) {
-                return true;
-            }
-        }
-
         return false;
+    }
+
+    private boolean hasAnyCategoryDescription(RecipeMarketplace.Category root) {
+        // Skip root description, only check child categories
+        for (RecipeMarketplace.Category child : root.getCategories()) {
+            if (hasAnyCategoryDescriptionRecursive(child)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasAnyCategoryDescriptionRecursive(RecipeMarketplace.Category category) {
+        if (StringUtils.isNotBlank(category.getDescription())) {
+            return true;
+        }
+        for (RecipeMarketplace.Category child : category.getCategories()) {
+            if (hasAnyCategoryDescriptionRecursive(child)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<String> collectMetadataKeys(RecipeMarketplace marketplace) {
+        Set<String> keys = new TreeSet<>();
+        for (RecipeListing recipe : marketplace.getAllRecipes()) {
+            keys.addAll(recipe.getMetadata().keySet());
+        }
+        return new ArrayList<>(keys);
     }
 }

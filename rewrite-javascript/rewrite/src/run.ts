@@ -41,7 +41,11 @@ export class Result {
 }
 
 async function hasScanningRecipe(recipe: Recipe): Promise<boolean> {
-    return recipe instanceof ScanningRecipe || (await recipe.recipeList()).some(hasScanningRecipe);
+    if (recipe instanceof ScanningRecipe) return true;
+    for (const item of (await recipe.recipeList())) {
+        if (await hasScanningRecipe(item)) return true;
+    }
+    return false;
 }
 
 async function recurseRecipeList<T>(recipe: Recipe, initial: T, fn: (recipe: Recipe, t: T) => Promise<T | undefined>): Promise<T | undefined> {
@@ -61,43 +65,100 @@ async function recursiveOnComplete(recipe: Recipe, ctx: ExecutionContext): Promi
 }
 
 export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: ExecutionContext): Promise<RecipeRun> {
+    const changeset: Result[] = [];
+    for await (const result of scheduleRunStreaming(recipe, before, ctx)) {
+        changeset.push(result);
+    }
+    return { changeset };
+}
+
+export type ProgressCallback = (phase: 'parsing' | 'scanning' | 'processing', current: number, total: number, sourcePath: string) => void;
+
+/**
+ * Streaming version of scheduleRun that yields results as soon as each file is processed.
+ * This allows callers to print diffs immediately and free memory earlier.
+ *
+ * Accepts either an array or an async iterable of source files. Files are processed
+ * immediately as they're yielded from the iterable, avoiding the need to collect all
+ * files into memory before starting work.
+ *
+ * For scanning recipes, each file is scanned immediately as it's pulled from the generator,
+ * then stored for the edit phase. The scan phase completes before any results are yielded.
+ *
+ * @param onProgress Optional callback for progress updates during scanning and processing phases.
+ */
+export async function* scheduleRunStreaming(
+    recipe: Recipe,
+    before: SourceFile[] | AsyncIterable<SourceFile>,
+    ctx: ExecutionContext,
+    onProgress?: ProgressCallback
+): AsyncGenerator<Result, void, undefined> {
     const cursor = rootCursor();
-    if (await hasScanningRecipe(recipe)) {
-        for (const b of before) {
+    const isScanning = await hasScanningRecipe(recipe);
+
+    if (isScanning) {
+        // For scanning recipes, pull files from the generator and scan them immediately.
+        // Files are stored for the later edit phase.
+        const files: SourceFile[] = [];
+        const iterable = Array.isArray(before) ? before : before;
+        const knownTotal = Array.isArray(before) ? before.length : -1; // -1 = unknown total
+
+        // Phase 1: Pull files from generator and scan each immediately
+        let scanCount = 0;
+        for await (const b of iterable) {
+            files.push(b);
+            scanCount++;
+            onProgress?.('scanning', scanCount, knownTotal, b.sourcePath);
+
+            // Scan this file immediately
             await recurseRecipeList(recipe, b, async (recipe, b2) => {
                 if (recipe instanceof ScanningRecipe) {
                     return (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor)
                 }
             });
         }
-    }
 
-    const generated = (await recurseRecipeList(recipe, [] as SourceFile[], async (recipe, generated) => {
-        if (recipe instanceof ScanningRecipe) {
-            generated.push(...await recipe.generate(recipe.accumulator(cursor, ctx), ctx));
+        const totalFiles = files.length;
+
+        // Phase 2: Collect generated files
+        const generated = (await recurseRecipeList(recipe, [] as SourceFile[], async (recipe, generated) => {
+            if (recipe instanceof ScanningRecipe) {
+                generated.push(...await recipe.generate(recipe.accumulator(cursor, ctx), ctx));
+            }
+            return generated;
+        }))!;
+
+        // Phase 3: Edit existing files and yield results immediately
+        for (let i = 0; i < files.length; i++) {
+            const b = files[i];
+            onProgress?.('processing', i + 1, totalFiles, b.sourcePath);
+            const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
+            // Always yield a result so the caller knows when each file is processed
+            yield new Result(b, editedB !== b ? editedB : b);
+            // Clear array entry to allow GC to free memory for this file
+            (files as any)[i] = null;
         }
-        return generated;
-    }))!;
 
-    const changeset: Result[] = [];
-
-    for (const b of before) {
-        const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx));
-        if (editedB !== b) {
-            changeset.push(new Result(b, editedB));
+        // Phase 4: Edit generated files and yield results
+        for (const g of generated) {
+            const editedG = await recurseRecipeList(recipe, g, async (recipe, g2) => (await recipe.editor()).visit(g2, ctx, cursor));
+            if (editedG) {
+                yield new Result(undefined, editedG);
+            }
         }
-    }
-
-    for (const g of generated) {
-        const editedG = await recurseRecipeList(recipe, g, async (recipe, g2) => (await recipe.editor()).visit(g2, ctx));
-        if (editedG) {
-            changeset.push(new Result(undefined, editedG));
+    } else {
+        // For non-scanning recipes, process files immediately as they come in
+        const iterable = Array.isArray(before) ? before : before;
+        const knownTotal = Array.isArray(before) ? before.length : -1; // -1 = unknown total
+        let processCount = 0;
+        for await (const b of iterable) {
+            processCount++;
+            onProgress?.('processing', processCount, knownTotal, b.sourcePath);
+            const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
+            // Always yield a result so the caller knows when each file is processed
+            yield new Result(b, editedB !== b ? editedB : b);
         }
     }
 
     await recursiveOnComplete(recipe, ctx);
-
-    return {
-        changeset: changeset
-    };
 }

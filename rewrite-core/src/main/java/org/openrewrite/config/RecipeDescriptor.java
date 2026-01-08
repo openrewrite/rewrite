@@ -18,20 +18,25 @@ package org.openrewrite.config;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
 import org.openrewrite.NlsRewrite;
-import org.openrewrite.marketplace.RecipeBundle;
-import org.openrewrite.marketplace.RecipeListing;
 
+import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
+
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class RecipeDescriptor implements RecipeListing {
+public class RecipeDescriptor {
     @EqualsAndHashCode.Include
     String name;
 
@@ -65,7 +70,51 @@ public class RecipeDescriptor implements RecipeListing {
 
     List<RecipeExample> examples;
 
-    @With
-    @Nullable
-    RecipeBundle bundle;
+    @Deprecated
+    URI source;
+
+    /**
+     * @param env Provides a source of category descriptors to build category names from more
+     *            than just the name segments.
+     * @return A list of category display names inferred from the structure of the recipe name,
+     * replacing individual segments of the display name with category descriptor names when those
+     * are defined to the provided environment.
+     */
+    public List<CategoryDescriptor> inferCategoriesFromName(Environment env) {
+        // Extract package from recipe name (everything before the last dot)
+        int lastDot = name.lastIndexOf('.');
+        if (lastDot == -1) {
+            return emptyList();
+        }
+
+        String packageName = name.substring(0, lastDot);
+
+        String[] parts = packageName.split("\\.");
+        List<CategoryDescriptor> categories = new ArrayList<>(parts.length);
+
+        nextPart:
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i];
+
+            String partialPackage = String.join(".", Arrays.copyOfRange(parts, 0, i + 1));
+            for (CategoryDescriptor categoryDescriptor : env.listCategoryDescriptors()) {
+                String categoryPackageName = categoryDescriptor.getPackageName();
+                if (categoryPackageName.equals(partialPackage)) {
+                    if (categoryDescriptor.isRoot()) {
+                        continue nextPart;
+                    }
+                    categories.add(categoryDescriptor);
+                    continue nextPart;
+                }
+            }
+
+            if (!part.isEmpty()) {
+                @Language("markdown") String capitalized = Character.toUpperCase(part.charAt(0)) + part.substring(1);
+                categories.add(new CategoryDescriptor(capitalized, partialPackage, "", emptySet(),
+                        false, 0, false));
+            }
+        }
+
+        return categories;
+    }
 }

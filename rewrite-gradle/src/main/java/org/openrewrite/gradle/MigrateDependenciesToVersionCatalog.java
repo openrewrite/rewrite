@@ -40,6 +40,7 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -148,7 +149,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                     public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                         if (tree instanceof SourceFile) {
                             SourceFile sourceFile = (SourceFile) tree;
-                            String path = sourceFile.getSourcePath().toString();
+                            Path path = sourceFile.getSourcePath();
                             if (path.endsWith(GRADLE_PROPERTIES) || path.endsWith(CATALOG_PATH)) {
                                 return SearchResult.found(tree);
                             }
@@ -167,13 +168,13 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                     SourceFile sourceFile = (SourceFile) tree;
 
                 // Check if version catalog already exists
-                if (sourceFile.getSourcePath().toString().endsWith(CATALOG_PATH)) {
+                if (sourceFile.getSourcePath().endsWith(CATALOG_PATH)) {
                     acc.catalogExists = true;
                     return tree;
                 }
 
                 // Parse gradle.properties to extract property values
-                if (sourceFile.getSourcePath().toString().endsWith(".properties") && sourceFile instanceof Properties.File) {
+                if (sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES) && sourceFile instanceof Properties.File) {
                     Properties.File propertiesFile = (Properties.File) sourceFile;
                     for (Properties.Content content : propertiesFile.getContent()) {
                         if (content instanceof Properties.Entry) {

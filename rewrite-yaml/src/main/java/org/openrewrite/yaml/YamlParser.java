@@ -197,7 +197,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         }
 
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
-                        int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
+                        int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix) + 1;
                         Yaml.Tag tag = null;
                         if (mappingStartEvent.getTag() != null) {
                             String prefixAfterColon = fullPrefix.substring(startIndex);
@@ -399,7 +399,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
                         }
                         Yaml.Tag tag = null;
-                        if (sse.getTag() != null) {
+                        if (sse.getTag() != null && startBracketPrefix == null) {
                             String prefixAfterColon = fullPrefix.substring(startIndex);
                             final int tagStartIndex = prefixAfterColon.indexOf('!');
                             String tagPrefix = prefixAfterColon.substring(0, tagStartIndex);
@@ -748,10 +748,29 @@ public class YamlParser implements org.openrewrite.Parser {
             this.prefix = prefix;
         }
 
+        public MappingWithPrefix(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor, @Nullable Tag tag, String prefix) {
+            super(id, markers, openingBracePrefix, entries, closingBracePrefix, anchor, tag);
+            this.prefix = prefix;
+        }
+
         @Override
         public Mapping withPrefix(String prefix) {
             this.prefix = prefix;
             return this;
+        }
+
+        @Override
+        public MappingWithPrefix withClosingBracePrefix(@Nullable String closingBracePrefix) {
+            return new MappingWithPrefix(
+                    getId(),
+                    getMarkers(),
+                    getOpeningBracePrefix(),
+                    getEntries(),
+                    closingBracePrefix,
+                    getAnchor(),
+                    getTag(),
+                    this.prefix
+            );
         }
     }
 
@@ -842,7 +861,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 if (mapping instanceof MappingWithPrefix) {
                     MappingWithPrefix mappingWithPrefix = (MappingWithPrefix) mapping;
                     return super.visitMapping(new Yaml.Mapping(mappingWithPrefix.getId(),
-                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getOpeningBracePrefix(), mappingWithPrefix.getEntries(), null, mappingWithPrefix.getAnchor(), mappingWithPrefix.getTag()), p);
+                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getOpeningBracePrefix(), mappingWithPrefix.getEntries(), mappingWithPrefix.getClosingBracePrefix(), mappingWithPrefix.getAnchor(), mappingWithPrefix.getTag()), p);
                 }
                 return super.visitMapping(mapping, p);
             }

@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,11 +26,11 @@ describe('capture types', () => {
                 // Create a capture with a type annotation
                 const x = capture({type: 'boolean'});
                 const pat = pattern`${x} || false`;
-                const match = await pat.match(binary);
+                const match = await pat.match(binary, this.cursor);
 
                 if (match) {
                     // Replace with a simpler expression
-                    return template`${x}`.apply(this.cursor, binary, match);
+                    return template`${x}`.apply(binary, this.cursor, { values: match });
                 }
                 return binary;
             }
@@ -47,11 +47,11 @@ describe('capture types', () => {
                 // Create a capture with a type annotation
                 const condition = capture({type: 'boolean'});
                 const pat = pattern`${condition} && true`;
-                const match = await pat.match(binary);
+                const match = await pat.match(binary, this.cursor);
 
                 if (match) {
                     // Use the capture in a template - type should be preserved
-                    return template`!${condition}`.apply(this.cursor, binary, match);
+                    return template`!${condition}`.apply(binary, this.cursor, { values: match });
                 }
                 return binary;
             }
@@ -69,11 +69,11 @@ describe('capture types', () => {
                 const x = capture({type: 'number'});
                 const y = capture({type: 'number'});
                 const pat = pattern`${x} + ${y}`;
-                const match = await pat.match(binary);
+                const match = await pat.match(binary, this.cursor);
 
                 if (match) {
                     // Swap the operands
-                    return template`${y} + ${x}`.apply(this.cursor, binary, match);
+                    return template`${y} + ${x}`.apply(binary, this.cursor, { values: match });
                 }
                 return binary;
             }
@@ -90,10 +90,10 @@ describe('capture types', () => {
                 // Create a capture without a type annotation
                 const x = capture();
                 const pat = pattern`${x} + 1`;
-                const match = await pat.match(binary);
+                const match = await pat.match(binary, this.cursor);
 
                 if (match) {
-                    return template`${x} * 2`.apply(this.cursor, binary, match);
+                    return template`${x} * 2`.apply(binary, this.cursor, { values: match });
                 }
                 return binary;
             }
@@ -111,7 +111,7 @@ describe('capture types', () => {
                 if (methodName.simpleName === 'toUpperCase' && method.select) {
                     // The select element is a string literal with natural type attribution from the parser
                     // Pass J element with type directly to template - type should be derived from the string type
-                    return template`${method.select.element}.toLowerCase()`.apply(this.cursor, method);
+                    return template`${method.select.element}.toLowerCase()`.apply(method, this.cursor);
                 }
                 return method;
             }
@@ -133,7 +133,7 @@ describe('capture types', () => {
                 if (binary.operator.element === J.Binary.Type.Addition) {
                     // Both operands are number literals with natural type attribution from the parser
                     // Pass both operands as J elements - types should be derived from the number types
-                    return template`${binary.right} + ${binary.left}`.apply(this.cursor, binary);
+                    return template`${binary.right} + ${binary.left}`.apply(binary, this.cursor);
                 }
                 return binary;
             }
@@ -150,10 +150,10 @@ describe('capture types', () => {
                 // Create a capture with Type.Primitive.Boolean
                 const condition = capture({type: Type.Primitive.Boolean});
                 const pat = pattern`${condition} && true`;
-                const match = await pat.match(binary);
+                const match = await pat.match(binary, this.cursor);
 
                 if (match) {
-                    return template`!${condition}`.apply(this.cursor, binary, match);
+                    return template`!${condition}`.apply(binary, this.cursor, { values: match });
                 }
                 return binary;
             }
@@ -170,10 +170,10 @@ describe('capture types', () => {
                 // Create a capture with Type.Primitive.String
                 const str = capture({type: Type.Primitive.String});
                 const pat = pattern`${str} + ""`;
-                const match = await pat.match(binary);
+                const match = await pat.match(binary, this.cursor);
 
                 if (match) {
-                    return template`${str}`.apply(this.cursor, binary, match);
+                    return template`${str}`.apply(binary, this.cursor, { values: match });
                 }
                 return binary;
             }
@@ -190,10 +190,10 @@ describe('capture types', () => {
                 // Create a capture with Type.Primitive.Double
                 const num = capture({type: Type.Primitive.Double});
                 const pat = pattern`${num} + 0`;
-                const match = await pat.match(binary);
+                const match = await pat.match(binary, this.cursor);
 
                 if (match) {
-                    return template`${num}`.apply(this.cursor, binary, match);
+                    return template`${num}`.apply(binary, this.cursor, { values: match });
                 }
                 return binary;
             }
@@ -219,10 +219,10 @@ describe('capture types', () => {
                     // Use the array type in a capture within a pattern
                     const arr = capture({type: arrayType});
                     const pat = pattern`oldMethod(${arr})`;
-                    const match = await pat.match(method);
+                    const match = await pat.match(method, this.cursor);
 
                     if (match) {
-                        return template`newMethod(${arr})`.apply(this.cursor, method, match);
+                        return template`newMethod(${arr})`.apply(method, this.cursor, { values: match });
                     }
                 }
                 return method;

@@ -2200,6 +2200,22 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void redundantSpacing() {
+        rewriteRun(
+          java(
+            """
+            /**
+            * <p>Some text.
+            *\s
+            * <p>More text.
+            */
+            class SomeClass {}
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5855")
     @Nested
     class GenericWildcard {

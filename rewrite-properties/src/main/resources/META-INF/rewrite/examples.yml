@@ -15,10 +15,11 @@
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.properties.AddProperty
 examples:
-- description: ''
+- description: '`AddPropertyTest#newProperty`'
   parameters:
   - management.metrics.enable.process.files
   - 'true'
+  - 'null'
   - 'null'
   - 'null'
   sources:
@@ -32,7 +33,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.properties.AddPropertyComment
 examples:
-- description: ''
+- description: '`AddPropertyCommentTest#shouldAddCommentToFirstProperty`'
   parameters:
   - management.metrics.enable.process.files
   - myComment
@@ -50,7 +51,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.properties.ChangePropertyKey
 examples:
-- description: ''
+- description: '`ChangePropertyKeyTest#changeKey`'
   parameters:
   - management.metrics.binders.files.enabled
   - management.metrics.enable.process.files
@@ -64,7 +65,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.properties.ChangePropertyValue
 examples:
-- description: ''
+- description: '`ChangePropertyValueTest#changeValue`'
   parameters:
   - management.metrics.binders.files.enabled
   - 'false'
@@ -79,7 +80,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.properties.CreatePropertiesFile
 examples:
-- description: ''
+- description: '`CreatePropertiesFileTest#hasCreatedPropertiesFile`'
   parameters:
   - test/test.properties
   - |
@@ -90,21 +91,13 @@ examples:
   - after: |
       # This is a comment
       x.y=z
-    language: properties
-- description: ''
-  parameters:
-  - test/test.properties
-  - after=true
-  - 'true'
-  sources:
-  - before: test.property=test
-    after: after=true
+    path: test/test.properties
     language: properties
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.properties.DeleteProperty
 examples:
-- description: ''
+- description: '`DeletePropertyTest#deleteOnlyProperty`'
   parameters:
   - delete.me
   - 'null'
@@ -116,7 +109,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.properties.search.FindProperties
 examples:
-- description: ''
+- description: '`FindPropertiesTest#findProperty`'
   parameters:
   - management.metrics.binders.files.enabled
   - 'null'

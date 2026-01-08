@@ -21,22 +21,22 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.graph.DependencyGraph;
+import org.openrewrite.maven.graph.DependencyTreeWalker;
 import org.openrewrite.maven.table.DependenciesInUse;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.table.ExplainDependenciesInUse;
+import org.openrewrite.maven.trait.MavenDependency;
+import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+
+import static java.util.stream.Collectors.joining;
 
 /**
  * Find direct and transitive dependencies, marking first order dependencies that
@@ -47,6 +47,7 @@ import java.util.Optional;
 @Value
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
+    transient ExplainDependenciesInUse explainDependenciesInUse = new ExplainDependenciesInUse(this);
 
     @Option(displayName = "Group pattern",
             description = "Group glob pattern used to match dependencies.",
@@ -86,7 +87,13 @@ public class DependencyInsight extends Recipe {
     public Validated<Object> validate() {
         Validated<Object> v = super.validate()
                 .and(Validated.test("scope", "scope is a valid Maven scope", scope,
-                        s -> Scope.fromName(s) != Scope.Invalid));
+                        s -> Scope.fromName(s) != Scope.Invalid))
+                .and(Validated.test(
+                        "coordinates",
+                        "groupIdPattern AND artifactIdPattern must not both be generic wildcards",
+                        this,
+                        r -> !("*".equals(r.groupIdPattern) && "*".equals(artifactIdPattern))
+                ));
         if (version != null) {
             v = v.and(Semver.validate(version, null));
         }
@@ -114,95 +121,127 @@ public class DependencyInsight extends Recipe {
         Scope requestedScope = scope == null ? null : Scope.fromName(scope);
 
         return new MavenIsoVisitor<ExecutionContext>() {
-            final DependencyGraph dependencyGraph = new DependencyGraph();
-            final Map<String, Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>>> pathsByScope = new HashMap<>();
-
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                // Collect dependency paths for each scope separately to avoid non-deterministic HashMap iteration
-                if (requestedScope != null) {
-                    List<ResolvedDependency> dependencies = getResolutionResult().getDependencies().get(requestedScope);
-                    if (dependencies != null) {
-                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
-                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, requestedScope.name().toLowerCase());
-                        pathsByScope.put(requestedScope.name().toLowerCase(), projectPaths);
-                    }
-                } else {
-                    getResolutionResult().getDependencies().forEach((scope, dependencies) -> {
-                        Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths = new HashMap<>();
-                        dependencyGraph.collectMavenDependencyPaths(dependencies, projectPaths, scope.name().toLowerCase());
-                        pathsByScope.put(scope.name().toLowerCase(), projectPaths);
-                    });
+                String projectName = document.getMarkers()
+                        .findFirst(JavaProject.class)
+                        .map(JavaProject::getProjectName)
+                        .orElse("");
+                String sourceSetName = document.getMarkers()
+                        .findFirst(JavaSourceSet.class)
+                        .map(JavaSourceSet::getName)
+                        .orElse("main");
+
+                Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByScope = new HashMap<>();
+                DependencyTreeWalker.Matches<Scope> matches = new DependencyTreeWalker.Matches<>();
+                collectMatchingDependencies(getResolutionResult(), dependencyPathsByScope, requestedScope, matches);
+
+                if (matches.isEmpty()) {
+                    return document;
                 }
-                return super.visitDocument(document, ctx);
+
+                for (Map.Entry<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> scopeEntry : dependencyPathsByScope.entrySet()) {
+                    for (Map.Entry<ResolvedGroupArtifactVersion, DependencyGraph> entry : scopeEntry.getValue().entrySet()) {
+                        ResolvedGroupArtifactVersion gav = entry.getKey();
+                        dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                gav.getGroupId(),
+                                gav.getArtifactId(),
+                                gav.getVersion(),
+                                gav.getDatedSnapshotVersion(),
+                                scopeEntry.getKey(),
+                                entry.getValue().getSize()
+                        ));
+                        explainDependenciesInUse.insertRow(ctx, new ExplainDependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                gav.getGroupId(),
+                                gav.getArtifactId(),
+                                gav.getVersion(),
+                                gav.getDatedSnapshotVersion(),
+                                scopeEntry.getKey(),
+                                entry.getValue().getSize(),
+                                entry.getValue().print()
+                        ));
+                    }
+                }
+
+                return (Xml.Document) new MarkIndividualDependency(onlyDirect, matches.byScope(), matches.byDirectDependency()).visitNonNull(document, ctx);
             }
 
-            @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = super.visitTag(tag, ctx);
-                if(!isDependencyTag()) {
-                    return t;
-                }
-                ResolvedDependency dependency = findDependency(t, requestedScope);
-                if(dependency == null) {
-                    return t;
-                }
-                ResolvedDependency match = dependency.findDependency(groupIdPattern, artifactIdPattern);
-                if(match == null) {
-                    return t;
-                }
-                if(version != null) {
-                    VersionComparator versionComparator = Semver.validate(version, null).getValue();
-                    if(versionComparator == null) {
-                        t = Markup.warn(t, new IllegalArgumentException("Could not construct a valid version comparator from " + version + "."));
-                    } else {
-                        if(!versionComparator.isValid(null, match.getVersion())) {
-                            return t;
-                        }
+            private void collectMatchingDependencies(
+                    MavenResolutionResult resolutionResult,
+                    Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByConfiguration,
+                    @Nullable Scope requestedScope,
+                    DependencyTreeWalker.Matches<Scope> matches
+            ) {
+                VersionComparator versionComparator = version != null ? Semver.validate(version, null).getValue() : null;
+                DependencyMatcher dependencyMatcher = new DependencyMatcher(groupIdPattern, artifactIdPattern, versionComparator);
+
+                for (Map.Entry<Scope, List<ResolvedDependency>> entry : resolutionResult.getDependencies().entrySet()) {
+                    Scope scope = entry.getKey();
+                    if (requestedScope != null && requestedScope != scope) {
+                        continue;
+                    }
+                    for (ResolvedDependency dependency : entry.getValue()) {
+                        matches.collect(scope, dependency, dependencyMatcher,
+                                (matched, path) -> {
+                                    dependencyPathsByConfiguration.computeIfAbsent(scope.name().toLowerCase(), __ -> new HashMap<>())
+                                            .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(scope.name().toLowerCase(), path);
+                                });
                     }
                 }
-                if (match == dependency) {
-                    t = SearchResult.found(t);
-                } else if (Boolean.TRUE.equals(onlyDirect)) {
-                    return t;
-                } else {
-                    t = SearchResult.found(t, match.getGav().toString());
-                }
-
-                Optional<JavaProject> javaProject = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
-                        .findFirst(JavaProject.class);
-                Optional<JavaSourceSet> javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
-                        .findFirst(JavaSourceSet.class);
-
-                Scope matchScope = Scope.fromName(match.getRequested().getScope());
-                String matchScopeName = matchScope.name().toLowerCase();
-
-                // Get the paths for this specific scope
-                Map<ResolvedGroupArtifactVersion, List<DependencyGraph.DependencyPath>> projectPaths =
-                        pathsByScope.getOrDefault(matchScopeName, new HashMap<>());
-
-                // Build the dependency graph string
-                String depGraph = dependencyGraph.buildDependencyGraph(
-                        match.getGav(),
-                        projectPaths,
-                        match.getDepth(),
-                        matchScopeName
-                );
-
-                dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
-                        javaProject.map(JavaProject::getProjectName).orElse(""),
-                        javaSourceSet.map(JavaSourceSet::getName).orElse("main"),
-                        match.getGroupId(),
-                        match.getArtifactId(),
-                        match.getVersion(),
-                        match.getDatedSnapshotVersion(),
-                        matchScopeName,
-                        match.getDepth(),
-                        depGraph
-                ));
-
-                return t;
             }
         };
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Value
+    private static class MarkIndividualDependency extends MavenIsoVisitor<ExecutionContext> {
+        @Nullable Boolean onlyDirect;
+        Map<Scope, Set<GroupArtifactVersion>> scopeToDirectDependency;
+        Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
+
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            Xml.Tag t = super.visitTag(tag, ctx);
+            if (!isDependencyTag()) {
+                return t;
+            }
+
+            Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+            for (Map.Entry<Scope, Set<GroupArtifactVersion>> entry : scopeToDirectDependency.entrySet()) {
+                if (tagScope == entry.getKey() || tagScope.isInClasspathOf(entry.getKey())) {
+                    return new MavenDependency.Matcher().get(getCursor()).map(dependency -> {
+                        ResolvedGroupArtifactVersion gav = dependency.getResolvedDependency().getGav();
+                        Optional<GroupArtifactVersion> scopeGav = entry.getValue().stream()
+                                .filter(dep -> dep.asGroupArtifact().equals(gav.asGroupArtifact()))
+                                .findAny();
+                        if (scopeGav.isPresent()) {
+                            Set<GroupArtifactVersion> mark = directDependencyToTargetDependency.get(gav.asGroupArtifactVersion());
+                            if (mark == null) {
+                                return null;
+                            }
+                            String resultText = mark.stream()
+                                    .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
+                                    .sorted()
+                                    .collect(joining(","));
+                            if (!resultText.isEmpty()) {
+                                if (Boolean.TRUE.equals(onlyDirect)) {
+                                    if (mark.stream().anyMatch(target -> gav.asGroupArtifactVersion().equals(target))) {
+                                        return SearchResult.found(t, resultText);
+                                    }
+                                } else {
+                                    return SearchResult.found(t, resultText);
+                                }
+                            }
+                        }
+                        return null;
+                    }).orElse(t);
+                }
+            }
+            return t;
+        }
     }
 }

@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -54,7 +54,8 @@ describe('variadic marker attachment', () => {
 
         // Pattern should have the captures array
         expect(pat.captures).toHaveLength(1);
-        expect(pat.captures[0].getName()).toBe('args');
-        expect(pat.captures[0].isVariadic()).toBe(true);
+        const firstCapture = pat.captures[0] as typeof args;
+        expect(firstCapture.getName()).toBe('args');
+        expect(firstCapture.isVariadic()).toBe(true);
     });
 });

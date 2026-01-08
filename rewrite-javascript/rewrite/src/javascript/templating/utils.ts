@@ -13,15 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import ts from 'typescript';
 import {Cursor} from '../..';
 import {J} from '../../java';
 import {JS} from '../index';
-import {JavaScriptParser} from '../parser';
-import {DependencyWorkspace} from '../dependency-workspace';
 import {Marker, Markers} from '../../markers';
 import {randomId} from '../../uuid';
-import {VariadicOptions, Capture, Any} from './types';
+import {ConstraintFunction, VariadicOptions} from './types';
 
 /**
  * Internal storage value type for pattern match captures.
@@ -38,102 +35,86 @@ export type CaptureStorageValue = J | J.RightPadded<J> | J[] | J.RightPadded<J>[
 export const WRAPPERS_MAP_SYMBOL = Symbol('wrappersMap');
 
 /**
- * Module-level TypeScript sourceFileCache for template parsing.
+ * Shared wrapper function name used by both patterns and templates.
+ * Using the same name allows cache sharing when pattern and template code is identical.
  */
-let templateSourceFileCache: Map<string, ts.SourceFile> | undefined;
+export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
 
 /**
- * Configure the sourceFileCache used for template parsing.
+ * Simple LRU (Least Recently Used) cache implementation using Map's insertion order.
+ * JavaScript Map maintains insertion order, so the first entry is the oldest.
  *
- * @param cache The sourceFileCache to use, or undefined to disable caching
+ * Used by both Pattern and Template caching to provide bounded memory usage.
  */
-export function setTemplateSourceFileCache(cache?: Map<string, ts.SourceFile>): void {
-    templateSourceFileCache = cache;
-}
+export class LRUCache<K, V> {
+    private cache = new Map<K, V>();
 
-/**
- * Cache for compiled templates and patterns.
- * Stores parsed ASTs to avoid expensive re-parsing and dependency resolution.
- */
-export class TemplateCache {
-    private cache = new Map<string, JS.CompilationUnit>();
-
-    /**
-     * Generates a cache key from template string, captures, and options.
-     */
-    private generateKey(
-        templateString: string,
-        captures: (Capture | Any<any>)[],
-        contextStatements: string[],
-        dependencies: Record<string, string>
-    ): string {
-        // Use the actual template string (with placeholders) as the primary key
-        const templateKey = templateString;
-
-        // Capture names
-        const capturesKey = captures.map(c => c.getName()).join(',');
-
-        // Context statements
-        const contextKey = contextStatements.join(';');
-
-        // Dependencies
-        const depsKey = JSON.stringify(dependencies || {});
-
-        return `${templateKey}::${capturesKey}::${contextKey}::${depsKey}`;
+    constructor(private maxSize: number) {
     }
 
-    /**
-     * Gets a cached compilation unit or creates and caches a new one.
-     */
-    async getOrParse(
-        templateString: string,
-        captures: (Capture | Any)[],
-        contextStatements: string[],
-        dependencies: Record<string, string>
-    ): Promise<JS.CompilationUnit> {
-        const key = this.generateKey(templateString, captures, contextStatements, dependencies);
-
-        let cu = this.cache.get(key);
-        if (cu) {
-            return cu;
+    get(key: K): V | undefined {
+        const value = this.cache.get(key);
+        if (value !== undefined) {
+            // Move to end (most recently used)
+            this.cache.delete(key);
+            this.cache.set(key, value);
         }
-
-        // Create workspace if dependencies are provided
-        // DependencyWorkspace has its own cache, so multiple templates with
-        // the same dependencies will automatically share the same workspace
-        let workspaceDir: string | undefined;
-        if (dependencies && Object.keys(dependencies).length > 0) {
-            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
-        }
-
-        // Prepend context statements for type attribution context
-        const fullTemplateString = contextStatements.length > 0
-            ? contextStatements.join('\n') + '\n' + templateString
-            : templateString;
-
-        // Parse and cache (workspace only needed during parsing)
-        // Use templateSourceFileCache if configured for ~3.2x speedup on dependency file parsing
-        const parser = new JavaScriptParser({
-            relativeTo: workspaceDir,
-            sourceFileCache: templateSourceFileCache
-        });
-        const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.ts'});
-        cu = (await parseGenerator.next()).value as JS.CompilationUnit;
-
-        this.cache.set(key, cu);
-        return cu;
+        return value;
     }
 
-    /**
-     * Clears the cache.
-     */
+    set(key: K, value: V): void {
+        // Remove if exists (to update position)
+        this.cache.delete(key);
+
+        // Add to end
+        this.cache.set(key, value);
+
+        // Evict oldest if over capacity
+        if (this.cache.size > this.maxSize) {
+            const iterator = this.cache.keys();
+            const firstEntry = iterator.next();
+            if (!firstEntry.done) {
+                this.cache.delete(firstEntry.value);
+            }
+        }
+    }
+
     clear(): void {
         this.cache.clear();
     }
 }
 
-// Global cache instance
-export const templateCache = new TemplateCache();
+/**
+ * Shared global LRU cache for both pattern and template ASTs.
+ * When pattern and template code is identical, they share the same cached AST.
+ * This mirrors JavaTemplate's unified approach in the Java implementation.
+ * Bounded to 100 entries using LRU eviction.
+ */
+export const globalAstCache = new LRUCache<string, J>(100);
+
+/**
+ * Generates a cache key for template/pattern processing.
+ * Used by both Pattern and Template for consistent cache key generation.
+ *
+ * @param templateParts The template string parts
+ * @param itemsKey String representing the captures/parameters (comma-separated)
+ * @param contextStatements Context declarations
+ * @param dependencies NPM dependencies
+ * @returns A cache key string
+ */
+export function generateCacheKey(
+    templateParts: string[] | TemplateStringsArray,
+    itemsKey: string,
+    contextStatements: string[],
+    dependencies: Record<string, string>
+): string {
+    return [
+        Array.from(templateParts).join('|'),
+        itemsKey,
+        contextStatements.join(';'),
+        JSON.stringify(dependencies)
+    ].join('::');
+}
 
 /**
  * Marker that stores capture metadata on pattern AST nodes.
@@ -146,7 +127,7 @@ export class CaptureMarker implements Marker {
     constructor(
         public readonly captureName: string,
         public readonly variadicOptions?: VariadicOptions,
-        public readonly constraint?: (node: any, cursor?: Cursor) => boolean
+        public readonly constraint?: ConstraintFunction<any>
     ) {
     }
 }
@@ -261,5 +242,57 @@ export class PlaceholderUtils {
             }
         }
         return undefined;
+    }
+
+    /**
+     * Extracts the relevant AST node from a wrapper function.
+     * Used by both pattern and template processors to intelligently extract
+     * code from `function __WRAPPER__() { code }` wrappers.
+     *
+     * @param lastStatement The last statement from the compilation unit
+     * @param contextName Context name for error messages (e.g., 'Pattern', 'Template')
+     * @returns The extracted AST node
+     */
+    static extractFromWrapper(lastStatement: J, contextName: string): J {
+        let extracted: J;
+
+        // Since we always wrap in function __WRAPPER__() { code }, look for it
+        if (lastStatement.kind === J.Kind.MethodDeclaration) {
+            const method = lastStatement as J.MethodDeclaration;
+            if (method.name?.simpleName === WRAPPER_FUNCTION_NAME && method.body) {
+                const body = method.body;
+
+                // Intelligently extract based on what's in the function body
+                if (body.statements.length === 0) {
+                    throw new Error(`${contextName} function body is empty`);
+                } else if (body.statements.length === 1) {
+                    const stmt = body.statements[0].element;
+
+                    // Single expression statement → extract the expression
+                    if (stmt.kind === JS.Kind.ExpressionStatement) {
+                        extracted = (stmt as JS.ExpressionStatement).expression;
+                    }
+                    // Single block statement → keep the block
+                    else if (stmt.kind === J.Kind.Block) {
+                        extracted = stmt;
+                    }
+                    // Other single statement → keep it
+                    else {
+                        extracted = stmt;
+                    }
+                } else {
+                    // Multiple statements → keep the block
+                    extracted = body;
+                }
+            } else {
+                // Not our wrapper function
+                extracted = lastStatement;
+            }
+        } else {
+            // Shouldn't happen with our wrapping strategy, but handle it
+            extracted = lastStatement;
+        }
+
+        return extracted;
     }
 }

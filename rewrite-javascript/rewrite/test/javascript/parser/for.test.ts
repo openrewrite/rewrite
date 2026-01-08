@@ -344,8 +344,11 @@ describe('for mapping', () => {
                 const arrayBinding = <JS.ArrayBindingPattern>(forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression;
                 expect(arrayBinding.elements.elements[0].element.kind).toBe(J.Kind.Identifier);
                 expect((arrayBinding.elements.elements[0].element as J.Identifier).simpleName).toBe("first");
-                expect(arrayBinding.elements.elements[1].element.kind).toBe(J.Kind.Identifier);
-                expect((arrayBinding.elements.elements[1].element as J.Identifier).simpleName).toBe("rest");
+                // The spread element is now a JS.Spread wrapping the identifier
+                expect(arrayBinding.elements.elements[1].element.kind).toBe(JS.Kind.Spread);
+                const spread = arrayBinding.elements.elements[1].element as JS.Spread;
+                expect(spread.expression.kind).toBe(J.Kind.Identifier);
+                expect((spread.expression as J.Identifier).simpleName).toBe("rest");
             }
         }));
 });
