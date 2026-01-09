@@ -228,13 +228,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     for (ResolvedDependency d : dependencies.get(Scope.Compile)) {
                         if (hasAcceptableTransitivity(d, acc) &&
                             groupId.equals(d.getGroupId()) &&
-                            artifactId.equals(d.getArtifactId())
+                            artifactId.equals(d.getArtifactId()) &&
+                            (d.isTransitive() ||
+                                    (d.isDirect() && version.equals(d.getVersion())))
                         ) {
-                            if ((d.isDirect() && version.equals(d.getVersion())) ||
-                                    (!d.isDirect() && vc.isValid(null, d.getVersion()))
-                            ) {
-                                return maven;
-                            }
+                            return maven;
                         }
                     }
                 }
