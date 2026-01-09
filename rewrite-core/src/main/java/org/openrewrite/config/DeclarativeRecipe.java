@@ -94,8 +94,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
         Set<String> initializingRecipes = new HashSet<>();
-        initialize(uninitializedRecipes, recipeList, recipeMap::get, initializingRecipes);
-        initialize(uninitializedPreconditions, preconditions, recipeMap::get, initializingRecipes);
+        Set<String> seenDeclarativeRecipeNames = new HashSet<>();
+        initialize(uninitializedRecipes, recipeList, recipeMap::get, initializingRecipes, seenDeclarativeRecipeNames);
+        initialize(uninitializedPreconditions, preconditions, recipeMap::get, initializingRecipes, seenDeclarativeRecipeNames);
     }
 
     @Deprecated
@@ -106,8 +107,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
         Set<String> initializingRecipes = new HashSet<>();
-        initialize(uninitializedRecipes, recipeList, availableRecipes, initializingRecipes);
-        initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes);
+        Set<String> seenDeclarativeRecipeNames = new HashSet<>();
+        initialize(uninitializedRecipes, recipeList, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
+        initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
     }
 
     @Deprecated
@@ -116,7 +118,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         this.initialize(availableRecipes);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes, Set<String> seenDeclarativeRecipeNames) {
         initialized.clear();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
@@ -125,7 +127,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 Recipe subRecipe = availableRecipes.apply(recipeFqn);
                 if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
-                        initializeDeclarativeRecipe((DeclarativeRecipe) subRecipe, recipeFqn, availableRecipes, initializingRecipes);
+                        if (!seenDeclarativeRecipeNames.add(recipeFqn)) {
+                            // Skip duplicate declarative recipe
+                            continue;
+                        }
+                        initializeDeclarativeRecipe((DeclarativeRecipe) subRecipe, recipeFqn, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
                     }
                     initialized.add(subRecipe);
                 } else {
@@ -138,7 +144,12 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 }
             } else {
                 if (recipe instanceof DeclarativeRecipe) {
-                    initializeDeclarativeRecipe((DeclarativeRecipe) recipe, recipe.getName(), availableRecipes, initializingRecipes);
+                    String recipeName = recipe.getName();
+                    if (!seenDeclarativeRecipeNames.add(recipeName)) {
+                        // Skip duplicate declarative recipe
+                        continue;
+                    }
+                    initializeDeclarativeRecipe((DeclarativeRecipe) recipe, recipeName, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
                 }
                 initialized.add(recipe);
             }
@@ -146,7 +157,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
-                                             Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+                                             Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes, Set<String> seenDeclarativeRecipeNames) {
         String recipeName = declarativeRecipe.getName();
         if (initializingRecipes.contains(recipeName)) {
             // Cycle detected - throw exception to fail fast
@@ -155,8 +166,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                     "Recipe '" + recipeIdentifier + "' creates a cycle: " + cycle);
         } else {
             initializingRecipes.add(recipeName);
-            declarativeRecipe.initialize(declarativeRecipe.uninitializedRecipes, declarativeRecipe.recipeList, availableRecipes, initializingRecipes);
-            declarativeRecipe.initialize(declarativeRecipe.uninitializedPreconditions, declarativeRecipe.preconditions, availableRecipes, initializingRecipes);
+            declarativeRecipe.initialize(declarativeRecipe.uninitializedRecipes, declarativeRecipe.recipeList, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
+            declarativeRecipe.initialize(declarativeRecipe.uninitializedPreconditions, declarativeRecipe.preconditions, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
             initializingRecipes.remove(recipeName);
         }
     }
