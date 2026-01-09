@@ -120,15 +120,18 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes, Set<String> seenDeclarativeRecipeNames) {
         initialized.clear();
-        for (int i = 0; i < uninitialized.size(); i++) {
-            Recipe recipe = uninitialized.get(i);
+        Iterator<Recipe> uninitializedIterator = uninitialized.iterator();
+        int i = 0;
+        while (uninitializedIterator.hasNext()) {
+            Recipe recipe = uninitializedIterator.next();
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
                 Recipe subRecipe = availableRecipes.apply(recipeFqn);
                 if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
                         if (!seenDeclarativeRecipeNames.add(recipeFqn)) {
-                            // Skip duplicate declarative recipe
+                            // Remove duplicate declarative recipe from uninitialized list
+                            uninitializedIterator.remove();
                             continue;
                         }
                         initializeDeclarativeRecipe((DeclarativeRecipe) subRecipe, recipeFqn, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
@@ -146,13 +149,15 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 if (recipe instanceof DeclarativeRecipe) {
                     String recipeName = recipe.getName();
                     if (!seenDeclarativeRecipeNames.add(recipeName)) {
-                        // Skip duplicate declarative recipe
+                        // Remove duplicate declarative recipe from uninitialized list
+                        uninitializedIterator.remove();
                         continue;
                     }
                     initializeDeclarativeRecipe((DeclarativeRecipe) recipe, recipeName, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
                 }
                 initialized.add(recipe);
             }
+            i++;
         }
     }
 

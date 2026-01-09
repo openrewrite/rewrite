@@ -256,6 +256,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         Collection<Recipe> recipes = env.listRecipes();
         // Non-declarative recipes are not deduplicated since they may have different configurations
         assertThat(recipes).singleElement().satisfies(r -> {
+            assertThat(r.validate().failures()).isEmpty();
             assertThat(r.getRecipeList()).hasSize(3);
         });
     }
@@ -293,6 +294,7 @@ class YamlResourceLoaderTest implements RewriteTest {
           .findFirst()
           .orElseThrow();
 
+        assertThat(parentRecipe.validate().failures()).isEmpty();
         assertThat(parentRecipe.getRecipeList()).hasSize(1);
         assertThat(parentRecipe.getRecipeList().getFirst().getName()).isEqualTo("test.SubRecipe");
     }
@@ -362,6 +364,10 @@ class YamlResourceLoaderTest implements RewriteTest {
 
         // C should NOT have D since it was already seen when initializing B
         assertThat(recipeC.getRecipeList()).isEmpty();
+
+        assertThat(recipeA.validate().failures()).isEmpty();
+        assertThat(recipeB.validate().failures()).isEmpty();
+        assertThat(recipeC.validate().failures()).isEmpty();
     }
 
     @Test
@@ -441,6 +447,10 @@ class YamlResourceLoaderTest implements RewriteTest {
 
         // C should NOT have D since it was already seen when initializing B
         assertThat(recipeC.getRecipeList()).isEmpty();
+
+        assertThat(recipeA.validate().failures()).isEmpty();
+        assertThat(recipeB.validate().failures()).isEmpty();
+        assertThat(recipeC.validate().failures()).isEmpty();
     }
 
     @Test
