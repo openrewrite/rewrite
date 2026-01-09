@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.docker.DockerfileVisitor;
-import org.openrewrite.docker.internal.DockerfilePrinter;
+import org.openrewrite.docker.DockerVisitor;
+import org.openrewrite.docker.internal.DockerPrinter;
 import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
@@ -35,16 +35,16 @@ public interface Docker extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) acceptDocker(v.adapt(DockerfileVisitor.class), p);
+        return (R) acceptDocker(v.adapt(DockerVisitor.class), p);
     }
 
-    default <P> @Nullable Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+    default <P> @Nullable Docker acceptDocker(DockerVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v.isAdaptableTo(DockerfileVisitor.class);
+        return v.isAdaptableTo(DockerVisitor.class);
     }
 
     Space getPrefix();
@@ -102,13 +102,13 @@ public interface Docker extends Tree {
         Space eof;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitFile(this, p);
         }
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new DockerfilePrinter<>();
+            return new DockerPrinter<>();
         }
     }
 
@@ -139,7 +139,7 @@ public interface Docker extends Tree {
         List<Instruction> instructions;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitStage(this, p);
         }
     }
@@ -180,7 +180,7 @@ public interface Docker extends Tree {
         As as;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitFrom(this, p);
         }
 
@@ -219,7 +219,7 @@ public interface Docker extends Tree {
         CommandLine commandLine;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitRun(this, p);
         }
     }
@@ -255,7 +255,7 @@ public interface Docker extends Tree {
         Argument destination;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitAdd(this, p);
         }
     }
@@ -291,7 +291,7 @@ public interface Docker extends Tree {
         Argument destination;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitCopy(this, p);
         }
     }
@@ -317,7 +317,7 @@ public interface Docker extends Tree {
         Argument value;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitArg(this, p);
         }
     }
@@ -340,7 +340,7 @@ public interface Docker extends Tree {
         List<EnvPair> pairs;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitEnv(this, p);
         }
 
@@ -377,7 +377,7 @@ public interface Docker extends Tree {
         List<LabelPair> pairs;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitLabel(this, p);
         }
 
@@ -414,7 +414,7 @@ public interface Docker extends Tree {
         CommandLine commandLine;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitCmd(this, p);
         }
     }
@@ -437,7 +437,7 @@ public interface Docker extends Tree {
         CommandLine commandLine;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitEntrypoint(this, p);
         }
     }
@@ -460,7 +460,7 @@ public interface Docker extends Tree {
         List<Argument> ports;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitExpose(this, p);
         }
     }
@@ -484,7 +484,7 @@ public interface Docker extends Tree {
         List<Argument> values;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitVolume(this, p);
         }
     }
@@ -507,7 +507,7 @@ public interface Docker extends Tree {
         List<Argument> arguments;  // JSON array elements
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitShell(this, p);
         }
     }
@@ -530,7 +530,7 @@ public interface Docker extends Tree {
         Argument path;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitWorkdir(this, p);
         }
     }
@@ -556,7 +556,7 @@ public interface Docker extends Tree {
         Argument group;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitUser(this, p);
         }
     }
@@ -579,7 +579,7 @@ public interface Docker extends Tree {
         Argument signal;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitStopsignal(this, p);
         }
     }
@@ -602,7 +602,7 @@ public interface Docker extends Tree {
         Instruction instruction;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitOnbuild(this, p);
         }
     }
@@ -631,7 +631,7 @@ public interface Docker extends Tree {
         Cmd cmd;  // null when isNone is true
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitHealthcheck(this, p);
         }
     }
@@ -654,7 +654,7 @@ public interface Docker extends Tree {
         Argument text;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitMaintainer(this, p);
         }
     }
@@ -678,7 +678,7 @@ public interface Docker extends Tree {
         CommandForm form;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitCommandLine(this, p);
         }
     }
@@ -705,7 +705,7 @@ public interface Docker extends Tree {
         List<Argument> arguments;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitShellForm(this, p);
         }
     }
@@ -726,7 +726,7 @@ public interface Docker extends Tree {
         List<Argument> arguments;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitExecForm(this, p);
         }
     }
@@ -766,7 +766,7 @@ public interface Docker extends Tree {
         String closing;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitHeredocForm(this, p);
         }
     }
@@ -790,7 +790,7 @@ public interface Docker extends Tree {
         Argument value;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitFlag(this, p);
         }
     }
@@ -811,7 +811,7 @@ public interface Docker extends Tree {
         List<ArgumentContent> contents;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitArgument(this, p);
         }
     }
@@ -838,7 +838,7 @@ public interface Docker extends Tree {
         String text;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitPlainText(this, p);
         }
     }
@@ -864,7 +864,7 @@ public interface Docker extends Tree {
         }
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitQuotedString(this, p);
         }
     }
@@ -886,7 +886,7 @@ public interface Docker extends Tree {
         boolean braced;
 
         @Override
-        public <P> Docker acceptDocker(DockerfileVisitor<P> v, P p) {
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitEnvironmentVariable(this, p);
         }
     }

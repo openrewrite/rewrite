@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
 
-public class DockerfileVisitor<P> extends TreeVisitor<Docker, P> {
+public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
 
     public Space visitSpace(Space space, P p) {
         return space;

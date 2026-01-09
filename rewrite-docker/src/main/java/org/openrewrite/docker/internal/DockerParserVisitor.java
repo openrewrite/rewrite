@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
-public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Docker> {
+public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     private final Path path;
     private final String source;
     private final Charset charset;
@@ -52,7 +52,7 @@ public class DockerfileParserVisitor extends DockerfileParserBaseVisitor<Docker>
     private int cursor = 0;
     private int codePointCursor = 0;
 
-    public DockerfileParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
+    public DockerParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
         this.path = path;
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();

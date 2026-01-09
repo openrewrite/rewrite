@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@
 package org.openrewrite.docker.internal;
 
 import org.openrewrite.PrintOutputCapture;
-import org.openrewrite.docker.DockerfileVisitor;
+import org.openrewrite.docker.DockerVisitor;
 import org.openrewrite.docker.tree.Comment;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.marker.Marker;
 
-public class DockerfilePrinter<P> extends DockerfileVisitor<PrintOutputCapture<P>> {
+public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Space visitSpace(Space space, PrintOutputCapture<P> p) {

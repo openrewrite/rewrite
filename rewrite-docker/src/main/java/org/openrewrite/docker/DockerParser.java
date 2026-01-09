@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.docker.internal.DockerfileParserVisitor;
+import org.openrewrite.docker.internal.DockerParserVisitor;
 import org.openrewrite.docker.internal.grammar.DockerfileLexer;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.tree.ParseError;
@@ -34,7 +34,7 @@ import java.nio.file.Path;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-public class DockerfileParser implements Parser {
+public class DockerParser implements Parser {
     private static final Pattern DOCKERFILE_PATTERN = Pattern.compile("(?i)(dockerfile|containerfile).*");
 
     @Override
@@ -52,7 +52,7 @@ public class DockerfileParser implements Parser {
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
-                Docker.File file = new DockerfileParserVisitor(
+                Docker.File file = new DockerParserVisitor(
                         input.getRelativePath(relativeTo),
                         input.getFileAttributes(),
                         input.getSource(ctx)
@@ -97,7 +97,7 @@ public class DockerfileParser implements Parser {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            ctx.getOnError().accept(new DockerfileParsingException(sourcePath,
+            ctx.getOnError().accept(new DockerParsingException(sourcePath,
                     String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
         }
     }
@@ -113,8 +113,8 @@ public class DockerfileParser implements Parser {
         }
 
         @Override
-        public DockerfileParser build() {
-            return new DockerfileParser();
+        public DockerParser build() {
+            return new DockerParser();
         }
 
         @Override
