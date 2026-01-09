@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, SourceFile, Tree} from "./tree";
-import {TreeVisitor} from "./visitor";
+import {AsyncTreeVisitor, TreeVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "./print";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
 import {updateIfChanged} from "./util";
@@ -31,7 +31,7 @@ export function isParseError(tree: any): tree is ParseError {
     return tree["kind"] === ParseErrorKind;
 }
 
-export class ParseErrorVisitor<P> extends TreeVisitor<Tree, P> {
+export class AsyncParseErrorVisitor<P> extends AsyncTreeVisitor<Tree, P> {
     async isAcceptable(sourceFile: SourceFile, p: P): Promise<boolean> {
         return isParseError(sourceFile);
     }
@@ -48,12 +48,29 @@ export class ParseErrorVisitor<P> extends TreeVisitor<Tree, P> {
     }
 }
 
+export class ParseErrorVisitor<P> extends TreeVisitor<Tree, P> {
+    isAcceptable(sourceFile: SourceFile, p: P): boolean {
+        return isParseError(sourceFile);
+    }
+
+    protected accept(t: Tree, p: P): Tree | undefined {
+        if (t.kind === ParseErrorKind) {
+            return this.visitParseError(t as ParseError, p);
+        }
+        throw new Error("Unexpected tree kind: " + t.kind);
+    }
+
+    protected visitParseError(e: ParseError, p: P): ParseError | undefined {
+        return this.produceTree(e, p);
+    }
+}
+
 TreePrinters.register(ParseErrorKind, () => new class extends ParseErrorVisitor<PrintOutputCapture> {
-    protected async visitParseError(e: ParseError, p: PrintOutputCapture): Promise<ParseError | undefined> {
+    protected visitParseError(e: ParseError, p: PrintOutputCapture): ParseError | undefined {
         for (let marker of e.markers.markers) {
             p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), it => it))
         }
-        await this.visitMarkers(e.markers, p);
+        this.visitMarkers(e.markers, p);
         for (let marker of e.markers.markers) {
             p.append(p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), it => it))
         }
@@ -79,14 +96,14 @@ RpcCodecs.registerCodec(ParseErrorKind, {
         });
     },
 
-    async rpcSend(after: ParseError, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, p => p.id);
-        await q.getAndSend(after, p => p.markers);
-        await q.getAndSend(after, p => p.sourcePath);
-        await q.getAndSend(after, p => p.charsetName);
-        await q.getAndSend(after, p => p.charsetBomMarked);
-        await q.getAndSend(after, p => p.checksum);
-        await q.getAndSend(after, p => p.fileAttributes);
-        await q.getAndSend(after, p => p.text);
+    rpcSend(after: ParseError, q: RpcSendQueue): void {
+        q.getAndSend(after, p => p.id);
+        q.getAndSend(after, p => p.markers);
+        q.getAndSend(after, p => p.sourcePath);
+        q.getAndSend(after, p => p.charsetName);
+        q.getAndSend(after, p => p.charsetBomMarked);
+        q.getAndSend(after, p => p.checksum);
+        q.getAndSend(after, p => p.fileAttributes);
+        q.getAndSend(after, p => p.text);
     }
 });

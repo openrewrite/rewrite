@@ -19,6 +19,7 @@ import {describe, expect, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
+    AsyncJavaScriptVisitor,
     ImportStyle,
     IntelliJ,
     javascript,
@@ -60,11 +61,11 @@ function createRemoveThenAddImportVisitor(
     const addImport = new AddImport({ module, member, alias });
 
     return new class extends JavaScriptVisitor<any> {
-        override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
+        override visitJsCompilationUnit(cu: any, p: any): J | undefined {
             // First remove the import, then add it back if referenced
-            let result = await removeImport.visit(cu, p);
+            let result = removeImport.visit(cu, p);
             if (result) {
-                result = await addImport.visit(result, p);
+                result = addImport.visit(result, p);
             }
             return result;
         }
@@ -89,9 +90,9 @@ function createForceRemoveFirstImportThenAddVisitor(
     alias?: string
 ): JavaScriptVisitor<any> {
     return new class extends JavaScriptVisitor<any> {
-        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+        override visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): J | undefined {
             // First, manually remove the first statement (the import)
-            let result: any = await this.produceJavaScript(cu, p, async draft => {
+            let result: any = this.produceJavaScript(cu, p, draft => {
                 if (draft.statements && draft.statements.length > 0) {
                     draft.statements = draft.statements.slice(1);
                     draft.statements[0].element.prefix = emptySpace;
@@ -106,7 +107,7 @@ function createForceRemoveFirstImportThenAddVisitor(
                     alias,
                     onlyIfReferenced: true
                 });
-                result = await addImport.visit(result, p) as any;
+                result = addImport.visit(result, p) as any;
             }
 
             return result;
@@ -129,7 +130,7 @@ function createAddImportWithTemplateVisitor(
     module: string,
     member?: string,
     alias?: string
-): JavaScriptVisitor<any> {
+): AsyncJavaScriptVisitor<any> {
     // Construct the import statement for type attribution
     let importStatement: string;
     if (member) {
@@ -142,7 +143,7 @@ function createAddImportWithTemplateVisitor(
         importStatement = `import ${alias || module} from '${module}'`;
     }
 
-    return new class extends JavaScriptVisitor<any> {
+    return new class extends AsyncJavaScriptVisitor<any> {
         constructor() {
             super();
             // Register AddImport in afterVisit so it runs after template changes
@@ -1061,7 +1062,7 @@ describe('AddImport visitor', () => {
             const spec = new RecipeSpec();
             // This test manually removes the import statement, then adds it back with onlyIfReferenced: true
             // This tests that type attribution correctly detects usage even when declaring type != module name
-            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            spec.recipe = fromVisitor(new class extends AsyncJavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
                     const jsCu = cu as any;
                     // First, manually remove the first statement (the import)
@@ -1744,7 +1745,7 @@ describe('AddImport visitor', () => {
 
             // Visitor that adds imports in non-alphabetical order
             const addImportsVisitor = new class extends JavaScriptVisitor<any> {
-                override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
+                override visitJsCompilationUnit(cu: any, p: any): J | undefined {
                     maybeAddImport(this, {module: 'zod', member: 'ZodType', onlyIfReferenced: false});
                     maybeAddImport(this, {module: 'zod', member: 'ZodError', onlyIfReferenced: false});
                     maybeAddImport(this, {module: 'zod', member: 'z', onlyIfReferenced: false});
@@ -1795,7 +1796,7 @@ describe('AddImport visitor', () => {
             alias?: string
         ): JavaScriptVisitor<any> {
             return new class extends JavaScriptVisitor<any> {
-                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                override visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): J | undefined {
                     // Create a SpacesStyle with es6ImportExportBraces: true using produce
                     const spacesStyle: SpacesStyle = produce(IntelliJ.TypeScript.spaces(), draft => {
                         draft.within.es6ImportExportBraces = true;
@@ -1827,7 +1828,7 @@ describe('AddImport visitor', () => {
                         alias,
                         onlyIfReferenced: false
                     });
-                    result = await addImport.visit(result, p) as JS.CompilationUnit;
+                    result = addImport.visit(result, p) as JS.CompilationUnit;
 
                     return result;
                 }

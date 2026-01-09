@@ -122,7 +122,7 @@ export class ChangeImport extends Recipe {
             private oldAlias?: string;
             private transformedImport = false;
 
-            override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
+            override visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): J | undefined {
                 // Reset tracking for each file
                 this.hasOldImport = false;
                 this.oldAlias = undefined;
@@ -143,7 +143,7 @@ export class ChangeImport extends Recipe {
                 }
 
                 // Visit the compilation unit (this will transform imports via visitJsImport)
-                let result = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
+                let result = super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
 
                 // If we transformed an import but need to add to existing import from new module,
                 // or if we only removed a member from a multi-import, use maybeAddImport
@@ -183,8 +183,8 @@ export class ChangeImport extends Recipe {
                 return result;
             }
 
-            override async visitImportDeclaration(jsImport: JS.Import, ctx: ExecutionContext): Promise<J | undefined> {
-                let imp = await super.visitImportDeclaration(jsImport, ctx) as JS.Import;
+            override visitImportDeclaration(jsImport: JS.Import, ctx: ExecutionContext): J | undefined {
+                let imp = super.visitImportDeclaration(jsImport, ctx) as JS.Import;
 
                 if (!this.hasOldImport) {
                     return imp;
@@ -235,7 +235,7 @@ export class ChangeImport extends Recipe {
                 }
             }
 
-            private async removeNamedImportMember(imp: JS.Import, memberToRemove: string, _ctx: ExecutionContext): Promise<JS.Import> {
+            private removeNamedImportMember(imp: JS.Import, memberToRemove: string, _ctx: ExecutionContext): JS.Import {
                 return produce(imp, draft => {
                     const importClause = draft.importClause;
                     if (!importClause?.namedBindings) return;
@@ -293,8 +293,8 @@ export class ChangeImport extends Recipe {
                 return imports;
             }
 
-            override async visitIdentifier(identifier: J.Identifier, ctx: ExecutionContext): Promise<J | undefined> {
-                let ident = await super.visitIdentifier(identifier, ctx) as J.Identifier;
+            override visitIdentifier(identifier: J.Identifier, ctx: ExecutionContext): J | undefined {
+                let ident = super.visitIdentifier(identifier, ctx) as J.Identifier;
 
                 if (!this.hasOldImport) {
                     return ident;
@@ -334,8 +334,8 @@ export class ChangeImport extends Recipe {
                 return ident;
             }
 
-            override async visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): Promise<J | undefined> {
-                let m = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
+            override visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J | undefined {
+                let m = super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
 
                 if (!this.hasOldImport) {
                     return m;
@@ -352,8 +352,8 @@ export class ChangeImport extends Recipe {
                 return m;
             }
 
-            override async visitFieldAccess(fieldAccess: J.FieldAccess, ctx: ExecutionContext): Promise<J | undefined> {
-                let fa = await super.visitFieldAccess(fieldAccess, ctx) as J.FieldAccess;
+            override visitFieldAccess(fieldAccess: J.FieldAccess, ctx: ExecutionContext): J | undefined {
+                let fa = super.visitFieldAccess(fieldAccess, ctx) as J.FieldAccess;
 
                 if (!this.hasOldImport) {
                     return fa;
@@ -370,8 +370,8 @@ export class ChangeImport extends Recipe {
                 return fa;
             }
 
-            override async visitFunctionCall(functionCall: JS.FunctionCall, ctx: ExecutionContext): Promise<J | undefined> {
-                let fc = await super.visitFunctionCall(functionCall, ctx) as JS.FunctionCall;
+            override visitFunctionCall(functionCall: JS.FunctionCall, ctx: ExecutionContext): J | undefined {
+                let fc = super.visitFunctionCall(functionCall, ctx) as JS.FunctionCall;
 
                 if (!this.hasOldImport) {
                     return fc;
@@ -388,8 +388,8 @@ export class ChangeImport extends Recipe {
                 return fc;
             }
 
-            override async visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): Promise<J | undefined> {
-                let nc = await super.visitNewClass(newClass, ctx) as J.NewClass;
+            override visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): J | undefined {
+                let nc = super.visitNewClass(newClass, ctx) as J.NewClass;
 
                 if (!this.hasOldImport) {
                     return nc;

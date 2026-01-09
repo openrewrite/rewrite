@@ -101,7 +101,7 @@ describe('dependency workspace', () => {
         // Verify type attribution exists
         let foundMethodInvocation = false;
         await (new class extends JavaScriptVisitor<any> {
-            protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+            protected visitMethodInvocation(method: J.MethodInvocation, _: any): J | undefined {
                 if (method.name.simpleName === 'v4') {
                     foundMethodInvocation = true;
                     // Verify that the method has type information from the workspace dependencies
@@ -133,7 +133,7 @@ describe('dependency workspace', () => {
                         afterRecipe: async cu => {
                             let foundMethodInvocation = false;
                             await (new class extends JavaScriptVisitor<any> {
-                                protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+                                protected visitMethodInvocation(method: J.MethodInvocation, _: any): J | undefined {
                                     if (method.name.simpleName === 'v4') {
                                         foundMethodInvocation = true;
                                         // Verify type attribution works with on-disk dependencies (baseline comparison)

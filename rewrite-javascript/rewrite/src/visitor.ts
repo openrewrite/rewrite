@@ -16,19 +16,27 @@
 import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
 import {create, Draft} from "mutative";
-import {mapAsync, updateIfChanged} from "./util";
+import {mapAsync, mapSync, updateIfChanged} from "./util";
 
 type Objectish = Record<string, any> | Array<any>;
 
 export type ValidRecipeReturnType<State> = State | void | undefined;
 
 export async function produceAsync<Base extends Objectish>(
-    before: Promise<Base> | Base,
+    before: Base | Base,
     recipe: (draft: Draft<Base>) => ValidRecipeReturnType<Draft<Base>> |
         PromiseLike<ValidRecipeReturnType<Draft<Base>>>
 ): Promise<Base | undefined> {
-    const b: Base = await before;
+    const b: Base = before;
     // Mutative's create(base, recipe) supports async recipes and rawReturn(undefined)
+    return create(b, recipe as any) as Base | undefined;
+}
+
+export function produceSync<Base extends Objectish>(
+    before: Base | Base,
+    recipe: (draft: Draft<Base>) => ValidRecipeReturnType<Draft<Base>>
+): Base | undefined {
+    const b: Base = before;
     return create(b, recipe as any) as Base | undefined;
 }
 
@@ -38,6 +46,130 @@ export abstract class TreeVisitor<T extends Tree, P> {
     protected cursor: Cursor = rootCursor();
     private visitCount: number = 0;
     public afterVisit: TreeVisitor<any, P>[] = [];
+
+    visitDefined<R extends T>(tree: Tree, p: P, parent?: Cursor): R {
+        return this.visit<R>(tree, p, parent)!;
+    }
+
+    visit<R extends T>(tree: Tree, p: P, parent?: Cursor): R | undefined {
+        if (parent !== undefined) {
+            this.cursor = parent;
+        }
+
+        let topLevel = false;
+        if (this.visitCount === 0) {
+            topLevel = true;
+        }
+
+        this.visitCount += 1;
+        this.cursor = new Cursor(tree, this.cursor);
+
+        let t: T | undefined
+        const isAcceptable = (!(isSourceFile(tree)) ||
+            this.isAcceptable(tree, p));
+
+        try {
+            if (isAcceptable) {
+                t = this.preVisit(tree as T, p)
+                if (this.cursor.messages.get(stopAfterPreVisit) !== true) {
+                    if (t !== undefined) {
+                        t = this.accept(t, p)
+                    }
+                    if (t !== undefined) {
+                        t = this.postVisit(t, p)
+                    }
+                }
+            }
+
+            this.cursor = this.cursor.parent!;
+
+            if (topLevel) {
+                if (this.afterVisit) {
+                    while (this.afterVisit.length > 0) {
+                        const v = this.afterVisit.shift()!;
+                        v.cursor = this.cursor;
+                        if (t !== undefined) {
+                            t = v.visit(t, p);
+                        }
+                    }
+                }
+                this.visitCount = 0;
+            }
+        } catch (e) {
+            if (e instanceof RecipeRunError) {
+                throw e;
+            }
+            throw new RecipeRunError(e as Error, this.cursor);
+        }
+
+        return (isAcceptable ? t : tree) as unknown as R;
+    }
+
+    protected accept(t: T, p: P): T | undefined {
+        return t
+    }
+
+    protected stopAfterPreVisit(): void {
+        this.cursor.messages.set(stopAfterPreVisit, true);
+    }
+
+    isAcceptable(sourceFile: SourceFile, p: P): boolean {
+        return true;
+    }
+
+    protected preVisit(tree: T, p: P): T | undefined {
+        return tree;
+    }
+
+    protected postVisit(tree: T, p: P): T | undefined {
+        return tree;
+    }
+
+    protected visitMarkers(markers: Markers, p: P): Markers {
+        if (markers === undefined) {
+            return emptyMarkers;
+        } else if (markers === emptyMarkers) {
+            return emptyMarkers;
+        } else if ((markers.markers?.length || 0) === 0) {
+            return markers;
+        }
+        return updateIfChanged(markers, {
+            markers: mapSync(markers.markers, m => this.visitMarker(m, p))
+        });
+    }
+
+    protected visitMarker<M extends Marker>(marker: M, p: P): M {
+        return marker;
+    }
+
+    protected produceTree<T extends Tree>(
+        before: T,
+        p: P,
+        recipe?: (draft: Draft<T>) => ValidRecipeReturnType<Draft<T>>
+    ): T | undefined {
+        // Visit markers separately to avoid Mutative drafting cyclic marker structures
+        const newMarkers = this.visitMarkers(before.markers, p);
+
+        if (recipe) {
+            // Remove markers before Mutative drafting to avoid cycles, then restore after
+            const withoutMarkers = { ...before, markers: emptyMarkers };
+            const result = create(withoutMarkers, recipe as any) as T | undefined;
+            if (result === undefined) {
+                return undefined;
+            }
+            // Restore markers (use newMarkers since we visited them)
+            return { ...result, markers: newMarkers } as T;
+        }
+
+        // No recipe - just update markers if changed
+        return updateIfChanged(before, { markers: newMarkers } as Partial<T>);
+    }
+}
+
+export abstract class AsyncTreeVisitor<T extends Tree, P> {
+    protected cursor: Cursor = rootCursor();
+    private visitCount: number = 0;
+    public afterVisit: (TreeVisitor<any, P> | AsyncTreeVisitor<any, P>)[] = [];
 
     async visitDefined<R extends T>(tree: Tree, p: P, parent?: Cursor): Promise<R> {
         return (await this.visit<R>(tree, p, parent))!;
@@ -79,7 +211,8 @@ export abstract class TreeVisitor<T extends Tree, P> {
                 if (this.afterVisit) {
                     while (this.afterVisit.length > 0) {
                         const v = this.afterVisit.shift()!;
-                        v.cursor = this.cursor;
+                        // Type assertion needed because 'cursor' is protected in both types
+                        (v as any).cursor = this.cursor;
                         if (t !== undefined) {
                             t = await v.visit(t, p);
                         }
@@ -125,9 +258,9 @@ export abstract class TreeVisitor<T extends Tree, P> {
         } else if ((markers.markers?.length || 0) === 0) {
             return markers;
         }
-        return updateIfChanged(markers, {
-            markers: await mapAsync(markers.markers, m => this.visitMarker(m, p))
-        });
+        return (await produceAsync<Markers>(markers, async (draft) => {
+            draft.markers = await mapAsync(markers.markers, m => this.visitMarker(m, p))
+        }))!;
     }
 
     protected async visitMarker<M extends Marker>(marker: M, p: P): Promise<M> {
@@ -141,28 +274,18 @@ export abstract class TreeVisitor<T extends Tree, P> {
             ((draft: Draft<T>) => ValidRecipeReturnType<Draft<T>>) |
             ((draft: Draft<T>) => Promise<ValidRecipeReturnType<Draft<T>>>)
     ): Promise<T | undefined> {
-        // Visit markers separately to avoid Mutative drafting cyclic marker structures
-        const newMarkers = await this.visitMarkers(before.markers, p);
-
-        if (recipe) {
-            // Remove markers before Mutative drafting to avoid cycles, then restore after
-            const withoutMarkers = { ...before, markers: emptyMarkers };
-            const result = await produceAsync(withoutMarkers, recipe);
-            if (result === undefined) {
-                return undefined;
+        return produceAsync(before, async draft => {
+            draft.markers = await this.visitMarkers(before.markers, p);
+            if (recipe) {
+                await recipe(draft);
             }
-            // Restore markers (use newMarkers since we visited them)
-            return { ...result, markers: newMarkers } as T;
-        }
-
-        // No recipe - just update markers if changed
-        return updateIfChanged(before, { markers: newMarkers } as Partial<T>);
+        });
     }
 }
 
 export function noopVisitor<T extends Tree, P>(): TreeVisitor<T, P> {
     return new class extends TreeVisitor<T, P> {
-        async visit<R extends Tree>(tree: Tree): Promise<R | undefined> {
+        visit<R extends Tree>(tree: Tree): R | undefined {
             return tree as unknown as R;
         }
     }

@@ -62,9 +62,9 @@ describe('template dependencies integration', () => {
 
         // Find the v4() call and verify pattern can match it
         let foundMatch = false;
-        await (new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await pat.match(method, this.cursor);
+        (new class extends JavaScriptVisitor<any> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                const match = pat.match(method, this.cursor);
                 if (match && method.name.simpleName === 'v4') {
                     foundMatch = true;
                     // The match succeeded, which means the pattern's AST was properly parsed
@@ -92,10 +92,10 @@ describe('template dependencies integration', () => {
         // Apply the template in a visitor
         let replacementFound = false;
         const result = await (new class extends JavaScriptVisitor<any> {
-            override async visitVariable(variable: any, p: any): Promise<any> {
+            override visitVariable(variable: any, p: any): any {
                 if (!replacementFound) {
                     // Apply the template to replace the initializer
-                    const replacement = await tmpl.apply(variable, this.cursor, { values: new Map() });
+                    const replacement = tmpl.apply(variable, this.cursor, { values: new Map() });
                     replacementFound = true;
 
                     // Verify the replacement was created
@@ -138,12 +138,12 @@ describe('template dependencies integration', () => {
         // All patterns should successfully match (proving they all parsed correctly)
         let matchCount = 0;
         await (new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                 if (method.name.simpleName === 'v4') {
                     // Try all three patterns
-                    const match1 = await pat1.match(method, this.cursor);
-                    const match2 = await pat2.match(method, this.cursor);
-                    const match3 = await pat3.match(method, this.cursor);
+                    const match1 = pat1.match(method, this.cursor);
+                    const match2 = pat2.match(method, this.cursor);
+                    const match3 = pat3.match(method, this.cursor);
 
                     if (match1) matchCount++;
                     if (match2) matchCount++;
@@ -183,10 +183,10 @@ describe('template dependencies integration', () => {
         // Verify the pattern can match and the method has type attribution
         let checkedMethodType = false;
         await (new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, _p: any): J | undefined {
                 if (method.name.simpleName === 'v1') {
                     // The pattern should match (which implicitly uses its typed internal AST)
-                    const match = await pat.match(method, this.cursor);
+                    const match = pat.match(method, this.cursor);
                     expect(match).toBeDefined();
 
                     // Verify the method has proper type attribution from dependencies
@@ -235,11 +235,11 @@ describe('template dependencies integration', () => {
         let foundV1Call = false;
         let patternMatched = false;
         await (new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, _p: any): J | undefined {
                 if (method.name.simpleName === 'v1') {
                     foundV1Call = true;
                     // The pattern should NOT match because the types are different
-                    const match = await pat.match(method, this.cursor);
+                    const match = pat.match(method, this.cursor);
                     if (match) {
                         patternMatched = true;
                     }
@@ -278,11 +278,11 @@ describe('template dependencies integration', () => {
         let foundV1Call = false;
         let patternMatched = false;
         await (new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, _p: any): J | undefined {
                 if (method.name.simpleName === 'v1') {
                     foundV1Call = true;
                     // The pattern SHOULD match because the types are the same
-                    const match = await pat.match(method, this.cursor);
+                    const match = pat.match(method, this.cursor);
                     if (match) {
                         patternMatched = true;
                     }
@@ -310,8 +310,8 @@ describe('template dependencies integration', () => {
         });
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                return await swapOperands.tryOn(this.cursor, binary) || binary;
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
+                return swapOperands.tryOn(this.cursor, binary) || binary;
             }
         });
 
@@ -326,12 +326,12 @@ describe('template dependencies integration', () => {
         const spec = new RecipeSpec();
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 const swapOperands = rewrite(() => ({
                     before: pattern`${_('left')} + ${_('right')}`,
                     after: template`${_('right')} + ${_('left')}`
                 }));
-                return await swapOperands.tryOn(this.cursor, binary) || binary;
+                return swapOperands.tryOn(this.cursor, binary) || binary;
             }
         });
 
@@ -346,7 +346,7 @@ describe('template dependencies integration', () => {
         const spec = new RecipeSpec();
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, _p: any): J | undefined {
                 // Create rewrite rules fresh for each invocation
                 const arg = capture();
                 const replaceUtilIsArray = rewrite(() => ({
@@ -365,8 +365,8 @@ describe('template dependencies integration', () => {
                     after: template`typeof ${arg} === 'boolean'`
                 }));
 
-                return await replaceUtilIsArray.tryOn(this.cursor, method) ||
-                    await replaceUtilIsBoolean.tryOn(this.cursor, method) ||
+                return replaceUtilIsArray.tryOn(this.cursor, method) ||
+                    replaceUtilIsBoolean.tryOn(this.cursor, method) ||
                     method;
             }
         });
@@ -449,7 +449,7 @@ describe('template dependencies integration', () => {
         const spec = new RecipeSpec();
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, _p: any): J | undefined {
                 const dateArg = capture('dateArg');
                 // Single pattern that matches both isDate(x) and util.isDate(x) via type attribution
                 const replaceIsDate = rewrite(() => ({
@@ -460,7 +460,7 @@ describe('template dependencies integration', () => {
                     after: template`${dateArg} instanceof Date`
                 }));
 
-                return await replaceIsDate.tryOn(this.cursor, method) || method;
+                return replaceIsDate.tryOn(this.cursor, method) || method;
             }
         });
 

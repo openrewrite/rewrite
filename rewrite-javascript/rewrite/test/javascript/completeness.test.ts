@@ -34,19 +34,20 @@ describe('JS LST element tree', () => {
         expect(tsInterfaces).toEqual(javaClasses);
     })
 
-    const visitorJavascriptMethods = Array.from(
-        readFileToString('javascript/visitor.ts').matchAll(/protected async (visit\w+)[(<]/gm), m => m[1])
-        .sort();
-    const visitorJavaMethods = Array.from(
-        readFileToString('java/visitor.ts').matchAll(/protected async (visit\w+)[(<]/gm), m => m[1])
-        .sort();
+    // Match both sync and async visitor methods, then deduplicate
+    const visitorJavascriptMethods = [...new Set(Array.from(
+        readFileToString('javascript/visitor.ts').matchAll(/protected (?:async )?(visit\w+)[(<]/gm), m => m[1])
+    )].sort();
+    const visitorJavaMethods = [...new Set(Array.from(
+        readFileToString('java/visitor.ts').matchAll(/protected (?:async )?(visit\w+)[(<]/gm), m => m[1])
+    )].sort();
     const excused = ["visitContainer", "visitExpression", "visitStatement", "visitSpace",
                                 "visitLeftPadded", "visitRightPadded",
                                 "visitOptionalContainer", "visitOptionalLeftPadded", "visitOptionalRightPadded",
                                 "visitType", "visitTypeName"];
-    const visitorMethods = visitorJavascriptMethods.concat(visitorJavaMethods)
+    const visitorMethods = [...new Set(visitorJavascriptMethods.concat(visitorJavaMethods)
         .filter(m => !excused.includes(m))
-        .sort();
+    )].sort();
 
     test("comparator.ts", () => {
         // Extract all override methods from the file
@@ -60,7 +61,7 @@ describe('JS LST element tree', () => {
             : comparatorContent;
 
         const comparatorTsMethods = Array.from(
-            baseComparatorContent.matchAll(/override async (visit\w+)[(<]/gm), m => m[1])
+            baseComparatorContent.matchAll(/override (?:async )?(visit\w+)[(<]/gm), m => m[1])
             .sort();
 
         expect(comparatorTsMethods).toEqual(visitorMethods);
@@ -86,10 +87,10 @@ describe('JS LST element tree', () => {
         ));
 
     test("rpc.ts / JavaScriptSender", () => {
-        const rpcTsMethods = Array.from(rpcTsContentByClass.get("JavaScriptSender")!
-            .matchAll(/override async (visit\w+)[(<]/gm), m => m[1])
+        const rpcTsMethods = [...new Set(Array.from(rpcTsContentByClass.get("JavaScriptSender")!
+            .matchAll(/override (?:async )?(visit\w+)[(<]/gm), m => m[1])
             .filter(m => !excused.includes(m))
-            .sort();
+        )].sort();
 
         expect(rpcTsMethods).toEqual(visitorJavascriptMethods);
     })

@@ -24,7 +24,7 @@ describe('WhitespaceReconciler', () => {
         parser.parseOne({sourcePath: 'test.ts', text: code}) as Promise<JS.CompilationUnit>;
 
     const parseOnly = (code: string) =>
-        parser.parseOnly({sourcePath: 'test.ts', text: code}) as Promise<JS.CompilationUnit>;
+        parser.parseOnly({sourcePath: 'test.ts', text: code}) as JS.CompilationUnit;
 
     const print = (cu: JS.CompilationUnit) => TreePrinters.print(cu);
 
@@ -33,7 +33,7 @@ describe('WhitespaceReconciler', () => {
         const original = await parse('const x=1');
 
         // Formatted code (no types for speed)
-        const formatted = await parseOnly('const x = 1');
+        const formatted = parseOnly('const x = 1');
 
         // Reconcile
         const reconciler = new WhitespaceReconciler();
@@ -53,7 +53,7 @@ describe('WhitespaceReconciler', () => {
         const original = await parse('const x = 1');
 
         // Formatted: different structure (function call)
-        const formatted = await parseOnly('foo()');
+        const formatted = parseOnly('foo()');
 
         // Reconcile - should return original unchanged
         const reconciler = new WhitespaceReconciler();
@@ -67,7 +67,7 @@ describe('WhitespaceReconciler', () => {
     it('should preserve markers from original tree', async () => {
         // For this test we just verify the structure is preserved
         const original = await parse('const x = 1; const y = 2');
-        const formatted = await parseOnly('const x = 1;\nconst y = 2');
+        const formatted = parseOnly('const x = 1;\nconst y = 2');
 
         const reconciler = new WhitespaceReconciler();
         const result = reconciler.reconcile(original, formatted);
@@ -78,7 +78,7 @@ describe('WhitespaceReconciler', () => {
 
     it('parseOnly should produce AST that prints identically to parse', async () => {
         const withTypes = await parse('const x: number = 1');
-        const withoutTypes = await parseOnly('const x: number = 1');
+        const withoutTypes = parseOnly('const x: number = 1');
 
         // Both should parse and print the same
         const printed1 = await print(withTypes);
@@ -88,7 +88,7 @@ describe('WhitespaceReconciler', () => {
 
     it('should reconcile multi-line formatting', async () => {
         const original = await parse('const fn = () => { return 1 }');
-        const formatted = await parseOnly(`const fn = () => {
+        const formatted = parseOnly(`const fn = () => {
   return 1;
 };
 `);
@@ -103,7 +103,7 @@ describe('WhitespaceReconciler', () => {
 
     it('should reconcile binary expression spacing', async () => {
         const original = await parse('const x=1+2');
-        const formatted = await parseOnly('const x = 1 + 2');
+        const formatted = parseOnly('const x = 1 + 2');
 
         const reconciler = new WhitespaceReconciler();
         const result = reconciler.reconcile(original, formatted);

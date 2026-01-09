@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Minutes, Recipe, RecipeDescriptor, ScanningRecipe} from "../recipe";
+import {Minutes, Recipe, RecipeDescriptor, RecipeVisitor, ScanningRecipe} from "../recipe";
 import {RewriteRpc} from "./rewrite-rpc";
-import {noopVisitor, TreeVisitor} from "../visitor";
+import {AsyncTreeVisitor, noopVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {SourceFile, Tree} from "../tree";
 
@@ -46,11 +46,11 @@ export class RpcRecipe extends ScanningRecipe<number> {
         return 0
     }
 
-    async editorWithData(_acc: number): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editorWithData(_acc: number): Promise<RecipeVisitor<any>> {
         return this.editVisitor ? new RpcVisitor(this.rpc, this.editVisitor) : noopVisitor();
     }
 
-    async scanner(_acc: number): Promise<TreeVisitor<any, ExecutionContext>> {
+    async scanner(_acc: number): Promise<RecipeVisitor<any>> {
         return this.scanVisitor ? new RpcVisitor(this.rpc, this.scanVisitor) : noopVisitor();
     }
 
@@ -82,7 +82,7 @@ export class RpcRecipe extends ScanningRecipe<number> {
     }
 }
 
-export class RpcVisitor extends TreeVisitor<Tree, ExecutionContext> {
+export class RpcVisitor extends AsyncTreeVisitor<Tree, ExecutionContext> {
     constructor(
         private readonly rpc: RewriteRpc,
         private readonly visitorName: string

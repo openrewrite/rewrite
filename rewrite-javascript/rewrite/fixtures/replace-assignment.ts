@@ -37,7 +37,7 @@ export class ReplaceAssignment extends Recipe {
         const envVar = this.variable;
         const envVarValue = "'" + process.env[envVar] + "'";
         return new class extends JavaScriptVisitor<ExecutionContext> {
-            protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, c: ExecutionContext): Promise<J | undefined> {
+            protected visitVariable(variable: J.VariableDeclarations.NamedVariable, c: ExecutionContext): J | undefined {
                 if ((variable.initializer!.element as J.Literal).valueSource === envVarValue) {
                     return super.visitVariable(variable, c);
                 }

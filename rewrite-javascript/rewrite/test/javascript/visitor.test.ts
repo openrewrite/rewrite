@@ -16,8 +16,15 @@
 
 import {Cursor, ExecutionContext, produceAsync} from "../../src";
 import {emptySpace, Expression, J, rightPadded} from "../../src/java";
-import {JavaScriptVisitor, JS, template, typescript} from "../../src/javascript";
-import {autoFormat, maybeAutoFormat} from "../../src/javascript/format";
+import {
+    AsyncJavaScriptVisitor,
+    autoFormat,
+    JavaScriptVisitor,
+    JS,
+    maybeAutoFormat,
+    template,
+    typescript
+} from "../../src/javascript";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 
 describe('JavaScript visitor formatting', () => {
@@ -26,7 +33,7 @@ describe('JavaScript visitor formatting', () => {
         ['autoFormat', false]
     ])('%s formats code after modification', async (formatMethod: string) => {
         // given
-        class AddArgumentVisitor extends JavaScriptVisitor<ExecutionContext> {
+        class AddArgumentVisitor extends AsyncJavaScriptVisitor<ExecutionContext> {
             protected override async visitMethodInvocation(
                 method: J.MethodInvocation,
                 ctx: ExecutionContext
@@ -34,13 +41,13 @@ describe('JavaScript visitor formatting', () => {
                 const original = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
                 const altered = await produceAsync(original, async draft => {
                     const newArg = await template`\`extra\``.apply(original, this.cursor) as Expression;
-
+                
                     draft.arguments.elements = [
                         ...draft.arguments.elements,
                         rightPadded(newArg, emptySpace)
                     ];
                 });
-
+            
                 if (formatMethod == 'maybeAutoFormat') {
                     return maybeAutoFormat(original, altered!, ctx);
                 } else {
@@ -68,7 +75,7 @@ describe('JavaScript visitor formatting', () => {
             let pathToRoot: any[] = [];
 
             class CursorInspectionVisitor extends JavaScriptVisitor<ExecutionContext> {
-                protected override async visitLiteral(literal: J.Literal, ctx: ExecutionContext): Promise<J | undefined> {
+                protected override visitLiteral(literal: J.Literal, ctx: ExecutionContext): J | undefined {
                     if (literal.valueSource === '"b"') {
                         let current: Cursor | undefined = this.cursor;
                         while (current !== undefined) {

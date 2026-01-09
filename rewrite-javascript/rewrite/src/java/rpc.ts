@@ -23,36 +23,36 @@ import {updateIfChanged} from "../util";
 import Space = J.Space;
 
 class TypeSender extends TypeVisitor<RpcSendQueue> {
-    protected async visitPrimitive(primitive: Type.Primitive, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSend(primitive, p => p.keyword);
+    protected visitPrimitive(primitive: Type.Primitive, q: RpcSendQueue): Type | undefined {
+        q.getAndSend(primitive, p => p.keyword);
         return primitive;
     }
 
-    protected async visitClass(cls: Type.Class, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSend(cls, c => c.flags);
-        await q.getAndSend(cls, c => c.classKind);
-        await q.getAndSend(cls, c => c.fullyQualifiedName);
-        await q.getAndSendList(cls, c => (c.typeParameters || []).map(t => asRef(t)), t => Type.signature(t), t => this.visit(t, q));
-        await q.getAndSend(cls, c => asRef(c.supertype), st => this.visit(st, q));
-        await q.getAndSend(cls, c => asRef(c.owningClass), oc => this.visit(oc, q));
-        await q.getAndSendList(cls, c => (c.annotations || []).map(a => asRef(a)), t => Type.signature(t), a => this.visit(a, q));
-        await q.getAndSendList(cls, c => (c.interfaces || []).map(i => asRef(i)), t => Type.signature(t), i => this.visit(i, q));
-        await q.getAndSendList(cls, c => (c.members || []).map(m => asRef(m)), t => Type.signature(t), m => this.visit(m, q));
-        await q.getAndSendList(cls, c => (c.methods || []).map(m => asRef(m)), t => Type.signature(t), m => this.visit(m, q));
+    protected visitClass(cls: Type.Class, q: RpcSendQueue): Type | undefined {
+        q.getAndSend(cls, c => c.flags);
+        q.getAndSend(cls, c => c.classKind);
+        q.getAndSend(cls, c => c.fullyQualifiedName);
+        q.getAndSendList(cls, c => (c.typeParameters || []).map(t => asRef(t)), t => Type.signature(t), t => this.visit(t, q));
+        q.getAndSend(cls, c => asRef(c.supertype), st => this.visit(st, q));
+        q.getAndSend(cls, c => asRef(c.owningClass), oc => this.visit(oc, q));
+        q.getAndSendList(cls, c => (c.annotations || []).map(a => asRef(a)), t => Type.signature(t), a => this.visit(a, q));
+        q.getAndSendList(cls, c => (c.interfaces || []).map(i => asRef(i)), t => Type.signature(t), i => this.visit(i, q));
+        q.getAndSendList(cls, c => (c.members || []).map(m => asRef(m)), t => Type.signature(t), m => this.visit(m, q));
+        q.getAndSendList(cls, c => (c.methods || []).map(m => asRef(m)), t => Type.signature(t), m => this.visit(m, q));
         return cls;
     }
 
-    protected async visitVariable(variable: Type.Variable, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSend(variable, v => v.name);
-        await q.getAndSend(variable, v => v.owner ? asRef(v.owner) : undefined, owner => this.visit(owner, q));
-        await q.getAndSend(variable, v => asRef(v.type), t => this.visit(t, q));
-        await q.getAndSendList(variable, v => (v.annotations || []).map(v2 => asRef(v2)), t => Type.signature(t), a => this.visit(a, q));
+    protected visitVariable(variable: Type.Variable, q: RpcSendQueue): Type | undefined {
+        q.getAndSend(variable, v => v.name);
+        q.getAndSend(variable, v => v.owner ? asRef(v.owner) : undefined, owner => this.visit(owner, q));
+        q.getAndSend(variable, v => asRef(v.type), t => this.visit(t, q));
+        q.getAndSendList(variable, v => (v.annotations || []).map(v2 => asRef(v2)), t => Type.signature(t), a => this.visit(a, q));
         return variable;
     }
 
-    protected async visitAnnotation(annotation: Type.Annotation, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSend(annotation, a => asRef(a.type), t => this.visit(t, q));
-        // await q.getAndSendList(annotation, a => (a.values || []).map(v => asRef(v)), v => {
+    protected visitAnnotation(annotation: Type.Annotation, q: RpcSendQueue): Type | undefined {
+        q.getAndSend(annotation, a => asRef(a.type), t => this.visit(t, q));
+        // q.getAndSendList(annotation, a => (a.values || []).map(v => asRef(v)), v => {
         //     let value: any;
         //     if (v.kind === Type.Kind.SingleElementValue) {
         //         const single = v as Type.Annotation.SingleElementValue;
@@ -64,50 +64,50 @@ class TypeSender extends TypeVisitor<RpcSendQueue> {
         //     return `${Type.signature(v.element)}:${value == null ? "null" : value.toString()}`;
         // }, async v => {
         //     // Handle element values inline like the Java implementation
-        //     await q.getAndSend(v, e => asRef(e.element), elem => this.visit(elem, q));
+        //     q.getAndSend(v, e => asRef(e.element), elem => this.visit(elem, q));
         //     if (v.kind === Type.Kind.SingleElementValue) {
         //         const single = v as Type.Annotation.SingleElementValue;
-        //         await q.getAndSend(single, s => s.constantValue);
-        //         await q.getAndSend(single, s => asRef(s.referenceValue), ref => this.visit(ref, q));
+        //         q.getAndSend(single, s => s.constantValue);
+        //         q.getAndSend(single, s => asRef(s.referenceValue), ref => this.visit(ref, q));
         //     } else if (v.kind === Type.Kind.ArrayElementValue) {
         //         const array = v as Type.Annotation.ArrayElementValue;
-        //         await q.getAndSendList(array, a => a.constantValues || [], val => val == null ? "null" : val.toString());
-        //         await q.getAndSendList(array, a => (a.referenceValues || []).map(r => asRef(r)), t => Type.signature(t), r => this.visit(r, q));
+        //         q.getAndSendList(array, a => a.constantValues || [], val => val == null ? "null" : val.toString());
+        //         q.getAndSendList(array, a => (a.referenceValues || []).map(r => asRef(r)), t => Type.signature(t), r => this.visit(r, q));
         //     }
         // });
         return annotation;
     }
 
-    protected async visitMethod(method: Type.Method, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSend(method, m => asRef(m.declaringType), dt => this.visit(dt, q));
-        await q.getAndSend(method, m => m.name);
-        await q.getAndSend(method, m => m.flags);
-        await q.getAndSend(method, m => asRef(m.returnType), rt => this.visit(rt, q));
-        await q.getAndSendList(method, m => m.parameterNames || [], v => v);
-        await q.getAndSendList(method, m => (m.parameterTypes || []).map(t => asRef(t)), t => Type.signature(t), pt => this.visit(pt, q));
-        await q.getAndSendList(method, m => (m.thrownExceptions || []).map(t => asRef(t)), t => Type.signature(t), et => this.visit(et, q));
-        await q.getAndSendList(method, m => (m.annotations || []).map(a => asRef(a)), t => Type.signature(t), a => this.visit(a, q));
-        await q.getAndSendList(method, m => m.defaultValue || undefined, v => v);
-        await q.getAndSendList(method, m => m.declaredFormalTypeNames || [], v => v);
+    protected visitMethod(method: Type.Method, q: RpcSendQueue): Type | undefined {
+        q.getAndSend(method, m => asRef(m.declaringType), dt => this.visit(dt, q));
+        q.getAndSend(method, m => m.name);
+        q.getAndSend(method, m => m.flags);
+        q.getAndSend(method, m => asRef(m.returnType), rt => this.visit(rt, q));
+        q.getAndSendList(method, m => m.parameterNames || [], v => v);
+        q.getAndSendList(method, m => (m.parameterTypes || []).map(t => asRef(t)), t => Type.signature(t), pt => this.visit(pt, q));
+        q.getAndSendList(method, m => (m.thrownExceptions || []).map(t => asRef(t)), t => Type.signature(t), et => this.visit(et, q));
+        q.getAndSendList(method, m => (m.annotations || []).map(a => asRef(a)), t => Type.signature(t), a => this.visit(a, q));
+        q.getAndSendList(method, m => m.defaultValue || undefined, v => v);
+        q.getAndSendList(method, m => m.declaredFormalTypeNames || [], v => v);
         return method;
     }
 
-    protected async visitArray(array: Type.Array, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSend(array, a => asRef(a.elemType), et => this.visit(et, q));
-        await q.getAndSendList(array, a => (a.annotations || []).map(ann => asRef(ann)), t => Type.signature(t), ann => this.visit(ann, q));
+    protected visitArray(array: Type.Array, q: RpcSendQueue): Type | undefined {
+        q.getAndSend(array, a => asRef(a.elemType), et => this.visit(et, q));
+        q.getAndSendList(array, a => (a.annotations || []).map(ann => asRef(ann)), t => Type.signature(t), ann => this.visit(ann, q));
         return array;
     }
 
-    protected async visitParameterized(parameterized: Type.Parameterized, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSend(parameterized, p => asRef(p.type), t => this.visit(t, q));
-        await q.getAndSendList(parameterized, p => (p.typeParameters || []).map(tp => asRef(tp)), t => Type.signature(t), tp => this.visit(tp, q));
+    protected visitParameterized(parameterized: Type.Parameterized, q: RpcSendQueue): Type | undefined {
+        q.getAndSend(parameterized, p => asRef(p.type), t => this.visit(t, q));
+        q.getAndSendList(parameterized, p => (p.typeParameters || []).map(tp => asRef(tp)), t => Type.signature(t), tp => this.visit(tp, q));
         return parameterized;
     }
 
-    protected async visitGenericTypeVariable(generic: Type.GenericTypeVariable, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSend(generic, g => g.name);
+    protected visitGenericTypeVariable(generic: Type.GenericTypeVariable, q: RpcSendQueue): Type | undefined {
+        q.getAndSend(generic, g => g.name);
         // Convert TypeScript enum to Java enum string
-        await q.getAndSend(generic, g => {
+        q.getAndSend(generic, g => {
             switch (g.variance) {
                 case Type.GenericTypeVariable.Variance.Covariant:
                     return 'COVARIANT';
@@ -118,17 +118,17 @@ class TypeSender extends TypeVisitor<RpcSendQueue> {
                     return 'INVARIANT';
             }
         });
-        await q.getAndSendList(generic, g => (g.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
+        q.getAndSendList(generic, g => (g.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
         return generic;
     }
 
-    protected async visitUnion(union: Type.Union, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSendList(union, u => (u.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
+    protected visitUnion(union: Type.Union, q: RpcSendQueue): Type | undefined {
+        q.getAndSendList(union, u => (u.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
         return union;
     }
 
-    protected async visitIntersection(intersection: Type.Intersection, q: RpcSendQueue): Promise<Type | undefined> {
-        await q.getAndSendList(intersection, i => (i.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
+    protected visitIntersection(intersection: Type.Intersection, q: RpcSendQueue): Type | undefined {
+        q.getAndSendList(intersection, i => (i.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
         return intersection;
     }
 }
@@ -165,13 +165,13 @@ class TypeReceiver {
 
     protected visitAnnotation(annotation: Type.Annotation, q: RpcReceiveQueue): Type | undefined {
         annotation.type = q.receive(annotation.type, t => this.visit(t, q) as Type.FullyQualified)!;
-        // annotation.values = await q.receiveList(annotation.values, async v => {
+        // annotation.values = q.receiveList(annotation.values, async v => {
         //     // Handle element values inline like the Java implementation
         //     if (v.kind === Type.Kind.SingleElementValue) {
         //         const single = v as Type.Annotation.SingleElementValue;
-        //         const element = await q.receive(single.element, elem => this.visit(elem, q));
-        //         const constantValue = await q.receive(single.constantValue);
-        //         const referenceValue = await q.receive(single.referenceValue, ref => this.visit(ref, q));
+        //         const element = q.receive(single.element, elem => this.visit(elem, q));
+        //         const constantValue = q.receive(single.constantValue);
+        //         const referenceValue = q.receive(single.referenceValue, ref => this.visit(ref, q));
         //         return {
         //             kind: Type.Kind.SingleElementValue,
         //             element,
@@ -180,9 +180,9 @@ class TypeReceiver {
         //         } as Type.Annotation.SingleElementValue;
         //     } else if (v.kind === Type.Kind.ArrayElementValue) {
         //         const array = v as Type.Annotation.ArrayElementValue;
-        //         const element = await q.receive(array.element, elem => this.visit(elem, q));
-        //         const constantValues = await q.receiveList(array.constantValues);
-        //         const referenceValues = await q.receiveList(array.referenceValues, r => this.visit(r, q));
+        //         const element = q.receive(array.element, elem => this.visit(elem, q));
+        //         const constantValues = q.receiveList(array.constantValues);
+        //         const referenceValues = q.receiveList(array.referenceValues, r => this.visit(r, q));
         //         return {
         //             kind: Type.Kind.ArrayElementValue,
         //             element,
@@ -288,564 +288,564 @@ class TypeReceiver {
 
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
-    protected async preVisit(j: J, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
-        await q.getAndSend(j, j2 => j2.markers);
+    protected preVisit(j: J, q: RpcSendQueue): J | undefined {
+        q.getAndSend(j, j2 => j2.id);
+        q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
+        q.getAndSend(j, j2 => j2.markers);
         return j;
     }
 
-    protected async visitAnnotatedType(annotatedType: J.AnnotatedType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(annotatedType, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSend(annotatedType, a => a.typeExpression, type => this.visit(type, q));
+    protected visitAnnotatedType(annotatedType: J.AnnotatedType, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(annotatedType, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSend(annotatedType, a => a.typeExpression, type => this.visit(type, q));
         return annotatedType;
     }
 
-    protected async visitAnnotation(annotation: J.Annotation, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(annotation, a => a.annotationType, type => this.visit(type, q));
-        await q.getAndSend(annotation, a => a.arguments, args => this.visitContainer(args, q));
+    protected visitAnnotation(annotation: J.Annotation, q: RpcSendQueue): J | undefined {
+        q.getAndSend(annotation, a => a.annotationType, type => this.visit(type, q));
+        q.getAndSend(annotation, a => a.arguments, args => this.visitContainer(args, q));
         return annotation;
     }
 
-    protected async visitArrayAccess(arrayAccess: J.ArrayAccess, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(arrayAccess, a => a.indexed, indexed => this.visit(indexed, q));
-        await q.getAndSend(arrayAccess, a => a.dimension, dim => this.visit(dim, q));
+    protected visitArrayAccess(arrayAccess: J.ArrayAccess, q: RpcSendQueue): J | undefined {
+        q.getAndSend(arrayAccess, a => a.indexed, indexed => this.visit(indexed, q));
+        q.getAndSend(arrayAccess, a => a.dimension, dim => this.visit(dim, q));
         return arrayAccess;
     }
 
-    protected async visitArrayDimension(dimension: J.ArrayDimension, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(dimension, d => d.index, idx => this.visitRightPadded(idx, q));
+    protected visitArrayDimension(dimension: J.ArrayDimension, q: RpcSendQueue): J | undefined {
+        q.getAndSend(dimension, d => d.index, idx => this.visitRightPadded(idx, q));
         return dimension;
     }
 
-    protected async visitArrayType(arrayType: J.ArrayType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(arrayType, a => a.elementType, type => this.visit(type, q));
-        await q.getAndSendList(arrayType, a => a.annotations || [], annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSend(arrayType, a => a.dimension, d => this.visitLeftPadded(d, q));
-        await q.getAndSend(arrayType, a => asRef(a.type), type => this.visitType(type, q));
+    protected visitArrayType(arrayType: J.ArrayType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(arrayType, a => a.elementType, type => this.visit(type, q));
+        q.getAndSendList(arrayType, a => a.annotations || [], annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSend(arrayType, a => a.dimension, d => this.visitLeftPadded(d, q));
+        q.getAndSend(arrayType, a => asRef(a.type), type => this.visitType(type, q));
         return arrayType;
     }
 
-    protected async visitAssert(assert: J.Assert, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(assert, a => a.condition, cond => this.visit(cond, q));
-        await q.getAndSend(assert, a => a.detail, detail => this.visitLeftPadded(detail, q));
+    protected visitAssert(assert: J.Assert, q: RpcSendQueue): J | undefined {
+        q.getAndSend(assert, a => a.condition, cond => this.visit(cond, q));
+        q.getAndSend(assert, a => a.detail, detail => this.visitLeftPadded(detail, q));
         return assert;
     }
 
-    protected async visitAssignment(assignment: J.Assignment, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(assignment, a => a.variable, variable => this.visit(variable, q));
-        await q.getAndSend(assignment, a => a.assignment, assign => this.visitLeftPadded(assign, q));
-        await q.getAndSend(assignment, a => asRef(a.type), type => this.visitType(type, q));
+    protected visitAssignment(assignment: J.Assignment, q: RpcSendQueue): J | undefined {
+        q.getAndSend(assignment, a => a.variable, variable => this.visit(variable, q));
+        q.getAndSend(assignment, a => a.assignment, assign => this.visitLeftPadded(assign, q));
+        q.getAndSend(assignment, a => asRef(a.type), type => this.visitType(type, q));
         return assignment;
     }
 
-    protected async visitAssignmentOperation(assignOp: J.AssignmentOperation, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(assignOp, a => a.variable, variable => this.visit(variable, q));
-        await q.getAndSend(assignOp, a => a.operator, op => this.visitLeftPadded(op, q));
-        await q.getAndSend(assignOp, a => a.assignment, assign => this.visit(assign, q));
-        await q.getAndSend(assignOp, a => asRef(a.type), type => this.visitType(type, q));
+    protected visitAssignmentOperation(assignOp: J.AssignmentOperation, q: RpcSendQueue): J | undefined {
+        q.getAndSend(assignOp, a => a.variable, variable => this.visit(variable, q));
+        q.getAndSend(assignOp, a => a.operator, op => this.visitLeftPadded(op, q));
+        q.getAndSend(assignOp, a => a.assignment, assign => this.visit(assign, q));
+        q.getAndSend(assignOp, a => asRef(a.type), type => this.visitType(type, q));
         return assignOp;
     }
 
-    protected async visitBinary(binary: J.Binary, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(binary, b => b.left, left => this.visit(left, q));
-        await q.getAndSend(binary, b => b.operator, op => this.visitLeftPadded(op, q));
-        await q.getAndSend(binary, b => b.right, right => this.visit(right, q));
-        await q.getAndSend(binary, a => asRef(a.type), type => this.visitType(type, q));
+    protected visitBinary(binary: J.Binary, q: RpcSendQueue): J | undefined {
+        q.getAndSend(binary, b => b.left, left => this.visit(left, q));
+        q.getAndSend(binary, b => b.operator, op => this.visitLeftPadded(op, q));
+        q.getAndSend(binary, b => b.right, right => this.visit(right, q));
+        q.getAndSend(binary, a => asRef(a.type), type => this.visitType(type, q));
         return binary;
     }
 
-    protected async visitBreak(breakStmt: J.Break, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(breakStmt, b => b.label, label => this.visit(label, q));
+    protected visitBreak(breakStmt: J.Break, q: RpcSendQueue): J | undefined {
+        q.getAndSend(breakStmt, b => b.label, label => this.visit(label, q));
         return breakStmt;
     }
 
-    protected async visitCase(caseStmt: J.Case, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(caseStmt, c => c.type);
-        await q.getAndSend(caseStmt, c => c.caseLabels, labels => this.visitContainer(labels, q));
-        await q.getAndSend(caseStmt, c => c.statements, stmts => this.visitContainer(stmts, q));
-        await q.getAndSend(caseStmt, c => c.body, body => this.visitRightPadded(body, q));
-        await q.getAndSend(caseStmt, c => c.guard, guard => this.visit(guard, q));
+    protected visitCase(caseStmt: J.Case, q: RpcSendQueue): J | undefined {
+        q.getAndSend(caseStmt, c => c.type);
+        q.getAndSend(caseStmt, c => c.caseLabels, labels => this.visitContainer(labels, q));
+        q.getAndSend(caseStmt, c => c.statements, stmts => this.visitContainer(stmts, q));
+        q.getAndSend(caseStmt, c => c.body, body => this.visitRightPadded(body, q));
+        q.getAndSend(caseStmt, c => c.guard, guard => this.visit(guard, q));
         return caseStmt;
     }
 
-    protected async visitContinue(continueStmt: J.Continue, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(continueStmt, c => c.label, label => this.visit(label, q));
+    protected visitContinue(continueStmt: J.Continue, q: RpcSendQueue): J | undefined {
+        q.getAndSend(continueStmt, c => c.label, label => this.visit(label, q));
         return continueStmt;
     }
 
-    protected async visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(controlParens, c => c.tree, tree => this.visitRightPadded(tree, q));
+    protected visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, q: RpcSendQueue): J | undefined {
+        q.getAndSend(controlParens, c => c.tree, tree => this.visitRightPadded(tree, q));
         return controlParens;
     }
 
-    protected async visitDeconstructionPattern(pattern: J.DeconstructionPattern, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(pattern, p => p.deconstructor, deconstructor => this.visit(deconstructor, q));
-        await q.getAndSend(pattern, p => p.nested, nested => this.visitContainer(nested, q));
-        await q.getAndSend(pattern, p => asRef(p.type), type => this.visitType(type, q));
+    protected visitDeconstructionPattern(pattern: J.DeconstructionPattern, q: RpcSendQueue): J | undefined {
+        q.getAndSend(pattern, p => p.deconstructor, deconstructor => this.visit(deconstructor, q));
+        q.getAndSend(pattern, p => p.nested, nested => this.visitContainer(nested, q));
+        q.getAndSend(pattern, p => asRef(p.type), type => this.visitType(type, q));
         return pattern;
     }
 
-    protected async visitDoWhileLoop(doWhile: J.DoWhileLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(doWhile, d => d.body, body => this.visitRightPadded(body, q));
-        await q.getAndSend(doWhile, d => d.whileCondition, cond => this.visitLeftPadded(cond, q));
+    protected visitDoWhileLoop(doWhile: J.DoWhileLoop, q: RpcSendQueue): J | undefined {
+        q.getAndSend(doWhile, d => d.body, body => this.visitRightPadded(body, q));
+        q.getAndSend(doWhile, d => d.whileCondition, cond => this.visitLeftPadded(cond, q));
         return doWhile;
     }
 
-    protected async visitEmpty(empty: J.Empty, _q: RpcSendQueue): Promise<J | undefined> {
+    protected visitEmpty(empty: J.Empty, _q: RpcSendQueue): J | undefined {
         // No additional properties to send
         return empty;
     }
 
-    protected async visitEnumValueSet(enumValueSet: J.EnumValueSet, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(enumValueSet, e => e.enums, enumValue => enumValue.element.id, enumValue => this.visitRightPadded(enumValue, q));
-        await q.getAndSend(enumValueSet, e => e.terminatedWithSemicolon);
+    protected visitEnumValueSet(enumValueSet: J.EnumValueSet, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(enumValueSet, e => e.enums, enumValue => enumValue.element.id, enumValue => this.visitRightPadded(enumValue, q));
+        q.getAndSend(enumValueSet, e => e.terminatedWithSemicolon);
         return enumValueSet;
     }
 
-    protected async visitEnumValue(enumValue: J.EnumValue, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(enumValue, e => e.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSend(enumValue, e => e.name, name => this.visit(name, q));
-        await q.getAndSend(enumValue, e => e.initializer, init => this.visit(init, q));
+    protected visitEnumValue(enumValue: J.EnumValue, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(enumValue, e => e.annotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSend(enumValue, e => e.name, name => this.visit(name, q));
+        q.getAndSend(enumValue, e => e.initializer, init => this.visit(init, q));
         return enumValue;
     }
 
-    protected async visitErroneous(erroneous: J.Erroneous, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(erroneous, e => e.text);
+    protected visitErroneous(erroneous: J.Erroneous, q: RpcSendQueue): J | undefined {
+        q.getAndSend(erroneous, e => e.text);
         return erroneous;
     }
 
-    protected async visitFieldAccess(fieldAccess: J.FieldAccess, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(fieldAccess, f => f.target, target => this.visit(target, q));
-        await q.getAndSend(fieldAccess, f => f.name, name => this.visitLeftPadded(name, q));
-        await q.getAndSend(fieldAccess, a => asRef(a.type), type => this.visitType(type, q));
+    protected visitFieldAccess(fieldAccess: J.FieldAccess, q: RpcSendQueue): J | undefined {
+        q.getAndSend(fieldAccess, f => f.target, target => this.visit(target, q));
+        q.getAndSend(fieldAccess, f => f.name, name => this.visitLeftPadded(name, q));
+        q.getAndSend(fieldAccess, a => asRef(a.type), type => this.visitType(type, q));
         return fieldAccess;
     }
 
-    protected async visitForEachLoop(forEach: J.ForEachLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(forEach, f => f.control, control => this.visit(control, q));
-        await q.getAndSend(forEach, f => f.body, body => this.visitRightPadded(body, q));
+    protected visitForEachLoop(forEach: J.ForEachLoop, q: RpcSendQueue): J | undefined {
+        q.getAndSend(forEach, f => f.control, control => this.visit(control, q));
+        q.getAndSend(forEach, f => f.body, body => this.visitRightPadded(body, q));
         return forEach;
     }
 
-    protected async visitForEachLoopControl(control: J.ForEachLoop.Control, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(control, c => c.variable, variable => this.visitRightPadded(variable, q));
-        await q.getAndSend(control, c => c.iterable, iterable => this.visitRightPadded(iterable, q));
+    protected visitForEachLoopControl(control: J.ForEachLoop.Control, q: RpcSendQueue): J | undefined {
+        q.getAndSend(control, c => c.variable, variable => this.visitRightPadded(variable, q));
+        q.getAndSend(control, c => c.iterable, iterable => this.visitRightPadded(iterable, q));
         return control;
     }
 
-    protected async visitForLoop(forLoop: J.ForLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(forLoop, f => f.control, control => this.visit(control, q));
-        await q.getAndSend(forLoop, f => f.body, body => this.visitRightPadded(body, q));
+    protected visitForLoop(forLoop: J.ForLoop, q: RpcSendQueue): J | undefined {
+        q.getAndSend(forLoop, f => f.control, control => this.visit(control, q));
+        q.getAndSend(forLoop, f => f.body, body => this.visitRightPadded(body, q));
         return forLoop;
     }
 
-    protected async visitForLoopControl(control: J.ForLoop.Control, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(control, c => c.init, i => i.element.id, i => this.visitRightPadded(i, q));
-        await q.getAndSend(control, c => c.condition, c => this.visitRightPadded(c, q));
-        await q.getAndSendList(control, c => c.update, u => u.element.id, u => this.visitRightPadded(u, q));
+    protected visitForLoopControl(control: J.ForLoop.Control, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(control, c => c.init, i => i.element.id, i => this.visitRightPadded(i, q));
+        q.getAndSend(control, c => c.condition, c => this.visitRightPadded(c, q));
+        q.getAndSendList(control, c => c.update, u => u.element.id, u => this.visitRightPadded(u, q));
         return control;
     }
 
-    protected async visitIf(ifStmt: J.If, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(ifStmt, i => i.ifCondition, cond => this.visit(cond, q));
-        await q.getAndSend(ifStmt, i => i.thenPart, then => this.visitRightPadded(then, q));
-        await q.getAndSend(ifStmt, i => i.elsePart, elsePart => this.visit(elsePart, q));
+    protected visitIf(ifStmt: J.If, q: RpcSendQueue): J | undefined {
+        q.getAndSend(ifStmt, i => i.ifCondition, cond => this.visit(cond, q));
+        q.getAndSend(ifStmt, i => i.thenPart, then => this.visitRightPadded(then, q));
+        q.getAndSend(ifStmt, i => i.elsePart, elsePart => this.visit(elsePart, q));
         return ifStmt;
     }
 
-    protected async visitElse(ifElse: J.If.Else, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(ifElse, e => e.body, body => this.visitRightPadded(body, q));
+    protected visitElse(ifElse: J.If.Else, q: RpcSendQueue): J | undefined {
+        q.getAndSend(ifElse, e => e.body, body => this.visitRightPadded(body, q));
         return ifElse;
     }
 
-    protected async visitImport(importStmt: J.Import, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(importStmt, i => i.static, static_ => this.visitLeftPadded(static_, q));
-        await q.getAndSend(importStmt, i => i.qualid, qualid => this.visit(qualid, q));
-        await q.getAndSend(importStmt, i => i.alias, alias => this.visitLeftPadded(alias, q));
+    protected visitImport(importStmt: J.Import, q: RpcSendQueue): J | undefined {
+        q.getAndSend(importStmt, i => i.static, static_ => this.visitLeftPadded(static_, q));
+        q.getAndSend(importStmt, i => i.qualid, qualid => this.visit(qualid, q));
+        q.getAndSend(importStmt, i => i.alias, alias => this.visitLeftPadded(alias, q));
         return importStmt;
     }
 
-    protected async visitInstanceOf(instanceOf: J.InstanceOf, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(instanceOf, i => i.expression, expr => this.visitRightPadded(expr, q));
-        await q.getAndSend(instanceOf, i => i.class, clazz => this.visit(clazz, q));
-        await q.getAndSend(instanceOf, i => i.pattern, pattern => this.visit(pattern, q));
-        await q.getAndSend(instanceOf, i => asRef(i.type), type => this.visitType(type, q));
-        await q.getAndSend(instanceOf, i => i.modifier, modifier => this.visit(modifier, q));
+    protected visitInstanceOf(instanceOf: J.InstanceOf, q: RpcSendQueue): J | undefined {
+        q.getAndSend(instanceOf, i => i.expression, expr => this.visitRightPadded(expr, q));
+        q.getAndSend(instanceOf, i => i.class, clazz => this.visit(clazz, q));
+        q.getAndSend(instanceOf, i => i.pattern, pattern => this.visit(pattern, q));
+        q.getAndSend(instanceOf, i => asRef(i.type), type => this.visitType(type, q));
+        q.getAndSend(instanceOf, i => i.modifier, modifier => this.visit(modifier, q));
         return instanceOf;
     }
 
-    protected async visitIntersectionType(intersectionType: J.IntersectionType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(intersectionType, i => i.bounds, bounds => this.visitContainer(bounds, q));
+    protected visitIntersectionType(intersectionType: J.IntersectionType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(intersectionType, i => i.bounds, bounds => this.visitContainer(bounds, q));
         return intersectionType;
     }
 
-    protected async visitLabel(label: J.Label, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(label, l => l.label, id => this.visitRightPadded(id, q));
-        await q.getAndSend(label, l => l.statement, stmt => this.visit(stmt, q));
+    protected visitLabel(label: J.Label, q: RpcSendQueue): J | undefined {
+        q.getAndSend(label, l => l.label, id => this.visitRightPadded(id, q));
+        q.getAndSend(label, l => l.statement, stmt => this.visit(stmt, q));
         return label;
     }
 
-    protected async visitLambda(lambda: J.Lambda, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(lambda, l => l.parameters, params => this.visit(params, q));
-        await q.getAndSend(lambda, l => l.arrow, arrow => this.visitSpace(arrow, q));
-        await q.getAndSend(lambda, l => l.body, body => this.visit(body, q));
-        await q.getAndSend(lambda, l => asRef(l.type), type => this.visitType(type, q));
+    protected visitLambda(lambda: J.Lambda, q: RpcSendQueue): J | undefined {
+        q.getAndSend(lambda, l => l.parameters, params => this.visit(params, q));
+        q.getAndSend(lambda, l => l.arrow, arrow => this.visitSpace(arrow, q));
+        q.getAndSend(lambda, l => l.body, body => this.visit(body, q));
+        q.getAndSend(lambda, l => asRef(l.type), type => this.visitType(type, q));
         return lambda;
     }
 
-    protected async visitLambdaParameters(params: J.Lambda.Parameters, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(params, p => p.parenthesized);
-        await q.getAndSendList(params, p => p.parameters, param => param.element.id, param => this.visitRightPadded(param, q));
+    protected visitLambdaParameters(params: J.Lambda.Parameters, q: RpcSendQueue): J | undefined {
+        q.getAndSend(params, p => p.parenthesized);
+        q.getAndSendList(params, p => p.parameters, param => param.element.id, param => this.visitRightPadded(param, q));
         return params;
     }
 
-    protected async visitLiteral(literal: J.Literal, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(literal, l => l.value);
-        await q.getAndSend(literal, l => l.valueSource);
-        await q.getAndSendList(literal, l => l.unicodeEscapes, e => e.valueSourceIndex + e.codePoint);
-        await q.getAndSend(literal, l => asRef(l.type), type => this.visitType(type, q));
+    protected visitLiteral(literal: J.Literal, q: RpcSendQueue): J | undefined {
+        q.getAndSend(literal, l => l.value);
+        q.getAndSend(literal, l => l.valueSource);
+        q.getAndSendList(literal, l => l.unicodeEscapes, e => e.valueSourceIndex + e.codePoint);
+        q.getAndSend(literal, l => asRef(l.type), type => this.visitType(type, q));
         return literal;
     }
 
-    protected async visitMemberReference(memberRef: J.MemberReference, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(memberRef, m => m.containing, cont => this.visitRightPadded(cont, q));
-        await q.getAndSend(memberRef, m => m.typeParameters, params => this.visitContainer(params, q));
-        await q.getAndSend(memberRef, m => m.reference, ref => this.visitLeftPadded(ref, q));
-        await q.getAndSend(memberRef, m => asRef(m.type), type => this.visitType(type, q));
-        await q.getAndSend(memberRef, m => asRef(m.methodType), type => this.visitType(type, q));
-        await q.getAndSend(memberRef, m => asRef(m.variableType), type => this.visitType(type, q));
+    protected visitMemberReference(memberRef: J.MemberReference, q: RpcSendQueue): J | undefined {
+        q.getAndSend(memberRef, m => m.containing, cont => this.visitRightPadded(cont, q));
+        q.getAndSend(memberRef, m => m.typeParameters, params => this.visitContainer(params, q));
+        q.getAndSend(memberRef, m => m.reference, ref => this.visitLeftPadded(ref, q));
+        q.getAndSend(memberRef, m => asRef(m.type), type => this.visitType(type, q));
+        q.getAndSend(memberRef, m => asRef(m.methodType), type => this.visitType(type, q));
+        q.getAndSend(memberRef, m => asRef(m.variableType), type => this.visitType(type, q));
         return memberRef;
     }
 
-    protected async visitMethodInvocation(invocation: J.MethodInvocation, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(invocation, m => m.select, select => this.visitRightPadded(select, q));
-        await q.getAndSend(invocation, m => m.typeParameters, params => this.visitContainer(params, q));
-        await q.getAndSend(invocation, m => m.name, name => this.visit(name, q));
-        await q.getAndSend(invocation, m => m.arguments, args => this.visitContainer(args, q));
-        await q.getAndSend(invocation, m => asRef(m.methodType), type => this.visitType(type, q));
+    protected visitMethodInvocation(invocation: J.MethodInvocation, q: RpcSendQueue): J | undefined {
+        q.getAndSend(invocation, m => m.select, select => this.visitRightPadded(select, q));
+        q.getAndSend(invocation, m => m.typeParameters, params => this.visitContainer(params, q));
+        q.getAndSend(invocation, m => m.name, name => this.visit(name, q));
+        q.getAndSend(invocation, m => m.arguments, args => this.visitContainer(args, q));
+        q.getAndSend(invocation, m => asRef(m.methodType), type => this.visitType(type, q));
         return invocation;
     }
 
-    protected async visitModifier(modifier: J.Modifier, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(modifier, m => m.keyword);
-        await q.getAndSend(modifier, m => m.type);
-        await q.getAndSendList(modifier, m => m.annotations, annot => annot.id, annot => this.visit(annot, q));
+    protected visitModifier(modifier: J.Modifier, q: RpcSendQueue): J | undefined {
+        q.getAndSend(modifier, m => m.keyword);
+        q.getAndSend(modifier, m => m.type);
+        q.getAndSendList(modifier, m => m.annotations, annot => annot.id, annot => this.visit(annot, q));
         return modifier;
     }
 
-    protected async visitMultiCatch(multiCatch: J.MultiCatch, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(multiCatch, m => m.alternatives, alt => alt.element.id, alt => this.visitRightPadded(alt, q));
+    protected visitMultiCatch(multiCatch: J.MultiCatch, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(multiCatch, m => m.alternatives, alt => alt.element.id, alt => this.visitRightPadded(alt, q));
         return multiCatch;
     }
 
-    protected async visitNewArray(newArray: J.NewArray, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(newArray, n => n.typeExpression, type => this.visit(type, q));
-        await q.getAndSendList(newArray, n => n.dimensions, dim => dim.id, dim => this.visit(dim, q));
-        await q.getAndSend(newArray, n => n.initializer, init => this.visitContainer(init, q));
-        await q.getAndSend(newArray, n => asRef(n.type), type => this.visitType(type, q));
+    protected visitNewArray(newArray: J.NewArray, q: RpcSendQueue): J | undefined {
+        q.getAndSend(newArray, n => n.typeExpression, type => this.visit(type, q));
+        q.getAndSendList(newArray, n => n.dimensions, dim => dim.id, dim => this.visit(dim, q));
+        q.getAndSend(newArray, n => n.initializer, init => this.visitContainer(init, q));
+        q.getAndSend(newArray, n => asRef(n.type), type => this.visitType(type, q));
         return newArray;
     }
 
-    protected async visitNewClass(newClass: J.NewClass, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(newClass, n => n.enclosing, encl => this.visitRightPadded(encl, q));
-        await q.getAndSend(newClass, n => n.new, n => this.visitSpace(n, q));
-        await q.getAndSend(newClass, n => n.class, clazz => this.visit(clazz, q));
-        await q.getAndSend(newClass, n => n.arguments, args => this.visitContainer(args, q));
-        await q.getAndSend(newClass, n => n.body, body => this.visit(body, q));
-        await q.getAndSend(newClass, n => asRef(n.constructorType), type => this.visitType(type, q));
+    protected visitNewClass(newClass: J.NewClass, q: RpcSendQueue): J | undefined {
+        q.getAndSend(newClass, n => n.enclosing, encl => this.visitRightPadded(encl, q));
+        q.getAndSend(newClass, n => n.new, n => this.visitSpace(n, q));
+        q.getAndSend(newClass, n => n.class, clazz => this.visit(clazz, q));
+        q.getAndSend(newClass, n => n.arguments, args => this.visitContainer(args, q));
+        q.getAndSend(newClass, n => n.body, body => this.visit(body, q));
+        q.getAndSend(newClass, n => asRef(n.constructorType), type => this.visitType(type, q));
         return newClass;
     }
 
-    protected async visitNullableType(nullableType: J.NullableType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(nullableType, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSend(nullableType, n => n.typeTree, type => this.visitRightPadded(type, q));
+    protected visitNullableType(nullableType: J.NullableType, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(nullableType, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSend(nullableType, n => n.typeTree, type => this.visitRightPadded(type, q));
         return nullableType;
     }
 
-    protected async visitParameterizedType(paramType: J.ParameterizedType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(paramType, p => p.class, clazz => this.visit(clazz, q));
-        await q.getAndSend(paramType, p => p.typeParameters, params => this.visitContainer(params, q));
-        await q.getAndSend(paramType, p => asRef(p.type), type => this.visitType(type, q));
+    protected visitParameterizedType(paramType: J.ParameterizedType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(paramType, p => p.class, clazz => this.visit(clazz, q));
+        q.getAndSend(paramType, p => p.typeParameters, params => this.visitContainer(params, q));
+        q.getAndSend(paramType, p => asRef(p.type), type => this.visitType(type, q));
         return paramType;
     }
 
-    protected async visitParentheses<T extends J>(parentheses: J.Parentheses<T>, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(parentheses, p => p.tree, tree => this.visitRightPadded(tree, q));
+    protected visitParentheses<T extends J>(parentheses: J.Parentheses<T>, q: RpcSendQueue): J | undefined {
+        q.getAndSend(parentheses, p => p.tree, tree => this.visitRightPadded(tree, q));
         return parentheses;
     }
 
-    protected async visitParenthesizedTypeTree(parenthesizedType: J.ParenthesizedTypeTree, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(parenthesizedType, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSend(parenthesizedType, p => p.parenthesizedType, tree => this.visit(tree, q));
+    protected visitParenthesizedTypeTree(parenthesizedType: J.ParenthesizedTypeTree, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(parenthesizedType, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSend(parenthesizedType, p => p.parenthesizedType, tree => this.visit(tree, q));
         return parenthesizedType;
     }
 
-    protected async visitPrimitive(primitive: J.Primitive, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(primitive, p => asRef(p.type), type => this.visitType(type, q));
+    protected visitPrimitive(primitive: J.Primitive, q: RpcSendQueue): J | undefined {
+        q.getAndSend(primitive, p => asRef(p.type), type => this.visitType(type, q));
         return primitive;
     }
 
-    protected async visitReturn(returnStmt: J.Return, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(returnStmt, r => r.expression, expr => this.visit(expr, q));
+    protected visitReturn(returnStmt: J.Return, q: RpcSendQueue): J | undefined {
+        q.getAndSend(returnStmt, r => r.expression, expr => this.visit(expr, q));
         return returnStmt;
     }
 
-    protected async visitSwitch(aSwitch: J.Switch, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(aSwitch, s => s.selector, sel => this.visit(sel, q));
-        await q.getAndSend(aSwitch, s => s.cases, block => this.visit(block, q));
+    protected visitSwitch(aSwitch: J.Switch, q: RpcSendQueue): J | undefined {
+        q.getAndSend(aSwitch, s => s.selector, sel => this.visit(sel, q));
+        q.getAndSend(aSwitch, s => s.cases, block => this.visit(block, q));
         return aSwitch;
     }
 
-    protected async visitSwitchExpression(switchExpr: J.SwitchExpression, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(switchExpr, s => s.selector, sel => this.visit(sel, q));
-        await q.getAndSend(switchExpr, s => s.cases, block => this.visit(block, q));
-        await q.getAndSend(switchExpr, s => asRef(s.type), type => this.visitType(type, q));
+    protected visitSwitchExpression(switchExpr: J.SwitchExpression, q: RpcSendQueue): J | undefined {
+        q.getAndSend(switchExpr, s => s.selector, sel => this.visit(sel, q));
+        q.getAndSend(switchExpr, s => s.cases, block => this.visit(block, q));
+        q.getAndSend(switchExpr, s => asRef(s.type), type => this.visitType(type, q));
         return switchExpr;
     }
 
-    protected async visitSynchronized(syncStmt: J.Synchronized, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(syncStmt, s => s.lock, lock => this.visit(lock, q));
-        await q.getAndSend(syncStmt, s => s.body, body => this.visit(body, q));
+    protected visitSynchronized(syncStmt: J.Synchronized, q: RpcSendQueue): J | undefined {
+        q.getAndSend(syncStmt, s => s.lock, lock => this.visit(lock, q));
+        q.getAndSend(syncStmt, s => s.body, body => this.visit(body, q));
         return syncStmt;
     }
 
-    protected async visitTernary(ternary: J.Ternary, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(ternary, t => t.condition, cond => this.visit(cond, q));
-        await q.getAndSend(ternary, t => t.truePart, truePart => this.visitLeftPadded(truePart, q));
-        await q.getAndSend(ternary, t => t.falsePart, falsePart => this.visitLeftPadded(falsePart, q));
-        await q.getAndSend(ternary, t => asRef(t.type), type => this.visitType(type, q));
+    protected visitTernary(ternary: J.Ternary, q: RpcSendQueue): J | undefined {
+        q.getAndSend(ternary, t => t.condition, cond => this.visit(cond, q));
+        q.getAndSend(ternary, t => t.truePart, truePart => this.visitLeftPadded(truePart, q));
+        q.getAndSend(ternary, t => t.falsePart, falsePart => this.visitLeftPadded(falsePart, q));
+        q.getAndSend(ternary, t => asRef(t.type), type => this.visitType(type, q));
         return ternary;
     }
 
-    protected async visitThrow(throwStmt: J.Throw, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(throwStmt, t => t.exception, exc => this.visit(exc, q));
+    protected visitThrow(throwStmt: J.Throw, q: RpcSendQueue): J | undefined {
+        q.getAndSend(throwStmt, t => t.exception, exc => this.visit(exc, q));
         return throwStmt;
     }
 
-    protected async visitTry(tryStmt: J.Try, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(tryStmt, t => t.resources, res => this.visitContainer(res, q));
-        await q.getAndSend(tryStmt, t => t.body, body => this.visit(body, q));
-        await q.getAndSendList(tryStmt, t => t.catches, catch_ => catch_.id, catch_ => this.visit(catch_, q));
-        await q.getAndSend(tryStmt, t => t.finally, fin => this.visitLeftPadded(fin, q));
+    protected visitTry(tryStmt: J.Try, q: RpcSendQueue): J | undefined {
+        q.getAndSend(tryStmt, t => t.resources, res => this.visitContainer(res, q));
+        q.getAndSend(tryStmt, t => t.body, body => this.visit(body, q));
+        q.getAndSendList(tryStmt, t => t.catches, catch_ => catch_.id, catch_ => this.visit(catch_, q));
+        q.getAndSend(tryStmt, t => t.finally, fin => this.visitLeftPadded(fin, q));
         return tryStmt;
     }
 
-    protected async visitTryResource(resource: J.Try.Resource, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(resource, r => r.variableDeclarations, variable => this.visit(variable, q));
-        await q.getAndSend(resource, r => r.terminatedWithSemicolon);
+    protected visitTryResource(resource: J.Try.Resource, q: RpcSendQueue): J | undefined {
+        q.getAndSend(resource, r => r.variableDeclarations, variable => this.visit(variable, q));
+        q.getAndSend(resource, r => r.terminatedWithSemicolon);
         return resource;
     }
 
-    protected async visitTryCatch(aCatch: J.Try.Catch, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(aCatch, c => c.parameter, param => this.visit(param, q));
-        await q.getAndSend(aCatch, c => c.body, body => this.visit(body, q));
+    protected visitTryCatch(aCatch: J.Try.Catch, q: RpcSendQueue): J | undefined {
+        q.getAndSend(aCatch, c => c.parameter, param => this.visit(param, q));
+        q.getAndSend(aCatch, c => c.body, body => this.visit(body, q));
         return aCatch;
     }
 
-    protected async visitTypeCast(typeCast: J.TypeCast, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typeCast, t => t.class, clazz => this.visit(clazz, q));
-        await q.getAndSend(typeCast, t => t.expression, expr => this.visit(expr, q));
+    protected visitTypeCast(typeCast: J.TypeCast, q: RpcSendQueue): J | undefined {
+        q.getAndSend(typeCast, t => t.class, clazz => this.visit(clazz, q));
+        q.getAndSend(typeCast, t => t.expression, expr => this.visit(expr, q));
         return typeCast;
     }
 
-    protected async visitTypeParameter(typeParam: J.TypeParameter, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(typeParam, t => t.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSendList(typeParam, t => t.modifiers, mod => mod.id, mod => this.visit(mod, q));
-        await q.getAndSend(typeParam, t => t.name, name => this.visit(name, q));
-        await q.getAndSend(typeParam, t => t.bounds, bounds => this.visitContainer(bounds, q));
+    protected visitTypeParameter(typeParam: J.TypeParameter, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(typeParam, t => t.annotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSendList(typeParam, t => t.modifiers, mod => mod.id, mod => this.visit(mod, q));
+        q.getAndSend(typeParam, t => t.name, name => this.visit(name, q));
+        q.getAndSend(typeParam, t => t.bounds, bounds => this.visitContainer(bounds, q));
         return typeParam;
     }
 
-    protected async visitTypeParameters(typeParams: J.TypeParameters, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(typeParams, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSendList(typeParams, t => t.typeParameters, p => p.element.id, params => this.visitRightPadded(params, q));
+    protected visitTypeParameters(typeParams: J.TypeParameters, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(typeParams, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSendList(typeParams, t => t.typeParameters, p => p.element.id, params => this.visitRightPadded(params, q));
         return typeParams;
     }
 
-    protected async visitUnary(unary: J.Unary, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(unary, u => u.operator, op => this.visitLeftPadded(op, q));
-        await q.getAndSend(unary, u => u.expression, expr => this.visit(expr, q));
-        await q.getAndSend(unary, u => asRef(u.type), type => this.visitType(type, q));
+    protected visitUnary(unary: J.Unary, q: RpcSendQueue): J | undefined {
+        q.getAndSend(unary, u => u.operator, op => this.visitLeftPadded(op, q));
+        q.getAndSend(unary, u => u.expression, expr => this.visit(expr, q));
+        q.getAndSend(unary, u => asRef(u.type), type => this.visitType(type, q));
         return unary;
     }
 
-    protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(variable, v => v.name, name => this.visit(name, q));
-        await q.getAndSendList(variable, v => v.dimensionsAfterName, d => JSON.stringify(d.element), dims => this.visitLeftPadded(dims, q));
-        await q.getAndSend(variable, v => v.initializer, init => this.visitLeftPadded(init, q));
-        await q.getAndSend(variable, v => asRef(v.variableType), type => this.visitType(type, q));
+    protected visitVariable(variable: J.VariableDeclarations.NamedVariable, q: RpcSendQueue): J | undefined {
+        q.getAndSend(variable, v => v.name, name => this.visit(name, q));
+        q.getAndSendList(variable, v => v.dimensionsAfterName, d => JSON.stringify(d.element), dims => this.visitLeftPadded(dims, q));
+        q.getAndSend(variable, v => v.initializer, init => this.visitLeftPadded(init, q));
+        q.getAndSend(variable, v => asRef(v.variableType), type => this.visitType(type, q));
         return variable;
     }
 
-    protected async visitWhileLoop(whileLoop: J.WhileLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(whileLoop, w => w.condition, cond => this.visit(cond, q));
-        await q.getAndSend(whileLoop, w => w.body, body => this.visitRightPadded(body, q));
+    protected visitWhileLoop(whileLoop: J.WhileLoop, q: RpcSendQueue): J | undefined {
+        q.getAndSend(whileLoop, w => w.condition, cond => this.visit(cond, q));
+        q.getAndSend(whileLoop, w => w.body, body => this.visitRightPadded(body, q));
         return whileLoop;
     }
 
-    protected async visitWildcard(wildcard: J.Wildcard, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(wildcard, w => w.bound, b => this.visitLeftPadded(b, q));
-        await q.getAndSend(wildcard, w => w.boundedType, type => this.visit(type, q));
+    protected visitWildcard(wildcard: J.Wildcard, q: RpcSendQueue): J | undefined {
+        q.getAndSend(wildcard, w => w.bound, b => this.visitLeftPadded(b, q));
+        q.getAndSend(wildcard, w => w.boundedType, type => this.visit(type, q));
         return wildcard;
     }
 
-    protected async visitYield(yieldExpr: J.Yield, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(yieldExpr, y => y.implicit);
-        await q.getAndSend(yieldExpr, y => y.value, value => this.visit(value, q));
+    protected visitYield(yieldExpr: J.Yield, q: RpcSendQueue): J | undefined {
+        q.getAndSend(yieldExpr, y => y.implicit);
+        q.getAndSend(yieldExpr, y => y.value, value => this.visit(value, q));
         return yieldExpr;
     }
 
-    protected async visitUnknown(unknown: J.Unknown, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(unknown, u => u.source, source => this.visit(source, q));
+    protected visitUnknown(unknown: J.Unknown, q: RpcSendQueue): J | undefined {
+        q.getAndSend(unknown, u => u.source, source => this.visit(source, q));
         return unknown;
     }
 
-    protected async visitUnknownSource(source: J.UnknownSource, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(source, s => s.text);
+    protected visitUnknownSource(source: J.UnknownSource, q: RpcSendQueue): J | undefined {
+        q.getAndSend(source, s => s.text);
         return source;
     }
 
-    protected async visitCompilationUnit(cu: J.CompilationUnit, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(cu, c => c.sourcePath);
-        await q.getAndSend(cu, c => c.charsetName);
-        await q.getAndSend(cu, c => c.charsetBomMarked);
-        await q.getAndSend(cu, c => c.checksum);
-        await q.getAndSend(cu, c => c.fileAttributes);
-        await q.getAndSend(cu, c => c.packageDeclaration, pkg => this.visitRightPadded(pkg, q));
-        await q.getAndSendList(cu, c => c.imports, imp => imp.element.id, imp => this.visitRightPadded(imp, q));
-        await q.getAndSendList(cu, c => c.classes, cls => cls.id, cls => this.visit(cls, q));
-        await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
+    protected visitCompilationUnit(cu: J.CompilationUnit, q: RpcSendQueue): J | undefined {
+        q.getAndSend(cu, c => c.sourcePath);
+        q.getAndSend(cu, c => c.charsetName);
+        q.getAndSend(cu, c => c.charsetBomMarked);
+        q.getAndSend(cu, c => c.checksum);
+        q.getAndSend(cu, c => c.fileAttributes);
+        q.getAndSend(cu, c => c.packageDeclaration, pkg => this.visitRightPadded(pkg, q));
+        q.getAndSendList(cu, c => c.imports, imp => imp.element.id, imp => this.visitRightPadded(imp, q));
+        q.getAndSendList(cu, c => c.classes, cls => cls.id, cls => this.visit(cls, q));
+        q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
         return cu;
     }
 
-    protected async visitPackage(pkg: J.Package, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(pkg, p => p.expression, expr => this.visit(expr, q));
-        await q.getAndSendList(pkg, p => p.annotations, annot => annot.id, annot => this.visit(annot, q));
+    protected visitPackage(pkg: J.Package, q: RpcSendQueue): J | undefined {
+        q.getAndSend(pkg, p => p.expression, expr => this.visit(expr, q));
+        q.getAndSendList(pkg, p => p.annotations, annot => annot.id, annot => this.visit(annot, q));
         return pkg;
     }
 
-    protected async visitClassDeclaration(cls: J.ClassDeclaration, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(cls, c => c.leadingAnnotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSendList(cls, c => c.modifiers, mod => mod.id, mod => this.visit(mod, q));
-        await q.getAndSend(cls, c => c.classKind, kind => this.visit(kind, q));
-        await q.getAndSend(cls, c => c.name, name => this.visit(name, q));
-        await q.getAndSend(cls, c => c.typeParameters, params => this.visitContainer(params, q));
-        await q.getAndSend(cls, c => c.primaryConstructor, cons => this.visitContainer(cons, q));
-        await q.getAndSend(cls, c => c.extends, ext => this.visitLeftPadded(ext, q));
-        await q.getAndSend(cls, c => c.implements, impl => this.visitContainer(impl, q));
-        await q.getAndSend(cls, c => c.permitting, perm => this.visitContainer(perm, q));
-        await q.getAndSend(cls, c => c.body, body => this.visit(body, q));
+    protected visitClassDeclaration(cls: J.ClassDeclaration, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(cls, c => c.leadingAnnotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSendList(cls, c => c.modifiers, mod => mod.id, mod => this.visit(mod, q));
+        q.getAndSend(cls, c => c.classKind, kind => this.visit(kind, q));
+        q.getAndSend(cls, c => c.name, name => this.visit(name, q));
+        q.getAndSend(cls, c => c.typeParameters, params => this.visitContainer(params, q));
+        q.getAndSend(cls, c => c.primaryConstructor, cons => this.visitContainer(cons, q));
+        q.getAndSend(cls, c => c.extends, ext => this.visitLeftPadded(ext, q));
+        q.getAndSend(cls, c => c.implements, impl => this.visitContainer(impl, q));
+        q.getAndSend(cls, c => c.permitting, perm => this.visitContainer(perm, q));
+        q.getAndSend(cls, c => c.body, body => this.visit(body, q));
         return cls;
     }
 
-    protected async visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(kind, k => k.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSend(kind, k => k.type);
+    protected visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(kind, k => k.annotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSend(kind, k => k.type);
         return kind;
     }
 
-    protected async visitBlock(block: J.Block, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(block, b => b.static, s => this.visitRightPadded(s, q));
-        await q.getAndSendList(block, b => b.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
-        await q.getAndSend(block, b => b.end, space => this.visitSpace(space, q));
+    protected visitBlock(block: J.Block, q: RpcSendQueue): J | undefined {
+        q.getAndSend(block, b => b.static, s => this.visitRightPadded(s, q));
+        q.getAndSendList(block, b => b.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
+        q.getAndSend(block, b => b.end, space => this.visitSpace(space, q));
         return block;
     }
 
-    protected async visitMethodDeclaration(method: J.MethodDeclaration, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(method, m => m.leadingAnnotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSendList(method, m => m.modifiers, mod => mod.id, mod => this.visit(mod, q));
-        await q.getAndSend(method, m => m.typeParameters, params => this.visit(params, q));
-        await q.getAndSend(method, m => m.returnTypeExpression, type => this.visit(type, q));
-        await q.getAndSendList(method, m => m.nameAnnotations, a => a.id, name => this.visit(name, q));
-        await q.getAndSend(method, m => m.name, name => this.visit(name, q));
-        await q.getAndSend(method, m => m.parameters, params => this.visitContainer(params, q));
-        await q.getAndSend(method, m => m.throws, throws => this.visitContainer(throws, q));
-        await q.getAndSend(method, m => m.body, body => this.visit(body, q));
-        await q.getAndSend(method, m => m.defaultValue, def => this.visitLeftPadded(def, q));
-        await q.getAndSend(method, m => asRef(m.methodType), type => this.visitType(type, q));
+    protected visitMethodDeclaration(method: J.MethodDeclaration, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(method, m => m.leadingAnnotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSendList(method, m => m.modifiers, mod => mod.id, mod => this.visit(mod, q));
+        q.getAndSend(method, m => m.typeParameters, params => this.visit(params, q));
+        q.getAndSend(method, m => m.returnTypeExpression, type => this.visit(type, q));
+        q.getAndSendList(method, m => m.nameAnnotations, a => a.id, name => this.visit(name, q));
+        q.getAndSend(method, m => m.name, name => this.visit(name, q));
+        q.getAndSend(method, m => m.parameters, params => this.visitContainer(params, q));
+        q.getAndSend(method, m => m.throws, throws => this.visitContainer(throws, q));
+        q.getAndSend(method, m => m.body, body => this.visit(body, q));
+        q.getAndSend(method, m => m.defaultValue, def => this.visitLeftPadded(def, q));
+        q.getAndSend(method, m => asRef(m.methodType), type => this.visitType(type, q));
         return method;
     }
 
-    protected async visitVariableDeclarations(varDecls: J.VariableDeclarations, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(varDecls, v => v.leadingAnnotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSendList(varDecls, v => v.modifiers, mod => mod.id, mod => this.visit(mod, q));
-        await q.getAndSend(varDecls, v => v.typeExpression, type => this.visit(type, q));
-        await q.getAndSend(varDecls, v => v.varargs, space => this.visitSpace(space, q));
-        await q.getAndSendList(varDecls, v => v.variables, variable => variable.element.id, variable => this.visitRightPadded(variable, q));
+    protected visitVariableDeclarations(varDecls: J.VariableDeclarations, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(varDecls, v => v.leadingAnnotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSendList(varDecls, v => v.modifiers, mod => mod.id, mod => this.visit(mod, q));
+        q.getAndSend(varDecls, v => v.typeExpression, type => this.visit(type, q));
+        q.getAndSend(varDecls, v => v.varargs, space => this.visitSpace(space, q));
+        q.getAndSendList(varDecls, v => v.variables, variable => variable.element.id, variable => this.visitRightPadded(variable, q));
         return varDecls;
     }
 
-    protected async visitIdentifier(ident: J.Identifier, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(ident, id => id.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSend(ident, id => id.simpleName);
-        await q.getAndSend(ident, id => asRef(id.type), type => this.visitType(type, q));
-        await q.getAndSend(ident, id => asRef(id.fieldType), type => this.visitType(type, q));
+    protected visitIdentifier(ident: J.Identifier, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(ident, id => id.annotations, annot => annot.id, annot => this.visit(annot, q));
+        q.getAndSend(ident, id => id.simpleName);
+        q.getAndSend(ident, id => asRef(id.type), type => this.visitType(type, q));
+        q.getAndSend(ident, id => asRef(id.fieldType), type => this.visitType(type, q));
         return ident;
     }
 
-    public override async visitSpace(space: J.Space, q: RpcSendQueue): Promise<J.Space> {
-        await q.getAndSendList(space, s => s.comments,
+    public override visitSpace(space: J.Space, q: RpcSendQueue): J.Space {
+        q.getAndSendList(space, s => s.comments,
             c => {
                 if (c.kind === J.Kind.TextComment) {
                     return (c as TextComment).text + c.suffix;
                 }
                 throw new Error(`Unexpected comment type ${c.kind}`);
             },
-            async c => {
+            c => {
                 if (c.kind === J.Kind.TextComment) {
                     const tc = c as TextComment;
-                    await q.getAndSend(tc, c2 => c2.multiline);
-                    await q.getAndSend(tc, c2 => c2.text);
+                    q.getAndSend(tc, c2 => c2.multiline);
+                    q.getAndSend(tc, c2 => c2.text);
                 } else {
                     throw new Error(`Unexpected comment type ${c.kind}`);
                 }
-                await q.getAndSend(c, c2 => c2.suffix);
-                await q.getAndSend(c, c2 => c2.markers);
+                q.getAndSend(c, c2 => c2.suffix);
+                q.getAndSend(c, c2 => c2.markers);
             });
-        await q.getAndSend(space, s => s.whitespace);
+        q.getAndSend(space, s => s.whitespace);
         return space;
     }
 
-    public override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
-        await q.getAndSend(left, l => l.before, space => this.visitSpace(space, q));
+    public override visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): J.LeftPadded<T> {
+        q.getAndSend(left, l => l.before, space => this.visitSpace(space, q));
         if (isTree(left.element)) {
-            await q.getAndSend(left, l => l.element, elem => this.visit(elem as J, q));
+            q.getAndSend(left, l => l.element, elem => this.visit(elem as J, q));
         } else if (isSpace(left.element)) {
-            await q.getAndSend(left, l => l.element, space => this.visitSpace(space as J.Space, q));
+            q.getAndSend(left, l => l.element, space => this.visitSpace(space as J.Space, q));
         } else {
-            await q.getAndSend(left, l => l.element);
+            q.getAndSend(left, l => l.element);
         }
-        await q.getAndSend(left, l => l.markers);
+        q.getAndSend(left, l => l.markers);
         return left;
     }
 
-    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcSendQueue): Promise<J.RightPadded<T>> {
+    public override visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcSendQueue): J.RightPadded<T> {
         if (isTree(right.element)) {
-            await q.getAndSend(right, r => r.element, elem => this.visit(elem as J, q));
+            q.getAndSend(right, r => r.element, elem => this.visit(elem as J, q));
         } else {
-            await q.getAndSend(right, r => r.element);
+            q.getAndSend(right, r => r.element);
         }
-        await q.getAndSend(right, r => r.after, space => this.visitSpace(space, q));
-        await q.getAndSend(right, r => r.markers);
+        q.getAndSend(right, r => r.after, space => this.visitSpace(space, q));
+        q.getAndSend(right, r => r.markers);
         return right;
     }
 
-    public override async visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): Promise<J.Container<T>> {
-        await q.getAndSend(container, c => c.before, space => this.visitSpace(space, q));
-        await q.getAndSendList(container, c => c.elements, elem => elem.element.id, elem => this.visitRightPadded(elem, q));
-        await q.getAndSend(container, c => c.markers);
+    public override visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): J.Container<T> {
+        q.getAndSend(container, c => c.before, space => this.visitSpace(space, q));
+        q.getAndSendList(container, c => c.elements, elem => elem.element.id, elem => this.visitRightPadded(elem, q));
+        q.getAndSend(container, c => c.markers);
         return container;
     }
 
     private typeVisitor = new TypeSender();
 
-    public override async visitType(javaType: Type | undefined, q: RpcSendQueue): Promise<Type | undefined> {
+    public override visitType(javaType: Type | undefined, q: RpcSendQueue): Type | undefined {
         if (!javaType) {
             return undefined;
         }
 
-        return await this.typeVisitor.visit(javaType, q);
+        return this.typeVisitor.visit(javaType, q);
     }
 }
 
@@ -1857,8 +1857,8 @@ export function registerJLanguageCodecs(sourceFileType: string,
                     return (receiver.visitSpace(before, q))!;
                 },
 
-                async rpcSend(after: J.Space, q: RpcSendQueue): Promise<void> {
-                    await sender.visitSpace(after, q);
+                rpcSend(after: J.Space, q: RpcSendQueue): void {
+                    sender.visitSpace(after, q);
                 }
             }, sourceFileType);
         } else if (kind === J.Kind.RightPadded) {
@@ -1867,8 +1867,8 @@ export function registerJLanguageCodecs(sourceFileType: string,
                     return (receiver.visitRightPadded(before, q))!;
                 },
 
-                async rpcSend<T extends J | boolean>(after: J.RightPadded<T>, q: RpcSendQueue): Promise<void> {
-                    await sender.visitRightPadded(after, q);
+                rpcSend<T extends J | boolean>(after: J.RightPadded<T>, q: RpcSendQueue): void {
+                    sender.visitRightPadded(after, q);
                 }
             }, sourceFileType);
         } else if (kind === J.Kind.LeftPadded) {
@@ -1877,8 +1877,8 @@ export function registerJLanguageCodecs(sourceFileType: string,
                     return (receiver.visitLeftPadded(before, q))!;
                 },
 
-                async rpcSend<T extends J | Space | number | string | boolean>(after: J.LeftPadded<T>, q: RpcSendQueue): Promise<void> {
-                    await sender.visitLeftPadded(after, q);
+                rpcSend<T extends J | Space | number | string | boolean>(after: J.LeftPadded<T>, q: RpcSendQueue): void {
+                    sender.visitLeftPadded(after, q);
                 }
             }, sourceFileType);
         } else if (kind === J.Kind.Container) {
@@ -1887,8 +1887,8 @@ export function registerJLanguageCodecs(sourceFileType: string,
                     return (receiver.visitContainer(before, q))!;
                 },
 
-                async rpcSend<T extends J>(after: J.Container<T>, q: RpcSendQueue): Promise<void> {
-                    await sender.visitContainer(after, q);
+                rpcSend<T extends J>(after: J.Container<T>, q: RpcSendQueue): void {
+                    sender.visitContainer(after, q);
                 }
             }, sourceFileType);
         } else {
@@ -1897,8 +1897,8 @@ export function registerJLanguageCodecs(sourceFileType: string,
                     return (receiver.visit(before, q))!;
                 },
 
-                async rpcSend(after: J, q: RpcSendQueue): Promise<void> {
-                    await sender.visit(after, q);
+                rpcSend(after: J, q: RpcSendQueue): void {
+                    sender.visit(after, q);
                 }
             }, sourceFileType);
         }

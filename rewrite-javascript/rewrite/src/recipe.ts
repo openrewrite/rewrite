@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {noopVisitor, TreeVisitor} from "./visitor";
+import {noopVisitor, TreeVisitor, AsyncTreeVisitor} from "./visitor";
 import {Cursor, SourceFile, Tree} from "./tree";
 import {ExecutionContext} from "./execution";
 import {DataTableDescriptor} from "./data-table";
@@ -22,6 +22,12 @@ import {mapAsync} from "./util";
 const OPTIONS_KEY = "__recipe_options__";
 
 export type Minutes = number;
+
+/**
+ * Union type for recipe visitors. Recipes can return either async or sync visitors.
+ * Sync visitors provide better performance by avoiding Promise overhead.
+ */
+export type RecipeVisitor<T extends Tree> = TreeVisitor<T, ExecutionContext> | AsyncTreeVisitor<T, ExecutionContext>;
 
 export abstract class Recipe {
     constructor(options?: {}) {
@@ -96,7 +102,7 @@ export abstract class Recipe {
             description: this.description,
             tags: this.tags,
             estimatedEffortPerOccurrence: this.estimatedEffortPerOccurrence,
-            recipeList: await mapAsync(await this.recipeList(), async r => r.descriptor()),
+            recipeList: await mapAsync(await this.recipeList(), async r => await r.descriptor()),
             options: Object.entries(optionsRecord).map(([key, descriptor]) => ({
                 name: key,
                 value: (this as any)[key],
@@ -111,9 +117,12 @@ export abstract class Recipe {
      * Returns the visitor that performs the transformation. This method is called by the
      * recipe framework during execution and must be overridden by concrete recipe implementations.
      *
+     * Recipes can return either async (AsyncTreeVisitor) or sync (TreeVisitor) visitors.
+     * Sync visitors (TreeVisitor) provide better performance by avoiding Promise overhead.
+     *
      * @returns A visitor that performs the recipe's transformation
      */
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editor(): Promise<RecipeVisitor<any>> {
         return noopVisitor()
     }
 
@@ -161,19 +170,21 @@ export abstract class ScanningRecipe<P> extends Recipe {
 
     abstract initialValue(ctx: ExecutionContext): P
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editor(): Promise<RecipeVisitor<any>> {
         const editorWithContext = (cursor: Cursor, ctx: ExecutionContext) =>
             this.editorWithData(this.accumulator(cursor, ctx));
 
-        return new class extends TreeVisitor<any, ExecutionContext> {
-            private delegate?: TreeVisitor<any, ExecutionContext>
+        return new class extends AsyncTreeVisitor<any, ExecutionContext> {
+            private delegate?: RecipeVisitor<any>
 
             async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
-                return (await this.delegateForCtx(ctx)).isAcceptable(sourceFile, ctx);
+                const d = await this.delegateForCtx(ctx);
+                return d.isAcceptable(sourceFile, ctx);
             }
 
             async visit<R extends Tree>(tree: Tree, ctx: ExecutionContext, parent?: Cursor): Promise<R | undefined> {
-                return (await this.delegateForCtx(ctx, parent)).visit(tree, ctx, parent);
+                const d = await this.delegateForCtx(ctx, parent)!;
+                return d.visit(tree, ctx, parent);
             }
 
             private async delegateForCtx(ctx: ExecutionContext, parent?: Cursor) {
@@ -185,7 +196,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
         }
     }
 
-    async editorWithData(acc: P): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editorWithData(_acc: P): Promise<RecipeVisitor<any>> {
         return noopVisitor();
     }
 
@@ -193,7 +204,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
         return [];
     }
 
-    async scanner(acc: P): Promise<TreeVisitor<any, ExecutionContext>> {
+    async scanner(_acc: P): Promise<RecipeVisitor<any>> {
         return noopVisitor();
     }
 }

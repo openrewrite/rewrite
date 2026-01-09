@@ -47,7 +47,7 @@ describe('new mapping', () => {
 
     test('simple identifier should not be wrapped in TypeTreeExpression', async () => {
         class CheckIdentifierNotWrappedVisitor extends JavaScriptVisitor<ExecutionContext> {
-            protected override async visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): Promise<J | undefined> {
+            protected override visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): J | undefined {
                 // Check that simple identifiers are not wrapped in JS.TypeTreeExpression
                 if (newClass.class?.kind === JS.Kind.TypeTreeExpression) {
                     const typeTreeExpr = newClass.class as JS.TypeTreeExpression;
@@ -76,7 +76,7 @@ describe('new mapping', () => {
 
     test('field access should not be wrapped in TypeTreeExpression', async () => {
         class CheckFieldAccessNotWrappedVisitor extends JavaScriptVisitor<ExecutionContext> {
-            protected override async visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): Promise<J | undefined> {
+            protected override visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): J | undefined {
                 // J.FieldAccess implements TypeTree, so it should not be wrapped
                 if (newClass.class?.kind === JS.Kind.TypeTreeExpression) {
                     const typeTreeExpr = newClass.class as JS.TypeTreeExpression;
@@ -105,7 +105,7 @@ describe('new mapping', () => {
 
     test('parameterized type with identifier should not wrap base class', async () => {
         class CheckParameterizedTypeVisitor extends JavaScriptVisitor<ExecutionContext> {
-            protected override async visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): Promise<J | undefined> {
+            protected override visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): J | undefined {
                 // Check parameterized types
                 if (newClass.class?.kind === J.Kind.ParameterizedType) {
                     const paramType = newClass.class as J.ParameterizedType;

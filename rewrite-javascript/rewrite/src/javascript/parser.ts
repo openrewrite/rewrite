@@ -120,7 +120,7 @@ export class JavaScriptParser extends Parser {
      * @param input The parser input containing the source code
      * @returns The parsed SourceFile, or a ParseExceptionResult if parsing failed
      */
-    async parseOnly(input: ParserInput): Promise<SourceFile> {
+    parseOnly(input: ParserInput): SourceFile {
         const filePath = parserInputFile(input);
         const sourcePath = this.relativeTo && !path.isAbsolute(filePath)
             ? path.join(this.relativeTo, filePath)
@@ -178,29 +178,46 @@ export class JavaScriptParser extends Parser {
         }
     }
 
-    // noinspection JSUnusedGlobalSymbols
-    reset(): this {
-        this.sourceFileCache && this.sourceFileCache.clear();
-        this.oldProgram = undefined;
-        return this;
-    }
+    /**
+     * Parses a single source file synchronously with full type checking.
+     *
+     * This method creates a TypeScript Program and type checker to provide
+     * full type attribution on the resulting AST, like the parse() method.
+     * Use parseOnly() instead when type information is not needed (e.g., formatting).
+     *
+     * @param input The parser input containing the source code
+     * @returns The parsed SourceFile, or a ParseExceptionResult if parsing failed
+     */
+    parseOneSync(input: ParserInput): SourceFile {
+        const filePath = parserInputFile(input);
+        const sourcePath = this.relativeTo && !path.isAbsolute(filePath)
+            ? path.join(this.relativeTo, filePath)
+            : filePath;
 
-    override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
-        const inputFiles = new Map<SourcePath, ParserInput>();
+        const inputFiles = new Map<SourcePath, ParserInput>([[sourcePath, input]]);
+        const host = this.createCompilerHost(inputFiles);
 
-        // Populate inputFiles map and remove from cache if necessary
-        for (const input of inputs) {
-            let sourcePath = parserInputFile(input);
-            // If relativeTo is set and path is not absolute, make it absolute
-            if (this.relativeTo && !path.isAbsolute(sourcePath)) {
-                sourcePath = path.join(this.relativeTo, sourcePath);
-            }
-            inputFiles.set(sourcePath, input);
-            // Remove from cache if previously cached
-            this.sourceFileCache && this.sourceFileCache.delete(sourcePath);
+        // Create a new Program with type checking
+        const program = ts.createProgram([sourcePath], this.compilerOptions, host, this.oldProgram);
+        this.oldProgram = program;
+
+        // Get the type checker and create type mapping
+        const typeChecker = program.getTypeChecker();
+        const typeMapping = new JavaScriptTypeMapping(typeChecker);
+
+        const tsSourceFile = program.getSourceFile(sourcePath);
+        if (!tsSourceFile) {
+            return this.error(input, new Error('Parser returned undefined'));
         }
 
-        // Create a new CompilerHost within parseInputs
+        return this.processSourceFile(input, tsSourceFile, program, typeMapping);
+    }
+
+    /**
+     * Creates a configured CompilerHost for parsing with type checking.
+     * Shared between parseOneSync() and parse().
+     */
+    private createCompilerHost(inputFiles: Map<SourcePath, ParserInput>): ts.CompilerHost {
         const host = ts.createCompilerHost(this.compilerOptions);
 
         // Set the current directory for module resolution
@@ -218,35 +235,23 @@ export class JavaScriptParser extends Parser {
             }
 
             // Read the file content
-            let sourceText: string | undefined;
-
-            // For input files
-            const input = inputFiles.get(fileName);
-            if (input) {
-                sourceText = parserInputRead(input);
+            let text: string | undefined;
+            const inp = inputFiles.get(fileName);
+            if (inp) {
+                text = parserInputRead(inp);
             } else {
-                // For dependency files
-                sourceText = ts.sys.readFile(fileName);
+                text = ts.sys.readFile(fileName);
             }
 
-            if (sourceText !== undefined) {
-                // Determine script kind based on file extension
+            if (text !== undefined) {
                 const scriptKind = getScriptKindFromFileName(fileName);
-
-                // Build CreateSourceFileOptions with jsDocParsingMode
                 const sourceFileOptions: ts.CreateSourceFileOptions = typeof languageVersion === 'number'
-                    ? {
-                        languageVersion: languageVersion,
-                        jsDocParsingMode: ts.JSDocParsingMode.ParseNone // We override this as otherwise invalid JSDoc causes parse errors
-                    }
-                    : {
-                        ...languageVersion,
-                        jsDocParsingMode: ts.JSDocParsingMode.ParseNone // We override this as otherwise invalid JSDoc causes parse errors
-                    };
+                    ? { languageVersion, jsDocParsingMode: ts.JSDocParsingMode.ParseNone }
+                    : { ...languageVersion, jsDocParsingMode: ts.JSDocParsingMode.ParseNone };
 
-                sourceFile = ts.createSourceFile(fileName, sourceText, sourceFileOptions, true, scriptKind);
+                sourceFile = ts.createSourceFile(fileName, text, sourceFileOptions, true, scriptKind);
                 // Cache the SourceFile if it's a dependency
-                if (!input && this.sourceFileCache) {
+                if (!inp && this.sourceFileCache) {
                     this.sourceFileCache.set(fileName, sourceFile);
                 }
                 return sourceFile;
@@ -257,19 +262,15 @@ export class JavaScriptParser extends Parser {
         };
 
         // Override fileExists
-        host.fileExists = (fileName) => {
-            return inputFiles.has(fileName) || ts.sys.fileExists(fileName);
-        };
+        host.fileExists = (fileName) => inputFiles.has(fileName) || ts.sys.fileExists(fileName);
 
         // Override readFile
         host.readFile = (fileName) => {
-            const input = inputFiles.get(fileName);
-            return input ? parserInputRead(input) : ts.sys.readFile(fileName);
+            const inp = inputFiles.get(fileName);
+            return inp ? parserInputRead(inp) : ts.sys.readFile(fileName);
         };
 
         // Custom module resolution to handle in-memory imports
-        // This is required because TypeScript's default module resolution looks for files on disk,
-        // but our source files only exist in memory (in the inputFiles map)
         host.resolveModuleNameLiterals = (moduleLiterals, containingFile) => {
             const resolvedModules: ts.ResolvedModuleWithFailedLookupLocations[] = [];
             const containingDir = path.dirname(containingFile);
@@ -283,13 +284,11 @@ export class JavaScriptParser extends Parser {
                     let resolved: string | undefined;
 
                     for (const ext of extensions) {
-                        // Try with extension
                         const candidate = path.join(containingDir, moduleName + ext);
                         if (inputFiles.has(candidate)) {
                             resolved = candidate;
                             break;
                         }
-                        // Also try exact match (if moduleName already has extension)
                         const exactCandidate = path.join(containingDir, moduleName);
                         if (inputFiles.has(exactCandidate)) {
                             resolved = exactCandidate;
@@ -309,63 +308,89 @@ export class JavaScriptParser extends Parser {
                     }
                 }
 
-                // Fall back to TypeScript's default resolution for node_modules and absolute paths
-                const result = ts.resolveModuleName(
-                    moduleName,
-                    containingFile,
-                    this.compilerOptions,
-                    host
-                );
-
-                resolvedModules.push(result);
+                // Fall back to TypeScript's default resolution
+                resolvedModules.push(ts.resolveModuleName(moduleName, containingFile, this.compilerOptions, host));
             }
             return resolvedModules;
         };
 
+        return host;
+    }
+
+    /**
+     * Processes a single TypeScript source file into a SourceFile AST.
+     * Shared between parseOneSync() and parse().
+     */
+    private processSourceFile(
+        input: ParserInput,
+        tsSourceFile: ts.SourceFile,
+        program: ts.Program,
+        typeMapping: JavaScriptTypeMapping
+    ): SourceFile {
+        if (hasFlowAnnotation(tsSourceFile)) {
+            return this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
+        }
+
+        const syntaxErrors = checkSyntaxErrors(program, tsSourceFile);
+        if (syntaxErrors.length > 0) {
+            const errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
+            return this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
+        }
+
+        try {
+            return produce(
+                new JavaScriptParserVisitor(tsSourceFile, this.relativePath(input), typeMapping)
+                    .visit(tsSourceFile) as SourceFile,
+                draft => {
+                    if (this.styles) {
+                        draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
+                    }
+                });
+        } catch (error) {
+            return this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
+        }
+    }
+
+    // noinspection JSUnusedGlobalSymbols
+    reset(): this {
+        this.sourceFileCache && this.sourceFileCache.clear();
+        this.oldProgram = undefined;
+        return this;
+    }
+
+    override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
+        const inputFiles = new Map<SourcePath, ParserInput>();
+
+        // Populate inputFiles map and remove from cache if necessary
+        for (const input of inputs) {
+            let sourcePath = parserInputFile(input);
+            if (this.relativeTo && !path.isAbsolute(sourcePath)) {
+                sourcePath = path.join(this.relativeTo, sourcePath);
+            }
+            inputFiles.set(sourcePath, input);
+            this.sourceFileCache && this.sourceFileCache.delete(sourcePath);
+        }
+
+        const host = this.createCompilerHost(inputFiles);
+
         // Create a new Program, passing the oldProgram for incremental parsing
         const program = ts.createProgram([...inputFiles.keys()], this.compilerOptions, host, this.oldProgram);
-
-        // Update the oldProgram reference
         this.oldProgram = program;
 
         // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
-        // This ensures that TypeScript types with the same type.id map to the same Type instance,
-        // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
+        // This ensures that TypeScript types with the same type.id map to the same Type instance.
         const typeChecker = program.getTypeChecker();
         const typeMapping = new JavaScriptTypeMapping(typeChecker);
 
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
-            const sourceFile = program.getSourceFile(filePath);
-            if (!sourceFile) {
+            const tsSourceFile = program.getSourceFile(filePath);
+            if (!tsSourceFile) {
                 yield this.error(input, new Error('Parser returned undefined'));
                 continue;
             }
 
-            if (hasFlowAnnotation(sourceFile)) {
-                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
-                continue;
-            }
-
-            const syntaxErrors = checkSyntaxErrors(program, sourceFile);
-            if (syntaxErrors.length > 0) {
-                let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
-                continue;
-            }
-
-            try {
-                yield produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
-                        .visit(sourceFile) as SourceFile,
-                    draft => {
-                        if (this.styles) {
-                            draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
-                        }
-                    });
-            } catch (error) {
-                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
-            }
+            yield this.processSourceFile(input, tsSourceFile, program, typeMapping);
         }
     }
 }

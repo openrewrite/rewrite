@@ -16,9 +16,9 @@
 
 import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
-import {TreeVisitor} from "../../visitor";
+import {AsyncTreeVisitor} from "../../visitor";
 import {Tree} from "../../tree";
-import {getMemberKeyName, isJson, isLiteral, Json, JsonVisitor} from "../../json";
+import {getMemberKeyName, isJson, isLiteral, Json, AsyncJsonVisitor} from "../../json";
 import {isDocuments, isYaml, Yaml} from "../../yaml";
 import {isPlainText, PlainText} from "../../text";
 import {
@@ -148,11 +148,11 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         return semver.gt(newMin, currentMin);
     }
 
-    async scanner(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+    async scanner(acc: Accumulator): Promise<AsyncTreeVisitor<any, ExecutionContext>> {
         const recipe = this;
         const LOCK_FILE_NAMES = getAllLockFileNames();
 
-        return new class extends TreeVisitor<Tree, ExecutionContext> {
+        return new class extends AsyncTreeVisitor<Tree, ExecutionContext> {
             protected async accept(tree: Tree, ctx: ExecutionContext): Promise<Tree | undefined> {
                 // Handle JSON documents (package.json and JSON lock files)
                 if (isJson(tree) && tree.kind === Json.Kind.Document) {
@@ -267,11 +267,11 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         };
     }
 
-    async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editorWithData(acc: Accumulator): Promise<AsyncTreeVisitor<any, ExecutionContext>> {
         const recipe = this;
 
         // Create JSON visitor that handles both package.json and JSON lock files
-        const jsonEditor = new class extends JsonVisitor<ExecutionContext> {
+        const jsonEditor = new class extends AsyncJsonVisitor<ExecutionContext> {
             protected async visitDocument(doc: Json.Document, ctx: ExecutionContext): Promise<Json | undefined> {
                 const sourcePath = doc.sourcePath;
 
@@ -429,7 +429,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
 /**
  * Visitor that updates the version of a specific dependency in a specific scope.
  */
-class UpdateVersionVisitor extends JsonVisitor<void> {
+class UpdateVersionVisitor extends AsyncJsonVisitor<void> {
     private readonly packageName: string;
     private readonly newVersion: string;
     private readonly targetScope: DependencyScope;

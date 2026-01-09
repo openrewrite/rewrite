@@ -28,7 +28,15 @@
  *    visitor to use matchSequence logic instead of strict length comparison when variadic
  *    captures are present, similar to how method invocations are handled.
  */
-import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from "../../../src/javascript";
+import {
+    JavaScriptVisitor,
+    capture,
+    JavaScriptParser,
+    JS,
+    pattern,
+    template,
+    typescript
+} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {Cursor} from "../../../src";
@@ -59,21 +67,21 @@ describe('variadic pattern matching in containers', () => {
         // This demonstrates the length mismatch issue in visitContainer
 
         // Should match function with multiple properties (pattern: 1 elem, target: 2 elems)
-        const result2 = await pat.match(await parse('function foo({a, b}) {}'), undefined!);
+        const result2 = pat.match(await parse('function foo({a, b}) {}'), undefined!);
         expect(result2).toBeDefined();
         const captured2 = result2!.get(props);
         expect(Array.isArray(captured2)).toBe(true);
         expect((captured2 as any[]).length).toBe(2);
 
         // Should match function with even more properties (pattern: 1 elem, target: 3 elems)
-        const result3 = await pat.match(await parse('function foo({a, b, c}) {}'), undefined!);
+        const result3 = pat.match(await parse('function foo({a, b, c}) {}'), undefined!);
         expect(result3).toBeDefined();
         const captured3 = result3!.get(props);
         expect(Array.isArray(captured3)).toBe(true);
         expect((captured3 as any[]).length).toBe(3);
 
         // Should also match with single property (lengths match)
-        const result1 = await pat.match(await parse('function foo({a}) {}'), undefined!);
+        const result1 = pat.match(await parse('function foo({a}) {}'), undefined!);
         expect(result1).toBeDefined();
         const captured1 = result1!.get(props);
         expect(Array.isArray(captured1)).toBe(true);
@@ -89,7 +97,7 @@ describe('variadic pattern matching in containers', () => {
         // This demonstrates the length mismatch: pattern=2, target=3
 
         // Should match function with multiple properties (pattern: 2 elems, target: 3 elems)
-        const result3 = await pat.match(await parse('function foo({a, b, c}) {}'), undefined!);
+        const result3 = pat.match(await parse('function foo({a, b, c}) {}'), undefined!);
         expect(result3).toBeDefined();
         const rest3 = result3!.get(rest);
         expect(Array.isArray(rest3)).toBe(true);
@@ -97,14 +105,14 @@ describe('variadic pattern matching in containers', () => {
 
         // Should also match when lengths are equal (pattern: 2 elems, target: 2 elems)
         // In this case the variadic captures zero elements
-        const result2 = await pat.match(await parse('function foo({a, b}) {}'), undefined!);
+        const result2 = pat.match(await parse('function foo({a, b}) {}'), undefined!);
         expect(result2).toBeDefined();
         const rest2 = result2!.get(rest);
         expect(Array.isArray(rest2)).toBe(true);
         expect((rest2 as any[]).length).toBe(1);
 
         // Should NOT match function with no properties - missing required first
-        expect(await pat.match(await parse('function foo({}) {}'), undefined!)).toBeUndefined();
+        expect(pat.match(await parse('function foo({}) {}'), undefined!)).toBeUndefined();
     });
 
     test('variadic capture in array destructuring pattern', async () => {
@@ -115,21 +123,21 @@ describe('variadic pattern matching in containers', () => {
         // This demonstrates the length mismatch issue in visitContainer
 
         // Should match function with multiple elements (pattern: 1 elem, target: 2 elems)
-        const result2 = await pat.match(await parse('function foo([a, b]) {}'), undefined!);
+        const result2 = pat.match(await parse('function foo([a, b]) {}'), undefined!);
         expect(result2).toBeDefined();
         const captured2 = result2!.get(elements);
         expect(Array.isArray(captured2)).toBe(true);
         expect((captured2 as any[]).length).toBe(2);
 
         // Should match function with even more elements (pattern: 1 elem, target: 3 elems)
-        const result3 = await pat.match(await parse('function foo([a, b, c]) {}'), undefined!);
+        const result3 = pat.match(await parse('function foo([a, b, c]) {}'), undefined!);
         expect(result3).toBeDefined();
         const captured3 = result3!.get(elements);
         expect(Array.isArray(captured3)).toBe(true);
         expect((captured3 as any[]).length).toBe(3);
 
         // Should also match with single element (lengths match)
-        const result1 = await pat.match(await parse('function foo([a]) {}'), undefined!);
+        const result1 = pat.match(await parse('function foo([a]) {}'), undefined!);
         expect(result1).toBeDefined();
         const captured1 = result1!.get(elements);
         expect(Array.isArray(captured1)).toBe(true);
@@ -178,11 +186,11 @@ describe('variadic pattern matching in containers', () => {
         const pat = pattern`function foo({${props}}) {}`;
 
         // Should NOT match with 1 element - constraint requires exactly 2
-        expect(await pat.match(await parse('function foo({a}) {}'), undefined!)).toBeUndefined();
+        expect(pat.match(await parse('function foo({a}) {}'), undefined!)).toBeUndefined();
 
         // Should match with 2 elements - constraint satisfied
         receivedCursor = null;
-        const result2 = await pat.match(await parse('function foo({a, b}) {}'), undefined!);
+        const result2 = pat.match(await parse('function foo({a, b}) {}'), undefined!);
         expect(result2).toBeDefined();
 
         // Verify cursor was provided
@@ -194,7 +202,7 @@ describe('variadic pattern matching in containers', () => {
         expect((captured2 as unknown as any[]).length).toBe(2);
 
         // Should NOT match with 3 elements - constraint requires exactly 2
-        expect(await pat.match(await parse('function foo({a, b, c}) {}'), undefined!)).toBeUndefined();
+        expect(pat.match(await parse('function foo({a, b, c}) {}'), undefined!)).toBeUndefined();
     });
 
     test('variadic replacement in object destructuring pattern', () => {
@@ -214,10 +222,10 @@ describe('variadic pattern matching in containers', () => {
 
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await beforePattern.match(methodInvocation, undefined!);
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): J | undefined {
+                const match = beforePattern.match(methodInvocation, undefined!);
                 if (match) {
-                    return await afterTemplate.apply(methodInvocation, this.cursor, {values: match});
+                    return afterTemplate.apply(methodInvocation, this.cursor, {values: match});
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -252,10 +260,10 @@ describe('variadic pattern matching in containers', () => {
 
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await beforePattern.match(methodInvocation, this.cursor);
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): J | undefined {
+                const match = beforePattern.match(methodInvocation, this.cursor);
                 if (match) {
-                    return await afterTemplate.apply(methodInvocation, this.cursor, {values: match});
+                    return afterTemplate.apply(methodInvocation, this.cursor, {values: match});
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -282,10 +290,10 @@ describe('variadic pattern matching in containers', () => {
 
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodDeclaration(method: J.MethodDeclaration, p: any): Promise<J | undefined> {
+            override visitMethodDeclaration(method: J.MethodDeclaration, p: any): J | undefined {
                 // Template with spread: function Name(...params) {...}
                 const afterTemplate = template`function ${method.name}(...${method.parameters.elements[0]}) {${method.body!.statements}}`;
-                return await afterTemplate.apply(method, this.cursor);
+                return afterTemplate.apply(method, this.cursor);
             }
         });
 
@@ -311,10 +319,10 @@ describe('variadic pattern matching in containers', () => {
 
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                 // Template with spread: myFunc(...args)
                 const afterTemplate = template`myFunc(...${method.arguments.elements[0]})`;
-                return await afterTemplate.apply(method, this.cursor);
+                return afterTemplate.apply(method, this.cursor);
             }
         });
 
@@ -334,10 +342,10 @@ describe('variadic pattern matching in containers', () => {
 
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                 // Template with spread in object literal: myFunc({ ...obj })
                 const afterTemplate = template`myFunc({ ...${method.arguments.elements[0]} })`;
-                return await afterTemplate.apply(method, this.cursor);
+                return afterTemplate.apply(method, this.cursor);
             }
         });
 

@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
-import {Recipe, ScanningRecipe} from "../../recipe";
+import {Recipe, RecipeVisitor, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, SourceFile, Tree} from "../../tree";
-import {TreeVisitor} from "../../visitor";
+import {AsyncTreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {withMetrics, extractSourcePath} from "./metrics";
 
@@ -73,7 +73,7 @@ export class Visit {
     private static async instantiateVisitor(request: Visit,
                                       preparedRecipes: Map<String, Recipe>,
                                       recipeCursors: WeakMap<Recipe, Cursor>,
-                                      p: any): Promise<TreeVisitor<any, any>> {
+                                      p: any): Promise<RecipeVisitor<any>> {
         const visitorName = request.visitor;
         if (visitorName.startsWith("scan:")) {
             const recipeKey = visitorName.substring("scan:".length);
@@ -95,7 +95,7 @@ export class Visit {
             }
             const acc = recipe.accumulator(cursor, p);
 
-            return new class extends TreeVisitor<any, ExecutionContext> {
+            return new class extends AsyncTreeVisitor<any, ExecutionContext> {
                 // Delegate isAcceptable to the scanner visitor
                 // This ensures we only process source files the scanner can handle
                 async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {

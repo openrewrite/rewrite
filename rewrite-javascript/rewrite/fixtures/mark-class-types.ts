@@ -24,9 +24,9 @@ export class MarkClassTypes extends Recipe {
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
-            protected async visitIdentifier(ident: J.Identifier, ctx: ExecutionContext): Promise<J.Identifier> {
-                const visited = await super.visitIdentifier(ident, ctx) as J.Identifier;
-
+            protected visitIdentifier(ident: J.Identifier, ctx: ExecutionContext): J.Identifier {
+                const visited = super.visitIdentifier(ident, ctx) as J.Identifier;
+            
                 // Mark lodash identifier with its type
                 if (ident.simpleName === '_' && ident.type && Type.isClass(ident.type)) {
                     for (const member of ident.type.members) {
@@ -34,12 +34,12 @@ export class MarkClassTypes extends Recipe {
                             throw new Error("Member owner does not match class that owns the member");
                         }
                     }
-
+            
                     // Access the fullyQualifiedName to prove the circular reference handling works
                     // The type should have members that reference back to owner, but asRef() handles this
                     return foundSearchResult(visited, ident.type.fullyQualifiedName);
                 }
-
+            
                 return visited;
             }
         };

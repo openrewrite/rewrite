@@ -24,8 +24,8 @@ export class MarkTypes extends Recipe {
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
-            protected async visitLiteral(literal: J.Literal, ctx: ExecutionContext): Promise<J.Literal> {
-                const visited = await super.visitLiteral(literal, ctx) as J.Literal;
+            protected visitLiteral(literal: J.Literal, ctx: ExecutionContext): J.Literal {
+                const visited = super.visitLiteral(literal, ctx) as J.Literal;
                 if (literal.type) {
                     const typeDescription = Type.isPrimitive(literal.type) 
                         ? (literal.type.keyword || 'None')
@@ -35,8 +35,8 @@ export class MarkTypes extends Recipe {
                 return visited;
             }
 
-            protected async visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): Promise<J> {
-                const visited = await super.visitClassDeclaration(classDecl, ctx) as J.ClassDeclaration;
+            protected visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J {
+                const visited = super.visitClassDeclaration(classDecl, ctx) as J.ClassDeclaration;
                 if (classDecl.name?.type) {
                     // Avoid accessing complex properties that might have circular references
                     // Just use the simple name which should be safe

@@ -384,7 +384,7 @@ const additionalCriticalCodes = new Set([
 // errors code description available at https://github.com/microsoft/TypeScript/blob/main/src/compiler/diagnosticMessages.json
 const excludedCodes = new Set([
     1039, // Initializers are not allowed in ambient contexts.
-    1064, // The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<{0}>'?
+    1064, // The return type of an async function or method must be the global T type. Did you mean to write '{0}'?
     1107, // Jump target cannot cross function boundary.
     1111, // Private field '{0}' must be declared in an enclosing class.
     1117, // An object literal cannot have multiple properties with the same name.

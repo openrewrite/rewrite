@@ -15,11 +15,10 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
-import {Recipe, RecipeDescriptor, ScanningRecipe} from "../../recipe";
+import {Recipe, RecipeDescriptor, RecipeVisitor, ScanningRecipe} from "../../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {Check} from "../../preconditions";
 import {RpcRecipe} from "../recipe";
-import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
@@ -94,7 +93,7 @@ export class PrepareRecipe {
      * precondition passes.
      */
     private static async optimizePreconditions(recipe: Recipe, phase: "edit" | "scan", preconditions: Precondition[]): Promise<Recipe> {
-        let visitor: TreeVisitor<any, ExecutionContext>;
+        let visitor: RecipeVisitor<any>;
         if (phase === "edit") {
             visitor = await recipe.editor();
         } else if (phase === "scan") {
@@ -113,12 +112,12 @@ export class PrepareRecipe {
                     recipe,
                     phase === "edit" ?
                         {
-                            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                            async editor(): Promise<RecipeVisitor<any>> {
                                 return visitor.v;
                             }
                         } :
                         {
-                            async scanner(acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
+                            async scanner(acc: any): Promise<RecipeVisitor<any>> {
                                 const checkVisitor = await (recipe as ScanningRecipe<any>).scanner(acc);
                                 return (checkVisitor as Check<any>).v;
                             }
@@ -132,7 +131,7 @@ export class PrepareRecipe {
         return recipe;
     }
 
-    private static visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Precondition[] {
+    private static visitorTypePrecondition(preconditions: Precondition[], v: RecipeVisitor<any>): Precondition[] {
         let treeType: string | undefined;
 
         // Use CommonJS require to defer loading and avoid circular dependencies

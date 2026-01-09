@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Recipe} from "../recipe";
+import {Recipe, RecipeVisitor} from "../recipe";
 import {ExecutionContext} from "../execution";
-import {noopVisitor, TreeVisitor} from "../visitor";
+import {noopVisitor} from "../visitor";
 import {Parser} from "../parser";
 import {TreePrinters} from "../print";
 import {SourceFile} from "../tree";
@@ -226,7 +226,7 @@ export class RecipeSpec {
 }
 
 class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
-    public override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
+    public override visitSpace(space: J.Space, p: ExecutionContext): J.Space {
         const ret = super.visitSpace(space, p);
         expect(space.whitespace).toMatch(/^\s*$/);
         return ret;
@@ -238,7 +238,7 @@ class NoopRecipe extends Recipe {
     displayName = "Do nothing";
     description = "Default no-op test, does nothing.";
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editor(): Promise<RecipeVisitor<any>> {
         return noopVisitor();
     }
 }
@@ -325,15 +325,15 @@ export class AdHocRecipe extends Recipe {
     displayName = "ad-hoc"
     description = "ad-hoc."
 
-    constructor(private visitor: TreeVisitor<any, any>) {
+    constructor(private visitor: RecipeVisitor<any>) {
         super();
     }
 
-    async editor(): Promise<TreeVisitor<any, any>> {
+    async editor(): Promise<RecipeVisitor<any>> {
         return this.visitor;
     }
 }
 
-export function fromVisitor(visitor: TreeVisitor<any, any>): Recipe {
+export function fromVisitor(visitor: RecipeVisitor<any>): Recipe {
     return new AdHocRecipe(visitor);
 }

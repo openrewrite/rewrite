@@ -19,7 +19,7 @@ import {
     foundSearchResult,
     isSourceFile,
     Option,
-    Recipe,
+    Recipe, RecipeVisitor,
     TreeVisitor
 } from "@openrewrite/rewrite";
 import {FindIdentifier} from "./search-recipe";
@@ -32,7 +32,7 @@ export class PathPreconditionVisitor extends TreeVisitor<any, ExecutionContext> 
         super();
     }
 
-    async visit<R extends any>(tree: any, _: ExecutionContext): Promise<R | undefined> {
+    visit<R extends any>(tree: any, _: ExecutionContext): R | undefined {
         if (isSourceFile(tree) && tree.sourcePath === this.requiredPath) {
             // Add a search result to indicate the precondition passed
             return foundSearchResult(tree) as R;
@@ -66,7 +66,7 @@ export class FindIdentifierWithPathPrecondition extends Recipe {
         super(options);
     }
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editor(): Promise<RecipeVisitor<any>> {
         const precondition = new PathPreconditionVisitor(this.requiredPath);
         const findIdentifier = new FindIdentifier({identifier: this.identifier});
 
@@ -99,7 +99,7 @@ export class ConditionalFindIdentifier extends Recipe {
         super(options);
     }
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editor(): Promise<RecipeVisitor<any>> {
         const findIdentifier = new FindIdentifier({identifier: this.identifier});
 
         // Use the check function with a boolean condition

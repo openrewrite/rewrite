@@ -34,7 +34,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         super();
     }
 
-    async visit<R extends J>(tree: J, p: any, parent?: Cursor): Promise<R | undefined> {
+    override visit<R extends J>(tree: J, p: any, parent?: Cursor): R | undefined {
         // Check if this node is a placeholder
         // BUT: Don't handle `JS.BindingElement` here - let `visitBindingElement` preserve `propertyName`
         if (tree.kind !== JS.Kind.BindingElement && this.isPlaceholder(tree)) {
@@ -52,9 +52,9 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * Override visitBindingElement to preserve propertyName from template when replacing.
      * For example, in `{ ref: ${ref} }`, we want to preserve `ref:` when replacing ${ref}.
      */
-    override async visitBindingElement(bindingElement: JS.BindingElement, p: any): Promise<J | undefined> {
+    override visitBindingElement(bindingElement: JS.BindingElement, p: any): J | undefined {
         // Visit the name to potentially replace placeholders
-        const visitedName = await this.visit(bindingElement.name, p);
+        const visitedName = this.visit(bindingElement.name, p);
 
         // If the name changed (placeholder was replaced), preserve the BindingElement structure
         // including the propertyName from the template
@@ -72,7 +72,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * Override visitContainer to handle variadic expansion for containers.
      * This handles J.Container instances anywhere in the AST (method arguments, etc.).
      */
-    override async visitContainer<T extends J>(container: J.Container<T>, p: any): Promise<J.Container<T>> {
+    override visitContainer<T extends J>(container: J.Container<T>, p: any): J.Container<T> {
         // Check if any elements are placeholders (possibly variadic)
         const hasPlaceholder = container.elements.some(elem => this.isPlaceholder(elem.element));
 
@@ -81,7 +81,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         }
 
         // Expand variadic placeholders in the container's elements
-        const newElements = await this.expandVariadicElements(container.elements, undefined, p);
+        const newElements = this.expandVariadicElements(container.elements, undefined, p);
 
         return produce(container, draft => {
             draft.elements = newElements as any;
@@ -93,7 +93,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * The base implementation will visit the element, which triggers our visit() override
      * for placeholder detection and replacement.
      */
-    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: any): Promise<J.RightPadded<T> | undefined> {
+    override visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: any): J.RightPadded<T> | undefined {
         return super.visitRightPadded(right, p);
     }
 
@@ -102,7 +102,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * Block.statements is J.RightPadded<Statement>[] (not a Container), so we need
      * array-level access for variadic expansion.
      */
-    override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
+    override visitBlock(block: J.Block, p: any): J | undefined {
         const hasPlaceholder = block.statements.some(stmt => {
             const stmtElement = stmt.element;
             // Check if it's an ExpressionStatement containing a placeholder
@@ -125,7 +125,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             return element;
         };
 
-        const newStatements = await this.expandVariadicElements(block.statements, unwrapStatement, p);
+        const newStatements = this.expandVariadicElements(block.statements, unwrapStatement, p);
 
         return produce(block, draft => {
             draft.statements = newStatements;
@@ -137,14 +137,14 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * CompilationUnit.statements is J.RightPadded<Statement>[] (not a Container), so we need
      * array-level access for variadic expansion.
      */
-    override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: any): Promise<J | undefined> {
+    override visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: any): J | undefined {
         const hasPlaceholder = compilationUnit.statements.some(stmt => this.isPlaceholder(stmt.element));
 
         if (!hasPlaceholder) {
             return super.visitJsCompilationUnit(compilationUnit, p);
         }
 
-        const newStatements = await this.expandVariadicElements(compilationUnit.statements, undefined, p);
+        const newStatements = this.expandVariadicElements(compilationUnit.statements, undefined, p);
 
         return produce(compilationUnit, draft => {
             draft.statements = newStatements;
@@ -179,13 +179,13 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * @param elements The list of wrapped elements to process
      * @param unwrapElement Optional function to unwrap the placeholder node from its container (e.g., ExpressionStatement)
      * @param p Context parameter for visitor
-     * @returns Promise of new list with placeholders expanded
+     * @returns New list with placeholders expanded
      */
-    private async expandVariadicElements(
+    private expandVariadicElements(
         elements: J.RightPadded<J>[],
         unwrapElement: (element: J) => J = (e) => e,
         p: any
-    ): Promise<J.RightPadded<J>[]> {
+    ): J.RightPadded<J>[] {
         const newElements: J.RightPadded<J>[] = [];
 
         for (const wrapped of elements) {
@@ -289,7 +289,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             }
 
             // Not a placeholder (or expansion failed) - process normally
-            const replacedElement = await this.visit(element, p);
+            const replacedElement = this.visit(element, p);
             if (replacedElement) {
                 // Check if the replacement came from a capture with a wrapper (to preserve markers)
                 const placeholderNode = unwrapElement(element);

@@ -25,6 +25,7 @@ import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
 import {
+    AsyncJavaScriptVisitor,
     findNodeResolutionResult,
     javascript,
     JavaScriptVisitor,
@@ -86,7 +87,7 @@ describe("Rewrite RPC", () => {
             //language=typescript
             ...typescript("console.log('hello');"),
             beforeRecipe: async (cu: JS.CompilationUnit) =>
-                await (new class extends JavaScriptVisitor<any> {
+                await (new class extends AsyncJavaScriptVisitor<any> {
                     protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
                         //language=typescript
                         expect(await client.print(method, this.cursor!.parent!))

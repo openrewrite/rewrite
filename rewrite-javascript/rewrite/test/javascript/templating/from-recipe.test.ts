@@ -15,6 +15,7 @@
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
+    AsyncJavaScriptVisitor,
     capture,
     fromRecipe,
     JavaScriptVisitor,
@@ -24,7 +25,7 @@ import {
     typescript
 } from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {ExecutionContext, Recipe, TreeVisitor} from "../../../src";
+import {ExecutionContext, Recipe, RecipeVisitor} from "../../../src";
 import {create as produce} from "mutative";
 
 describe('fromRecipe', () => {
@@ -37,9 +38,9 @@ describe('fromRecipe', () => {
             displayName = 'Change One to Two';
             description = 'Changes literal 1 to literal 2.';
 
-            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+            async editor(): Promise<RecipeVisitor<any>> {
                 return new class extends JavaScriptVisitor<ExecutionContext> {
-                    override async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J | undefined> {
+                    override visitLiteral(literal: J.Literal, p: ExecutionContext): J | undefined {
                         if (literal.valueSource === '1') {
                             return produce(literal, draft => {
                                 draft.value = 2;
@@ -52,10 +53,10 @@ describe('fromRecipe', () => {
             }
         }
 
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+        spec.recipe = fromVisitor(new class extends AsyncJavaScriptVisitor<any> {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
-                const rule = fromRecipe(new ChangeOneToTwoRecipe(), p);
-                return await rule.tryOn(this.cursor, literal) || literal;
+                const rule = await fromRecipe(new ChangeOneToTwoRecipe(), p);
+                return rule.tryOn(this.cursor, literal) || literal;
             }
         });
 
@@ -72,8 +73,8 @@ describe('fromRecipe', () => {
             displayName = 'Change X to Y';
             description = 'Changes identifier x to y.';
 
-            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                return new class extends JavaScriptVisitor<ExecutionContext> {
+            async editor(): Promise<RecipeVisitor<any>> {
+                return new class extends AsyncJavaScriptVisitor<ExecutionContext> {
                     override async visitIdentifier(ident: J.Identifier, p: ExecutionContext): Promise<J | undefined> {
                         if (ident.simpleName === 'x') {
                             return produce(ident, draft => {
@@ -92,11 +93,11 @@ describe('fromRecipe', () => {
             after: template`${capture('b')} + ${capture('a')}`
         }));
 
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+        spec.recipe = fromVisitor(new class extends AsyncJavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                 // Chain: First swap, then change x to y
-                const combined = swapRule.andThen(fromRecipe(new ChangeXToYRecipe(), p));
-                return await combined.tryOn(this.cursor, binary) || binary;
+                const combined = swapRule.andThen(await fromRecipe(new ChangeXToYRecipe(), p));
+                return combined.tryOn(this.cursor, binary) || binary;
             }
         });
 
@@ -114,8 +115,8 @@ describe('fromRecipe', () => {
             displayName = 'Change Two to Three';
             description = 'Changes literal 2 to literal 3.';
 
-            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                return new class extends JavaScriptVisitor<ExecutionContext> {
+            async editor(): Promise<RecipeVisitor<any>> {
+                return new class extends AsyncJavaScriptVisitor<ExecutionContext> {
                     override async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J | undefined> {
                         if (literal.valueSource === '2') {
                             return produce(literal, draft => {
@@ -135,11 +136,11 @@ describe('fromRecipe', () => {
             after: template`2`
         }));
 
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+        spec.recipe = fromVisitor(new class extends AsyncJavaScriptVisitor<any> {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 // Chain: First change 1 to 2, then change 2 to 3
-                const combined = changeRule.andThen(fromRecipe(new ChangeTwoToThreeRecipe(), p));
-                return await combined.tryOn(this.cursor, literal) || literal;
+                const combined = changeRule.andThen(await fromRecipe(new ChangeTwoToThreeRecipe(), p));
+                return combined.tryOn(this.cursor, literal) || literal;
             }
         });
 
@@ -157,9 +158,9 @@ describe('fromRecipe', () => {
             displayName = 'No-op';
             description = 'Does nothing.';
 
-            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+            async editor(): Promise<RecipeVisitor<any>> {
                 return new class extends JavaScriptVisitor<ExecutionContext> {
-                    override async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J | undefined> {
+                    override visitLiteral(literal: J.Literal, p: ExecutionContext): J | undefined {
                         // Always return the same literal unchanged
                         return literal;
                     }
@@ -167,10 +168,12 @@ describe('fromRecipe', () => {
             }
         }
 
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+        spec.recipe = fromVisitor(new class extends AsyncJavaScriptVisitor<any> {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
-                const rule = fromRecipe(new NoOpRecipe(), p);
-                return await rule.tryOn(this.cursor, literal) || literal;
+                const rule = await fromRecipe(new NoOpRecipe(), p);
+                // Note: For async recipes, tryOn() returns a Promise at runtime,
+                // so we must await it before using || fallback
+                return (await (rule.tryOn(this.cursor, literal) as any)) || literal;
             }
         });
 
@@ -188,8 +191,8 @@ describe('fromRecipe', () => {
             displayName = 'Change One to Two';
             description = 'Changes literal 1 to literal 2.';
 
-            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                return new class extends JavaScriptVisitor<ExecutionContext> {
+            async editor(): Promise<RecipeVisitor<any>> {
+                return new class extends AsyncJavaScriptVisitor<ExecutionContext> {
                     override async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J | undefined> {
                         if (literal.valueSource === '1') {
                             return produce(literal, draft => {
@@ -209,8 +212,8 @@ describe('fromRecipe', () => {
             displayName = 'Change Two to Three';
             description = 'Changes literal 2 to literal 3.';
 
-            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                return new class extends JavaScriptVisitor<ExecutionContext> {
+            async editor(): Promise<RecipeVisitor<any>> {
+                return new class extends AsyncJavaScriptVisitor<ExecutionContext> {
                     override async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J | undefined> {
                         if (literal.valueSource === '2') {
                             return produce(literal, draft => {
@@ -224,12 +227,12 @@ describe('fromRecipe', () => {
             }
         }
 
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+        spec.recipe = fromVisitor(new class extends AsyncJavaScriptVisitor<any> {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 // Chain two recipes
-                const combined = fromRecipe(new ChangeOneToTwoRecipe(), p)
-                    .andThen(fromRecipe(new ChangeTwoToThreeRecipe(), p));
-                return await combined.tryOn(this.cursor, literal) || literal;
+                const combined = (await fromRecipe(new ChangeOneToTwoRecipe(), p))
+                    .andThen(await fromRecipe(new ChangeTwoToThreeRecipe(), p));
+                return combined.tryOn(this.cursor, literal) || literal;
             }
         });
 

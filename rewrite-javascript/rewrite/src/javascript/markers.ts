@@ -94,9 +94,9 @@ function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
             } as Partial<M>);
         },
 
-        async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
-            await q.getAndSend(after, a => a.id);
-            await q.getAndSend(after, a => a.prefix);
+        rpcSend(after: M, q: RpcSendQueue): void {
+            q.getAndSend(after, a => a.id);
+            q.getAndSend(after, a => a.prefix);
         }
     });
 }
@@ -119,11 +119,11 @@ RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
         });
     },
 
-    async rpcSend(after: PrettierStyle, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.config);
-        await q.getAndSend(after, a => a.prettierVersion);
-        await q.getAndSend(after, a => a.ignored);
+    rpcSend(after: PrettierStyle, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.config);
+        q.getAndSend(after, a => a.prettierVersion);
+        q.getAndSend(after, a => a.ignored);
     }
 });
 
@@ -137,9 +137,9 @@ RpcCodecs.registerCodec(StyleKind.Autodetect, {
         });
     },
 
-    async rpcSend(after: Autodetect, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSendList(after, a => a.styles, s => s.kind);
+    rpcSend(after: Autodetect, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSendList(after, a => a.styles, s => s.kind);
     }
 });
 
@@ -161,9 +161,9 @@ function registerSimpleCodec<T extends { kind: string }>(
             return updateIfChanged(before, updates);
         },
 
-        async rpcSend(after: T, q: RpcSendQueue): Promise<void> {
+        rpcSend(after: T, q: RpcSendQueue): void {
             for (const field of fields) {
-                await q.getAndSend(after, a => (a as any)[field]);
+                q.getAndSend(after, a => (a as any)[field]);
             }
         }
     });
@@ -231,14 +231,14 @@ RpcCodecs.registerCodec(StyleKind.SpacesStyle, {
         });
     },
 
-    async rpcSend(after: SpacesStyle, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.beforeParentheses);
-        await q.getAndSend(after, a => a.aroundOperators);
-        await q.getAndSend(after, a => a.beforeLeftBrace);
-        await q.getAndSend(after, a => a.beforeKeywords);
-        await q.getAndSend(after, a => a.within);
-        await q.getAndSend(after, a => a.ternaryOperator);
-        await q.getAndSend(after, a => a.other);
+    rpcSend(after: SpacesStyle, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.beforeParentheses);
+        q.getAndSend(after, a => a.aroundOperators);
+        q.getAndSend(after, a => a.beforeLeftBrace);
+        q.getAndSend(after, a => a.beforeKeywords);
+        q.getAndSend(after, a => a.within);
+        q.getAndSend(after, a => a.ternaryOperator);
+        q.getAndSend(after, a => a.other);
     }
 });
 
@@ -261,8 +261,8 @@ RpcCodecs.registerCodec(StyleKind.WrappingAndBracesStyle, {
         });
     },
 
-    async rpcSend(after: WrappingAndBracesStyle, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.ifStatement);
-        await q.getAndSend(after, a => a.keepWhenReformatting);
+    rpcSend(after: WrappingAndBracesStyle, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.ifStatement);
+        q.getAndSend(after, a => a.keepWhenReformatting);
     }
 });

@@ -22,11 +22,11 @@ import {
     PackageManager
 } from "./node-resolution-result";
 import {replaceMarkerByKind} from "../markers";
-import {Json, JsonParser, JsonVisitor} from "../json";
-import {isDocuments, Yaml, YamlParser, YamlVisitor} from "../yaml";
+import {Json, JsonParser, AsyncJsonVisitor} from "../json";
+import {isDocuments, Yaml, YamlParser, AsyncYamlVisitor} from "../yaml";
 import {PlainTextParser} from "../text";
 import {SourceFile} from "../tree";
-import {TreeVisitor} from "../visitor";
+import {AsyncTreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {getPlatformCommand} from "../shell-utils";
 import * as fs from "fs";
@@ -766,8 +766,8 @@ export async function runWorkspaceInstallInTempDir(
  */
 export function createYamlLockFileVisitor<T>(
     acc: DependencyRecipeAccumulator<T>
-): YamlVisitor<ExecutionContext> {
-    return new class extends YamlVisitor<ExecutionContext> {
+): AsyncYamlVisitor<ExecutionContext> {
+    return new class extends AsyncYamlVisitor<ExecutionContext> {
         protected async visitDocuments(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml | undefined> {
             const sourcePath = docs.sourcePath;
             const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
@@ -795,12 +795,12 @@ export function createYamlLockFileVisitor<T>(
  * @returns A TreeVisitor that handles both JSON and YAML files
  */
 export function createLockFileEditor<T>(
-    jsonEditor: JsonVisitor<ExecutionContext>,
+    jsonEditor: AsyncJsonVisitor<ExecutionContext>,
     acc: DependencyRecipeAccumulator<T>
-): TreeVisitor<any, ExecutionContext> {
+): AsyncTreeVisitor<any, ExecutionContext> {
     const yamlEditor = createYamlLockFileVisitor(acc);
 
-    return new class extends TreeVisitor<any, ExecutionContext> {
+    return new class extends AsyncTreeVisitor<any, ExecutionContext> {
         async visit(tree: any, ctx: ExecutionContext): Promise<any> {
             if (isDocuments(tree)) {
                 return yamlEditor.visit(tree, ctx);

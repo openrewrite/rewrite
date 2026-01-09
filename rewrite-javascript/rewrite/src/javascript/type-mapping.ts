@@ -98,7 +98,7 @@ export class JavaScriptTypeMapping {
                 return Type.unknownType;
             }
             // Skip instantiated types ONLY if they're not type references
-            // Type references like Array<string>, Promise<T> are instantiated but should be mapped
+            // Type references like Array<string>, T are instantiated but should be mapped
             // Other instantiated types (like object literals) should return unknown
             if (objectFlags & ts.ObjectFlags.Instantiated) {
                 const isTypeReference = objectFlags & ts.ObjectFlags.Reference;

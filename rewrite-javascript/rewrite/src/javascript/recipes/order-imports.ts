@@ -15,9 +15,9 @@
  */
 
 import {Recipe} from "../../recipe";
-import {produceAsync, TreeVisitor} from "../../visitor";
+import {produceAsync, AsyncTreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
-import {JavaScriptVisitor, JS} from "../index";
+import {AsyncJavaScriptVisitor, JS} from "../index";
 import {J} from "../../java";
 import {create as produce, Draft} from "mutative";
 import {SpacesStyle, styleFromSourceFile, StyleKind} from "../style";
@@ -44,8 +44,8 @@ export class OrderImports extends Recipe {
     readonly description = "Sort imports by category and module path. Categories: side-effect, namespace, default, named, type. Within each category, imports are sorted alphabetically by module path. Named specifiers within each import are also sorted alphabetically.";
 
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-        return new class extends JavaScriptVisitor<ExecutionContext> {
+    async editor(): Promise<AsyncTreeVisitor<any, ExecutionContext>> {
+        return new class extends AsyncJavaScriptVisitor<ExecutionContext> {
 
             protected async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
                 const importCount = this.countImports(cu);

@@ -41,8 +41,8 @@ export class PreferOptionalChain extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
-            protected async visitTernary(ternary: J.Ternary, ctx: ExecutionContext): Promise<J | undefined> {
-                const visited = await super.visitTernary(ternary, ctx) as J.Ternary;
+            protected visitTernary(ternary: J.Ternary, ctx: ExecutionContext): J | undefined {
+                const visited = super.visitTernary(ternary, ctx) as J.Ternary;
 
                 // Check if the condition is an identifier
                 if (visited.condition.kind !== J.Kind.Identifier) {
