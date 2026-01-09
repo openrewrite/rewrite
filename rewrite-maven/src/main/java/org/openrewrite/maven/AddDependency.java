@@ -30,6 +30,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -219,16 +220,21 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return maven;
                 }
 
+                VersionComparator vc = requireNonNull(Semver.validate(version, versionPattern).getValue());
+
                 // If the dependency is already in compile scope it will be available everywhere, no need to continue
                 Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
                 if (dependencies.get(Scope.Compile) != null) {
                     for (ResolvedDependency d : dependencies.get(Scope.Compile)) {
                         if (hasAcceptableTransitivity(d, acc) &&
                             groupId.equals(d.getGroupId()) &&
-                            artifactId.equals(d.getArtifactId()) &&
-                            version.equals(d.getVersion())
+                            artifactId.equals(d.getArtifactId())
                         ) {
-                            return maven;
+                            if ((d.isDirect() && version.equals(d.getVersion())) ||
+                                    (!d.isDirect() && vc.isValid(null, d.getVersion()))
+                            ) {
+                                return maven;
+                            }
                         }
                     }
                 }
