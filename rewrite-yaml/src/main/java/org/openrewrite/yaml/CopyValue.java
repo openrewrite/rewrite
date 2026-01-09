@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
@@ -27,7 +28,6 @@ import java.nio.file.Path;
 
 import static java.util.Collections.singletonList;
 
-@SuppressWarnings("LanguageMismatch")
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
@@ -101,8 +101,10 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Data
     public static class Accumulator {
+        @Language("yml")
         @Nullable
         String snippet;
+
         Path path;
     }
 
@@ -147,7 +149,8 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         if (acc.snippet == null) {
             return TreeVisitor.noop();
         }
-        return Preconditions.check(new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
+        return Preconditions.check(
+                new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
                 new YamlIsoVisitor<ExecutionContext>() {
                     @Override
                     public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
