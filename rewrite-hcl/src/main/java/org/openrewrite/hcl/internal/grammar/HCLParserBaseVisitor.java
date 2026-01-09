@@ -75,6 +75,13 @@ public class HCLParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> impleme
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
+	@Override public T visitIdentifierLike(HCLParser.IdentifierLikeContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
 	@Override public T visitOperationExpression(HCLParser.OperationExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}

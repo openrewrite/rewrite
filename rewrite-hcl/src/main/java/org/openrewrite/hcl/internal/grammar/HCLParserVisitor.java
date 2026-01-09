@@ -62,6 +62,12 @@ public interface HCLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitBlockLabel(HCLParser.BlockLabelContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link HCLParser#identifierLike}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitIdentifierLike(HCLParser.IdentifierLikeContext ctx);
+	/**
 	 * Visit a parse tree produced by the {@code OperationExpression}
 	 * labeled alternative in {@link HCLParser#expression}.
 	 * @param ctx the parse tree

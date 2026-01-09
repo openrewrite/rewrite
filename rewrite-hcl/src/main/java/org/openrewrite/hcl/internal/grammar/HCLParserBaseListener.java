@@ -104,6 +104,18 @@ public class HCLParserBaseListener implements HCLParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterIdentifierLike(HCLParser.IdentifierLikeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitIdentifierLike(HCLParser.IdentifierLikeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterOperationExpression(HCLParser.OperationExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
