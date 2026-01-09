@@ -27,7 +27,7 @@ import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
-import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
+import org.jetbrains.kotlin.ir.visitors.IrVisitor
 import org.jetbrains.kotlin.psi.*
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.kotlin.KotlinIrTypeMapping
@@ -48,13 +48,13 @@ class PsiElementIrAssociations(private val typeMapping: KotlinIrTypeMapping, pri
             }
         }.visitFile(psiFile)
 
-        object : IrElementVisitor<Unit, MutableMap<PsiElement, MutableList<IrInfo>>> {
+        object : IrVisitor<Unit, MutableMap<PsiElement, MutableList<IrInfo>>>() {
             override fun visitElement(element: IrElement, data: MutableMap<PsiElement, MutableList<IrInfo>>) {
                 if (element is IrMetadataSourceOwner) {
                     if (element.metadata is FirMetadataSource) {
                         when (element.metadata) {
                             is FirMetadataSource.File -> {
-                                val source = (element.metadata!! as FirMetadataSource.File).files[0].source
+                                val source = (element.metadata!! as FirMetadataSource.File).fir.source
                                 if (source is KtRealPsiSourceElement) {
                                     elementMap.computeIfAbsent(source.psi) { ArrayList() } += IrInfo(element, depth)
                                 }
@@ -147,7 +147,7 @@ class PsiElementIrAssociations(private val typeMapping: KotlinIrTypeMapping, pri
             }
 
             is KtConstantExpression, is KtStringTemplateExpression -> {
-                { it is IrConst<*> }
+                { it is IrConst }
             }
 
             is KtClassLiteralExpression -> {
