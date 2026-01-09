@@ -22,8 +22,8 @@ import {
     PackageManager
 } from "./node-resolution-result";
 import {replaceMarkerByKind} from "../markers";
-import {Json, JsonParser, AsyncJsonVisitor} from "../json";
-import {isDocuments, Yaml, YamlParser, AsyncYamlVisitor} from "../yaml";
+import {AsyncJsonVisitor, Json, JsonParser} from "../json";
+import {isDocuments, Yaml, YamlParser, YamlVisitor} from "../yaml";
 import {PlainTextParser} from "../text";
 import {SourceFile} from "../tree";
 import {AsyncTreeVisitor} from "../visitor";
@@ -419,27 +419,27 @@ export function getLockFileFormat(lockFileName: string, content?: string): 'yaml
  * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml", "yarn.lock")
  * @returns The parsed SourceFile (Json.Document, Yaml.Documents, or PlainText)
  */
-export async function parseLockFileContent(
+export function parseLockFileContent(
     content: string,
     sourcePath: string,
     lockFileName: string
-): Promise<SourceFile> {
+): SourceFile {
     // Pass content to getLockFileFormat for yarn.lock detection
     const format = getLockFileFormat(lockFileName, content);
 
     switch (format) {
         case 'yaml': {
             const parser = new YamlParser({});
-            return await parser.parseOne({text: content, sourcePath}) as Yaml.Documents;
+            return parser.parseOne({text: content, sourcePath}) as Yaml.Documents;
         }
         case 'text': {
             const parser = new PlainTextParser({});
-            return await parser.parseOne({text: content, sourcePath});
+            return parser.parseOne({text: content, sourcePath});
         }
         case 'json':
         default: {
             const parser = new JsonParser({});
-            return await parser.parseOne({text: content, sourcePath}) as Json.Document;
+            return parser.parseOne({text: content, sourcePath}) as Json.Document;
         }
     }
 }
@@ -766,14 +766,14 @@ export async function runWorkspaceInstallInTempDir(
  */
 export function createYamlLockFileVisitor<T>(
     acc: DependencyRecipeAccumulator<T>
-): AsyncYamlVisitor<ExecutionContext> {
-    return new class extends AsyncYamlVisitor<ExecutionContext> {
-        protected async visitDocuments(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml | undefined> {
+): YamlVisitor<ExecutionContext> {
+    return new class extends YamlVisitor<ExecutionContext> {
+        override visitDocuments(docs: Yaml.Documents, _ctx: ExecutionContext): Yaml | undefined {
             const sourcePath = docs.sourcePath;
             const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
             if (updatedLockContent) {
                 const lockFileName = path.basename(sourcePath);
-                const parsed = await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Yaml.Documents;
+                const parsed = parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Yaml.Documents;
                 // Preserve original ID for RPC compatibility
                 return {
                     ...docs,

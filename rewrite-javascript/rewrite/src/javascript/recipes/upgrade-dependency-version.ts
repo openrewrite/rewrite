@@ -318,7 +318,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                 if (getAllLockFileNames().includes(lockFileName)) {
                     const updatedLockContent = acc.updatedLockFiles.get(sourcePath);
                     if (updatedLockContent) {
-                        const parsed = await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
+                        const parsed = parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
                         // Preserve original ID for RPC compatibility
                         return {
                             ...doc,

@@ -150,7 +150,7 @@ class TemplateCache {
             relativeTo: workspaceDir,
             sourceFileCache: templateSourceFileCache
         });
-        cu = parser.parseOneSync({text: fullTemplateString, sourcePath: 'template.ts'}) as JS.CompilationUnit;
+        cu = parser.parseOne({text: fullTemplateString, sourcePath: 'template.ts'}) as JS.CompilationUnit;
 
         this.cache.set(key, cu);
         return cu;

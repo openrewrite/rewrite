@@ -179,7 +179,7 @@ export class JavaScriptParser extends Parser {
     }
 
     /**
-     * Parses a single source file synchronously with full type checking.
+     * Parses a single source file with full type checking.
      *
      * This method creates a TypeScript Program and type checker to provide
      * full type attribution on the resulting AST, like the parse() method.
@@ -188,7 +188,7 @@ export class JavaScriptParser extends Parser {
      * @param input The parser input containing the source code
      * @returns The parsed SourceFile, or a ParseExceptionResult if parsing failed
      */
-    parseOneSync(input: ParserInput): SourceFile {
+    override parseOne(input: ParserInput): SourceFile {
         const filePath = parserInputFile(input);
         const sourcePath = this.relativeTo && !path.isAbsolute(filePath)
             ? path.join(this.relativeTo, filePath)
@@ -215,7 +215,7 @@ export class JavaScriptParser extends Parser {
 
     /**
      * Creates a configured CompilerHost for parsing with type checking.
-     * Shared between parseOneSync() and parse().
+     * Shared between parseOne() and parse().
      */
     private createCompilerHost(inputFiles: Map<SourcePath, ParserInput>): ts.CompilerHost {
         const host = ts.createCompilerHost(this.compilerOptions);
@@ -319,7 +319,7 @@ export class JavaScriptParser extends Parser {
 
     /**
      * Processes a single TypeScript source file into a SourceFile AST.
-     * Shared between parseOneSync() and parse().
+     * Shared between parseOne() and parse().
      */
     private processSourceFile(
         input: ParserInput,

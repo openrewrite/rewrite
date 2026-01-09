@@ -37,29 +37,33 @@ export class YamlParser extends Parser {
 
     async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile> {
         for (const sourcePath of sourcePaths) {
-            const text = parserInputRead(sourcePath);
-            try {
-                yield {
-                    ...new YamlCstReader(text).parse(),
-                    sourcePath: this.relativePath(sourcePath)
-                };
-            } catch (e: any) {
-                // Return a ParseError for files that can't be parsed
-                const parseError: ParseError = {
-                    kind: ParseErrorKind,
+            yield this.parseOne(sourcePath);
+        }
+    }
+
+    override parseOne(input: ParserInput): SourceFile {
+        const text = parserInputRead(input);
+        try {
+            return {
+                ...new YamlCstReader(text).parse(),
+                sourcePath: this.relativePath(input)
+            };
+        } catch (e: any) {
+            // Return a ParseError for files that can't be parsed
+            const parseError: ParseError = {
+                kind: ParseErrorKind,
+                id: randomId(),
+                markers: markers({
+                    kind: MarkersKind.ParseExceptionResult,
                     id: randomId(),
-                    markers: markers({
-                        kind: MarkersKind.ParseExceptionResult,
-                        id: randomId(),
-                        parserType: "YamlParser",
-                        exceptionType: e.name || "Error",
-                        message: e.message || "Unknown parse error"
-                    } satisfies ParseExceptionResult as ParseExceptionResult),
-                    sourcePath: this.relativePath(sourcePath),
-                    text
-                };
-                yield parseError;
-            }
+                    parserType: "YamlParser",
+                    exceptionType: e.name || "Error",
+                    message: e.message || "Unknown parse error"
+                } satisfies ParseExceptionResult as ParseExceptionResult),
+                sourcePath: this.relativePath(input),
+                text
+            };
+            return parseError;
         }
     }
 }

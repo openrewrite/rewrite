@@ -21,7 +21,7 @@ describe('WhitespaceReconciler', () => {
     const parser = new JavaScriptParser();
 
     const parse = (code: string) =>
-        parser.parseOne({sourcePath: 'test.ts', text: code}) as Promise<JS.CompilationUnit>;
+        parser.parseOne({sourcePath: 'test.ts', text: code}) as JS.CompilationUnit;
 
     const parseOnly = (code: string) =>
         parser.parseOnly({sourcePath: 'test.ts', text: code}) as JS.CompilationUnit;
@@ -117,7 +117,7 @@ describe('prettierFormat', () => {
     const parser = new JavaScriptParser();
 
     const parse = (code: string) =>
-        parser.parseOne({sourcePath: 'test.ts', text: code}) as Promise<JS.CompilationUnit>;
+        parser.parseOne({sourcePath: 'test.ts', text: code}) as JS.CompilationUnit;
 
     const print = (cu: JS.CompilationUnit) => TreePrinters.print(cu);
 
