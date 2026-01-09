@@ -313,7 +313,7 @@ function createNullPlaceholder(prefix: J.Space): J.Identifier {
         kind: J.Kind.Identifier,
         id: randomId(),
         markers: emptyMarkers,
-        prefix: prefix,
+        prefix,
         annotations: [],
         simpleName: "null",
         type: undefined,

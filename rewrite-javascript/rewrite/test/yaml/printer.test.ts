@@ -405,7 +405,7 @@ describe('printing YAML', () => {
             prefix: "",
             markers: emptyMarkers,
             style: Yaml.ScalarStyle.PLAIN,
-            anchor: anchor,
+            anchor,
             tag: undefined,
             value: "test"
         };
@@ -457,7 +457,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
-            anchor: anchor
+            anchor
         };
 
         const documentEnd: Yaml.DocumentEnd = {

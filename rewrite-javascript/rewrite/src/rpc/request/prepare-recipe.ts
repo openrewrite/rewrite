@@ -73,12 +73,12 @@ export class PrepareRecipe {
                     preparedRecipes.set(id, recipe);
 
                     const result = {
-                        id: id,
+                        id,
                         descriptor: await recipe.descriptor(),
                         editVisitor: `edit:${id}`,
-                        editPreconditions: editPreconditions,
+                        editPreconditions,
                         scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
-                        scanPreconditions: scanPreconditions
+                        scanPreconditions
                     };
 
                     return result;

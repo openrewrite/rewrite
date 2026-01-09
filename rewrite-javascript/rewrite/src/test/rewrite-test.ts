@@ -192,7 +192,7 @@ export class RecipeSpec {
         for (const spec of specs) {
             if (spec.before) {
                 const sourcePath = spec.path || `${snowflake.generate()}.${spec.ext}`;
-                before.push([spec, {text: dedent(spec.before), sourcePath: sourcePath}]);
+                before.push([spec, {text: dedent(spec.before), sourcePath}]);
             }
         }
         const parser = specs[0].parser(this.executionContext);

@@ -63,7 +63,7 @@ describe("Rewrite RPC", () => {
         const marketplace = new RecipeMarketplace();
         await activate(marketplace);
         server = new RewriteRpc(serverConnection, {
-            marketplace: marketplace
+            marketplace
         });
     });
 

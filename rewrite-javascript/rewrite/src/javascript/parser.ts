@@ -515,7 +515,7 @@ export class JavaScriptParserVisitor {
         return {
             kind: JS.Kind.CompilationUnit,
             id: randomId(),
-            prefix: prefix,
+            prefix,
             markers: emptyMarkers,
             sourcePath: this.sourcePath,
             charsetName: bomAndTextEncoding.encoding,
@@ -698,7 +698,7 @@ export class JavaScriptParserVisitor {
     private leftPadded<T extends J | J.Space | number | string | boolean>(before: J.Space, t: T, markers?: Markers): J.LeftPadded<T> {
         return {
             kind: J.Kind.LeftPadded,
-            before: before,
+            before,
             element: t,
             markers: markers ?? emptyMarkers
         };
@@ -841,7 +841,7 @@ export class JavaScriptParserVisitor {
         return {
             kind: JS.Kind.TypeTreeExpression,
             id: randomId(),
-            prefix: prefix,
+            prefix,
             markers: emptyMarkers,
             expression: {
                 ...expression,
@@ -944,8 +944,8 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            value: value,
-            valueSource: valueSource,
+            value,
+            valueSource,
             type: this.mapPrimitiveType(node)
         };
     }
@@ -1082,7 +1082,7 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: node.dotDotDotToken ? this.prefix(node.dotDotDotToken) : this.prefix(node.name),
                     markers: emptyMarkers,
-                    name: name,
+                    name,
                     dimensionsAfterName: [],
                     initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
                     variableType: this.mapVariableType(node)
@@ -1124,7 +1124,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            annotationType: annotationType,
+            annotationType,
             arguments: _arguments
         };
     }
@@ -1200,7 +1200,7 @@ export class JavaScriptParserVisitor {
             return {
                 kind: JS.Kind.ComputedPropertyMethodDeclaration,
                 id: randomId(),
-                prefix: prefix,
+                prefix,
                 markers: emptyMarkers,
                 leadingAnnotations: [], // no decorators allowed
                 modifiers: [], // no modifiers allowed
@@ -1222,14 +1222,14 @@ export class JavaScriptParserVisitor {
         return {
             kind: J.Kind.MethodDeclaration,
             id: randomId(),
-            prefix: prefix,
+            prefix,
             markers: emptyMarkers,
             leadingAnnotations: [], // no decorators allowed
             modifiers: [], // no modifiers allowed
             typeParameters: this.mapTypeParametersAsObject(node),
             returnTypeExpression: this.mapTypeInfo(node),
             nameAnnotations: [],
-            name: name,
+            name,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             methodType: this.mapMethodType(node)
         };
@@ -1256,8 +1256,8 @@ export class JavaScriptParserVisitor {
             return {
                 kind: JS.Kind.ComputedPropertyMethodDeclaration,
                 id: randomId(),
-                prefix: prefix,
-                markers: markers,
+                prefix,
+                markers,
                 leadingAnnotations: this.mapDecorators(node),
                 modifiers: this.mapModifiers(node),
                 typeParameters: this.mapTypeParametersAsObject(node),
@@ -1272,8 +1272,8 @@ export class JavaScriptParserVisitor {
         return {
             kind: J.Kind.MethodDeclaration,
             id: randomId(),
-            prefix: prefix,
-            markers: markers,
+            prefix,
+            markers,
             leadingAnnotations: this.mapDecorators(node),
             modifiers: this.mapModifiers(node),
             typeParameters: this.mapTypeParametersAsObject(node),
@@ -1881,7 +1881,7 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: emptySpace,
                     markers: emptyMarkers,
-                    name: name,
+                    name,
                     dimensionsAfterName: [],
                     variableType: this.mapVariableType(node),
                 },
@@ -1998,7 +1998,7 @@ export class JavaScriptParserVisitor {
             prefix: elementPrefix,
             markers: emptyMarkers,
             propertyName: node.propertyName && this.rightPadded(this.convert<J.Identifier>(node.propertyName), this.suffix(node.propertyName)),
-            name: name,
+            name,
             initializer: node.initializer && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert<Expression>(node.initializer)),
             variableType: this.mapVariableType(node)
         };
@@ -3314,7 +3314,7 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
-                modifiers: modifiers,
+                modifiers,
                 variables: varDecls
             };
         }
@@ -3599,7 +3599,7 @@ export class JavaScriptParserVisitor {
                     this.visit(clause),
                     emptySpace
                 )),
-            end: end
+            end
         }
     }
 
@@ -4098,7 +4098,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             token: ts.SyntaxKind.WithKeyword === node.token ? JS.ImportAttributes.Token.With : JS.ImportAttributes.Token.Assert,
-            elements: elements,
+            elements,
         };
     }
 
@@ -4616,7 +4616,7 @@ export class JavaScriptParserVisitor {
     }
 
     private newEmpty(prefix: J.Space = emptySpace, markers?: Markers): J.Empty {
-        return {kind: J.Kind.Empty, id: randomId(), prefix: prefix, markers: markers ?? emptyMarkers};
+        return {kind: J.Kind.Empty, id: randomId(), prefix, markers: markers ?? emptyMarkers};
     }
 
     private maybeAddOptionalMarker(t: {
@@ -4675,7 +4675,7 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
             kind: J.Kind.TextComment,
             multiline: isMultiline,
             text: commentBody,
-            suffix: suffix,
+            suffix,
             markers: emptyMarkers
         } satisfies TextComment as TextComment);
     });
@@ -4686,7 +4686,7 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
         whitespace = text.slice(nodeStart, leadingWhitespacePos);
     }
 
-    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace};
+    return {kind: J.Kind.Space, comments, whitespace};
 }
 
 class FlowSyntaxNotSupportedError extends SyntaxError {

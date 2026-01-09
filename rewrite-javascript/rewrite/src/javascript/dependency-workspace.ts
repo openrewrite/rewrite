@@ -164,7 +164,7 @@ export class DependencyWorkspace {
                     name: "openrewrite-template-workspace",
                     version: "1.0.0",
                     private: true,
-                    dependencies: dependencies
+                    dependencies
                 };
                 fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(packageJson, null, 2));
             }
