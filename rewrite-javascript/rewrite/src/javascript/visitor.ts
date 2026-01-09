@@ -1214,7 +1214,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitAssignmentOperationExtensions(tree as unknown as JS.AssignmentOperation, p);
                 case JS.Kind.IndexedAccessType:
                     return this.visitIndexedAccessType(tree as unknown as JS.IndexedAccessType, p);
-                case JS.Kind.IndexType:
+                case JS.Kind.IndexedAccessTypeIndexType:
                     return this.visitIndexedAccessTypeIndexType(tree as unknown as JS.IndexedAccessType.IndexType, p);
                 case JS.Kind.TypeQuery:
                     return this.visitTypeQuery(tree as unknown as JS.TypeQuery, p);

@@ -30,7 +30,7 @@ const executionContextCodec: RpcCodec<ExecutionContext> = {
     async rpcSend(_after: ExecutionContext, _q: RpcSendQueue): Promise<void> {
     },
 
-    async rpcReceive(_before: ExecutionContext, _q: RpcReceiveQueue): Promise<ExecutionContext> {
+    rpcReceive(_before: ExecutionContext, _q: RpcReceiveQueue): ExecutionContext {
         return new ExecutionContext();
     }
 }

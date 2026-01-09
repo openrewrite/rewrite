@@ -52,10 +52,10 @@ export interface OmitParentheses extends Marker {
 
 // Register codecs for all Java markers with additional properties
 RpcCodecs.registerCodec(J.Markers.TrailingComma, {
-    async rpcReceive(before: TrailingComma, q: RpcReceiveQueue): Promise<TrailingComma> {
+    rpcReceive(before: TrailingComma, q: RpcReceiveQueue): TrailingComma {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            suffix: await q.receive(before.suffix),
+            id: q.receive(before.id),
+            suffix: q.receive(before.suffix),
         });
     },
 
@@ -72,9 +72,9 @@ export function registerMarkerCodec<M extends Marker>(
     kind: M["kind"]
 ) {
     RpcCodecs.registerCodec(kind, {
-        async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
+        rpcReceive(before: M, q: RpcReceiveQueue): M {
             return updateIfChanged(before, {
-                id: await q.receive(before.id),
+                id: q.receive(before.id),
             } as Partial<M>);
         },
 

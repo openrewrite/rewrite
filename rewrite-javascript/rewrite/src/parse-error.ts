@@ -66,16 +66,16 @@ TreePrinters.register(ParseErrorKind, () => new class extends ParseErrorVisitor<
 })
 
 RpcCodecs.registerCodec(ParseErrorKind, {
-    async rpcReceive(before: ParseError, q: RpcReceiveQueue): Promise<ParseError> {
+    rpcReceive(before: ParseError, q: RpcReceiveQueue): ParseError {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            markers: await q.receive(before.markers),
-            sourcePath: await q.receive(before.sourcePath),
-            charsetName: await q.receive(before.charsetName),
-            charsetBomMarked: await q.receive(before.charsetBomMarked),
-            checksum: await q.receive(before.checksum),
-            fileAttributes: await q.receive(before.fileAttributes),
-            text: await q.receive(before.text),
+            id: q.receive(before.id),
+            markers: q.receiveMarkers(before.markers),
+            sourcePath: q.receive(before.sourcePath),
+            charsetName: q.receive(before.charsetName),
+            charsetBomMarked: q.receive(before.charsetBomMarked),
+            checksum: q.receive(before.checksum),
+            fileAttributes: q.receive(before.fileAttributes),
+            text: q.receive(before.text),
         });
     },
 

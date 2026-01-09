@@ -18,7 +18,6 @@ package org.openrewrite.rpc.internal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import lombok.Getter;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ObjectMappers;
@@ -33,6 +32,11 @@ public class PreparedRecipeCache {
     private final @Getter Map<String, Recipe> instantiated = new HashMap<>();
     private final @Getter Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
 
+    public void clear() {
+        instantiated.clear();
+        recipeCursors.clear();
+    }
+
     @SuppressWarnings("unchecked")
     public <P> TreeVisitor<?, P> instantiateVisitor(String visitorName, @Nullable Map<String, Object> visitorOptions) {
         if (visitorName.startsWith("scan:")) {
@@ -40,7 +44,7 @@ public class PreparedRecipeCache {
             ScanningRecipe<Object> recipe = (ScanningRecipe<Object>) instantiated.get(visitorName.substring("scan:".length()));
             return (TreeVisitor<?, P>) new TreeVisitor<Tree, ExecutionContext>() {
                 @Override
-                public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+                public Tree preVisit(Tree tree, ExecutionContext ctx) {
                     stopAfterPreVisit();
                     Object acc = recipe.getAccumulator(recipeCursors.computeIfAbsent(recipe, r -> new Cursor(null, Cursor.ROOT_VALUE)), ctx);
                     recipe.getScanner(acc).visit(tree, ctx);

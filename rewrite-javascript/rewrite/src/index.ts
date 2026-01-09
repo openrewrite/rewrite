@@ -91,13 +91,13 @@ RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
         await q.getAndSend(after, a => a.message);
         await q.getAndSend(after, a => a.treeType);
     },
-    async rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): Promise<ParseExceptionResult> {
+    rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): ParseExceptionResult {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            parserType: await q.receive(before.parserType),
-            exceptionType: await q.receive(before.exceptionType),
-            message: await q.receive(before.message),
-            treeType: await q.receive(before.treeType),
+            id: q.receive(before.id),
+            parserType: q.receive(before.parserType),
+            exceptionType: q.receive(before.exceptionType),
+            message: q.receive(before.message),
+            treeType: q.receive(before.treeType),
         });
     }
 });

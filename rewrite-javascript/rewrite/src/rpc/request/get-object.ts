@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
-import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
+import {RpcObjectState, RpcRawMessage, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../../reference";
 import {extractSourcePath, withMetrics} from "./metrics";
 
@@ -32,7 +32,7 @@ export class GetObject {
         trace: () => boolean,
         metricsCsv?: string,
     ): void {
-        const pendingData = new Map<string, RpcObjectData[]>();
+        const pendingData = new Map<string, RpcRawMessage[]>();
 
         connection.onRequest(
             new rpc.RequestType<GetObject, any, Error>("GetObject"),
@@ -43,10 +43,11 @@ export class GetObject {
                     const objId = request.id;
                     if (!localObjects.has(objId)) {
                         context.target = '';
+                        // Return compact array format for "not found" case
                         return [
-                            {state: RpcObjectState.DELETE},
-                            {state: RpcObjectState.END_OF_OBJECT}
-                        ];
+                            [RpcObjectState.DELETE, null, null],
+                            [RpcObjectState.END_OF_OBJECT, null, null]
+                        ] as RpcRawMessage[];
                     }
 
                     const objectOrGenerator = localObjects.get(objId)!;

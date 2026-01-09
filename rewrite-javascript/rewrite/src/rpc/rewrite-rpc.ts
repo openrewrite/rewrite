@@ -21,22 +21,22 @@ import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {
     Generate,
     GenerateResponse,
-    GetObject,
     GetMarketplace,
     GetMarketplaceResponseRow,
-    toMarketplace,
+    GetObject,
     Parse,
     ParseProject,
     PrepareRecipe,
     PrepareRecipeResponse,
     Print,
+    toMarketplace,
     TraceGetObject,
     Visit,
     VisitResponse
 } from "./request";
 import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv} from "./request/metrics";
-import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
+import {RpcRawMessage, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
@@ -57,6 +57,9 @@ export class RewriteRpc {
     readonly remoteRefs: Map<number, any> = new Map();
     readonly localRefs: ReferenceMap = new ReferenceMap();
 
+    private readonly preparedRecipes: Map<String, Recipe> = new Map();
+    private readonly recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap();
+
     private remoteLanguages?: string[];
     private readonly logger?: rpc.Logger;
     private traceGetObject: TraceGetObject = {receive: false, send: false};
@@ -76,9 +79,6 @@ export class RewriteRpc {
         initializeMetricsCsv(options.metricsCsv, options.logger);
         this.logger = options.logger;
 
-        const preparedRecipes: Map<String, Recipe> = new Map();
-        const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
-
         // Need this indirection, otherwise `this` will be undefined when executed in the handlers.
         const getObject = (id: string, sourceFileType?: string) => this.getObject(id, sourceFileType);
         const getCursor = (cursorIds: string[] | undefined, sourceFileType?: string) => this.getCursor(cursorIds, sourceFileType);
@@ -86,13 +86,13 @@ export class RewriteRpc {
 
         const marketplace = options.marketplace || new RecipeMarketplace();
 
-        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
-        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
+        Visit.handle(this.connection, this.localObjects, this.preparedRecipes, this.recipeCursors, getObject, getCursor, options.metricsCsv);
+        Generate.handle(this.connection, this.localObjects, this.preparedRecipes, this.recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
         GetMarketplace.handle(this.connection, marketplace, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
-        PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
+        PrepareRecipe.handle(this.connection, marketplace, this.preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
@@ -104,7 +104,15 @@ export class RewriteRpc {
                 this.traceGetObject = request;
                 return true;
             }
-        )
+        );
+
+        this.connection.onRequest(
+            new rpc.RequestType0<boolean, Error>("Reset"),
+            async () => {
+                this.reset();
+                return true;
+            }
+        );
 
         RewriteRpc.set(this);
         this.connection.listen();
@@ -123,28 +131,83 @@ export class RewriteRpc {
         return this;
     }
 
-    async getObject<P>(id: string, sourceFileType?: string): Promise<P> {
-        const localObject = this.localObjects.get(id);
+    /**
+     * Resets all caches. Used for benchmarking to ensure a clean state between runs.
+     */
+    reset(): void {
+        this.localObjects.clear();
+        this.localObjectIds.clear();
+        this.remoteObjects.clear();
+        this.remoteRefs.clear();
+        this.localRefs.clear();
+        this.preparedRecipes.clear();
+        // WeakMap doesn't have clear(), but since preparedRecipes is cleared,
+        // the recipes will be garbage collected and so will their cursor entries
+        this.remoteLanguages = undefined;
 
-        const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, () => {
-            return this.connection.sendRequest(
-                new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-                new GetObject(id, sourceFileType),
-            );
-        }, this.logger, this.traceGetObject.receive);
-
-        const remoteObject = await q.receive<P>(localObject);
-
-        const eof = (await q.take());
-        if (eof.state !== RpcObjectState.END_OF_OBJECT) {
-            RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
-            throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
+        // Trigger garbage collection if available (requires --expose-gc flag)
+        if (typeof global.gc === 'function') {
+            global.gc();
         }
+    }
+
+    private static totalItems = 0;
+    private static totalCalls = 0;
+
+    static getStats(): {calls: number, items: number, avgItemsPerCall: number} {
+        return {
+            calls: RewriteRpc.totalCalls,
+            items: RewriteRpc.totalItems,
+            avgItemsPerCall: RewriteRpc.totalCalls > 0 ? Math.round(RewriteRpc.totalItems / RewriteRpc.totalCalls) : 0
+        };
+    }
+
+    async getObject<P>(id: string, sourceFileType?: string): Promise<P> {
+        // Fetch data in batches - each batch is an array of compact arrays: [[state, valueType, value, ref?, trace?], ...]
+        // Keep fetching until we receive END_OF_OBJECT
+        const batches: RpcRawMessage[][] = [];
+        const request = new GetObject(id, sourceFileType);
+        const requestType = new rpc.RequestType<GetObject, RpcRawMessage[], Error>("GetObject");
+
+        let batchCount = 0;
+        const maxBatches = 100000; // Safety limit to prevent infinite loops
+
+        while (true) {
+            if (batchCount >= maxBatches) {
+                throw new Error(`Exceeded max batch limit (${maxBatches}) for object ${id}`);
+            }
+
+            const batch = await this.connection.sendRequest(requestType, request);
+            RewriteRpc.totalCalls++;
+            batchCount++;
+
+            if (batch.length === 0) {
+                throw new Error(`Empty batch received for object ${id} after ${batchCount} batches`);
+            }
+
+            batches.push(batch);
+
+            // Check if the last element in this batch is END_OF_OBJECT
+            if (RpcReceiveQueue.isComplete(batch)) {
+                break;
+            }
+        }
+
+        // Create queue with batches - no copying needed
+        const q = new RpcReceiveQueue(batches, this.remoteRefs, sourceFileType);
+
+        // Deserialize synchronously - q.receive() will look up the codec from
+        // the RpcCodecs registry based on the object's kind and sourceFileType
+        const localObject = this.localObjects.get(id);
+        const remoteObject = q.receive<P>(localObject);
+
+        // Verify END_OF_OBJECT was reached
+        q.verifyComplete();
 
         this.remoteObjects.set(id, remoteObject);
         this.localObjects.set(id, remoteObject);
 
-        return remoteObject;
+        return remoteObject!;
     }
 
     async getCursor(cursorIds: string[] | undefined, sourceFileType?: string): Promise<Cursor> {
@@ -299,5 +362,10 @@ class IdentityMap {
         } else {
             return this.primitiveMap.has(key);
         }
+    }
+
+    clear(): void {
+        this.objectMap = new WeakMap<any, string>();
+        this.primitiveMap.clear();
     }
 }
