@@ -16,27 +16,27 @@
 package org.openrewrite.docker;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.docker.tree.Dockerfile;
+import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.docker.Assertions.dockerfile;
+import static org.openrewrite.docker.Assertions.docker;
 
-class DockerfileParserTest implements RewriteTest {
+class DockerParserTest implements RewriteTest {
 
     @Test
     void simpleFrom() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.From from = doc.getStages().getFirst().getFrom();
-                assertThat(((Dockerfile.PlainText) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
-                assertThat(((Dockerfile.PlainText) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.PlainText) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(((Docker.PlainText) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
                 assertThat(from.getDigest()).isNull();
                 assertThat(from.getAs()).isNull();
             })
@@ -47,17 +47,17 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void fromWithPlatform() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.From from = doc.getStages().getFirst().getFrom();
+                Docker.From from = doc.getStages().getFirst().getFrom();
                 assertThat(from.getFlags()).hasSize(1);
                 assertThat(from.getFlags().getFirst().getName()).isEqualTo("platform");
-                assertThat(((Dockerfile.PlainText) from.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("linux/amd64");
-                assertThat(((Dockerfile.PlainText) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
-                assertThat(((Dockerfile.PlainText) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
+                assertThat(((Docker.PlainText) from.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("linux/amd64");
+                assertThat(((Docker.PlainText) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(((Docker.PlainText) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
             })
           )
         );
@@ -66,16 +66,16 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void fromWithAs() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04 AS base
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.From from = doc.getStages().getFirst().getFrom();
-                assertThat(((Dockerfile.PlainText) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
-                assertThat(((Dockerfile.PlainText) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.PlainText) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(((Docker.PlainText) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
                 assertThat(from.getAs()).isNotNull();
-                assertThat(((Dockerfile.PlainText) from.getAs().getName().getContents().getFirst()).getText()).isEqualTo("base");
+                assertThat(((Docker.PlainText) from.getAs().getName().getContents().getFirst()).getText()).isEqualTo("base");
             })
           )
         );
@@ -84,18 +84,18 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void simpleRun() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN apt-get update
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Run run = (Dockerfile.Run) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(run.getCommandLine().getForm()).isInstanceOf(Dockerfile.ShellForm.class);
-                Dockerfile.ShellForm shellForm = (Dockerfile.ShellForm) run.getCommandLine().getForm();
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(run.getCommandLine().getForm()).isInstanceOf(Docker.ShellForm.class);
+                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommandLine().getForm();
                 assertThat(shellForm.getArguments())
                   .singleElement()
-                  .extracting(arg -> ((Dockerfile.PlainText) arg.getContents().getFirst()).getText())
+                  .extracting(arg -> ((Docker.PlainText) arg.getContents().getFirst()).getText())
                   .isEqualTo("apt-get update");
             })
           )
@@ -105,19 +105,19 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void runExecForm() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN ["apt-get", "update"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Run run = (Dockerfile.Run) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(run.getCommandLine().getForm()).isInstanceOf(Dockerfile.ExecForm.class);
-                Dockerfile.ExecForm execForm = (Dockerfile.ExecForm) run.getCommandLine().getForm();
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(run.getCommandLine().getForm()).isInstanceOf(Docker.ExecForm.class);
+                Docker.ExecForm execForm = (Docker.ExecForm) run.getCommandLine().getForm();
                 assertThat(execForm.getArguments()).hasSize(2)
                   .satisfiesExactly(
-                    arg -> assertThat(((Dockerfile.QuotedString) arg.getContents().getFirst()).getValue()).isEqualTo("apt-get"),
-                    arg -> assertThat(((Dockerfile.QuotedString) arg.getContents().getFirst()).getValue()).isEqualTo("update")
+                    arg -> assertThat(((Docker.QuotedString) arg.getContents().getFirst()).getValue()).isEqualTo("apt-get"),
+                    arg -> assertThat(((Docker.QuotedString) arg.getContents().getFirst()).getValue()).isEqualTo("update")
                   );
             })
           )
@@ -127,19 +127,19 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void runWithEnvironmentVariable() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN CGO_ENABLED=0 go build -o app
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Run run = (Dockerfile.Run) doc.getStages().getLast().getInstructions().getFirst();
+                Docker.Run run = (Docker.Run) doc.getStages().getLast().getInstructions().getFirst();
                 assertThat(run.getFlags()).isNull();
-                assertThat(run.getCommandLine().getForm()).isInstanceOf(Dockerfile.ShellForm.class);
-                Dockerfile.ShellForm shellForm = (Dockerfile.ShellForm) run.getCommandLine().getForm();
+                assertThat(run.getCommandLine().getForm()).isInstanceOf(Docker.ShellForm.class);
+                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommandLine().getForm();
                 assertThat(shellForm.getArguments())
                   .singleElement()
-                  .extracting(arg -> ((Dockerfile.PlainText) arg.getContents().getFirst()).getText())
+                  .extracting(arg -> ((Docker.PlainText) arg.getContents().getFirst()).getText())
                   .isEqualTo("CGO_ENABLED=0 go build -o app");
             })
           )
@@ -149,7 +149,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void multipleInstructions() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN apt-get update
@@ -162,7 +162,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void lowercaseInstructions() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               from ubuntu:20.04
               run apt-get update
@@ -175,7 +175,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void mixedCaseInstructions() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               From ubuntu:20.04 as builder
               Run apt-get update
@@ -187,7 +187,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void multiStageFrom() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM golang:1.20 AS builder
               RUN go build -o app .
@@ -197,8 +197,8 @@ class DockerfileParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> assertThat(doc.getStages())
               .satisfiesExactly(
-                golang -> assertThat(((Dockerfile.PlainText) golang.getFrom().getImageName().getContents().getFirst()).getText()).isEqualTo("golang"),
-                alpine -> assertThat(((Dockerfile.PlainText) alpine.getFrom().getImageName().getContents().getFirst()).getText()).isEqualTo("alpine")
+                golang -> assertThat(((Docker.PlainText) golang.getFrom().getImageName().getContents().getFirst()).getText()).isEqualTo("golang"),
+                alpine -> assertThat(((Docker.PlainText) alpine.getFrom().getImageName().getContents().getFirst()).getText()).isEqualTo("alpine")
               ))
           )
         );
@@ -207,7 +207,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void runWithLineContinuation() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN apt-get update && \\
@@ -221,16 +221,16 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void runWithSimpleFlag() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN --network=none apt-get update
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Run run = (Dockerfile.Run) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getFlags()).hasSize(1);
                 assertThat(run.getFlags().getFirst().getName()).isEqualTo("network");
-                assertThat(((Dockerfile.PlainText) run.getFlags().getFirst().getValue().getContents().getFirst()).getText()).contains("none");
+                assertThat(((Docker.PlainText) run.getFlags().getFirst().getValue().getContents().getFirst()).getText()).contains("none");
             })
           )
         );
@@ -239,18 +239,18 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void runWithMultipleFlags() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN --network=none --mount=type=cache,target=/cache apt-get update
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Run run = (Dockerfile.Run) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getFlags()).hasSize(2);
                 assertThat(run.getFlags().get(0).getName()).isEqualTo("network");
-                assertThat(((Dockerfile.PlainText) run.getFlags().get(0).getValue().getContents().getFirst()).getText()).contains("none");
+                assertThat(((Docker.PlainText) run.getFlags().get(0).getValue().getContents().getFirst()).getText()).contains("none");
                 assertThat(run.getFlags().get(1).getName()).isEqualTo("mount");
-                assertThat(((Dockerfile.PlainText) run.getFlags().get(1).getValue().getContents().getFirst()).getText()).contains("type=cache,target=/cache");
+                assertThat(((Docker.PlainText) run.getFlags().get(1).getValue().getContents().getFirst()).getText()).contains("type=cache,target=/cache");
             })
           )
         );
@@ -259,15 +259,15 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void cmdShellForm() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               CMD nginx -g daemon off;
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Cmd cmd = (Dockerfile.Cmd) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(cmd.getCommandLine().getForm()).isInstanceOf(Dockerfile.ShellForm.class);
-                Dockerfile.ShellForm shellForm = (Dockerfile.ShellForm) cmd.getCommandLine().getForm();
+                Docker.Cmd cmd = (Docker.Cmd) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(cmd.getCommandLine().getForm()).isInstanceOf(Docker.ShellForm.class);
+                Docker.ShellForm shellForm = (Docker.ShellForm) cmd.getCommandLine().getForm();
                 assertThat(shellForm.getArguments()).hasSize(1);
             })
           )
@@ -277,15 +277,15 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void cmdExecForm() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               CMD ["nginx", "-g", "daemon off;"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Cmd cmd = (Dockerfile.Cmd) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(cmd.getCommandLine().getForm()).isInstanceOf(Dockerfile.ExecForm.class);
-                Dockerfile.ExecForm execForm = (Dockerfile.ExecForm) cmd.getCommandLine().getForm();
+                Docker.Cmd cmd = (Docker.Cmd) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(cmd.getCommandLine().getForm()).isInstanceOf(Docker.ExecForm.class);
+                Docker.ExecForm execForm = (Docker.ExecForm) cmd.getCommandLine().getForm();
                 assertThat(execForm.getArguments()).hasSize(3);
             })
           )
@@ -295,15 +295,15 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void entrypointExecForm() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ENTRYPOINT ["./app"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Entrypoint entrypoint = (Dockerfile.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(entrypoint.getCommandLine().getForm()).isInstanceOf(Dockerfile.ExecForm.class);
-                Dockerfile.ExecForm execForm = (Dockerfile.ExecForm) entrypoint.getCommandLine().getForm();
+                Docker.Entrypoint entrypoint = (Docker.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(entrypoint.getCommandLine().getForm()).isInstanceOf(Docker.ExecForm.class);
+                Docker.ExecForm execForm = (Docker.ExecForm) entrypoint.getCommandLine().getForm();
                 assertThat(execForm.getArguments()).hasSize(1);
             })
           )
@@ -313,15 +313,15 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void entrypointShellForm() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ENTRYPOINT /bin/sh -c 'echo hello'
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Entrypoint entrypoint = (Dockerfile.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(entrypoint.getCommandLine().getForm()).isInstanceOf(Dockerfile.ShellForm.class);
-                Dockerfile.ShellForm shellForm = (Dockerfile.ShellForm) entrypoint.getCommandLine().getForm();
+                Docker.Entrypoint entrypoint = (Docker.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(entrypoint.getCommandLine().getForm()).isInstanceOf(Docker.ShellForm.class);
+                Docker.ShellForm shellForm = (Docker.ShellForm) entrypoint.getCommandLine().getForm();
                 assertThat(shellForm.getArguments()).hasSize(1);
             })
           )
@@ -331,18 +331,18 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void envSingleLine() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ENV NODE_VERSION=18.0.0
               ENV PATH=/usr/local/bin:$PATH
               """,
             spec -> spec.afterRecipe(doc -> {
-                List<Dockerfile.Instruction> instructions = doc.getStages().getFirst().getInstructions();
-                Dockerfile.Env env1 = (Dockerfile.Env) instructions.getFirst();
+                List<Docker.Instruction> instructions = doc.getStages().getFirst().getInstructions();
+                Docker.Env env1 = (Docker.Env) instructions.getFirst();
                 assertThat(env1.getPairs()).hasSize(1);
-                assertThat(((Dockerfile.PlainText) env1.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
-                assertThat(((Dockerfile.PlainText) env1.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
+                assertThat(((Docker.PlainText) env1.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
+                assertThat(((Docker.PlainText) env1.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
             })
           )
         );
@@ -351,18 +351,18 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void envMultiplePairs() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ENV NODE_VERSION=18.0.0 NPM_VERSION=9.0.0
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Env env = (Dockerfile.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(env.getPairs()).hasSize(2);
-                assertThat(((Dockerfile.PlainText) env.getPairs().get(0).getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
-                assertThat(((Dockerfile.PlainText) env.getPairs().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
-                assertThat(((Dockerfile.PlainText) env.getPairs().get(1).getKey().getContents().getFirst()).getText()).isEqualTo("NPM_VERSION");
-                assertThat(((Dockerfile.PlainText) env.getPairs().get(1).getValue().getContents().getFirst()).getText()).isEqualTo("9.0.0");
+                assertThat(((Docker.PlainText) env.getPairs().get(0).getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
+                assertThat(((Docker.PlainText) env.getPairs().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
+                assertThat(((Docker.PlainText) env.getPairs().get(1).getKey().getContents().getFirst()).getText()).isEqualTo("NPM_VERSION");
+                assertThat(((Docker.PlainText) env.getPairs().get(1).getValue().getContents().getFirst()).getText()).isEqualTo("9.0.0");
             })
           )
         );
@@ -371,18 +371,18 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void envOldStyleSpaceSeparated() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ENV NODE_VERSION 18.0.0
               """,
             spec -> spec.afterRecipe(doc -> {
-                List<Dockerfile.Instruction> instructions = doc.getStages().getFirst().getInstructions();
-                Dockerfile.Env env1 = (Dockerfile.Env) instructions.getFirst();
+                List<Docker.Instruction> instructions = doc.getStages().getFirst().getInstructions();
+                Docker.Env env1 = (Docker.Env) instructions.getFirst();
                 assertThat(env1.getPairs()).hasSize(1);
                 assertThat(env1.getPairs().getFirst().isHasEquals()).isFalse();
-                assertThat(((Dockerfile.PlainText) env1.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
-                assertThat(((Dockerfile.PlainText) env1.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
+                assertThat(((Docker.PlainText) env1.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
+                assertThat(((Docker.PlainText) env1.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
             })
           )
         );
@@ -391,16 +391,16 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void labelSinglePair() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               LABEL version=1.0.0
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Label label = (Dockerfile.Label) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Label label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(label.getPairs()).hasSize(1);
-                assertThat(((Dockerfile.PlainText) label.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("version");
-                assertThat(((Dockerfile.PlainText) label.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
+                assertThat(((Docker.PlainText) label.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("version");
+                assertThat(((Docker.PlainText) label.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
             })
           )
         );
@@ -409,16 +409,16 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void labelMultiplePairs() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               LABEL version=1.0.0 app=myapp
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Label label = (Dockerfile.Label) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Label label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(label.getPairs()).hasSize(2);
-                assertThat(((Dockerfile.PlainText) label.getPairs().get(0).getKey().getContents().getFirst()).getText()).isEqualTo("version");
-                assertThat(((Dockerfile.PlainText) label.getPairs().get(1).getKey().getContents().getFirst()).getText()).isEqualTo("app");
+                assertThat(((Docker.PlainText) label.getPairs().get(0).getKey().getContents().getFirst()).getText()).isEqualTo("version");
+                assertThat(((Docker.PlainText) label.getPairs().get(1).getKey().getContents().getFirst()).getText()).isEqualTo("app");
             })
           )
         );
@@ -427,7 +427,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void labelWithQuotedValues() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               LABEL description="My application" version="1.0.0"
@@ -439,16 +439,16 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void simpleArg() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ARG VERSION=1.0.0
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Arg arg = (Dockerfile.Arg) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Dockerfile.PlainText) arg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(((Docker.PlainText) arg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
                 assertThat(arg.getValue()).isNotNull();
-                assertThat(((Dockerfile.PlainText) arg.getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
+                assertThat(((Docker.PlainText) arg.getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
             })
           )
         );
@@ -457,14 +457,14 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void argWithoutValue() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ARG VERSION
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Arg arg = (Dockerfile.Arg) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Dockerfile.PlainText) arg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(((Docker.PlainText) arg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
                 assertThat(arg.getValue()).isNull();
             })
           )
@@ -474,7 +474,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void argInstructions() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               ARG BASE_IMAGE=ubuntu:20.04
               FROM ${BASE_IMAGE}
@@ -487,14 +487,14 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void workdirInstruction() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               WORKDIR /app
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Workdir workdir = (Dockerfile.Workdir) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Dockerfile.PlainText) workdir.getPath().getContents().getFirst()).getText()).isEqualTo("/app");
+                Docker.Workdir workdir = (Docker.Workdir) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(((Docker.PlainText) workdir.getPath().getContents().getFirst()).getText()).isEqualTo("/app");
             })
           )
         );
@@ -503,14 +503,14 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void userInstruction() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               USER nobody
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.User user = (Dockerfile.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Dockerfile.PlainText) user.getUser().getContents().getFirst()).getText()).isEqualTo("nobody");
+                Docker.User user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(((Docker.PlainText) user.getUser().getContents().getFirst()).getText()).isEqualTo("nobody");
                 assertThat(user.getGroup()).isNull();
             })
           )
@@ -520,15 +520,15 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void userWithGroup() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               USER app:group
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.User user = (Dockerfile.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Dockerfile.PlainText) user.getUser().getContents().getFirst()).getText()).isEqualTo("app");
-                assertThat(((Dockerfile.PlainText) user.getGroup().getContents().getFirst()).getText()).isEqualTo("group");
+                Docker.User user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(((Docker.PlainText) user.getUser().getContents().getFirst()).getText()).isEqualTo("app");
+                assertThat(((Docker.PlainText) user.getGroup().getContents().getFirst()).getText()).isEqualTo("group");
             })
           )
         );
@@ -537,14 +537,14 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void stopsignalInstruction() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               STOPSIGNAL SIGTERM
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Stopsignal stopsignal = (Dockerfile.Stopsignal) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Dockerfile.PlainText) stopsignal.getSignal().getContents().getFirst()).getText()).isEqualTo("SIGTERM");
+                Docker.Stopsignal stopsignal = (Docker.Stopsignal) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(((Docker.PlainText) stopsignal.getSignal().getContents().getFirst()).getText()).isEqualTo("SIGTERM");
             })
           )
         );
@@ -553,14 +553,14 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void maintainerInstruction() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               MAINTAINER John Doe <john@example.com>
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Maintainer maintainer = (Dockerfile.Maintainer) doc.getStages().getFirst().getInstructions().getFirst();
-                assertThat(((Dockerfile.PlainText) maintainer.getText().getContents().getFirst()).getText()).isEqualTo("John Doe <john@example.com>");
+                Docker.Maintainer maintainer = (Docker.Maintainer) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(((Docker.PlainText) maintainer.getText().getContents().getFirst()).getText()).isEqualTo("John Doe <john@example.com>");
             })
           )
         );
@@ -569,16 +569,16 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void simpleCopy() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               COPY app.jar /app/
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Copy copy = (Dockerfile.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Copy copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(copy.getSources()).hasSize(1);
-                assertThat(((Dockerfile.PlainText) copy.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.jar");
-                assertThat(((Dockerfile.PlainText) copy.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
+                assertThat(((Docker.PlainText) copy.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.jar");
+                assertThat(((Docker.PlainText) copy.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
             })
           )
         );
@@ -587,16 +587,16 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void addInstruction() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ADD app.tar.gz /app/
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Add add = (Dockerfile.Add) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Add add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(add.getSources()).hasSize(1);
-                assertThat(((Dockerfile.PlainText) add.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.tar.gz");
-                assertThat(((Dockerfile.PlainText) add.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
+                assertThat(((Docker.PlainText) add.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.tar.gz");
+                assertThat(((Docker.PlainText) add.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
             })
           )
         );
@@ -605,15 +605,15 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void exposeInstruction() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               EXPOSE 8080
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Expose expose = (Dockerfile.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(expose.getPorts()).hasSize(1);
-                assertThat(((Dockerfile.PlainText) expose.getPorts().getFirst().getContents().getFirst()).getText()).isEqualTo("8080");
+                assertThat(((Docker.PlainText) expose.getPorts().getFirst().getContents().getFirst()).getText()).isEqualTo("8080");
             })
           )
         );
@@ -622,16 +622,16 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void exposeMultiplePorts() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               EXPOSE 8080 8443
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Expose expose = (Dockerfile.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(expose.getPorts()).hasSize(2);
-                assertThat(((Dockerfile.PlainText) expose.getPorts().get(0).getContents().getFirst()).getText()).isEqualTo("8080");
-                assertThat(((Dockerfile.PlainText) expose.getPorts().get(1).getContents().getFirst()).getText()).isEqualTo("8443");
+                assertThat(((Docker.PlainText) expose.getPorts().get(0).getContents().getFirst()).getText()).isEqualTo("8080");
+                assertThat(((Docker.PlainText) expose.getPorts().get(1).getContents().getFirst()).getText()).isEqualTo("8443");
             })
           )
         );
@@ -640,13 +640,13 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void volumeWithJsonArray() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               VOLUME ["/data", "/logs"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Volume volume = (Dockerfile.Volume) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Volume volume = (Docker.Volume) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(volume.getValues()).hasSize(2);
                 assertThat(volume.isJsonForm()).isTrue();
             })
@@ -657,17 +657,17 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void volumeWithPathList() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               VOLUME /data /logs
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Volume volume = (Dockerfile.Volume) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Volume volume = (Docker.Volume) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(volume.getValues()).hasSize(2);
                 assertThat(volume.isJsonForm()).isFalse();
-                assertThat(((Dockerfile.PlainText) volume.getValues().get(0).getContents().getFirst()).getText()).isEqualTo("/data");
-                assertThat(((Dockerfile.PlainText) volume.getValues().get(1).getContents().getFirst()).getText()).isEqualTo("/logs");
+                assertThat(((Docker.PlainText) volume.getValues().get(0).getContents().getFirst()).getText()).isEqualTo("/data");
+                assertThat(((Docker.PlainText) volume.getValues().get(1).getContents().getFirst()).getText()).isEqualTo("/logs");
             })
           )
         );
@@ -676,13 +676,13 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void shellInstruction() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               SHELL ["/bin/bash", "-c"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Shell shell = (Dockerfile.Shell) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Shell shell = (Docker.Shell) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(shell.getArguments()).hasSize(2);
             })
           )
@@ -692,14 +692,14 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void onbuildInstruction() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ONBUILD RUN apt-get update
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Onbuild onbuild = (Dockerfile.Onbuild) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(onbuild.getInstruction()).isInstanceOf(Dockerfile.Run.class);
+                Docker.Onbuild onbuild = (Docker.Onbuild) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(onbuild.getInstruction()).isInstanceOf(Docker.Run.class);
             })
           )
         );
@@ -708,14 +708,14 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void onbuildWithCopy() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               ONBUILD COPY app.jar /app/
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Onbuild onbuild = (Dockerfile.Onbuild) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(onbuild.getInstruction()).isInstanceOf(Dockerfile.Copy.class);
+                Docker.Onbuild onbuild = (Docker.Onbuild) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(onbuild.getInstruction()).isInstanceOf(Docker.Copy.class);
             })
           )
         );
@@ -724,13 +724,13 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void healthcheckNone() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               HEALTHCHECK NONE
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Healthcheck healthcheck = (Dockerfile.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Healthcheck healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(healthcheck.isNone()).isTrue();
             })
           )
@@ -740,13 +740,13 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void healthcheckWithCmd() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               HEALTHCHECK CMD curl -f http://localhost/ || exit 1
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.Healthcheck healthcheck = (Dockerfile.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Healthcheck healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(healthcheck.isNone()).isFalse();
                 assertThat(healthcheck.getCmd()).isNotNull();
             })
@@ -757,23 +757,23 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void copyInstructions() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               COPY --chown=app:app app.jar /app/
               COPY --from=builder /build/output /app/
               """,
             spec -> spec.afterRecipe(doc -> {
-                List<Dockerfile.Instruction> instructions = doc.getStages().getFirst().getInstructions();
-                Dockerfile.Copy copy1 = (Dockerfile.Copy) instructions.getFirst();
+                List<Docker.Instruction> instructions = doc.getStages().getFirst().getInstructions();
+                Docker.Copy copy1 = (Docker.Copy) instructions.getFirst();
                 assertThat(copy1.getFlags()).hasSize(1);
                 assertThat(copy1.getFlags().getFirst().getName()).isEqualTo("chown");
-                assertThat(((Dockerfile.PlainText) copy1.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("app:app");
+                assertThat(((Docker.PlainText) copy1.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("app:app");
 
-                Dockerfile.Copy copy2 = (Dockerfile.Copy) instructions.get(1);
+                Docker.Copy copy2 = (Docker.Copy) instructions.get(1);
                 assertThat(copy2.getFlags()).hasSize(1);
                 assertThat(copy2.getFlags().getFirst().getName()).isEqualTo("from");
-                assertThat(((Dockerfile.PlainText) copy2.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("builder");
+                assertThat(((Docker.PlainText) copy2.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("builder");
             })
           )
         );
@@ -782,26 +782,26 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void complexExpression() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               ARG VERSION=25
               FROM $REGISTRY/image:${VERSION}-suffix
               """,
             spec -> spec.afterRecipe(doc -> {
-                Dockerfile.From from = doc.getStages().getLast().getFrom();
+                Docker.From from = doc.getStages().getLast().getFrom();
 
                 // Check imageName contents
-                List<Dockerfile.ArgumentContent> imageNameContents = from.getImageName().getContents();
+                List<Docker.ArgumentContent> imageNameContents = from.getImageName().getContents();
                 assertThat(imageNameContents).hasSize(2);
-                assertThat(imageNameContents.getFirst()).extracting(arg -> ((Dockerfile.EnvironmentVariable) arg).getName()).isEqualTo("REGISTRY");
-                assertThat(imageNameContents.get(1)).extracting(arg -> ((Dockerfile.PlainText) arg).getText()).isEqualTo("/image");
+                assertThat(imageNameContents.getFirst()).extracting(arg -> ((Docker.EnvironmentVariable) arg).getName()).isEqualTo("REGISTRY");
+                assertThat(imageNameContents.get(1)).extracting(arg -> ((Docker.PlainText) arg).getText()).isEqualTo("/image");
 
                 // Check tag contents
                 assertThat(from.getTag()).isNotNull();
-                List<Dockerfile.ArgumentContent> tagContents = from.getTag().getContents();
+                List<Docker.ArgumentContent> tagContents = from.getTag().getContents();
                 assertThat(tagContents).hasSize(2);
-                assertThat(tagContents.getFirst()).extracting(arg -> ((Dockerfile.EnvironmentVariable) arg).getName()).isEqualTo("VERSION");
-                assertThat(tagContents.get(1)).extracting(arg -> ((Dockerfile.PlainText) arg).getText()).isEqualTo("-suffix");
+                assertThat(tagContents.getFirst()).extracting(arg -> ((Docker.EnvironmentVariable) arg).getName()).isEqualTo("VERSION");
+                assertThat(tagContents.get(1)).extracting(arg -> ((Docker.PlainText) arg).getText()).isEqualTo("-suffix");
 
                 // Check no digest
                 assertThat(from.getDigest()).isNull();
@@ -813,7 +813,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void comprehensiveDockerfile() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               # syntax=docker/dockerfile:1
               
@@ -841,7 +841,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void runWithHeredoc() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN <<EOF
@@ -856,7 +856,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void runWithHeredocDash() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN <<-FILE_END
@@ -871,7 +871,7 @@ class DockerfileParserTest implements RewriteTest {
     @Test
     void copyWithHeredoc() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               COPY <<EOF /app/config.txt

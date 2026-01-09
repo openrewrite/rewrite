@@ -17,7 +17,7 @@ package org.openrewrite.docker;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.docker.tree.Dockerfile;
+import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -27,15 +27,15 @@ public class Assertions {
     private Assertions() {
     }
 
-    public static SourceSpecs dockerfile(@Language("dockerfile") @Nullable String before) {
-        return dockerfile(before, s -> {
+    public static SourceSpecs docker(@Language("dockerfile") @Nullable String before) {
+        return docker(before, s -> {
         });
     }
 
-    public static SourceSpecs dockerfile(@Language("dockerfile") @Nullable String before,
-                                         Consumer<SourceSpec<Dockerfile.Document>> spec) {
-        SourceSpec<Dockerfile.Document> dockerfile = new SourceSpec<>(
-                Dockerfile.Document.class,
+    public static SourceSpecs docker(@Language("dockerfile") @Nullable String before,
+                                     Consumer<SourceSpec<Docker.File>> spec) {
+        SourceSpec<Docker.File> dockerfile = new SourceSpec<>(
+                Docker.File.class,
                 null,
                 DockerfileParser.builder(),
                 before,
@@ -45,17 +45,17 @@ public class Assertions {
         return dockerfile;
     }
 
-    public static SourceSpecs dockerfile(@Language("dockerfile") @Nullable String before,
-                                         @Language("dockerfile") @Nullable String after) {
-        return dockerfile(before, after, s -> {
+    public static SourceSpecs docker(@Language("dockerfile") @Nullable String before,
+                                     @Language("dockerfile") @Nullable String after) {
+        return docker(before, after, s -> {
         });
     }
 
-    public static SourceSpecs dockerfile(@Language("dockerfile") @Nullable String before,
-                                         @Language("dockerfile") @Nullable String after,
-                                         Consumer<SourceSpec<Dockerfile.Document>> spec) {
-        SourceSpec<Dockerfile.Document> dockerfile = new SourceSpec<>(
-                Dockerfile.Document.class,
+    public static SourceSpecs docker(@Language("dockerfile") @Nullable String before,
+                                     @Language("dockerfile") @Nullable String after,
+                                     Consumer<SourceSpec<Docker.File>> spec) {
+        SourceSpec<Docker.File> dockerfile = new SourceSpec<>(
+                Docker.File.class,
                 null,
                 DockerfileParser.builder(),
                 before,

@@ -137,7 +137,7 @@ public class Space {
         return this == EMPTY;
     }
 
-    public static Space firstPrefix(@Nullable List<? extends Dockerfile> trees) {
+    public static Space firstPrefix(@Nullable List<? extends Docker> trees) {
         return trees == null || trees.isEmpty() ? Space.EMPTY : trees.iterator().next().getPrefix();
     }
 

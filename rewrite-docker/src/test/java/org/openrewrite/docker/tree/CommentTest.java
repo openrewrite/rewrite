@@ -16,16 +16,17 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.Assertions;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.docker.Assertions.dockerfile;
+import static org.openrewrite.docker.Assertions.docker;
 
 class CommentTest implements RewriteTest {
 
     @Test
     void commentsAtTop() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               # This is a comment
               # Another comment line
@@ -38,7 +39,7 @@ class CommentTest implements RewriteTest {
     @Test
     void commentsInline() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04  # Base image
               RUN apt-get update  # Update packages
@@ -50,7 +51,7 @@ class CommentTest implements RewriteTest {
     @Test
     void commentsBetweenInstructions() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               # Update and install dependencies
@@ -65,7 +66,7 @@ class CommentTest implements RewriteTest {
     @Test
     void emptyLinesAndComments() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               # Base image
               FROM ubuntu:20.04
@@ -83,7 +84,7 @@ class CommentTest implements RewriteTest {
     @Test
     void trailingCommentAfterImage() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM 'ubuntu:22.04' # Trailing comment
               RUN apt-get update

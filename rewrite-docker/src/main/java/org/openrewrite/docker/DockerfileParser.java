@@ -24,7 +24,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.docker.internal.DockerfileParserVisitor;
 import org.openrewrite.docker.internal.grammar.DockerfileLexer;
-import org.openrewrite.docker.tree.Dockerfile;
+import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -52,14 +52,14 @@ public class DockerfileParser implements Parser {
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
-                Dockerfile.Document document = new DockerfileParserVisitor(
+                Docker.File file = new DockerfileParserVisitor(
                         input.getRelativePath(relativeTo),
                         input.getFileAttributes(),
                         input.getSource(ctx)
                 ).visitDockerfile(parser.dockerfile());
 
-                parsingListener.parsed(input, document);
-                return requirePrintEqualsInput(document, input, relativeTo, ctx);
+                parsingListener.parsed(input, file);
+                return requirePrintEqualsInput(file, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 return ParseError.build(this, input, relativeTo, ctx, t);
@@ -109,7 +109,7 @@ public class DockerfileParser implements Parser {
     public static class Builder extends Parser.Builder {
 
         public Builder() {
-            super(Dockerfile.Document.class);
+            super(Docker.File.class);
         }
 
         @Override

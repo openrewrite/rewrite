@@ -20,7 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.docker.Assertions.dockerfile;
+import static org.openrewrite.docker.Assertions.docker;
 
 class ChangeBaseImageTest implements RewriteTest {
 
@@ -33,7 +33,7 @@ class ChangeBaseImageTest implements RewriteTest {
     @Test
     void changeSimpleBaseImage() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN apt-get update
@@ -49,7 +49,7 @@ class ChangeBaseImageTest implements RewriteTest {
     @Test
     void changeBaseImageWithFlags() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
               RUN apt-get update
@@ -66,7 +66,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeBaseImageWithAs() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("golang:1.20", "golang:1.21", null, null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM golang:1.20 AS builder
               RUN go build -o app .
@@ -88,7 +88,7 @@ class ChangeBaseImageTest implements RewriteTest {
     @Test
     void changeMultipleStages() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04 AS base
               RUN apt-get update
@@ -116,7 +116,7 @@ class ChangeBaseImageTest implements RewriteTest {
     @Test
     void dontChangeNonMatchingImage() {
         rewriteRun(
-          dockerfile(
+          Assertions.docker(
             """
               FROM alpine:latest
               RUN apk add --no-cache ca-certificates
@@ -129,7 +129,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeWithGlobPattern() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:*", "ubuntu:22.04", null, null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN apt-get update
@@ -146,7 +146,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeWithGlobPatternMultipleMatches() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:*", "ubuntu:22.04", null, null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:18.04 AS base
               FROM ubuntu:20.04 AS builder
@@ -165,7 +165,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeWithWildcardImageName() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("*/ubuntu:20.04", "docker.io/library/ubuntu:22.04", null, null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM gcr.io/ubuntu:20.04
               """,
@@ -180,7 +180,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void addPlatformFlag() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:20.04", null, "linux/arm64")),
-          dockerfile(
+          Assertions.docker(
             """
               FROM ubuntu:20.04
               RUN apt-get update
@@ -197,7 +197,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void updatePlatformFlag() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:20.04", null, "linux/arm64")),
-          dockerfile(
+          Assertions.docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
               RUN apt-get update
@@ -214,7 +214,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void removePlatformFlag() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:20.04", "linux/amd64", null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
               RUN apt-get update
@@ -231,7 +231,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeImageAndPlatform() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:22.04", null, "linux/arm64")),
-          dockerfile(
+          Assertions.docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
               RUN apt-get update
@@ -248,7 +248,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void onlyChangeImageWithMatchingPlatform() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:22.04", "linux/amd64", null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
               RUN apt-get update
@@ -271,7 +271,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeImageAndPlatformWhenMatchingOldPlatform() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:22.04", "linux/amd64", "linux/arm64")),
-          dockerfile(
+          Assertions.docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
               RUN apt-get update
@@ -294,7 +294,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeBaseImageWithDoubleQuotedString() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:22.04", null, null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM "ubuntu:20.04"
               RUN apt-get update
@@ -311,7 +311,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeBaseImageWithDoubleQuotedStringPreservesAs() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:22.04", null, null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM "ubuntu:20.04" as builder
               RUN apt-get update
@@ -328,7 +328,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeBaseImageWithSingleQuotedString() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:22.04", null, null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM 'ubuntu:20.04'
               RUN apt-get update
@@ -345,7 +345,7 @@ class ChangeBaseImageTest implements RewriteTest {
     void changeBaseImageWithSingleQuotedStringPreservesTrailingComment() {
         rewriteRun(
           spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04", "ubuntu:22.04", null, null)),
-          dockerfile(
+          Assertions.docker(
             """
               FROM 'ubuntu:20.04' # Trailing comment
               RUN apt-get update
