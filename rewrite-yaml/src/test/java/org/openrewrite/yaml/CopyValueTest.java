@@ -17,29 +17,17 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CopyValueTest implements RewriteTest {
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-        spec.executionContext(ctx);
-    }
-
     @DocumentExample
     @Test
     void changeCurrentFileWhenNull() {
         rewriteRun(
-          spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.destination", null)
-          ),
+          spec -> spec.recipe(new CopyValue("$.source", null, "$.destination", null, null)),
           yaml(
             """
               source: value
@@ -48,8 +36,7 @@ class CopyValueTest implements RewriteTest {
             """
               source: value
               destination: value
-              """,
-            spec -> spec.path("a.yml")
+              """
           )
         );
     }
@@ -57,9 +44,7 @@ class CopyValueTest implements RewriteTest {
     @Test
     void changeOnlyMatchingFile() {
         rewriteRun(
-          spec -> spec.recipe(
-            new CopyValue("$.source", "a.yml", "$.destination", null)
-          ),
+          spec -> spec.recipe(new CopyValue("$.source", "a.yml", "$.destination", null, null)),
           yaml(
             """
               source: value
@@ -84,9 +69,7 @@ class CopyValueTest implements RewriteTest {
     @Test
     void copyComplexValue() {
         rewriteRun(
-          spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.destination", null)
-          ),
+          spec -> spec.recipe(new CopyValue("$.source", null, "$.destination", null, null)),
           yaml(
             """
               source:
@@ -107,9 +90,7 @@ class CopyValueTest implements RewriteTest {
     @Test
     void copyToOtherFile() {
         rewriteRun(
-          spec -> spec.recipe(
-            new CopyValue("$.source", "a.yml", "$.destination", "b.yml")
-          ),
+          spec -> spec.recipe(new CopyValue("$.source", "a.yml", "$.destination", "b.yml", null)),
           yaml(
             """
               source: value
@@ -131,14 +112,34 @@ class CopyValueTest implements RewriteTest {
     @Test
     void createNewKeysFalse() {
         rewriteRun(
-          spec -> spec.recipe(
-            new CopyValue("$.source", null, "$.destination", null, false)
-          ),
+          spec -> spec.recipe(new CopyValue("$.source", null, "$.destination", null, false)),
           yaml(
             """
               source:
                 foo: bar
                 key: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeNewKeys() {
+        rewriteRun(
+          spec -> spec.recipe(new CopyValue("$.a.b", null, "$.c.e", null, null)),
+          yaml(
+            """
+              a:
+                b: hi
+              c:
+                d: yo
+              """,
+            """
+              a:
+                b: hi
+              c:
+                d: yo
+                e: hi
               """
           )
         );

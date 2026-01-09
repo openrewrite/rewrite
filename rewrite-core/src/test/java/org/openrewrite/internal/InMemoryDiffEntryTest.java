@@ -18,9 +18,11 @@ package org.openrewrite.internal;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.marker.GitTreeEntry;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
@@ -225,6 +227,7 @@ class InMemoryDiffEntryTest {
             );
         }
     }
+
     @Disabled("Does not work with CI due to jgit shadowJar")
     @Test
     void executableFile() {
@@ -386,6 +389,23 @@ class InMemoryDiffEntryTest {
               
               
               """);
+        }
+    }
+
+    @Test
+    void fencedMarkerPrinterIsApplied() {
+        PlainText before = PlainTextParser.builder().build().parse("Hello").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withText("Hello World")
+          .withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            String expectedMarker = "{{" + searchResult.getId() + "}}";
+            assertThat(diff).contains(expectedMarker);
+            assertThat(diff).doesNotContain("~~>");
         }
     }
 }

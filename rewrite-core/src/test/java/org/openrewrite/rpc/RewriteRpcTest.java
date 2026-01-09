@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.*;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
@@ -240,7 +241,8 @@ class RewriteRpcTest implements RewriteTest {
 
                 @Override
                 public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
-                    return requireNonNull(marketplace.findRecipe(listing.getName())).prepare(options);
+                    // Use RecipeLoader to instantiate directly, avoiding recursive marketplace lookup
+                    return new RecipeLoader(null).load(listing.getName(), options);
                 }
             };
         }

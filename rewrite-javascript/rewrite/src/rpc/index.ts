@@ -21,8 +21,7 @@ import {updateIfChanged} from "../util";
 
 export * from "./queue";
 export * from "../reference";
-// rewrite-rpc is not exported here to avoid circular dependency
-// Import directly from "./rewrite-rpc" if needed
+export {RewriteRpc} from "./rewrite-rpc";
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
     async rpcReceive(before: Checksum, q: RpcReceiveQueue): Promise<Checksum> {

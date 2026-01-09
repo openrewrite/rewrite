@@ -25,7 +25,9 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.rpc.request.*;
@@ -61,13 +63,12 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
-    private final AtomicInteger batchSize = new AtomicInteger(200);
+    private final AtomicInteger batchSize = new AtomicInteger(1000);
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
     private final AtomicReference<@Nullable PrintStream> log = new AtomicReference<>();
     private final AtomicReference<TraceGetObject> traceGetObject = new AtomicReference<>(
             new TraceGetObject(false, false));
-    private final AtomicReference<PrepareRecipe.@Nullable Loader> recipeLoader = new AtomicReference<>();
 
     final PreparedRecipeCache preparedRecipes = new PreparedRecipeCache();
 
@@ -143,7 +144,14 @@ public class RewriteRpc {
                 }
             }
         });
-        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, recipeLoader));
+        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, (id, opts) -> {
+            RecipeListing listing = marketplace.findRecipe(id);
+            if (listing != null) {
+                return listing.prepare(opts);
+            }
+            // Fall back to loading by class name if not found in marketplace
+            return new RecipeLoader(null).load(id, opts);
+        }));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
 
         jsonRpc.bind();
@@ -166,11 +174,6 @@ public class RewriteRpc {
 
     public RewriteRpc log(@Nullable PrintStream logFile) {
         this.log.set(logFile);
-        return this;
-    }
-
-    public RewriteRpc recipeLoader(PrepareRecipe.@Nullable Loader recipeLoader) {
-        this.recipeLoader.set(recipeLoader);
         return this;
     }
 

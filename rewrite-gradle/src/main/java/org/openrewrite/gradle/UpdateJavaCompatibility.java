@@ -263,10 +263,13 @@ public class UpdateJavaCompatibility extends Recipe {
             List<Expression> args = m.getArguments();
 
             if (args.size() == 1) {
-                if (args.get(0) instanceof J.Literal || ("jvmToolchain".equals(m.getSimpleName()) && args.get(0) instanceof J.Lambda)) {
+                if (args.get(0) instanceof J.Literal || args.get(0) instanceof J.FieldAccess ||
+                        ("jvmToolchain".equals(m.getSimpleName()) && args.get(0) instanceof J.Lambda)) {
+                    DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
                     Integer currentMajor = getMajorVersion(args.get(0));
-                    if (shouldUpdateVersion(currentMajor)) {
-                        return m.withArguments(ListUtils.mapFirst(m.getArguments(), it -> changeJavaVersion(it, null)));
+                    if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
+                        DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
+                        return m.withArguments(ListUtils.mapFirst(m.getArguments(), it -> changeJavaVersion(it, actualStyle)));
                     }
                     return m;
                 }
