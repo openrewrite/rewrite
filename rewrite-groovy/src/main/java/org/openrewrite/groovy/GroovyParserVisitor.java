@@ -2000,7 +2000,7 @@ public class GroovyParserVisitor {
                 referenceName = ((ConstantExpression) ref.getMethodName()).getValue().toString();
             }
 
-            if (operation.equals(".&")) {
+            if (".&".equals(operation)) {
                 queue.add(new G.MethodPointer(randomId(), fmt, Markers.EMPTY,
                         padRight(expression, opPrefix),
                         padLeft(whitespace(), new J.Identifier(randomId(),
