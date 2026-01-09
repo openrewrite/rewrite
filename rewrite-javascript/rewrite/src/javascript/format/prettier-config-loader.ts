@@ -467,9 +467,13 @@ export function loadPrettierVersionSync(version: string): { format: (source: str
     // Check if version is cached on disk
     if (isPrettierCached(version)) {
         // Create sync wrapper using @prettier/sync's createSynchronizedPrettier
+        // Note: We must specify the explicit file path, not just the directory,
+        // because make-synchronized uses dynamic import() which doesn't support
+        // directory imports in ES modules.
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { createSynchronizedPrettier } = require('@prettier/sync');
-        const syncPrettier = createSynchronizedPrettier({ prettierEntry: getPrettierCacheDir(version) + '/node_modules/prettier' });
+        const prettierPath = getPrettierCacheDir(version) + '/node_modules/prettier/index.mjs';
+        const syncPrettier = createSynchronizedPrettier({ prettierEntry: prettierPath });
         prettierSyncModuleCache.set(version, syncPrettier);
         return syncPrettier;
     }
